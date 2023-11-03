@@ -29,6 +29,11 @@ Tuple
      * ``Tuple[List[...]]`` is not allowed.
      * ``Tuple[Tuple[...]]`` is not allowed.
 
+********
+Iterable
+********
+* Will be interpreted the same as ``List``. The passed in data will be a ``list``. See List_ rules.
+
 *****
 Union
 *****

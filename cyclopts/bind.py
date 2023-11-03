@@ -101,7 +101,7 @@ def _parse_pos(f: Callable, tokens: Iterable[str], f_kwargs: Dict) -> Tuple[list
     signature = inspect.signature(f)
     parameters = list(signature.parameters.values())
 
-    f_args = []
+    f_args = []  # make this (parameter, arg)
 
     def remaining_parameters():
         for parameter in parameters:
@@ -113,7 +113,9 @@ def _parse_pos(f: Callable, tokens: Iterable[str], f_kwargs: Dict) -> Tuple[list
         if not tokens:
             break
         if parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
-            f_args.extend(_coerce_pos(parameter, x) for x in tokens)
+            for token in tokens:
+                f_args.append(_coerce_pos(parameter, token))
+            tokens.clear()
             break
         elif parameter.kind == parameter.POSITIONAL_ONLY:
             f_args.append(_coerce_pos(parameter, tokens.popleft()))
