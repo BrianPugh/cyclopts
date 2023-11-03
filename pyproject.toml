@@ -27,7 +27,10 @@ generate-setup-file = false
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = "^3.8"
-typing-extensions = "^4.8.0"
+typing-extensions = {version=">=4.8.0", python="<=3.8"}
+attrs = ">=23.1.0"
+autoregistry = ">=1.1.1"
+rich = ">=13.6.0"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "~7.1.2"
@@ -41,6 +44,7 @@ pre_commit = ">=2.16.0"
 pytest = ">=7.1.2"
 pytest-cov = ">=3.0.0"
 pytest-mock = ">=3.7.0"
+typer = "0.9.0"
 
 [tool.poetry.group.debug]
 optional = true
@@ -173,5 +177,6 @@ paths=["cyclopts"]
 deps-file="pyproject.toml"
 sections=["tool.poetry.dependencies"]
 exclude-deps =[
+  "typing-extensions",
   "rich",
 ]
