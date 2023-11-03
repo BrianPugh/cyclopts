@@ -1,3 +1,4 @@
+import inspect
 import os
 import shlex
 import sys
@@ -8,7 +9,7 @@ from attrs import define, field
 from autoregistry import Registry
 
 from cyclopts.bind import create_bound_arguments
-from cyclopts.exceptions import CommandCollisionError, UnusedCliTokensError
+from cyclopts.exceptions import CommandCollisionError, MissingTypeError, UnusedCliTokensError
 from cyclopts.help import display_help
 
 
@@ -26,6 +27,9 @@ class App:
             return partial(
                 self.command,
             )  # Pass the rest of params here
+        for parameter in inspect.signature(f).parameters.values():
+            if parameter.annotation is parameter.empty:
+                raise MissingTypeError(parameter.name)
         self.registry(f, **kwargs)
         return f
 

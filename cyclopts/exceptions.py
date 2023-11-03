@@ -6,6 +6,15 @@ class UnreachableError(CycloptsError):
     """Code-block should be unreachable."""
 
 
+class MissingTypeError(CycloptsError):
+    """Function parameter is missing a type annotation."""
+
+    def __init__(self, value, message="Parameter missing type: "):
+        self.value = value
+        self.message = message + str(value)
+        super().__init__(self.message)
+
+
 class CommandCollisionError(CycloptsError):
     pass
 

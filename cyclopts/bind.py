@@ -4,7 +4,7 @@ from collections import deque
 from typing import Callable, Dict, Iterable, Tuple
 
 from cyclopts.coercion import default_coercion_lookup
-from cyclopts.exceptions import UnknownKeywordError, UnreachableError
+from cyclopts.exceptions import MissingTypeError, UnknownKeywordError, UnreachableError
 from cyclopts.parameter import get_hint_param
 
 
