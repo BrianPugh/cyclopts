@@ -12,7 +12,7 @@
 
 ---
 
-Intuitive, easy CLI based on python type hints.
+Intuitive, easy CLIs based on python type hints.
 
 # Installation
 
