@@ -18,7 +18,18 @@ def test_missing_positional_type(app):
             pass
 
 
-def test_basic_1(app):
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1 2 3",
+        "foo --a 1 --b 2 --c 3",
+        "foo --c 3 1 2",
+        "foo --c 3 --b=2 1",
+        "foo --c 3 --b=2 --a 1",
+        "foo 1 --b=2 3",
+    ],
+)
+def test_basic_1(app, cmd_str):
     @app.command
     def foo(a: int, b: int, c: int):
         pass
@@ -26,14 +37,7 @@ def test_basic_1(app):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3)
 
-    def run(s):
-        actual_command, actual_bind, unused_args = app.parse_known_args(s)
-        assert actual_command == foo
-        assert actual_bind == expected_bind
-        assert unused_args == []
-
-    run("foo 1 2 3")
-    run("foo --a 1 --b 2 --c 3")
-    run("foo --c 3 1 2")
-    run("foo --c 3 --b=2 1")
-    run("foo --c 3 --b=2 --a 1")
+    actual_command, actual_bind, unused_args = app.parse_known_args(cmd_str)
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+    assert unused_args == []

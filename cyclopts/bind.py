@@ -105,8 +105,10 @@ def _parse_pos(f: Callable, tokens: Iterable[str], f_kwargs: Dict) -> Tuple[list
         if parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
             f_args.extend(_coerce_pos(parameter, x) for x in tokens)
             break
-        elif parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
+        elif parameter.kind == parameter.POSITIONAL_ONLY:
             f_args.append(_coerce_pos(parameter, tokens.popleft()))
+        elif parameter.kind == parameter.POSITIONAL_OR_KEYWORD:
+            f_kwargs[parameter.name] = _coerce_pos(parameter, tokens.popleft())
         else:
             raise UnreachableError("Not expected to get here.")
 
