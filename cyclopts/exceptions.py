@@ -19,6 +19,10 @@ class UnsupportedTypeHintError(CycloptsError):
     pass
 
 
+class UnsupportedPositionalError(CycloptsError):
+    pass
+
+
 class CommandCollisionError(CycloptsError):
     pass
 

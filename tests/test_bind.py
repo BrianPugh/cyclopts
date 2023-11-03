@@ -5,7 +5,7 @@ import pytest
 
 import cyclopts
 from cyclopts import MissingArgumentError
-from cyclopts.exceptions import UnknownKeywordError, UnsupportedTypeHintError
+from cyclopts.exceptions import UnknownKeywordError, UnsupportedPositionalError, UnsupportedTypeHintError
 
 
 @pytest.fixture
@@ -152,11 +152,10 @@ def test_basic_pos_only_list_not_allowed(app):
             pass
 
 
-@pytest.mark.skip(reason="not done yet")
 def test_basic_pos_kw_list_not_allowed_by_pos(app):
     @app.command
     def foo(a: List[int]):
         pass
 
-    with pytest.raises(UnsupportedTypeHintError):
+    with pytest.raises(UnsupportedPositionalError):
         app.parse_args("foo 1 2 3")

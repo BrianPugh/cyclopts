@@ -12,6 +12,7 @@ __all__ = [
     "UnknownKeywordError",
     "UnreachableError",
     "UnusedCliTokensError",
+    "UnsupportedPositionalError",
     "UnsupportedTypeHintError",
 ]
 
@@ -24,6 +25,7 @@ from cyclopts.exceptions import (
     RepeatKeywordError,
     UnknownKeywordError,
     UnreachableError,
+    UnsupportedPositionalError,
     UnsupportedTypeHintError,
     UnusedCliTokensError,
 )

@@ -9,6 +9,8 @@ from cyclopts.exceptions import (
     MissingTypeError,
     UnknownKeywordError,
     UnreachableError,
+    UnsupportedPositionalError,
+    UnsupportedTypeHintError,
 )
 from cyclopts.parameter import get_hint_param
 
@@ -54,7 +56,7 @@ def _parse_kw_and_flags(f, tokens):
     cli2kw, cli2flag = _cli2parameter_mappings(f)
 
     f_kwargs = {}
-    remaining_tokens = deque()
+    remaining_tokens = []
 
     # Parse All Keyword Arguments & Flags
     skip_next_iteration = False
@@ -116,6 +118,8 @@ def _parse_pos(f: Callable, tokens: Iterable[str], f_kwargs: Dict) -> Tuple[list
         elif parameter.kind == parameter.POSITIONAL_ONLY:
             f_args.append(_coerce_pos(parameter, tokens.popleft()))
         elif parameter.kind == parameter.POSITIONAL_OR_KEYWORD:
+            if typing.get_origin(parameter.annotation) is list:
+                raise UnsupportedPositionalError("List parameters cannot be populated by positional arguments.")
             f_kwargs[parameter.name] = _coerce_pos(parameter, tokens.popleft())
         else:
             raise UnreachableError("Not expected to get here.")
