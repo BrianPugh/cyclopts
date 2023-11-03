@@ -8,29 +8,26 @@ vcs = "git"
 style = "semver"
 
 [tool.poetry]
-name = "pythontemplate"
+name = "cyclopts"
 version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
-homepage = "https://github.com/GIT_USERNAME/GIT_REPONAME"
-repository = "https://github.com/GIT_USERNAME/GIT_REPONAME"
+homepage = "https://github.com/BrianPugh/cyclopts"
+repository = "https://github.com/BrianPugh/cyclopts"
 license = "Apache-2.0"
 description = ""
-authors = ["YOUR_NAME_HERE"]
+authors = ["Brian Pugh"]
 readme = "README.rst"
-packages = [{include = "pythontemplate"}]
-include = ["pythontemplate/*.so", "pythontemplate/*.pyd"]  # Compiled extensions
+packages = [{include = "cyclopts"}]
+include = ["cyclopts/*.so", "cyclopts/*.pyd"]  # Compiled extensions
 
 [tool.poetry.build]
 generate-setup-file = false
 
 [tool.poetry.scripts]
-pythontemplate = "pythontemplate.cli.main:run_app"
 
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
 python = "^3.8"
-typer = ">=0.9.0"
 typing-extensions = "^4.8.0"
-rich = ">=10.11.0"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "~7.1.2"
@@ -172,7 +169,7 @@ skip = 'poetry.lock,'
 
 [tool.creosote]
 venvs=[".venv"]
-paths=["pythontemplate"]
+paths=["cyclopts"]
 deps-file="pyproject.toml"
 sections=["tool.poetry.dependencies"]
 exclude-deps =[

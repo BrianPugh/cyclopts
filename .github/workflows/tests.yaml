@@ -85,7 +85,7 @@ jobs:
         if: steps.check_test_files.outputs.files_exists == 'true'
         run: |
           source ${{ env.ACTIVATE_PYTHON_VENV }}
-          python -m pytest --cov=pythontemplate --cov-report term --cov-report xml --junitxml=testresults.xml
+          python -m pytest --cov=cyclopts --cov-report term --cov-report xml --junitxml=testresults.xml
           coverage report
 
       - name: Upload coverage to Codecov

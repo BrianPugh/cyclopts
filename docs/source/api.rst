@@ -1,7 +1,7 @@
 API
 ===
 
-.. automodule:: pythontemplate
+.. automodule:: cyclopts
    :members:
    :undoc-members:
    :show-inheritance:

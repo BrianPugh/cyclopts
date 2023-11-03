@@ -16,16 +16,16 @@ import git
 sys.path.insert(0, str(Path("../..").absolute()))
 
 
-from pythontemplate import __version__
+from cyclopts import __version__
 
 git_repo = git.Repo(".", search_parent_directories=True)  # type: ignore[reportPrivateImportUsage]
 git_commit = git_repo.head.commit
 
 # -- Project information -----------------------------------------------------
 
-project = "pythontemplate"
-copyright = f"{date.today().year}, YOUR_NAME_HERE"
-author = "YOUR_NAME_HERE"
+project = "cyclopts"
+copyright = f"{date.today().year}, Brian Pugh"
+author = "Brian Pugh"
 
 # The short X.Y version.
 version = __version__
@@ -82,7 +82,7 @@ autodoc_default_options = {
 autoclass_content = "init"
 
 # LinkCode
-code_url = f"https://github.com/GIT_USERNAME/GIT_REPONAME/blob/{git_commit}"
+code_url = f"https://github.com/BrianPugh/cyclopts/blob/{git_commit}"
 
 
 def linkcode_resolve(domain, info):
@@ -124,7 +124,7 @@ def linkcode_resolve(domain, info):
     if file is None:
         return None
     file = Path(file).resolve().relative_to(git_repo.working_dir)
-    if file.parts[0] != "pythontemplate":
+    if file.parts[0] != "cyclopts":
         # e.g. object is a typing.NewType
         return None
     start, end = lines[1], lines[1] + len(lines[0]) - 1
@@ -168,8 +168,8 @@ html_theme_options = {
 html_context = {
     # Github options
     "display_github": True,
-    "github_user": "GIT_USERNAME",
-    "github_repo": "GIT_REPONAME",
+    "github_user": "BrianPugh",
+    "github_repo": "cyclopts",
     "github_version": "main",
     "conf_py_path": "/docs/source/",
 }
