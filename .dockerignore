@@ -1,0 +1,11 @@
+# Do NOT put .git in here, it's needed for versioning
+# and will be removed during the docker build process.
+.codecov.yml
+.flake8
+.github
+.gitignore
+.pre-commit-config.yaml
+.readthedocs.yaml
+assets
+docs
+tests

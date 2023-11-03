@@ -1,0 +1,13 @@
+/* Have contents take up entire browser window width. */
+.wy-nav-content {
+    max-width: none !important
+}
+
+/* override table width restrictions */
+.wy-table-responsive table td, .wy-table-responsive table th {
+    white-space: normal !important;
+}
+
+.wy-table-responsive {
+    overflow: visible !important;
+}

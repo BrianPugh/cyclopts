@@ -1,0 +1,180 @@
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.1"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+
+[tool.poetry]
+name = "pythontemplate"
+version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
+homepage = "https://github.com/GIT_USERNAME/GIT_REPONAME"
+repository = "https://github.com/GIT_USERNAME/GIT_REPONAME"
+license = "Apache-2.0"
+description = ""
+authors = ["YOUR_NAME_HERE"]
+readme = "README.rst"
+packages = [{include = "pythontemplate"}]
+include = ["pythontemplate/*.so", "pythontemplate/*.pyd"]  # Compiled extensions
+
+[tool.poetry.build]
+generate-setup-file = false
+
+[tool.poetry.scripts]
+pythontemplate = "pythontemplate.cli.main:run_app"
+
+[tool.poetry.dependencies]
+# Be as loose as possible if writing a library.
+python = "^3.8"
+typer = ">=0.9.0"
+typing-extensions = "^4.8.0"
+rich = ">=10.11.0"
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "~7.1.2"
+sphinx_rtd_theme = "~1.3.0"
+gitpython = ">=3.1.31"
+sphinx-copybutton = "^0.5.2"
+
+[tool.poetry.group.dev.dependencies]
+coverage = {extras = ["toml"], version = ">=5.1"}
+pre_commit = ">=2.16.0"
+pytest = ">=7.1.2"
+pytest-cov = ">=3.0.0"
+pytest-mock = ">=3.7.0"
+
+[tool.poetry.group.debug]
+optional = true
+
+[tool.poetry.group.debug.dependencies]
+ipdb = ">=0.13.9"
+line_profiler = ">=3.5.1"
+
+[tool.coverage.run]
+branch = true
+omit = [
+    "tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    "pragma: no cover",
+
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self.debug:",
+    "if debug:",
+    "if DEBUG:",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if False:",
+    "if __name__ == .__main__.:",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[tool.ruff]
+target-version = 'py38'
+select = [
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "D",  # pydocstyle
+    "E",  # Error
+    "F",  # pyflakes
+    "I",  # isort
+    "ISC", # flake8-implicit-str-concat
+    "N",  # pep8-naming
+    "PGH",  # pygrep-hooks
+    "PTH", # flake8-use-pathlib
+    "Q",  # flake8-quotes
+    "S",  # bandit
+    "SIM",  # flake8-simplify
+    "TRY",  # tryceratops
+    "UP",  # pyupgrade
+    "W",  # Warning
+    "YTT", # flake8-2020
+]
+
+exclude = [
+    "migrations",
+    "__pycache__",
+    "manage.py",
+    "settings.py",
+    "env",
+    ".env",
+    "venv",
+    ".venv",
+]
+
+ignore = [
+    "B905",  # zip strict=True; remove once python <3.10 support is dropped.
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "D200",
+    "D401",
+    "E402",
+    "E501",
+    "F401",
+    "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
+]
+line-length = 120  # Must agree with Black
+
+[tool.ruff.flake8-bugbear]
+extend-immutable-calls = [
+    "chr",
+    "typer.Argument",
+    "typer.Option",
+]
+
+[tool.ruff.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.per-file-ignores]
+"tests/*.py" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "S101",  # use of "assert"
+    "S102",  # use of "exec"
+    "S106",  # possible hardcoded password.
+    "PGH001",  # use of "eval"
+]
+
+[tool.ruff.pep8-naming]
+staticmethod-decorators = [
+    "pydantic.validator",
+    "pydantic.root_validator",
+]
+
+[tool.codespell]
+skip = 'poetry.lock,'
+
+[tool.creosote]
+venvs=[".venv"]
+paths=["pythontemplate"]
+deps-file="pyproject.toml"
+sections=["tool.poetry.dependencies"]
+exclude-deps =[
+  "rich",
+]

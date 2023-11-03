@@ -1,0 +1,106 @@
+# Regular tests
+#
+# Use this to ensure your tests are passing on every push and PR (skipped on
+# pushes which only affect documentation).
+#
+# You should make sure you run jobs on at least the *oldest* and the *newest*
+# versions of python that your codebase is intended to support.
+
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    env:
+      OS: ${{ matrix.os }}
+      PYTHON: ${{ matrix.python-version }}
+
+    steps:
+      - name: Set OS Environment Variables (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo 'ACTIVATE_PYTHON_VENV=.venv/scripts/activate' >> $GITHUB_ENV
+
+      - name: Set OS Environment Variables (not Windows)
+        if: runner.os != 'Windows'
+        run: |
+          echo 'ACTIVATE_PYTHON_VENV=.venv/bin/activate' >> $GITHUB_ENV
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Cache $HOME/.local # Significantly speeds up Poetry Install
+        uses: actions/cache@v3
+        with:
+          path: ~/.local
+          key: dotlocal-${{ runner.os }}-${{ hashFiles('.github/workflows/tests.yml') }}
+
+      - name: Set up python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: false # Currently there seems to be some race-condition in windows
+
+      - name: Install library
+        run: poetry install --no-interaction
+
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pre-commit/
+          key: pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Pre-commit run
+        run: |
+          source ${{ env.ACTIVATE_PYTHON_VENV }}
+          pre-commit run --show-diff-on-failure --color=always --all-files
+
+      - name: Check tests folder existence
+        id: check_test_files
+        uses: andstor/file-existence-action@v2
+        with:
+          files: "tests"
+
+      - name: Run tests
+        if: steps.check_test_files.outputs.files_exists == 'true'
+        run: |
+          source ${{ env.ACTIVATE_PYTHON_VENV }}
+          python -m pytest --cov=pythontemplate --cov-report term --cov-report xml --junitxml=testresults.xml
+          coverage report
+
+      - name: Upload coverage to Codecov
+        if: steps.check_test_files.outputs.files_exists == 'true'
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unittests
+          env_vars: OS,PYTHON
+          name: Python ${{ matrix.python-version }} on ${{ runner.os }}
+
+      #----------------------------------------------
+      #            make sure docs build
+      #----------------------------------------------
+      - name: Build HTML docs
+        run: |
+          source ${{ env.ACTIVATE_PYTHON_VENV }}
+          sphinx-build -b html docs/source/ docs/build/html

@@ -1,0 +1,71 @@
+exclude: ^(poetry.lock|.idea/)
+repos:
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: "v0.0.292"
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+        args:
+          - "--line-length=120"
+          - "--target-version=py38"
+          - "--target-version=py39"
+          - "--target-version=py310"
+          - "--target-version=py311"
+        types: [python]
+
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: 1.16.0
+    hooks:
+      - id: blacken-docs
+        additional_dependencies:
+          - "black==23.3.0"
+        args:
+          - "--line-length=120"
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-yaml
+      - id: debug-statements
+      - id: destroyed-symlinks
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
+      - id: pretty-format-json
+        args: ["--autofix", "--no-ensure-ascii", "--no-sort-keys"]
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: \.(html|svg)$
+
+  - repo: https://github.com/fredrikaverpil/creosote.git
+    rev: v3.0.0
+    hooks:
+      - id: creosote
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.6
+    additional_dependencies:
+      - tomli
+    hooks:
+      - id: codespell
+
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.330.post0
+    hooks:
+      - id: pyright

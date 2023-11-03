@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+# Only use builtin libraries for this script
+import re
+import readline
+import shutil
+import subprocess  # nosec
+import sys
+from datetime import date
+from pathlib import Path
+from typing import List, Union
+
+POETRY_BIN = shutil.which("poetry")
+
+
+class col:  # noqa: N801
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
+
+class BadResponseError(Exception):
+    """User gave a response that does not agree with rule set."""
+
+
+def run(cmds, **kwargs):
+    """Run bash cmd without capturing stdout."""
+    subprocess.run(cmds, capture_output=False, check=True, **kwargs)  # noqa: S603
+
+
+def check_and_install_poetry():
+    global POETRY_BIN
+    if not POETRY_BIN:
+        print("poetry not found. Installing...")
+        run(
+            "curl -sSL https://install.python-poetry.org | python3 -",
+            shell=True,  # noqa: S604
+        )
+        POETRY_BIN = str(Path("~/.local/bin/poetry").expanduser())
+
+    # Check if the poetry installation is potentially broken; see issue #46
+    try:
+        subprocess.check_output(["poetry", "--version"])  # noqa: S603, S607
+    except subprocess.CalledProcessError:
+        print(
+            f"{col.FAIL}\n\nPoetry installation failed healthcheck. Manual debugging required. It is unlikely that python-template's bootstrapping is at fault.\n{col.ENDC}"
+        )
+        sys.exit(1)
+
+    # Add necessary plugins
+    run(["poetry", "self", "add", "poetry-dynamic-versioning[plugin]"])
+
+
+def camel_to_snake(s):
+    return "".join(["_" + c.lower() if c.isupper() else c for c in s]).lstrip("_")
+
+
+def validate_input(prompt, validate=None, default=""):
+    """Prompts user until response passes ``validate``."""
+    while True:
+        response = input(prompt + ": ")
+
+        if not response:
+            response = default
+
+        if validate is None:
+            break
+
+        try:
+            validate(response)
+            break
+        except BadResponseError as e:
+            print(f'"{response}" {e}')
+    return response
+
+
+def git(*args):
+    return subprocess.check_output(["git"] + list(args))  # noqa: S603
+
+
+yes_terms = {"yes", "y", "true", "t", "1"}
+no_terms = {"no", "n", "false", "f", "0"}
+
+
+def is_boolean(response):
+    response = response.lower()
+    if response not in yes_terms.union(no_terms):
+        raise BadResponseError
+
+
+def is_identifier(response):
+    if not response.isidentifier():
+        raise BadResponseError("is not a valid python identifier.")
+
+
+def is_lower(response):
+    if response.lower() != response:
+        raise BadResponseError("should be all lower case.")
+
+
+def is_not_empty(response):
+    if not response:
+        raise BadResponseError("Cannot be empty.")
+
+
+def good_module_name(response):
+    is_identifier(response)
+    is_lower(response)
+    if "_" in response:
+        raise BadResponseError("should not contain an underscore _")
+    if len(response) > 20:
+        raise BadResponseError("is too long (max 20 char limit).")
+
+
+def good_class_name(response):
+    is_identifier(response)
+    if not response[0].isupper():
+        raise BadResponseError("first letter should be capitalized.")
+
+
+def remove_lines_in_file(file, *lines_to_remove):
+    file = Path(file)
+    lines_to_remove = {line + "\n" for line in lines_to_remove}
+    with file.open("r+") as f:
+        lines = f.readlines()
+        f.seek(0)
+
+        lines = [line for line in lines if line not in lines_to_remove]
+        # Remove all trailing newlines
+        while lines[-1] == "\n":
+            lines.pop()
+
+        for line in lines:
+            f.write(line)
+
+        f.truncate()
+
+
+def git_remote_to_username_repo(git_remote_url):
+    ssh_prefix = "git@github.com:"
+    https_prefix = "https://github.com/"
+    if git_remote_url.startswith(ssh_prefix):
+        username_repo = git_remote_url[len(ssh_prefix) : -4]
+    elif git_remote_url.startswith(https_prefix):
+        username_repo = git_remote_url[len(https_prefix) : -4]
+    else:
+        raise ValueError(f"Unknown remote url {git_remote_url}")
+
+    return username_repo.split("/", 1)
+
+
+def main():
+    check_and_install_poetry()
+
+    replacements: dict[str, str] = {
+        "CURRENT_YEAR_HERE": str(date.today().year),
+    }
+
+    git_remote_url = git("config", "--get", "remote.origin.url").decode().strip()
+    try:
+        (
+            replacements["GIT_USERNAME"],
+            replacements["GIT_REPONAME"],
+        ) = git_remote_to_username_repo(git_remote_url)
+    except ValueError:
+        print("Unable to get github URL. You will manually have to replace GIT_USERNAME and GIT_REPONAME in README.rst")
+
+    ########################
+    # User Questions Begin #
+    ########################
+    replacements["YOUR_NAME_HERE"] = validate_input("Enter your name", is_not_empty)
+    replacements["pythontemplate"] = validate_input("Python Module Name", good_module_name)
+    replacements["cpythontemplate"] = "c" + replacements["pythontemplate"]
+    is_library = validate_input(
+        "Is this going to be a library? [default: yes]",
+        is_boolean,
+        default="yes",
+    )
+    is_library = is_library in yes_terms
+
+    is_typed = validate_input(
+        "Are you going to add type hints? [default: yes]",
+        is_boolean,
+        default="yes",
+    )
+    is_typed = is_typed in yes_terms
+
+    include_cli = validate_input(
+        "Would you like to include a CLI using Typer? [default: yes]",
+        is_boolean,
+        default="yes",
+    )
+    include_cli = include_cli in yes_terms
+
+    use_cython = validate_input(
+        "Will your project use Cython? [default: no]",
+        is_boolean,
+        default="no",
+    )
+    use_cython = use_cython in yes_terms
+
+    ######################
+    # User Questions End #
+    ######################
+
+    if is_library:
+        # Don't need docker for library.
+        Path("Dockerfile").unlink()
+        Path(".dockerignore").unlink()
+        Path(".github/workflows/docker.yaml").unlink()
+
+    if not is_typed:
+        # Remove the py.typed file
+        Path("pythontemplate/py.typed").unlink()
+
+    if not include_cli:
+        # Delete CLI-replated files & config
+        Path("pythontemplate/__main__.py").unlink()
+        shutil.rmtree("pythontemplate/cli")
+        remove_lines_in_file("pyproject.toml", 'pythontemplate = "pythontemplate.cli.main:run_app"')
+
+    if use_cython:
+        # Forgo nice simple poetry action for CIBuildWheel.
+        Path(".github/workflows/deploy.yaml").unlink()
+
+        # Add Cython-related configurations to pyproject.toml
+        with Path("pyproject.toml").open() as f:
+            pyproject_contents = f.readlines()
+
+        with Path("pyproject.toml").open("w") as f:
+            for line in pyproject_contents:
+                if line == 'requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.1"]\n':
+                    line = 'requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.1", "Cython>=3.0.0", "setuptools>=61.0"]\n'
+                f.write(line)
+
+                if line == "[tool.poetry.group.dev.dependencies]\n":
+                    f.write('cython = ">=1.0.0"\n')
+
+                if line == "[tool.poetry.build]\n":
+                    f.write("script = 'build.py'\n")
+    else:
+        # Delete cython-related files
+        paths_to_delete: List[Union[str, Path]] = [
+            ".github/workflows/build_wheels.yaml",
+            "build.py",
+            "pythontemplate/_c_src",
+        ]
+        paths_to_delete.extend(Path("pythontemplate").rglob("*.pyx"))
+        paths_to_delete.extend(Path("pythontemplate").rglob("*.pxd"))
+
+        for path_to_delete in paths_to_delete:
+            path_to_delete = Path(path_to_delete)
+            if path_to_delete.is_file():
+                path_to_delete.unlink()
+            else:
+                shutil.rmtree(str(path_to_delete))
+
+    def replace(string):
+        """Replace whole words only."""
+
+        def _replace(match):
+            return replacements[match.group(0)]
+
+        # notice that the 'this' in 'thistle' is not matched
+        return re.sub("|".join(r"\b%s\b" % re.escape(s) for s in replacements), _replace, string)
+
+    repo = Path(__file__).parent
+    bootstrap_file = repo / "bootstrap"
+    files: list[Path] = list(repo.rglob("*.py"))
+    files.extend(repo.rglob("*.pyx"))
+    files.extend(repo.rglob("*.pxd"))
+    files.extend(repo.rglob("*.yaml"))
+    files.extend(repo.rglob("*.rst"))
+    files.append(Path("pyproject.toml"))
+    files.append(Path(".gitignore"))
+
+    if not is_library:
+        files.append(Path("Dockerfile"))
+    for file in files:
+        contents = file.read_text()
+        contents = replace(contents)
+        file.write_text(contents)
+        if file.stem in replacements:
+            dst = file.with_name(replacements[file.stem] + file.suffix)
+            file.replace(dst)
+
+    # Move the app folder
+    (repo / "pythontemplate").replace(repo / replacements["pythontemplate"])
+
+    # Move README_TEMPLATE.rst
+    (repo / "README_TEMPLATE.rst").replace(repo / "README.rst")
+
+    run([POETRY_BIN, "config", "virtualenvs.in-project", "true", "--local"])
+
+    if not include_cli:
+        run([POETRY_BIN, "remove", "typer"])
+        run([POETRY_BIN, "remove", "rich"])
+
+    run([POETRY_BIN, "update"])
+    run([POETRY_BIN, "install"])
+    run(["poetry", "run", "python", "-m", "pre_commit", "install"])
+    run(["poetry", "run", "python", "-m", "pre_commit", "autoupdate"])
+
+    # Delete this script
+    bootstrap_file.unlink()
+
+    git("add", "-A")
+    git("commit", "-m", "bootstrap from template", "--no-verify")
+
+    print(col.OKGREEN)
+    print("Bootstrapping complete. Changes committed. Please run:")
+    print("    git push")
+    print(col.ENDC)
+
+
+if __name__ == "__main__":
+    main()
