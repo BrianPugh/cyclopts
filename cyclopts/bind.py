@@ -12,7 +12,7 @@ from cyclopts.exceptions import (
     UnsupportedPositionalError,
     UnsupportedTypeHintError,
 )
-from cyclopts.parameter import get_hint_param
+from cyclopts.parameter import get_hint_parameter
 
 
 def _cli2parameter_mappings(f: Callable):
@@ -21,7 +21,7 @@ def _cli2parameter_mappings(f: Callable):
     for parameter in signature.parameters.values():
         # TODO: add some type validation rules here
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
-            hint, param = get_hint_param(parameter)
+            hint, param = get_hint_parameter(parameter)
             key = param.name if param.name else parameter.name.replace("_", "-")
             if (typing.get_origin(hint) or hint) is bool:
                 # Boolean Flag
@@ -33,7 +33,7 @@ def _cli2parameter_mappings(f: Callable):
 
 
 def _coerce_kw(d, parameter, value: str):
-    hint, param = get_hint_param(parameter)
+    hint, param = get_hint_parameter(parameter)
     hint = typing.get_origin(hint) or hint
     # TODO: I don't think this will properly handle List[List[int]]
     coercion = param.coercion if param.coercion else default_coercion_lookup.get(hint, hint)
@@ -46,7 +46,7 @@ def _coerce_kw(d, parameter, value: str):
 
 
 def _coerce_pos(parameter, value: str):
-    hint, param = get_hint_param(parameter)
+    hint, param = get_hint_parameter(parameter)
     hint = typing.get_origin(hint) or hint
     coercion = param.coercion if param.coercion else default_coercion_lookup.get(hint, hint)
     return coercion(value)

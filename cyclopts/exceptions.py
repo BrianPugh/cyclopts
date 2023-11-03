@@ -46,5 +46,9 @@ class MissingArgumentError(CycloptsError):
 
 
 class RepeatKeywordError(CycloptsError):
-    def __init__(self, message="Cannot specify Parameter multiple times per annotation."):
+    def __init__(self, message="Cannot specify keyword multiple times."):
         super().__init__(message)
+
+
+class MultipleParameterAnnotationError(CycloptsError):
+    pass

@@ -14,6 +14,7 @@ __all__ = [
     "UnusedCliTokensError",
     "UnsupportedPositionalError",
     "UnsupportedTypeHintError",
+    "MultipleParameterAnnotationError",
 ]
 
 from cyclopts.core import App
@@ -22,6 +23,7 @@ from cyclopts.exceptions import (
     CycloptsError,
     MissingArgumentError,
     MissingTypeError,
+    MultipleParameterAnnotationError,
     RepeatKeywordError,
     UnknownKeywordError,
     UnreachableError,

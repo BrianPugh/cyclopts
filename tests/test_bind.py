@@ -2,10 +2,16 @@ import inspect
 from typing import List, Optional, Union
 
 import pytest
+from typing_extensions import Annotated
 
 import cyclopts
-from cyclopts import MissingArgumentError
-from cyclopts.exceptions import UnknownKeywordError, UnsupportedPositionalError, UnsupportedTypeHintError
+from cyclopts import (
+    MissingArgumentError,
+    Parameter,
+    UnknownKeywordError,
+    UnsupportedPositionalError,
+    UnsupportedTypeHintError,
+)
 
 
 @pytest.fixture
@@ -66,19 +72,39 @@ def test_basic_2(app, cmd_str):
     assert actual_bind == expected_bind
 
 
-@pytest.mark.skip()
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "foo 1 2 3 --d 10 --some-flag",
-        "foo --some-flag 1 --b=2 3 --d 10",
-        "foo 1 2 --some-flag 3 --d 10",
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
     ],
 )
-def test_basic_union(app, cmd_str):
-    @app.command
-    def foo(a: int, b: int, c: int, /):
-        pass
+@pytest.mark.parametrize("annotated", [False, True])
+def test_union_required_implicit_coercion(app, cmd_str, annotated):
+    """
+    For a union without an explicit coercion, the first non-None type annotation
+    should be used. In this case, it's ``int``.
+    """
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[Union[None, int, float], Parameter(help="help for a")]):
+            pass
+
+    else:
+
+        @app.command
+        def foo(a: Union[None, int, float]):
+            pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(1)
+
+    actual_command, actual_bind = app.parse_args(cmd_str)
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+    assert isinstance(actual_bind.args[0], int)
 
 
 @pytest.mark.parametrize(
