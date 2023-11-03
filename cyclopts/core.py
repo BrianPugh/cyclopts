@@ -96,7 +96,7 @@ class App:
         Parameters
         ----------
         prompt: str
-            Shell prompt. Defaults to ``$ ``.
+            Shell prompt. Defaults to ``"$ "``.
         quit: Iterable[str]
             List of strings that will cause the shell to exit and this method to return.
             Defaults to ``["q", "quit"]``

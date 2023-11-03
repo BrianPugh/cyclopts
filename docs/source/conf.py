@@ -39,6 +39,7 @@ release = __version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "myst_parser",
     "sphinx_rtd_theme",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
@@ -145,7 +146,7 @@ html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 
 html_title = project
-html_logo = "../../assets/logo_200w.png"
+html_logo = "../../assets/logo_512w.png"
 html_favicon = None
 
 html_theme_options = {

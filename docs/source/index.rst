@@ -1,8 +1,8 @@
 Welcome to cyclopts's documentation!
 ==========================================
 
-.. include:: ../../README.rst
-  :start-after: inclusion-marker-do-not-remove
+.. include:: ../../README.md
+   :parser: myst_parser.sphinx_
 
 .. toctree::
    :maxdepth: 2
