@@ -1,10 +1,11 @@
 import inspect
+from typing import List
 
 import pytest
 
 import cyclopts
 from cyclopts import MissingArgumentError
-from cyclopts.exceptions import UnknownKeywordError
+from cyclopts.exceptions import UnknownKeywordError, UnsupportedTypeHintError
 
 
 @pytest.fixture
@@ -39,7 +40,7 @@ def test_basic_1(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3)
 
-    actual_command, actual_bind, unused_args = app.parse_known_args(cmd_str)
+    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
     assert unused_args == []
@@ -61,7 +62,7 @@ def test_basic_2(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3, d=10, some_flag=True)
 
-    actual_command, actual_bind, unused_args = app.parse_known_args(cmd_str)
+    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
     assert unused_args == []
@@ -81,7 +82,7 @@ def test_basic_pos_only(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3)
 
-    actual_command, actual_bind, unused_args = app.parse_known_args(cmd_str)
+    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
     assert unused_args == []
@@ -101,7 +102,7 @@ def test_basic_pos_only_exceptions(app, cmd_str_e):
         pass
 
     with pytest.raises(e):
-        app.parse_known_args(cmd_str)
+        app.parse_args(cmd_str)
 
 
 @pytest.mark.parametrize(
@@ -120,7 +121,7 @@ def test_basic_pos_only_extended(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3, 4)
 
-    actual_command, actual_bind, unused_args = app.parse_known_args(cmd_str)
+    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
     assert unused_args == []
@@ -140,4 +141,22 @@ def test_basic_pos_only_extended_exceptions(app, cmd_str_e):
         pass
 
     with pytest.raises(e):
-        app.parse_known_args(cmd_str)
+        app.parse_args(cmd_str)
+
+
+def test_basic_pos_only_list_not_allowed(app):
+    with pytest.raises(UnsupportedTypeHintError):
+
+        @app.command
+        def foo(a: List[int], /):
+            pass
+
+
+@pytest.mark.skip(reason="not done yet")
+def test_basic_pos_kw_list_not_allowed_by_pos(app):
+    @app.command
+    def foo(a: List[int]):
+        pass
+
+    with pytest.raises(UnsupportedTypeHintError):
+        app.parse_args("foo 1 2 3")

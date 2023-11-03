@@ -134,6 +134,7 @@ ignore = [
     "E501",
     "F401",
     "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
+    "SIM102",  # Combining if-statements
 ]
 line-length = 120  # Must agree with Black
 

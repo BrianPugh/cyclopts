@@ -2,6 +2,7 @@ import inspect
 import os
 import shlex
 import sys
+import typing
 from functools import partial
 from typing import Callable, Iterable, Optional, Union
 
@@ -9,7 +10,7 @@ from attrs import define, field
 from autoregistry import Registry
 
 from cyclopts.bind import create_bound_arguments
-from cyclopts.exceptions import CommandCollisionError, MissingTypeError, UnusedCliTokensError
+from cyclopts.exceptions import CommandCollisionError, MissingTypeError, UnsupportedTypeHintError, UnusedCliTokensError
 from cyclopts.help import display_help
 
 
@@ -30,6 +31,9 @@ class App:
         for parameter in inspect.signature(f).parameters.values():
             if parameter.annotation is parameter.empty:
                 raise MissingTypeError(parameter.name)
+            if parameter.kind == parameter.POSITIONAL_ONLY:
+                if typing.get_origin(parameter.annotation) is list:
+                    raise UnsupportedTypeHintError("Positional-only parameter cannot be of type 'list'.")
         self.registry(f, **kwargs)
         return f
 
@@ -72,6 +76,12 @@ class App:
         remaining_tokens = list(remaining_tokens)
         return command, bound, remaining_tokens
 
+    def parse_args(self, tokens: Union[None, str, Iterable[str]] = None):
+        command, bound, remaining_tokens = self.parse_known_args(tokens)
+        if remaining_tokens:
+            raise UnusedCliTokensError(remaining_tokens)
+        return command, bound, remaining_tokens
+
     def __call__(self, tokens: Union[None, str, Iterable[str]] = None):
         """Interprets and executes a command.
 
@@ -81,9 +91,7 @@ class App:
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         """
-        command, bound, remaining_tokens = self.parse_known_args(tokens)
-        if remaining_tokens:
-            raise UnusedCliTokensError(remaining_tokens)
+        command, bound, remaining_tokens = self.parse_args(tokens)
         return command(*bound.args, **bound.kwargs)
 
     def interactive_shell(
