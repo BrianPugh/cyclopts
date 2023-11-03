@@ -80,7 +80,7 @@ class App:
         command, bound, remaining_tokens = self.parse_known_args(tokens)
         if remaining_tokens:
             raise UnusedCliTokensError(remaining_tokens)
-        return command, bound, remaining_tokens
+        return command, bound
 
     def __call__(self, tokens: Union[None, str, Iterable[str]] = None):
         """Interprets and executes a command.
@@ -91,7 +91,7 @@ class App:
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         """
-        command, bound, remaining_tokens = self.parse_args(tokens)
+        command, bound = self.parse_args(tokens)
         return command(*bound.args, **bound.kwargs)
 
     def interactive_shell(

@@ -1,5 +1,5 @@
 import inspect
-from typing import List
+from typing import List, Optional, Union
 
 import pytest
 
@@ -40,10 +40,9 @@ def test_basic_1(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3)
 
-    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
+    actual_command, actual_bind = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
-    assert unused_args == []
 
 
 @pytest.mark.parametrize(
@@ -62,10 +61,24 @@ def test_basic_2(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3, d=10, some_flag=True)
 
-    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
+    actual_command, actual_bind = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
-    assert unused_args == []
+
+
+@pytest.mark.skip()
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1 2 3 --d 10 --some-flag",
+        "foo --some-flag 1 --b=2 3 --d 10",
+        "foo 1 2 --some-flag 3 --d 10",
+    ],
+)
+def test_basic_union(app, cmd_str):
+    @app.command
+    def foo(a: int, b: int, c: int, /):
+        pass
 
 
 @pytest.mark.parametrize(
@@ -74,7 +87,7 @@ def test_basic_2(app, cmd_str):
         "foo 1 2 3",
     ],
 )
-def test_basic_pos_only(app, cmd_str):
+def test_pos_only(app, cmd_str):
     @app.command
     def foo(a: int, b: int, c: int, /):
         pass
@@ -82,10 +95,9 @@ def test_basic_pos_only(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3)
 
-    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
+    actual_command, actual_bind = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
-    assert unused_args == []
 
 
 @pytest.mark.parametrize(
@@ -94,7 +106,7 @@ def test_basic_pos_only(app, cmd_str):
         ("foo 1 2 --c=3", UnknownKeywordError),
     ],
 )
-def test_basic_pos_only_exceptions(app, cmd_str_e):
+def test_pos_only_exceptions(app, cmd_str_e):
     cmd_str, e = cmd_str_e
 
     @app.command
@@ -113,7 +125,7 @@ def test_basic_pos_only_exceptions(app, cmd_str_e):
         "foo 1 2 --d=4 3",
     ],
 )
-def test_basic_pos_only_extended(app, cmd_str):
+def test_pos_only_extended(app, cmd_str):
     @app.command
     def foo(a: int, b: int, c: int, /, d: int):
         pass
@@ -121,10 +133,9 @@ def test_basic_pos_only_extended(app, cmd_str):
     signature = inspect.signature(foo)
     expected_bind = signature.bind(1, 2, 3, 4)
 
-    actual_command, actual_bind, unused_args = app.parse_args(cmd_str)
+    actual_command, actual_bind = app.parse_args(cmd_str)
     assert actual_command == foo
     assert actual_bind == expected_bind
-    assert unused_args == []
 
 
 @pytest.mark.parametrize(
@@ -133,7 +144,7 @@ def test_basic_pos_only_extended(app, cmd_str):
         ("foo 1 2 3", MissingArgumentError),
     ],
 )
-def test_basic_pos_only_extended_exceptions(app, cmd_str_e):
+def test_pos_only_extended_exceptions(app, cmd_str_e):
     cmd_str, e = cmd_str_e
 
     @app.command
@@ -144,7 +155,7 @@ def test_basic_pos_only_extended_exceptions(app, cmd_str_e):
         app.parse_args(cmd_str)
 
 
-def test_basic_pos_only_list_not_allowed(app):
+def test_pos_only_list_not_allowed(app):
     with pytest.raises(UnsupportedTypeHintError):
 
         @app.command
@@ -152,7 +163,7 @@ def test_basic_pos_only_list_not_allowed(app):
             pass
 
 
-def test_basic_pos_kw_list_not_allowed_by_pos(app):
+def test_pos_kw_list_not_allowed_by_pos(app):
     @app.command
     def foo(a: List[int]):
         pass
