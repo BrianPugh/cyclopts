@@ -33,6 +33,10 @@ class UnknownKeywordError(CycloptsError):
         super().__init__(self.message)
 
 
+class MissingArgumentError(CycloptsError):
+    pass
+
+
 class RepeatKeywordError(CycloptsError):
     def __init__(self, message="Cannot specify Parameter multiple times per annotation."):
         super().__init__(message)

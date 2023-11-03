@@ -5,6 +5,7 @@ __all__ = [
     "App",
     "CommandCollisionError",
     "CycloptsError",
+    "MissingArgumentError",
     "MissingTypeError",
     "Parameter",
     "RepeatKeywordError",
@@ -17,6 +18,7 @@ from cyclopts.core import App
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
+    MissingArgumentError,
     MissingTypeError,
     RepeatKeywordError,
     UnknownKeywordError,

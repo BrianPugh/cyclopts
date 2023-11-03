@@ -4,7 +4,12 @@ from collections import deque
 from typing import Callable, Dict, Iterable, Tuple
 
 from cyclopts.coercion import default_coercion_lookup
-from cyclopts.exceptions import MissingTypeError, UnknownKeywordError, UnreachableError
+from cyclopts.exceptions import (
+    MissingArgumentError,
+    MissingTypeError,
+    UnknownKeywordError,
+    UnreachableError,
+)
 from cyclopts.parameter import get_hint_param
 
 
@@ -65,7 +70,10 @@ def _parse_kw_and_flags(f, tokens):
             token = token[2:]  # remove the leading "--"
             if "=" in token:
                 cli_key, cli_value = token.split("=", 1)
-                parameter = cli2kw[cli_key]
+                try:
+                    parameter = cli2kw[cli_key]
+                except KeyError as e:
+                    raise UnknownKeywordError(cli_key) from e
             elif token in cli2flag:
                 parameter, cli_value = cli2flag[token]
             elif token in cli2kw:
@@ -73,7 +81,7 @@ def _parse_kw_and_flags(f, tokens):
                 try:
                     cli_value = tokens[i + 1]
                 except IndexError as e:
-                    raise ValueError("No value supplied for keyword --{cli_key}") from e
+                    raise MissingArgumentError(f"Unknown CLI keyword --{cli_key}") from e
                 parameter = cli2kw[cli_key]
                 skip_next_iteration = True
             else:
@@ -120,7 +128,11 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
     f_pos, remaining_tokens = _parse_pos(f, remaining_tokens, f_kwargs)
 
     signature = inspect.signature(f)
-    bound = signature.bind(*f_pos, **f_kwargs)
+    try:
+        bound = signature.bind(*f_pos, **f_kwargs)
+    except TypeError as e:
+        raise MissingArgumentError from e
+
     bound.apply_defaults()
 
     return bound, remaining_tokens
