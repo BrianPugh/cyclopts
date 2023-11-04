@@ -25,9 +25,7 @@ List
 Tuple
 *****
 
-* Elements must be single-length.
-     * ``Tuple[List[...]]`` is not allowed.
-     * ``Tuple[Tuple[...]]`` is not allowed.
+* Currently not supported.
 
 ********
 Iterable

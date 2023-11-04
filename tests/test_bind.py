@@ -1,5 +1,5 @@
 import inspect
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import pytest
 from typing_extensions import Annotated
@@ -96,6 +96,41 @@ def test_union_required_implicit_coercion(app, cmd_str, annotated):
 
         @app.command
         def foo(a: Union[None, int, float]):
+            pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(1)
+
+    actual_command, actual_bind = app.parse_args(cmd_str)
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+    assert isinstance(actual_bind.args[0], int)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
+    ],
+)
+@pytest.mark.parametrize("annotated", [False, True])
+def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated):
+    """
+    For a union without an explicit coercion, the first non-None type annotation
+    should be used. In this case, it's ``int``.
+    """
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[Optional[int], Parameter(help="help for a")] = None):
+            pass
+
+    else:
+
+        @app.command
+        def foo(a: Optional[int] = None):
             pass
 
     signature = inspect.signature(foo)
