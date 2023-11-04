@@ -56,8 +56,8 @@ def _coerce_parameter(
         out.setdefault(parameter, {})
 
         if is_iterable:
-            out[parameter].set_default(key, [])
-            out[parameter][key].append(value)
+            out[parameter].setdefault(key, [])
+            out[parameter][key].append(value[key])
         else:
             out[parameter].update(value)
     elif is_iterable or parameter.kind is parameter.VAR_POSITIONAL:  # ``*args``
