@@ -16,12 +16,10 @@ def _cli2parameter_mappings(f: Callable):
     kw_mapping, flag_mapping = {}, {}
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
-        # TODO: add some type validation rules here
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint, param = get_hint_parameter(parameter)
             key = param.name if param.name else parameter.name.replace("_", "-")
-            if (typing.get_origin(hint) or hint) is bool:
-                # Boolean Flag
+            if (typing.get_origin(hint) or hint) is bool:  # Boolean Flag
                 flag_mapping[key] = (parameter, True)
                 flag_mapping["no-" + key] = (parameter, False)
             else:
@@ -69,7 +67,6 @@ def _parse_kw_and_flags(f, tokens, mapping):
             continue
 
         # Check for keyword argument with equal sign
-        # Goal: get key and value
         if token.startswith("--"):  # some sort of keyword
             token = token[2:]  # remove the leading "--"
             if "=" in token:

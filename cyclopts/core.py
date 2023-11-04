@@ -31,6 +31,8 @@ class App:
         for parameter in inspect.signature(f).parameters.values():
             if parameter.annotation is parameter.empty:
                 raise MissingTypeError(parameter.name)
+            if typing.get_origin(parameter.annotation) is tuple:
+                raise UnsupportedTypeHintError("Tuples are not currently supported.")
             if parameter.kind == parameter.POSITIONAL_ONLY:
                 if typing.get_origin(parameter.annotation) is list:
                     raise UnsupportedTypeHintError("Positional-only parameter cannot be of type 'list'.")
