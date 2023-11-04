@@ -254,6 +254,25 @@ def test_pos_kw_list_not_allowed_by_pos(app):
         app.parse_args("foo 1 2 3")
 
 
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1 --bar=2 --baz 3",
+    ],
+)
+def test_keyword_only(app, cmd_str):
+    @app.command
+    def foo(a: int, **kwargs: int):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(1, bar=2, baz=3)
+
+    actual_command, actual_bind = app.parse_args(cmd_str)
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+
 def test_keyword_list(app):
     @app.command
     def foo(a: List[int]):

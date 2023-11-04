@@ -99,7 +99,6 @@ select = [
     "PGH",  # pygrep-hooks
     "PTH", # flake8-use-pathlib
     "Q",  # flake8-quotes
-    "S",  # bandit
     "TRY",  # tryceratops
     "UP",  # pyupgrade
     "W",  # Warning
@@ -157,7 +156,6 @@ convention = "numpy"
     "D106",
     "D107",
     "D205",
-    "S101",  # use of "assert"
     "S102",  # use of "exec"
     "S106",  # possible hardcoded password.
     "PGH001",  # use of "eval"

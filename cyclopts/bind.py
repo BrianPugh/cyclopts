@@ -1,7 +1,7 @@
 import inspect
 import typing
 from collections import deque
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Union
 
 from cyclopts.coercion import lookup as coercion_lookup
 from cyclopts.exceptions import (
@@ -13,9 +13,13 @@ from cyclopts.parameter import get_coercion, get_hint_parameter
 
 
 def _cli2parameter_mappings(f: Callable):
+    kwargs_parameter = None
     kw_mapping, flag_mapping = {}, {}
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
+        if parameter.kind == parameter.VAR_KEYWORD:
+            kwargs_parameter = parameter
+
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint, param = get_hint_parameter(parameter)
             key = param.name if param.name else parameter.name.replace("_", "-")
@@ -24,35 +28,58 @@ def _cli2parameter_mappings(f: Callable):
                 flag_mapping["no-" + key] = (parameter, False)
             else:
                 kw_mapping[key] = parameter
-    return kw_mapping, flag_mapping
+    return kw_mapping, flag_mapping, kwargs_parameter
 
 
-def _coerce_parameter(out: Dict[inspect.Parameter, Any], parameter: inspect.Parameter, value: str):
+def _coerce_parameter(
+    out: Dict[inspect.Parameter, Any],
+    parameter: inspect.Parameter,
+    value: Union[str, Dict[str, str]],
+):
     """Coerce an input string value according to Cyclopts rules.
 
     Updates dictionary inplace.
+
+    Parameters
+    ----------
+    value: Union[str, Dict[str, str]]
+        If a dictionary, the parameter must be VAR_KEYWORD
     """
     coercion, is_iterable = get_coercion(parameter)
 
-    value = coercion(value)
-    if is_iterable or parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
+    if parameter.kind is parameter.VAR_KEYWORD:  # ``**kwargs``
+        assert isinstance(value, dict)
+
+        key = list(value)[0]
+        value = {key: coercion(value[key])}
+
+        out.setdefault(parameter, {})
+
+        if is_iterable:
+            out[parameter].set_default(key, [])
+            out[parameter][key].append(value)
+        else:
+            out[parameter].update(value)
+    elif is_iterable or parameter.kind is parameter.VAR_POSITIONAL:  # ``*args``
+        value = coercion(value)
         out.setdefault(parameter, [])
         out[parameter].append(value)
     else:
+        value = coercion(value)
         out[parameter] = value
 
 
 def _parse_kw_and_flags(f, tokens, mapping):
-    cli2kw, cli2flag = _cli2parameter_mappings(f)
+    cli2kw, cli2flag, kwargs_parameter = _cli2parameter_mappings(f)
 
     remaining_tokens = []
 
     # Parse All Keyword Arguments & Flags
-    skip_next_iteration = False
+    skip_next_iterations = 0
     for i, token in enumerate(tokens):
         # If the previous argument was a keyword, then this is its value
-        if skip_next_iteration:
-            skip_next_iteration = False
+        if skip_next_iterations:
+            skip_next_iterations -= 1
             continue
 
         if not token.startswith("--"):
@@ -62,24 +89,27 @@ def _parse_kw_and_flags(f, tokens, mapping):
 
         token = token[2:]  # remove the leading "--"
 
-        if "=" in token:
-            cli_key, cli_value = token.split("=", 1)
+        if token in cli2flag:
+            parameter, cli_value = cli2flag[token]
+        else:
+            if "=" in token:
+                cli_key, cli_value = token.split("=", 1)
+            else:
+                cli_key = token
+                try:
+                    cli_value = tokens[i + 1]
+                    skip_next_iterations = 1
+                except IndexError as e:
+                    raise MissingArgumentError(f"Unknown CLI keyword --{cli_key}") from e
+
             try:
                 parameter = cli2kw[cli_key]
             except KeyError as e:
-                raise UnknownKeywordError(cli_key) from e
-        elif token in cli2flag:
-            parameter, cli_value = cli2flag[token]
-        elif token in cli2kw:
-            cli_key = token
-            try:
-                cli_value = tokens[i + 1]
-            except IndexError as e:
-                raise MissingArgumentError(f"Unknown CLI keyword --{cli_key}") from e
-            parameter = cli2kw[cli_key]
-            skip_next_iteration = True
-        else:
-            raise UnknownKeywordError(f"--{token}")
+                if kwargs_parameter:
+                    parameter = kwargs_parameter
+                    cli_value = {cli_key: cli_value}
+                else:
+                    raise UnknownKeywordError(cli_key) from e
 
         _coerce_parameter(mapping, parameter, cli_value)
 
@@ -130,6 +160,8 @@ def _bind(f: Callable, mapping):
                     raise MissingArgumentError from e
         elif p.kind is p.VAR_POSITIONAL:  # ``*args``
             f_pos.extend(mapping.get(p, []))
+        elif p.kind is p.VAR_KEYWORD:
+            f_kwargs.update(mapping.get(p, {}))
         else:
             try:
                 f_kwargs[p.name] = mapping[p]
