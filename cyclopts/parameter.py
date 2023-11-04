@@ -82,6 +82,10 @@ def _reduce_hint_iterable(hint: type):
     return List[element_type]
 
 
+# Common types that an end-user might accidentally attempt to use.
+_unsupported_types = {tuple, set, frozenset, range, dict, Callable}
+
+
 def get_hint_parameter(parameter: inspect.Parameter) -> Tuple[type, Parameter]:
     """Get the type hint and Cyclopts ``Parameter`` from a possibly annotated inspect Parameter.
 
@@ -101,6 +105,10 @@ def get_hint_parameter(parameter: inspect.Parameter) -> Tuple[type, Parameter]:
             cyclopts_parameter = Parameter()
     else:
         cyclopts_parameter = Parameter()
+
+    hint_origin = typing.get_origin(hint)
+    if hint_origin in _unsupported_types:
+        raise UnsupportedTypeHintError(f"Unsupported type: {hint_origin}")
 
     hint = reduce_hint(hint)
 

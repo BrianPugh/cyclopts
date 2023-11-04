@@ -19,3 +19,11 @@ def _int(s: str) -> int:
         return int(s, 2)
     else:
         return int(s, 0)
+
+
+def _bytes(s: str) -> bytes:
+    return bytes(s, encoding="utf8")
+
+
+def _bytearray(s: str) -> bytearray:
+    return bytearray(_bytes(s))

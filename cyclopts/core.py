@@ -16,15 +16,13 @@ from cyclopts.parameter import get_hint_parameter
 
 
 def _validate_type_supported(p: inspect.Parameter):
+    # get_hint_parameter internally does some validation
     hint, parameter = get_hint_parameter(p)
     if p.annotation is p.empty:
         raise MissingTypeError(p.name)
-    if typing.get_origin(p.annotation) is tuple:
-        raise UnsupportedTypeHintError("Tuples are not currently supported.")
     if p.kind == p.POSITIONAL_ONLY:
         if typing.get_origin(p.annotation) is list:
             raise UnsupportedTypeHintError("Positional-only parameter cannot be of type 'list'.")
-    # TODO: check for double nested Lists
 
 
 @define
