@@ -3,13 +3,13 @@ import typing
 from collections import deque
 from typing import Any, Callable, Dict, Iterable, List, Tuple
 
-from cyclopts.coercion import default_coercion_lookup
+from cyclopts.coercion import lookup as coercion_lookup
 from cyclopts.exceptions import (
     MissingArgumentError,
     UnknownKeywordError,
     UnsupportedPositionalError,
 )
-from cyclopts.parameter import get_hint_parameter
+from cyclopts.parameter import get_coercion, get_hint_parameter
 
 
 def _cli2parameter_mappings(f: Callable):
@@ -27,30 +27,19 @@ def _cli2parameter_mappings(f: Callable):
     return kw_mapping, flag_mapping
 
 
-def _coerce_kw(out, parameter, value: str):
+def _coerce_parameter(out: Dict[inspect.Parameter, Any], parameter: inspect.Parameter, value: str):
     """Coerce an input string value according to Cyclopts rules.
 
     Updates dictionary inplace.
     """
-    hint, param = get_hint_parameter(parameter)
-    hint = typing.get_origin(hint) or hint
-    coercion = param.coercion if param.coercion else default_coercion_lookup.get(hint, hint)
+    coercion, is_iterable = get_coercion(parameter)
+
     value = coercion(value)
-    if hint in (list, tuple, Iterable):
-        out.setdefault(parameter, [])
-        out[parameter].append(value)
-    elif parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
+    if is_iterable or parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
         out.setdefault(parameter, [])
         out[parameter].append(value)
     else:
         out[parameter] = value
-
-
-def _coerce_pos(parameter, value: str):
-    hint, param = get_hint_parameter(parameter)
-    hint = typing.get_origin(hint) or hint
-    coercion = param.coercion if param.coercion else default_coercion_lookup.get(hint, hint)
-    return coercion(value)
 
 
 def _parse_kw_and_flags(f, tokens, mapping):
@@ -66,31 +55,33 @@ def _parse_kw_and_flags(f, tokens, mapping):
             skip_next_iteration = False
             continue
 
-        # Check for keyword argument with equal sign
-        if token.startswith("--"):  # some sort of keyword
-            token = token[2:]  # remove the leading "--"
-            if "=" in token:
-                cli_key, cli_value = token.split("=", 1)
-                try:
-                    parameter = cli2kw[cli_key]
-                except KeyError as e:
-                    raise UnknownKeywordError(cli_key) from e
-            elif token in cli2flag:
-                parameter, cli_value = cli2flag[token]
-            elif token in cli2kw:
-                cli_key = token
-                try:
-                    cli_value = tokens[i + 1]
-                except IndexError as e:
-                    raise MissingArgumentError(f"Unknown CLI keyword --{cli_key}") from e
-                parameter = cli2kw[cli_key]
-                skip_next_iteration = True
-            else:
-                raise UnknownKeywordError(f"--{token}")
-
-            _coerce_kw(mapping, parameter, cli_value)
-        else:  # positional
+        if not token.startswith("--"):
+            # TODO: parse single-hyphen flags here
             remaining_tokens.append(token)
+            continue
+
+        token = token[2:]  # remove the leading "--"
+
+        if "=" in token:
+            cli_key, cli_value = token.split("=", 1)
+            try:
+                parameter = cli2kw[cli_key]
+            except KeyError as e:
+                raise UnknownKeywordError(cli_key) from e
+        elif token in cli2flag:
+            parameter, cli_value = cli2flag[token]
+        elif token in cli2kw:
+            cli_key = token
+            try:
+                cli_value = tokens[i + 1]
+            except IndexError as e:
+                raise MissingArgumentError(f"Unknown CLI keyword --{cli_key}") from e
+            parameter = cli2kw[cli_key]
+            skip_next_iteration = True
+        else:
+            raise UnknownKeywordError(f"--{token}")
+
+        _coerce_parameter(mapping, parameter, cli_value)
 
     return remaining_tokens
 
@@ -111,13 +102,13 @@ def _parse_pos(f: Callable, tokens: Iterable[str], out: Dict) -> List[str]:
             break
         if parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
             for token in tokens:
-                _coerce_kw(out, parameter, token)
+                _coerce_parameter(out, parameter, token)
             tokens.clear()
             break
         else:
             if typing.get_origin(parameter.annotation) is list:
                 raise UnsupportedPositionalError("List parameters cannot be populated by positional arguments.")
-            _coerce_kw(out, parameter, tokens.popleft())
+            _coerce_parameter(out, parameter, tokens.popleft())
 
     return list(tokens)
 

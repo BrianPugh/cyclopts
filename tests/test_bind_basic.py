@@ -252,3 +252,16 @@ def test_pos_kw_list_not_allowed_by_pos(app):
 
     with pytest.raises(UnsupportedPositionalError):
         app.parse_args("foo 1 2 3")
+
+
+def test_keyword_list(app):
+    @app.command
+    def foo(a: List[int]):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind([1, 2, 3])
+
+    actual_command, actual_bind = app.parse_args("foo --a=1 --a=2 --a 3")
+    assert actual_command == foo
+    assert actual_bind == expected_bind

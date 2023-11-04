@@ -1,11 +1,17 @@
 import inspect
 import typing
-from typing import Callable, Optional, Tuple, Union
+from collections import abc
+from typing import Callable, List, Optional, Tuple, Union
 
 from attrs import frozen
 from typing_extensions import Annotated
 
-from cyclopts.exceptions import MultipleParameterAnnotationError, RepeatKeywordError
+from cyclopts.coercion import lookup as coercion_lookup
+from cyclopts.exceptions import (
+    MissingTypeError,
+    MultipleParameterAnnotationError,
+    UnsupportedTypeHintError,
+)
 
 # from types import NoneType is available >=3.10
 NoneType = type(None)
@@ -18,6 +24,62 @@ class Parameter:
     coercion: Optional[Callable] = None
     show_default = True
     help: str = ""
+
+
+def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
+    is_iterable = False
+    hint, param = get_hint_parameter(parameter)
+
+    if typing.get_origin(hint) in _iterable_reduce_set:
+        is_iterable = True
+        hint = typing.get_args(hint)[0]
+
+    hint = typing.get_origin(hint) or hint
+
+    coercion = param.coercion if param.coercion else coercion_lookup.get(hint, hint)
+
+    return coercion, is_iterable
+
+
+def reduce_hint(hint: type):
+    while True:
+        pre_reduced_hint = hint
+        hint = _reduce_hint_union(hint)
+        hint = _reduce_hint_iterable(hint)
+        if pre_reduced_hint == hint:
+            break
+    return hint
+
+
+def _reduce_hint_union(hint: type):
+    """Resolve Optional/Union types to a single type."""
+    while typing.get_origin(hint) is Union:
+        # Note: origin of ``Optional`` is also ``Union``
+        if typing.get_origin(hint) is Union:
+            for hint_arg in typing.get_args(hint):
+                if hint_arg is NoneType:
+                    continue
+                hint = hint_arg
+                break
+    return hint
+
+
+_iterable_reduce_set = {list, abc.Iterable}
+
+
+def _reduce_hint_iterable(hint: type):
+    """Converts and validates type to list."""
+    # Note: typing.get_origin(typing.Iterable) == collections.abc.Iterable
+    if typing.get_origin(hint) not in _iterable_reduce_set:
+        return hint
+
+    list_args = typing.get_args(hint)
+    if not list_args:
+        raise MissingTypeError("List annotations must supply element type.")
+    element_type = typing.get_origin(list_args[0]) or list_args[0]
+    if element_type in _iterable_reduce_set:
+        raise UnsupportedTypeHintError("Cannot have nested iterable types.")
+    return List[element_type]
 
 
 def get_hint_parameter(parameter: inspect.Parameter) -> Tuple[type, Parameter]:
@@ -40,14 +102,6 @@ def get_hint_parameter(parameter: inspect.Parameter) -> Tuple[type, Parameter]:
     else:
         cyclopts_parameter = Parameter()
 
-    # Resolve Union types to a single type
-    while typing.get_origin(hint) is Union:
-        # Note: origin of ``Optional`` is also ``Union``
-        if typing.get_origin(hint) is Union:
-            for hint_arg in typing.get_args(hint):
-                if hint_arg is NoneType:
-                    continue
-                hint = hint_arg
-                break
+    hint = reduce_hint(hint)
 
     return hint, cyclopts_parameter

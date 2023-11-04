@@ -43,3 +43,11 @@ Optional
 ********
 
 * ``Optional[...]`` is syntactic sugar for ``Union[..., None]``.  See Union_ rules.
+
+***
+int
+***
+
+* Accepts vanilla decimal values (e.g. `123`).
+* Accepts hexadecimal values (strings starting with `0x`).
+* Accepts binary values (strings starting with `0b`)
