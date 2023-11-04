@@ -36,10 +36,8 @@ def _coerce_kw(out, parameter, value: str):
     """
     hint, param = get_hint_parameter(parameter)
     hint = typing.get_origin(hint) or hint
-    # TODO: I don't think this will properly handle List[List[int]]
     coercion = param.coercion if param.coercion else default_coercion_lookup.get(hint, hint)
     value = coercion(value)
-    hint = typing.get_origin(hint) or hint
     if hint in (list, tuple, Iterable):
         out.setdefault(parameter, [])
         out[parameter].append(value)
