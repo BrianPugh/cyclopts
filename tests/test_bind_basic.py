@@ -265,3 +265,12 @@ def test_keyword_list(app):
     actual_command, actual_bind = app.parse_args("foo --a=1 --a=2 --a 3")
     assert actual_command == foo
     assert actual_bind == expected_bind
+
+
+def test_keyword_list_pos_not_allowed(app):
+    @app.command
+    def foo(a: List[int]):
+        pass
+
+    with pytest.raises(UnsupportedPositionalError):
+        app.parse_args("foo 1")
