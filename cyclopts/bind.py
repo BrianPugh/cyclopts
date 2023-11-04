@@ -1,16 +1,13 @@
 import inspect
 import typing
 from collections import deque
-from typing import Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 
 from cyclopts.coercion import default_coercion_lookup
 from cyclopts.exceptions import (
     MissingArgumentError,
-    MissingTypeError,
     UnknownKeywordError,
-    UnreachableError,
     UnsupportedPositionalError,
-    UnsupportedTypeHintError,
 )
 from cyclopts.parameter import get_hint_parameter
 
@@ -32,17 +29,25 @@ def _cli2parameter_mappings(f: Callable):
     return kw_mapping, flag_mapping
 
 
-def _coerce_kw(d, parameter, value: str):
+def _coerce_kw(out, parameter, value: str):
+    """Coerce an input string value according to Cyclopts rules.
+
+    Updates dictionary inplace.
+    """
     hint, param = get_hint_parameter(parameter)
     hint = typing.get_origin(hint) or hint
     # TODO: I don't think this will properly handle List[List[int]]
     coercion = param.coercion if param.coercion else default_coercion_lookup.get(hint, hint)
     value = coercion(value)
-    if (typing.get_origin(hint) or hint) in (list, tuple):
-        d.setdefault(parameter.name, [])
-        d[parameter.name].append(value)
+    hint = typing.get_origin(hint) or hint
+    if hint in (list, tuple, Iterable):
+        out.setdefault(parameter, [])
+        out[parameter].append(value)
+    elif parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
+        out.setdefault(parameter, [])
+        out[parameter].append(value)
     else:
-        d[parameter.name] = value
+        out[parameter] = value
 
 
 def _coerce_pos(parameter, value: str):
@@ -52,10 +57,9 @@ def _coerce_pos(parameter, value: str):
     return coercion(value)
 
 
-def _parse_kw_and_flags(f, tokens):
+def _parse_kw_and_flags(f, tokens, mapping):
     cli2kw, cli2flag = _cli2parameter_mappings(f)
 
-    f_kwargs = {}
     remaining_tokens = []
 
     # Parse All Keyword Arguments & Flags
@@ -89,23 +93,21 @@ def _parse_kw_and_flags(f, tokens):
             else:
                 raise UnknownKeywordError(f"--{token}")
 
-            _coerce_kw(f_kwargs, parameter, cli_value)
+            _coerce_kw(mapping, parameter, cli_value)
         else:  # positional
             remaining_tokens.append(token)
 
-    return f_kwargs, remaining_tokens
+    return remaining_tokens
 
 
-def _parse_pos(f: Callable, tokens: Iterable[str], f_kwargs: Dict) -> Tuple[list, list]:
+def _parse_pos(f: Callable, tokens: Iterable[str], out: Dict) -> List[str]:
     tokens = deque(tokens)
     signature = inspect.signature(f)
     parameters = list(signature.parameters.values())
 
-    f_args = []  # make this (parameter, arg)
-
     def remaining_parameters():
         for parameter in parameters:
-            if parameter.name in f_kwargs:
+            if parameter in out:
                 continue
             yield parameter
 
@@ -114,31 +116,48 @@ def _parse_pos(f: Callable, tokens: Iterable[str], f_kwargs: Dict) -> Tuple[list
             break
         if parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
             for token in tokens:
-                f_args.append(_coerce_pos(parameter, token))
+                _coerce_kw(out, parameter, token)
             tokens.clear()
             break
-        elif parameter.kind == parameter.POSITIONAL_ONLY:
-            f_args.append(_coerce_pos(parameter, tokens.popleft()))
-        elif parameter.kind == parameter.POSITIONAL_OR_KEYWORD:
+        else:
             if typing.get_origin(parameter.annotation) is list:
                 raise UnsupportedPositionalError("List parameters cannot be populated by positional arguments.")
-            f_kwargs[parameter.name] = _coerce_pos(parameter, tokens.popleft())
-        else:
-            raise UnreachableError("Not expected to get here.")
+            _coerce_kw(out, parameter, tokens.popleft())
 
-    return f_args, list(tokens)
+    return list(tokens)
+
+
+def _is_required(parameter: inspect.Parameter) -> bool:
+    return parameter.default is parameter.empty
+
+
+def _bind(f: Callable, mapping):
+    signature = inspect.signature(f)
+
+    f_pos, f_kwargs = [], {}
+    for p in signature.parameters.values():
+        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+            try:
+                f_pos.append(mapping[p])
+            except KeyError as e:
+                if _is_required(p):
+                    raise MissingArgumentError from e
+        elif p.kind is p.VAR_POSITIONAL:  # ``*args``
+            f_pos.extend(mapping.get(p, []))
+        else:
+            try:
+                f_kwargs[p.name] = mapping[p]
+            except KeyError as e:
+                if _is_required(p):
+                    raise MissingArgumentError from e
+
+    return signature.bind(*f_pos, **f_kwargs)
 
 
 def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[str]]:
-    f_kwargs, remaining_tokens = _parse_kw_and_flags(f, tokens)
-    f_pos, remaining_tokens = _parse_pos(f, remaining_tokens, f_kwargs)
-
-    signature = inspect.signature(f)
-    try:
-        bound = signature.bind(*f_pos, **f_kwargs)
-    except TypeError as e:
-        raise MissingArgumentError from e
-
-    bound.apply_defaults()
-
+    # Note: mapping is updated inplace
+    mapping: Dict[inspect.Parameter, Any] = {}
+    remaining_tokens = _parse_kw_and_flags(f, tokens, mapping)
+    remaining_tokens = _parse_pos(f, remaining_tokens, mapping)
+    bound = _bind(f, mapping)
     return bound, remaining_tokens

@@ -107,7 +107,6 @@ def test_union_required_implicit_coercion(app, cmd_str, annotated):
     assert isinstance(actual_bind.args[0], int)
 
 
-@pytest.mark.skip(reason="wip")
 @pytest.mark.parametrize(
     "cmd_str",
     [
