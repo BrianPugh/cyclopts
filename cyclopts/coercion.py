@@ -1,8 +1,15 @@
+import builtins
 from typing import Union
 
+__all__ = [
+    "bool",
+    "int",
+    "default_coercion_lookup",
+]
 
-def coerce_bool(s: Union[str, bool]) -> bool:
-    if isinstance(s, bool):
+
+def bool(s: Union[str, builtins.bool]) -> bool:
+    if isinstance(s, builtins.bool):
         return s
 
     s = s.lower()
@@ -11,11 +18,11 @@ def coerce_bool(s: Union[str, bool]) -> bool:
     return True
 
 
-def coerce_int(s: str) -> int:
-    return int(s, 0)
+def int(s: str) -> int:
+    return builtins.int(s, 0)
 
 
 default_coercion_lookup = {
-    int: coerce_int,
-    bool: coerce_bool,
+    builtins.int: int,
+    builtins.bool: bool,
 }

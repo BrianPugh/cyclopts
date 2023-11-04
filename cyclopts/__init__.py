@@ -3,6 +3,7 @@ __version__ = "0.0.0"
 
 __all__ = [
     "App",
+    "coercion",
     "CommandCollisionError",
     "CycloptsError",
     "MissingArgumentError",
@@ -32,3 +33,5 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
 )
 from cyclopts.parameter import Parameter
+
+from . import coercion
