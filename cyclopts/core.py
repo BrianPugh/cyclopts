@@ -1,3 +1,4 @@
+import argparse as builtin_argparse
 import inspect
 import os
 import shlex
@@ -6,18 +7,18 @@ import typing
 from functools import partial
 from typing import Callable, Iterable, Optional, Union
 
-from attrs import define, field
+from attrs import Factory, define, field
 from autoregistry import Registry
 
 from cyclopts.bind import create_bound_arguments
 from cyclopts.exceptions import CommandCollisionError, MissingTypeError, UnsupportedTypeHintError, UnusedCliTokensError
-from cyclopts.help import display_help
+from cyclopts.help import HelpMixin
 from cyclopts.parameter import get_hint_parameter
 
 
 def _validate_type_supported(p: inspect.Parameter):
     # get_hint_parameter internally does some validation
-    hint, parameter = get_hint_parameter(p)
+    get_hint_parameter(p)
     if p.annotation is p.empty:
         raise MissingTypeError(p.name)
     if p.kind == p.POSITIONAL_ONLY:
@@ -26,9 +27,29 @@ def _validate_type_supported(p: inspect.Parameter):
 
 
 @define
-class App:
+class App(HelpMixin):
+    # Name of the Program
+    name: str = field(default=sys.argv[0])
+
+    # Argument Parser that may be helpful for global options if command chaining.
+    # Part of ``App`` so that we can assimilate the parsing data into ``display_help``.
+    argparse: builtin_argparse.ArgumentParser = field(factory=builtin_argparse.ArgumentParser)
+
+    # User can provide their own registry if they want their own python-function-name to
+    # cli-command-name conversion.
     registry: Registry = field(factory=partial(Registry, hyphen=True, case_sensitive=True))
-    _default_command: Callable = field(default=display_help)
+
+    ######################
+    # Private Attributes #
+    ######################
+    _default_command: Callable = field(
+        init=False,
+        default=Factory(lambda self: self.display_help, takes_self=True),
+    )
+
+    ###########
+    # Methods #
+    ###########
 
     def __getitem__(self, key: str) -> Callable:
         return self.registry[key]
@@ -49,7 +70,7 @@ class App:
             return partial(
                 self.default_command,
             )  # Pass the rest of params here
-        if self._default_command is not display_help:
+        if self._default_command is not self.display_help:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
         return self.command(f=f)
 
@@ -69,10 +90,7 @@ class App:
         else:
             tokens = list(tokens)
 
-        if not tokens:
-            return self._default_command()
-
-        if tokens[0] in self.registry:
+        if tokens and tokens[0] in self.registry:
             # This is a valid command
             command = self[tokens[0]]
             tokens = tokens[1:]
