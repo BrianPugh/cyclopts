@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional, Tuple
 
 from rich import box
 from rich.console import Console
@@ -37,6 +37,19 @@ def _format_usage(self):
     return Text(" ".join(usage_string), style="bold")
 
 
+def _format_doc(self):
+    doc_strings = self.help.split("\n")
+
+    if not doc_strings:
+        return Text()
+
+    components: List[Tuple[str, str]] = [(doc_strings[0], "default")]
+    for s in doc_strings[1:]:
+        components.append((s, "info"))
+
+    return Text.assemble(*components)
+
+
 def _format_arguments(self):
     breakpoint()
     raise NotImplementedError
@@ -60,7 +73,9 @@ class HelpMixin:
             console = Console()
 
         console.print(_format_usage(self))
+        console.print(_format_doc(self))
         console.print(_format_options(self))
+        return
 
         if True:  # TODO
             console.print(_format_arguments(self))

@@ -1,4 +1,5 @@
 import argparse as builtin_argparse
+import importlib
 import inspect
 import os
 import shlex
@@ -29,18 +30,50 @@ def _format_name(name: str):
     return name.lower().replace("_", "-")
 
 
+def _create_default_argparse(self):
+    parser = builtin_argparse.ArgumentParser(
+        add_help=False,
+    )
+    return parser
+
+
+def _default_version(default="0.0.0") -> str:
+    """Attempts to get the calling code's ``module.__version__``.
+
+    Returns ``default`` if it cannot find ``__version__``.
+    """
+    stack = inspect.stack()
+    calling_frame = stack[2]  # Assumes ``App`` is calling this
+    if (module := inspect.getmodule(calling_frame.frame)) is None:
+        return default
+
+    root_module_name = module.__name__.split(".")[0]
+    try:
+        module = importlib.import_module(root_module_name)
+    except ImportError:
+        return default
+    return getattr(module, "__version__", default)
+
+
 @define
 class App(HelpMixin):
     # Name of the Program
     name: str = field(default=sys.argv[0])
 
+    help: str = ""
+    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
+
+    version: str = field(factory=_default_version)
+    version_flags: Iterable[str] = field(factory=lambda: ["--version"])
+
     # Argument Parser that may be helpful for global options if command chaining.
     # Part of ``App`` so that we can assimilate the parsing data into ``display_help``.
-    argparse: builtin_argparse.ArgumentParser = field(factory=builtin_argparse.ArgumentParser)
+    argparse: builtin_argparse.ArgumentParser = field(default=Factory(_create_default_argparse, takes_self=True))
 
     ######################
     # Private Attributes #
     ######################
+
     _default_command: Callable = field(
         init=False,
         default=Factory(lambda self: self.display_help, takes_self=True),
@@ -53,6 +86,9 @@ class App(HelpMixin):
     ###########
     # Methods #
     ###########
+
+    def display_version(self):
+        print(self.version)
 
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
@@ -114,8 +150,18 @@ class App(HelpMixin):
         if isinstance(command, App):
             return command.parse_known_args(tokens)
 
-        bound, remaining_tokens = create_bound_arguments(command, tokens)
-        remaining_tokens = list(remaining_tokens)
+        if any(flag in tokens for flag in self.help_flags):
+            command = self.display_help
+            bound = inspect.signature(command).bind()
+            remaining_tokens = []
+        elif any(flag in tokens for flag in self.version_flags):
+            command = self.display_version
+            bound = inspect.signature(command).bind()
+            remaining_tokens = []
+        else:
+            bound, remaining_tokens = create_bound_arguments(command, tokens)
+            remaining_tokens = list(remaining_tokens)
+
         return command, bound, remaining_tokens
 
     def parse_args(self, tokens: Union[None, str, Iterable[str]] = None):
