@@ -79,8 +79,11 @@ class App(HelpMixin):
         default=Factory(lambda self: self.display_help, takes_self=True),
     )
 
+    # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
+    # A list of higher up ``cyclopts.App``.
+    # Used for printing "Usage" help-string.
     _help_command_prefixes: List[str] = field(init=False, factory=list)
 
     ###########
@@ -93,35 +96,33 @@ class App(HelpMixin):
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
 
-    def register(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
+    def register(self, obj: Optional[Callable] = None, *, name: str = "", **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
-        if obj is None:  # Called ``app.command``
+        if obj is None:  # Called ``@app.command``
             return partial(
                 self.register,
             )  # Pass the rest of params here
 
         if isinstance(obj, App):  # Registering a sub-App
             name = obj.name
-            # Help String Prefix
             obj._help_command_prefixes.append(self.name)
         else:
             for parameter in inspect.signature(obj).parameters.values():
                 _validate_type_supported(parameter)
-            # TODO: command should take in optional ``name``
-            name = _format_name(obj.__name__)
+            name = name or _format_name(obj.__name__)
 
-        # TODO: collision check
+        if name in self._commands:
+            raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')
+
         self._commands[name] = obj
         return obj
 
-    def register_default(self, f=None):
-        if f is None:  # Called ``app.default_command``
-            return partial(
-                self.register_default,
-            )  # Pass the rest of params here
+    def register_default(self, obj=None, **kwargs):
+        if obj is None:  # Called ``@app.default_command``
+            return partial(self.register_default, **kwargs)  # Pass the rest of params here
         if self._default_command is not self.display_help:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
-        return self.register(obj=f)
+        return self.register(obj=obj, **kwargs)
 
     def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None):
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
@@ -151,7 +152,7 @@ class App(HelpMixin):
             return command.parse_known_args(tokens)
 
         if any(flag in tokens for flag in self.help_flags):
-            command = self.display_help
+            command = partial(self.display_help, function=command)
             bound = inspect.signature(command).bind()
             remaining_tokens = []
         elif any(flag in tokens for flag in self.version_flags):
