@@ -29,7 +29,6 @@ generate-setup-file = false
 python = "^3.8"
 typing-extensions = ">=4.8.0"
 attrs = ">=23.1.0"
-autoregistry = ">=1.1.1"
 rich = ">=13.6.0"
 
 [tool.poetry.group.docs.dependencies]

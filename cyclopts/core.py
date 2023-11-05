@@ -5,10 +5,9 @@ import shlex
 import sys
 import typing
 from functools import partial
-from typing import Callable, Iterable, Optional, Union
+from typing import Callable, Dict, Iterable, Optional, Union
 
 from attrs import Factory, define, field
-from autoregistry import Registry
 
 from cyclopts.bind import create_bound_arguments
 from cyclopts.exceptions import CommandCollisionError, MissingTypeError, UnsupportedTypeHintError, UnusedCliTokensError
@@ -26,6 +25,10 @@ def _validate_type_supported(p: inspect.Parameter):
             raise UnsupportedTypeHintError("Positional-only parameter cannot be of type 'list'.")
 
 
+def _format_name(name: str):
+    return name.lower().replace("_", "-")
+
+
 @define
 class App(HelpMixin):
     # Name of the Program
@@ -35,10 +38,6 @@ class App(HelpMixin):
     # Part of ``App`` so that we can assimilate the parsing data into ``display_help``.
     argparse: builtin_argparse.ArgumentParser = field(factory=builtin_argparse.ArgumentParser)
 
-    # User can provide their own registry if they want their own python-function-name to
-    # cli-command-name conversion.
-    registry: Registry = field(factory=partial(Registry, hyphen=True, case_sensitive=True))
-
     ######################
     # Private Attributes #
     ######################
@@ -47,23 +46,33 @@ class App(HelpMixin):
         default=Factory(lambda self: self.display_help, takes_self=True),
     )
 
+    _commands: Dict[str, Callable] = field(init=False, factory=dict)
+
     ###########
     # Methods #
     ###########
 
     def __getitem__(self, key: str) -> Callable:
-        return self.registry[key]
+        return self._commands[key]
 
-    def command(self, f: Optional[Callable] = None, **kwargs) -> Callable:
+    def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
-        if f is None:  # Called ``app.command``
+        if obj is None:  # Called ``app.command``
             return partial(
                 self.command,
             )  # Pass the rest of params here
-        for parameter in inspect.signature(f).parameters.values():
-            _validate_type_supported(parameter)
-        self.registry(f, **kwargs)
-        return f
+
+        if isinstance(obj, App):  # Registering a sub-App
+            name = obj.name
+        else:
+            for parameter in inspect.signature(obj).parameters.values():
+                _validate_type_supported(parameter)
+            # TODO: command should take in optional ``name``
+            name = _format_name(obj.__name__)
+
+        # TODO: collision check
+        self._commands[name] = obj
+        return obj
 
     def default_command(self, f=None):
         if f is None:  # Called ``app.default_command``
@@ -72,7 +81,7 @@ class App(HelpMixin):
             )  # Pass the rest of params here
         if self._default_command is not self.display_help:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
-        return self.command(f=f)
+        return self.command(obj=f)
 
     def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None):
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
@@ -90,12 +99,16 @@ class App(HelpMixin):
         else:
             tokens = list(tokens)
 
-        if tokens and tokens[0] in self.registry:
+        # Extract out the command-string
+        if tokens and tokens[0] in self._commands:
             # This is a valid command
             command = self[tokens[0]]
             tokens = tokens[1:]
         else:
             command = self._default_command
+
+        if isinstance(command, App):
+            return command.parse_known_args(tokens)
 
         bound, remaining_tokens = create_bound_arguments(command, tokens)
         remaining_tokens = list(remaining_tokens)

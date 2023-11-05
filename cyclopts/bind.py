@@ -151,15 +151,29 @@ def _bind(f: Callable, mapping):
     signature = inspect.signature(f)
 
     f_pos, f_kwargs = [], {}
+    use_pos = True
+
+    def f_pos_append(p):
+        nonlocal use_pos
+        assert use_pos
+        try:
+            f_pos.append(mapping[p])
+        except KeyError as e:
+            if _is_required(p):
+                raise MissingArgumentError from e
+            use_pos = False
+
+    """
+    Unintuitive notes:
+    * Parameters before a ``*args`` may have type ``POSITIONAL_OR_KEYWORD``.
+        * Only args before a ``/`` are ``POSITIONAL_ONLY``.
+    """
     for p in signature.parameters.values():
-        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
-            try:
-                f_pos.append(mapping[p])
-            except KeyError as e:
-                if _is_required(p):
-                    raise MissingArgumentError from e
-        elif p.kind is p.VAR_POSITIONAL:  # ``*args``
+        if use_pos and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+            f_pos_append(p)
+        elif use_pos and p.kind is p.VAR_POSITIONAL:  # ``*args``
             f_pos.extend(mapping.get(p, []))
+            use_pos = False
         elif p.kind is p.VAR_KEYWORD:
             f_kwargs.update(mapping.get(p, {}))
         else:

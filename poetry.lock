@@ -59,17 +59,6 @@ tests = ["attrs[tests-no-zope]", "zope-interface"]
 tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
 
 [[package]]
-name = "autoregistry"
-version = "1.1.1"
-description = "Automatic registry design-pattern for mapping names to functionality."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "autoregistry-1.1.1-py3-none-any.whl", hash = "sha256:2efb7ff26edd941736a004061aa8e7a519f4611b000b77d4233d412e51ab58c9"},
-    {file = "autoregistry-1.1.1.tar.gz", hash = "sha256:2ad9850d74e1a88c154c43c81469684472d84623d3b4903b8e4b5fc0365d1ba4"},
-]
-
-[[package]]
 name = "babel"
 version = "2.13.1"
 description = "Internationalization utilities"
@@ -1511,4 +1500,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "40f64a1109acfd39972b9852d63a972b2cd4320aed6e67997c7350dfbc1b193b"
+content-hash = "7193e399f1486fc2e15f23e64c9f67cfb29f6c2c62320cecff34661eacde7186"
