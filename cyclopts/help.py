@@ -28,11 +28,11 @@ def _create_two_col_panel(title: str, col_1_strings: Iterable[str]):
 def _format_usage(self):
     usage_string = []
     usage_string.append("Usage:")
-    usage_string.append(self.name)
-
-    # TODO: This should be generic to a cyclopts.App and a registered command...
-    # TODO: description string
-    breakpoint()
+    usage_string.extend(self._help_command_prefixes)
+    usage_string.append(self.name)  # How do we get the prefix commands?
+    usage_string.append("COMMAND")
+    usage_string.append("[OPTIONS]")
+    usage_string.append("[ARGS]")
 
     return Text(" ".join(usage_string), style="bold")
 

@@ -5,7 +5,7 @@ import shlex
 import sys
 import typing
 from functools import partial
-from typing import Callable, Dict, Iterable, Optional, Union
+from typing import Callable, Dict, Iterable, List, Optional, Union
 
 from attrs import Factory, define, field
 
@@ -48,6 +48,8 @@ class App(HelpMixin):
 
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
+    _help_command_prefixes: List[str] = field(init=False, factory=list)
+
     ###########
     # Methods #
     ###########
@@ -64,6 +66,8 @@ class App(HelpMixin):
 
         if isinstance(obj, App):  # Registering a sub-App
             name = obj.name
+            # Help String Prefix
+            obj._help_command_prefixes.append(self.name)
         else:
             for parameter in inspect.signature(obj).parameters.values():
                 _validate_type_supported(parameter)
