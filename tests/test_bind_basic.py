@@ -22,7 +22,7 @@ def app():
 def test_missing_positional_type(app):
     with pytest.raises(cyclopts.MissingTypeError):
 
-        @app.command
+        @app.register
         def foo(a, b, c):
             pass
 
@@ -39,7 +39,7 @@ def test_missing_positional_type(app):
     ],
 )
 def test_basic_1(app, cmd_str):
-    @app.command
+    @app.register
     def foo(a: int, b: int, c: int):
         pass
 
@@ -60,7 +60,7 @@ def test_basic_1(app, cmd_str):
     ],
 )
 def test_basic_2(app, cmd_str):
-    @app.command
+    @app.register
     def foo(a: int, b: int, c: int, d: int = 5, some_flag: bool = False):
         pass
 
@@ -88,13 +88,13 @@ def test_union_required_implicit_coercion(app, cmd_str, annotated):
     """
     if annotated:
 
-        @app.command
+        @app.register
         def foo(a: Annotated[Union[None, int, float], Parameter(help="help for a")]):
             pass
 
     else:
 
-        @app.command
+        @app.register
         def foo(a: Union[None, int, float]):
             pass
 
@@ -123,13 +123,13 @@ def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated):
     """
     if annotated:
 
-        @app.command
+        @app.register
         def foo(a: Annotated[Optional[int], Parameter(help="help for a")] = None):
             pass
 
     else:
 
-        @app.command
+        @app.register
         def foo(a: Optional[int] = None):
             pass
 
@@ -151,7 +151,7 @@ def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated):
     ],
 )
 def test_star_args(app, cmd_str):
-    @app.command
+    @app.register
     def foo(a: int, b: int, *args: int):
         pass
 
@@ -170,7 +170,7 @@ def test_star_args(app, cmd_str):
     ],
 )
 def test_pos_only(app, cmd_str):
-    @app.command
+    @app.register
     def foo(a: int, b: int, c: int, /):
         pass
 
@@ -191,7 +191,7 @@ def test_pos_only(app, cmd_str):
 def test_pos_only_exceptions(app, cmd_str_e):
     cmd_str, e = cmd_str_e
 
-    @app.command
+    @app.register
     def foo(a: int, b: int, c: int, /):
         pass
 
@@ -208,7 +208,7 @@ def test_pos_only_exceptions(app, cmd_str_e):
     ],
 )
 def test_pos_only_extended(app, cmd_str):
-    @app.command
+    @app.register
     def foo(a: int, b: int, c: int, /, d: int):
         pass
 
@@ -229,7 +229,7 @@ def test_pos_only_extended(app, cmd_str):
 def test_pos_only_extended_exceptions(app, cmd_str_e):
     cmd_str, e = cmd_str_e
 
-    @app.command
+    @app.register
     def foo(a: int, b: int, c: int, /, d: int):
         pass
 
@@ -240,13 +240,13 @@ def test_pos_only_extended_exceptions(app, cmd_str_e):
 def test_pos_only_list_not_allowed(app):
     with pytest.raises(UnsupportedTypeHintError):
 
-        @app.command
+        @app.register
         def foo(a: List[int], /):
             pass
 
 
 def test_pos_kw_list_not_allowed_by_pos(app):
-    @app.command
+    @app.register
     def foo(a: List[int]):
         pass
 
@@ -255,7 +255,7 @@ def test_pos_kw_list_not_allowed_by_pos(app):
 
 
 def test_kwargs_int(app):
-    @app.command
+    @app.register
     def foo(a: int, **kwargs: int):
         pass
 
@@ -268,7 +268,7 @@ def test_kwargs_int(app):
 
 
 def test_kwargs_list_int(app):
-    @app.command
+    @app.register
     def foo(a: int, **kwargs: List[int]):
         pass
 
@@ -281,7 +281,7 @@ def test_kwargs_list_int(app):
 
 
 def test_keyword_list(app):
-    @app.command
+    @app.register
     def foo(a: List[int]):
         pass
 
@@ -294,7 +294,7 @@ def test_keyword_list(app):
 
 
 def test_keyword_list_pos_not_allowed(app):
-    @app.command
+    @app.register
     def foo(a: List[int]):
         pass
 

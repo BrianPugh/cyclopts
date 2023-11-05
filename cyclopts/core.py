@@ -55,11 +55,11 @@ class App(HelpMixin):
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
 
-    def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
+    def register(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
         if obj is None:  # Called ``app.command``
             return partial(
-                self.command,
+                self.register,
             )  # Pass the rest of params here
 
         if isinstance(obj, App):  # Registering a sub-App
@@ -74,14 +74,14 @@ class App(HelpMixin):
         self._commands[name] = obj
         return obj
 
-    def default_command(self, f=None):
+    def register_default(self, f=None):
         if f is None:  # Called ``app.default_command``
             return partial(
-                self.default_command,
+                self.register_default,
             )  # Pass the rest of params here
         if self._default_command is not self.display_help:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
-        return self.command(obj=f)
+        return self.register(obj=f)
 
     def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None):
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
