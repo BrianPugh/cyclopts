@@ -1,6 +1,6 @@
 import argparse
-from typing import Callable, Iterable, List, Optional, Tuple
 from itertools import chain
+from typing import Callable, Iterable, List, Optional, Tuple
 
 from rich import box
 from rich.console import Console
@@ -145,7 +145,7 @@ def _format_commands(self):
 
 
 class HelpMixin:
-    def display_help(self, *, function: Optional[Callable] = None, console: Optional[Console] = None):
+    def print_help(self, *, function: Optional[Callable] = None, console: Optional[Console] = None):
         if console is None:
             console = Console()
 

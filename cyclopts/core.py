@@ -67,7 +67,7 @@ class App(HelpMixin):
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
 
     # Argument Parser that may be helpful for global options if command chaining.
-    # Part of ``App`` so that we can assimilate the parsing data into ``display_help``.
+    # Part of ``App`` so that we can assimilate the parsing data into ``print_help``.
     argparse: builtin_argparse.ArgumentParser = field(default=Factory(_create_default_argparse, takes_self=True))
 
     ######################
@@ -76,7 +76,7 @@ class App(HelpMixin):
 
     _default_command: Callable = field(
         init=False,
-        default=Factory(lambda self: self.display_help, takes_self=True),
+        default=Factory(lambda self: self.print_help, takes_self=True),
     )
 
     # Maps CLI-name of a command to a function handle.
@@ -120,7 +120,7 @@ class App(HelpMixin):
     def register_default(self, obj=None, **kwargs):
         if obj is None:  # Called ``@app.default_command``
             return partial(self.register_default, **kwargs)  # Pass the rest of params here
-        if self._default_command is not self.display_help:
+        if self._default_command is not self.print_help:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
         return self.register(obj=obj, **kwargs)
 
@@ -152,7 +152,7 @@ class App(HelpMixin):
             return command.parse_known_args(tokens)
 
         if any(flag in tokens for flag in self.help_flags):
-            command = partial(self.display_help, function=command)
+            command = partial(self.print_help, function=command)
             bound = inspect.signature(command).bind()
             remaining_tokens = []
         elif any(flag in tokens for flag in self.version_flags):
