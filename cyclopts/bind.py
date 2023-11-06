@@ -3,14 +3,13 @@ import typing
 from collections import deque
 from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
 
-from cyclopts.coercion import lookup as coercion_lookup
 from cyclopts.exceptions import (
     CoercionError,
     MissingArgumentError,
     UnknownKeywordError,
     UnsupportedPositionalError,
 )
-from cyclopts.parameter import get_coercion, get_hint_parameter
+from cyclopts.parameter import get_coercion, get_hint_parameter, get_name
 
 UnknownTokens = NewType("UnknownTokens", List[str])
 
@@ -25,10 +24,10 @@ def _cli2parameter_mappings(f: Callable):
 
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint, param = get_hint_parameter(parameter)
-            key = param.name if param.name else parameter.name.replace("_", "-")
+            key = get_name(parameter)
             if (typing.get_origin(hint) or hint) is bool:  # Boolean Flag
                 flag_mapping[key] = (parameter, True)
-                flag_mapping["no-" + key] = (parameter, False)
+                # flag_mapping["no-" + key] = (parameter, False)  # TODO
             else:
                 kw_mapping[key] = parameter
     return kw_mapping, flag_mapping, kwargs_parameter
@@ -100,8 +99,6 @@ def _parse_kw_and_flags(f, tokens, mapping):
             remaining_tokens.append(token)
             continue
 
-        token = token[2:]  # remove the leading "--"
-
         if token in cli2flag:
             parameter, cli_value = cli2flag[token]
         else:
@@ -113,13 +110,15 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     cli_value = tokens[i + 1]
                     skip_next_iterations = 1
                 except IndexError as e:
-                    raise MissingArgumentError(f"Unknown CLI keyword --{cli_key}") from e
+                    raise MissingArgumentError(f"Unknown CLI keyword {cli_key}") from e
 
             try:
                 parameter = cli2kw[cli_key]
             except KeyError as e:
                 if kwargs_parameter:
                     parameter = kwargs_parameter
+                    cli_key = cli_key[2:]  # strip off leading "--"
+                    cli_key = cli_key.replace("-", "_")
                     cli_value = {cli_key: cli_value}
                 else:
                     raise UnknownKeywordError(cli_key) from e

@@ -26,6 +26,20 @@ class Parameter:
     help: str = ""
 
 
+def get_name(parameter: inspect.Parameter) -> str:
+    _, param = get_hint_parameter(parameter)
+    if param.name:
+        name = param.name
+    else:
+        name = "--" + parameter.name.replace("_", "-")
+
+    if parameter.kind is parameter.POSITIONAL_ONLY:
+        # Name is only used for help-string
+        return name.upper()
+    else:
+        return name
+
+
 def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
     is_iterable = False
     hint, param = get_hint_parameter(parameter)

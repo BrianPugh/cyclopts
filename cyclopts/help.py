@@ -1,4 +1,6 @@
 import argparse
+import inspect
+import typing
 from functools import partial
 from itertools import chain
 from typing import Callable, Iterable, List, Optional, Tuple
@@ -6,12 +8,15 @@ from typing import Callable, Iterable, List, Optional, Tuple
 from attrs import define, field
 from rich import box
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from cyclopts.bind import UnknownTokens
 from cyclopts.docstring import DocString
 from cyclopts.exceptions import CycloptsError, UnreachableError
+from cyclopts.parameter import get_hint_parameter, get_name
 
 
 class SilentRich:
@@ -124,6 +129,8 @@ def _format_global_options(self, function):
 
 def _format_options(self, function):
     # --option -o limitations helpstring
+    panel, table = _create_panel_table(title=self.help_panel_title)
+
     if function is None:
         for command_name, command_fn in self._commands.items():
             pass
@@ -132,11 +139,54 @@ def _format_options(self, function):
         raise NotImplementedError
     else:
         # Check the global argparse
-        breakpoint()
-        panel, table = _create_two_col_panel("Options")
-        raise NotImplementedError
+        parameters = []
+        for parameter in inspect.signature(function).parameters.values():
+            hint, param = get_hint_parameter(parameter)
 
-    raise NotImplementedError
+            if (typing.get_origin(hint) or hint) is UnknownTokens:
+                continue
+
+            parameters.append(parameter)
+
+        has_required, has_short = False, False
+        options, options_short, helps = [], [], []
+
+        def is_required(parameter):
+            return parameter.default is parameter.empty
+
+        for parameter in parameters:
+            hint, param = get_hint_parameter(parameter)
+            name = get_name(parameter)
+            has_required |= is_required(parameter)
+            # TODO: need to handle multinaming
+            options.append(name)
+            # TODO: infer from docstring
+
+            help_components = []
+            if param.help:
+                help_components.append(param.help)
+            if param.show_default and not is_required(parameter):
+                help_components.append(rf"[dim]\[default: {parameter.default}][/dim]")
+            helps.append(" ".join(help_components))
+
+        if has_required:
+            table.add_column(justify="left", width=1, style="red bold")
+        table.add_column(justify="left", width=max(len(x) for x in options), style="cyan")
+        # if has_short:
+        #    table.add_column(justify="left", width=max(len(x) for x in options_short) + 1, style="green")
+        table.add_column(justify="left")
+
+        for parameter, option, _help in zip(parameters, options, helps):
+            row_args = []
+            if has_required:
+                row_args.append("*" if is_required(parameter) else "")
+            row_args.append(option)
+            # if has_short:
+            #     row_args.append(option_short)
+            row_args.append(_help)
+            table.add_row(*row_args)
+
+    return panel
 
 
 def _format_commands(self):
@@ -152,7 +202,7 @@ class HelpMixin:
 
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
 
-    help_panel_prefix: str = ""
+    help_panel_title: str = "Parameters"
 
     help_print_usage: bool = True
     help_print_options: bool = True
@@ -172,15 +222,4 @@ class HelpMixin:
         if self.help_print_usage:
             console.print(_format_usage(self, function))
         console.print(_format_doc(self, function))
-        # console.print(_format_global_arguments(self, function))
-        # console.print(_format_global_options(self, function))
-        breakpoint()
         console.print(_format_options(self, function))
-        breakpoint()
-        # console.print(_format_options(self))
-        return
-
-        if True:  # TODO
-            console.print(_format_arguments(self, function))
-        else:
-            console.print(_format_commands(self, function))
