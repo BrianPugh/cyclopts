@@ -84,7 +84,7 @@ class App(HelpMixin):
 
     # A list of higher up ``cyclopts.App``.
     # Used for printing "Usage" help-string.
-    _help_command_prefixes: List[str] = field(init=False, factory=list)
+    _help_usage_prefixes: List[str] = field(init=False, factory=list)
 
     ###########
     # Methods #
@@ -105,7 +105,7 @@ class App(HelpMixin):
 
         if isinstance(obj, App):  # Registering a sub-App
             name = obj.name
-            obj._help_command_prefixes.append(self.name)
+            obj._help_usage_prefixes.append(self.name)
         else:
             for parameter in inspect.signature(obj).parameters.values():
                 _validate_type_supported(parameter)

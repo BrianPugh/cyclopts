@@ -39,7 +39,7 @@ def _create_panel_table(**kwargs):
 def _format_usage(self, function):
     usage_string = []
     usage_string.append("Usage:")
-    usage_string.extend(self._help_command_prefixes)
+    usage_string.extend(self._help_usage_prefixes)
     usage_string.append(self.name)
     if function is not None:
         for name, f in self._commands.items():
