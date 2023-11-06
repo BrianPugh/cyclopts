@@ -1,7 +1,9 @@
 import argparse
+from functools import partial
 from itertools import chain
 from typing import Callable, Iterable, List, Optional, Tuple
 
+from attrs import define, field
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
@@ -144,15 +146,34 @@ def _format_commands(self):
     raise NotImplementedError
 
 
+@define(kw_only=True)
 class HelpMixin:
-    def print_help(self, *, function: Optional[Callable] = None, console: Optional[Console] = None):
+    help: str = ""
+
+    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
+
+    help_panel_prefix: str = ""
+
+    help_print_usage: bool = True
+    help_print_options: bool = True
+    help_print_commands: bool = True
+
+    ######################
+    # Private Attributes #
+    ######################
+    # A list of higher up ``cyclopts.App``.
+    # Used for printing "Usage" help-string.
+    _help_usage_prefixes: List[str] = field(init=False, factory=list)
+
+    def help_print(self, *, function: Optional[Callable] = None, console: Optional[Console] = None):
         if console is None:
             console = Console()
 
-        console.print(_format_usage(self, function))
+        if self.help_print_usage:
+            console.print(_format_usage(self, function))
         console.print(_format_doc(self, function))
         # console.print(_format_global_arguments(self, function))
-        console.print(_format_global_options(self, function))
+        # console.print(_format_global_options(self, function))
         breakpoint()
         console.print(_format_options(self, function))
         breakpoint()

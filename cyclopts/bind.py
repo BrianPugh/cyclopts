@@ -1,15 +1,18 @@
 import inspect
 import typing
 from collections import deque
-from typing import Any, Callable, Dict, Iterable, List, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
 
 from cyclopts.coercion import lookup as coercion_lookup
 from cyclopts.exceptions import (
+    CoercionError,
     MissingArgumentError,
     UnknownKeywordError,
     UnsupportedPositionalError,
 )
 from cyclopts.parameter import get_coercion, get_hint_parameter
+
+UnknownTokens = NewType("UnknownTokens", List[str])
 
 
 def _cli2parameter_mappings(f: Callable):
@@ -32,6 +35,7 @@ def _cli2parameter_mappings(f: Callable):
 
 
 def _coerce_parameter(
+    f: Callable,
     out: Dict[inspect.Parameter, Any],
     parameter: inspect.Parameter,
     value: Union[str, Dict[str, str]],
@@ -47,6 +51,15 @@ def _coerce_parameter(
     """
     coercion, is_iterable = get_coercion(parameter)
 
+    def _safe_coerce(value):
+        try:
+            return coercion(value)
+        except Exception as e:
+            raise CoercionError(
+                f'Error trying to coerce value "{value}" via "{coercion}" '
+                f'for parameter "{parameter.name}" of function "{f}"'
+            ) from e
+
     if parameter.kind is parameter.VAR_KEYWORD:  # ``**kwargs``
         assert isinstance(value, dict)
 
@@ -61,11 +74,11 @@ def _coerce_parameter(
         else:
             out[parameter].update(value)
     elif is_iterable or parameter.kind is parameter.VAR_POSITIONAL:  # ``*args``
-        value = coercion(value)
+        value = _safe_coerce(value)
         out.setdefault(parameter, [])
         out[parameter].append(value)
     else:
-        value = coercion(value)
+        value = _safe_coerce(value)
         out[parameter] = value
 
 
@@ -111,7 +124,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 else:
                     raise UnknownKeywordError(cli_key) from e
 
-        _coerce_parameter(mapping, parameter, cli_value)
+        _coerce_parameter(f, mapping, parameter, cli_value)
 
     return remaining_tokens
 
@@ -132,13 +145,13 @@ def _parse_pos(f: Callable, tokens: Iterable[str], out: Dict) -> List[str]:
             break
         if parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
             for token in tokens:
-                _coerce_parameter(out, parameter, token)
+                _coerce_parameter(f, out, parameter, token)
             tokens.clear()
             break
         else:
             if typing.get_origin(parameter.annotation) is list:
                 raise UnsupportedPositionalError("List parameters cannot be populated by positional arguments.")
-            _coerce_parameter(out, parameter, tokens.popleft())
+            _coerce_parameter(f, out, parameter, tokens.popleft())
 
     return list(tokens)
 
@@ -160,7 +173,7 @@ def _bind(f: Callable, mapping):
             f_pos.append(mapping[p])
         except KeyError as e:
             if _is_required(p):
-                raise MissingArgumentError from e
+                raise MissingArgumentError(f'Missing argument "{p.name}"') from e
             use_pos = False
 
     """
@@ -190,6 +203,15 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
     # Note: mapping is updated inplace
     mapping: Dict[inspect.Parameter, Any] = {}
     remaining_tokens = _parse_kw_and_flags(f, tokens, mapping)
+
+    for parameter in inspect.signature(f).parameters.values():
+        hint = typing.get_origin(parameter.annotation) or parameter.annotation
+        if hint is UnknownTokens:
+            mapping[parameter] = remaining_tokens
+            remaining_tokens = []
+            break
+
     remaining_tokens = _parse_pos(f, remaining_tokens, mapping)
+
     bound = _bind(f, mapping)
     return bound, remaining_tokens

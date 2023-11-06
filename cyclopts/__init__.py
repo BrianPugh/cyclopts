@@ -4,6 +4,7 @@ __version__ = "0.0.0"
 __all__ = [
     "App",
     "coercion",
+    "CoercionError",
     "CommandCollisionError",
     "CycloptsError",
     "MissingArgumentError",
@@ -11,6 +12,7 @@ __all__ = [
     "Parameter",
     "RepeatKeywordError",
     "UnknownKeywordError",
+    "UnknownTokens",
     "UnreachableError",
     "UnusedCliTokensError",
     "UnsupportedPositionalError",
@@ -18,8 +20,10 @@ __all__ = [
     "MultipleParameterAnnotationError",
 ]
 
+from cyclopts.bind import UnknownTokens
 from cyclopts.core import App
 from cyclopts.exceptions import (
+    CoercionError,
     CommandCollisionError,
     CycloptsError,
     MissingArgumentError,

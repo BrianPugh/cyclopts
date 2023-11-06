@@ -6,6 +6,10 @@ class UnreachableError(CycloptsError):
     """Code-block should be unreachable."""
 
 
+class CoercionError(CycloptsError):
+    pass
+
+
 class MissingTypeError(CycloptsError):
     """Function parameter is missing a type annotation."""
 

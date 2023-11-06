@@ -1,4 +1,3 @@
-import argparse as builtin_argparse
 import importlib
 import inspect
 import os
@@ -6,7 +5,7 @@ import shlex
 import sys
 import typing
 from functools import partial
-from typing import Callable, Dict, Iterable, List, Optional, Union
+from typing import Callable, Dict, Iterable, List, NewType, Optional, Union
 
 from attrs import Factory, define, field
 
@@ -30,13 +29,6 @@ def _format_name(name: str):
     return name.lower().replace("_", "-")
 
 
-def _create_default_argparse(self):
-    parser = builtin_argparse.ArgumentParser(
-        add_help=False,
-    )
-    return parser
-
-
 def _default_version(default="0.0.0") -> str:
     """Attempts to get the calling code's ``module.__version__``.
 
@@ -55,41 +47,38 @@ def _default_version(default="0.0.0") -> str:
     return getattr(module, "__version__", default)
 
 
-@define
+def _normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
+    if tokens is None:
+        tokens = sys.argv[1:]  # Remove the executable
+    elif isinstance(tokens, str):
+        tokens = shlex.split(tokens)
+    else:
+        tokens = list(tokens)
+    return tokens
+
+
+@define(kw_only=True)
 class App(HelpMixin):
     # Name of the Program
     name: str = field(default=sys.argv[0])
 
-    help: str = ""
-    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
-
     version: str = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
-
-    # Argument Parser that may be helpful for global options if command chaining.
-    # Part of ``App`` so that we can assimilate the parsing data into ``print_help``.
-    argparse: builtin_argparse.ArgumentParser = field(default=Factory(_create_default_argparse, takes_self=True))
 
     ######################
     # Private Attributes #
     ######################
-
     _default_command: Callable = field(
         init=False,
-        default=Factory(lambda self: self.print_help, takes_self=True),
+        default=Factory(lambda self: self.help_print, takes_self=True),
     )
 
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
-    # A list of higher up ``cyclopts.App``.
-    # Used for printing "Usage" help-string.
-    _help_usage_prefixes: List[str] = field(init=False, factory=list)
-
     ###########
     # Methods #
     ###########
-
     def display_version(self):
         print(self.version)
 
@@ -120,9 +109,14 @@ class App(HelpMixin):
     def register_default(self, obj=None, **kwargs):
         if obj is None:  # Called ``@app.default_command``
             return partial(self.register_default, **kwargs)  # Pass the rest of params here
-        if self._default_command is not self.print_help:
+        if self._default_command != self.help_print:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
-        return self.register(obj=obj, **kwargs)
+        self._default_command = obj
+
+        for parameter in inspect.signature(obj).parameters.values():
+            _validate_type_supported(parameter)
+
+        return obj
 
     def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None):
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
@@ -133,12 +127,7 @@ class App(HelpMixin):
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         """
-        if tokens is None:
-            tokens = sys.argv[1:]  # Remove the executable
-        elif isinstance(tokens, str):
-            tokens = shlex.split(tokens)
-        else:
-            tokens = list(tokens)
+        tokens = _normalize_tokens(tokens)
 
         # Extract out the command-string
         if tokens and tokens[0] in self._commands:
@@ -152,7 +141,7 @@ class App(HelpMixin):
             return command.parse_known_args(tokens)
 
         if any(flag in tokens for flag in self.help_flags):
-            command = partial(self.print_help, function=command)
+            command = partial(self.help_print, function=command)
             bound = inspect.signature(command).bind()
             remaining_tokens = []
         elif any(flag in tokens for flag in self.version_flags):
