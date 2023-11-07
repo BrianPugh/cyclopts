@@ -76,6 +76,8 @@ class App(HelpMixin):
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
+    _meta: "App" = field(init=False, default=None)
+
     ###########
     # Methods #
     ###########
@@ -84,6 +86,17 @@ class App(HelpMixin):
 
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
+
+    @property
+    def meta(self) -> "App":
+        if self._meta is None:
+            self._meta = App(
+                help_flags=[],  # disables "--help"
+                version_flags=[],  # disables "--version" for
+                help_print_usage=False,
+                help_panel_title="Session Parameters",
+            )
+        return self._meta
 
     def register(self, obj: Optional[Callable] = None, *, name: str = "", **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
