@@ -161,6 +161,8 @@ class App(HelpMixin):
             return command.parse_known_args(tokens)
 
         if any(flag in tokens for flag in self.help_flags):
+            if command is self.help_print:
+                command = None
             command = partial(self.help_print, function=command)
             bound = inspect.signature(command).bind()
             remaining_tokens = []
