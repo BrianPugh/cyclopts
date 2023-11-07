@@ -215,9 +215,8 @@ class HelpMixin:
     # Used for printing "Usage" help-string.
     _help_usage_prefixes: List[str] = field(init=False, factory=list)
 
-    def help_print(self, *, function: Optional[Callable] = None, console: Optional[Console] = None):
-        if console is None:
-            console = Console()
+    def help_print(self, *, function: Optional[Callable] = None):
+        console = Console()
 
         if self.help_print_usage:
             console.print(_format_usage(self, function))

@@ -131,9 +131,7 @@ class App(HelpMixin):
 
         # Extract out the command-string
         if tokens and tokens[0] in self._commands:
-            # This is a valid command
-            command = self[tokens[0]]
-            tokens = tokens[1:]
+            command, tokens = self[tokens[0]], tokens[1:]
         else:
             command = self._default_command
 
