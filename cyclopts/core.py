@@ -7,10 +7,17 @@ import typing
 from functools import partial
 from typing import Callable, Dict, Iterable, List, NewType, Optional, Union
 
+import attrs
 from attrs import Factory, define, field
 
 from cyclopts.bind import create_bound_arguments
-from cyclopts.exceptions import CommandCollisionError, MissingTypeError, UnsupportedTypeHintError, UnusedCliTokensError
+from cyclopts.exceptions import (
+    CommandCollisionError,
+    CycloptsError,
+    MissingTypeError,
+    UnsupportedTypeHintError,
+    UnusedCliTokensError,
+)
 from cyclopts.help import HelpMixin
 from cyclopts.parameter import get_hint_parameter
 
@@ -76,24 +83,22 @@ class App(HelpMixin):
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
-    _meta: "App" = field(init=False, default=None)
+    _meta: "MetaApp" = field(init=False, default=None)
 
     ###########
     # Methods #
     ###########
-    def display_version(self):
+    def version_print(self):
         print(self.version)
 
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
 
     @property
-    def meta(self) -> "App":
+    def meta(self) -> "MetaApp":
         if self._meta is None:
-            self._meta = App(
-                help_flags=[],  # disables "--help"
-                version_flags=[],  # disables "--version" for
-                help_print_usage=False,
+            self._meta = MetaApp(
+                help_print=self.help_print,
                 help_panel_title="Session Parameters",
             )
         return self._meta
@@ -122,6 +127,10 @@ class App(HelpMixin):
     def register_default(self, obj=None, **kwargs):
         if obj is None:  # Called ``@app.default_command``
             return partial(self.register_default, **kwargs)  # Pass the rest of params here
+
+        if isinstance(obj, App):  # Registering a sub-App
+            raise CycloptsError("Cannot register a sub App to default.")
+
         if self._default_command != self.help_print:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
         self._default_command = obj
@@ -156,7 +165,7 @@ class App(HelpMixin):
             bound = inspect.signature(command).bind()
             remaining_tokens = []
         elif any(flag in tokens for flag in self.version_flags):
-            command = self.display_version
+            command = self.version_print
             bound = inspect.signature(command).bind()
             remaining_tokens = []
         else:
@@ -219,3 +228,13 @@ class App(HelpMixin):
                 self(split_user_input)
             except Exception as e:
                 print(e)
+
+
+@define(kw_only=True)
+class MetaApp(App):
+    @property
+    def meta(self):
+        raise CycloptsError("Cannot nest meta apps.")
+
+    def register(self, *args, **kwargs):
+        raise CycloptsError("Cannot register commands to a meta app.")

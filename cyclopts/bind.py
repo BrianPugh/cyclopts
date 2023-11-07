@@ -109,19 +109,23 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 try:
                     cli_value = tokens[i + 1]
                     skip_next_iterations = 1
-                except IndexError as e:
-                    raise MissingArgumentError(f"Unknown CLI keyword {cli_key}") from e
+                except IndexError:
+                    # This could be a flag downstream
+                    remaining_tokens.append(token)
+                    continue
 
             try:
                 parameter = cli2kw[cli_key]
-            except KeyError as e:
+            except KeyError:
                 if kwargs_parameter:
                     parameter = kwargs_parameter
                     cli_key = cli_key[2:]  # strip off leading "--"
                     cli_key = cli_key.replace("-", "_")
                     cli_value = {cli_key: cli_value}
                 else:
-                    raise UnknownKeywordError(cli_key) from e
+                    remaining_tokens.append(cli_key)
+                    remaining_tokens.append(cli_value)
+                    continue
 
         _coerce_parameter(f, mapping, parameter, cli_value)
 
