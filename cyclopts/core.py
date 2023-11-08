@@ -5,12 +5,13 @@ import shlex
 import sys
 import typing
 from functools import partial
-from typing import Callable, Dict, Iterable, List, NewType, Optional, Union
+from typing import Callable, Dict, Iterable, List, NewType, NoReturn, Optional, Tuple, Union
 
 import attrs
 from attrs import Factory, define, field
+from rich.console import Console, Group
 
-from cyclopts.bind import create_bound_arguments
+from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -18,7 +19,7 @@ from cyclopts.exceptions import (
     UnsupportedTypeHintError,
     UnusedCliTokensError,
 )
-from cyclopts.help import HelpMixin
+from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
 from cyclopts.parameter import get_hint_parameter
 
 
@@ -54,31 +55,25 @@ def _default_version(default="0.0.0") -> str:
     return getattr(module, "__version__", default)
 
 
-def _normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
-    if tokens is None:
-        tokens = sys.argv[1:]  # Remove the executable
-    elif isinstance(tokens, str):
-        tokens = shlex.split(tokens)
-    else:
-        tokens = list(tokens)
-    return tokens
-
-
 @define(kw_only=True)
-class App(HelpMixin):
+class App:
     # Name of the Program
     name: str = field(default=sys.argv[0])
 
     version: str = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
 
+    help: str = ""
+    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
+    help_print_usage: bool = True
+    help_print_options: bool = True
+    help_print_commands: bool = True
+    help_panel_title: str = "Parameters"
+
     ######################
     # Private Attributes #
     ######################
-    _default_command: Callable = field(
-        init=False,
-        default=Factory(lambda self: self.help_print, takes_self=True),
-    )
+    _default_command: Optional[Callable] = field(init=False, default=None)
 
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
@@ -88,8 +83,9 @@ class App(HelpMixin):
     ###########
     # Methods #
     ###########
-    def version_print(self):
+    def version_print(self) -> NoReturn:
         print(self.version)
+        sys.exit()
 
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
@@ -98,7 +94,8 @@ class App(HelpMixin):
     def meta(self) -> "MetaApp":
         if self._meta is None:
             self._meta = MetaApp(
-                help_print=self.help_print,
+                help_flags=[],
+                version_flags=[],
                 help_panel_title="Session Parameters",
             )
         return self._meta
@@ -112,7 +109,6 @@ class App(HelpMixin):
 
         if isinstance(obj, App):  # Registering a sub-App
             name = obj.name
-            obj._help_usage_prefixes.append(self.name)
         else:
             for parameter in inspect.signature(obj).parameters.values():
                 _validate_type_supported(parameter)
@@ -131,7 +127,7 @@ class App(HelpMixin):
         if isinstance(obj, App):  # Registering a sub-App
             raise CycloptsError("Cannot register a sub App to default.")
 
-        if self._default_command != self.help_print:
+        if self._default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
         self._default_command = obj
 
@@ -140,8 +136,23 @@ class App(HelpMixin):
 
         return obj
 
-    def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None):
+    def parse_special_flags(self, tokens: Union[None, str, Iterable[str]] = None):
+        """Parse/Execute special flags like ``help`` and ``version``.
+
+        May not return.
+        """
+        tokens = normalize_tokens(tokens)
+
+        # Handle special flags here
+        if any(flag in tokens for flag in self.help_flags):
+            self.help_print(tokens)
+        elif any(flag in tokens for flag in self.version_flags):
+            self.version_print()
+
+    def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple:
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
+
+        Does **NOT** handle special flags.
 
         Parameter
         ---------
@@ -149,7 +160,7 @@ class App(HelpMixin):
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         """
-        tokens = _normalize_tokens(tokens)
+        tokens = normalize_tokens(tokens)
 
         # Extract out the command-string
         if tokens and tokens[0] in self._commands:
@@ -160,23 +171,21 @@ class App(HelpMixin):
         if isinstance(command, App):
             return command.parse_known_args(tokens)
 
-        if any(flag in tokens for flag in self.help_flags):
-            if command is self.help_print:
-                command = None
-            command = partial(self.help_print, function=command)
-            bound = inspect.signature(command).bind()
-            remaining_tokens = []
-        elif any(flag in tokens for flag in self.version_flags):
-            command = self.version_print
-            bound = inspect.signature(command).bind()
-            remaining_tokens = []
-        else:
-            bound, remaining_tokens = create_bound_arguments(command, tokens)
-            remaining_tokens = list(remaining_tokens)
+        bound, remaining_tokens = create_bound_arguments(command, tokens)
+        remaining_tokens = list(remaining_tokens)
 
         return command, bound, remaining_tokens
 
-    def parse_args(self, tokens: Union[None, str, Iterable[str]] = None):
+    def parse_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple[Callable, inspect.BoundArguments]:
+        """Interpret arguments into a function and BoundArguments.
+
+        Does **NOT** handle special flags.
+
+        Raises
+        ------
+        UnusedCliTokensError
+            If any tokens remain after parsing.
+        """
         command, bound, remaining_tokens = self.parse_known_args(tokens)
         if remaining_tokens:
             raise UnusedCliTokensError(remaining_tokens)
@@ -191,8 +200,41 @@ class App(HelpMixin):
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         """
+        self.parse_special_flags(tokens)
         command, bound = self.parse_args(tokens)
         return command(*bound.args, **bound.kwargs)
+
+    def help_print(self, tokens: Union[None, str, Iterable[str]] = None) -> NoReturn:
+        tokens = normalize_tokens(tokens)
+
+        console = Console()
+
+        command_chain = []
+        command_mapping = self._commands
+        function_or_app = self
+        for token in tokens:
+            try:
+                function_or_app = command_mapping[token]
+            except KeyError:
+                break
+            if isinstance(function_or_app, App):
+                command_mapping = function_or_app._commands
+            command_chain.append(token)
+
+        if self.help_print_usage:
+            console.print(format_usage(self.name, command_chain))
+
+        console.print(format_doc(self, function_or_app))
+
+        if self.meta._default_command:
+            console.print(format_parameters(self.meta._default_command, title=self.meta.help_panel_title))
+
+        if isinstance(function_or_app, App):
+            console.print(format_commands(function_or_app))
+        else:
+            console.print(format_parameters(function_or_app, title=self.help_panel_title))
+
+        sys.exit()
 
     def interactive_shell(
         self,

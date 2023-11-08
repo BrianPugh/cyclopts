@@ -1,9 +1,10 @@
 import argparse
 import inspect
+import sys
 import typing
 from functools import partial
 from itertools import chain
-from typing import Callable, Iterable, List, Optional, Tuple
+from typing import Callable, Iterable, List, NoReturn, Optional, Tuple, Union
 
 from attrs import Factory, define, field
 from rich import box
@@ -13,7 +14,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from cyclopts.bind import UnknownTokens
+from cyclopts.bind import UnknownTokens, normalize_tokens
 from cyclopts.docstring import DocString
 from cyclopts.exceptions import CycloptsError, UnreachableError
 from cyclopts.parameter import get_hint_parameter, get_name
@@ -43,25 +44,26 @@ def _create_panel_table(**kwargs):
     return panel, table
 
 
-def _format_usage(self, function):
+def format_usage(app_name, command_chain: List[str]):
     usage_string = []
     usage_string.append("Usage:")
-    usage_string.extend(self._help_usage_prefixes)
-    usage_string.append(self.name)
-    if function is not None:
-        for name, f in self._commands.items():
-            if f == function:
-                usage_string.append(name)
-                break
+    usage_string.append(app_name)
+    usage_string.extend(command_chain)
     usage_string.append("COMMAND")  # TODO: only do this if there are subcommands
     usage_string.append("[OPTIONS]")  # TODO: only do this if there are options
     usage_string.append("[ARGS]")  # TODO: only do this if there are positional arguments
+    usage_string.append("\n")
 
     return Text(" ".join(usage_string), style="bold")
 
 
-def _format_doc(self, function):
-    doc_strings = self.help.split("\n")
+def format_doc(self, function: Optional[Callable]):
+    if function is None:
+        doc_strings = self.help.split("\n")
+    elif isinstance(function, type(self)):
+        doc_strings = function.help.split("\n")
+    else:
+        doc_strings = (function.__doc__ or "").split("\n")
 
     if not doc_strings:
         return Text()
@@ -73,8 +75,8 @@ def _format_doc(self, function):
     return Text.assemble(*components)
 
 
-def _format_commands(self, function):
-    if not self._commands:
+def format_commands(app):
+    if not app._commands:
         return _silent
 
     panel, table = _create_panel_table(title="Commands")
@@ -82,7 +84,7 @@ def _format_commands(self, function):
     table.add_column(justify="left", style="cyan")
     table.add_column(justify="left")
 
-    for command_name, command_fn in self._commands.items():
+    for command_name, command_fn in app._commands.items():
         row_args = []
         row_args.append(command_name)
         docstring = DocString(command_fn)
@@ -91,11 +93,11 @@ def _format_commands(self, function):
     return panel
 
 
-def _format_function(self, function):
+def format_parameters(function, title):
     if function is None:
         return _silent
 
-    panel, table = _create_panel_table(title=self.help_panel_title)
+    panel, table = _create_panel_table(title=title)
 
     parameters = []
     for parameter in inspect.signature(function).parameters.values():
@@ -141,34 +143,3 @@ def _format_function(self, function):
         table.add_row(*row_args)
 
     return panel
-
-
-@define(kw_only=True)
-class HelpMixin:
-    help: str = ""
-
-    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
-
-    help_print: Callable = field(default=Factory(lambda self: self._help_print, takes_self=True))
-
-    help_print_usage: bool = True
-    help_print_options: bool = True
-    help_print_commands: bool = True
-
-    help_panel_title: str = "Parameters"
-
-    ######################
-    # Private Attributes #
-    ######################
-    # A list of higher up ``cyclopts.App``.
-    # Used for printing "Usage" help-string.
-    _help_usage_prefixes: List[str] = field(init=False, factory=list)
-
-    def _help_print(self, *, function: Optional[Callable] = None):
-        console = Console()
-
-        if self.help_print_usage:
-            console.print(_format_usage(self, function))
-        console.print(_format_doc(self, function))
-        console.print(_format_function(self, function))
-        console.print(_format_commands(self, function))

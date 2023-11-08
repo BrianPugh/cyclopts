@@ -1,4 +1,6 @@
 import inspect
+import shlex
+import sys
 import typing
 from collections import deque
 from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
@@ -12,6 +14,16 @@ from cyclopts.exceptions import (
 from cyclopts.parameter import get_coercion, get_hint_parameter, get_name
 
 UnknownTokens = NewType("UnknownTokens", List[str])
+
+
+def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
+    if tokens is None:
+        tokens = sys.argv[1:]  # Remove the executable
+    elif isinstance(tokens, str):
+        tokens = shlex.split(tokens)
+    else:
+        tokens = list(tokens)
+    return tokens
 
 
 def _cli2parameter_mappings(f: Callable):
