@@ -43,6 +43,13 @@ _lookup = {
 }
 
 
+class Pipeline(list):
+    def __call__(self, value):
+        for f in self:
+            value = f(value)
+        return value
+
+
 def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
     """Get the coercion function, and whether or not the type is iterable."""
     is_iterable = False
@@ -53,13 +60,18 @@ def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
         hint = typing.get_args(hint)[0]
 
     if param.coercion:
-        return param.coercion, is_iterable
+        coercion = [param.coercion] if callable(param.coercion) else param.coercion
+        coercion = Pipeline(coercion)
+        return coercion, is_iterable
 
     if typing.get_origin(hint) is Literal:
         choices = typing.get_args(hint)
+        # TODO: get type of first non-None choice
         raise NotImplementedError
 
     hint = typing.get_origin(hint) or hint
     coercion = _lookup.get(hint, hint)
+    coercion = [coercion] if callable(coercion) else coercion
+    coercion = Pipeline(coercion)
 
     return coercion, is_iterable

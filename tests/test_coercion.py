@@ -2,7 +2,7 @@ import inspect
 from typing import List, Literal, Optional
 
 from cyclopts import coercion
-from cyclopts.coercion import get_coercion
+from cyclopts.coercion import Pipeline, get_coercion
 
 
 def test_get_coercion_bool():
@@ -15,7 +15,7 @@ def test_get_coercion_bool():
     for f in [foo, bar]:
         signature = inspect.signature(f)
         parameter = list(signature.parameters.values())[0]
-        assert (coercion.bool, False) == get_coercion(parameter)
+        assert (Pipeline([coercion.bool]), False) == get_coercion(parameter)
 
 
 def test_get_coercion_list_int():
@@ -23,7 +23,7 @@ def test_get_coercion_list_int():
         pass
 
     parameter = list(inspect.signature(foo).parameters.values())[0]
-    assert (coercion.int, True) == get_coercion(parameter)
+    assert (Pipeline([coercion.int]), True) == get_coercion(parameter)
 
 
 def test_get_coercion_literal():
@@ -31,4 +31,4 @@ def test_get_coercion_literal():
         pass
 
     parameter = list(inspect.signature(foo).parameters.values())[0]
-    assert (coercion.int, True) == get_coercion(parameter)  # TODO
+    assert (Pipeline([coercion.int]), True) == get_coercion(parameter)  # TODO

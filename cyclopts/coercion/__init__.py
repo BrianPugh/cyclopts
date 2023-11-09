@@ -1,11 +1,16 @@
 __all__ = [
+    "Pipeline",
     "bool",
-    "int",
-    "bytes",
     "bytearray",
+    "bytes",
     "get_coercion",
+    "int",
 ]
 
+from ._common import (
+    Pipeline,
+    get_coercion,
+)
 from ._common import (
     _bool as bool,
 )
@@ -17,7 +22,4 @@ from ._common import (
 )
 from ._common import (
     _int as int,
-)
-from ._common import (
-    get_coercion,
 )
