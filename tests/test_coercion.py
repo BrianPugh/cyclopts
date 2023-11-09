@@ -1,5 +1,5 @@
 import inspect
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from cyclopts import coercion
 from cyclopts.coercion import get_coercion
@@ -22,6 +22,13 @@ def test_get_coercion_list_int():
     def foo(a: List[int]):
         pass
 
-    signature = inspect.signature(foo)
-    parameter = list(signature.parameters.values())[0]
+    parameter = list(inspect.signature(foo).parameters.values())[0]
     assert (coercion.int, True) == get_coercion(parameter)
+
+
+def test_get_coercion_literal():
+    def foo(a: Literal[1, 2, 3]):
+        pass
+
+    parameter = list(inspect.signature(foo).parameters.values())[0]
+    assert (coercion.int, True) == get_coercion(parameter)  # TODO
