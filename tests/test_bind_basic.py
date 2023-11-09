@@ -6,6 +6,7 @@ from typing_extensions import Annotated
 
 import cyclopts
 from cyclopts import (
+    CoercionError,
     MissingArgumentError,
     Parameter,
     UnknownKeywordError,
@@ -185,7 +186,7 @@ def test_pos_only(app, cmd_str):
 @pytest.mark.parametrize(
     "cmd_str_e",
     [
-        ("foo 1 2 --c=3", UnknownKeywordError),
+        ("foo 1 2 --c=3", CoercionError),
     ],
 )
 def test_pos_only_exceptions(app, cmd_str_e):

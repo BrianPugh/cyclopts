@@ -94,6 +94,13 @@ def _coerce_parameter(
         out[parameter] = value
 
 
+def _cli_kw_to_f_kw(cli_key: str):
+    """Only used for converting unknown CLI key/value keys for ``**kwargs``."""
+    cli_key = cli_key[2:]  # strip off leading "--"
+    cli_key = cli_key.replace("-", "_")
+    return cli_key
+
+
 def _parse_kw_and_flags(f, tokens, mapping):
     cli2kw, cli2flag, kwargs_parameter = _cli2parameter_mappings(f)
 
@@ -112,29 +119,36 @@ def _parse_kw_and_flags(f, tokens, mapping):
             remaining_tokens.append(token)
             continue
 
+        # Goal: get Parameter and Value
         if token in cli2flag:
             parameter, cli_value = cli2flag[token]
-        else:
-            if "=" in token:
-                cli_key, cli_value = token.split("=", 1)
-            else:
-                cli_key = token
-                try:
-                    cli_value = tokens[i + 1]
-                    skip_next_iterations = 1
-                except IndexError:
-                    # This could be a flag downstream
+        elif "=" in token:
+            cli_key, cli_value = token.split("=", 1)
+            try:
+                parameter = cli2kw[cli_key]
+            except KeyError:
+                if kwargs_parameter:
+                    parameter = kwargs_parameter
+                    cli_value = {_cli_kw_to_f_kw(cli_key): cli_value}
+                else:
                     remaining_tokens.append(token)
                     continue
+        else:
+            cli_key = token
+            try:
+                cli_value = tokens[i + 1]
+                skip_next_iterations = 1
+            except IndexError:
+                # This could be a flag downstream
+                remaining_tokens.append(token)
+                continue
 
             try:
                 parameter = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
                     parameter = kwargs_parameter
-                    cli_key = cli_key[2:]  # strip off leading "--"
-                    cli_key = cli_key.replace("-", "_")
-                    cli_value = {cli_key: cli_value}
+                    cli_value = {_cli_kw_to_f_kw(cli_key): cli_value}
                 else:
                     remaining_tokens.append(cli_key)
                     remaining_tokens.append(cli_value)
