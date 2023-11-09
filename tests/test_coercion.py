@@ -2,7 +2,7 @@ import inspect
 from typing import List, Optional
 
 from cyclopts import coercion
-from cyclopts.parameter import get_coercion
+from cyclopts.coercion import get_coercion
 
 
 def test_get_coercion_bool():

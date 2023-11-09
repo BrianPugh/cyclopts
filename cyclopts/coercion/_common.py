@@ -1,4 +1,9 @@
-from typing import Union
+import inspect
+import typing
+from typing import Callable, Literal, Tuple, Union
+
+from cyclopts.parameter import get_hint_parameter
+from cyclopts.typing import is_iterable_type_hint
 
 
 def _bool(s: Union[str, bool]) -> bool:
@@ -27,3 +32,34 @@ def _bytes(s: str) -> bytes:
 
 def _bytearray(s: str) -> bytearray:
     return bytearray(_bytes(s))
+
+
+_lookup = {
+    int: _int,
+    bool: _bool,
+    bytes: _bytes,
+    bytearray: _bytearray,
+    # typing.Literal:
+}
+
+
+def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
+    """Get the coercion function, and whether or not the type is iterable."""
+    is_iterable = False
+    hint, param = get_hint_parameter(parameter)
+
+    if is_iterable_type_hint(hint):
+        is_iterable = True
+        hint = typing.get_args(hint)[0]
+
+    if param.coercion:
+        return param.coercion, is_iterable
+
+    if typing.get_origin(hint) is Literal:
+        choices = typing.get_args(hint)
+        raise NotImplementedError
+
+    hint = typing.get_origin(hint) or hint
+    coercion = _lookup.get(hint, hint)
+
+    return coercion, is_iterable

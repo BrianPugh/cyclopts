@@ -1,11 +1,9 @@
-import builtins
-
 __all__ = [
-    "lookup",
     "bool",
     "int",
     "bytes",
     "bytearray",
+    "get_coercion",
 ]
 
 from ._common import (
@@ -20,10 +18,6 @@ from ._common import (
 from ._common import (
     _int as int,
 )
-
-lookup = {
-    builtins.int: int,
-    builtins.bool: bool,
-    builtins.bytes: bytes,
-    builtins.bytearray: bytearray,
-}
+from ._common import (
+    get_coercion,
+)

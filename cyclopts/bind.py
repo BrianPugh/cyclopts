@@ -5,13 +5,14 @@ import typing
 from collections import deque
 from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
 
+from cyclopts.coercion import get_coercion
 from cyclopts.exceptions import (
     CoercionError,
     MissingArgumentError,
     UnknownKeywordError,
     UnsupportedPositionalError,
 )
-from cyclopts.parameter import get_coercion, get_hint_parameter, get_name
+from cyclopts.parameter import get_hint_parameter, get_name
 
 UnknownTokens = NewType("UnknownTokens", List[str])
 
