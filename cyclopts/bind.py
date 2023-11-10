@@ -115,12 +115,10 @@ def _parse_kw_and_flags(f, tokens, mapping):
             skip_next_iterations -= 1
             continue
 
-        if not token.startswith("--"):
-            # TODO: parse single-hyphen flags here
+        if not token.startswith("-"):
             remaining_tokens.append(token)
             continue
 
-        # Goal: get Parameter and Value
         if token in cli2flag:
             parameter, cli_value = cli2flag[token]
         elif "=" in token:
