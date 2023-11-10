@@ -301,3 +301,18 @@ def test_keyword_list_pos_not_allowed(app):
 
     with pytest.raises(UnsupportedPositionalError):
         app.parse_args("foo 1")
+
+
+def test_keyword_optional_list_none_default(app):
+    @app.register
+    def foo(a: Optional[List[int]] = None):
+        assert a is None
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind()
+
+    actual_command, actual_bind = app.parse_args("foo")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+    foo(*actual_bind.args, **actual_bind.kwargs)

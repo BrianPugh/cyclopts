@@ -76,6 +76,7 @@ def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
         elif issubclass(hint, Enum):
 
             def coercion_enum(s):
+                """Case-insensitive enum lookup."""
                 s = s.lower()
                 for member in hint:
                     if member.name.lower() == s:
