@@ -26,7 +26,7 @@ typer_app([], standalone_mode=False)
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register()
+@cyclopts_app.register_default()
 def foo(favorite_numbers: Optional[List[int]] = None):
     if favorite_numbers is None:
         favorite_numbers = [1, 2, 3]
@@ -34,9 +34,9 @@ def foo(favorite_numbers: Optional[List[int]] = None):
 
 
 print("Cyclopts with arguments:")
-cyclopts_app(["foo", "--favorite-numbers", "100", "--favorite-numbers", "200"])
+cyclopts_app(["--favorite-numbers", "100", "--favorite-numbers", "200"])
 # My favorite numbers are: [100, 200]
 
 print("Cyclopts without arguments:")
-cyclopts_app(["foo"])
+cyclopts_app([])
 # My favorite numbers are: [1, 2, 3]
