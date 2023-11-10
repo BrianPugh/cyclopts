@@ -1,5 +1,6 @@
 import inspect
 import typing
+from enum import Enum
 from typing import Callable, Literal, Tuple, Union
 
 from cyclopts.parameter import get_hint_parameter
@@ -39,7 +40,6 @@ _lookup = {
     bool: _bool,
     bytes: _bytes,
     bytearray: _bytearray,
-    # typing.Literal:
 }
 
 
@@ -73,6 +73,16 @@ def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
                 return s
 
             coercion.append(validate_is_choice)
+        elif issubclass(hint, Enum):
+
+            def coercion_enum(s):
+                s = s.lower()
+                for member in hint:
+                    if member.name.lower() == s:
+                        return member
+                raise ValueError(f"{s} is not a valid choice.")
+
+            coercion = Pipeline([coercion_enum])
         else:
             hint = typing.get_origin(hint) or hint
             coercion = Pipeline([_lookup.get(hint, hint)])

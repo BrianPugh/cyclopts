@@ -1,4 +1,5 @@
 import inspect
+from enum import Enum, auto
 from typing import List, Literal, Optional
 
 import pytest
@@ -40,3 +41,19 @@ def test_get_coercion_literal():
     assert coercion("3") == 3
     with pytest.raises(ValueError):
         coercion("4")
+
+
+def test_get_coercion_enum():
+    class SoftwareEnvironment(Enum):
+        DEV = auto()
+        STAGING = auto()
+        PROD = auto()
+
+    def foo(a: SoftwareEnvironment = SoftwareEnvironment.DEV):
+        pass
+
+    parameter = list(inspect.signature(foo).parameters.values())[0]
+    coercion, is_iterable = get_coercion(parameter)
+    assert coercion("dev") == SoftwareEnvironment.DEV
+    assert coercion("staging") == SoftwareEnvironment.STAGING
+    assert coercion("prod") == SoftwareEnvironment.PROD
