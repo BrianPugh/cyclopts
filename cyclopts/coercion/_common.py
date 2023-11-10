@@ -60,18 +60,21 @@ def get_coercion(parameter: inspect.Parameter) -> Tuple[Callable, bool]:
         hint = typing.get_args(hint)[0]
 
     if param.coercion:
-        coercion = [param.coercion] if callable(param.coercion) else param.coercion
-        coercion = Pipeline(coercion)
-        return coercion, is_iterable
+        coercion = Pipeline([param.coercion] if callable(param.coercion) else param.coercion)
+    else:
+        if typing.get_origin(hint) is Literal:
+            choices = typing.get_args(hint)
+            literal_type = type(choices[0])
+            coercion = Pipeline([_lookup.get(literal_type, literal_type)])
 
-    if typing.get_origin(hint) is Literal:
-        choices = typing.get_args(hint)
-        # TODO: get type of first non-None choice
-        raise NotImplementedError
+            def validate_is_choice(s):
+                if s not in choices:
+                    raise ValueError(f"{s} is not a valid choice.")
+                return s
 
-    hint = typing.get_origin(hint) or hint
-    coercion = _lookup.get(hint, hint)
-    coercion = [coercion] if callable(coercion) else coercion
-    coercion = Pipeline(coercion)
+            coercion.append(validate_is_choice)
+        else:
+            hint = typing.get_origin(hint) or hint
+            coercion = Pipeline([_lookup.get(hint, hint)])
 
     return coercion, is_iterable

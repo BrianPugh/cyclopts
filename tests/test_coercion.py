@@ -1,6 +1,8 @@
 import inspect
 from typing import List, Literal, Optional
 
+import pytest
+
 from cyclopts import coercion
 from cyclopts.coercion import Pipeline, get_coercion
 
@@ -31,4 +33,10 @@ def test_get_coercion_literal():
         pass
 
     parameter = list(inspect.signature(foo).parameters.values())[0]
-    assert (Pipeline([coercion.int]), True) == get_coercion(parameter)  # TODO
+    coercion, is_iterable = get_coercion(parameter)
+    assert is_iterable is False
+    assert coercion("1") == 1
+    assert coercion("2") == 2
+    assert coercion("3") == 3
+    with pytest.raises(ValueError):
+        coercion("4")
