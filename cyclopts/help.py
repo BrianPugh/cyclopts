@@ -1,23 +1,15 @@
-import argparse
 import inspect
-import sys
 import typing
-from functools import partial
-from itertools import chain
-from typing import Callable, Iterable, List, NoReturn, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple
 
-from attrs import Factory, define, field
 from rich import box
-from rich.console import Console, Group
-from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from cyclopts.bind import UnknownTokens, normalize_tokens
+from cyclopts.bind import UnknownTokens
 from cyclopts.docstring import DocString
-from cyclopts.exceptions import CycloptsError, UnreachableError
-from cyclopts.parameter import get_hint_parameter, get_name
+from cyclopts.parameter import get_hint_parameter, get_names
 
 
 class SilentRich:
@@ -124,7 +116,7 @@ def format_parameters(function, title):
 
     for parameter in parameters:
         hint, param = get_hint_parameter(parameter)
-        option = get_name(parameter)
+        options = get_names(parameter)
 
         help_components = []
         if param.help:
@@ -136,7 +128,7 @@ def format_parameters(function, title):
         row_args = []
         if has_required:
             row_args.append("*" if is_required(parameter) else "")
-        row_args.append(option)
+        row_args.append(",".join(options))
         # if has_short:
         #     row_args.append(option_short)
         row_args.append(" ".join(help_components))

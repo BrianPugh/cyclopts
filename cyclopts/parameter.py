@@ -1,9 +1,8 @@
 import inspect
 import typing
-from collections import abc
-from typing import Callable, List, Literal, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Union
 
-from attrs import frozen
+from attrs import field, frozen
 from typing_extensions import Annotated
 
 from cyclopts.exceptions import (
@@ -17,30 +16,36 @@ from cyclopts.typing import is_iterable_type_hint
 NoneType = type(None)
 
 
+def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
+    if isinstance(input_value, str):
+        return (input_value,)
+    return tuple(input_value)
+
+
 @frozen
 class Parameter:
     """User-facing parameter annotation."""
 
     # User Options
-    name: str = ""
+    name: Tuple[str, ...] = field(default=[], converter=_str_to_tuple_converter)
     coercion: Optional[Callable] = None
     show_default = True
     help: str = ""
 
 
-def get_name(parameter: inspect.Parameter) -> str:
+def get_names(parameter: inspect.Parameter) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
     _, param = get_hint_parameter(parameter)
     if param.name:
-        name = param.name
+        names = list(param.name)
     else:
-        name = "--" + parameter.name.replace("_", "-")
+        if parameter.kind is parameter.POSITIONAL_ONLY:
+            # Name is only used for help-string
+            names = [parameter.name.upper()]
+        else:
+            names = ["--" + parameter.name.replace("_", "-")]
 
-    if parameter.kind is parameter.POSITIONAL_ONLY:
-        # Name is only used for help-string
-        return name.upper()
-    else:
-        return name
+    return names
 
 
 def _reduce_hint(hint: type):

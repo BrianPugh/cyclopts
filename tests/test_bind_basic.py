@@ -76,6 +76,27 @@ def test_basic_2(app, cmd_str):
 @pytest.mark.parametrize(
     "cmd_str",
     [
+        "foo --age 10",
+        "foo --duration 10",
+        "foo -a 10",
+    ],
+)
+def test_multiple_names(app, cmd_str):
+    @app.register
+    def foo(age: Annotated[int, Parameter(name=["--age", "--duration", "-a"])]):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(age=10)
+
+    actual_command, actual_bind = app.parse_args(cmd_str)
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
         "foo 1",
         "foo --a=1",
         "foo --a 1",

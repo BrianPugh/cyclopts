@@ -9,10 +9,9 @@ from cyclopts.coercion import get_coercion
 from cyclopts.exceptions import (
     CoercionError,
     MissingArgumentError,
-    UnknownKeywordError,
     UnsupportedPositionalError,
 )
-from cyclopts.parameter import get_hint_parameter, get_name
+from cyclopts.parameter import get_hint_parameter, get_names
 
 UnknownTokens = NewType("UnknownTokens", List[str])
 
@@ -37,12 +36,14 @@ def _cli2parameter_mappings(f: Callable):
 
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint, param = get_hint_parameter(parameter)
-            key = get_name(parameter)
+            keys = get_names(parameter)
             if (typing.get_origin(hint) or hint) is bool:  # Boolean Flag
-                flag_mapping[key] = (parameter, True)
+                for key in keys:
+                    flag_mapping[key] = (parameter, True)
                 # flag_mapping["no-" + key] = (parameter, False)  # TODO
             else:
-                kw_mapping[key] = parameter
+                for key in keys:
+                    kw_mapping[key] = parameter
     return kw_mapping, flag_mapping, kwargs_parameter
 
 

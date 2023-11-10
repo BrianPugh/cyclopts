@@ -5,11 +5,10 @@ import shlex
 import sys
 import typing
 from functools import partial
-from typing import Callable, Dict, Iterable, List, NewType, NoReturn, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, NoReturn, Optional, Tuple, Union
 
-import attrs
-from attrs import Factory, define, field
-from rich.console import Console, Group
+from attrs import define, field
+from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
