@@ -64,14 +64,28 @@ def _convert(type_, element):
 _unsupported_target_types = {dict}
 
 
-def coerce(target_type, *args):
-    origin_target_type = get_origin(target_type)
-    if target_type in _unsupported_target_types:
-        raise ValueError(f"Unsupported Type: {target_type}")
-    if origin_target_type in _unsupported_target_types:
-        raise ValueError(f"Unsupported Type: {origin_target_type}")
-    if target_type is tuple:
+def _get_origin_and_validate(type_):
+    origin_type = get_origin(type_)
+    if type_ in _unsupported_target_types:
+        raise ValueError(f"Unsupported Type: {type_}")
+    if origin_type in _unsupported_target_types:
+        raise ValueError(f"Unsupported Type: {origin_type}")
+    if type_ is tuple:
         raise ValueError("Tuple type hints must contain inner hints.")
+    return origin_type
+
+
+def _resolve_union(type_):
+    while type_ is not Union:
+        non_none_types = [t for t in get_args(type_) if t is not None]
+        if not non_none_types:
+            raise ValueError("Union type cannot be all NoneType")
+        type_ = non_none_types[0]
+    return type_
+
+
+def coerce(target_type, *args):
+    origin_target_type = _get_origin_and_validate(target_type)
 
     if origin_target_type is tuple:
         inner_types = get_args(target_type)
@@ -83,15 +97,31 @@ def coerce(target_type, *args):
     elif origin_target_type in [list, set]:
         return _convert(target_type, args)
     elif origin_target_type is Union:
-        non_none_types = [t for t in get_args(target_type) if t is not None]
-        if not non_none_types:
-            raise ValueError("Union type cannot be all NoneType")
-        return [_convert(non_none_types[0], item) for item in args]
+        target_type = _resolve_union(target_type)
+        return [_convert(target_type, item) for item in args]
     elif len(args) == 1 and not isinstance(target_type, Iterable):
         return _convert(target_type, args[0])
     else:
         return [_convert(target_type, item) for item in args]
 
+
+def token_count(type_) -> int:
+    """The number of tokens after a keyword the parameter should consume."""
+    origin_type = _get_origin_and_validate(type_)
+    if origin_type is tuple:
+        return len(get_args(type_))
+    elif origin_type is bool or type_ is bool:
+        return 0
+    else:
+        return 1
+
+
+# Example Usage
+assert 0 == token_count(bool)
+assert 1 == token_count(int)
+assert 1 == token_count(Union[None, int])
+assert 1 == token_count(List[int])
+assert 3 == token_count(Tuple[int, int, int])
 
 # Example Usage
 assert 1 == coerce(int, "1")
