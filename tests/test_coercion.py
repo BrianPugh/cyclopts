@@ -76,3 +76,13 @@ def test_coerce_literal():
 
 def test_coerce_path():
     assert Path("foo") == coerce(Path, "foo")
+
+
+def test_coerce_bytes():
+    assert b"foo" == coerce(bytes, "foo")
+    assert [b"foo", b"bar"] == coerce(bytes, "foo", "bar")
+
+
+def test_coerce_bytearray():
+    assert bytearray(b"foo") == coerce(bytes, "foo")
+    assert [bytearray(b"foo"), bytearray(b"bar")] == coerce(bytes, "foo", "bar")
