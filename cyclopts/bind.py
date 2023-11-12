@@ -1,8 +1,7 @@
 import inspect
 import shlex
 import sys
-import typing
-from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, get_origin
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
@@ -34,7 +33,7 @@ def _cli2parameter_mappings(f: Callable):
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint = resolve_union(resolve_annotated(parameter.annotation))
             keys = get_names(parameter)
-            if (typing.get_origin(hint) or hint) is bool:  # Boolean Flag
+            if hint is bool:  # Boolean Flag
                 for key in keys:
                     flag_mapping[key] = (parameter, "true")
                 # flag_mapping["no-" + key] = (parameter, False)  # TODO
@@ -87,6 +86,8 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     continue
 
             consume_count = token_count(parameter.annotation)
+            if consume_count == -1:
+                breakpoint()
             cli_values.append(cli_value)
             try:
                 for j in range(consume_count - 1):
@@ -105,6 +106,10 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 if kwargs_parameter:
                     breakpoint()
                     consume_count = token_count(kwargs_parameter.annotation)
+
+                    if consume_count == -1:
+                        breakpoint()
+
                     try:
                         for j in range(consume_count):
                             cli_values.append(tokens[i + 1 + j])
@@ -122,6 +127,9 @@ def _parse_kw_and_flags(f, tokens, mapping):
             else:
                 cli_values = []
                 consume_count = token_count(parameter.annotation)
+
+                if consume_count == -1:
+                    breakpoint()
 
                 try:
                     for j in range(consume_count):
@@ -153,17 +161,24 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
     for parameter in remaining_parameters():
         if not tokens:
             break
+
         if parameter.kind == parameter.VAR_POSITIONAL:  # ``*args``
             mapping[parameter] = tokens
             tokens = []
             break
-        else:
-            consume_count = max(1, token_count(parameter.annotation))
-            if len(tokens) < consume_count:
-                # TODO: better exception
-                raise MissingArgumentError(f"Not enough arguments for {parameter}")
-            mapping[parameter] = tokens[:consume_count]
-            tokens = tokens[consume_count:]
+
+        consume_count = token_count(parameter.annotation)
+        if consume_count < 0:  # Consume all remaining tokens
+            mapping[parameter] = tokens
+            tokens = []
+            break
+
+        consume_count = max(1, consume_count)
+
+        if len(tokens) < consume_count:
+            raise MissingArgumentError(f"Not enough arguments for {parameter}")
+        mapping[parameter] = tokens[:consume_count]
+        tokens = tokens[consume_count:]
 
     return tokens
 

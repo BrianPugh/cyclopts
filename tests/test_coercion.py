@@ -34,7 +34,7 @@ def test_token_count_bool():
 
 
 def test_token_count_list():
-    assert 1 == token_count(List[int])
+    assert -1 == token_count(List[int])
 
 
 def test_coerce_bool():

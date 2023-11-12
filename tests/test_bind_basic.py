@@ -265,13 +265,17 @@ def test_pos_only_list_not_allowed(app):
             pass
 
 
-def test_pos_kw_list_not_allowed_by_pos(app):
+def test_pos_list(app):
     @app.register
     def foo(a: List[int]):
         pass
 
-    with pytest.raises(UnsupportedPositionalError):
-        app.parse_args("foo 1 2 3")
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind([1, 2, 3])
+
+    actual_command, actual_bind = app.parse_args("foo 1 2 3")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
 
 
 def test_kwargs_int(app):

@@ -131,13 +131,18 @@ def coerce(type_, *args):
 
 
 def token_count(type_: type) -> int:
-    """The number of tokens after a keyword the parameter should consume."""
+    """The number of tokens after a keyword the parameter should consume.
+
+    Returns ``-1`` if all remaining tokens should be consumed.
+    """
     type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)
 
     if origin_type is tuple:
         return len(get_args(type_))
-    elif origin_type is bool or type_ is bool:
+    elif (origin_type or type_) is bool:
         return 0
+    elif (origin_type or type_) in (list, set):
+        return -1
     else:
         return 1
