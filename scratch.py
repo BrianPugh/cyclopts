@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from enum import Enum, auto
 from pathlib import Path
 from typing import List, Literal, Set, Tuple, Union, get_args, get_origin
 
@@ -48,8 +49,7 @@ def _convert(type_, element):
     if isinstance(type_, (list, tuple, set)):
         return type_(_convert(type_[0], e) for e in element)  # pyright: ignore[reportGeneralTypeIssues]
     elif origin_type is Union:
-        non_none_types = [t for t in inner_types if t is not NoneType]
-        return _convert(non_none_types[0], element)
+        return _convert(_resolve_union(type_), element)
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
@@ -86,8 +86,8 @@ def _get_origin_and_validate(type_):
 
 
 def _resolve_union(type_):
-    while type_ is not Union:
-        non_none_types = [t for t in get_args(type_) if t is not None]
+    while get_origin(type_) is Union:
+        non_none_types = [t for t in get_args(type_) if t is not NoneType]
         if not non_none_types:
             raise ValueError("Union type cannot be all NoneType")
         type_ = non_none_types[0]
@@ -134,8 +134,10 @@ assert 1 == token_count(List[int])
 assert 3 == token_count(Tuple[int, int, int])
 
 # Example Usage
-res = coerce(Literal["foo", "bar", 3], "foo")
+assert {1, 2, 3} == coerce(Set[Union[int, str]], "1", "2", "3")
 assert "foo" == coerce(Literal["foo", "bar", 3], "foo")
+assert "bar" == coerce(Literal["foo", "bar", 3], "bar")
+assert 3 == coerce(Literal["foo", "bar", 3], "3")
 assert 1 == coerce(int, "1")
 
 assert [123, 456] == coerce(int, "123", "456")
@@ -157,3 +159,9 @@ def assert_tuple(expected, actual):
 
 
 assert_tuple((1, 2.0), coerce(Tuple[int, Union[None, float, int]], "1", "2"))
+
+
+class SoftwareEnvironment(Enum):
+    DEV = auto()
+    STAGING = auto()
+    PROD = auto()
