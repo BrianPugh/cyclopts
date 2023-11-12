@@ -4,6 +4,7 @@ from typing import Literal, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
+# from types import NoneType is available >=3.10
 NoneType = type(None)
 
 
@@ -50,7 +51,7 @@ def _convert(type_, element):
     if isinstance(type_, (list, tuple, set)):
         return type_(_convert(type_[0], e) for e in element)  # pyright: ignore[reportGeneralTypeIssues]
     elif origin_type is Union:
-        return _convert(_resolve_union(type_), element)
+        return _convert(resolve_union(type_), element)
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
@@ -92,7 +93,7 @@ def _get_origin_and_validate(type_):
     return origin_type
 
 
-def _resolve_union(type_):
+def resolve_union(type_):
     while get_origin(type_) is Union:
         non_none_types = [t for t in get_args(type_) if t is not NoneType]
         if not non_none_types:
@@ -101,14 +102,15 @@ def _resolve_union(type_):
     return type_
 
 
-def _resolve_annotated(type_):
+def resolve_annotated(type_):
     while get_origin(type_) is Annotated:
         type_ = get_args(type_)[0]
     return type_
 
 
 def coerce(type_, *args):
-    type_ = _resolve_annotated(type_)
+    type_ = resolve_annotated(type_)
+    type_ = resolve_union(type_)
     origin_type = _get_origin_and_validate(type_)
 
     if origin_type is tuple:
@@ -120,9 +122,6 @@ def coerce(type_, *args):
         return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
     elif origin_type in [list, set]:
         return _convert(type_, args)
-    elif origin_type is Union:
-        type_ = _resolve_union(type_)
-        return [_convert(type_, item) for item in args]
     elif len(args) == 1:
         return _convert(type_, args[0])
     else:
@@ -131,7 +130,7 @@ def coerce(type_, *args):
 
 def token_count(type_) -> int:
     """The number of tokens after a keyword the parameter should consume."""
-    type_ = _resolve_annotated(type_)
+    type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)
 
     if origin_type is tuple:

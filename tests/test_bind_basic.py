@@ -31,12 +31,12 @@ def test_missing_positional_type(app):
 @pytest.mark.parametrize(
     "cmd_str",
     [
+        "foo 1 --b=2 3",
         "foo 1 2 3",
         "foo --a 1 --b 2 --c 3",
         "foo --c 3 1 2",
         "foo --c 3 --b=2 1",
         "foo --c 3 --b=2 --a 1",
-        "foo 1 --b=2 3",
     ],
 )
 def test_basic_1(app, cmd_str):

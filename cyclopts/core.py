@@ -19,12 +19,9 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
 )
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
-from cyclopts.parameter import get_hint_parameter
 
 
 def _validate_type_supported(p: inspect.Parameter):
-    # get_hint_parameter internally does some validation
-    get_hint_parameter(p)
     if p.annotation is p.empty:
         raise MissingTypeError(p.name)
     if p.kind == p.POSITIONAL_ONLY:
@@ -171,8 +168,6 @@ class App:
             return command.parse_known_args(tokens)
 
         bound, remaining_tokens = create_bound_arguments(command, tokens)
-        remaining_tokens = list(remaining_tokens)
-
         return command, bound, remaining_tokens
 
     def parse_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple[Callable, inspect.BoundArguments]:

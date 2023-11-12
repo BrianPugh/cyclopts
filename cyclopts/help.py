@@ -93,7 +93,7 @@ def format_parameters(function, title):
 
     parameters = []
     for parameter in inspect.signature(function).parameters.values():
-        hint, param = get_hint_parameter(parameter)
+        hint, param = get_hint_parameter(parameter.annotation)
 
         if (typing.get_origin(hint) or hint) is UnknownTokens:
             continue
@@ -115,7 +115,7 @@ def format_parameters(function, title):
     table.add_column(justify="left")
 
     for parameter in parameters:
-        hint, param = get_hint_parameter(parameter)
+        hint, param = get_hint_parameter(parameter.annotation)
         options = get_names(parameter)
 
         help_components = []

@@ -45,12 +45,20 @@ def test_coerce_bool():
 def test_coerce_int():
     assert [123, 456] == coerce(int, "123", "456")
     assert [123, 456] == coerce(List[int], "123", "456")
+    assert [123] == coerce(List[int], "123")
 
 
 def test_coerce_annotated_int():
     assert 1 == coerce(int, "1")
     assert [123, 456] == coerce(Annotated[int, "foo"], "123", "456")
     assert [123, 456] == coerce(Annotated[List[int], "foo"], "123", "456")
+
+
+def test_coerce_annotated_union_int():
+    assert 123 == coerce(Annotated[Union[None, int, float], "foo"], "123")
+    assert 1 == coerce(int, "1")
+    assert [123, 456] == coerce(Annotated[int, "foo"], "123", "456")
+    assert [123, 456] == coerce(Annotated[Union[None, int, float], "foo"], "123", "456")
 
 
 def test_coerce_enum():
