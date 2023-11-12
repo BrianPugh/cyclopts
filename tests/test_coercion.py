@@ -1,59 +1,78 @@
 import inspect
 from enum import Enum, auto
-from typing import List, Literal, Optional
+from pathlib import Path
+from typing import List, Literal, Optional, Set, Tuple, Union
 
 import pytest
+from typing_extensions import Annotated
 
-from cyclopts import coercion
-from cyclopts.coercion import Pipeline, get_coercion
-
-
-def test_get_coercion_bool():
-    def foo(a: bool = False):
-        pass
-
-    def bar(a: Optional[bool] = None):
-        pass
-
-    for f in [foo, bar]:
-        signature = inspect.signature(f)
-        parameter = list(signature.parameters.values())[0]
-        assert (Pipeline([coercion.bool]), False) == get_coercion(parameter)
+from cyclopts.coercion import coerce, token_count
 
 
-def test_get_coercion_list_int():
-    def foo(a: List[int]):
-        pass
-
-    parameter = list(inspect.signature(foo).parameters.values())[0]
-    assert (Pipeline([coercion.int]), True) == get_coercion(parameter)
-
-
-def test_get_coercion_literal():
-    def foo(a: Literal[1, 2, 3]):
-        pass
-
-    parameter = list(inspect.signature(foo).parameters.values())[0]
-    coercion, is_iterable = get_coercion(parameter)
-    assert is_iterable is False
-    assert coercion("1") == 1
-    assert coercion("2") == 2
-    assert coercion("3") == 3
-    with pytest.raises(ValueError):
-        coercion("4")
+def _assert_tuple(expected, actual):
+    assert type(actual) == tuple
+    assert len(expected) == len(actual)
+    for e, a in zip(expected, actual):
+        assert type(e) == type(a)
+        assert e == a
 
 
-def test_get_coercion_enum():
+def test_token_count_tuple():
+    assert 3 == token_count(Tuple[int, int, int])
+
+
+def test_token_union():
+    assert 1 == token_count(Union[None, int])
+
+
+def test_token_count_standard():
+    assert 1 == token_count(int)
+
+
+def test_token_count_bool():
+    assert 0 == token_count(bool)
+
+
+def test_token_count_list():
+    assert 1 == token_count(List[int])
+
+
+def test_coerce_bool():
+    assert True is coerce(bool, "true")
+    assert False is coerce(bool, "false")
+
+
+def test_coerce_int():
+    assert [123, 456] == coerce(int, "123", "456")
+    assert [123, 456] == coerce(List[int], "123", "456")
+
+
+def test_coerce_annotated_int():
+    assert 1 == coerce(int, "1")
+    assert [123, 456] == coerce(Annotated[int, "foo"], "123", "456")
+    assert [123, 456] == coerce(Annotated[List[int], "foo"], "123", "456")
+
+
+def test_coerce_enum():
     class SoftwareEnvironment(Enum):
         DEV = auto()
         STAGING = auto()
         PROD = auto()
 
-    def foo(a: SoftwareEnvironment = SoftwareEnvironment.DEV):
-        pass
+    assert SoftwareEnvironment.STAGING == coerce(SoftwareEnvironment, "staging")
+    _assert_tuple((1, 2.0), coerce(Tuple[int, Union[None, float, int]], "1", "2"))
 
-    parameter = list(inspect.signature(foo).parameters.values())[0]
-    coercion, is_iterable = get_coercion(parameter)
-    assert coercion("dev") == SoftwareEnvironment.DEV
-    assert coercion("staging") == SoftwareEnvironment.STAGING
-    assert coercion("prod") == SoftwareEnvironment.PROD
+
+def test_coerce_set():
+    assert {"123", "456"} == coerce(Set[str], "123", "456")
+    assert {123, 456} == coerce(Set[Union[int, str]], "123", "456")
+
+
+def test_coerce_literal():
+    assert "foo" == coerce(Literal["foo", "bar", 3], "foo")
+    assert "bar" == coerce(Literal["foo", "bar", 3], "bar")
+    assert 3 == coerce(Literal["foo", "bar", 3], "3")
+
+
+def test_coerce_path():
+    assert Path("foo") == coerce(Path, "foo")
