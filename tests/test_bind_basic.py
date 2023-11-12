@@ -9,9 +9,7 @@ from cyclopts import (
     CoercionError,
     MissingArgumentError,
     Parameter,
-    UnknownKeywordError,
     UnsupportedPositionalError,
-    UnsupportedTypeHintError,
 )
 
 
@@ -260,7 +258,7 @@ def test_pos_only_extended_exceptions(app, cmd_str_e):
 
 
 def test_pos_only_list_not_allowed(app):
-    with pytest.raises(UnsupportedTypeHintError):
+    with pytest.raises(TypeError):
 
         @app.register
         def foo(a: List[int], /):

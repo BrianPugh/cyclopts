@@ -19,10 +19,6 @@ class MissingTypeError(CycloptsError):
         super().__init__(self.message)
 
 
-class UnsupportedTypeHintError(CycloptsError):
-    pass
-
-
 class UnsupportedPositionalError(CycloptsError):
     pass
 

@@ -1,5 +1,6 @@
+from typing import Iterable, List, Literal, Tuple
+
 import pytest
-from typing import Iterable, List, Tuple, Literal
 
 from cyclopts.typing import is_iterable_type_hint
 

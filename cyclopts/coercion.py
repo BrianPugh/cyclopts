@@ -4,6 +4,8 @@ from typing import Literal, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
+from cyclopts.exceptions import CoercionError
+
 # from types import NoneType is available >=3.10
 NoneType = type(None)
 
@@ -61,13 +63,13 @@ def _convert(type_, element):
             if res == choice:
                 return res
         else:
-            raise ValueError(f"Error converting '{element}' to {type_}")
+            raise CoercionError(f"Error converting '{element}' to {type_}")
     elif isclass(type_) and issubclass(type_, Enum):
         element_lower = element.lower()
         for member in type_:
             if member.name.lower() == element_lower:
                 return member
-        raise ValueError(f"Error converting '{element}' to {type_}")
+        raise CoercionError(f"Error converting '{element}' to {type_}")
     elif origin_type in [list, set]:
         return origin_type(_convert(inner_types[0], e) for e in element)
     elif origin_type is tuple:
@@ -76,7 +78,7 @@ def _convert(type_, element):
         try:
             return _converters.get(type_, type_)(element)
         except ValueError as e:
-            raise ValueError(f"Error converting '{element}' to {type_}") from e
+            raise CoercionError(f"Error converting '{element}' to {type_}") from e
 
 
 _unsupported_target_types = {dict}
@@ -85,11 +87,11 @@ _unsupported_target_types = {dict}
 def _get_origin_and_validate(type_):
     origin_type = get_origin(type_)
     if type_ in _unsupported_target_types:
-        raise ValueError(f"Unsupported Type: {type_}")
+        raise TypeError(f"Unsupported Type: {type_}")
     if origin_type in _unsupported_target_types:
-        raise ValueError(f"Unsupported Type: {origin_type}")
+        raise TypeError(f"Unsupported Type: {origin_type}")
     if type_ is tuple:
-        raise ValueError("Tuple type hints must contain inner hints.")
+        raise TypeError("Tuple type hints must contain inner hints.")
     return origin_type
 
 
@@ -128,7 +130,7 @@ def coerce(type_, *args):
         return [_convert(type_, item) for item in args]
 
 
-def token_count(type_) -> int:
+def token_count(type_: type) -> int:
     """The number of tokens after a keyword the parameter should consume."""
     type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)

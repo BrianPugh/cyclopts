@@ -6,9 +6,7 @@ from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
-    CoercionError,
     MissingArgumentError,
-    UnsupportedPositionalError,
 )
 from cyclopts.parameter import get_hint_parameter, get_names
 
@@ -88,7 +86,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     remaining_tokens.append(token)
                     continue
 
-            consume_count = token_count(parameter)
+            consume_count = token_count(parameter.annotation)
             cli_values.append(cli_value)
             try:
                 for j in range(consume_count - 1):
@@ -105,7 +103,8 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 parameter = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    consume_count = token_count(kwargs_parameter)
+                    breakpoint()
+                    consume_count = token_count(kwargs_parameter.annotation)
                     try:
                         for j in range(consume_count):
                             cli_values.append(tokens[i + 1 + j])
@@ -122,7 +121,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     continue
             else:
                 cli_values = []
-                consume_count = token_count(parameter)
+                consume_count = token_count(parameter.annotation)
 
                 try:
                     for j in range(consume_count):
@@ -162,7 +161,7 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
             consume_count = max(1, token_count(parameter.annotation))
             if len(tokens) < consume_count:
                 # TODO: better exception
-                raise Exception(f"Not enough arguments for {parameter}")
+                raise MissingArgumentError(f"Not enough arguments for {parameter}")
             mapping[parameter] = tokens[:consume_count]
             tokens = tokens[consume_count:]
 
