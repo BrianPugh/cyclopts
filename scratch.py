@@ -1,0 +1,117 @@
+from collections.abc import Iterable
+from pathlib import Path
+from typing import List, Set, Tuple, Union, get_args, get_origin
+
+NoneType = type(None)
+
+
+def _bool(s: Union[str, bool]) -> bool:
+    if isinstance(s, bool):
+        return s
+
+    s = s.lower()
+    if s in {"no", "n", "0", "false", "f"}:
+        return False
+    return True
+
+
+def _int(s: str) -> int:
+    s = s.lower()
+    if s.startswith("0x"):
+        return int(s, 16)
+    elif s.startswith("0b"):
+        return int(s, 2)
+    else:
+        return int(s, 0)
+
+
+def _bytes(s: str) -> bytes:
+    return bytes(s, encoding="utf8")
+
+
+def _bytearray(s: str) -> bytearray:
+    return bytearray(_bytes(s))
+
+
+# For types that need more logic than just invoking their type
+_converters = {
+    bool: _bool,
+    int: _int,
+    bytes: _bytes,
+    bytearray: _bytearray,
+}
+
+
+def _convert(type_, element):
+    origin_type = get_origin(type_)
+    inner_types = get_args(type_)
+    if isinstance(type_, (list, tuple, set)):
+        return type_(_convert(type_[0], e) for e in element)  # pyright: ignore[reportGeneralTypeIssues]
+    elif origin_type is Union:
+        non_none_types = [t for t in inner_types if t is not NoneType]
+        return _convert(non_none_types[0], element)
+    elif origin_type in [list, set]:
+        return origin_type(_convert(inner_types[0], e) for e in element)
+    elif origin_type is tuple:
+        return tuple(_convert(t, e) for t, e in zip(inner_types, element))
+    else:
+        try:
+            return _converters.get(type_, type_)(element)
+        except ValueError as e:
+            raise ValueError(f"Error converting '{element}' to {type_}") from e
+
+
+_unsupported_target_types = {dict}
+
+
+def coerce(target_type, *args):
+    origin_target_type = get_origin(target_type)
+    if target_type in _unsupported_target_types:
+        raise ValueError(f"Unsupported Type: {target_type}")
+    if origin_target_type in _unsupported_target_types:
+        raise ValueError(f"Unsupported Type: {origin_target_type}")
+    if target_type is tuple:
+        raise ValueError("Tuple type hints must contain inner hints.")
+
+    if origin_target_type is tuple:
+        inner_types = get_args(target_type)
+        if len(inner_types) != len(args):
+            raise ValueError(
+                f"Number of arguments does not match the tuple structure: expected {len(inner_types)} but got {len(args)}"
+            )
+        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
+    elif origin_target_type in [list, set]:
+        return _convert(target_type, args)
+    elif origin_target_type is Union:
+        non_none_types = [t for t in get_args(target_type) if t is not None]
+        if not non_none_types:
+            raise ValueError("Union type cannot be all NoneType")
+        return [_convert(non_none_types[0], item) for item in args]
+    elif len(args) == 1 and not isinstance(target_type, Iterable):
+        return _convert(target_type, args[0])
+    else:
+        return [_convert(target_type, item) for item in args]
+
+
+# Example Usage
+assert 1 == coerce(int, "1")
+
+assert [123, 456] == coerce(int, "123", "456")
+assert [123, 456] == coerce(List[int], "123", "456")
+assert {123, 456} == coerce(Set[int], "123", "456")
+assert {"123", "456"} == coerce(Set[str], "123", "456")
+assert {123, 456} == coerce(Set[Union[int, str]], "123", "456")
+assert Path("foo") == coerce(Path, "foo")
+assert True is coerce(bool, "true")
+assert False is coerce(bool, "false")
+
+
+def assert_tuple(expected, actual):
+    assert type(actual) == tuple
+    assert len(expected) == len(actual)
+    for e, a in zip(expected, actual):
+        assert type(e) == type(a)
+        assert e == a
+
+
+assert_tuple((1, 2.0), coerce(Tuple[int, Union[None, float, int]], "1", "2"))
