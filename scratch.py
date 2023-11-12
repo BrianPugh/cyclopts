@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from enum import Enum, auto
+from inspect import isclass
 from pathlib import Path
 from typing import List, Literal, Set, Tuple, Union, get_args, get_origin
 
@@ -60,6 +61,12 @@ def _convert(type_, element):
                 return res
         else:
             raise ValueError(f"Error converting '{element}' to {type_}")
+    elif isclass(type_) and issubclass(type_, Enum):
+        element_lower = element.lower()
+        for member in type_:
+            if member.name.lower() == element_lower:
+                return member
+        raise ValueError(f"Error converting '{element}' to {type_}")
     elif origin_type in [list, set]:
         return origin_type(_convert(inner_types[0], e) for e in element)
     elif origin_type is tuple:
@@ -165,3 +172,6 @@ class SoftwareEnvironment(Enum):
     DEV = auto()
     STAGING = auto()
     PROD = auto()
+
+
+assert SoftwareEnvironment.STAGING == coerce(SoftwareEnvironment, "staging")
