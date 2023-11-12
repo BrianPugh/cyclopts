@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import List, Set, Tuple, Union, get_args, get_origin
+from typing import List, Literal, Set, Tuple, Union, get_args, get_origin
 
 NoneType = type(None)
 
@@ -50,6 +50,16 @@ def _convert(type_, element):
     elif origin_type is Union:
         non_none_types = [t for t in inner_types if t is not NoneType]
         return _convert(non_none_types[0], element)
+    elif origin_type is Literal:
+        for choice in get_args(type_):
+            try:
+                res = _convert(type(choice), (element))
+            except Exception:
+                continue
+            if res == choice:
+                return res
+        else:
+            raise ValueError(f"Error converting '{element}' to {type_}")
     elif origin_type in [list, set]:
         return origin_type(_convert(inner_types[0], e) for e in element)
     elif origin_type is tuple:
@@ -99,7 +109,7 @@ def coerce(target_type, *args):
     elif origin_target_type is Union:
         target_type = _resolve_union(target_type)
         return [_convert(target_type, item) for item in args]
-    elif len(args) == 1 and not isinstance(target_type, Iterable):
+    elif len(args) == 1:
         return _convert(target_type, args[0])
     else:
         return [_convert(target_type, item) for item in args]
@@ -124,6 +134,8 @@ assert 1 == token_count(List[int])
 assert 3 == token_count(Tuple[int, int, int])
 
 # Example Usage
+res = coerce(Literal["foo", "bar", 3], "foo")
+assert "foo" == coerce(Literal["foo", "bar", 3], "foo")
 assert 1 == coerce(int, "1")
 
 assert [123, 456] == coerce(int, "123", "456")
