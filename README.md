@@ -20,3 +20,38 @@ Intuitive, easy CLIs based on python type hints.
 ```bash
 pip install cyclopts
 ```
+
+# Quick Start
+Create an application using `cyclopts.App`, and then register commands using the `register` decorator.
+
+```python
+from cyclopts import App
+
+app = App()
+
+
+@app.register
+def foo(loops: int):
+    for i in range(loops):
+        print(f"Looping! {i}")
+
+
+@app.register_default
+def default_action():
+    print("Hello world! This runs when no command is specified.")
+
+
+app()
+```
+
+Executing the script from the command line:
+
+```bash
+$ python demo.py
+Hello world! This runs when no command is specified.
+
+$ python demo.py foo 3
+Looping! 0
+Looping! 1
+Looping! 2
+```
