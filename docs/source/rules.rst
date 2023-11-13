@@ -9,9 +9,7 @@ Operations that are not allowed arise from overly-ambiguous CLI commands.
 List
 ****
 
-* Lists are only allowed for keyword arguments.
-
-* For the CLI input, only one element will be added per keyword specified.
+* If provided as a keyword, only one element will be added per token pair.
 
   .. code-block:: bash
 
@@ -25,7 +23,6 @@ List
 Tuple
 *****
 
-* Currently not supported.
 
 ********
 Iterable
@@ -59,5 +56,3 @@ Enum
 ***
 set
 ***
-
-* not supported
