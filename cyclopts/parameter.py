@@ -21,8 +21,24 @@ class Parameter:
     """User-facing parameter annotation."""
 
     # User Options
+
+    # Name(s) that this parameter should be exposed to the cli as.
+    # These should start with ``--`` (or ``-`` for single-character).
     name: Tuple[str, ...] = field(default=[], converter=_str_to_tuple_converter)
-    coercion: Optional[Callable] = None
+
+    # User provided coercion function with signature:
+    #
+    #    def coercion(type_, *args):
+    #        pass
+    #
+    # Where ``type_`` is the parameter type hint, and ``args`` are all string
+    # tokens that were parsed to be associated with this parameter.
+    # Typically this is a single token. The returned value will be supplied to
+    # the command. If a list of callables is provided, they will be called in-order.
+    coercion: Union[None, Callable, List[Callable]] = None
+
+    negative: Tuple[str, ...] = field(default=[], converter=_str_to_tuple_converter)
+
     show_default = True
     help: str = ""
 
