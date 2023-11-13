@@ -1,11 +1,11 @@
 import inspect
 import typing
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Iterable, List, Optional, Tuple, Union, get_origin
 
 from attrs import field, frozen
 from typing_extensions import Annotated
 
-from cyclopts.exceptions import MultipleParameterAnnotationError
+from cyclopts.exceptions import MultipleParameterAnnotationError, UnreachableError
 
 
 def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
@@ -48,8 +48,12 @@ class Parameter:
     help: str = ""
 
     def get_negatives(self, type_, *names) -> Tuple[str, ...]:
+        type_ = get_origin(type_) or type_
+
         if self.negative is not None:
             return self.negative
+        elif type_ not in (bool, list, set):
+            return ()
 
         out = []
         for name in names:
@@ -61,8 +65,7 @@ class Parameter:
                 continue
             else:
                 # Should never reach here.
-                breakpoint()
-                raise NotImplementedError
+                raise UnreachableError
 
             if type_ is bool:
                 negative_word = "no"

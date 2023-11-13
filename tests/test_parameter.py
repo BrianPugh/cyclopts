@@ -1,3 +1,5 @@
+from typing import List, Set
+
 import pytest
 
 from cyclopts import Parameter
@@ -8,7 +10,7 @@ def test_parameter_get_negatives_bool_default():
     assert ("--no-foo", "--no-bar") == p.get_negatives(bool, "--foo", "--bar")
 
 
-@pytest.mark.parametrize("type_", [list, set])
+@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
 def test_parameter_get_negatives_iterable_default(type_):
     p = Parameter()
     assert ("--empty-foo", "--empty-bar") == p.get_negatives(type_, "--foo", "--bar")

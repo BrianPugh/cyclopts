@@ -1,7 +1,7 @@
 import inspect
 import shlex
 import sys
-from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, get_origin
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
@@ -24,7 +24,7 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
 
 def _cli2parameter_mappings(f: Callable):
     kwargs_parameter = None
-    kw_mapping, flag_mapping = {}, {}
+    mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
         annotation = str if parameter.annotation is parameter.empty else parameter.annotation
@@ -38,13 +38,14 @@ def _cli2parameter_mappings(f: Callable):
             keys = get_names(parameter)
             if hint is bool:  # Boolean Flag
                 for key in keys:
-                    flag_mapping[key] = (parameter, "true")
+                    mapping[key] = (parameter, "true")
                 for key in user_param.get_negatives(hint, *keys):
-                    flag_mapping[key] = (parameter, "false")
+                    mapping[key] = (parameter, "false")
             else:
                 for key in keys:
-                    kw_mapping[key] = parameter
-    return kw_mapping, flag_mapping, kwargs_parameter
+                    mapping[key] = (parameter, None)
+
+    return mapping, kwargs_parameter
 
 
 def _cli_kw_to_f_kw(cli_key: str):
@@ -56,7 +57,7 @@ def _cli_kw_to_f_kw(cli_key: str):
 
 
 def _parse_kw_and_flags(f, tokens, mapping):
-    cli2kw, cli2flag, kwargs_parameter = _cli2parameter_mappings(f)
+    cli2kw, kwargs_parameter = _cli2parameter_mappings(f)
 
     if kwargs_parameter:
         mapping[kwargs_parameter] = {}
@@ -77,15 +78,12 @@ def _parse_kw_and_flags(f, tokens, mapping):
 
         cli_values = []
 
-        if token in cli2flag:
-            parameter, cli_value = cli2flag[token]
-            cli_values.append(cli_value)
-        elif "=" in token:
+        if "=" in token:
             cli_key, cli_value = token.split("=", 1)
             cli_values.append(cli_value)
 
             try:
-                parameter = cli2kw[cli_key]
+                parameter, _ = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
                     consume_count = max(1, token_count(kwargs_parameter.annotation))
@@ -120,7 +118,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
             cli_key = token
 
             try:
-                parameter = cli2kw[cli_key]
+                parameter, implicit_value = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
                     consume_count = max(1, token_count(kwargs_parameter.annotation))
@@ -142,17 +140,19 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     remaining_tokens.append(cli_key)
                     continue
             else:
-                cli_values = []
-                consume_count = max(1, token_count(parameter.annotation))
+                if implicit_value is not None:
+                    cli_values.append(implicit_value)
+                else:
+                    consume_count = max(1, token_count(parameter.annotation))
 
-                try:
-                    for j in range(consume_count):
-                        cli_values.append(tokens[i + 1 + j])
-                    skip_next_iterations = consume_count
-                except IndexError:
-                    # This could be a flag downstream
-                    remaining_tokens.append(token)
-                    continue
+                    try:
+                        for j in range(consume_count):
+                            cli_values.append(tokens[i + 1 + j])
+                        skip_next_iterations = consume_count
+                    except IndexError:
+                        # This could be a flag downstream
+                        remaining_tokens.append(token)
+                        continue
 
         mapping.setdefault(parameter, [])
         mapping[parameter].extend(cli_values)
