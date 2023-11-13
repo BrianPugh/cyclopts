@@ -23,9 +23,6 @@ from cyclopts.help import format_commands, format_doc, format_parameters, format
 def _validate_type_supported(p: inspect.Parameter):
     if p.annotation is p.empty:
         raise MissingTypeError(p.name)
-    if p.kind == p.POSITIONAL_ONLY:
-        if typing.get_origin(p.annotation) is list:
-            raise TypeError("Positional-only parameter cannot be of type 'list'.")
 
 
 def _format_name(name: str):
