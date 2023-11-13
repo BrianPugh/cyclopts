@@ -1,3 +1,4 @@
+import inspect
 from enum import Enum
 from inspect import isclass
 from typing import Literal, Union, get_args, get_origin
@@ -111,6 +112,9 @@ def resolve_annotated(type_):
 
 
 def coerce(type_, *args):
+    if type_ is inspect.Parameter.empty:
+        type_ = str
+
     type_ = resolve_annotated(type_)
     type_ = resolve_union(type_)
     origin_type = _get_origin_and_validate(type_)
@@ -135,6 +139,9 @@ def token_count(type_: type) -> int:
 
     Returns ``-1`` if all remaining tokens should be consumed.
     """
+    if type_ is inspect.Parameter.empty:
+        return 1
+
     type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)
 

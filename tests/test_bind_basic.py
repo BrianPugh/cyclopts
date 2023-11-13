@@ -8,14 +8,6 @@ import cyclopts
 from cyclopts import Parameter
 
 
-def test_missing_positional_type(app):
-    with pytest.raises(cyclopts.MissingTypeError):
-
-        @app.register
-        def foo(a, b, c):
-            pass
-
-
 @pytest.mark.parametrize(
     "cmd_str",
     [

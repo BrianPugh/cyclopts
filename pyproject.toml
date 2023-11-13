@@ -83,6 +83,7 @@ exclude_lines = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+ignore = ["docs/"]
 
 [tool.ruff]
 target-version = 'py38'
@@ -158,6 +159,9 @@ convention = "numpy"
     "S102",  # use of "exec"
     "S106",  # possible hardcoded password.
     "PGH001",  # use of "eval"
+]
+"docs/*.py" = [
+    "F811",  # redefinition
 ]
 
 [tool.ruff.pep8-naming]

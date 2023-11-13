@@ -20,11 +20,6 @@ from cyclopts.exceptions import (
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
 
 
-def _validate_type_supported(p: inspect.Parameter):
-    if p.annotation is p.empty:
-        raise MissingTypeError(p.name)
-
-
 def _format_name(name: str):
     return name.lower().replace("_", "-")
 
@@ -102,8 +97,6 @@ class App:
         if isinstance(obj, App):  # Registering a sub-App
             name = obj.name
         else:
-            for parameter in inspect.signature(obj).parameters.values():
-                _validate_type_supported(parameter)
             name = name or _format_name(obj.__name__)
 
         if name in self._commands:
@@ -122,9 +115,6 @@ class App:
         if self._default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
         self._default_command = obj
-
-        for parameter in inspect.signature(obj).parameters.values():
-            _validate_type_supported(parameter)
 
         return obj
 

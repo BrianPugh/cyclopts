@@ -27,11 +27,13 @@ def _cli2parameter_mappings(f: Callable):
     kw_mapping, flag_mapping = {}, {}
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
+        annotation = str if parameter.annotation is parameter.empty else parameter.annotation
+
         if parameter.kind == parameter.VAR_KEYWORD:
             kwargs_parameter = parameter
 
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
-            hint = resolve_union(resolve_annotated(parameter.annotation))
+            hint = resolve_union(resolve_annotated(annotation))
             keys = get_names(parameter)
             if hint is bool:  # Boolean Flag
                 for key in keys:
