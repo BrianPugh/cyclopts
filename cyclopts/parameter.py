@@ -5,9 +5,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, Union
 from attrs import field, frozen
 from typing_extensions import Annotated
 
-from cyclopts.exceptions import (
-    MultipleParameterAnnotationError,
-)
+from cyclopts.exceptions import MultipleParameterAnnotationError
 
 
 def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
@@ -34,8 +32,8 @@ class Parameter:
     # Where ``type_`` is the parameter type hint, and ``args`` are all string
     # tokens that were parsed to be associated with this parameter.
     # Typically this is a single token. The returned value will be supplied to
-    # the command. If a list of callables is provided, they will be called in-order.
-    coercion: Union[None, Callable, List[Callable]] = None
+    # the command.
+    coercion: Union[None, Callable] = field(default=None)
 
     negative: Tuple[str, ...] = field(default=[], converter=_str_to_tuple_converter)
 

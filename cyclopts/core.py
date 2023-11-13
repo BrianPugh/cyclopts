@@ -3,7 +3,6 @@ import inspect
 import os
 import shlex
 import sys
-import typing
 from functools import partial
 from typing import Callable, Dict, Iterable, NoReturn, Optional, Tuple, Union
 
@@ -14,7 +13,6 @@ from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
-    MissingTypeError,
     UnusedCliTokensError,
 )
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage

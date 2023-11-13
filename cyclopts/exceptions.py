@@ -10,15 +10,6 @@ class CoercionError(CycloptsError):
     pass
 
 
-class MissingTypeError(CycloptsError):
-    """Function parameter is missing a type annotation."""
-
-    def __init__(self, value, message="Parameter missing type: "):
-        self.value = value
-        self.message = message + str(value)
-        super().__init__(self.message)
-
-
 class UnsupportedPositionalError(CycloptsError):
     pass
 
@@ -43,11 +34,6 @@ class UnknownKeywordError(CycloptsError):
 
 class MissingArgumentError(CycloptsError):
     pass
-
-
-class RepeatKeywordError(CycloptsError):
-    def __init__(self, message="Cannot specify keyword multiple times."):
-        super().__init__(message)
 
 
 class MultipleParameterAnnotationError(CycloptsError):

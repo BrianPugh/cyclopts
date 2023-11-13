@@ -1,7 +1,7 @@
 import inspect
 import shlex
 import sys
-from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, get_origin
+from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
