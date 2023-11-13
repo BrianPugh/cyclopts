@@ -54,6 +54,9 @@ def _cli_kw_to_f_kw(cli_key: str):
 def _parse_kw_and_flags(f, tokens, mapping):
     cli2kw, cli2flag, kwargs_parameter = _cli2parameter_mappings(f)
 
+    if kwargs_parameter:
+        mapping[kwargs_parameter] = {}
+
     remaining_tokens = []
 
     # Parse All Keyword Arguments & Flags
@@ -75,20 +78,32 @@ def _parse_kw_and_flags(f, tokens, mapping):
             cli_values.append(cli_value)
         elif "=" in token:
             cli_key, cli_value = token.split("=", 1)
+            cli_values.append(cli_value)
+
             try:
                 parameter = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    parameter = kwargs_parameter
-                    cli_value = {_cli_kw_to_f_kw(cli_key): cli_value}
+                    consume_count = max(1, token_count(kwargs_parameter.annotation))
+
+                    try:
+                        for j in range(consume_count - 1):
+                            cli_values.append(tokens[i + 1 + j])
+                    except IndexError:
+                        # This could be a flag downstream
+                        remaining_tokens.append(token)
+                        continue
+
+                    key = _cli_kw_to_f_kw(cli_key)
+                    mapping[kwargs_parameter].setdefault(key, [])
+                    mapping[kwargs_parameter][key].extend(cli_values)
+                    skip_next_iterations = consume_count - 1
                 else:
                     remaining_tokens.append(token)
-                    continue
+                continue
 
-            consume_count = token_count(parameter.annotation)
-            if consume_count == -1:
-                breakpoint()
-            cli_values.append(cli_value)
+            consume_count = max(1, token_count(parameter.annotation))
+
             try:
                 for j in range(consume_count - 1):
                     cli_values.append(tokens[i + 1 + j])
@@ -104,32 +119,27 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 parameter = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    breakpoint()
-                    consume_count = token_count(kwargs_parameter.annotation)
-
-                    if consume_count == -1:
-                        breakpoint()
+                    consume_count = max(1, token_count(kwargs_parameter.annotation))
 
                     try:
                         for j in range(consume_count):
                             cli_values.append(tokens[i + 1 + j])
+                        skip_next_iterations = consume_count
                     except IndexError:
                         # This could be a flag downstream
                         remaining_tokens.append(token)
                         continue
 
-                    # TODO: handle kwargs
-                    breakpoint()
+                    key = _cli_kw_to_f_kw(cli_key)
+                    mapping[kwargs_parameter].setdefault(key, [])
+                    mapping[kwargs_parameter][key].extend(cli_values)
                     continue
                 else:
                     remaining_tokens.append(cli_key)
                     continue
             else:
                 cli_values = []
-                consume_count = token_count(parameter.annotation)
-
-                if consume_count == -1:
-                    breakpoint()
+                consume_count = max(1, token_count(parameter.annotation))
 
                 try:
                     for j in range(consume_count):
@@ -245,7 +255,12 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
 
     coerced = {}
     for parameter, parameter_tokens in mapping.items():
-        coerced[parameter] = coerce(parameter.annotation, *parameter_tokens)
+        if parameter.kind == parameter.VAR_KEYWORD:
+            coerced[parameter] = {}
+            for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
+                coerced[parameter][key] = coerce(parameter.annotation, *values)
+        else:
+            coerced[parameter] = coerce(parameter.annotation, *parameter_tokens)
 
     bound = _bind(f, coerced)
     return bound, remaining_tokens

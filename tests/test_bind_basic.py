@@ -317,13 +317,17 @@ def test_keyword_list(app):
     assert actual_bind == expected_bind
 
 
-def test_keyword_list_pos_not_allowed(app):
+def test_keyword_list_pos(app):
     @app.register
     def foo(a: List[int]):
         pass
 
-    with pytest.raises(UnsupportedPositionalError):
-        app.parse_args("foo 1")
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind([1, 2, 3])
+
+    actual_command, actual_bind = app.parse_args("foo 1 2 3")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
 
 
 def test_keyword_optional_list_none_default(app):
