@@ -36,14 +36,12 @@ def _cli2parameter_mappings(f: Callable):
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint = resolve_union(resolve_annotated(annotation))
             keys = get_names(parameter)
-            if hint is bool:  # Boolean Flag
-                for key in keys:
-                    mapping[key] = (parameter, "true")
-                for key in user_param.get_negatives(hint, *keys):
-                    mapping[key] = (parameter, "false")
-            else:
-                for key in keys:
-                    mapping[key] = (parameter, None)
+
+            for key in keys:
+                mapping[key] = (parameter, True if hint is bool else None)
+
+            for key in user_param.get_negatives(hint, *keys):
+                mapping[key] = (parameter, (get_origin(hint) or hint)())
 
     return mapping, kwargs_parameter
 
@@ -261,14 +259,20 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
     for parameter, parameter_tokens in mapping.items():
         _, p = get_hint_parameter(parameter.annotation)
 
-        action = p.coercion if p.coercion else coerce
-
-        if parameter.kind == parameter.VAR_KEYWORD:
-            coerced[parameter] = {}
-            for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
-                coerced[parameter][key] = action(parameter.annotation, *values)
+        # This is a little jank, but works for all current use-cases
+        for parameter_token in parameter_tokens:
+            if not isinstance(parameter_token, str):
+                coerced[parameter] = parameter_tokens[0]
+                break
         else:
-            coerced[parameter] = action(parameter.annotation, *parameter_tokens)
+            action = p.coercion if p.coercion else coerce
+
+            if parameter.kind == parameter.VAR_KEYWORD:
+                coerced[parameter] = {}
+                for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
+                    coerced[parameter][key] = action(parameter.annotation, *values)
+            else:
+                coerced[parameter] = action(parameter.annotation, *parameter_tokens)
 
     bound = _bind(f, coerced)
     return bound, remaining_tokens
