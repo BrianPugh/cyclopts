@@ -14,6 +14,13 @@ def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str
     return tuple(input_value)
 
 
+def _optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Optional[Tuple[str, ...]]:
+    if input_value is None:
+        return None
+
+    return _str_to_tuple_converter(input_value)
+
+
 @frozen
 class Parameter:
     """User-facing parameter annotation."""
@@ -33,12 +40,37 @@ class Parameter:
     # tokens that were parsed to be associated with this parameter.
     # Typically this is a single token. The returned value will be supplied to
     # the command.
-    coercion: Union[None, Callable] = field(default=None)
+    coercion: Optional[Callable] = field(default=None)
 
-    negative: Tuple[str, ...] = field(default=[], converter=_str_to_tuple_converter)
+    negative: Optional[Tuple[str, ...]] = field(default=None, converter=_optional_str_to_tuple_converter)
 
     show_default = True
     help: str = ""
+
+    def get_negatives(self, type_, *names) -> Tuple[str, ...]:
+        if self.negative is not None:
+            return self.negative
+
+        out = []
+        for name in names:
+            if name.startswith("--"):
+                prefix = "--"
+                name = name[2:]
+            elif name.startswith("-"):
+                # Don't currently support short flags
+                continue
+            else:
+                # Should never reach here.
+                breakpoint()
+                raise NotImplementedError
+
+            if type_ is bool:
+                negative_word = "no"
+            else:
+                negative_word = "empty"
+
+            out.append(f"{prefix}{negative_word}-{name}")
+        return tuple(out)
 
 
 def get_names(parameter: inspect.Parameter) -> List[str]:

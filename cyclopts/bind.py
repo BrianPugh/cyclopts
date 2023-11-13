@@ -28,6 +28,7 @@ def _cli2parameter_mappings(f: Callable):
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
         annotation = str if parameter.annotation is parameter.empty else parameter.annotation
+        _, user_param = get_hint_parameter(annotation)
 
         if parameter.kind == parameter.VAR_KEYWORD:
             kwargs_parameter = parameter
@@ -38,7 +39,8 @@ def _cli2parameter_mappings(f: Callable):
             if hint is bool:  # Boolean Flag
                 for key in keys:
                     flag_mapping[key] = (parameter, "true")
-                # flag_mapping["no-" + key] = (parameter, False)  # TODO
+                for key in user_param.get_negatives(hint, *keys):
+                    flag_mapping[key] = (parameter, "false")
             else:
                 for key in keys:
                     kw_mapping[key] = parameter
