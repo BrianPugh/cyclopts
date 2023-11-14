@@ -20,7 +20,7 @@ from cyclopts import Parameter
     ],
 )
 def test_basic_1(app, cmd_str):
-    @app.register
+    @app.command
     def foo(a: int, b: int, c: int):
         pass
 
@@ -41,7 +41,7 @@ def test_basic_1(app, cmd_str):
     ],
 )
 def test_basic_2(app, cmd_str):
-    @app.register
+    @app.command
     def foo(a: int, b: int, c: int, d: int = 5, some_flag: bool = False):
         pass
 
@@ -62,7 +62,7 @@ def test_basic_2(app, cmd_str):
     ],
 )
 def test_multiple_names(app, cmd_str):
-    @app.register
+    @app.command
     def foo(age: Annotated[int, Parameter(name=["--age", "--duration", "-a"])]):
         pass
 
@@ -90,13 +90,13 @@ def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated):
     """
     if annotated:
 
-        @app.register
+        @app.command
         def foo(a: Annotated[Optional[int], Parameter(help="help for a")] = None):
             pass
 
     else:
 
-        @app.register
+        @app.command
         def foo(a: Optional[int] = None):
             pass
 

@@ -14,7 +14,7 @@ from cyclopts import CoercionError, MissingArgumentError
     ],
 )
 def test_star_args(app, cmd_str):
-    @app.register
+    @app.command
     def foo(a: int, b: int, *args: int):
         pass
 
@@ -33,7 +33,7 @@ def test_star_args(app, cmd_str):
     ],
 )
 def test_pos_only(app, cmd_str):
-    @app.register
+    @app.command
     def foo(a: int, b: int, c: int, /):
         pass
 
@@ -54,7 +54,7 @@ def test_pos_only(app, cmd_str):
 def test_pos_only_exceptions(app, cmd_str_e):
     cmd_str, e = cmd_str_e
 
-    @app.register
+    @app.command
     def foo(a: int, b: int, c: int, /):
         pass
 
@@ -71,7 +71,7 @@ def test_pos_only_exceptions(app, cmd_str_e):
     ],
 )
 def test_pos_only_extended(app, cmd_str):
-    @app.register
+    @app.command
     def foo(a: int, b: int, c: int, /, d: int):
         pass
 
@@ -92,7 +92,7 @@ def test_pos_only_extended(app, cmd_str):
 def test_pos_only_extended_exceptions(app, cmd_str_e):
     cmd_str, e = cmd_str_e
 
-    @app.register
+    @app.command
     def foo(a: int, b: int, c: int, /, d: int):
         pass
 

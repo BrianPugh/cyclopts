@@ -3,7 +3,7 @@ from typing import List
 
 
 def test_kwargs_list_int(app):
-    @app.register
+    @app.command
     def foo(a: int, **kwargs: List[int]):
         pass
 
@@ -16,7 +16,7 @@ def test_kwargs_list_int(app):
 
 
 def test_kwargs_int(app):
-    @app.register
+    @app.command
     def foo(a: int, **kwargs: int):
         pass
 

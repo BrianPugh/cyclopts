@@ -10,7 +10,7 @@ def test_multiple_names(app):
         assert args == ("5",)
         return 2 * int(args[0])
 
-    @app.register
+    @app.command
     def foo(
         age: Annotated[
             int,

@@ -3,7 +3,7 @@ from typing import List, Optional
 
 
 def test_pos_list(app):
-    @app.register
+    @app.command
     def foo(a: List[int]):
         pass
 
@@ -16,7 +16,7 @@ def test_pos_list(app):
 
 
 def test_keyword_list(app):
-    @app.register
+    @app.command
     def foo(a: List[int]):
         pass
 
@@ -29,7 +29,7 @@ def test_keyword_list(app):
 
 
 def test_keyword_list_pos(app):
-    @app.register
+    @app.command
     def foo(a: List[int]):
         pass
 
@@ -42,7 +42,7 @@ def test_keyword_list_pos(app):
 
 
 def test_keyword_optional_list_none_default(app):
-    @app.register
+    @app.command
     def foo(a: Optional[List[int]] = None):
         assert a is None
 

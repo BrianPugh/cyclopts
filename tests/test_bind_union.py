@@ -26,13 +26,13 @@ def test_union_required_implicit_coercion(app, cmd_str, expected, annotated):
     """
     if annotated:
 
-        @app.register
+        @app.command
         def foo(a: Annotated[Union[None, int, str], Parameter(help="help for a")]):
             pass
 
     else:
 
-        @app.register
+        @app.command
         def foo(a: Union[None, int, str]):
             pass
 

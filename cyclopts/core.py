@@ -85,11 +85,11 @@ class App:
             )
         return self._meta
 
-    def register(self, obj: Optional[Callable] = None, *, name: str = "", **kwargs) -> Callable:
+    def command(self, obj: Optional[Callable] = None, *, name: str = "", **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
         if obj is None:  # Called ``@app.command``
             return partial(
-                self.register,
+                self.command,
             )  # Pass the rest of params here
 
         if isinstance(obj, App):  # Registering a sub-App
@@ -108,7 +108,7 @@ class App:
             return partial(self.default, **kwargs)  # Pass the rest of params here
 
         if isinstance(obj, App):  # Registering a sub-App
-            raise CycloptsError("Cannot register a sub App to default.")
+            raise CycloptsError("Cannot register a sub-App to default.")
 
         if self._default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
@@ -258,5 +258,5 @@ class MetaApp(App):
     def meta(self):
         raise CycloptsError("Cannot nest meta apps.")
 
-    def register(self, *args, **kwargs):
+    def command(self, *args, **kwargs):
         raise CycloptsError("Cannot register commands to a meta app.")
