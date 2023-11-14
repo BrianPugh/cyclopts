@@ -85,12 +85,13 @@ class App:
             )
         return self._meta
 
-    def command(self, obj: Optional[Callable] = None, *, name: str = "", **kwargs) -> Callable:
+    def command(self, obj: Optional[Callable] = None, *, name: str = "") -> Callable:
         """Decorator to register a function as a CLI command."""
         if obj is None:  # Called ``@app.command``
             return partial(
                 self.command,
-            )  # Pass the rest of params here
+                name=name,
+            )  # All input keyword args must be passed here.
 
         if isinstance(obj, App):  # Registering a sub-App
             name = obj.name
@@ -103,9 +104,9 @@ class App:
         self._commands[name] = obj
         return obj
 
-    def default(self, obj=None, **kwargs):
+    def default(self, obj=None):
         if obj is None:  # Called ``@app.default_command``
-            return partial(self.default, **kwargs)  # Pass the rest of params here
+            return partial(self.default)  # All input keyword args must be passed here.
 
         if isinstance(obj, App):  # Registering a sub-App
             raise CycloptsError("Cannot register a sub-App to default.")
