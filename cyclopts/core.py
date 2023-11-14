@@ -63,7 +63,7 @@ class App:
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
-    _meta: "MetaApp" = field(init=False, default=None)
+    _meta: "App" = field(init=False, default=None)
 
     ###########
     # Methods #
@@ -76,9 +76,9 @@ class App:
         return self._commands[key]
 
     @property
-    def meta(self) -> "MetaApp":
+    def meta(self) -> "App":
         if self._meta is None:
-            self._meta = MetaApp(
+            self._meta = type(self)(
                 help_flags=[],
                 version_flags=[],
                 help_panel_title="Session Parameters",
@@ -251,13 +251,3 @@ class App:
                 self(split_user_input)
             except Exception as e:
                 print(e)
-
-
-@define(kw_only=True)
-class MetaApp(App):
-    @property
-    def meta(self):
-        raise CycloptsError("Cannot nest meta apps.")
-
-    def command(self, *args, **kwargs):
-        raise CycloptsError("Cannot register commands to a meta app.")
