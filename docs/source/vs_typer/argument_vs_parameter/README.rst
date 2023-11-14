@@ -41,5 +41,17 @@ Because of these builtin python mechanisms, Cyclopts just has a single ``Paramet
 
 I believe that Typer's separate ``Argument`` and ``Option`` classes are a relic from when they must be supplied as a parameter's proxy default value.
 
+.. code-block:: python
+
+   app = typer.Typer()
+
+
+   @app.command()
+   def foo(a=Argument(), b=Option(default=2)):
+       pass
+
+When used as such, we lose the ability to define the function signature with position-only or keyword-only markers.
+We also lose the ability to directly inspect which parameters are optional by having "real" defaults and which ones are required.
+
 .. _PEP570: https://peps.python.org/pep-0570/
 .. _a more user-friendly tutorial: https://realpython.com/lessons/positional-only-arguments/
