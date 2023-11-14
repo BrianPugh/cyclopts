@@ -1,7 +1,7 @@
 ===============================
 Positional or Keyword Arguments
 ===============================
-Following the `Argument vs Parameter`_ discussion, a limitation of Typer is that a parameter cannot be both positional and keyword.
+Following the `Argument vs Option`_ discussion, a limitation of Typer is that a parameter cannot be both positional and keyword.
 
 For example, lets say we want to implement a ``mv`` -like functionality that takes in a source path, and a destination path:
 
