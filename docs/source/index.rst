@@ -12,6 +12,7 @@ Welcome to cyclopts's documentation!
    Installation
    Overview
    api
+   vs_typer/README.rst
 
 
 

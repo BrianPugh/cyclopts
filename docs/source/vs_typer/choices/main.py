@@ -16,7 +16,7 @@ typer_app = typer.Typer()
 
 
 @typer_app.command()
-def foo(env: Environment = Environment.STAGING):
+def foo(env: Environment = Environment.DEV):
     env = env.name
     print(f"Using: {env}")
 
@@ -32,7 +32,7 @@ cyclopts_app = cyclopts.App()
 
 
 @cyclopts_app.register_default()
-def foo(env: Environment = Environment.STAGING):
+def foo(env: Environment = Environment.DEV):
     env = env.name
     print(f"Using: {env}")
 
