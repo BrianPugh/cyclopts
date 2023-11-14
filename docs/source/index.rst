@@ -10,8 +10,8 @@ Cyclopts
    :caption: Usage
 
    self
-   Installation
-   Overview
+   Installation.rst
+   getting_started.rst
    commands.rst
    vs_typer/README.rst
 
