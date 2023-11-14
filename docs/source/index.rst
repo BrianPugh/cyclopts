@@ -9,7 +9,6 @@ Cyclopts
    :maxdepth: 1
    :caption: Usage
 
-   self
    Installation.rst
    getting_started.rst
    commands.rst
