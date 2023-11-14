@@ -40,3 +40,7 @@ cyclopts_app(["--favorite-numbers", "100", "--favorite-numbers", "200"])
 print("Cyclopts without arguments:")
 cyclopts_app([])
 # My favorite numbers are: [1, 2, 3]
+
+print("Cyclopts with --empty-favorite-numbers:")
+cyclopts_app(["--empty-favorite-numbers"])
+# My favorite numbers are: []
