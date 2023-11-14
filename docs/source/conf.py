@@ -152,12 +152,12 @@ html_favicon = None
 html_theme_options = {
     # "analytics_id": "G-XXXXXXXXXX",  # Provided by Google in your dashboard
     # "analytics_anonymize_ip": False,
-    "logo_only": False,
+    "logo_only": True,
     "display_version": False,
     "prev_next_buttons_location": "bottom",
     "style_external_links": False,
     "vcs_pageview_mode": "",
-    "style_nav_header_background": "white",
+    "style_nav_header_background": "#F7E5B9",
     # Toc options
     "collapse_navigation": True,
     "sticky_navigation": True,
