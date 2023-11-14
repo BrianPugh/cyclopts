@@ -183,10 +183,15 @@ class App:
         command, bound = self.parse_args(tokens)
         return command(*bound.args, **bound.kwargs)
 
-    def help_print(self, tokens: Union[None, str, Iterable[str]] = None) -> NoReturn:
+    def help_print(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        console: Optional[Console] = None,
+    ) -> NoReturn:
         tokens = normalize_tokens(tokens)
 
-        console = Console()
+        if console is None:
+            console = Console()
 
         command_chain = []
         command_mapping = self._commands
