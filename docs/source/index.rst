@@ -12,7 +12,6 @@ Cyclopts
    self
    Installation
    Overview
-   api
    commands.rst
    vs_typer/README.rst
 
@@ -23,3 +22,4 @@ Cyclopts
 
    meta_app.rst
    rules.rst
+   api

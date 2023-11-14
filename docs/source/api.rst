@@ -1,7 +1,8 @@
 API
 ===
 
-.. automodule:: cyclopts
+.. autoclass:: cyclopts.App
    :members:
-   :undoc-members:
-   :show-inheritance:
+
+.. autoclass:: cyclopts.Parameter
+   :members:
