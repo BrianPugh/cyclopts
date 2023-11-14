@@ -207,7 +207,7 @@ class App:
                     command_chain,
                     command=bool(self._commands),
                     options=not bool(self._commands),  # TODO
-                    args=True,  # TODO
+                    args=False,  # TODO
                 )
             )
 

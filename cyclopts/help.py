@@ -69,10 +69,9 @@ def format_doc(self, function: Optional[Callable]):
     if not doc_strings:
         return Text()
 
-    components: List[Tuple[str, str]] = [(doc_strings[0], "default")]
+    components: List[Tuple[str, str]] = [(doc_strings[0] + "\n", "default")]
     for s in doc_strings[1:]:
-        components.append((s, "info"))
-    components.append(("\n", "default"))
+        components.append((s + "\n", "info"))
 
     return Text.assemble(*components)
 
@@ -88,7 +87,7 @@ def format_commands(app):
 
     for command_name, command_fn in app._commands.items():
         row_args = []
-        row_args.append(command_name)
+        row_args.append(command_name + " ")  # A little extra padding
         docstring = DocString(command_fn)
         row_args.append(docstring.short_description)
         table.add_row(*row_args)
