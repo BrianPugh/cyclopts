@@ -83,41 +83,6 @@ def test_multiple_names(app, cmd_str):
     ],
 )
 @pytest.mark.parametrize("annotated", [False, True])
-def test_union_required_implicit_coercion(app, cmd_str, annotated):
-    """
-    For a union without an explicit coercion, the first non-None type annotation
-    should be used. In this case, it's ``int``.
-    """
-    if annotated:
-
-        @app.register
-        def foo(a: Annotated[Union[None, int, float], Parameter(help="help for a")]):
-            pass
-
-    else:
-
-        @app.register
-        def foo(a: Union[None, int, float]):
-            pass
-
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(1)
-
-    actual_command, actual_bind = app.parse_args(cmd_str)
-    assert actual_command == foo
-    assert actual_bind == expected_bind
-    assert isinstance(actual_bind.args[0], int)
-
-
-@pytest.mark.parametrize(
-    "cmd_str",
-    [
-        "foo 1",
-        "foo --a=1",
-        "foo --a 1",
-    ],
-)
-@pytest.mark.parametrize("annotated", [False, True])
 def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated):
     """
     For a union without an explicit coercion, the first non-None type annotation

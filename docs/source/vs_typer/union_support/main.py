@@ -12,8 +12,24 @@ def foo(value: Union[int, str] = "default_str"):
     print(f"{type(value)=} {value=}")
 
 
-typer_app(["foo"], standalone_mode=False)
+print("Typer:")
+try:
+    typer_app(["123"], standalone_mode=False)
+except Exception as e:
+    print(e)
 # AssertionError: Typer Currently doesn't support Union types
 
 cyclopts_app = cyclopts.App()
 # TODO
+
+
+@cyclopts_app.register_default
+def foo(value: Union[int, str] = "default_str"):
+    print(f"{type(value)=} {value=}")
+
+
+print("Cyclopts:")
+cyclopts_app(["123"])
+# type(value)=<class 'int'> value=123
+cyclopts_app(["bar"])
+# type(value)=<class 'str'> value='bar'

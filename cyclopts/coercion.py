@@ -54,7 +54,15 @@ def _convert(type_, element):
     if isinstance(type_, (list, tuple, set)):
         return type_(_convert(type_[0], e) for e in element)  # pyright: ignore[reportGeneralTypeIssues]
     elif origin_type is Union:
-        return _convert(resolve_union(type_), element)
+        for t in inner_types:
+            if t is NoneType:
+                continue
+            try:
+                return _convert(resolve_union(t), element)
+            except Exception:
+                pass
+        else:
+            raise CoercionError(f"Error converting '{element}' to {type_}")
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
@@ -116,7 +124,6 @@ def coerce(type_, *args):
         type_ = str
 
     type_ = resolve_annotated(type_)
-    type_ = resolve_union(type_)
     origin_type = _get_origin_and_validate(type_)
 
     if origin_type is tuple:

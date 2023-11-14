@@ -33,7 +33,7 @@ Iterable
 Union
 *****
 
-* If an explicit ``coercion`` is not provided, the coercion will be interpreted based on the first non ``NoneType`` annotation.
+* The unioned types will be iterated over until a successful coercion is performed.
 
 ********
 Optional
