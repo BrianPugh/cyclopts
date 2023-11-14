@@ -53,6 +53,15 @@ def test_basic_2(app, cmd_str):
     assert actual_bind == expected_bind
 
 
+def test_command_rename(app):
+    @app.command(name="bar")
+    def foo():
+        pass
+
+    actual_command, _ = app.parse_args("bar")
+    assert actual_command == foo
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [
