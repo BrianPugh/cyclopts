@@ -15,20 +15,21 @@ For better-or-worse, Cyclopts uses it's own internal parsing strategy, gaining c
 
 This section was written about the current version of Typer: ``v0.9.0``.
 
-------
-Topics
-------
 .. toctree::
+   :maxdepth: 1
+   :caption: Topics
+
    argument_vs_parameter/README.rst
    positional_or_keyword/README.rst
    choices/README.rst
-   command_chaining/README.rst
    default_command/README.rst
-   flag_negation/README.rst
-   help_defaults/README.rst
    optional_list/README.rst
-   unit_testing/README.rst
+   help_defaults/README.rst
+   flag_negation/README.rst
+   union_support/README.rst
    version_flag/README.rst
+   unit_testing/README.rst
+   command_chaining/README.rst
 
 
 .. _Typer: https://typer.tiangolo.com

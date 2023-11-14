@@ -1,6 +1,6 @@
-=====
-Rules
-=====
+========================
+Automatic Coercion Rules
+========================
 This page intends to serve as a terse list of rules Cyclopts follows for more ambiguous typing/situations.
 
 Operations that are not allowed arise from overly-ambiguous CLI commands.

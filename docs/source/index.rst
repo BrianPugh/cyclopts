@@ -1,24 +1,25 @@
-Welcome to cyclopts's documentation!
-==========================================
+========
+Cyclopts
+========
 
 .. include:: ../../README.md
    :parser: myst_parser.sphinx_
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Usage
 
    self
    Installation
    Overview
    api
+   commands.rst
    vs_typer/README.rst
 
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Advanced Usage
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   meta_app.rst
+   rules.rst
