@@ -48,7 +48,7 @@ IMHO, this is backwards; typically the enum name (e.g. ``DEV``) is intended to b
 -------
 Literal
 -------
-Enums don't jive with everyone's workflow.
+Enums don't work well with everyone's workflow.
 Many people prefer to directly use strings for their functions' options.
 The much more intuitive, convenient method of doing this is with the ``Literal`` type annotation.
 Unfortuneately, Typer has not provided support, despite `a feature request dating back to early 2020`_
