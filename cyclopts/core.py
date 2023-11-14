@@ -201,7 +201,15 @@ class App:
             command_chain.append(token)
 
         if self.help_print_usage:
-            console.print(format_usage(self.name, command_chain))
+            console.print(
+                format_usage(
+                    self.name,
+                    command_chain,
+                    command=bool(self._commands),
+                    options=not bool(self._commands),  # TODO
+                    args=True,  # TODO
+                )
+            )
 
         console.print(format_doc(self, function_or_app))
 

@@ -36,14 +36,23 @@ def _create_panel_table(**kwargs):
     return panel, table
 
 
-def format_usage(app_name, command_chain: List[str]):
+def format_usage(
+    app_name,
+    command_chain: List[str],
+    command=True,
+    options=True,
+    args=True,
+):
     usage_string = []
     usage_string.append("Usage:")
     usage_string.append(app_name)
     usage_string.extend(command_chain)
-    usage_string.append("COMMAND")  # TODO: only do this if there are subcommands
-    usage_string.append("[OPTIONS]")  # TODO: only do this if there are options
-    usage_string.append("[ARGS]")  # TODO: only do this if there are positional arguments
+    if command:
+        usage_string.append("COMMAND")
+    if options:
+        usage_string.append("[OPTIONS]")
+    if args:
+        usage_string.append("[ARGS]")
     usage_string.append("\n")
 
     return Text(" ".join(usage_string), style="bold")
@@ -63,6 +72,7 @@ def format_doc(self, function: Optional[Callable]):
     components: List[Tuple[str, str]] = [(doc_strings[0], "default")]
     for s in doc_strings[1:]:
         components.append((s, "info"))
+    components.append(("\n", "default"))
 
     return Text.assemble(*components)
 
