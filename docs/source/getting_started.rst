@@ -26,7 +26,7 @@ The most bare-bones Cyclopts application is as follows:
    if __name__ == "__main__":
        app()
 
-If we save this code to ``main.py`` and run it, we get the following:
+Save this as ``main.py`` and execute it to see:
 
 .. code-block:: bash
 
@@ -34,7 +34,7 @@ If we save this code to ``main.py`` and run it, we get the following:
    Hello World!
 
 
-Lets look at this line-by-line.
+Let's dissect it step-by-step.
 
 All Cyclopts applications start with the ``cyclopts.App`` object.
 
@@ -42,10 +42,9 @@ All Cyclopts applications start with the ``cyclopts.App`` object.
 
    app = cyclopts.App()
 
-Cyclopts behavior can be configured through the ``App`` class, but that will be explored in later documentation.
-The ``app`` object has a ``register_default`` method that can be used to decorate objects.
-All Cyclopts applications have a single default function that gets executed when no command is specified at execution.
-
+While the ``App`` class offers various configuration options, we'll delve into those in the advanced guides.
+The key method here is ``register_default``, which registers a function as the default action.
+In this example, the ``main`` function is our default, and is executed when no command is provided.
 
 ------------------
 Function Arguments
@@ -67,31 +66,30 @@ Let's add some arguments to make this program a little more exciting.
    if __name__ == "__main__":
        app()
 
-Running it:
+Execute it with an argument:
 
 .. code-block:: bash
 
    $ python main.py Alice
    Hello Alice!
 
-Breaking down what happened here:
+Here's what's happening:
 
-1. We created a function, ``main``, and registered it to ``app`` as the default function.
+1. We created a function, ``main``, and registered it to ``app`` as the default
+   function.
 
-2. We then called ``app()``, this invokes Cyclopts to start parsing the command-line inputs.
+2. Invoking ``app()`` triggers Cyclopts to parse CLI inputs.
 
-3. Cyclopts sees that we called the script with a single positional argument with value ``"Alice"``.
-   Cyclopts checks the type hint of the first positional argument in ``main``.
-   Because we did not provide a type hint for the ``name`` parameter, cyclopts will default to assuming type ``str``.
-   Cyclopts casts the input ``Alice`` to a string; since it's already inherently a string this doesn't really do anything.
+3. Cyclopts identifies ``"Alice"`` as a positional argument and, in the absence
+   of an explicit type hint for ``name``, defaults to treating it as a string.
 
-4. After parsing the arguments, Cyclopts finally executes ``main("Alice")``.
+4. Cyclopts calls the registered default ``main("Alice")``, and the greeting is printed.
 
 
 ^^^^^^^^^^^^^^^^^^
 Multiple Arguments
 ^^^^^^^^^^^^^^^^^^
-To further drive the point home, lets add more arguments:
+Extending the example, lets add more arguments:
 
 .. code-block:: python
 
@@ -118,10 +116,9 @@ Running it:
    Hello Alice!
    Hello Alice!
 
-Here, the CLI provided ``"3"`` gets appropriately cast to an int and used in the ``main`` function.
-Cyclopts follows all the same variable binding rules the python function would have if being called directly from python.
-Specifically, we can specify arguments not just positionally, but also via keywords.
-For this program, all of the following CLI invocations would execute the same thing:
+The command line input ``"3"`` is automatically converted to an integer.
+Cyclopts adheres to Python's argument binding rules, allowing both positional and keyword arguments.
+Therefore, all these commands are equivalent:
 
 .. code-block: bash
 
