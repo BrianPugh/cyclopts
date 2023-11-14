@@ -1,6 +1,6 @@
-=====================
-Argument vs Parameter
-=====================
+==================
+Argument vs Option
+==================
 In Typer, the actual difference between the ``Argument`` and ``Option`` classes aren't very clear.
 Generally, it can be said that:
 

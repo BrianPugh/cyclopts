@@ -19,7 +19,7 @@ This section was written about the current version of Typer: ``v0.9.0``.
    :maxdepth: 1
    :caption: Topics
 
-   argument_vs_parameter/README.rst
+   argument_vs_option/README.rst
    positional_or_keyword/README.rst
    choices/README.rst
    default_command/README.rst
