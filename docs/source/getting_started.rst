@@ -28,7 +28,7 @@ The most bare-bones Cyclopts application is as follows:
 
 Save this as ``main.py`` and execute it to see:
 
-.. code-block:: bash
+.. code-block:: console
 
    $ python main.py
    Hello World!
@@ -68,7 +68,7 @@ Let's add some arguments to make this program a little more exciting.
 
 Execute it with an argument:
 
-.. code-block:: bash
+.. code-block:: console
 
    $ python main.py Alice
    Hello Alice!
@@ -109,7 +109,7 @@ Extending the example, lets add more arguments:
 
 Running it:
 
-.. code-block:: bash
+.. code-block:: console
 
    $ python main.py Alice 3
    Hello Alice!
@@ -120,7 +120,7 @@ The command line input ``"3"`` is automatically converted to an integer.
 Cyclopts adheres to Python's argument binding rules, allowing both positional and keyword arguments.
 Therefore, all these commands are equivalent:
 
-.. code-block: bash
+.. code-block: console
 
    $ python main.py Alice 3
    $ python main.py --name Alice --count 3

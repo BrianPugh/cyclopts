@@ -35,7 +35,7 @@ For that, you can use the meta-app feature of Cyclopts.
 
    app.meta()
 
-.. code-block:: bash
+.. code-block:: console
 
    $ python my-script.py --user=Bob foo 3
    Hello Bob

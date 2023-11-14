@@ -19,24 +19,26 @@ Cyclopts aims to provide an intuitive and efficient developer experience, making
 
 # Why Cyclopts?
 
-- *Intuitive API*: Cyclopts features a straightforward and intuitive API, making it easy for developers to create complex CLI applications with minimal code.
+- **Intuitive API**: Cyclopts features a straightforward and intuitive API, making it easy for developers to create complex CLI applications with minimal code.
 
-- *Advanced Type Hinting*: Cyclopts offers advanced type hinting features, allowing for more accurate and informative command-line interfaces.
+- **Advanced Type Hinting**: Cyclopts offers advanced type hinting features, allowing for more accurate and informative command-line interfaces.
 
-- *Rich Help Generation*: Automatically generates beautiful, user-friendly help messages, ensuring that users can easily understand and utilize your CLI application.
+- **Rich Help Generation**: Automatically generates beautiful, user-friendly help messages, ensuring that users can easily understand and utilize your CLI application.
 
-- *Extensible and Customizable*: Designed with extensibility in mind, Cyclopts allows developers to easily add custom behaviors and integrate with other systems.
+- **Extensible and Customizable**: Designed with extensibility in mind, Cyclopts allows developers to easily add custom behaviors and integrate with other systems.
 
 
 # Installation
 Cyclopts requires Python >=3.8; to install Cyclopts, run:
 
-```bash
+```console
 pip install cyclopts
 ```
 
 # Quick Start
-Create an application using `cyclopts.App`, and then register commands using the `register` decorator.
+- Create an application using `cyclopts.App`.
+- Register commands with the `command` decorator.
+- Register a default function with the `default` decorator.
 
 ```python
 from cyclopts import App
@@ -44,7 +46,7 @@ from cyclopts import App
 app = App()
 
 
-@app.register
+@app.command
 def foo(loops: int):
     for i in range(loops):
         print(f"Looping! {i}")
@@ -60,7 +62,7 @@ app()
 
 Executing the script from the command line:
 
-```bash
+```console
 $ python demo.py
 Hello world! This runs when no command is specified.
 

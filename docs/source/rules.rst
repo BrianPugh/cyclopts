@@ -11,7 +11,7 @@ List
 
 * If provided as a keyword, only one element will be added per token pair.
 
-  .. code-block:: bash
+  .. code-block:: console
 
      my-program --list-argument foo --list-argument bar
 

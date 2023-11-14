@@ -35,7 +35,7 @@ The registered command can either be a function, or another Cyclopts application
 
    app()
 
-.. code-block:: bash
+.. code-block:: console
 
    $ python scratch2.py foo bar 5
    BAR: 5
