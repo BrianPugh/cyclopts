@@ -20,7 +20,6 @@ except Exception as e:
 # AssertionError: Typer Currently doesn't support Union types
 
 cyclopts_app = cyclopts.App()
-# TODO
 
 
 @cyclopts_app.default
