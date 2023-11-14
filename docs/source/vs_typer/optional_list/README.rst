@@ -1,13 +1,13 @@
 ==============
 Optional Lists
 ==============
-Typer does not handle optional lists well.
-If no elements are provided via the CLI, an empty list will be provided to the command.
-Frequently, this is fine behavior, but it's unexpected and semantically different.
-Because lists are mutable, and `setting mutable defaults is strongly discouraged`_, setting list parameters to ``None`` is common practice.
-Setting a list parameter to ``None`` in some may indicate to use a default list instead of an empty list.
+Typer does not handle optional lists particularly well.
+In Typer, if a list argument is not provided via the CLI, an empty list is passed to the command by default.
+While this might be acceptable in some scenarios, it can be unexpected and differs semantically from a None value.
+Because lists are mutable, and `setting mutable defaults is strongly discouraged`_, setting list parameters' default to ``None`` is common practice.
+This approach can also help differentiate between the intention of using a default list and explicitly requesting an empty list.
 
-Consider the following example:
+Consider the following Typer example:
 
 
 .. code-block:: python
@@ -27,12 +27,13 @@ Consider the following example:
    typer_app([], standalone_mode=False)
    # My favorite numbers are: []
 
-Here, the desired behavior is to have a default list ``favorite_numbers = [1, 2, 3]``.
-However, supplying an empty list means to have no ``favorite_numbers``.
+In this example, we expect the default list ``[1, 2, 3]`` to be used when no input is provided.
+However, Typer supplies an empty list instead of ``None``.
 Typer supplies an empty list instead of the expected default ``None``.
 
-Cyclopts behaves as expected in this scenario.
-By default, a ``--empty-*`` flag is provideded for each iterable (``set``, ``list``) parameter, in case an empty value is actually desired.
+Cyclopts addresses this issue more intuitively.
+If no CLI option is specified, the parameter's default value ``None`` is used.
+If we wish to pass an empty iterable (``set``, ``list``), cyclopts provides an --empty-* flag for each iterable parameter.
 
 .. code-block:: python
 
