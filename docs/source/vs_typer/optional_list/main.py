@@ -26,7 +26,7 @@ typer_app([], standalone_mode=False)
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default()
+@cyclopts_app.default()
 def foo(favorite_numbers: Optional[List[int]] = None):
     if favorite_numbers is None:
         favorite_numbers = [1, 2, 3]

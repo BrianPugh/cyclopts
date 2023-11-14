@@ -31,7 +31,7 @@ typer_app(cmd, standalone_mode=False)
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default()
+@cyclopts_app.default()
 def foo(env: Environment = Environment.DEV):
     env = env.name
     print(f"Using: {env}")
@@ -47,7 +47,7 @@ cyclopts_app(cmd)
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default()
+@cyclopts_app.default()
 def foo(env: Literal["dev", "staging", "prod"] = "staging"):
     print(f"Using: {env}")
 

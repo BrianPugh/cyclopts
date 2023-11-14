@@ -14,7 +14,7 @@ from cyclopts import Parameter
     ],
 )
 def test_boolean_flag_default(app, cmd_str, expected):
-    @app.register_default
+    @app.default
     def foo(my_flag: bool = True):
         pass
 
@@ -34,7 +34,7 @@ def test_boolean_flag_default(app, cmd_str, expected):
     ],
 )
 def test_boolean_flag_custom_negative(app, cmd_str, expected):
-    @app.register_default
+    @app.default
     def foo(my_flag: Annotated[bool, Parameter(negative="--yesnt-my-flag")] = True):
         pass
 

@@ -27,7 +27,7 @@ except Exception as e:
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default()
+@cyclopts_app.default()
 def mv(src, dst):
     print(f"Moving {src} -> {dst}")
 

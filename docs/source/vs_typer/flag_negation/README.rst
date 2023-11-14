@@ -57,7 +57,7 @@ To suppress the negative-flag generation, set this argument to either an empty s
    cyclopts_app = cyclopts.App()
 
 
-   @cyclopts_app.register_default
+   @cyclopts_app.default
    def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative="")] = False):
        print(f"{my_flag=}")
 
@@ -72,7 +72,7 @@ To define your own custom negative flag, just provide it as a string or list of 
 
 .. code-block:: python
 
-   @cyclopts_app.register_default
+   @cyclopts_app.default
    def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative="--your-flag")] = False):
        print(f"{my_flag=}")
 

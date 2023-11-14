@@ -34,7 +34,7 @@ IMHO, this is backwards; typically the enum name (e.g. ``DEV``) is intended to b
    cyclopts_app = cyclopts.App()
 
 
-   @cyclopts_app.register_default()
+   @cyclopts_app.default()
    def foo(env: Environment = Environment.DEV):
        env = env.name
        print(f"Using: {env}")
@@ -59,7 +59,7 @@ Cyclopts has builtin support for ``Literal``.
    cyclopts_app = cyclopts.App()
 
 
-   @cyclopts_app.register_default()
+   @cyclopts_app.default()
    def foo(env: Literal["dev", "staging", "prod"] = "staging"):
        print(f"Using: {env}")
 

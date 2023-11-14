@@ -50,7 +50,7 @@ def foo(loops: int):
         print(f"Looping! {i}")
 
 
-@app.register_default
+@app.default
 def default_action():
     print("Hello world! This runs when no command is specified.")
 

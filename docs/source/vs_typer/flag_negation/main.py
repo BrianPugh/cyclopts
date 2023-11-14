@@ -23,7 +23,7 @@ typer_app(["--no-my-flag"], standalone_mode=False)
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default
+@cyclopts_app.default
 def foo(my_flag: bool = False):
     print(f"{my_flag=}")
 
@@ -38,7 +38,7 @@ cyclopts_app(["--no-my-flag"])
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default
+@cyclopts_app.default
 def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative="--your-flag")] = False):
     print(f"{my_flag=}")
 

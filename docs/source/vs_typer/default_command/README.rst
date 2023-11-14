@@ -50,7 +50,7 @@ Github user `ajlive's callback solution`_ is copied below.
 To avoid this confusion, Cyclopts has two ways of registering a function:
 
 1. ``app.register`` - Register a function as a command.
-2. ``app.register_default`` - Invoked if no registered command can be parsed from the CLI.
+2. ``app.default`` - Invoked if no registered command can be parsed from the CLI.
 
 .. code-block:: python
 

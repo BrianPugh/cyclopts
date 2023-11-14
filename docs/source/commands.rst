@@ -4,7 +4,7 @@ Commands
 
 For a given cyclopts application, there are 2 primary registering actions:
 1. ``@app.register`` registers
-2. ``@app.register_default``
+2. ``@app.default``
 
 
 --------
@@ -46,5 +46,5 @@ The registered command can either be a function, or another Cyclopts application
 ----------------
 Register Default
 ----------------
-You **cannot** register a subapp via ``register_default``.
-The default ``register_default`` handler runs ``app.display_help()``.
+You **cannot** register a subapp via ``default``.
+The default ``default`` handler runs ``app.display_help()``.

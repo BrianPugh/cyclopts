@@ -27,7 +27,7 @@ typer_app(["--help"], standalone_mode=False)
 cyclopts_app = cyclopts.App()
 
 
-@cyclopts_app.register_default()
+@cyclopts_app.default()
 def compress(
     src: Annotated[Path, cyclopts.Parameter(help="File to compress")],
     dst: Annotated[Path, cyclopts.Parameter(help="Path to save compressed data to.")] = Path("out.zip"),

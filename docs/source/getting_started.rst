@@ -18,7 +18,7 @@ The most bare-bones Cyclopts application is as follows:
    app = cyclopts.App()
 
 
-   @app.register_default
+   @app.default
    def main():
        print("Hello World!")
 
@@ -43,7 +43,7 @@ All Cyclopts applications start with the ``cyclopts.App`` object.
    app = cyclopts.App()
 
 While the ``App`` class offers various configuration options, we'll delve into those in the advanced guides.
-The key method here is ``register_default``, which registers a function as the default action.
+The key method here is ``default``, which registers a function as the default action.
 In this example, the ``main`` function is our default, and is executed when no command is provided.
 
 ------------------
@@ -58,7 +58,7 @@ Let's add some arguments to make this program a little more exciting.
    app = cyclopts.App()
 
 
-   @app.register_default
+   @app.default
    def main(name):
        print(f"Hello {name}!")
 
@@ -98,7 +98,7 @@ Extending the example, lets add more arguments:
    app = cyclopts.App()
 
 
-   @app.register_default
+   @app.default
    def main(name: str, count: int):
        for _ in range(count):
            print(f"Hello {name}!")

@@ -12,7 +12,7 @@ import pytest
     ],
 )
 def test_optional_list_empty_flag_default(app, cmd_str, expected):
-    @app.register_default
+    @app.default
     def foo(my_list: Optional[List[int]] = None):
         pass
 
@@ -36,7 +36,7 @@ def test_optional_list_empty_flag_default(app, cmd_str, expected):
     ],
 )
 def test_optional_set_empty_flag_default(app, cmd_str, expected):
-    @app.register_default
+    @app.default
     def foo(my_set: Optional[Set[int]] = None):
         pass
 

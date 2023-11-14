@@ -27,7 +27,7 @@ For that, you can use the meta-app feature of Cyclopts.
            print(f"Looping! {i}")
 
 
-   @app.meta.register_default
+   @app.meta.default
    def my_app_launcher(tokens: UnknownTokens, *, user: str):
        print(f"Hello {user}")
        app(tokens)

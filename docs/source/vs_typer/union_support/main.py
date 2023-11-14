@@ -23,7 +23,7 @@ cyclopts_app = cyclopts.App()
 # TODO
 
 
-@cyclopts_app.register_default
+@cyclopts_app.default
 def foo(value: Union[int, str] = "default_str"):
     print(f"{type(value)=} {value=}")
 

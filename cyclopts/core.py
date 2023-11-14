@@ -103,9 +103,9 @@ class App:
         self._commands[name] = obj
         return obj
 
-    def register_default(self, obj=None, **kwargs):
+    def default(self, obj=None, **kwargs):
         if obj is None:  # Called ``@app.default_command``
-            return partial(self.register_default, **kwargs)  # Pass the rest of params here
+            return partial(self.default, **kwargs)  # Pass the rest of params here
 
         if isinstance(obj, App):  # Registering a sub-App
             raise CycloptsError("Cannot register a sub App to default.")
