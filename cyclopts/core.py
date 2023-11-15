@@ -56,7 +56,7 @@ class App:
     version: str = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
 
-    help: str = ""
+    help: Optional[str] = None
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
     help_print_usage: bool = True
     help_print_options: bool = True
@@ -84,6 +84,21 @@ class App:
             return sys.argv[0]
         else:
             return _format_name(self.default_command.__name__)
+
+    @property
+    def _help_derived(self) -> str:  # TODO: better name
+        if self.help is not None:
+            return self.help
+        if self.default_command is None:
+            return ""
+        if self.default_command.__doc__ is None:
+            return ""
+        return self.default_command.__doc__
+
+    @property
+    def _help_short_derived(self) -> str:  # TODO: better name
+        help = self._help_derived
+        return help.split("\n", 1)[0]
 
     def version_print(self) -> None:
         print(self.version)

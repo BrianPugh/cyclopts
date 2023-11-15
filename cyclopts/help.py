@@ -89,14 +89,10 @@ def format_commands(app):
     table.add_column(justify="left", style="cyan")
     table.add_column(justify="left")
 
-    for command_name, command_config in app._commands.items():
+    for command_name, command_app in app._commands.items():
         row_args = []
         row_args.append(command_name + " ")  # A little extra padding
-        if command_config.help is not None:
-            row_args.append(command_config.help)
-        else:
-            docstring = DocString(command_config.function)
-            row_args.append(docstring.short_description)
+        row_args.append(command_app._help_short_derived)
         table.add_row(*row_args)
     return panel
 
