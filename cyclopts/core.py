@@ -68,7 +68,7 @@ class App:
     ######################
 
     # Maps CLI-name of a command to a function handle.
-    _commands: Dict[str, Callable] = field(init=False, factory=dict)
+    _commands: Dict[str, "App"] = field(init=False, factory=dict)
 
     _meta: "App" = field(init=False, default=None)
 
@@ -236,14 +236,13 @@ class App:
 
         command_chain = []
         command_mapping = self._commands
-        function_or_app = self
+        app = self
         for token in tokens:
             try:
-                function_or_app = command_mapping[token].function
+                app = command_mapping[token]
             except KeyError:
                 break
-            if isinstance(function_or_app, App):
-                command_mapping = function_or_app._commands
+            command_mapping = app._commands
             command_chain.append(token)
 
         # Print the:
@@ -260,7 +259,7 @@ class App:
             )
 
         # Print the App/Command's Doc String.
-        console.print(format_doc(self, function_or_app))
+        console.print(format_doc(self, app))
 
         # Print the meta app's parameter, if available.
         if self.meta.default_command:
@@ -271,10 +270,7 @@ class App:
         #    * Otherwise, print the default app parameters.
         # Otherwise:
         #     * print the command's parameters.
-        if isinstance(function_or_app, App):
-            console.print(format_commands(function_or_app))
-        else:
-            console.print(format_parameters(function_or_app, title=self.help_panel_title))
+        console.print(format_commands(app))
 
     def interactive_shell(
         self,
