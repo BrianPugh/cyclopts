@@ -103,5 +103,4 @@ def test_help_empty(console):
         app.help_print(console=console)
     str_output = capture.get()
 
-    print(str_output, end="")
     assert str_output == "\x1b[1mUsage: foo [OPTIONS] \x1b[0m\n\n"
