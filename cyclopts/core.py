@@ -4,9 +4,9 @@ import os
 import shlex
 import sys
 from functools import partial
-from typing import Callable, Dict, Iterable, NoReturn, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
-from attrs import define, field
+from attrs import Factory, define, field, frozen
 from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
@@ -40,6 +40,20 @@ def _default_version(default="0.0.0") -> str:
     return getattr(module, "__version__", default)
 
 
+def _populate_default_name(obj: Callable) -> str:
+    if isinstance(obj, App):  # Registering a sub-App
+        return obj.name
+    else:
+        return _format_name(obj.__name__)
+
+
+@frozen(kw_only=True)
+class ActionConfig:
+    function: Callable
+    name: str = field(default=Factory(lambda x: _populate_default_name(x.function), takes_self=True))
+    help: Optional[str] = None
+
+
 @define(kw_only=True)
 class App:
     # Name of the Program
@@ -61,7 +75,7 @@ class App:
     _default_command: Optional[Callable] = field(init=False, default=None)
 
     # Maps CLI-name of a command to a function handle.
-    _commands: Dict[str, Callable] = field(init=False, factory=dict)
+    _commands: Dict[str, ActionConfig] = field(init=False, factory=dict)
 
     _meta: "App" = field(init=False, default=None)
 
@@ -72,7 +86,7 @@ class App:
         print(self.version)
 
     def __getitem__(self, key: str) -> Callable:
-        return self._commands[key]
+        return self._commands[key].function
 
     @property
     def meta(self) -> "App":
@@ -84,23 +98,19 @@ class App:
             )
         return self._meta
 
-    def command(self, obj: Optional[Callable] = None, *, name: str = "") -> Callable:
+    def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
         if obj is None:  # Called ``@app.command``
-            return partial(
-                self.command,
-                name=name,
-            )  # All input keyword args must be passed here.
+            return partial(self.command, **kwargs)
 
-        if isinstance(obj, App):  # Registering a sub-App
-            name = obj.name
-        else:
-            name = name or _format_name(obj.__name__)
+        config = ActionConfig(function=obj, **kwargs)
 
-        if name in self._commands:
-            raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')
+        if config.name in self._commands:
+            raise CommandCollisionError(
+                f'Command "{config.name}" previously registered as {self._commands[config.name]}'
+            )
 
-        self._commands[name] = obj
+        self._commands[config.name] = config
         return obj
 
     def default(self, obj=None):
@@ -200,7 +210,7 @@ class App:
         function_or_app = self
         for token in tokens:
             try:
-                function_or_app = command_mapping[token]
+                function_or_app = command_mapping[token].function
             except KeyError:
                 break
             if isinstance(function_or_app, App):

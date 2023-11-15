@@ -79,6 +79,23 @@ def test_format_commands_docstring(app, console):
     )
 
 
+@pytest.mark.skip
+def test_format_commands_explicit(app, console):
+    @app.command
+    def foo():
+        """Docstring for Foo.
+
+        This should not be shown.
+        """
+        pass
+
+    with console.capture() as capture:
+        console.print(format_commands(app))
+
+    str_output = capture.get()
+    assert str_output == ()
+
+
 def test_help_empty(console):
     app = App(name="foo")
 
