@@ -62,7 +62,7 @@ def test_format_doc_function(app, console):
 def test_format_commands_docstring(app, console):
     @app.command
     def foo():
-        """Docstring for Foo.
+        """Docstring for foo.
 
         This should not be shown.
         """
@@ -74,13 +74,13 @@ def test_format_commands_docstring(app, console):
     str_output = capture.get()
     assert str_output == (
         "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
-        "│ foo  Docstring for Foo.                                            │\n"
+        "│ foo  Docstring for foo.                                            │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
 
-def test_format_commands_explicit(app, console):
-    @app.command(help="Docstring for Foo.")
+def test_format_commands_explicit_help(app, console):
+    @app.command(help="Docstring for foo.")
     def foo():
         """Should not be shown."""
         pass
@@ -91,7 +91,27 @@ def test_format_commands_explicit(app, console):
     str_output = capture.get()
     assert str_output == (
         "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
-        "│ foo  Docstring for Foo.                                            │\n"
+        "│ foo  Docstring for foo.                                            │\n"
+        "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
+
+
+def test_format_commands_explicit_name(app, console):
+    @app.command(name="bar")
+    def foo():
+        """Docstring for bar.
+
+        This should not be shown.
+        """
+        pass
+
+    with console.capture() as capture:
+        console.print(format_commands(app))
+
+    str_output = capture.get()
+    assert str_output == (
+        "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
+        "│ bar  Docstring for bar.                                            │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
