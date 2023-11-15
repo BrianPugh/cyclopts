@@ -53,6 +53,9 @@ class ActionConfig:
     name: str = field(default=Factory(lambda x: _populate_default_name(x.function), takes_self=True))
     help: Optional[str] = None
 
+    def __call__(self, *args, **kwargs):
+        return self.function(*args, **kwargs)
+
 
 @define(kw_only=True)
 class App:
@@ -86,7 +89,7 @@ class App:
         print(self.version)
 
     def __getitem__(self, key: str) -> Callable:
-        return self._commands[key].function
+        return self._commands[key]
 
     @property
     def meta(self) -> "App":
@@ -157,7 +160,7 @@ class App:
 
         # Extract out the command-string
         if tokens and tokens[0] in self._commands:
-            command, tokens = self[tokens[0]], tokens[1:]
+            command, tokens = self[tokens[0]].function, tokens[1:]
         elif self._default_command:
             command = self._default_command.function
         else:
