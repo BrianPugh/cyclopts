@@ -1,5 +1,8 @@
+from textwrap import dedent
+
 import pytest
 from rich.console import Console
+from typing_extensions import Annotated
 
 from cyclopts import App, Parameter
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
@@ -12,7 +15,7 @@ def console():
 
 @pytest.fixture
 def app():
-    return App(help="App Help String Line 1.")
+    return App(name="app", help="App Help String Line 1.")
 
 
 def test_help_format_usage_empty(console):
@@ -124,3 +127,35 @@ def test_help_empty(console):
     str_output = capture.get()
 
     assert str_output == "\x1b[1mUsage: foo [OPTIONS] \x1b[0m\n\n"
+
+
+@pytest.mark.skip(reason="wip")
+def test_help_print_function(app, console):
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    @app.command(help="Cmd help string.")
+    def cmd(
+        foo: Annotated[str, Parameter(help="Docstring for foo.")],
+        *,
+        bar: Annotated[str, Parameter(help="Docstring for bar.")],
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    str_output = capture.get()
+    expected = dedent(
+        """\
+        Usage: app cmd [ARGS] [OPTIONS]
+
+        Cmd help string.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ * FOO,--foo   Docstring for foo.                                   │
+        │ * --bar       Docstring for bar.                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert str_output == expected
