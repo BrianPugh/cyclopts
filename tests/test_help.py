@@ -10,6 +10,11 @@ def console():
     return Console(width=70)
 
 
+@pytest.fixture
+def app():
+    return App(help="App Help String Line 1.")
+
+
 def test_help_format_usage_empty(console):
     with console.capture() as capture:
         console.print(
@@ -40,9 +45,7 @@ def test_help_format_usage_command(console):
     assert str_output == "\x1b[1mUsage: foo COMMAND \x1b[0m\n\n"
 
 
-def test_format_doc_function(console):
-    app = App(help="App Help String Line 1.")
-
+def test_format_doc_function(app, console):
     def foo():
         """Foo Doc String Line 1.
 
@@ -54,6 +57,26 @@ def test_format_doc_function(console):
 
     str_output = capture.get()
     assert str_output == "\x1b[39mFoo Doc String Line 1.\x1b[0m\n\nFoo Doc String Line 3.\n\n"
+
+
+def test_format_commands_docstring(app, console):
+    @app.command
+    def foo():
+        """Docstring for Foo.
+
+        This should not be shown.
+        """
+        pass
+
+    with console.capture() as capture:
+        console.print(format_commands(app))
+
+    str_output = capture.get()
+    assert str_output == (
+        "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
+        "│ \x1b[36mfoo \x1b[0m\x1b[36m \x1b[0mDocstring for Foo.                                            │\n"
+        "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
 
 
 def test_help_empty(console):
