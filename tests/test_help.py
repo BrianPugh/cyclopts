@@ -7,7 +7,7 @@ from cyclopts.help import format_commands, format_doc, format_parameters, format
 
 @pytest.fixture
 def console():
-    return Console(width=70)
+    return Console(width=70, force_terminal=True, no_color=True, highlight=False)
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_format_doc_function(app, console):
         console.print(format_doc(app, foo))
 
     str_output = capture.get()
-    assert str_output == "\x1b[39mFoo Doc String Line 1.\x1b[0m\n\nFoo Doc String Line 3.\n\n"
+    assert str_output == "Foo Doc String Line 1.\n\nFoo Doc String Line 3.\n\n"
 
 
 def test_format_commands_docstring(app, console):
@@ -74,7 +74,7 @@ def test_format_commands_docstring(app, console):
     str_output = capture.get()
     assert str_output == (
         "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
-        "│ \x1b[36mfoo \x1b[0m\x1b[36m \x1b[0mDocstring for Foo.                                            │\n"
+        "│ foo  Docstring for Foo.                                            │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
