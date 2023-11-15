@@ -72,7 +72,7 @@ class App:
     ######################
     # Private Attributes #
     ######################
-    _default_command: Optional[Callable] = field(init=False, default=None)
+    _default_command: Optional[ActionConfig] = field(init=False, default=None)
 
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, ActionConfig] = field(init=False, factory=dict)
@@ -113,16 +113,17 @@ class App:
         self._commands[config.name] = config
         return obj
 
-    def default(self, obj=None):
+    def default(self, obj=None, **kwargs):
         if obj is None:  # Called ``@app.default_command``
-            return partial(self.default)  # All input keyword args must be passed here.
+            return partial(self.default, **kwargs)
 
         if isinstance(obj, App):  # Registering a sub-App
             raise CycloptsError("Cannot register a sub-App to default.")
 
         if self._default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
-        self._default_command = obj
+
+        self._default_command = ActionConfig(function=obj, **kwargs)
 
         return obj
 
@@ -157,8 +158,12 @@ class App:
         # Extract out the command-string
         if tokens and tokens[0] in self._commands:
             command, tokens = self[tokens[0]], tokens[1:]
+        elif self._default_command:
+            command = self._default_command.function
         else:
-            command = self._default_command
+            command = self.help_print
+            bound = inspect.signature(command).bind(tokens=tokens)
+            return command, bound, []
 
         if isinstance(command, App):
             return command.parse_known_args(tokens)
