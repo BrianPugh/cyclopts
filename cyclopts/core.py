@@ -40,27 +40,18 @@ def _default_version(default="0.0.0") -> str:
     return getattr(module, "__version__", default)
 
 
-def _populate_default_name(obj: Callable) -> str:
-    if isinstance(obj, App):  # Registering a sub-App
-        return obj.name
-    else:
-        return _format_name(obj.__name__)
-
-
-@frozen(kw_only=True)
-class ActionConfig:
-    function: Callable
-    name: str = field(default=Factory(lambda x: _populate_default_name(x.function), takes_self=True))
-    help: Optional[str] = None
-
-    def __call__(self, *args, **kwargs):
-        return self.function(*args, **kwargs)
+def _validate_default_command(x):
+    if isinstance(x, App):
+        raise TypeError("Cannot register a sub-App to default.")
+    return x
 
 
 @define(kw_only=True)
 class App:
     # Name of the Program
-    name: str = field(default=sys.argv[0])
+    default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
+
+    name: Optional[str] = None  # field(default=Factory(_default_name, takes_self=True))
 
     version: str = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
@@ -75,16 +66,25 @@ class App:
     ######################
     # Private Attributes #
     ######################
-    _default_command: Optional[ActionConfig] = field(init=False, default=None)
 
     # Maps CLI-name of a command to a function handle.
-    _commands: Dict[str, ActionConfig] = field(init=False, factory=dict)
+    _commands: Dict[str, Callable] = field(init=False, factory=dict)
 
     _meta: "App" = field(init=False, default=None)
 
     ###########
     # Methods #
     ###########
+    @property
+    def _name_derived(self) -> str:  # TODO: better name
+        """Guaranteed to have a string name."""
+        if self.name:
+            return self.name
+        elif self.default_command is None:
+            return sys.argv[0]
+        else:
+            return _format_name(self.default_command.__name__)
+
     def version_print(self) -> None:
         print(self.version)
 
@@ -106,27 +106,32 @@ class App:
         if obj is None:  # Called ``@app.command``
             return partial(self.command, **kwargs)
 
-        config = ActionConfig(function=obj, **kwargs)
+        if isinstance(obj, App):
+            app = obj
+            if kwargs:
+                raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
+        else:
+            app = App(default_command=obj, **kwargs)
 
-        if config.name in self._commands:
-            raise CommandCollisionError(
-                f'Command "{config.name}" previously registered as {self._commands[config.name]}'
-            )
+        name = kwargs.get("name", app._name_derived)
 
-        self._commands[config.name] = config
+        if name in self._commands:
+            raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')
+
+        self._commands[name] = app
         return obj
 
-    def default(self, obj=None, **kwargs):
+    def default(self, obj=None):
         if obj is None:  # Called ``@app.default_command``
-            return partial(self.default, **kwargs)
+            return self.default
 
         if isinstance(obj, App):  # Registering a sub-App
-            raise CycloptsError("Cannot register a sub-App to default.")
+            raise TypeError("Cannot register a sub-App to default.")
 
-        if self._default_command is not None:
-            raise CommandCollisionError(f"Default command previously set to {self._default_command}.")
+        if self.default_command is not None:
+            raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        self._default_command = ActionConfig(function=obj, **kwargs)
+        self.default_command = obj
 
         return obj
 
@@ -160,9 +165,10 @@ class App:
 
         # Extract out the command-string
         if tokens and tokens[0] in self._commands:
-            command, tokens = self[tokens[0]].function, tokens[1:]
-        elif self._default_command:
-            command = self._default_command.function
+            command, tokens = self[tokens[0]], tokens[1:]
+        elif self.default_command:
+            # We need to break the recursion here
+            command = self.default_command
         else:
             command = self.help_print
             bound = inspect.signature(command).bind(tokens=tokens)
@@ -225,6 +231,8 @@ class App:
                 command_mapping = function_or_app._commands
             command_chain.append(token)
 
+        # Print the:
+        #    my-app command COMMAND [ARGS] [OPTIONS]
         if self.help_print_usage:
             console.print(
                 format_usage(
@@ -236,11 +244,18 @@ class App:
                 )
             )
 
+        # Print the App/Command's Doc String.
         console.print(format_doc(self, function_or_app))
 
-        if self.meta._default_command:
-            console.print(format_parameters(self.meta._default_command, title=self.meta.help_panel_title))
+        # Print the meta app's parameter, if available.
+        if self.meta.default_command:
+            console.print(format_parameters(self.meta.default_command, title=self.meta.help_panel_title))
 
+        # If this is a subapp:
+        #    * If there are subcommands, print them.
+        #    * Otherwise, print the default app parameters.
+        # Otherwise:
+        #     * print the command's parameters.
         if isinstance(function_or_app, App):
             console.print(format_commands(function_or_app))
         else:
