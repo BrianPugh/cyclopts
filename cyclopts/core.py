@@ -68,9 +68,8 @@ class App:
     ###########
     # Methods #
     ###########
-    def version_print(self) -> NoReturn:
+    def version_print(self) -> None:
         print(self.version)
-        sys.exit()
 
     def __getitem__(self, key: str) -> Callable:
         return self._commands[key]
@@ -127,8 +126,10 @@ class App:
         # Handle special flags here
         if any(flag in tokens for flag in self.help_flags):
             self.help_print(tokens)
+            sys.exit()
         elif any(flag in tokens for flag in self.version_flags):
             self.version_print()
+            sys.exit()
 
     def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple:
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
@@ -186,8 +187,9 @@ class App:
     def help_print(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
+        *,
         console: Optional[Console] = None,
-    ) -> NoReturn:
+    ) -> None:
         tokens = normalize_tokens(tokens)
 
         if console is None:
@@ -225,8 +227,6 @@ class App:
             console.print(format_commands(function_or_app))
         else:
             console.print(format_parameters(function_or_app, title=self.help_panel_title))
-
-        sys.exit()
 
     def interactive_shell(
         self,

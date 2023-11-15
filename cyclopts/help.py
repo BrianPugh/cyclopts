@@ -60,14 +60,16 @@ def format_usage(
 
 def format_doc(self, function: Optional[Callable]):
     if function is None:
-        doc_strings = self.help.split("\n")
+        raw_doc_string = self.help
     elif isinstance(function, type(self)):
-        doc_strings = function.help.split("\n")
+        raw_doc_string = function.help
     else:
-        doc_strings = (function.__doc__ or "").split("\n")
+        raw_doc_string = function.__doc__ or ""
 
-    if not doc_strings:
-        return Text()
+    if not raw_doc_string:
+        return _silent
+
+    doc_strings = raw_doc_string.split("\n")
 
     components: List[Tuple[str, str]] = [(doc_strings[0] + "\n", "default")]
     for s in doc_strings[1:]:
