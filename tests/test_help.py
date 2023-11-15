@@ -79,21 +79,21 @@ def test_format_commands_docstring(app, console):
     )
 
 
-@pytest.mark.skip
 def test_format_commands_explicit(app, console):
-    @app.command
+    @app.command(help="Docstring for Foo.")
     def foo():
-        """Docstring for Foo.
-
-        This should not be shown.
-        """
+        """Should not be shown."""
         pass
 
     with console.capture() as capture:
         console.print(format_commands(app))
 
     str_output = capture.get()
-    assert str_output == ()
+    assert str_output == (
+        "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
+        "│ foo  Docstring for Foo.                                            │\n"
+        "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
 
 
 def test_help_empty(console):
