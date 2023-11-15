@@ -48,3 +48,11 @@ Register Default
 ----------------
 You **cannot** register a subapp via ``default``.
 The default ``default`` handler runs ``app.display_help()``.
+
+--------------------------
+Decorated Function Details
+--------------------------
+Cyclopts **does not modify the decorated function in any way**.
+When decorated with ``@app.default`` or ``app.command``, the function is registered
+to an internal dictionary, and **that is it**.
+There is minimal overhead, and the function can be used exactly as if it were not decorated by Cyclopts.
