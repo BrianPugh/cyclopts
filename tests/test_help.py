@@ -11,7 +11,6 @@ def console():
 
 
 def test_help_format_usage_empty(console):
-    print("meow")
     with console.capture() as capture:
         console.print(
             format_usage(
@@ -19,11 +18,26 @@ def test_help_format_usage_empty(console):
                 [],
                 command=False,
                 options=False,
-                args=False,  # TODO
+                args=False,
             )
         )
     str_output = capture.get()
     assert str_output == "\x1b[1mUsage: foo \x1b[0m\n\n"
+
+
+def test_help_format_usage_command(console):
+    with console.capture() as capture:
+        console.print(
+            format_usage(
+                "foo",
+                [],
+                command=True,
+                options=False,
+                args=False,
+            )
+        )
+    str_output = capture.get()
+    assert str_output == "\x1b[1mUsage: foo COMMAND \x1b[0m\n\n"
 
 
 def test_help_empty(console):
