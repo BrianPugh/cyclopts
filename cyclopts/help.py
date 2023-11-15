@@ -1,5 +1,6 @@
 import inspect
 import typing
+from textwrap import dedent
 from typing import Callable, List, Optional, Tuple
 
 from rich import box
@@ -69,11 +70,12 @@ def format_doc(self, function: Optional[Callable]):
     if not raw_doc_string:
         return _silent
 
-    doc_strings = raw_doc_string.split("\n")
+    doc_strings = raw_doc_string.split("\n", 1)
 
     components: List[Tuple[str, str]] = [(doc_strings[0] + "\n", "default")]
-    for s in doc_strings[1:]:
-        components.append((s + "\n", "info"))
+
+    if len(doc_strings) > 1:
+        components.append((dedent(doc_strings[1]), "info"))
 
     return Text.assemble(*components)
 

@@ -40,6 +40,22 @@ def test_help_format_usage_command(console):
     assert str_output == "\x1b[1mUsage: foo COMMAND \x1b[0m\n\n"
 
 
+def test_format_doc_function(console):
+    app = App(help="App Help String Line 1.")
+
+    def foo():
+        """Foo Doc String Line 1.
+
+        Foo Doc String Line 3.
+        """
+
+    with console.capture() as capture:
+        console.print(format_doc(app, foo))
+
+    str_output = capture.get()
+    assert str_output == "\x1b[39mFoo Doc String Line 1.\x1b[0m\n\nFoo Doc String Line 3.\n\n"
+
+
 def test_help_empty(console):
     app = App(name="foo")
 
