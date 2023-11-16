@@ -117,6 +117,30 @@ def test_help_empty(console):
     assert actual == "Usage: foo\n\n"
 
 
+def test_help_format_parameters(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[str, Parameter(help="Docstring for foo.")],
+        *,
+        bar: Annotated[str, Parameter(help="Docstring for bar.")],
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO,--foo  Docstring for foo.                                   │
+        │ *  --bar      Docstring for bar.                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_function(app, console):
     with console.capture() as capture:
         app.help_print(console=console)
