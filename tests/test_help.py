@@ -4,7 +4,7 @@ import pytest
 from rich.console import Console
 from typing_extensions import Annotated
 
-from cyclopts import App, Parameter
+from cyclopts import App, Parameter, UnknownTokens
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
 
 
@@ -216,6 +216,44 @@ def test_help_print_commands_and_function(app, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO,--foo  Docstring for foo.                                   │
         │ *  --bar      Docstring for bar.                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_print_commands_plus_meta(app, console):
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    @app.command(help="Cmd1 help string.")
+    def cmd1():
+        pass
+
+    @app.command(help="Cmd2 help string.")
+    def cmd2():
+        pass
+
+    @app.meta.default
+    def main(tokens: UnknownTokens, *, hostname: Annotated[str, Parameter(help="Hostname to connect to.")]):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  --hostname  Hostname to connect to.                             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ cmd1  Cmd1 help string.                                            │
+        │ cmd2  Cmd2 help string.                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
