@@ -4,12 +4,12 @@ from textwrap import dedent
 from typing import Callable, List, Optional, Tuple
 
 from rich import box
+from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
 from cyclopts.bind import UnknownTokens
-from cyclopts.docstring import DocString
 from cyclopts.parameter import get_hint_parameter, get_names
 
 
@@ -94,17 +94,18 @@ def format_commands(app):
         row_args.append(command_name + " ")  # A little extra padding
         row_args.append(command_app._help_short_derived)
         table.add_row(*row_args)
+
     return panel
 
 
-def format_parameters(function, title):
-    if function is None:
+def format_parameters(app, title):
+    if not app.default_command:
         return _silent
 
     panel, table = _create_panel_table(title=title)
 
     parameters = []
-    for parameter in inspect.signature(function).parameters.values():
+    for parameter in inspect.signature(app.default_command).parameters.values():
         hint, param = get_hint_parameter(parameter.annotation)
 
         if (typing.get_origin(hint) or hint) is UnknownTokens:

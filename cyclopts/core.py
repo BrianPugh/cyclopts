@@ -265,11 +265,6 @@ class App:
         if self.meta.default_command:
             console.print(format_parameters(self.meta.default_command, title=self.meta.help_panel_title))
 
-        # If this is a subapp:
-        #    * If there are subcommands, print them.
-        #    * Otherwise, print the default app parameters.
-        # Otherwise:
-        #     * print the command's parameters.
         console.print(format_commands(app))
 
     def interactive_shell(
