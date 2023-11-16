@@ -58,7 +58,8 @@ class App:
 
     help: Optional[str] = None
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
-    help_panel_title: str = "Parameters"
+    help_title_commands: str = "Commands"
+    help_title_parameters: str = "Parameters"
 
     ######################
     # Private Attributes #
@@ -109,7 +110,7 @@ class App:
             self._meta = type(self)(
                 help_flags=[],
                 version_flags=[],
-                help_panel_title="Session Parameters",
+                help_title_parameters="Session Parameters",
             )
         return self._meta
 
@@ -251,10 +252,10 @@ class App:
 
         # Print the meta app's parameter, if available.
         if self.meta.default_command:
-            console.print(format_parameters(self.meta.default_command, title=self.meta.help_panel_title))
+            console.print(format_parameters(self.meta.default_command, title=self.meta.help_title_parameters))
 
-        console.print(format_commands(app, "Commands"))
-        console.print(format_parameters(app, "Parameters"))
+        console.print(format_commands(app, self.help_title_commands))
+        console.print(format_parameters(app, self.help_title_parameters))
 
     def interactive_shell(
         self,
