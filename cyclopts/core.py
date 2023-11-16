@@ -58,9 +58,6 @@ class App:
 
     help: Optional[str] = None
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
-    help_print_usage: bool = True
-    help_print_options: bool = True
-    help_print_commands: bool = True
     help_panel_title: str = "Parameters"
 
     ######################
@@ -247,8 +244,7 @@ class App:
 
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
-        if self.help_print_usage:
-            console.print(format_usage(self, command_chain))
+        console.print(format_usage(self, command_chain))
 
         # Print the App/Command's Doc String.
         console.print(format_doc(self, app))
