@@ -274,14 +274,16 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
                 coerced[parameter] = parameter_tokens[0]
                 break
         else:
-            action = p.converter if p.converter else coerce
-
             if parameter.kind == parameter.VAR_KEYWORD:
                 coerced[parameter] = {}
                 for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
-                    coerced[parameter][key] = action(parameter.annotation, *values)
+                    val = p.converter(parameter.annotation, *values)
+                    p.validator(parameter.annotation, val)
+                    coerced[parameter][key] = val
             else:
-                coerced[parameter] = action(parameter.annotation, *parameter_tokens)
+                val = p.converter(parameter.annotation, *parameter_tokens)
+                p.validator(parameter.annotation, val)
+                coerced[parameter] = val
 
     bound = _bind(f, coerced)
     return bound, remaining_tokens

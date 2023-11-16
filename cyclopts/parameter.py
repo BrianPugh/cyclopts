@@ -5,7 +5,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, Union, get_origin
 from attrs import field, frozen
 from typing_extensions import Annotated
 
-from cyclopts.coercion import resolve
+from cyclopts.coercion import coerce, resolve
 from cyclopts.exceptions import MultipleParameterAnnotationError, UnreachableError
 
 
@@ -20,6 +20,10 @@ def _optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]
         return None
 
     return _str_to_tuple_converter(input_value)
+
+
+def _default_validator(type_, arg):
+    pass
 
 
 @frozen
@@ -39,9 +43,17 @@ class Parameter:
     #
     # Where ``type_`` is the parameter type hint, and ``args`` are all string
     # tokens that were parsed to be associated with this parameter.
-    # Typically this is a single token. The returned value will be supplied to
-    # the command.
-    converter: Optional[Callable] = field(default=None)
+    # Typically this is a single token.
+    # The returned value will be supplied to the command.
+    converter: Callable = field(default=coerce)
+
+    # User provided validator function with signatre:
+    #
+    #    def validator(type_, arg):
+    #        pass
+    #
+    # The validator (if provided) will be invoked AFTER the converter/implicit-coercion.
+    validator: Callable = field(default=_default_validator)
 
     negative: Optional[Tuple[str, ...]] = field(default=None, converter=_optional_str_to_tuple_converter)
 
