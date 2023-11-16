@@ -133,8 +133,8 @@ def test_help_format_parameters(app, console):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo.                                   │
-        │ *  BAR,--bar  Docstring for bar.                                   │
+        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  BAR,--bar  Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -273,8 +273,8 @@ def test_help_print_function(app, console):
         Cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo.                                   │
-        │ *  --bar      Docstring for bar.                                   │
+        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -347,8 +347,8 @@ def test_help_print_commands_and_function(app, console):
         │ cmd2  Cmd2 help string.                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo.                                   │
-        │ *  --bar      Docstring for bar.                                   │
+        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -382,7 +382,7 @@ def test_help_print_commands_plus_meta(app, console):
         App Help String Line 1.
 
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  Hostname to connect to.                             │
+        │ *  --hostname  Hostname to connect to. [required]                  │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1  Cmd1 help string.                                            │

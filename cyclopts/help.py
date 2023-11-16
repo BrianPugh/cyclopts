@@ -148,6 +148,8 @@ def format_parameters(app, title):
             help_components.append(param.help)
         if param.show_default and not is_required(parameter):
             help_components.append(rf"[dim]\[default: {parameter.default}][/dim]")
+        if is_required(parameter):
+            help_components.append(r"[red][dim]\[required][/dim][/red]")
 
         # populate row
         row_args = []
