@@ -12,6 +12,7 @@ from rich.console import Console
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
+    CycloptsError,
     UnusedCliTokensError,
 )
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
@@ -132,7 +133,7 @@ class App:
         name = app._name_derived
 
         if name in self._commands:
-            raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')
+            raise CommandCollisionError(msg=f'Command "{name}" previously registered as {self._commands[name]}')
 
         self._commands[name] = app
         return obj
@@ -145,7 +146,7 @@ class App:
             raise TypeError("Cannot register a sub-App to default.")
 
         if self.default_command is not None:
-            raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
+            raise CommandCollisionError(msg=f"Default command previously set to {self.default_command}.")
 
         self.default_command = obj
 
@@ -208,7 +209,10 @@ class App:
         """
         command, bound, remaining_tokens = self.parse_known_args(tokens)
         if remaining_tokens:
-            raise UnusedCliTokensError(remaining_tokens)
+            raise UnusedCliTokensError(
+                target=command,
+                unused_tokens=remaining_tokens,
+            )
         return command, bound
 
     def __call__(self, tokens: Union[None, str, Iterable[str]] = None):
