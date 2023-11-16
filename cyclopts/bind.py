@@ -22,7 +22,19 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
-def cli2parameter_mappings(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
+def cli2parameter(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
+    """Creates a dictionary mapping CLI keywords to python keywords.
+
+    Typically the mapping is something like:
+
+        {"--foo": (<Parameter "foo">, None)}
+
+    Each value is a tuple containing:
+
+    1. The corresponding ``inspect.Parameter``.
+    2. A predefined value. If this value is ``None``, the value should be
+       inferred from subsequent tokens.
+    """
     mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
@@ -51,7 +63,7 @@ def _cli_kw_to_f_kw(cli_key: str):
 
 
 def _parse_kw_and_flags(f, tokens, mapping):
-    cli2kw = cli2parameter_mappings(f)
+    cli2kw = cli2parameter(f)
     kwargs_parameter = next((p for p in inspect.signature(f).parameters.values() if p.kind == p.VAR_KEYWORD), None)
 
     if kwargs_parameter:
