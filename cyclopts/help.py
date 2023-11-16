@@ -136,6 +136,7 @@ def format_parameters(app, title):
     for parameter in parameters:
         hint, param = get_hint_parameter(parameter.annotation)
         options = get_names(parameter)
+        options.extend(param.get_negatives(hint, *options))
 
         if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
             arg_name = options[0].lstrip("-").upper()

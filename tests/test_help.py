@@ -140,7 +140,6 @@ def test_help_format_parameters(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip
 def test_help_format_parameters_bool_flag(app, console):
     @app.command
     def cmd(
@@ -155,8 +154,28 @@ def test_help_format_parameters_bool_flag(app, console):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo.                                   │
-        │ *  BAR,--bar  Docstring for bar.                                   │
+        │ FOO,--foo,--no-foo  Docstring for foo. [default: True]             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_parameters_bool_flag_custom_negative(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[bool, Parameter(negative="--yesnt-foo", help="Docstring for foo.")] = True,
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo,--yesnt-foo  Docstring for foo. [default: True]          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
