@@ -121,7 +121,6 @@ def test_help_format_parameters(app, console):
     @app.command
     def cmd(
         foo: Annotated[str, Parameter(help="Docstring for foo.")],
-        *,
         bar: Annotated[str, Parameter(help="Docstring for bar.")],
     ):
         pass
@@ -134,7 +133,30 @@ def test_help_format_parameters(app, console):
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO,--foo  Docstring for foo.                                   │
-        │ *  --bar      Docstring for bar.                                   │
+        │ *  BAR,--bar  Docstring for bar.                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_parameters_defaults(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[str, Parameter(help="Docstring for foo.")] = "fizz",
+        bar: Annotated[str, Parameter(help="Docstring for bar.")] = "buzz",
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo. [default: fizz]                      │
+        │ BAR,--bar  Docstring for bar. [default: buzz]                      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
