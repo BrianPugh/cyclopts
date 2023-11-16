@@ -6,13 +6,12 @@ import sys
 from functools import partial
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
-from attrs import Factory, define, field, frozen
+from attrs import define, evolve, field
 from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
-    CycloptsError,
     UnusedCliTokensError,
 )
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
@@ -64,7 +63,6 @@ class App:
     ######################
     # Private Attributes #
     ######################
-
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, "App"] = field(init=False, factory=dict)
 
@@ -123,10 +121,15 @@ class App:
             app = obj
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
-        else:
-            app = App(default_command=obj, **kwargs)
 
-        name = kwargs.get("name", app._name_derived)
+            # Disable ``--version`` on sub-apps.
+            app.version_flags = []
+        else:
+            kwargs.setdefault("name", None)
+            kwargs.setdefault("help", None)
+            app = evolve(self, default_command=obj, **kwargs)
+
+        name = app._name_derived
 
         if name in self._commands:
             raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')

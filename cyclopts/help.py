@@ -105,60 +105,79 @@ def format_commands(app, title):
 
 
 def format_parameters(app, title):
-    if not app.default_command:
-        return _silent
-
     panel, table = _create_panel_table(title=title)
-
-    parameters = []
-    for parameter in inspect.signature(app.default_command).parameters.values():
-        hint, param = get_hint_parameter(parameter.annotation)
-
-        if (typing.get_origin(hint) or hint) is UnknownTokens:
-            continue
-
-        parameters.append(parameter)
 
     has_required, has_short = False, False  # noqa: F841
 
-    def is_required(parameter):
-        return parameter.default is parameter.empty
+    if app.default_command:
+        parameters = []
+        for parameter in inspect.signature(app.default_command).parameters.values():
+            hint, param = get_hint_parameter(parameter.annotation)
 
-    has_required = any(is_required(p) for p in parameters)
+            if (typing.get_origin(hint) or hint) is UnknownTokens:
+                continue
 
-    if has_required:
-        table.add_column(justify="left", width=1, style="red bold")
-    table.add_column(justify="left", no_wrap=True, style="cyan")
-    # if has_short:
-    #    table.add_column(justify="left", width=max(len(x) for x in options_short) + 1, style="green")
-    table.add_column(justify="left")
+            parameters.append(parameter)
 
-    for parameter in parameters:
-        hint, param = get_hint_parameter(parameter.annotation)
-        options = get_names(parameter)
-        options.extend(param.get_negatives(hint, *options))
+        def is_required(parameter):
+            return parameter.default is parameter.empty
 
-        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
-            arg_name = options[0].lstrip("-").upper()
-            if arg_name != options[0]:
-                options = [arg_name, *options]
+        has_required = any(is_required(p) for p in parameters)
 
-        help_components = []
-        if param.help:
-            help_components.append(param.help)
-        if param.show_default and not is_required(parameter):
-            help_components.append(rf"[dim]\[default: {parameter.default}][/dim]")
-        if is_required(parameter):
-            help_components.append(r"[red][dim]\[required][/dim][/red]")
+        if has_required:
+            table.add_column(justify="left", width=1, style="red bold")
+        table.add_column(justify="left", no_wrap=True, style="cyan")
+        # if has_short:
+        #    table.add_column(justify="left", width=max(len(x) for x in options_short) + 1, style="green")
+        table.add_column(justify="left")
 
-        # populate row
+        for parameter in parameters:
+            hint, param = get_hint_parameter(parameter.annotation)
+            options = get_names(parameter)
+            options.extend(param.get_negatives(hint, *options))
+
+            if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
+                arg_name = options[0].lstrip("-").upper()
+                if arg_name != options[0]:
+                    options = [arg_name, *options]
+
+            help_components = []
+            if param.help:
+                help_components.append(param.help)
+            if param.show_default and not is_required(parameter):
+                help_components.append(rf"[dim]\[default: {parameter.default}][/dim]")
+            if is_required(parameter):
+                help_components.append(r"[red][dim]\[required][/dim][/red]")
+
+            # populate row
+            row_args = []
+            if has_required:
+                row_args.append("*" if is_required(parameter) else "")
+            row_args.append(",".join(options) + " ")  # a little extra padding
+            # if has_short:
+            #     row_args.append(option_short)
+            row_args.append(" ".join(help_components))
+            table.add_row(*row_args)
+
+    # Add in special flags
+    if app.version_flags:
         row_args = []
         if has_required:
-            row_args.append("*" if is_required(parameter) else "")
-        row_args.append(",".join(options) + " ")  # a little extra padding
-        # if has_short:
-        #     row_args.append(option_short)
-        row_args.append(" ".join(help_components))
+            row_args.append("")
+
+        row_args.append(",".join(app.version_flags) + " ")
+        row_args.append("Show this message and exit.")
         table.add_row(*row_args)
+
+    if app.help_flags:
+        row_args = []
+        if has_required:
+            row_args.append("")
+        row_args.append(",".join(app.help_flags) + " ")
+        row_args.append(f"Print {app._name_derived} version and exit.")
+        table.add_row(*row_args)
+
+    if table.row_count == 0:
+        return _silent
 
     return panel

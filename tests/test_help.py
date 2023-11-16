@@ -16,7 +16,12 @@ def console():
 
 @pytest.fixture
 def app():
-    return App(name="app", help="App Help String Line 1.")
+    return App(
+        name="app",
+        help="App Help String Line 1.",
+        version_flags=[],
+        help_flags=[],
+    )
 
 
 def test_help_format_usage_empty(app, console):
@@ -109,7 +114,7 @@ def test_format_commands_explicit_name(app, console):
 
 
 def test_help_empty(console):
-    app = App(name="foo")
+    app = App(name="foo", version_flags=[], help_flags=[])
 
     with console.capture() as capture:
         app.help_print(console=console)
@@ -356,6 +361,9 @@ def test_help_print_commands_and_function(app, console):
 
 
 def test_help_print_commands_plus_meta(app, console):
+    app.version_flags = ["--version"]
+    app.help_flags = ["--help", "-h"]
+
     with console.capture() as capture:
         app.help_print(console=console)
 
@@ -387,6 +395,10 @@ def test_help_print_commands_plus_meta(app, console):
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1  Cmd1 help string.                                            │
         │ cmd2  Cmd2 help string.                                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --version  Show this message and exit.                             │
+        │ --help,-h  Print app version and exit.                             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
