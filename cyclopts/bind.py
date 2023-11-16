@@ -22,16 +22,12 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
-def _cli2parameter_mappings(f: Callable):
-    kwargs_parameter = None
+def cli2parameter_mappings(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
     mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
     signature = inspect.signature(f)
     for parameter in signature.parameters.values():
         annotation = str if parameter.annotation is parameter.empty else parameter.annotation
         _, user_param = get_hint_parameter(annotation)
-
-        if parameter.kind == parameter.VAR_KEYWORD:
-            kwargs_parameter = parameter
 
         if parameter.kind in (parameter.POSITIONAL_OR_KEYWORD, parameter.KEYWORD_ONLY):
             hint = resolve_union(resolve_annotated(annotation))
@@ -43,7 +39,7 @@ def _cli2parameter_mappings(f: Callable):
             for key in user_param.get_negatives(hint, *keys):
                 mapping[key] = (parameter, (get_origin(hint) or hint)())
 
-    return mapping, kwargs_parameter
+    return mapping
 
 
 def _cli_kw_to_f_kw(cli_key: str):
@@ -55,7 +51,8 @@ def _cli_kw_to_f_kw(cli_key: str):
 
 
 def _parse_kw_and_flags(f, tokens, mapping):
-    cli2kw, kwargs_parameter = _cli2parameter_mappings(f)
+    cli2kw = cli2parameter_mappings(f)
+    kwargs_parameter = next((p for p in inspect.signature(f).parameters.values() if p.kind == p.VAR_KEYWORD), None)
 
     if kwargs_parameter:
         mapping[kwargs_parameter] = {}
