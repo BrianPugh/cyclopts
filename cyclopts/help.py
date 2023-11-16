@@ -38,25 +38,33 @@ def _create_panel_table(**kwargs):
 
 
 def format_usage(
-    app_name,
+    self,
     command_chain: List[str],
-    command=True,
-    options=True,
-    args=True,
 ):
-    usage_string = []
-    usage_string.append("Usage:")
-    usage_string.append(app_name)
-    usage_string.extend(command_chain)
-    if command:
-        usage_string.append("COMMAND")
-    if options:
-        usage_string.append("[OPTIONS]")
-    if args:
-        usage_string.append("[ARGS]")
-    usage_string.append("\n")
+    usage = []
+    usage.append("Usage:")
+    usage.append(self._name_derived)
+    usage.extend(command_chain)
 
-    return Text(" ".join(usage_string), style="bold")
+    app = self
+    for command in command_chain:
+        app = app[command]
+
+    if app._commands:
+        usage.append("COMMAND")
+
+    if app.default_command:
+        to_show = set()
+        for parameter in inspect.signature(app.default_command).parameters.values():
+            if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL, parameter.POSITIONAL_OR_KEYWORD):
+                to_show.add("[ARGS]")
+            if parameter.kind in (parameter.KEYWORD_ONLY, parameter.VAR_KEYWORD, parameter.POSITIONAL_OR_KEYWORD):
+                to_show.add("[OPTIONS]")
+        usage.extend(sorted(to_show))
+
+    usage.append("\n")
+
+    return Text(" ".join(usage), style="bold")
 
 
 def format_doc(self, function: Optional[Callable]):

@@ -248,15 +248,7 @@ class App:
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
         if self.help_print_usage:
-            console.print(
-                format_usage(
-                    self.name,
-                    command_chain,
-                    command=bool(self._commands),
-                    options=not bool(self._commands),  # TODO
-                    args=False,  # TODO
-                )
-            )
+            console.print(format_usage(self, command_chain))
 
         # Print the App/Command's Doc String.
         console.print(format_doc(self, app))
