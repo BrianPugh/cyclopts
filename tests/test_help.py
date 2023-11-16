@@ -72,7 +72,7 @@ def test_format_commands_docstring(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_commands(app))
+        console.print(format_commands(app, "Commands"))
 
     str_output = capture.get()
     assert str_output == (
@@ -89,7 +89,7 @@ def test_format_commands_explicit_help(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_commands(app))
+        console.print(format_commands(app, "Commands"))
 
     str_output = capture.get()
     assert str_output == (
@@ -109,7 +109,7 @@ def test_format_commands_explicit_name(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_commands(app))
+        console.print(format_commands(app, "Commands"))
 
     str_output = capture.get()
     assert str_output == (
@@ -129,7 +129,7 @@ def test_help_empty(console):
     assert str_output == "\x1b[1mUsage: foo [OPTIONS] \x1b[0m\n\n"
 
 
-@pytest.mark.skip(reason="wip")
+@pytest.mark.skip
 def test_help_print_function(app, console):
     with console.capture() as capture:
         app.help_print(console=console)
@@ -153,8 +153,8 @@ def test_help_print_function(app, console):
         Cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ * FOO,--foo   Docstring for foo.                                   │
-        │ * --bar       Docstring for bar.                                   │
+        │ *  FOO,--foo  Docstring for foo.                                   │
+        │ *  --bar      Docstring for bar.                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

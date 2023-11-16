@@ -80,11 +80,11 @@ def format_doc(self, function: Optional[Callable]):
     return Text.assemble(*components)
 
 
-def format_commands(app):
+def format_commands(app, title):
     if not app._commands:
         return _silent
 
-    panel, table = _create_panel_table(title="Commands")
+    panel, table = _create_panel_table(title=title)
 
     table.add_column(justify="left", style="cyan")
     table.add_column(justify="left")
@@ -131,6 +131,11 @@ def format_parameters(app, title):
         hint, param = get_hint_parameter(parameter.annotation)
         options = get_names(parameter)
 
+        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
+            arg_name = options[0].lstrip("-").upper()
+            if arg_name != options[0]:
+                options = [arg_name, *options]
+
         help_components = []
         if param.help:
             help_components.append(param.help)
@@ -141,7 +146,7 @@ def format_parameters(app, title):
         row_args = []
         if has_required:
             row_args.append("*" if is_required(parameter) else "")
-        row_args.append(",".join(options))
+        row_args.append(",".join(options) + " ")  # a little extra padding
         # if has_short:
         #     row_args.append(option_short)
         row_args.append(" ".join(help_components))

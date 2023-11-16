@@ -265,7 +265,8 @@ class App:
         if self.meta.default_command:
             console.print(format_parameters(self.meta.default_command, title=self.meta.help_panel_title))
 
-        console.print(format_commands(app))
+        console.print(format_commands(app, "Commands"))
+        console.print(format_parameters(app, "Parameters"))
 
     def interactive_shell(
         self,
