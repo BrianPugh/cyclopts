@@ -146,3 +146,34 @@ def test_help_print_function(app, console):
         """
     )
     assert actual == expected
+
+
+def test_help_print_commands(app, console):
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    @app.command(help="Cmd1 help string.")
+    def cmd1():
+        pass
+
+    @app.command(help="Cmd2 help string.")
+    def cmd2():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ cmd1  Cmd1 help string.                                            │
+        │ cmd2  Cmd2 help string.                                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
