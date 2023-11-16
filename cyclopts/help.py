@@ -62,9 +62,7 @@ def format_usage(
                 to_show.add("[OPTIONS]")
         usage.extend(sorted(to_show))
 
-    usage.append("\n")
-
-    return Text(" ".join(usage), style="bold")
+    return Text(" ".join(usage) + "\n", style="bold")
 
 
 def format_doc(self, function: Optional[Callable]):

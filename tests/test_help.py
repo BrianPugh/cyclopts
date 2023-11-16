@@ -10,7 +10,7 @@ from cyclopts.help import format_commands, format_doc, format_parameters, format
 
 @pytest.fixture
 def console():
-    return Console(width=70, force_terminal=True, no_color=True, highlight=False)
+    return Console(width=70, force_terminal=True, highlight=False, color_system=None)
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def test_help_format_usage_empty(app, console):
     with console.capture() as capture:
         console.print(format_usage(app, []))
     actual = capture.get()
-    assert actual == "\x1b[1mUsage: app \x1b[0m\n\n"
+    assert actual == "Usage: app\n\n"
 
 
 def test_help_format_usage_command(app, console):
@@ -33,7 +33,7 @@ def test_help_format_usage_command(app, console):
     with console.capture() as capture:
         console.print(format_usage(app, []))
     actual = capture.get()
-    assert actual == "\x1b[1mUsage: app COMMAND \x1b[0m\n\n"
+    assert actual == "Usage: app COMMAND\n\n"
 
 
 def test_format_doc_function(app, console):
@@ -114,10 +114,9 @@ def test_help_empty(console):
         app.help_print(console=console)
     actual = capture.get()
 
-    assert actual == "\x1b[1mUsage: foo \x1b[0m\n\n"
+    assert actual == "Usage: foo\n\n"
 
 
-@pytest.mark.skip
 def test_help_print_function(app, console):
     with console.capture() as capture:
         app.help_print(console=console)
