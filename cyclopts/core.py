@@ -220,6 +220,8 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         console: Optional[Console] = None,
+        print_error: bool = True,
+        exit_on_error: bool = True,
     ):
         """Interprets and executes a command.
 
@@ -228,16 +230,27 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
+        print_error: bool
+            Print a rich-formatted error on error.
+            Defaults to ``True``.
+        exit_on_error: bool
+            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            Otherwise, continue to raise the exception.
+            Defaults to ``True``.
         """
         try:
             self.parse_special_flags(tokens)
             command, bound = self.parse_args(tokens)
         except CycloptsError as e:
-            if console is None:
-                console = Console()
-            console.print(format_cyclopts_error(e))
-            # TODO: Should we exit here? Probably not...
-            sys.exit(1)
+            if print_error:
+                if console is None:
+                    console = Console()
+                console.print(format_cyclopts_error(e))
+
+            if exit_on_error:
+                sys.exit(1)
+            else:
+                raise
         else:
             return command(*bound.args, **bound.kwargs)
 
