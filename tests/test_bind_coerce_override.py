@@ -6,7 +6,7 @@ from cyclopts import Parameter
 
 
 def test_multiple_names(app):
-    def custom_coercion(type_, *args):
+    def custom_converter(type_, *args):
         assert args == ("5",)
         return 2 * int(args[0])
 
@@ -15,7 +15,7 @@ def test_multiple_names(app):
         age: Annotated[
             int,
             Parameter(
-                coercion=custom_coercion,
+                converter=custom_converter,
             ),
         ]
     ):

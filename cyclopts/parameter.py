@@ -32,16 +32,16 @@ class Parameter:
     # These should start with ``--`` (or ``-`` for single-character).
     name: Tuple[str, ...] = field(default=[], converter=_str_to_tuple_converter)
 
-    # User provided coercion function with signature:
+    # User provided converter function with signature:
     #
-    #    def coercion(type_, *args):
+    #    def converter(type_, *args):
     #        pass
     #
     # Where ``type_`` is the parameter type hint, and ``args`` are all string
     # tokens that were parsed to be associated with this parameter.
     # Typically this is a single token. The returned value will be supplied to
     # the command.
-    coercion: Optional[Callable] = field(default=None)
+    converter: Optional[Callable] = field(default=None)
 
     negative: Optional[Tuple[str, ...]] = field(default=None, converter=_optional_str_to_tuple_converter)
 

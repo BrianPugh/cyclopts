@@ -274,7 +274,7 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
                 coerced[parameter] = parameter_tokens[0]
                 break
         else:
-            action = p.coercion if p.coercion else coerce
+            action = p.converter if p.converter else coerce
 
             if parameter.kind == parameter.VAR_KEYWORD:
                 coerced[parameter] = {}
