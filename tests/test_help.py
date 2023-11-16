@@ -1,4 +1,5 @@
 from textwrap import dedent
+from typing import List, Optional
 
 import pytest
 from rich.console import Console
@@ -176,6 +177,27 @@ def test_help_format_parameters_bool_flag_custom_negative(app, console):
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ FOO,--foo,--yesnt-foo  Docstring for foo. [default: True]          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_parameters_list_flag(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[Optional[List[int]], Parameter(help="Docstring for foo.")] = None,
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo,--empty-foo  Docstring for foo. [default: None]          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

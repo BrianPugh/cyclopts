@@ -5,6 +5,7 @@ from typing import Callable, Iterable, List, Optional, Tuple, Union, get_origin
 from attrs import field, frozen
 from typing_extensions import Annotated
 
+from cyclopts.coercion import resolve
 from cyclopts.exceptions import MultipleParameterAnnotationError, UnreachableError
 
 
@@ -106,4 +107,4 @@ def get_hint_parameter(hint) -> Tuple[type, Parameter]:
     else:
         cyclopts_parameter = Parameter()
 
-    return hint, cyclopts_parameter
+    return resolve(hint), cyclopts_parameter

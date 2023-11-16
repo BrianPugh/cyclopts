@@ -104,7 +104,17 @@ def _get_origin_and_validate(type_):
     return origin_type
 
 
-def resolve_union(type_):
+def resolve(type_: type) -> type:
+    """Perform all simplifying/ambiguous resolutions."""
+    type_prev = None
+    while type_ != type_prev:
+        type_prev = type_
+        type_ = resolve_annotated(type_)
+        type_ = resolve_union(type_)
+    return type_
+
+
+def resolve_union(type_: type) -> type:
     while get_origin(type_) is Union:
         non_none_types = [t for t in get_args(type_) if t is not NoneType]
         if not non_none_types:
@@ -113,13 +123,13 @@ def resolve_union(type_):
     return type_
 
 
-def resolve_annotated(type_):
+def resolve_annotated(type_: type) -> type:
     while get_origin(type_) is Annotated:
         type_ = get_args(type_)[0]
     return type_
 
 
-def coerce(type_, *args):
+def coerce(type_: type, *args):
     if type_ is inspect.Parameter.empty:
         type_ = str
 
