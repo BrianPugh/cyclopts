@@ -2,6 +2,9 @@ import inspect
 from typing import Callable, List, Optional
 
 from attrs import define, field
+from rich import box
+from rich.panel import Panel
+from rich.text import Text
 
 
 def _get_function_info(func):
@@ -26,12 +29,12 @@ class CycloptsError(Exception):
             strings.append(
                 "Error parsing tokens for function\n"
                 f"    {self.target.__name__}{inspect.signature(self.target)}\n"
-                f"Defined in File {file}, line {lineno}"
+                f'Defined in file "{file}", line {lineno}'
             )
         if self.tokens is not None:
             strings.append(f"Input Tokens: {self.tokens}")
 
-        return "\n" + "\n".join(strings) + "\n"
+        return "\n".join(strings) + "\n"
 
 
 class UnreachableError(CycloptsError):
@@ -69,8 +72,20 @@ class MissingArgumentError(CycloptsError):
 
         count = token_count(self.parameter.annotation)
         s = super().__str__()
-        return s + f'Parameter "{self.parameter.name}" requires {count} arguments. Parsed: {self.tokens_so_far}\n'
+        return s + f'Parameter "{self.parameter.name}" requires {count} arguments. Parsed: {self.tokens_so_far}'
 
 
 class MultipleParameterAnnotationError(CycloptsError):
     pass
+
+
+def format_cyclopts_error(e: CycloptsError):
+    panel = Panel(
+        Text(str(e), "default"),
+        title="Error",
+        box=box.ROUNDED,
+        expand=True,
+        title_align="left",
+        style="red",
+    )
+    return panel

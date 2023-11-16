@@ -14,6 +14,7 @@ from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
     UnusedCliTokensError,
+    format_cyclopts_error,
 )
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
 
@@ -215,7 +216,11 @@ class App:
             )
         return command, bound
 
-    def __call__(self, tokens: Union[None, str, Iterable[str]] = None):
+    def __call__(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        console: Optional[Console] = None,
+    ):
         """Interprets and executes a command.
 
         Parameter
@@ -224,9 +229,17 @@ class App:
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         """
-        self.parse_special_flags(tokens)
-        command, bound = self.parse_args(tokens)
-        return command(*bound.args, **bound.kwargs)
+        try:
+            self.parse_special_flags(tokens)
+            command, bound = self.parse_args(tokens)
+        except CycloptsError as e:
+            if console is None:
+                console = Console()
+            console.print(format_cyclopts_error(e))
+            # TODO: Should we exit here? Probably not...
+            sys.exit(1)
+        else:
+            return command(*bound.args, **bound.kwargs)
 
     def help_print(
         self,
