@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, g
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
+    CycloptsError,
     MissingArgumentError,
 )
 from cyclopts.parameter import get_hint_parameter, get_names
@@ -197,7 +198,7 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
         consume_count = max(1, consume_count)
 
         if len(tokens) < consume_count:
-            raise MissingArgumentError(f"Not enough arguments for {parameter}")
+            raise MissingArgumentError(parameter=parameter, tokens_so_far=tokens)
         mapping[parameter] = tokens[:consume_count]
         tokens = tokens[consume_count:]
 
@@ -224,9 +225,9 @@ def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any]):
         assert use_pos
         try:
             f_pos.append(mapping[p])
-        except KeyError as e:
+        except KeyError:
             if _is_required(p):
-                raise MissingArgumentError(f'Missing argument "{p.name}"') from e
+                raise MissingArgumentError(parameter=p, tokens_so_far=[]) from None
             use_pos = False
 
     # Unintuitive notes:
@@ -243,14 +244,14 @@ def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any]):
         else:
             try:
                 f_kwargs[p.name] = mapping[p]
-            except KeyError as e:
+            except KeyError:
                 if _is_required(p):
-                    raise MissingArgumentError from e
+                    raise MissingArgumentError(parameter=p, tokens_so_far=[]) from None
 
     return signature.bind(*f_pos, **f_kwargs)
 
 
-def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[str]]:
+def _create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.BoundArguments, Iterable[str]]:
     # Note: mapping is updated inplace
     mapping: Dict[inspect.Parameter, List[str]] = {}
     remaining_tokens = _parse_kw_and_flags(f, tokens, mapping)
@@ -287,3 +288,12 @@ def create_bound_arguments(f, tokens) -> Tuple[inspect.BoundArguments, Iterable[
 
     bound = _bind(f, coerced)
     return bound, remaining_tokens
+
+
+def create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.BoundArguments, Iterable[str]]:
+    try:
+        return _create_bound_arguments(f, tokens)
+    except CycloptsError as e:
+        e.target = f
+        e.tokens = tokens
+        raise

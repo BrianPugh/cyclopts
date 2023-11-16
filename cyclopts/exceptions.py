@@ -13,8 +13,7 @@ class CycloptsError(Exception):
     """Root exception."""
 
     msg: Optional[str] = None
-    tokens: List[str] = field(factory=list)
-
+    tokens: Optional[List[str]] = None
     target: Optional[Callable] = None
 
     def __str__(self):
@@ -29,7 +28,10 @@ class CycloptsError(Exception):
                 f"    {self.target.__name__}{inspect.signature(self.target)}\n"
                 f"Defined in File {file}, line {lineno}"
             )
-        return "\n" + "\n".join(strings)
+        if self.tokens is not None:
+            strings.append(f"Input Tokens: {self.tokens}")
+
+        return "\n" + "\n".join(strings) + "\n"
 
 
 class UnreachableError(CycloptsError):
@@ -54,11 +56,20 @@ class UnusedCliTokensError(CycloptsError):
 
     def __str__(self):
         s = super().__str__()
-        return s + f"\nUnused Tokens: {self.unused_tokens}"
+        return s + f"Unused Tokens: {self.unused_tokens}"
 
 
+@define(kw_only=True)
 class MissingArgumentError(CycloptsError):
-    pass
+    parameter: inspect.Parameter
+    tokens_so_far: List[str]
+
+    def __str__(self):
+        from cyclopts.coercion import token_count
+
+        count = token_count(self.parameter.annotation)
+        s = super().__str__()
+        return s + f'Parameter "{self.parameter.name}" requires {count} arguments. Parsed: {self.tokens_so_far}\n'
 
 
 class MultipleParameterAnnotationError(CycloptsError):
