@@ -36,4 +36,7 @@ def compress(
 
 
 cyclopts_app(["--help"])
-# TODO
+# ╭─ Parameters ───────────────────────────────────────────────────────╮
+# │ *  SRC,--src  File to compress. [required]                         │
+# │    DST,--dst  Path to save compressed data to. [default: out.zip]  │
+# ╰────────────────────────────────────────────────────────────────────╯

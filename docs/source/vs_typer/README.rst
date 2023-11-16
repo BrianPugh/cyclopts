@@ -11,6 +11,7 @@ With the introduction of ``Annotated`` in python3.9, type hints were able to be 
 
 Additionally, Typer is built on top of `Click`_.
 This makes it difficult for newcomers to figure out which elements are typer-related and which elements are click-related.
+It's also hard to tell whether the following critisizms of these sections stem from Typer, or the underlying Click.
 For better-or-worse, Cyclopts uses it's own internal parsing strategy, gaining complete control over the process.
 
 This section was written about the current version of Typer: ``v0.9.0``.
