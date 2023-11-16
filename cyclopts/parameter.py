@@ -44,8 +44,8 @@ class Parameter:
 
     negative: Optional[Tuple[str, ...]] = field(default=None, converter=_optional_str_to_tuple_converter)
 
-    show_default = True
-    help: str = ""
+    show_default: bool = field(default=True)
+    help: str = field(default="")
 
     def get_negatives(self, type_, *names) -> Tuple[str, ...]:
         type_ = get_origin(type_) or type_

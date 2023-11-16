@@ -163,6 +163,29 @@ def test_help_format_parameters_defaults(app, console):
     assert actual == expected
 
 
+def test_help_format_parameters_defaults_no_show(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[str, Parameter(show_default=False, help="Docstring for foo.")] = "fizz",
+        bar: Annotated[str, Parameter(help="Docstring for bar.")] = "buzz",
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo.                                      │
+        │ BAR,--bar  Docstring for bar. [default: buzz]                      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_function(app, console):
     with console.capture() as capture:
         app.help_print(console=console)
