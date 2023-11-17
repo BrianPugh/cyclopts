@@ -118,14 +118,16 @@ class App:
         command_chain = []
         command_mapping = self._commands
         app = self
-        for token in tokens:
+        unused_tokens = tokens
+        for i, token in enumerate(tokens):
             try:
                 app = command_mapping[token]
+                unused_tokens = tokens[i + 1 :]
             except KeyError:
                 break
             command_mapping = app._commands
             command_chain.append(token)
-        return command_chain, app
+        return command_chain, app, unused_tokens
 
     def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
@@ -203,22 +205,19 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        # Extract out the command-string
-        if tokens and tokens[0] in self._commands:
-            command, tokens = self[tokens[0]], tokens[1:]
-        elif self.default_command:
-            # We need to break the recursion here
+        command_chain, app, unused_tokens = self._parse_command_chain(tokens)
+
+        if app is not self:
+            return app.parse_known_args(unused_tokens)
+
+        if self.default_command:
             command = self.default_command
+            bound, remaining_tokens = create_bound_arguments(command, unused_tokens)
+            return command, bound, remaining_tokens
         else:
             command = self.help_print
             bound = inspect.signature(command).bind(tokens=tokens)
             return command, bound, []
-
-        if isinstance(command, App):
-            return command.parse_known_args(tokens)
-
-        bound, remaining_tokens = create_bound_arguments(command, tokens)
-        return command, bound, remaining_tokens
 
     def parse_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple[Callable, inspect.BoundArguments]:
         """Interpret arguments into a function and BoundArguments.
@@ -289,7 +288,7 @@ class App:
         if console is None:
             console = Console()
 
-        command_chain, app = self._parse_command_chain(tokens)
+        command_chain, app, _ = self._parse_command_chain(tokens)
 
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
