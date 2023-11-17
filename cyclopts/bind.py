@@ -57,6 +57,18 @@ def cli2parameter(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
     return mapping
 
 
+def parameter2cli(f: Callable) -> Dict[inspect.Parameter, List[str]]:
+    c2p = cli2parameter(f)
+    p2c = {}
+
+    for cli, tup in c2p.items():
+        parameter = tup[0]
+        p2c.setdefault(parameter, [])
+        p2c[parameter].append(cli)
+
+    return p2c
+
+
 def _cli_kw_to_f_kw(cli_key: str):
     """Only used for converting unknown CLI key/value keys for ``**kwargs``."""
     assert cli_key.startswith("--")
@@ -269,7 +281,8 @@ def _create_bound_arguments(
 ) -> Tuple[inspect.BoundArguments, Iterable[str]]:
     # Note: mapping is updated inplace
     mapping: Dict[inspect.Parameter, List[str]] = {}
-    cli2kw = cli2parameter(f)
+    c2p = cli2parameter(f)
+    p2c = parameter2cli(f)
     unused_tokens = _parse_kw_and_flags(f, tokens, mapping)
 
     try:
@@ -301,6 +314,8 @@ def _create_bound_arguments(
 
         bound = _bind(f, coerced)
     except CycloptsError as e:
+        e.cli2parameter = c2p
+        e.parameter2cli = p2c
         e.unused_tokens = unused_tokens
         raise
 

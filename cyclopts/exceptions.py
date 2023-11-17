@@ -1,5 +1,5 @@
 import inspect
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from attrs import define, field
 from rich import box
@@ -25,6 +25,8 @@ class CycloptsError(Exception):
     root_input_tokens: Optional[List[str]] = None
     unused_tokens: Optional[List[str]] = None
     target: Optional[Callable] = None
+    cli2parameter: Optional[Dict[str, Tuple[inspect.Parameter, Any]]] = None
+    parameter2cli: Optional[Dict[inspect.Parameter, List[str]]] = None
 
     # Tokens that led up to the actual command being executed.
     command_chain: Optional[List[str]] = None
@@ -92,13 +94,16 @@ class MissingArgumentError(CycloptsError):
         else:
             required_string = f"requires {count} arguments"
 
+        assert self.parameter2cli is not None
+        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
+
         strings = []
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{self.parameter.name}" {required_string}.'
+                f'Command "{" ".join(self.command_chain)}" parameter "{parameter_cli_name}" {required_string}.'
             )
         else:
-            strings.append(f'Parameter "{self.parameter.name}" {required_string}.')
+            strings.append(f'Parameter "{parameter_cli_name}" {required_string}.')
 
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")
