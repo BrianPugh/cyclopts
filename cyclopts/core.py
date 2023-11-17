@@ -315,7 +315,7 @@ class App:
         # Print the meta app's parameter, if available.
         if self.meta.default_command:
             console.print(format_commands(self.meta, self.meta.help_title_parameters))
-            console.print(format_parameters(self.meta, self.meta.help_title_parameters))
+            console.print(format_parameters(self.meta, self.meta.help_title_parameters, hide_var_positional=True))
 
         console.print(format_commands(app, self.help_title_commands))
         console.print(format_parameters(app, self.help_title_parameters))

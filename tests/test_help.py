@@ -5,7 +5,7 @@ import pytest
 from rich.console import Console
 from typing_extensions import Annotated
 
-from cyclopts import App, Parameter, UnknownTokens
+from cyclopts import App, Parameter
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
 
 
@@ -376,7 +376,7 @@ def test_help_print_commands_plus_meta(app, console):
         pass
 
     @app.meta.default
-    def main(tokens: UnknownTokens, *, hostname: Annotated[str, Parameter(help="Hostname to connect to.")]):
+    def main(*tokens, hostname: Annotated[str, Parameter(help="Hostname to connect to.")]):
         pass
 
     with console.capture() as capture:

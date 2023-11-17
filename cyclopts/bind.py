@@ -12,8 +12,6 @@ from cyclopts.exceptions import (
 )
 from cyclopts.parameter import get_hint_parameter, get_names
 
-UnknownTokens = NewType("UnknownTokens", List[str])
-
 
 def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     if tokens is None:
@@ -191,8 +189,6 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
         for parameter in signature.parameters.values():
             if parameter in mapping:
                 continue
-            if resolve_annotated(parameter.annotation) is UnknownTokens:
-                continue
             if parameter.kind is parameter.KEYWORD_ONLY:
                 break
             yield parameter
@@ -268,14 +264,6 @@ def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any]):
     return signature.bind(*f_pos, **f_kwargs)
 
 
-def _populate_unknown_tokens(f: Callable, tokens: List[str], mapping) -> List[str]:
-    for parameter in inspect.signature(f).parameters.values():
-        if parameter.annotation is UnknownTokens:
-            mapping[parameter] = tokens
-            return []
-    return tokens
-
-
 def _create_bound_arguments(
     f: Callable,
     tokens: List[str],
@@ -288,8 +276,6 @@ def _create_bound_arguments(
 
     try:
         unused_tokens = _parse_pos(f, unused_tokens, mapping)
-
-        _populate_unknown_tokens(f, unused_tokens, mapping)
 
         coerced = {}
         for parameter, parameter_tokens in mapping.items():

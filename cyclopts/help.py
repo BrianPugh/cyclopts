@@ -1,15 +1,12 @@
 import inspect
-import typing
 from textwrap import dedent
 from typing import Callable, List, Optional, Tuple
 
 from rich import box
-from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from cyclopts.bind import UnknownTokens
 from cyclopts.parameter import get_hint_parameter, get_names
 
 
@@ -104,22 +101,17 @@ def format_commands(app, title):
     return panel
 
 
-def format_parameters(app, title):
+def format_parameters(app, title, hide_var_positional=False):
     panel, table = _create_panel_table(title=title)
 
     has_required, has_short = False, False  # noqa: F841
 
     if app.default_command:
-        parameters = []
-        for parameter in inspect.signature(app.default_command).parameters.values():
-            hint, param = get_hint_parameter(parameter.annotation)
-
-            if (typing.get_origin(hint) or hint) is UnknownTokens:
-                continue
-
-            parameters.append(parameter)
+        parameters = list(inspect.signature(app.default_command).parameters.values())
 
         def is_required(parameter):
+            if hide_var_positional and parameter.kind == parameter.VAR_POSITIONAL:
+                return False
             return parameter.default is parameter.empty
 
         has_required = any(is_required(p) for p in parameters)
@@ -132,6 +124,9 @@ def format_parameters(app, title):
         table.add_column(justify="left")
 
         for parameter in parameters:
+            if hide_var_positional and parameter.kind == parameter.VAR_POSITIONAL:
+                continue
+
             hint, param = get_hint_parameter(parameter.annotation)
             options = get_names(parameter)
             options.extend(param.get_negatives(hint, *options))

@@ -16,7 +16,7 @@ For that, you can use the meta-app feature of Cyclopts.
 
 .. code-block:: python
 
-   from cyclopts import App, UnknownTokens
+   from cyclopts import App
 
    app = App()
 
@@ -28,7 +28,7 @@ For that, you can use the meta-app feature of Cyclopts.
 
 
    @app.meta.default
-   def my_app_launcher(tokens: UnknownTokens, *, user: str):
+   def my_app_launcher(*tokens, user: str):
        print(f"Hello {user}")
        app(tokens)
 
@@ -43,4 +43,5 @@ For that, you can use the meta-app feature of Cyclopts.
    Looping! 1
    Looping! 2
 
-By annotating a parameter with the ``UnknownTokens`` type hint, cyclopts will pass along all unknown tokens as a list.
+The variable positional ``*tokens`` (with implicit type ``str``) will aggregate all remaining tokens.
+We can then pass them along to the primary ``app``.

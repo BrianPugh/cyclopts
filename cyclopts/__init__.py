@@ -8,12 +8,10 @@ __all__ = [
     "CycloptsError",
     "MissingArgumentError",
     "Parameter",
-    "UnknownTokens",
     "UnusedCliTokensError",
     "MultipleParameterAnnotationError",
 ]
 
-from cyclopts.bind import UnknownTokens
 from cyclopts.core import App
 from cyclopts.exceptions import (
     CoercionError,
