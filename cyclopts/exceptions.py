@@ -1,3 +1,4 @@
+import difflib
 import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
@@ -55,16 +56,32 @@ class CycloptsError(Exception):
             return ""
 
 
-class UnreachableError(CycloptsError):
-    """Code-block should be unreachable."""
-
-
 class CoercionError(CycloptsError):
-    pass
+    """There was an error performing automatic type coercion."""
 
 
 class CommandCollisionError(CycloptsError):
-    pass
+    """A command with the same name has already been registered to the app."""
+
+
+class InvalidCommandError(CycloptsError):
+    """CLI token combination did not yield a valid command.
+
+    If defaulting to a nonexistent ``default_command``, and there are
+    still unknown tokens, then this should be raised instead of printing help.
+    """
+
+    def __str__(self):
+        assert self.unused_tokens
+        token = self.unused_tokens[0]
+        response = super().__str__() + f'Unable to interpret valid command from "{token}".'
+
+        if self.app:
+            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.8)
+            if close_matches:
+                response += f' Did you mean "{close_matches[0]}"?'
+
+        return response
 
 
 @define(kw_only=True)
@@ -72,8 +89,7 @@ class UnusedCliTokensError(CycloptsError):
     unused_tokens: List[str]
 
     def __str__(self):
-        s = super().__str__()
-        return s + f"Unused Tokens: {self.unused_tokens}"
+        return super().__str__() + f"Unused Tokens: {self.unused_tokens}."
 
 
 @define(kw_only=True)
@@ -108,11 +124,16 @@ class MissingArgumentError(CycloptsError):
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")
 
-        return " ".join(strings)
+        return super().__str__() + " ".join(strings)
 
 
 class MultipleParameterAnnotationError(CycloptsError):
-    pass
+    """Multiple ``cyclopts.Parameter`` objects found in type annotation.
+
+    For example:
+
+        def foo(a: Annotated[int, Parameter(), Parameter()])
+    """
 
 
 def format_cyclopts_error(e: CycloptsError):

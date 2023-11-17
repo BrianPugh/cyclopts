@@ -6,7 +6,7 @@ from attrs import field, frozen
 from typing_extensions import Annotated
 
 from cyclopts.coercion import coerce, resolve
-from cyclopts.exceptions import MultipleParameterAnnotationError, UnreachableError
+from cyclopts.exceptions import MultipleParameterAnnotationError
 
 
 def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
@@ -78,7 +78,7 @@ class Parameter:
                 continue
             else:
                 # Should never reach here.
-                raise UnreachableError
+                raise NotImplementedError("All parameters should have started with '-' or '--'.")
 
             if type_ is bool:
                 negative_word = "no"

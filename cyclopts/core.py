@@ -13,6 +13,7 @@ from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
+    InvalidCommandError,
     UnusedCliTokensError,
     format_cyclopts_error,
 )
@@ -213,12 +214,15 @@ class App:
 
             if self.default_command:
                 command = self.default_command
-                bound, remaining_tokens = create_bound_arguments(command, unused_tokens)
-                return command, bound, remaining_tokens
+                bound, unused_tokens = create_bound_arguments(command, unused_tokens)
+                return command, bound, unused_tokens
             else:
-                command = self.help_print
-                bound = inspect.signature(command).bind(tokens=tokens)
-                return command, bound, []
+                if unused_tokens:
+                    raise InvalidCommandError(unused_tokens=unused_tokens)
+                else:
+                    command = self.help_print
+                    bound = inspect.signature(command).bind(tokens=tokens)
+                    return command, bound, []
         except CycloptsError as e:
             e.app = app
             if command_chain:
