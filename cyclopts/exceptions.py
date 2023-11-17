@@ -15,9 +15,28 @@ def _get_function_info(func):
     return inspect.getsourcefile(func), inspect.getsourcelines(func)[1]
 
 
+class CommandCollisionError:
+    """A command with the same name has already been registered to the app."""
+
+    # This doesn't derive from CycloptsError since this is a developer error
+    # rather than a runtime error.
+
+
+class MultipleParameterAnnotationError:
+    """Multiple ``cyclopts.Parameter`` objects found in type annotation.
+
+    For example:
+
+        def foo(a: Annotated[int, Parameter(), Parameter()])
+    """
+
+    # This doesn't derive from CycloptsError since this is a developer error
+    # rather than a runtime error.
+
+
 @define(kw_only=True)
 class CycloptsError(Exception):
-    """Root exception."""
+    """Root exception for runtime errors."""
 
     msg: Optional[str] = None
 
@@ -74,10 +93,6 @@ class CoercionError(CycloptsError):
             response += f' for "{parameter_cli_name}"'
 
         return super().__str__() + response + "."
-
-
-class CommandCollisionError(CycloptsError):
-    """A command with the same name has already been registered to the app."""
 
 
 class InvalidCommandError(CycloptsError):
@@ -141,15 +156,6 @@ class MissingArgumentError(CycloptsError):
             strings.append(f" Parsed: {self.tokens_so_far}.")
 
         return super().__str__() + " ".join(strings)
-
-
-class MultipleParameterAnnotationError(CycloptsError):
-    """Multiple ``cyclopts.Parameter`` objects found in type annotation.
-
-    For example:
-
-        def foo(a: Annotated[int, Parameter(), Parameter()])
-    """
 
 
 def format_cyclopts_error(e: CycloptsError):
