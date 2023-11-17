@@ -62,7 +62,7 @@ def _convert(type_, element):
             except Exception:
                 pass
         else:
-            raise CoercionError(msg=f"Error converting '{element}' to {type_}")
+            raise CoercionError(input_value=element, target_type=type_)
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
@@ -72,13 +72,13 @@ def _convert(type_, element):
             if res == choice:
                 return res
         else:
-            raise CoercionError(msg=f"Error converting '{element}' to {type_}")
+            raise CoercionError(input_value=element, target_type=type_)
     elif isclass(type_) and issubclass(type_, Enum):
         element_lower = element.lower()
         for member in type_:
             if member.name.lower() == element_lower:
                 return member
-        raise CoercionError(msg=f"Error converting '{element}' to {type_}")
+        raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in [list, set]:
         return origin_type(_convert(inner_types[0], e) for e in element)
     elif origin_type is tuple:
@@ -86,8 +86,8 @@ def _convert(type_, element):
     else:
         try:
             return _converters.get(type_, type_)(element)
-        except ValueError as e:
-            raise CoercionError(msg=f"Error converting '{element}' to {type_}") from e
+        except ValueError:
+            raise CoercionError(input_value=element, target_type=type_) from None
 
 
 _unsupported_target_types = {dict}

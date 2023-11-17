@@ -56,8 +56,24 @@ class CycloptsError(Exception):
             return ""
 
 
+@define(kw_only=True)
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
+
+    input_value: str
+    target_type: type
+
+    parameter: Optional[inspect.Parameter] = None
+
+    def __str__(self):
+        response = f'Error converting "{self.input_value}" to {self.target_type}'
+
+        if self.parameter:
+            assert self.parameter2cli is not None
+            parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
+            response += f' for "{parameter_cli_name}"'
+
+        return super().__str__() + response + "."
 
 
 class CommandCollisionError(CycloptsError):

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, g
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
+    CoercionError,
     CycloptsError,
     MissingArgumentError,
 )
@@ -301,16 +302,20 @@ def _create_bound_arguments(
                     coerced[parameter] = parameter_tokens[0]
                     break
             else:
-                if parameter.kind == parameter.VAR_KEYWORD:
-                    coerced[parameter] = {}
-                    for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
-                        val = p.converter(parameter.annotation, *values)
+                try:
+                    if parameter.kind == parameter.VAR_KEYWORD:
+                        coerced[parameter] = {}
+                        for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
+                            val = p.converter(parameter.annotation, *values)
+                            p.validator(parameter.annotation, val)
+                            coerced[parameter][key] = val
+                    else:
+                        val = p.converter(parameter.annotation, *parameter_tokens)
                         p.validator(parameter.annotation, val)
-                        coerced[parameter][key] = val
-                else:
-                    val = p.converter(parameter.annotation, *parameter_tokens)
-                    p.validator(parameter.annotation, val)
-                    coerced[parameter] = val
+                        coerced[parameter] = val
+                except CoercionError as e:
+                    e.parameter = parameter
+                    raise
 
         bound = _bind(f, coerced)
     except CycloptsError as e:
