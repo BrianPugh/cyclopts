@@ -1,6 +1,7 @@
 import inspect
 import shlex
 import sys
+from functools import lru_cache
 from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, get_origin
 
 from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
@@ -23,6 +24,7 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
+@lru_cache(maxsize=1)
 def cli2parameter(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
     """Creates a dictionary mapping CLI keywords to python keywords.
 
@@ -267,6 +269,7 @@ def _create_bound_arguments(
 ) -> Tuple[inspect.BoundArguments, Iterable[str]]:
     # Note: mapping is updated inplace
     mapping: Dict[inspect.Parameter, List[str]] = {}
+    cli2kw = cli2parameter(f)
     unused_tokens = _parse_kw_and_flags(f, tokens, mapping)
 
     try:

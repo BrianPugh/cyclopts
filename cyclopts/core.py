@@ -207,10 +207,10 @@ class App:
 
         command_chain, app, unused_tokens = self._parse_command_chain(tokens)
 
-        if app is not self:
-            return app.parse_known_args(unused_tokens)
-
         try:
+            if app is not self:
+                return app.parse_known_args(unused_tokens)
+
             if self.default_command:
                 command = self.default_command
                 bound, remaining_tokens = create_bound_arguments(command, unused_tokens)
