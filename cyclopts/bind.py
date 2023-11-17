@@ -309,5 +309,5 @@ def create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.Boun
         return _create_bound_arguments(f, tokens)
     except CycloptsError as e:
         e.target = f
-        e.input_tokens = tokens
+        e.root_input_tokens = tokens
         raise

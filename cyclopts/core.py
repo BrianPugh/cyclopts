@@ -270,7 +270,7 @@ class App:
             self.parse_special_flags(tokens)
             command, bound = self.parse_args(tokens)
         except CycloptsError as e:
-            e.input_tokens = tokens
+            e.root_input_tokens = tokens
             if print_error:
                 if console is None:
                     console = Console()
