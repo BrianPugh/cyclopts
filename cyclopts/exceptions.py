@@ -66,7 +66,7 @@ class CoercionError(CycloptsError):
     parameter: Optional[inspect.Parameter] = None
 
     def __str__(self):
-        response = f'Error converting "{self.input_value}" to {self.target_type}'
+        response = f'Error converting value "{self.input_value}" to {self.target_type}'
 
         if self.parameter:
             assert self.parameter2cli is not None
