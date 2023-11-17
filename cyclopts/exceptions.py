@@ -85,10 +85,25 @@ class MissingArgumentError(CycloptsError):
         # TODO: need to go from parameter -> cli_name
 
         count = token_count(self.parameter.annotation)
-        if self.command_chain:
-            return f'Command "{" ".join(self.command_chain)}"\'s parameter "{self.parameter.name}" requires {count} arguments. Parsed: {self.tokens_so_far}'
+        if count == 0:
+            required_string = "flag required"
+        elif count == 1:
+            required_string = "requires an argument"
         else:
-            return f'Parameter "{self.parameter.name}" requires {count} arguments. Parsed: {self.tokens_so_far}'
+            required_string = f"requires {count} arguments"
+
+        strings = []
+        if self.command_chain:
+            strings.append(
+                f'Command "{" ".join(self.command_chain)}"\'s parameter "{self.parameter.name}" {required_string}.'
+            )
+        else:
+            strings.append(f'Parameter "{self.parameter.name}" {required_string}.')
+
+        if self.verbose:
+            strings.append(f" Parsed: {self.tokens_so_far}.")
+
+        return " ".join(strings)
 
 
 class MultipleParameterAnnotationError(CycloptsError):
