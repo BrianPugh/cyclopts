@@ -220,6 +220,7 @@ class App:
                 bound = inspect.signature(command).bind(tokens=tokens)
                 return command, bound, []
         except CycloptsError as e:
+            e.app = app
             if command_chain:
                 e.command_chain = command_chain
             raise

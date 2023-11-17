@@ -1,10 +1,13 @@
 import inspect
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from attrs import define, field
 from rich import box
 from rich.panel import Panel
 from rich.text import Text
+
+if TYPE_CHECKING:
+    from cyclopts.core import App
 
 
 def _get_function_info(func):
@@ -25,6 +28,8 @@ class CycloptsError(Exception):
 
     # Tokens that led up to the actual command being executed.
     command_chain: Optional[List[str]] = None
+
+    app: Optional["App"] = None
 
     def __str__(self):
         if self.msg is not None:
