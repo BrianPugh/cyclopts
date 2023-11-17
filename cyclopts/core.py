@@ -191,6 +191,15 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
+
+        Returns
+        -------
+        command: Callable
+            Bare function to execute.
+        bound: inspect.BoundArguments
+            Bound arguments for ``command``.
+        remaining_tokens: List[str]
+            Any remaining CLI tokens.
         """
         tokens = normalize_tokens(tokens)
 
@@ -266,8 +275,8 @@ class App:
                 sys.exit(1)
             else:
                 raise
-        else:
-            return command(*bound.args, **bound.kwargs)
+
+        return command(*bound.args, **bound.kwargs)
 
     def help_print(
         self,
