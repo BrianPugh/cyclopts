@@ -23,6 +23,9 @@ class CycloptsError(Exception):
     unused_tokens: Optional[List[str]] = None
     target: Optional[Callable] = None
 
+    # Tokens that led up to the actual command being executed.
+    command_chain: Optional[List[str]] = None
+
     def __str__(self):
         if self.msg is not None:
             return self.msg

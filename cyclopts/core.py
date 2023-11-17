@@ -210,14 +210,19 @@ class App:
         if app is not self:
             return app.parse_known_args(unused_tokens)
 
-        if self.default_command:
-            command = self.default_command
-            bound, remaining_tokens = create_bound_arguments(command, unused_tokens)
-            return command, bound, remaining_tokens
-        else:
-            command = self.help_print
-            bound = inspect.signature(command).bind(tokens=tokens)
-            return command, bound, []
+        try:
+            if self.default_command:
+                command = self.default_command
+                bound, remaining_tokens = create_bound_arguments(command, unused_tokens)
+                return command, bound, remaining_tokens
+            else:
+                command = self.help_print
+                bound = inspect.signature(command).bind(tokens=tokens)
+                return command, bound, []
+        except CycloptsError as e:
+            if command_chain:
+                e.command_chain = command_chain
+            raise
 
     def parse_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple[Callable, inspect.BoundArguments]:
         """Interpret arguments into a function and BoundArguments.
