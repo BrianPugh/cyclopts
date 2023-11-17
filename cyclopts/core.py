@@ -114,6 +114,19 @@ class App:
             )
         return self._meta
 
+    def _parse_command_chain(self, tokens):
+        command_chain = []
+        command_mapping = self._commands
+        app = self
+        for token in tokens:
+            try:
+                app = command_mapping[token]
+            except KeyError:
+                break
+            command_mapping = app._commands
+            command_chain.append(token)
+        return command_chain, app
+
     def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
         """Decorator to register a function as a CLI command."""
         if obj is None:  # Called ``@app.command``
@@ -265,16 +278,7 @@ class App:
         if console is None:
             console = Console()
 
-        command_chain = []
-        command_mapping = self._commands
-        app = self
-        for token in tokens:
-            try:
-                app = command_mapping[token]
-            except KeyError:
-                break
-            command_mapping = app._commands
-            command_chain.append(token)
+        command_chain, app = self._parse_command_chain(tokens)
 
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
