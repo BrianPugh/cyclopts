@@ -251,10 +251,12 @@ class App:
             Otherwise, continue to raise the exception.
             Defaults to ``True``.
         """
+        tokens = normalize_tokens(tokens)
         try:
             self.parse_special_flags(tokens)
             command, bound = self.parse_args(tokens)
         except CycloptsError as e:
+            e.input_tokens = tokens
             if print_error:
                 if console is None:
                     console = Console()
