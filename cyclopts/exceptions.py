@@ -95,7 +95,7 @@ class MissingArgumentError(CycloptsError):
         strings = []
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}"\'s parameter "{self.parameter.name}" {required_string}.'
+                f'Command "{" ".join(self.command_chain)}" parameter "{self.parameter.name}" {required_string}.'
             )
         else:
             strings.append(f'Parameter "{self.parameter.name}" {required_string}.')
