@@ -249,6 +249,7 @@ class App:
         console: Optional[Console] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
+        verbose: bool = False,
     ):
         """Interprets and executes a command.
 
@@ -264,12 +265,16 @@ class App:
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
             Defaults to ``True``.
+        verbose: bool
+            Populate exception strings with more information intended for developers.
+            Defaults to ``False``.
         """
         tokens = normalize_tokens(tokens)
         try:
             self.parse_special_flags(tokens)
             command, bound = self.parse_args(tokens)
         except CycloptsError as e:
+            e.verbose = verbose
             e.root_input_tokens = tokens
             if print_error:
                 if console is None:

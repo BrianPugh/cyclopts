@@ -45,9 +45,12 @@ class CycloptsError(Exception):
             if self.root_input_tokens is not None:
                 strings.append(f"Root Input Tokens: {self.root_input_tokens}")
         else:
-            raise NotImplementedError
+            pass
 
-        return "\n".join(strings) + "\n"
+        if strings:
+            return "\n".join(strings) + "\n"
+        else:
+            return ""
 
 
 class UnreachableError(CycloptsError):
