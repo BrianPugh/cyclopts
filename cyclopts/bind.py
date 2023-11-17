@@ -70,7 +70,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
     if kwargs_parameter:
         mapping[kwargs_parameter] = {}
 
-    remaining_tokens = []
+    unused_tokens = []
 
     # Parse All Keyword Arguments & Flags
     skip_next_iterations = 0
@@ -81,7 +81,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
             continue
 
         if not token.startswith("-"):
-            remaining_tokens.append(token)
+            unused_tokens.append(token)
             continue
 
         cli_values = []
@@ -101,7 +101,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                             cli_values.append(tokens[i + 1 + j])
                     except IndexError:
                         # This could be a flag downstream
-                        remaining_tokens.append(token)
+                        unused_tokens.append(token)
                         continue
 
                     key = _cli_kw_to_f_kw(cli_key)
@@ -109,7 +109,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     mapping[kwargs_parameter][key].extend(cli_values)
                     skip_next_iterations = consume_count - 1
                 else:
-                    remaining_tokens.append(token)
+                    unused_tokens.append(token)
                 continue
 
             consume_count = max(1, token_count(parameter.annotation))
@@ -119,7 +119,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     cli_values.append(tokens[i + 1 + j])
             except IndexError:
                 # This could be a flag downstream
-                remaining_tokens.append(token)
+                unused_tokens.append(token)
                 continue
             skip_next_iterations = consume_count - 1
         else:
@@ -137,7 +137,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                         skip_next_iterations = consume_count
                     except IndexError:
                         # This could be a flag downstream
-                        remaining_tokens.append(token)
+                        unused_tokens.append(token)
                         continue
 
                     key = _cli_kw_to_f_kw(cli_key)
@@ -145,7 +145,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     mapping[kwargs_parameter][key].extend(cli_values)
                     continue
                 else:
-                    remaining_tokens.append(cli_key)
+                    unused_tokens.append(cli_key)
                     continue
             else:
                 if implicit_value is not None:
@@ -159,13 +159,13 @@ def _parse_kw_and_flags(f, tokens, mapping):
                         skip_next_iterations = consume_count
                     except IndexError:
                         # This could be a flag downstream
-                        remaining_tokens.append(token)
+                        unused_tokens.append(token)
                         continue
 
         mapping.setdefault(parameter, [])
         mapping[parameter].extend(cli_values)
 
-    return remaining_tokens
+    return unused_tokens
 
 
 def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
@@ -175,6 +175,8 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
     def remaining_parameters():
         for parameter in signature.parameters.values():
             if parameter in mapping:
+                continue
+            if resolve_annotated(parameter.annotation) is UnknownTokens:
                 continue
             if parameter.kind is parameter.KEYWORD_ONLY:
                 break
@@ -251,43 +253,55 @@ def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any]):
     return signature.bind(*f_pos, **f_kwargs)
 
 
-def _create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.BoundArguments, Iterable[str]]:
-    # Note: mapping is updated inplace
-    mapping: Dict[inspect.Parameter, List[str]] = {}
-    remaining_tokens = _parse_kw_and_flags(f, tokens, mapping)
-
+def _populate_unknown_tokens(f: Callable, tokens: List[str], mapping) -> List[str]:
     for parameter in inspect.signature(f).parameters.values():
         if parameter.annotation is UnknownTokens:
-            mapping[parameter] = remaining_tokens
-            remaining_tokens = []
-            break
+            mapping[parameter] = tokens
+            return []
+    return tokens
 
-    # TODO: should this be before checking for UnknownTokens?
-    remaining_tokens = _parse_pos(f, remaining_tokens, mapping)
 
-    coerced = {}
-    for parameter, parameter_tokens in mapping.items():
-        _, p = get_hint_parameter(parameter.annotation)
+def _create_bound_arguments(
+    f: Callable,
+    tokens: List[str],
+) -> Tuple[inspect.BoundArguments, Iterable[str]]:
+    # Note: mapping is updated inplace
+    mapping: Dict[inspect.Parameter, List[str]] = {}
+    unused_tokens = _parse_kw_and_flags(f, tokens, mapping)
 
-        # This is a little jank, but works for all current use-cases
-        for parameter_token in parameter_tokens:
-            if not isinstance(parameter_token, str):
-                coerced[parameter] = parameter_tokens[0]
-                break
-        else:
-            if parameter.kind == parameter.VAR_KEYWORD:
-                coerced[parameter] = {}
-                for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
-                    val = p.converter(parameter.annotation, *values)
-                    p.validator(parameter.annotation, val)
-                    coerced[parameter][key] = val
+    try:
+        unused_tokens = _parse_pos(f, unused_tokens, mapping)
+
+        _populate_unknown_tokens(f, unused_tokens, mapping)
+
+        coerced = {}
+        for parameter, parameter_tokens in mapping.items():
+            _, p = get_hint_parameter(parameter.annotation)
+
+            # Checking if parameter_token is a string is a little jank,
+            # but works for all current use-cases
+            for parameter_token in parameter_tokens:
+                if not isinstance(parameter_token, str):
+                    coerced[parameter] = parameter_tokens[0]
+                    break
             else:
-                val = p.converter(parameter.annotation, *parameter_tokens)
-                p.validator(parameter.annotation, val)
-                coerced[parameter] = val
+                if parameter.kind == parameter.VAR_KEYWORD:
+                    coerced[parameter] = {}
+                    for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
+                        val = p.converter(parameter.annotation, *values)
+                        p.validator(parameter.annotation, val)
+                        coerced[parameter][key] = val
+                else:
+                    val = p.converter(parameter.annotation, *parameter_tokens)
+                    p.validator(parameter.annotation, val)
+                    coerced[parameter] = val
 
-    bound = _bind(f, coerced)
-    return bound, remaining_tokens
+        bound = _bind(f, coerced)
+    except CycloptsError as e:
+        e.unused_tokens = unused_tokens
+        raise
+
+    return bound, unused_tokens
 
 
 def create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.BoundArguments, Iterable[str]]:
@@ -295,5 +309,5 @@ def create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.Boun
         return _create_bound_arguments(f, tokens)
     except CycloptsError as e:
         e.target = f
-        e.tokens = tokens
+        e.input_tokens = tokens
         raise

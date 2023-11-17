@@ -16,7 +16,11 @@ class CycloptsError(Exception):
     """Root exception."""
 
     msg: Optional[str] = None
-    tokens: Optional[List[str]] = None
+
+    verbose: bool = True
+
+    input_tokens: Optional[List[str]] = None
+    unused_tokens: Optional[List[str]] = None
     target: Optional[Callable] = None
 
     def __str__(self):
@@ -24,15 +28,18 @@ class CycloptsError(Exception):
             return self.msg
 
         strings = []
-        if self.target:
-            file, lineno = _get_function_info(self.target)
-            strings.append(
-                "Error parsing tokens for function\n"
-                f"    {self.target.__name__}{inspect.signature(self.target)}\n"
-                f'Defined in file "{file}", line {lineno}'
-            )
-        if self.tokens is not None:
-            strings.append(f"Input Tokens: {self.tokens}")
+        if self.verbose:
+            if self.target:
+                file, lineno = _get_function_info(self.target)
+                strings.append(
+                    "Error parsing tokens for function\n"
+                    f"    {self.target.__name__}{inspect.signature(self.target)}\n"
+                    f'Defined in file "{file}", line {lineno}'
+                )
+            if self.input_tokens is not None:
+                strings.append(f"Input Tokens: {self.input_tokens}")
+        else:
+            raise NotImplementedError
 
         return "\n".join(strings) + "\n"
 
@@ -42,10 +49,6 @@ class UnreachableError(CycloptsError):
 
 
 class CoercionError(CycloptsError):
-    pass
-
-
-class UnsupportedPositionalError(CycloptsError):
     pass
 
 
@@ -69,6 +72,8 @@ class MissingArgumentError(CycloptsError):
 
     def __str__(self):
         from cyclopts.coercion import token_count
+
+        # TODO: need to go from parameter -> cli_name
 
         count = token_count(self.parameter.annotation)
         s = super().__str__()
