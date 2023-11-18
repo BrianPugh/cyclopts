@@ -2,16 +2,10 @@ from textwrap import dedent
 from typing import List, Optional
 
 import pytest
-from rich.console import Console
 from typing_extensions import Annotated
 
 from cyclopts import App, Parameter
 from cyclopts.help import format_commands, format_doc, format_parameters, format_usage
-
-
-@pytest.fixture
-def console():
-    return Console(width=70, force_terminal=True, highlight=False, color_system=None)
 
 
 @pytest.fixture
