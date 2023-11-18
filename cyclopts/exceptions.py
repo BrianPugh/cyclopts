@@ -15,14 +15,14 @@ def _get_function_info(func):
     return inspect.getsourcefile(func), inspect.getsourcelines(func)[1]
 
 
-class CommandCollisionError:
+class CommandCollisionError(Exception):
     """A command with the same name has already been registered to the app."""
 
     # This doesn't derive from CycloptsError since this is a developer error
     # rather than a runtime error.
 
 
-class MultipleParameterAnnotationError:
+class MultipleParameterAnnotationError(Exception):
     """Multiple ``cyclopts.Parameter`` objects found in type annotation.
 
     For example:

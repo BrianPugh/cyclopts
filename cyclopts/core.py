@@ -150,7 +150,7 @@ class App:
         name = app._name_derived
 
         if name in self._commands:
-            raise CommandCollisionError(msg=f'Command "{name}" previously registered as {self._commands[name]}')
+            raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')
 
         self._commands[name] = app
         return obj
@@ -163,26 +163,11 @@ class App:
             raise TypeError("Cannot register a sub-App to default.")
 
         if self.default_command is not None:
-            raise CommandCollisionError(msg=f"Default command previously set to {self.default_command}.")
+            raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
         self.default_command = obj
 
         return obj
-
-    def parse_special_flags(self, tokens: Union[None, str, Iterable[str]] = None):
-        """Parse/Execute special flags like ``help`` and ``version``.
-
-        May not return.
-        """
-        tokens = normalize_tokens(tokens)
-
-        # Handle special flags here
-        if any(flag in tokens for flag in self.help_flags):
-            self.help_print(tokens)
-            sys.exit()
-        elif any(flag in tokens for flag in self.version_flags):
-            self.version_print()
-            sys.exit()
 
     def parse_known_args(self, tokens: Union[None, str, Iterable[str]] = None) -> Tuple:
         """Interpret arguments into a function, BoundArguments, and any remaining unknown arguments.
@@ -239,12 +224,26 @@ class App:
         UnusedCliTokensError
             If any tokens remain after parsing.
         """
-        command, bound, remaining_tokens = self.parse_known_args(tokens)
-        if remaining_tokens:
-            raise UnusedCliTokensError(
-                target=command,
-                unused_tokens=remaining_tokens,
-            )
+        tokens = normalize_tokens(tokens)
+
+        if any(flag in tokens for flag in self.help_flags):
+            # Help
+            command = self.help_print
+            bound = inspect.signature(command).bind(tokens)
+            unused_tokens = []
+        elif any(flag in tokens for flag in self.version_flags):
+            # Version
+            command = self.version_print
+            bound = inspect.signature(command).bind()
+            unused_tokens = []
+        else:
+            # Normal parsing
+            command, bound, unused_tokens = self.parse_known_args(tokens)
+            if unused_tokens:
+                raise UnusedCliTokensError(
+                    target=command,
+                    unused_tokens=unused_tokens,
+                )
         return command, bound
 
     def __call__(
@@ -275,7 +274,6 @@ class App:
         """
         tokens = normalize_tokens(tokens)
         try:
-            self.parse_special_flags(tokens)
             command, bound = self.parse_args(tokens)
         except CycloptsError as e:
             e.verbose = verbose
