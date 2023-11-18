@@ -9,6 +9,7 @@ from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
     MissingArgumentError,
+    UnknownKeywordError,
 )
 from cyclopts.parameter import get_hint_parameter, get_names
 
@@ -113,16 +114,14 @@ def _parse_kw_and_flags(f, tokens, mapping):
                         for j in range(consume_count - 1):
                             cli_values.append(tokens[i + 1 + j])
                     except IndexError:
-                        # This could be a flag downstream
-                        unused_tokens.append(token)
-                        continue
+                        raise MissingArgumentError(parameter=kwargs_parameter, tokens_so_far=cli_values) from None
 
                     key = _cli_kw_to_f_kw(cli_key)
                     mapping[kwargs_parameter].setdefault(key, [])
                     mapping[kwargs_parameter][key].extend(cli_values)
                     skip_next_iterations = consume_count - 1
                 else:
-                    unused_tokens.append(token)
+                    raise UnknownKeywordError(token=cli_key) from None
                 continue
 
             consume_count = max(1, token_count(parameter.annotation))
@@ -132,6 +131,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     cli_values.append(tokens[i + 1 + j])
             except IndexError:
                 # This could be a flag downstream
+                # TODO
                 unused_tokens.append(token)
                 continue
             skip_next_iterations = consume_count - 1
@@ -149,17 +149,14 @@ def _parse_kw_and_flags(f, tokens, mapping):
                             cli_values.append(tokens[i + 1 + j])
                         skip_next_iterations = consume_count
                     except IndexError:
-                        # This could be a flag downstream
-                        unused_tokens.append(token)
-                        continue
+                        raise MissingArgumentError(parameter=kwargs_parameter, tokens_so_far=cli_values) from None
 
                     key = _cli_kw_to_f_kw(cli_key)
                     mapping[kwargs_parameter].setdefault(key, [])
                     mapping[kwargs_parameter][key].extend(cli_values)
                     continue
                 else:
-                    unused_tokens.append(cli_key)
-                    continue
+                    raise UnknownKeywordError(token=cli_key) from None
             else:
                 if implicit_value is not None:
                     cli_values.append(implicit_value)
@@ -171,9 +168,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                             cli_values.append(tokens[i + 1 + j])
                         skip_next_iterations = consume_count
                     except IndexError:
-                        # This could be a flag downstream
-                        unused_tokens.append(token)
-                        continue
+                        raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
 
         mapping.setdefault(parameter, [])
         mapping[parameter].extend(cli_values)
@@ -272,9 +267,11 @@ def _create_bound_arguments(
     mapping: Dict[inspect.Parameter, List[str]] = {}
     c2p = cli2parameter(f)
     p2c = parameter2cli(f)
-    unused_tokens = _parse_kw_and_flags(f, tokens, mapping)
+
+    unused_tokens = None
 
     try:
+        unused_tokens = _parse_kw_and_flags(f, tokens, mapping)
         unused_tokens = _parse_pos(f, unused_tokens, mapping)
 
         coerced = {}

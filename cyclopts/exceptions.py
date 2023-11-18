@@ -76,6 +76,14 @@ class CycloptsError(Exception):
 
 
 @define(kw_only=True)
+class UnknownKeywordError(CycloptsError):
+    token: str
+
+    def __str__(self):
+        return super().__str__() + f"Unknown keyword: {self.token}"
+
+
+@define(kw_only=True)
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
 

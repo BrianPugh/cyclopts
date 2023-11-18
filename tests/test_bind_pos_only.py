@@ -3,6 +3,7 @@ import inspect
 import pytest
 
 from cyclopts import CoercionError, MissingArgumentError
+from cyclopts.exceptions import UnknownKeywordError
 
 
 @pytest.mark.parametrize(
@@ -48,7 +49,7 @@ def test_pos_only(app, cmd_str):
 @pytest.mark.parametrize(
     "cmd_str_e",
     [
-        ("foo 1 2 --c=3", CoercionError),
+        ("foo 1 2 --c=3", UnknownKeywordError),
     ],
 )
 def test_pos_only_exceptions(app, cmd_str_e):
