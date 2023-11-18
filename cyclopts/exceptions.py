@@ -136,10 +136,13 @@ class MissingArgumentError(CycloptsError):
         count = token_count(self.parameter.annotation)
         if count == 0:
             required_string = "flag required"
+            only_got_string = ""
         elif count == 1:
             required_string = "requires an argument"
+            only_got_string = ""
         else:
             required_string = f"requires {count} arguments"
+            only_got_string = f" Only got {len(self.tokens_so_far)}."
 
         assert self.parameter2cli is not None
         parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
@@ -147,10 +150,10 @@ class MissingArgumentError(CycloptsError):
         strings = []
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{parameter_cli_name}" {required_string}.'
+                f'Command "{" ".join(self.command_chain)}" parameter "{parameter_cli_name}" {required_string}.{only_got_string}'
             )
         else:
-            strings.append(f'Parameter "{parameter_cli_name}" {required_string}.')
+            strings.append(f'Parameter "{parameter_cli_name}" {required_string}.{only_got_string}')
 
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")
