@@ -140,6 +140,27 @@ def test_help_format_parameters(app, console):
     assert actual == expected
 
 
+def test_help_format_parameters_short_name(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[str, Parameter(name=["--foo", "-f"], help="Docstring for foo.")],
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO,--foo  -f  Docstring for foo. [required]                    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_parameters_bool_flag(app, console):
     @app.command
     def cmd(

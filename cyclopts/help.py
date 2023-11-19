@@ -104,7 +104,7 @@ def format_commands(app, title):
 def format_parameters(app, title, hide_var_positional=False):
     panel, table = _create_panel_table(title=title)
 
-    has_required, has_short = False, False  # noqa: F841
+    has_required, has_short = False, False
 
     if app.default_command:
         parameters = list(inspect.signature(app.default_command).parameters.values())
@@ -114,13 +114,21 @@ def format_parameters(app, title, hide_var_positional=False):
                 return False
             return parameter.default is parameter.empty
 
+        def is_short(s):
+            return not s.startswith("--") and s.startswith("-")
+
         has_required = any(is_required(p) for p in parameters)
+
+        for p in parameters:
+            has_short = any(is_short(x) for x in get_names(p))
+            if has_short:
+                break
 
         if has_required:
             table.add_column(justify="left", width=1, style="red bold")
         table.add_column(justify="left", no_wrap=True, style="cyan")
-        # if has_short:
-        #    table.add_column(justify="left", width=max(len(x) for x in options_short) + 1, style="green")
+        if has_short:
+            table.add_column(justify="left", no_wrap=True, style="green")
         table.add_column(justify="left")
 
         for parameter in parameters:
@@ -136,6 +144,13 @@ def format_parameters(app, title, hide_var_positional=False):
                 if arg_name != options[0]:
                     options = [arg_name, *options]
 
+            short_options, long_options = [], []
+            for option in options:
+                if is_short(option):
+                    short_options.append(option)
+                else:
+                    long_options.append(option)
+
             help_components = []
             if param.help:
                 help_components.append(param.help)
@@ -148,9 +163,9 @@ def format_parameters(app, title, hide_var_positional=False):
             row_args = []
             if has_required:
                 row_args.append("*" if is_required(parameter) else "")
-            row_args.append(",".join(options) + " ")  # a little extra padding
-            # if has_short:
-            #     row_args.append(option_short)
+            row_args.append(",".join(long_options) + " ")  # a little extra padding
+            if has_short:
+                row_args.append(",".join(short_options) + " ")  # a little extra padding
             row_args.append(" ".join(help_components))
             table.add_row(*row_args)
 
