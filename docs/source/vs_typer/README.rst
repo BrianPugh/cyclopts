@@ -27,6 +27,7 @@ This section was written about the current version of Typer: ``v0.9.0``.
    optional_list/README.rst
    help_defaults/README.rst
    flag_negation/README.rst
+   validation/README.rst
    union_support/README.rst
    version_flag/README.rst
    unit_testing/README.rst

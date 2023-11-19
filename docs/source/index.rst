@@ -13,6 +13,7 @@ Cyclopts
    getting_started.rst
    commands.rst
    vs_typer/README.rst
+   rules.rst
 
 
 .. toctree::
@@ -20,5 +21,5 @@ Cyclopts
    :caption: Advanced Usage
 
    meta_app.rst
-   rules.rst
+   command_chaining.rst
    api
