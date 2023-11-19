@@ -1,6 +1,6 @@
 import inspect
 import typing
-from typing import Callable, Iterable, List, Optional, Tuple, Union, get_origin
+from typing import Any, Callable, Iterable, List, Optional, Protocol, Tuple, Type, Union, get_origin
 
 from attrs import field, frozen
 from typing_extensions import Annotated
@@ -26,9 +26,52 @@ def _default_validator(type_, arg):
     pass
 
 
+class Converter(Protocol):
+    def __call__(self, type: Type, *args: str) -> Any:
+        ...
+
+
+class Validator(Protocol):
+    def __call__(self, type: Type, args: Any) -> None:
+        ...
+
+
 @frozen
 class Parameter:
-    """User-facing parameter annotation."""
+    """Additional cyclopts configuration for individual function parameters.
+
+    Parameters
+    ----------
+    name: Union[str, Iterable[str]]
+        Defaults to the python parameter's name, prepended with ``--``.
+    negative: Union[None, str, Iterable[str]]
+        Name(s) for empty iterables or false boolean flags.
+        For booleans, defaults to ``--no-{name}``.
+        For iterables, defaults to ``--empty-{name}``.
+        Set to an empty list to disable this feature.
+    help: str
+       Help string to be displayed in the help page.
+    show_default: bool
+        If a variable has a default, display the default in the help page.
+        Defaults to ``True``.
+    converter: Optional[Converter]
+        A function that converts string token(s) into an object. The converter must have signature:
+
+        .. code-block:: python
+
+            def converter(type_, *args) -> Any:
+                pass
+
+        where ``Any`` is the intended type of the annotated variable.
+        If not provided, defaults to Cyclopts's coercion engine.
+    validator: Validator
+        A function that validates data returned by the ``converter``.
+
+        .. code-block:: python
+
+            def converter(type_, data: Any) -> None:
+                pass  # Raise any exception here if data is invalid.
+    """
 
     # User Options
 
@@ -45,7 +88,7 @@ class Parameter:
     # tokens that were parsed to be associated with this parameter.
     # Typically this is a single token.
     # The returned value will be supplied to the command.
-    converter: Callable = field(default=coerce)
+    converter: Converter = field(default=coerce)
 
     # User provided validator function with signatre:
     #
@@ -53,7 +96,7 @@ class Parameter:
     #        pass
     #
     # The validator (if provided) will be invoked AFTER the converter/implicit-coercion.
-    validator: Callable = field(default=_default_validator)
+    validator: Validator = field(default=_default_validator)
 
     negative: Optional[Tuple[str, ...]] = field(default=None, converter=_optional_str_to_tuple_converter)
 

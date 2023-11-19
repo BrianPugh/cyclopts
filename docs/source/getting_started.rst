@@ -5,9 +5,9 @@ Getting Started
 Cyclopts heavily relies on function parameter type hints.
 If you are new to type hints or need a refresher, `checkout the mypy cheatsheet`_.
 
-----------
-Bare Bones
-----------
+----------------------------
+A Basic Cyclopts Application
+----------------------------
 
 The most bare-bones Cyclopts application is as follows:
 
@@ -42,8 +42,8 @@ All Cyclopts applications start with the ``cyclopts.App`` object.
 
    app = cyclopts.App()
 
-While the ``App`` class offers various configuration options, we'll delve into those in the advanced guides.
-The key method here is ``default``, which registers a function as the default action.
+The ``App`` class offers various configuration options that we'll investigate in future guides.
+The ``app`` object has a decorator method, ``default``, which registers a function as the default action.
 In this example, the ``main`` function is our default, and is executed when no command is provided.
 
 ------------------

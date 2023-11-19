@@ -79,7 +79,7 @@ autodoc_default_options = {
     "undoc-members": True,
     "exclude-members": "__weakref__",
 }
-autoclass_content = "init"
+autoclass_content = "class"
 
 # LinkCode
 code_url = f"https://github.com/BrianPugh/cyclopts/blob/{git_commit}"

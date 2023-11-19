@@ -50,10 +50,29 @@ def _validate_default_command(x):
 
 @define(kw_only=True)
 class App:
-    # Name of the Program
+    """Cyclopts Application.
+
+    Parameters
+    ----------
+    name: Optional[str]
+        Name of application.
+        If not provided, defaults to ``sys.argv[0]``.
+    version: Optional[str]
+        Version to be displayed when a token of ``version_flags`` is encountered.
+        Defaults to attempting to derive version from package instantiating ``App``.
+    version_flags : Iterable[str]
+        Tokens that trigger ``version_print``.
+        Set to an empty list to disable version feature.
+        Defaults to ``["--version"]``
+    help_flags : Iterable[str]
+        Tokens that trigger ``help_print``.
+        Set to an empty list to disable help feature.
+        Defaults to ``["--help", "-h"]``
+    """
+
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
 
-    name: Optional[str] = None  # field(default=Factory(_default_name, takes_self=True))
+    name: Optional[str] = None
 
     version: str = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
@@ -100,6 +119,7 @@ class App:
         return help.split("\n", 1)[0]
 
     def version_print(self) -> None:
+        """Print the application version."""
         print(self.version)
 
     def __getitem__(self, key: str) -> Callable:
@@ -156,6 +176,7 @@ class App:
         return obj
 
     def default(self, obj=None):
+        """Decorator to register a function as the default handler."""
         if obj is None:  # Called ``@app.default_command``
             return self.default
 
@@ -174,8 +195,8 @@ class App:
 
         Does **NOT** handle special flags.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
@@ -256,8 +277,8 @@ class App:
     ):
         """Interprets and executes a command.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
