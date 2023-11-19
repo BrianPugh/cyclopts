@@ -7,6 +7,7 @@ __all__ = [
     "CommandCollisionError",
     "Converter",
     "CycloptsError",
+    "ValidationError",
     "MissingArgumentError",
     "MultipleParameterAnnotationError",
     "Parameter",
@@ -22,5 +23,6 @@ from cyclopts.exceptions import (
     MissingArgumentError,
     MultipleParameterAnnotationError,
     UnusedCliTokensError,
+    ValidationError,
 )
 from cyclopts.parameter import Converter, Parameter, Validator

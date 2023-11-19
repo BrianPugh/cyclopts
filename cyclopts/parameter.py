@@ -27,12 +27,12 @@ def _default_validator(type_, arg):
 
 
 class Converter(Protocol):
-    def __call__(self, type: Type, *args: str) -> Any:
+    def __call__(self, type_: Type, *args: str) -> Any:
         ...
 
 
 class Validator(Protocol):
-    def __call__(self, type: Type, args: Any) -> None:
+    def __call__(self, type_: Type, value: Any) -> None:
         ...
 
 
@@ -69,7 +69,7 @@ class Parameter:
 
         .. code-block:: python
 
-            def converter(type_, data: Any) -> None:
+            def validator(type_, value: Any) -> None:
                 pass  # Raise any exception here if data is invalid.
     """
 

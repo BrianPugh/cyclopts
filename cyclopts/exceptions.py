@@ -76,6 +76,15 @@ class CycloptsError(Exception):
 
 
 @define(kw_only=True)
+class ValidationError(CycloptsError):
+    msg: str = ""
+    parameter: Optional[inspect.Parameter] = None
+
+    def __str__(self):
+        return super().__str__() + self.msg
+
+
+@define(kw_only=True)
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
 

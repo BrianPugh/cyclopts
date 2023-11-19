@@ -9,6 +9,7 @@ from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
     MissingArgumentError,
+    ValidationError,
 )
 from cyclopts.parameter import get_hint_parameter, get_names
 
@@ -289,6 +290,7 @@ def _create_bound_arguments(
                     break
             else:
                 try:
+                    # TODO: catch/raise validator errors to be cycloptserror
                     if parameter.kind == parameter.VAR_KEYWORD:
                         coerced[parameter] = {}
                         for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
@@ -302,6 +304,9 @@ def _create_bound_arguments(
                 except CoercionError as e:
                     e.parameter = parameter
                     raise
+                except (AssertionError, ValueError, TypeError) as e:
+                    new_exception = ValidationError(msg=e.args[0], parameter=parameter)
+                    raise new_exception from e
 
         bound = _bind(f, coerced)
     except CycloptsError as e:

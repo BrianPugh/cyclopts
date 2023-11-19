@@ -3,7 +3,7 @@ import inspect
 import pytest
 from typing_extensions import Annotated
 
-from cyclopts import Parameter
+from cyclopts import Parameter, ValidationError
 
 
 def test_custom_converter(app):
@@ -23,8 +23,8 @@ def test_custom_converter(app):
 
 
 def test_custom_validator(app):
-    def custom_validator(type_, arg):
-        if not (0 < arg < 150):
+    def custom_validator(type_, value):
+        if not (0 < value < 150):
             raise ValueError("An unreasonable age was entered.")
 
     @app.default
@@ -38,13 +38,13 @@ def test_custom_validator(app):
     assert actual_command == foo
     assert actual_bind == expected_bind
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         app.parse_args("200")
 
 
 def test_custom_converter_and_validator(app):
-    def custom_validator(type_, arg):
-        if not (0 < arg < 150):
+    def custom_validator(type_, value):
+        if not (0 < value < 150):
             raise ValueError("An unreasonable age was entered.")
 
     def custom_converter(type_, *args):
@@ -61,5 +61,5 @@ def test_custom_converter_and_validator(app):
     assert actual_command == foo
     assert actual_bind == expected_bind
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         app.parse_args("200")
