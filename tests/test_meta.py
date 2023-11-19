@@ -4,14 +4,16 @@ import pytest
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "a-value --b b-value --c=c-value-manual",
+        "1 --b 2 --c=c-value-manual --meta-flag",
+        "1 --b=2 --c=c-value-manual --meta-flag",
+        "1 --b=2 --c c-value-manual --meta-flag",
     ],
 )
 def test_meta_basic(app, cmd_str):
     @app.default
     def foo(a: int, b: int, c="c-value"):
-        assert a == "a-value"
-        assert b == "b-value"
+        assert a == 1
+        assert b == 2
         assert c == "c-value-manual"
 
     @app.meta.default
