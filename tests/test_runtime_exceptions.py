@@ -35,3 +35,15 @@ def test_runtime_exception_missing_parameter(app, console):
         '│ Parameter "--c" requires an argument.                              │\n'
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
+
+
+def test_runtime_exception_bad_command(app, console):
+    with console.capture() as capture, pytest.raises(CycloptsError):
+        app(["bad-command", "123"], exit_on_error=False, console=console)
+
+    actual = capture.get()
+    assert actual == (
+        "╭─ Error ────────────────────────────────────────────────────────────╮\n"
+        '│ Unable to interpret valid command from "bad-command".              │\n'
+        "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
