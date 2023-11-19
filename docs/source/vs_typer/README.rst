@@ -30,7 +30,6 @@ This section was written about the current version of Typer: ``v0.9.0``.
    union_support/README.rst
    version_flag/README.rst
    unit_testing/README.rst
-   command_chaining/README.rst
 
 
 .. _Typer: https://typer.tiangolo.com

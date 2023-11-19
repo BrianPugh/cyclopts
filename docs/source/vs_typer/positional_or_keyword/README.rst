@@ -1,7 +1,7 @@
 ===============================
 Positional or Keyword Arguments
 ===============================
-Following the `Argument vs Option`_ discussion, a limitation of Typer is that a parameter cannot be both positional and keyword.
+A limitation of Typer is that a parameter cannot be both positional and keyword.
 
 For example, lets say we want to implement a ``mv`` -like functionality that takes in a source path, and a destination path:
 
@@ -21,6 +21,7 @@ For example, lets say we want to implement a ``mv`` -like functionality that tak
 The code works when supplying the inputs as positional arguments, but fails when trying to specify them as keywords.
 
 .. code-block:: python
+
    print("Typer keyword:")
    typer_app(["--src", "foo", "--dst", "bar"], standalone_mode=False)
    # No such option: --src
