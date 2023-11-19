@@ -322,6 +322,7 @@ class App:
         self,
         prompt: str = "$ ",
         quit: Iterable[str] = ["q", "quit"],
+        **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
 
@@ -338,19 +339,24 @@ class App:
         else:  # Windows
             print("Interactive shell. Press Ctrl-Z followed by Enter to exit.")
 
+        kwargs.setdefault("exit_on_error", False)
+
         while True:
             try:
                 user_input = input(prompt)
             except EOFError:
                 break
 
-            split_user_input = shlex.split(user_input)
+            split_user_input = normalize_tokens(user_input)
             if not split_user_input:
                 continue
             if split_user_input[0] in quit:
                 break
 
             try:
-                self(split_user_input)
+                self(split_user_input, **kwargs)
+            except CycloptsError:
+                # Upstream __call__ already printed the error
+                pass
             except Exception as e:
                 print(e)
