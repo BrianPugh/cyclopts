@@ -108,21 +108,11 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 parameter, _ = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    consume_count = max(1, token_count(kwargs_parameter.annotation)[0])
-
-                    try:
-                        for j in range(consume_count - 1):
-                            cli_values.append(tokens[i + 1 + j])
-                    except IndexError:
-                        raise MissingArgumentError(parameter=kwargs_parameter, tokens_so_far=cli_values) from None
-
-                    key = _cli_kw_to_f_kw(cli_key)
-                    mapping[kwargs_parameter].setdefault(key, [])
-                    mapping[kwargs_parameter][key].extend(cli_values)
-                    skip_next_iterations = consume_count - 1
+                    parameter = kwargs_parameter
+                    cli_key = _cli_kw_to_f_kw(cli_key)
                 else:
                     unused_tokens.append(token)
-                continue
+                    continue
 
             consume_count = max(1, token_count(parameter.annotation)[0])
 
@@ -170,8 +160,12 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     except IndexError:
                         raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
 
-        mapping.setdefault(parameter, [])
-        mapping[parameter].extend(cli_values)
+        if parameter is kwargs_parameter:
+            mapping[parameter].setdefault(cli_key, [])
+            mapping[parameter][cli_key].extend(cli_values)
+        else:
+            mapping.setdefault(parameter, [])
+            mapping[parameter].extend(cli_values)
 
     return unused_tokens
 
