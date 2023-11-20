@@ -27,7 +27,6 @@ def test_bind_tuple_basic(app, cmd_str):
     assert actual_bind == expected_bind
 
 
-@pytest.mark.skip(reason="Need to implement solution.")
 @pytest.mark.parametrize(
     "cmd_str",
     [

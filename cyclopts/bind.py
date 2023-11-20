@@ -114,10 +114,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                         for j in range(consume_count - 1):
                             cli_values.append(tokens[i + 1 + j])
                     except IndexError:
-                        # TODO: this should actually raise an exception
-                        # This could be a flag downstream
-                        unused_tokens.append(token)
-                        continue
+                        raise MissingArgumentError(parameter=kwargs_parameter, tokens_so_far=cli_values) from None
 
                     key = _cli_kw_to_f_kw(cli_key)
                     mapping[kwargs_parameter].setdefault(key, [])
@@ -133,10 +130,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 for j in range(consume_count - 1):
                     cli_values.append(tokens[i + 1 + j])
             except IndexError:
-                # TODO: this should actually raise an exception
-                # This could be a flag downstream
-                unused_tokens.append(token)
-                continue
+                raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
             skip_next_iterations = consume_count - 1
         else:
             cli_key = token
@@ -174,10 +168,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                             cli_values.append(tokens[i + 1 + j])
                         skip_next_iterations = consume_count
                     except IndexError:
-                        # TODO: this should actually raise an exception
-                        # This could be a flag downstream
-                        unused_tokens.append(token)
-                        continue
+                        raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
 
         mapping.setdefault(parameter, [])
         mapping[parameter].extend(cli_values)
