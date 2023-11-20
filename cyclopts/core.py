@@ -155,19 +155,25 @@ class App:
         if obj is None:  # Called ``@app.command``
             return partial(self.command, **kwargs)
 
+        name = None
+
         if isinstance(obj, App):
             app = obj
+
+            if app.name is None:
+                name = kwargs.pop("name", None)
+                if name is None:
+                    raise ValueError("Sub-app MUST have a name specified.") from None
+
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
-
-            # Disable ``--version`` on sub-apps.
-            app.version_flags = []
         else:
             kwargs.setdefault("name", None)
             kwargs.setdefault("help", None)
             app = evolve(self, default_command=obj, **kwargs)
 
-        name = app._name_derived
+        if name is None:
+            name = app._name_derived
 
         if name in self._commands:
             raise CommandCollisionError(f'Command "{name}" previously registered as {self._commands[name]}')

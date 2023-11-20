@@ -1,3 +1,5 @@
+import pytest
+
 from cyclopts import App
 
 
@@ -24,3 +26,10 @@ def test_subapp_basic(app):
     assert -4 == app("bar fizz 1 2 3")
     assert 100 == app("bar buzz")
     assert 200 == app("bar 2")
+
+
+def test_subapp_must_have_name(app):
+    with pytest.raises(ValueError):
+        app.command(App())  # Failure on attempting to register an app without an explicit name.
+
+    app.command(App(), name="foo")  # However, this is fine.
