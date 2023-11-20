@@ -36,7 +36,7 @@ Save this as ``main.py`` and execute it to see:
 
 Let's dissect it step-by-step.
 
-All Cyclopts applications start with the ``cyclopts.App`` object.
+All Cyclopts applications start with a :class:`App <cyclopts.App>` object.
 
 .. code-block:: python
 

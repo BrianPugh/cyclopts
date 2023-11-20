@@ -46,7 +46,7 @@ To achieve this in Typer, we need the following `bulky implementation`_:
 
 Not only is this a lot of boilerplate, but it also has some nasty side-effects, such as impacting `whether or not you need to specify the command in a single-command program.`_
 
-With Cyclopts, the version is automatically detected by checking the package's version ``cyclopts.App`` is instantiated from. If you prefer explicitness, ``version`` can also be explicitly supplied to :class:`App <cyclopts.App>`.
+With Cyclopts, the version is automatically detected by checking the package's version :class:`App <cyclopts.App>` is instantiated from. If you prefer explicitness, ``version`` can also be explicitly supplied to :class:`App <cyclopts.App>`.
 
 
 .. code-block:: python
