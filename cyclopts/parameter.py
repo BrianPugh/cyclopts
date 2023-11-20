@@ -155,7 +155,7 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
 
 
 def get_hint_parameter(hint) -> Tuple[type, Parameter]:
-    """Get the type hint and Cyclopts ``Parameter`` from a possibly annotated inspect Parameter."""
+    """Get the type hint and Cyclopts :class:`Parameter` from a possibly annotated inspect Parameter."""
     if typing.get_origin(hint) is Annotated:
         hint_args = typing.get_args(hint)
         hint = hint_args[0]

@@ -30,7 +30,7 @@ def _default_version(default="0.0.0") -> str:
     Returns ``default`` if it cannot find ``__version__``.
     """
     stack = inspect.stack()
-    calling_frame = stack[2]  # Assumes ``App`` is calling this
+    calling_frame = stack[2]  # Assumes App is calling this
     if (module := inspect.getmodule(calling_frame.frame)) is None:
         return default
 
@@ -59,7 +59,7 @@ class App:
         If not provided, defaults to ``sys.argv[0]``.
     version: Optional[str]
         Version to be displayed when a token of ``version_flags`` is encountered.
-        Defaults to attempting to derive version from package instantiating ``App``.
+        Defaults to attempting to derive version from package instantiating :class:`App`.
     version_flags : Iterable[str]
         Tokens that trigger ``version_print``.
         Set to an empty list to disable version feature.
@@ -151,7 +151,16 @@ class App:
         return command_chain, app, unused_tokens
 
     def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
-        """Decorator to register a function as a CLI command."""
+        """Decorator to register a function as a CLI command.
+
+        Parameters
+        ----------
+        obj: Optional[Callable]
+            Function or :class:`App` to be registered as a command.
+        **kwargs
+            Any argument that :class:`App` can take.
+            ``name`` and ``help`` are common arguments.
+        """
         if obj is None:  # Called ``@app.command``
             return partial(self.command, **kwargs)
 
@@ -323,6 +332,13 @@ class App:
         *,
         console: Optional[Console] = None,
     ) -> None:
+        """Print the help page.
+
+        Parameters
+        ----------
+        tokens: Union[None, str, Iterable[str]]
+            Tokens to interpret for traversing the application command structure.
+        """
         tokens = normalize_tokens(tokens)
 
         if console is None:
