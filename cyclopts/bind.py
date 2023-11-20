@@ -2,9 +2,9 @@ import inspect
 import shlex
 import sys
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterable, List, NewType, Tuple, Union, get_origin
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Union, get_origin
 
-from cyclopts.coercion import coerce, resolve_annotated, resolve_union, token_count
+from cyclopts.coercion import resolve_annotated, resolve_union, token_count
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
@@ -108,12 +108,13 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 parameter, _ = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    consume_count = max(1, token_count(kwargs_parameter.annotation))
+                    consume_count = max(1, token_count(kwargs_parameter.annotation)[0])
 
                     try:
                         for j in range(consume_count - 1):
                             cli_values.append(tokens[i + 1 + j])
                     except IndexError:
+                        # TODO: this should actually raise an exception
                         # This could be a flag downstream
                         unused_tokens.append(token)
                         continue
@@ -126,12 +127,13 @@ def _parse_kw_and_flags(f, tokens, mapping):
                     unused_tokens.append(token)
                 continue
 
-            consume_count = max(1, token_count(parameter.annotation))
+            consume_count = max(1, token_count(parameter.annotation)[0])
 
             try:
                 for j in range(consume_count - 1):
                     cli_values.append(tokens[i + 1 + j])
             except IndexError:
+                # TODO: this should actually raise an exception
                 # This could be a flag downstream
                 unused_tokens.append(token)
                 continue
@@ -143,7 +145,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 parameter, implicit_value = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    consume_count = max(1, token_count(kwargs_parameter.annotation))
+                    consume_count = max(1, token_count(kwargs_parameter.annotation)[0])
 
                     try:
                         for j in range(consume_count):
@@ -165,13 +167,14 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 if implicit_value is not None:
                     cli_values.append(implicit_value)
                 else:
-                    consume_count = max(1, token_count(parameter.annotation))
+                    consume_count = max(1, token_count(parameter.annotation)[0])
 
                     try:
                         for j in range(consume_count):
                             cli_values.append(tokens[i + 1 + j])
                         skip_next_iterations = consume_count
                     except IndexError:
+                        # TODO: this should actually raise an exception
                         # This could be a flag downstream
                         unused_tokens.append(token)
                         continue
@@ -188,7 +191,8 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
 
     def remaining_parameters():
         for parameter in signature.parameters.values():
-            if parameter in mapping:
+            _, consume_all = token_count(parameter.annotation)
+            if parameter in mapping and not consume_all:
                 continue
             if parameter.kind is parameter.KEYWORD_ONLY:
                 break
@@ -203,9 +207,10 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
             tokens = []
             break
 
-        consume_count = token_count(parameter.annotation)
-        if consume_count < 0:  # Consume all remaining tokens
-            mapping[parameter] = tokens
+        consume_count, consume_all = token_count(parameter.annotation)
+        if consume_all:
+            mapping.setdefault(parameter, [])
+            mapping[parameter] = tokens + mapping[parameter]
             tokens = []
             break
 
@@ -213,6 +218,7 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
 
         if len(tokens) < consume_count:
             raise MissingArgumentError(parameter=parameter, tokens_so_far=tokens)
+
         mapping[parameter] = tokens[:consume_count]
         tokens = tokens[consume_count:]
 
@@ -290,7 +296,6 @@ def _create_bound_arguments(
                     break
             else:
                 try:
-                    # TODO: catch/raise validator errors to be cycloptserror
                     if parameter.kind == parameter.VAR_KEYWORD:
                         coerced[parameter] = {}
                         for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]

@@ -140,9 +140,7 @@ class MissingArgumentError(CycloptsError):
     def __str__(self):
         from cyclopts.coercion import token_count
 
-        # TODO: need to go from parameter -> cli_name
-
-        count = token_count(self.parameter.annotation)
+        count, _ = token_count(self.parameter.annotation)
         if count == 0:
             required_string = "flag required"
             only_got_string = ""

@@ -1,7 +1,7 @@
 import inspect
 from enum import Enum
 from inspect import isclass
-from typing import Literal, Union, get_args, get_origin
+from typing import Literal, ParamSpec, Tuple, Type, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
@@ -80,7 +80,7 @@ def _convert(type_, element):
                 return member
         raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in [list, set]:
-        count = token_count(inner_types[0])
+        count, _ = token_count(inner_types[0])
         if count > 1:
             gen = zip(*[iter(element)] * count)
         else:
@@ -98,7 +98,7 @@ def _convert(type_, element):
 _unsupported_target_types = {dict}
 
 
-def _get_origin_and_validate(type_):
+def _get_origin_and_validate(type_: Type) -> ParamSpec:
     origin_type = get_origin(type_)
     if type_ in _unsupported_target_types:
         raise TypeError(f"Unsupported Type: {type_}")
@@ -109,7 +109,7 @@ def _get_origin_and_validate(type_):
     return origin_type
 
 
-def resolve(type_: type) -> type:
+def resolve(type_: Type) -> Type:
     """Perform all simplifying/ambiguous resolutions."""
     type_prev = None
     while type_ != type_prev:
@@ -119,7 +119,7 @@ def resolve(type_: type) -> type:
     return type_
 
 
-def resolve_union(type_: type) -> type:
+def resolve_union(type_: Type) -> Type:
     while get_origin(type_) is Union:
         non_none_types = [t for t in get_args(type_) if t is not NoneType]
         if not non_none_types:
@@ -128,13 +128,13 @@ def resolve_union(type_: type) -> type:
     return type_
 
 
-def resolve_annotated(type_: type) -> type:
+def resolve_annotated(type_: Type) -> Type:
     while get_origin(type_) is Annotated:
         type_ = get_args(type_)[0]
     return type_
 
 
-def coerce(type_: type, *args):
+def coerce(type_: Type, *args):
     if type_ is inspect.Parameter.empty:
         type_ = str
 
@@ -156,22 +156,30 @@ def coerce(type_: type, *args):
         return [_convert(type_, item) for item in args]
 
 
-def token_count(type_: type) -> int:
+def token_count(type_: Type) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
-    Returns ``-1`` if all remaining tokens should be consumed.
+    Returns
+    -------
+    int
+        Number of tokens that constitute a single element.
+    bool
+        If this is ``True`` and positional, consume all remaining tokens.
     """
     if type_ is inspect.Parameter.empty:
-        return 1
+        return 1, False
 
     type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)
 
+    # TODO: Handle Iterable?
     if origin_type is tuple:
-        return len(get_args(type_))
+        return len(get_args(type_)), False
     elif (origin_type or type_) is bool:
-        return 0
-    elif (origin_type or type_) in (list, set):
-        return -1
+        return 0, False
+    elif type_ in (list, set) or (origin_type in (list, set) and len(get_args(type_)) == 0):
+        return 1, True
+    elif origin_type in (list, set) and len(get_args(type_)):
+        return token_count(get_args(type_)[0])[0], True
     else:
-        return 1
+        return 1, False

@@ -47,10 +47,10 @@ def test_bind_tuple_insufficient_tokens(app, cmd_str):
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "1 2 3 4 --color 80 160 255",
+        "1 2 --coordinates 3 4 --color 80 160 255",
         "--coordinates 1 2 --color 80 160 255 --coordinates 3 4",
         "--coordinates 1 2 --coordinates 3 4 --color 80 160 255",
-        "1 2 --coordinates 3 4 --color 80 160 255",
+        "1 2 3 4 --color 80 160 255",
     ],
 )
 def test_bind_list_of_tuple(app, cmd_str):

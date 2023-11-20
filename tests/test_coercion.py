@@ -18,23 +18,28 @@ def _assert_tuple(expected, actual):
 
 
 def test_token_count_tuple():
-    assert 3 == token_count(Tuple[int, int, int])
+    assert (3, False) == token_count(Tuple[int, int, int])
 
 
 def test_token_union():
-    assert 1 == token_count(Union[None, int])
+    assert (1, False) == token_count(Union[None, int])
 
 
 def test_token_count_standard():
-    assert 1 == token_count(int)
+    assert (1, False) == token_count(int)
 
 
 def test_token_count_bool():
-    assert 0 == token_count(bool)
+    assert (0, False) == token_count(bool)
 
 
 def test_token_count_list():
-    assert -1 == token_count(List[int])
+    assert (1, True) == token_count(List[int])
+    assert (1, True) == token_count(list[int])
+
+
+def test_token_count_list_of_tuple():
+    assert (3, True) == token_count(List[Tuple[int, int, int]])
 
 
 def test_coerce_bool():

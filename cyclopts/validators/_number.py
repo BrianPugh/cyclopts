@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Type, Union
 
 from attrs import frozen
 
@@ -12,7 +12,7 @@ class Number:
     gt: Optional[Numeric] = None
     gte: Optional[Numeric] = None
 
-    def __call__(self, type_: type, value: Numeric):
+    def __call__(self, type_: Type, value: Numeric):
         if not isinstance(value, Numeric):
             raise TypeError
 
