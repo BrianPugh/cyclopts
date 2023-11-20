@@ -80,7 +80,12 @@ def _convert(type_, element):
                 return member
         raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in [list, set]:
-        return origin_type(_convert(inner_types[0], e) for e in element)
+        count = token_count(inner_types[0])
+        if count > 1:
+            gen = zip(*[iter(element)] * count)
+        else:
+            gen = element
+        return origin_type(_convert(inner_types[0], e) for e in gen)
     elif origin_type is tuple:
         return tuple(_convert(t, e) for t, e in zip(inner_types, element))
     else:
