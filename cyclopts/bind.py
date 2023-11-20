@@ -57,6 +57,7 @@ def cli2parameter(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
     return mapping
 
 
+@lru_cache(maxsize=1)
 def parameter2cli(f: Callable) -> Dict[inspect.Parameter, List[str]]:
     c2p = cli2parameter(f)
     p2c = {}
@@ -99,6 +100,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
             continue
 
         cli_values = []
+        kwargs_key = None
 
         if "=" in token:
             cli_key, cli_value = token.split("=", 1)
@@ -109,7 +111,7 @@ def _parse_kw_and_flags(f, tokens, mapping):
             except KeyError:
                 if kwargs_parameter:
                     parameter = kwargs_parameter
-                    cli_key = _cli_kw_to_f_kw(cli_key)
+                    kwargs_key = _cli_kw_to_f_kw(cli_key)
                 else:
                     unused_tokens.append(token)
                     continue
@@ -129,40 +131,29 @@ def _parse_kw_and_flags(f, tokens, mapping):
                 parameter, implicit_value = cli2kw[cli_key]
             except KeyError:
                 if kwargs_parameter:
-                    consume_count = max(1, token_count(kwargs_parameter.annotation)[0])
-
-                    try:
-                        for j in range(consume_count):
-                            cli_values.append(tokens[i + 1 + j])
-                        skip_next_iterations = consume_count
-                    except IndexError:
-                        # This could be a flag downstream
-                        unused_tokens.append(token)
-                        continue
-
-                    key = _cli_kw_to_f_kw(cli_key)
-                    mapping[kwargs_parameter].setdefault(key, [])
-                    mapping[kwargs_parameter][key].extend(cli_values)
-                    continue
+                    parameter = kwargs_parameter
+                    kwargs_key = _cli_kw_to_f_kw(cli_key)
+                    implicit_value = None
                 else:
                     unused_tokens.append(cli_key)
                     continue
-            else:
-                if implicit_value is not None:
-                    cli_values.append(implicit_value)
-                else:
-                    consume_count = max(1, token_count(parameter.annotation)[0])
 
-                    try:
-                        for j in range(consume_count):
-                            cli_values.append(tokens[i + 1 + j])
-                        skip_next_iterations = consume_count
-                    except IndexError:
-                        raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
+            if implicit_value is not None:
+                cli_values.append(implicit_value)
+            else:
+                consume_count = max(1, token_count(parameter.annotation)[0])
+
+                try:
+                    for j in range(consume_count):
+                        cli_values.append(tokens[i + 1 + j])
+                    skip_next_iterations = consume_count
+                except IndexError:
+                    raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
 
         if parameter is kwargs_parameter:
-            mapping[parameter].setdefault(cli_key, [])
-            mapping[parameter][cli_key].extend(cli_values)
+            assert kwargs_key is not None
+            mapping[parameter].setdefault(kwargs_key, [])
+            mapping[parameter][kwargs_key].extend(cli_values)
         else:
             mapping.setdefault(parameter, [])
             mapping[parameter].extend(cli_values)
