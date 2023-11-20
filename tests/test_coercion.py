@@ -1,9 +1,7 @@
-import inspect
 from enum import Enum, auto
 from pathlib import Path
-from typing import List, Literal, Optional, Set, Tuple, Union
+from typing import Iterable, List, Literal, Optional, Set, Tuple, Union
 
-import pytest
 from typing_extensions import Annotated
 
 from cyclopts.coercion import coerce, token_count
@@ -48,9 +46,7 @@ def test_coerce_bool():
 
 
 def test_coerce_int():
-    assert [123, 456] == coerce(int, "123", "456")
-    assert [123, 456] == coerce(List[int], "123", "456")
-    assert [123] == coerce(List[int], "123")
+    assert 123 == coerce(int, "123")
 
 
 def test_coerce_annotated_int():
@@ -84,6 +80,12 @@ def test_coerce_enum():
 
     assert SoftwareEnvironment.STAGING == coerce(SoftwareEnvironment, "staging")
     _assert_tuple((1, 2.0), coerce(Tuple[int, Union[None, float, int]], "1", "2"))
+
+
+def test_coerce_list():
+    assert [123, 456] == coerce(int, "123", "456")
+    assert [123, 456] == coerce(List[int], "123", "456")
+    assert [123] == coerce(List[int], "123")
 
 
 def test_coerce_set():
