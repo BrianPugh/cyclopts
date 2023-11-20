@@ -42,7 +42,7 @@ All Cyclopts applications start with the ``cyclopts.App`` object.
 
    app = cyclopts.App()
 
-The ``App`` class offers various configuration options that we'll investigate in future guides.
+The :class:`App <cyclopts.App>` class offers various configuration options that we'll investigate in future guides.
 The ``app`` object has a decorator method, ``default``, which registers a function as the default action.
 In this example, the ``main`` function is our default, and is executed when no command is provided.
 

@@ -49,7 +49,7 @@ To use a different negative flag, you can supply the name after a slash in your 
    typer_app(["--your-flag"], standalone_mode=False)
    # my_flag=False
 
-Cyclopts's ``Parameter`` takes in an optional ``negative`` flag.
+Cyclopts's :class:`Parameter <cyclopts.Parameter>` takes in an optional ``negative`` flag.
 To suppress the negative-flag generation, set this argument to either an empty string or list.
 
 .. code-block:: python

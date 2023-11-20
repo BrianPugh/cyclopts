@@ -6,7 +6,7 @@ If a specific type (including custom types) is not specified, the coercion defau
 For example, cyclopts doesn't have an explicit rule for ``pathlib.Path``, so if the value ``"foo.bin"`` is
 provided, Cyclopts will default to coercing it as ``pathlib.Path("foo.bin")``.
 
-Automatic coercion can always be overridden via the ``converter`` field of ``Parameter``.
+Automatic coercion can always be overridden via the ``converter`` field of :class:`Parameter <cyclopts.Parameter>`.
 Typically, the ``converter`` function will receive a single token, but it may receive multiple tokens
 if the annotated type is iterable (e.g. ``list``, ``set``).
 

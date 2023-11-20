@@ -37,7 +37,7 @@ From these function signatures, we can deduce:
 
 2. Which parameters are required, by their lack of defaults.
 
-Because of these builtin python mechanisms, Cyclopts just has a single ``Parameter`` class used for providing additional parameter metadata.
+Because of these builtin python mechanisms, Cyclopts just has a single :class:`Parameter <cyclopts.Parameter>` class used for providing additional parameter metadata.
 
 I believe that Typer's separate ``Argument`` and ``Option`` classes are a relic from when they must be supplied as a parameter's proxy default value.
 

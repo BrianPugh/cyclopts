@@ -1,7 +1,7 @@
 ========
 Meta App
 ========
-Typically, a Cyclopts application is launched by calling the ``App`` object:
+Typically, a Cyclopts application is launched by calling the :class:`App <cyclopts.App>` object:
 
 .. code-block:: python
 
