@@ -26,6 +26,11 @@ def _default_validator(type_, arg):
     pass
 
 
+def _token_count_validator(instance, attribute, value):
+    if value is not None and instance.converter is coerce:
+        raise ValueError('Must specify a "converter" if setting "token_count".')
+
+
 class Converter(Protocol):
     def __call__(self, type_: Type, *args: str) -> Any:
         ...
@@ -99,6 +104,8 @@ class Parameter:
     validator: Validator = field(default=_default_validator)
 
     negative: Optional[Tuple[str, ...]] = field(default=None, converter=_optional_str_to_tuple_converter)
+
+    token_count: Optional[int] = field(default=None, validator=_token_count_validator)
 
     show_default: bool = field(default=True)
     help: str = field(default="")

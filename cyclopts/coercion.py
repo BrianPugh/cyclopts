@@ -178,8 +178,14 @@ def token_count(type_: Type) -> Tuple[int, bool]:
     bool
         If this is ``True`` and positional, consume all remaining tokens.
     """
+    from cyclopts.parameter import get_hint_parameter
+
     if type_ is inspect.Parameter.empty:
         return 1, False
+
+    type_, param = get_hint_parameter(type_)
+    if param.token_count is not None:
+        return abs(param.token_count), param.token_count < 0
 
     type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)

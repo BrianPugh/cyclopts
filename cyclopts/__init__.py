@@ -3,6 +3,7 @@ __version__ = "0.0.0"
 
 __all__ = [
     "App",
+    "coerce",
     "CoercionError",
     "CommandCollisionError",
     "Converter",
@@ -16,6 +17,7 @@ __all__ = [
     "validators",
 ]
 
+from cyclopts.coercion import coerce
 from cyclopts.core import App
 from cyclopts.exceptions import (
     CoercionError,
