@@ -85,7 +85,13 @@ def test_coerce_enum():
         PROD = auto()
 
     assert SoftwareEnvironment.STAGING == coerce(SoftwareEnvironment, "staging")
-    _assert_tuple((1, 2.0), coerce(Tuple[int, Union[None, float, int]], "1", "2"))
+
+
+def test_coerce_tuple():
+    _assert_tuple(
+        (1, 2.0),
+        coerce(Tuple[int, Union[None, float, int]], "1", "2"),
+    )
 
 
 def test_coerce_list():
