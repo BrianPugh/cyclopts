@@ -1,7 +1,7 @@
 import inspect
 from enum import Enum
 from inspect import isclass
-from typing import Literal, ParamSpec, Tuple, Type, Union, get_args, get_origin
+from typing import List, Literal, ParamSpec, Set, Tuple, Type, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
@@ -9,6 +9,11 @@ from cyclopts.exceptions import CoercionError
 
 # from types import NoneType is available >=3.10
 NoneType = type(None)
+
+_implicit_iterable_type_mapping = {
+    list: List[str],
+    set: Set[str],
+}
 
 
 def _bool(s: Union[str, bool]) -> bool:
@@ -51,8 +56,9 @@ _converters = {
 def _convert(type_, element):
     origin_type = get_origin(type_)
     inner_types = get_args(type_)
-    if isinstance(type_, (list, tuple, set)):
-        return type_(_convert(type_[0], e) for e in element)  # pyright: ignore[reportGeneralTypeIssues]
+
+    if type_ in _implicit_iterable_type_mapping:
+        return _convert(_implicit_iterable_type_mapping[type_], element)
     elif origin_type is Union:
         for t in inner_types:
             if t is NoneType:
@@ -148,7 +154,8 @@ def coerce(type_: Type, *args):
                 f"Number of arguments does not match the tuple structure: expected {len(inner_types)} but got {len(args)}"
             )
         return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
-    elif origin_type in [list, set]:
+    elif (origin_type or type_) in [list, set]:
+        # TODO: any iterable that's not str
         return _convert(type_, args)
     elif len(args) == 1:
         return _convert(type_, args[0])

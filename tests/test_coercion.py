@@ -1,7 +1,8 @@
 from enum import Enum, auto
 from pathlib import Path
-from typing import Iterable, List, Literal, Optional, Set, Tuple, Union
+from typing import Iterable, List, Literal, Set, Tuple, Union
 
+import pytest
 from typing_extensions import Annotated
 
 from cyclopts.coercion import coerce, token_count
@@ -86,6 +87,17 @@ def test_coerce_list():
     assert [123, 456] == coerce(int, "123", "456")
     assert [123, 456] == coerce(List[int], "123", "456")
     assert [123] == coerce(List[int], "123")
+
+
+def test_coerce_bare_list():
+    # Implicit element type: str
+    assert ["123", "456"] == coerce(list, "123", "456")
+
+
+@pytest.mark.skip
+def test_coerce_iterable():
+    assert [123, 456] == coerce(Iterable[int], "123", "456")
+    assert [123] == coerce(Iterable[int], "123")
 
 
 def test_coerce_set():
