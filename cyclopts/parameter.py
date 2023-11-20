@@ -76,6 +76,12 @@ class Parameter:
 
             def validator(type_, value: Any) -> None:
                 pass  # Raise any exception here if data is invalid.
+    token_count: Optional[int]
+       Number of CLI tokens this parameter consumes.
+       Used when the annotated parameter is a custom class that consumes more
+       (or less) than the standard single token.
+       If specified, a custom ``converter`` **must** also be specified.
+       Defaults to autodetecting based on type annotation.
     """
 
     # User Options

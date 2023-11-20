@@ -146,7 +146,20 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def coerce(type_: Type, *args):
+def coerce(type_: Type, *args: str):
+    """Coerce variables into a specified type.
+
+    Cyclopts primary type coercion engine.
+
+    See Cyclopt's automatic coercion rules :doc:`/rules`.
+
+    Parameters
+    ----------
+    type_: Type
+        A type hint/annotation to coerce ``*args`` into.
+    `*args`: str
+        String tokens to coerce.
+    """
     if type_ is inspect.Parameter.empty:
         type_ = str
 

@@ -6,3 +6,5 @@ API
    :special-members: __call__
 
 .. autoclass:: cyclopts.Parameter
+
+.. autofunction:: cyclopts.coerce
