@@ -41,6 +41,11 @@ def test_token_count_list_of_tuple():
     assert (3, True) == token_count(List[Tuple[int, int, int]])
 
 
+def test_token_count_iterable():
+    assert (1, True) == token_count(Iterable[int])
+    assert (2, True) == token_count(Iterable[Tuple[int, int]])
+
+
 def test_coerce_bool():
     assert True is coerce(bool, "true")
     assert False is coerce(bool, "false")
@@ -94,7 +99,6 @@ def test_coerce_bare_list():
     assert ["123", "456"] == coerce(list, "123", "456")
 
 
-@pytest.mark.skip
 def test_coerce_iterable():
     assert [123, 456] == coerce(Iterable[int], "123", "456")
     assert [123] == coerce(Iterable[int], "123")

@@ -1,3 +1,4 @@
+import collections.abc
 import inspect
 from enum import Enum
 from inspect import isclass
@@ -14,6 +15,8 @@ _implicit_iterable_type_mapping = {
     list: List[str],
     set: Set[str],
 }
+
+_iterable_types = {list, set}
 
 
 def _bool(s: Union[str, bool]) -> bool:
@@ -59,6 +62,9 @@ def _convert(type_, element):
 
     if type_ in _implicit_iterable_type_mapping:
         return _convert(_implicit_iterable_type_mapping[type_], element)
+    elif origin_type is collections.abc.Iterable:
+        return _convert(List[*inner_types], element)  # pyright: ignore[reportGeneralTypeIssues]
+
     elif origin_type is Union:
         for t in inner_types:
             if t is NoneType:
@@ -85,7 +91,7 @@ def _convert(type_, element):
             if member.name.lower() == element_lower:
                 return member
         raise CoercionError(input_value=element, target_type=type_)
-    elif origin_type in [list, set]:
+    elif origin_type in _iterable_types:
         count, _ = token_count(inner_types[0])
         if count > 1:
             gen = zip(*[iter(element)] * count)
@@ -154,8 +160,7 @@ def coerce(type_: Type, *args):
                 f"Number of arguments does not match the tuple structure: expected {len(inner_types)} but got {len(args)}"
             )
         return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
-    elif (origin_type or type_) in [list, set]:
-        # TODO: any iterable that's not str
+    elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
         return _convert(type_, args)
     elif len(args) == 1:
         return _convert(type_, args[0])
@@ -179,14 +184,13 @@ def token_count(type_: Type) -> Tuple[int, bool]:
     type_ = resolve_annotated(type_)
     origin_type = _get_origin_and_validate(type_)
 
-    # TODO: Handle Iterable?
     if origin_type is tuple:
         return len(get_args(type_)), False
     elif (origin_type or type_) is bool:
         return 0, False
-    elif type_ in (list, set) or (origin_type in (list, set) and len(get_args(type_)) == 0):
+    elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
         return 1, True
-    elif origin_type in (list, set) and len(get_args(type_)):
+    elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
         return token_count(get_args(type_)[0])[0], True
     else:
         return 1, False
