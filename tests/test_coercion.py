@@ -64,6 +64,11 @@ def test_coerce_annotated_union_str_2nd_choice():
     assert "foo" == coerce(Union[None, int, str], "foo")
 
 
+def test_coerce_annotated_nested_union_str_2nd_choice():
+    assert 123 == coerce(Union[None, Union[int, str]], "123")
+    assert "foo" == coerce(Union[None, Union[int, str]], "foo")
+
+
 def test_coerce_annotated_union_int():
     assert 123 == coerce(Annotated[Union[None, int, float], "foo"], "123")
     assert 1 == coerce(int, "1")
