@@ -60,11 +60,13 @@ class App:
     version: Optional[str]
         Version to be displayed when a token of ``version_flags`` is encountered.
         Defaults to attempting to derive version from package instantiating :class:`App`.
-    version_flags : Iterable[str]
+    version_flags: Iterable[str]
         Tokens that trigger ``version_print``.
         Set to an empty list to disable version feature.
         Defaults to ``["--version"]``
-    help_flags : Iterable[str]
+    help: Optional[str]
+        Help text.
+    help_flags: Iterable[str]
         Tokens that trigger ``help_print``.
         Set to an empty list to disable help feature.
         Defaults to ``["--help", "-h"]``

@@ -30,6 +30,7 @@ python = "^3.8"
 typing-extensions = ">=4.8.0"
 attrs = ">=23.1.0"
 rich = ">=13.6.0"
+docstring-parser = "^0.15"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "~7.1.2"

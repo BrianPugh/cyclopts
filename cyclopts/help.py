@@ -1,13 +1,16 @@
 import inspect
-from textwrap import dedent
+from functools import lru_cache
 from typing import Callable, List, Optional, Tuple
 
+from docstring_parser import parse as docstring_parse
 from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
 from cyclopts.parameter import get_hint_parameter, get_names
+
+docstring_parse = lru_cache(maxsize=16)(docstring_parse)
 
 
 class SilentRich:
@@ -64,21 +67,23 @@ def format_usage(
 
 def format_doc(self, function: Optional[Callable]):
     if function is None:
-        raw_doc_string = self.help
+        raw_doc_string = self._help_derived
     elif isinstance(function, type(self)):
-        raw_doc_string = function.help
+        raw_doc_string = function._help_derived
     else:
         raw_doc_string = function.__doc__ or ""
 
     if not raw_doc_string:
         return _silent
 
-    doc_strings = raw_doc_string.split("\n", 1)
+    parsed = docstring_parse(raw_doc_string)
 
-    components: List[Tuple[str, str]] = [(doc_strings[0] + "\n", "default")]
+    components: List[Tuple[str, str]] = []
+    if parsed.short_description:
+        components.append((parsed.short_description + "\n", "default"))
 
-    if len(doc_strings) > 1:
-        components.append((dedent(doc_strings[1]), "info"))
+    if parsed.long_description:
+        components.append(("\n" + parsed.long_description + "\n", "info"))
 
     return Text.assemble(*components)
 
