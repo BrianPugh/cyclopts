@@ -87,3 +87,8 @@ Enum
 ***
 set
 ***
+
+***
+Any
+***
+Treated the same as no type hint (i.e. treated as a ``str``).

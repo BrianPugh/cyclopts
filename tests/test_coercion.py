@@ -1,6 +1,6 @@
 from enum import Enum, auto
 from pathlib import Path
-from typing import Iterable, List, Literal, Set, Tuple, Union
+from typing import Any, Iterable, List, Literal, Set, Tuple, Union
 
 import pytest
 from typing_extensions import Annotated
@@ -123,6 +123,10 @@ def test_coerce_literal():
 
 def test_coerce_path():
     assert Path("foo") == coerce(Path, "foo")
+
+
+def test_coerce_any():
+    assert "foo" == coerce(Any, "foo")
 
 
 def test_coerce_bytes():

@@ -1,5 +1,5 @@
 import inspect
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import pytest
 from typing_extensions import Annotated
@@ -132,3 +132,34 @@ def test_exception_repeat_argument(app, cmd_str):
 
     with pytest.raises(RepeatArgumentError):
         app.parse_args(cmd_str)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
+    ],
+)
+@pytest.mark.parametrize("annotated", [False, True])
+def test_bind_any_hint(app, cmd_str, annotated):
+    """The ``Any`` type hint should be treated as a ``str``."""
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = None):
+            pass
+
+    else:
+
+        @app.command
+        def foo(a: Any = None):
+            pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind("1")
+
+    actual_command, actual_bind = app.parse_args(cmd_str)
+    assert actual_command == foo
+    assert actual_bind == expected_bind

@@ -2,7 +2,7 @@ import collections.abc
 import inspect
 from enum import Enum
 from inspect import isclass
-from typing import List, Literal, ParamSpec, Set, Tuple, Type, Union, get_args, get_origin
+from typing import Any, List, Literal, ParamSpec, Set, Tuple, Type, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
@@ -164,6 +164,10 @@ def coerce(type_: Type, *args: str):
         type_ = str
 
     type_ = resolve_annotated(type_)
+
+    if type_ is Any:
+        type_ = str
+
     origin_type = _get_origin_and_validate(type_)
 
     if origin_type is tuple:
