@@ -12,7 +12,6 @@ Cyclopts
    Installation.rst
    getting_started.rst
    commands.rst
-   vs_typer/README.rst
    rules.rst
 
 
@@ -23,3 +22,9 @@ Cyclopts
    meta_app.rst
    command_chaining.rst
    api
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Alternative Libraries
+
+   vs_typer/README.rst
