@@ -9,6 +9,7 @@ from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
     MissingArgumentError,
+    RepeatArgumentError,
     ValidationError,
 )
 from cyclopts.parameter import get_hint_parameter, get_names
@@ -134,11 +135,17 @@ def _parse_kw_and_flags(f, tokens, mapping):
 
         skip_next_iterations = consume_count
 
+        _, repeatable = token_count(parameter.annotation)
         if parameter is kwargs_parameter:
             assert kwargs_key is not None
+            if parameter in mapping[parameter] and not repeatable:
+                raise RepeatArgumentError(parameter=parameter)
             mapping[parameter].setdefault(kwargs_key, [])
             mapping[parameter][kwargs_key].extend(cli_values)
         else:
+            if parameter in mapping and not repeatable:
+                raise RepeatArgumentError(parameter=parameter)
+
             mapping.setdefault(parameter, [])
             mapping[parameter].extend(cli_values)
 

@@ -6,6 +6,7 @@ from typing_extensions import Annotated
 
 import cyclopts
 from cyclopts import Parameter
+from cyclopts.exceptions import RepeatArgumentError
 
 
 @pytest.mark.parametrize(
@@ -116,3 +117,18 @@ def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated):
     assert actual_command == foo
     assert actual_bind == expected_bind
     assert isinstance(actual_bind.args[0], int)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "--foo val1 --foo val2",
+    ],
+)
+def test_exception_repeat_argument(app, cmd_str):
+    @app.default
+    def default(foo: str):
+        pass
+
+    with pytest.raises(RepeatArgumentError):
+        app.parse_args(cmd_str)

@@ -225,6 +225,23 @@ class MissingArgumentError(CycloptsError):
         return super().__str__() + " ".join(strings)
 
 
+@define(kw_only=True)
+class RepeatArgumentError(CycloptsError):
+    """The same parameter has erroneously been specified multiple times.
+
+    Attributes
+    ----------
+    parameter: inspect.Parameter
+        The repeat parameter.
+    """
+
+    parameter: inspect.Parameter
+
+    def __str__(self):
+        # TODO
+        return super().__str__()
+
+
 def format_cyclopts_error(e: CycloptsError):
     panel = Panel(
         Text(str(e), "default"),
