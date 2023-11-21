@@ -1,12 +1,13 @@
 import inspect
 import typing
-from typing import Any, Callable, Iterable, List, Optional, Protocol, Tuple, Type, Union, get_origin
+from typing import Iterable, List, Optional, Tuple, Union, get_origin
 
 from attrs import field, frozen
 from typing_extensions import Annotated
 
 from cyclopts.coercion import coerce, resolve
 from cyclopts.exceptions import MultipleParameterAnnotationError
+from cyclopts.protocols import Converter, Validator
 
 
 def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
@@ -29,16 +30,6 @@ def _default_validator(type_, arg):
 def _token_count_validator(instance, attribute, value):
     if value is not None and instance.converter is coerce:
         raise ValueError('Must specify a "converter" if setting "token_count".')
-
-
-class Converter(Protocol):
-    def __call__(self, type_: Type, *args: str) -> Any:
-        ...
-
-
-class Validator(Protocol):
-    def __call__(self, type_: Type, value: Any) -> None:
-        ...
 
 
 @frozen

@@ -30,6 +30,7 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
     ValidationError,
 )
-from cyclopts.parameter import Converter, Parameter, Validator
+from cyclopts.parameter import Parameter
+from cyclopts.protocols import Converter, Validator
 
 from . import validators
