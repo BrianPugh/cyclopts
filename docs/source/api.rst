@@ -15,3 +15,23 @@ Exceptions
 ----------
 
 .. autoexception:: cyclopts.CycloptsError
+   :show-inheritance:
+
+.. autoexception:: cyclopts.ValidationError
+   :show-inheritance:
+
+.. autoexception:: cyclopts.CoercionError
+   :show-inheritance:
+
+.. autoexception:: cyclopts.InvalidCommandError
+   :show-inheritance:
+
+.. autoexception:: cyclopts.UnusedCliTokensError
+   :show-inheritance:
+
+.. autoexception:: cyclopts.MissingArgumentError
+   :show-inheritance:
+
+.. autoexception:: cyclopts.CommandCollisionError
+
+.. autoexception:: cyclopts.MultipleParameterAnnotationError

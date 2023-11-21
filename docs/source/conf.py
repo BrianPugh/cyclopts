@@ -12,6 +12,8 @@ from datetime import date
 from pathlib import Path
 
 import git
+from sphinx.application import Sphinx
+from sphinx.ext.autodoc import Options
 
 sys.path.insert(0, str(Path("../..").absolute()))
 
@@ -76,7 +78,7 @@ napoleon_attr_annotations = True
 # Autodoc
 autodoc_default_options = {
     "member-order": "bysource",
-    "undoc-members": True,
+    "undoc-members": False,
     "exclude-members": "__weakref__",
 }
 autoclass_content = "class"
@@ -177,3 +179,18 @@ html_context = {
 html_css_files = [
     "custom.css",
 ]
+
+
+# --- Other Custom Stuff
+
+
+def simplify_exception_signature(
+    app: Sphinx, what: str, name: str, obj, options: Options, signature, return_annotation
+):
+    # Check if the object is an exception and modify the signature
+    if what == "exception" and isinstance(obj, type) and issubclass(obj, BaseException):
+        return ("", None)  # Return an empty signature and no return annotation
+
+
+def setup(app: Sphinx):
+    app.connect("autodoc-process-signature", simplify_exception_signature)

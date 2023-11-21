@@ -3,17 +3,18 @@ __version__ = "0.0.0"
 
 __all__ = [
     "App",
-    "coerce",
     "CoercionError",
     "CommandCollisionError",
     "Converter",
     "CycloptsError",
-    "ValidationError",
+    "InvalidCommandError",
     "MissingArgumentError",
     "MultipleParameterAnnotationError",
     "Parameter",
     "UnusedCliTokensError",
+    "ValidationError",
     "Validator",
+    "coerce",
     "validators",
 ]
 
@@ -23,6 +24,7 @@ from cyclopts.exceptions import (
     CoercionError,
     CommandCollisionError,
     CycloptsError,
+    InvalidCommandError,
     MissingArgumentError,
     MultipleParameterAnnotationError,
     UnusedCliTokensError,

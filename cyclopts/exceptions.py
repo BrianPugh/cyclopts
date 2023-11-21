@@ -1,6 +1,6 @@
 import difflib
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
 from attrs import define, field
 from rich import box
@@ -9,6 +9,17 @@ from rich.text import Text
 
 if TYPE_CHECKING:
     from cyclopts.core import App
+
+
+__all__ = [
+    "CoercionError",
+    "CommandCollisionError",
+    "CycloptsError",
+    "MissingArgumentError",
+    "MultipleParameterAnnotationError",
+    "UnusedCliTokensError",
+    "ValidationError",
+]
 
 
 def _get_function_info(func):
@@ -36,7 +47,33 @@ class MultipleParameterAnnotationError(Exception):
 
 @define(kw_only=True)
 class CycloptsError(Exception):
-    """Root exception for runtime errors."""
+    """Root exception for runtime errors.
+
+    As CycloptsErrors bubble up the Cyclopts stack, more information is added to it.
+    Finally, :func:`cyclopts.exceptions.format_cyclopts_error` formats the message nicely for the user.
+
+    Attributes
+    ----------
+    msg: Optional[str]
+        If set, override automatic message generation.
+    verbose: bool
+        More verbose error messages; aimed towards developers debugging their Cyclopts app.
+        Defaults to ``False``.
+    root_input_tokens: Optional[List[str]]
+        The parsed CLI tokens that were initially fed into the :class:`App`.
+    unused_tokens: Optional[List[str]]
+        Leftover tokens after parsing is complete.
+    target: Optional[Callable]
+        The python function associated with the command being parsed.
+    cli2parameter: Optional[Dict[str, Tuple[inspect.Parameter, Any]]]
+        Dictionary mapping CLI strings to python parameters.
+    parameter2cli: Optional[Dict[inspect.Parameter, List[str]]]
+        Dictionary mapping function parameters to possible CLI tokens.
+    command_chain:
+        List of command that lead to ``target``.
+    app: Optional[cyclopts.App]
+        The Cyclopts application itself.
+    """
 
     msg: Optional[str] = None
 
@@ -48,7 +85,6 @@ class CycloptsError(Exception):
     cli2parameter: Optional[Dict[str, Tuple[inspect.Parameter, Any]]] = None
     parameter2cli: Optional[Dict[inspect.Parameter, List[str]]] = None
 
-    # Tokens that led up to the actual command being executed.
     command_chain: Optional[List[str]] = None
 
     app: Optional["App"] = None
@@ -77,19 +113,33 @@ class CycloptsError(Exception):
 
 @define(kw_only=True)
 class ValidationError(CycloptsError):
-    msg: str = ""
-    parameter: Optional[inspect.Parameter] = None
+    """Validator function raised an exception.
+
+    Attributes
+    ----------
+    parameter: inspect.Parameter
+        Parameter who's ``validator`` function failed.
+    """
+
+    parameter: inspect.Parameter
 
     def __str__(self):
+        assert self.msg is not None
         return super().__str__() + self.msg
 
 
 @define(kw_only=True)
 class CoercionError(CycloptsError):
-    """There was an error performing automatic type coercion."""
+    """There was an error performing automatic type coercion.
+
+    Attributes
+    ----------
+    input_value: str
+    target_type: Type
+    """
 
     input_value: str
-    target_type: type
+    target_type: Type
 
     parameter: Optional[inspect.Parameter] = None
 
@@ -105,11 +155,7 @@ class CoercionError(CycloptsError):
 
 
 class InvalidCommandError(CycloptsError):
-    """CLI token combination did not yield a valid command.
-
-    If defaulting to a nonexistent ``default_command``, and there are
-    still unknown tokens, then this should be raised instead of printing help.
-    """
+    """CLI token combination did not yield a valid command."""
 
     def __str__(self):
         assert self.unused_tokens
@@ -126,14 +172,25 @@ class InvalidCommandError(CycloptsError):
 
 @define(kw_only=True)
 class UnusedCliTokensError(CycloptsError):
-    unused_tokens: List[str]
+    """Not all CLI tokens were used as expected."""
 
     def __str__(self):
+        assert self.unused_tokens is not None
         return super().__str__() + f"Unused Tokens: {self.unused_tokens}."
 
 
 @define(kw_only=True)
 class MissingArgumentError(CycloptsError):
+    """A parameter had insufficient tokens to be populated.
+
+    Attributes
+    ----------
+    parameter: inspect.Parameter
+        The parameter that failed to parse.
+    tokens_so_far: List[str]
+        The tokens that were parsed so far for this Parameter.
+    """
+
     parameter: inspect.Parameter
     tokens_so_far: List[str]
 
