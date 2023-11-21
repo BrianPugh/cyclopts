@@ -149,8 +149,8 @@ def resolve_annotated(type_: Type) -> Type:
 def coerce(type_: Type, *args: str):
     """Coerce variables into a specified type.
 
-    Cyclopts primary type coercion engine.
-
+    Internally used to coercing string CLI tokens into python builtin types.
+    Externally, may be useful in a custom converter.
     See Cyclopt's automatic coercion rules :doc:`/rules`.
 
     Parameters

@@ -1,3 +1,4 @@
+===
 API
 ===
 
@@ -8,3 +9,9 @@ API
 .. autoclass:: cyclopts.Parameter
 
 .. autofunction:: cyclopts.coerce
+
+----------
+Exceptions
+----------
+
+.. autoexception:: cyclopts.CycloptsError
