@@ -56,7 +56,8 @@ The default :meth:`app.default <cyclopts.App.default>` handler runs :meth:`app.h
 Changing Name
 -------------
 By default, a command is registered to the function name with underscores replaced with hyphens.
-For example, ``def foo_bar()`` will become the command ``foo-bar``.
+Any leading or trailing underscore/hyphens are stripped.
+For example, ``def _foo_bar()`` will become the command ``foo-bar``.
 The name can be manually in the :meth:`command <cyclopts.App.command>` decorator by setting the ``name`` parameter.
 
 .. code-block:: python

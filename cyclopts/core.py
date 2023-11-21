@@ -21,7 +21,7 @@ from cyclopts.help import format_commands, format_doc, format_parameters, format
 
 
 def _format_name(name: str):
-    return name.lower().replace("_", "-")
+    return name.lower().replace("_", "-").strip("-")
 
 
 def _default_version(default="0.0.0") -> str:
