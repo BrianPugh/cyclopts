@@ -6,7 +6,7 @@
 
 ![Python compat](https://img.shields.io/badge/>=python-3.8-blue.svg)
 [![PyPI](https://img.shields.io/pypi/v/cyclopts.svg)](https://pypi.org/project/cyclopts/)
-[![ReadTheDocs](https://readthedocs.org/projects/cyclopts/badge/?version=latest)](https://cyclopts.readthedocs.io/en/latest/?badge=latest)
+[![ReadTheDocs](https://readthedocs.org/projects/cyclopts/badge/?version=latest)](https://cyclopts.readthedocs.io)
 [![codecov](https://codecov.io/gh/BrianPugh/cyclopts/graph/badge.svg?token=HA393WIYUK)](https://codecov.io/gh/BrianPugh/cyclopts)
 
 
