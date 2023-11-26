@@ -1,0 +1,67 @@
+name: Build package and push to PyPi
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Includes getting tags
+
+      - name: Cache $HOME/.local # Significantly speeds up Poetry Install
+        uses: actions/cache@v3
+        with:
+          path: ~/.local
+          key: dotlocal-${{ runner.os }}-${{ hashFiles('.github/workflows/deploy.yml') }}
+
+      - name: Set up python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Add Poetry Plugins
+        run: |
+          poetry self add poetry-dynamic-versioning[plugin]
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root --without=dev
+
+      - name: Install project
+        run: poetry install --no-interaction --without=dev
+
+      - name: Build package
+        run: poetry build
+
+      - name: Publish package
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
+          poetry publish
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dist
+          path: dist/
