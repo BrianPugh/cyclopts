@@ -14,7 +14,7 @@
 
 ---
 
-**Documentation:** http://cyclopts.readthedocs.com
+**Documentation:** https://cyclopts.readthedocs.io
 
 **Source Code:** https://github.com/BrianPugh/cyclopts
 
@@ -80,7 +80,7 @@ Looping! 1
 Looping! 2
 ```
 With just a few additional lines of code, we have a full-featured CLI app.
-See [the docs](http://cyclopts.readthedocs.com) for more advanced usage.
+See [the docs](https://cyclopts.readthedocs.io) for more advanced usage.
 
 # Compared to Typer
 Cyclopts is what you thought Typer was.
