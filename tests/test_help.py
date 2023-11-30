@@ -599,3 +599,55 @@ def test_help_print_commands_plus_meta(app, console):
         """
     )
     assert actual == expected
+
+
+@pytest.mark.skip(reason="not ready yet")
+def test_help_print_commands_plus_meta_short(app, console):
+    app.version_flags = ["--version"]
+    app.help_flags = ["--help", "-h"]
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    @app.command(help="Cmd1 help string.")
+    def cmd1():
+        pass
+
+    @app.meta.command(help="Meta cmd help string.")
+    def meta_cmd():
+        pass
+
+    @app.command(help="Cmd2 help string.")
+    def cmd2():
+        pass
+
+    @app.meta.default
+    def main(
+        *tokens: str,
+        hostname: Annotated[str, Parameter(name=["--hostname", "-n"], help="Hostname to connect to.")],
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  --hostname  Hostname to connect to. [required]                  │
+        │    --version   Display application version.                        │
+        │    --help,-h   Display this message and exit.                      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ cmd1      Cmd1 help string.                                        │
+        │ cmd2      Cmd2 help string.                                        │
+        │ meta-cmd  Meta cmd help string.                                    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

@@ -152,83 +152,86 @@ def format_parameters(app, title, show_special=True):
     if app.default_command:
         help_lookup = parameter2docstring(app.default_command)
         parameters = list(inspect.signature(app.default_command).parameters.values())
+    else:
+        help_lookup = {}
+        parameters = []
 
-        def is_required(parameter):
-            return parameter.default is parameter.empty
+    def is_required(parameter):
+        return parameter.default is parameter.empty
 
-        def is_short(s):
-            return not s.startswith("--") and s.startswith("-")
+    def is_short(s):
+        return not s.startswith("--") and s.startswith("-")
 
-        has_required = any(is_required(p) for p in parameters)
+    has_required = any(is_required(p) for p in parameters)
 
-        for parameter in parameters:
-            type_, param = get_hint_parameter(parameter.annotation)
-            if not param.show_:
-                continue
-            has_short = any(is_short(x) for x in get_names(parameter))
-            if has_short:
-                break
-
-        if has_required:
-            table.add_column(justify="left", width=1, style="red bold")
-        table.add_column(justify="left", no_wrap=True, style="cyan")
+    for parameter in parameters:
+        type_, param = get_hint_parameter(parameter.annotation)
+        if not param.show_:
+            continue
+        has_short = any(is_short(x) for x in get_names(parameter))
         if has_short:
-            table.add_column(justify="left", no_wrap=True, style="green")
-        table.add_column(justify="left")
+            break
 
-        for parameter in parameters:
-            type_, param = get_hint_parameter(parameter.annotation)
+    if has_required:
+        table.add_column(justify="left", width=1, style="red bold")
+    table.add_column(justify="left", no_wrap=True, style="cyan")
+    if has_short:
+        table.add_column(justify="left", no_wrap=True, style="green")
+    table.add_column(justify="left")
 
-            if not param.show_:
-                continue
+    for parameter in parameters:
+        type_, param = get_hint_parameter(parameter.annotation)
 
-            options = get_names(parameter)
-            options.extend(param.get_negatives(type_, *options))
+        if not param.show_:
+            continue
 
-            if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
-                arg_name = options[0].lstrip("-").upper()
-                if arg_name != options[0]:
-                    options = [arg_name, *options]
+        options = get_names(parameter)
+        options.extend(param.get_negatives(type_, *options))
 
-            short_options, long_options = [], []
-            for option in options:
-                if is_short(option):
-                    short_options.append(option)
-                else:
-                    long_options.append(option)
+        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
+            arg_name = options[0].lstrip("-").upper()
+            if arg_name != options[0]:
+                options = [arg_name, *options]
 
-            help_components = []
-            if param.help is not None:
-                help_components.append(param.help)
+        short_options, long_options = [], []
+        for option in options:
+            if is_short(option):
+                short_options.append(option)
             else:
-                with suppress(KeyError):
-                    help_components.append(help_lookup[parameter].description)
+                long_options.append(option)
 
-            if param.show_choices:
-                choices = _get_choices(type_)
-                if choices:
-                    help_components.append(rf"[dim]\[choices: {choices}][/dim]")
+        help_components = []
+        if param.help is not None:
+            help_components.append(param.help)
+        else:
+            with suppress(KeyError):
+                help_components.append(help_lookup[parameter].description)
 
-            if param.show_default and not is_required(parameter):
-                default = ""
-                if isclass(type_) and issubclass(type_, Enum):
-                    default = parameter.default.name.lower().replace("_", "-")
-                else:
-                    default = parameter.default
+        if param.show_choices:
+            choices = _get_choices(type_)
+            if choices:
+                help_components.append(rf"[dim]\[choices: {choices}][/dim]")
 
-                help_components.append(rf"[dim]\[default: {default}][/dim]")
-            if is_required(parameter):
-                help_components.append(r"[red][dim]\[required][/dim][/red]")
+        if param.show_default and not is_required(parameter):
+            default = ""
+            if isclass(type_) and issubclass(type_, Enum):
+                default = parameter.default.name.lower().replace("_", "-")
+            else:
+                default = parameter.default
 
-            # populate row
-            row_args = []
-            if has_required:
-                row_args.append("*" if is_required(parameter) else "")
-            row_args.append(",".join(long_options) + " ")  # a little extra padding
-            if has_short:
-                row_args.append(",".join(short_options) + " ")  # a little extra padding
-            row_args.append(" ".join(help_components))
-            table.add_row(*row_args)
+            help_components.append(rf"[dim]\[default: {default}][/dim]")
+        if is_required(parameter):
+            help_components.append(r"[red][dim]\[required][/dim][/red]")
+
+        # populate row
+        row_args = []
+        if has_required:
+            row_args.append("*" if is_required(parameter) else "")
+        row_args.append(",".join(long_options) + " ")  # a little extra padding
+        if has_short:
+            row_args.append(",".join(short_options) + " ")  # a little extra padding
+        row_args.append(" ".join(help_components))
+        table.add_row(*row_args)
 
     # Add in special flags
     if show_special:
@@ -238,6 +241,10 @@ def format_parameters(app, title, show_special=True):
                 row_args.append("")
 
             row_args.append(",".join(app.version_flags) + " ")
+
+            if has_short:
+                row_args.append("")
+
             row_args.append("Display application version.")
             table.add_row(*row_args)
 
@@ -246,6 +253,10 @@ def format_parameters(app, title, show_special=True):
             if has_required:
                 row_args.append("")
             row_args.append(",".join(app.help_flags) + " ")
+
+            if has_short:
+                row_args.append("")
+
             row_args.append("Display this message and exit.")
             table.add_row(*row_args)
 
