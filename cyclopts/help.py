@@ -150,12 +150,16 @@ def format_parameters(app, title, show_special=True):
 
     has_required, has_short = False, False
 
+    parameters = []
     if app.default_command:
         help_lookup = parameter2docstring(app.default_command)
-        parameters = list(inspect.signature(app.default_command).parameters.values())
+        for parameter in inspect.signature(app.default_command).parameters.values():
+            _, param = get_hint_parameter(parameter.annotation)
+            if not param.parse or not param.show_:
+                continue
+            parameters.append(parameter)
     else:
         help_lookup = {}
-        parameters = []
 
     def is_required(parameter):
         return parameter.default is parameter.empty
@@ -219,9 +223,6 @@ def format_parameters(app, title, show_special=True):
 
     for parameter in parameters:
         type_, param = get_hint_parameter(parameter.annotation)
-
-        if not param.show_:
-            continue
 
         options = get_names(parameter)
         options.extend(param.get_negatives(type_, *options))
