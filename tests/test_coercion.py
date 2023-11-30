@@ -7,7 +7,7 @@ import pytest
 from typing_extensions import Annotated
 
 from cyclopts import CoercionError
-from cyclopts.coercion import coerce, token_count
+from cyclopts.coercion import coerce, resolve, token_count
 
 
 def _assert_tuple(expected, actual):
@@ -169,3 +169,9 @@ def test_coerce_bytearray():
     assert bytearray(b"foo") == res
 
     assert [bytearray(b"foo"), bytearray(b"bar")] == coerce(bytearray, "foo", "bar")
+
+
+def test_resolve_annotated():
+    type_ = Annotated[Literal["foo", "bar"], "fizz"]
+    res = resolve(type_)
+    assert res == Literal["foo", "bar"]
