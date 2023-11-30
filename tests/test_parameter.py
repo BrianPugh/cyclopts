@@ -47,4 +47,4 @@ def test_get_hint_parameter_basic():
     )
     type_, cparam = get_hint_parameter(iparam.annotation)
     assert type_ is bool
-    assert cparam is expected_cparam
+    assert cparam == expected_cparam

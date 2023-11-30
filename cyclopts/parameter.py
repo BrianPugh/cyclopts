@@ -197,9 +197,9 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
         return str, Parameter()
 
     if type(type_) is AnnotatedType:
-        hint_args = typing.get_args(type_)
-        type_ = hint_args[0]
-        cyclopts_parameters = [x for x in hint_args[1:] if isinstance(x, Parameter)]
+        annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+        type_ = typing.get_args(type_)[0]
+        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
         if len(cyclopts_parameters) > 2:
             raise MultipleParameterAnnotationError
         elif len(cyclopts_parameters) == 1:
