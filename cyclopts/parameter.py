@@ -6,7 +6,7 @@ from typing import Iterable, List, Optional, Tuple, Type, Union, get_origin
 from attrs import field, frozen
 from typing_extensions import Annotated
 
-from cyclopts.coercion import coerce, get_origin_and_validate, resolve
+from cyclopts.coercion import AnnotatedType, coerce, get_origin_and_validate, resolve
 from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
 
@@ -25,10 +25,6 @@ def _optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]
         return ()
 
     return _str_to_tuple_converter(input_value)
-
-
-def _default_validator(type_, arg):
-    pass
 
 
 def _token_count_validator(instance, attribute, value):
@@ -77,7 +73,7 @@ class Parameter:
     If not provided, defaults to :ref:`Cyclopts's internal coercion engine <Coercion Rules>`.
     """
 
-    validator: Validator = field(default=_default_validator)
+    validator: Optional[Validator] = field(default=None)
     """
     A function that validates data returned by the ``converter``.
 
@@ -182,7 +178,7 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
     if param.name:
         names = list(param.name)
     else:
-        if parameter.kind is parameter.POSITIONAL_ONLY:
+        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL):
             # Name is only used for help-string
             names = [parameter.name.upper()]
         else:
@@ -200,10 +196,10 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
     if type_ is inspect.Parameter.empty:
         return str, Parameter()
 
-    if typing.get_origin(type_) is Annotated:
-        hint_args = typing.get_args(type_)
-        type_ = hint_args[0]
-        cyclopts_parameters = [x for x in hint_args[1:] if isinstance(x, Parameter)]
+    if type(type_) is AnnotatedType:
+        annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+        type_ = typing.get_args(type_)[0]
+        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
         if len(cyclopts_parameters) > 2:
             raise MultipleParameterAnnotationError
         elif len(cyclopts_parameters) == 1:
