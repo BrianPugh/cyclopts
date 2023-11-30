@@ -11,9 +11,10 @@ from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+from typing_extensions import Annotated
 
 from cyclopts.exceptions import DocstringError
-from cyclopts.parameter import get_hint_parameter, get_names
+from cyclopts.parameter import Parameter, get_hint_parameter, get_names
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
 
@@ -162,6 +163,43 @@ def format_parameters(app, title, show_special=True):
     def is_short(s):
         return not s.startswith("--") and s.startswith("-")
 
+    if show_special:
+        if app.version_flags:
+            parameters.append(
+                inspect.Parameter(
+                    name="version",
+                    kind=inspect.Parameter.KEYWORD_ONLY,
+                    default=False,
+                    annotation=Annotated[
+                        bool,
+                        Parameter(
+                            name=app.version_flags,
+                            negative="",
+                            show_default=False,
+                            help="Display application version.",
+                        ),
+                    ],
+                )
+            )
+
+        if app.help_flags:
+            parameters.append(
+                inspect.Parameter(
+                    name="help",
+                    kind=inspect.Parameter.KEYWORD_ONLY,
+                    default=False,
+                    annotation=Annotated[
+                        bool,
+                        Parameter(
+                            name=app.help_flags,
+                            negative="",
+                            show_default=False,
+                            help="Display this message and exit.",
+                        ),
+                    ],
+                )
+            )
+
     has_required = any(is_required(p) for p in parameters)
 
     for parameter in parameters:
@@ -173,11 +211,11 @@ def format_parameters(app, title, show_special=True):
             break
 
     if has_required:
-        table.add_column(justify="left", width=1, style="red bold")
-    table.add_column(justify="left", no_wrap=True, style="cyan")
+        table.add_column(justify="left", width=1, style="red bold")  # For asterisk
+    table.add_column(justify="left", no_wrap=True, style="cyan")  # For option names
     if has_short:
-        table.add_column(justify="left", no_wrap=True, style="green")
-    table.add_column(justify="left")
+        table.add_column(justify="left", no_wrap=True, style="green")  # For short options
+    table.add_column(justify="left")  # For main help text.
 
     for parameter in parameters:
         type_, param = get_hint_parameter(parameter.annotation)
@@ -232,33 +270,6 @@ def format_parameters(app, title, show_special=True):
             row_args.append(",".join(short_options) + " ")  # a little extra padding
         row_args.append(" ".join(help_components))
         table.add_row(*row_args)
-
-    # Add in special flags
-    if show_special:
-        if app.version_flags:
-            row_args = []
-            if has_required:
-                row_args.append("")
-
-            row_args.append(",".join(app.version_flags) + " ")
-
-            if has_short:
-                row_args.append("")
-
-            row_args.append("Display application version.")
-            table.add_row(*row_args)
-
-        if app.help_flags:
-            row_args = []
-            if has_required:
-                row_args.append("")
-            row_args.append(",".join(app.help_flags) + " ")
-
-            if has_short:
-                row_args.append("")
-
-            row_args.append("Display this message and exit.")
-            table.add_row(*row_args)
 
     if table.row_count == 0:
         return _silent

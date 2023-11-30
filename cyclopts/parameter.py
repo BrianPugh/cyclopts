@@ -182,7 +182,7 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
     if param.name:
         names = list(param.name)
     else:
-        if parameter.kind is parameter.POSITIONAL_ONLY:
+        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL):
             # Name is only used for help-string
             names = [parameter.name.upper()]
         else:

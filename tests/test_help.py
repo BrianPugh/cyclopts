@@ -42,8 +42,8 @@ def test_help_default_help_flags(console):
     App Help String Line 1.
 
     ╭─ Parameters ───────────────────────────────────────────────────────╮
-    │ --version  Display application version.                            │
-    │ --help,-h  Display this message and exit.                          │
+    │ --version      Display application version.                        │
+    │ --help     -h  Display this message and exit.                      │
     ╰────────────────────────────────────────────────────────────────────╯
     """
     )
@@ -587,9 +587,9 @@ def test_help_print_commands_plus_meta(app, console):
         App Help String Line 1.
 
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  Hostname to connect to. [required]                  │
-        │    --version   Display application version.                        │
-        │    --help,-h   Display this message and exit.                      │
+        │ *  --hostname      Hostname to connect to. [required]              │
+        │    --version       Display application version.                    │
+        │    --help      -h  Display this message and exit.                  │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1      Cmd1 help string.                                        │
@@ -601,7 +601,6 @@ def test_help_print_commands_plus_meta(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="not ready yet")
 def test_help_print_commands_plus_meta_short(app, console):
     app.version_flags = ["--version"]
     app.help_flags = ["--help", "-h"]
@@ -639,9 +638,10 @@ def test_help_print_commands_plus_meta_short(app, console):
         App Help String Line 1.
 
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  Hostname to connect to. [required]                  │
-        │    --version   Display application version.                        │
-        │    --help,-h   Display this message and exit.                      │
+        │ *  TOKENS          [required]                                      │
+        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │    --version       Display application version.                    │
+        │    --help      -h  Display this message and exit.                  │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1      Cmd1 help string.                                        │
