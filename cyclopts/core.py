@@ -144,9 +144,6 @@ class App:
             return k in self._meta_parent
         return False
 
-    def __len__(self) -> int:
-        return len(self._commands)
-
     @property
     def meta(self) -> "App":
         if self._meta is None:
