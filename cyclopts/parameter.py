@@ -27,10 +27,6 @@ def _optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]
     return _str_to_tuple_converter(input_value)
 
 
-def _default_validator(type_, arg):
-    pass
-
-
 def _token_count_validator(instance, attribute, value):
     if value is not None and instance.converter is coerce:
         raise ValueError('Must specify a "converter" if setting "token_count".')
@@ -77,7 +73,7 @@ class Parameter:
     If not provided, defaults to :ref:`Cyclopts's internal coercion engine <Coercion Rules>`.
     """
 
-    validator: Validator = field(default=_default_validator)
+    validator: Optional[Validator] = field(default=None)
     """
     A function that validates data returned by the ``converter``.
 
