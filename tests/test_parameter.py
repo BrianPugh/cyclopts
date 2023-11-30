@@ -1,8 +1,11 @@
+import inspect
 from typing import List, Set
 
 import pytest
+from typing_extensions import Annotated
 
 from cyclopts import Parameter
+from cyclopts.parameter import get_hint_parameter
 
 
 def test_parameter_get_negatives_bool_default():
@@ -26,3 +29,22 @@ def test_parameter_get_negatives_custom_single(type_):
 def test_parameter_get_negatives_bool_custom_list(type_):
     p = Parameter(negative=["--foo", "--bar"])
     assert ("--foo", "--bar") == p.get_negatives(type_, "this-string-doesnt-matter")
+
+
+def test_get_hint_parameter_basic():
+    expected_cparam = Parameter(
+        name=["--help", "-h"],
+        negative="",
+        show_default=False,
+        help="Display this message and exit.",
+    )
+
+    iparam = inspect.Parameter(
+        name="help",
+        kind=inspect.Parameter.KEYWORD_ONLY,
+        default=False,
+        annotation=Annotated[bool, expected_cparam],
+    )
+    type_, cparam = get_hint_parameter(iparam.annotation)
+    assert type_ is bool
+    assert cparam is expected_cparam

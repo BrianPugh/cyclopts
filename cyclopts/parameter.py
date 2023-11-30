@@ -6,7 +6,7 @@ from typing import Iterable, List, Optional, Tuple, Type, Union, get_origin
 from attrs import field, frozen
 from typing_extensions import Annotated
 
-from cyclopts.coercion import coerce, get_origin_and_validate, resolve
+from cyclopts.coercion import AnnotatedType, coerce, get_origin_and_validate, resolve
 from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
 
@@ -196,7 +196,7 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
     if type_ is inspect.Parameter.empty:
         return str, Parameter()
 
-    if typing.get_origin(type_) is Annotated:
+    if type(type_) is AnnotatedType:
         hint_args = typing.get_args(type_)
         type_ = hint_args[0]
         cyclopts_parameters = [x for x in hint_args[1:] if isinstance(x, Parameter)]
