@@ -10,6 +10,7 @@ from cyclopts.exceptions import CoercionError
 
 # from types import NoneType is available >=3.10
 NoneType = type(None)
+AnnotatedType = type(Annotated[int, 0])
 
 _implicit_iterable_type_mapping = {
     list: List[str],
@@ -148,7 +149,7 @@ def resolve_union(type_: Type) -> Type:
 
 
 def resolve_annotated(type_: Type) -> Type:
-    while get_origin(type_) is Annotated:
+    if type(type_) is AnnotatedType:
         type_ = get_args(type_)[0]
     return type_
 
