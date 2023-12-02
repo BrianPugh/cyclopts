@@ -3,6 +3,7 @@ import inspect
 import os
 import sys
 from functools import partial
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from attrs import define, evolve, field
@@ -111,7 +112,7 @@ class App:
         if self._name:
             return self._name
         elif self.default_command is None:
-            return sys.argv[0]
+            return Path(sys.argv[0]).name
         else:
             return _format_name(self.default_command.__name__)
 
