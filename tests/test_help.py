@@ -602,6 +602,7 @@ def test_help_print_commands_plus_meta(app, console):
 
 
 def test_help_print_commands_plus_meta_short(app, console):
+    app.help = None
     app.version_flags = ["--version"]
     app.help_flags = ["--help", "-h"]
 
@@ -613,7 +614,14 @@ def test_help_print_commands_plus_meta_short(app, console):
         pass
 
     @app.meta.command(help="Meta cmd help string.")
-    def meta_cmd():
+    def meta_cmd(a: int):
+        """
+
+        Parameters
+        ----------
+        a
+            Some value.
+        """
         pass
 
     @app.command(help="Cmd2 help string.")
@@ -625,6 +633,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         *tokens: str,
         hostname: Annotated[str, Parameter(name=["--hostname", "-n"], help="Hostname to connect to.")],
     ):
+        """App Help String Line 1 from meta."""
         pass
 
     with console.capture() as capture:
@@ -635,7 +644,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         """\
         Usage: app COMMAND
 
-        App Help String Line 1.
+        App Help String Line 1 from meta.
 
         ╭─ Session Parameters ───────────────────────────────────────────────╮
         │ *  TOKENS          [required]                                      │
@@ -647,6 +656,64 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ cmd1      Cmd1 help string.                                        │
         │ cmd2      Cmd2 help string.                                        │
         │ meta-cmd  Meta cmd help string.                                    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+    # Add in a default root app.
+    @app.default
+    def root_default_cmd(rdp):
+        """Root Default Command Short Description.
+
+        Parameters
+        ----------
+        rdp:
+            RDP description.
+        """
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        Root Default Command Short Description.
+
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  TOKENS          [required]                                      │
+        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │    --version       Display application version.                    │
+        │    --help      -h  Display this message and exit.                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  RDP,--rdp  RDP description. [required]                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ cmd1      Cmd1 help string.                                        │
+        │ cmd2      Cmd2 help string.                                        │
+        │ meta-cmd  Meta cmd help string.                                    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+    # Test that the meta command help parsing is correct.
+    with console.capture() as capture:
+        app.help_print(["meta-cmd"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app meta-cmd [ARGS] [OPTIONS]
+
+        Meta cmd help string.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  A,--a  Some value. [required]                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

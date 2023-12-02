@@ -2,11 +2,13 @@ import importlib
 import inspect
 import os
 import sys
+from contextlib import suppress
+from copy import copy
 from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-from attrs import define, evolve, field
+from attrs import define, field
 from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
@@ -67,6 +69,14 @@ def _validate_default_command(x):
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
     return x
+
+
+def _combined_meta_command_mapping(app):
+    """Return a copied and combined mapping containing app and meta-app commands."""
+    command_mapping = copy(app._commands)
+    while (app := app._meta) and app._commands:
+        command_mapping.update(app._commands)
+    return command_mapping
 
 
 @define(kw_only=True)
@@ -140,11 +150,16 @@ class App:
     def help_(self) -> str:
         if self.help is not None:
             return self.help
-        if self.default_command is None:
+        elif self.default_command is None:
+            # Try and fallback to a meta-app docstring.
+            if self._meta is None:
+                return ""
+            else:
+                return self.meta.help_
+        elif self.default_command.__doc__ is None:
             return ""
-        if self.default_command.__doc__ is None:
-            return ""
-        return self.default_command.__doc__
+        else:
+            return self.default_command.__doc__
 
     def version_print(self) -> None:
         """Print the application version."""
@@ -156,6 +171,9 @@ class App:
         All commands get registered to Cyclopts as subapps.
         The actual function handler is at ``app[key].default_command``.
         """
+        if self._meta:
+            with suppress(KeyError):
+                return self.meta[key]
         return self._commands[key]
 
     def __contains__(self, k: str) -> bool:
@@ -176,17 +194,20 @@ class App:
 
     def _parse_command_chain(self, tokens):
         command_chain = []
-        command_mapping = self._commands
         app = self
         unused_tokens = tokens
+
+        command_mapping = _combined_meta_command_mapping(app)
+
         for i, token in enumerate(tokens):
             try:
                 app = command_mapping[token]
                 unused_tokens = tokens[i + 1 :]
             except KeyError:
                 break
-            command_mapping = app._commands
             command_chain.append(token)
+            command_mapping = _combined_meta_command_mapping(app)
+
         return command_chain, app, unused_tokens
 
     def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
@@ -217,11 +238,9 @@ class App:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
         else:
             validate_command(obj)
-            kwargs.setdefault("name", None)
-            kwargs.setdefault("help", None)
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
-            app = evolve(self, default_command=obj, **kwargs)
+            app = App(default_command=obj, **kwargs)
 
         if name is None:
             name = app.name
@@ -442,7 +461,7 @@ class App:
         def walk_apps():
             # Iterates from deepest to shallowest
             meta_list = [app]  # shallowest to deepest
-            meta = self
+            meta = app
             while (meta := meta._meta) and meta.default_command:
                 meta_list.append(meta)
             yield from reversed(meta_list)
@@ -450,14 +469,14 @@ class App:
         show_special = True
 
         command_rows = {}
-        for app in walk_apps():
-            command_rows.setdefault(app.help_title_commands, [])
-            command_rows[app.help_title_commands].extend(format_command_rows(app))
+        for subapp in walk_apps():
+            command_rows.setdefault(subapp.help_title_commands, [])
+            command_rows[subapp.help_title_commands].extend(format_command_rows(subapp))
 
             console.print(
                 format_parameters(
-                    app,
-                    app.help_title_parameters,
+                    subapp,
+                    subapp.help_title_parameters,
                     show_special=show_special,
                 )
             )
