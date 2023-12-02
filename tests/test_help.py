@@ -602,6 +602,7 @@ def test_help_print_commands_plus_meta(app, console):
 
 
 def test_help_print_commands_plus_meta_short(app, console):
+    app.help = None
     app.version_flags = ["--version"]
     app.help_flags = ["--help", "-h"]
 
@@ -625,6 +626,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         *tokens: str,
         hostname: Annotated[str, Parameter(name=["--hostname", "-n"], help="Hostname to connect to.")],
     ):
+        """App Help String Line 1 from meta."""
         pass
 
     with console.capture() as capture:
@@ -635,7 +637,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         """\
         Usage: app COMMAND
 
-        App Help String Line 1.
+        App Help String Line 1 from meta.
 
         ╭─ Session Parameters ───────────────────────────────────────────────╮
         │ *  TOKENS          [required]                                      │

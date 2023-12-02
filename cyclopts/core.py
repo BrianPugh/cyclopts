@@ -140,11 +140,16 @@ class App:
     def help_(self) -> str:
         if self.help is not None:
             return self.help
-        if self.default_command is None:
+        elif self.default_command is None:
+            # Try and fallback to a meta-app docstring.
+            if self._meta is None:
+                return ""
+            else:
+                return self.meta.help_
+        elif self.default_command.__doc__ is None:
             return ""
-        if self.default_command.__doc__ is None:
-            return ""
-        return self.default_command.__doc__
+        else:
+            return self.default_command.__doc__
 
     def version_print(self) -> None:
         """Print the application version."""
