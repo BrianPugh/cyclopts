@@ -661,6 +661,46 @@ def test_help_print_commands_plus_meta_short(app, console):
     )
     assert actual == expected
 
+    # Add in a default root app.
+    @app.default
+    def root_default_cmd(rdp):
+        """Root Default Command Short Description.
+
+        Parameters
+        ----------
+        rdp:
+            RDP description.
+        """
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        Root Default Command Short Description.
+
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  TOKENS          [required]                                      │
+        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │    --version       Display application version.                    │
+        │    --help      -h  Display this message and exit.                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  RDP,--rdp  RDP description. [required]                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ cmd1      Cmd1 help string.                                        │
+        │ cmd2      Cmd2 help string.                                        │
+        │ meta-cmd  Meta cmd help string.                                    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
     # Test that the meta command help parsing is correct.
     with console.capture() as capture:
         app.help_print(["meta-cmd"], console=console)
