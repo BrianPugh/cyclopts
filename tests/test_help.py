@@ -614,7 +614,14 @@ def test_help_print_commands_plus_meta_short(app, console):
         pass
 
     @app.meta.command(help="Meta cmd help string.")
-    def meta_cmd():
+    def meta_cmd(a: int):
+        """
+
+        Parameters
+        ----------
+        a
+            Some value.
+        """
         pass
 
     @app.command(help="Cmd2 help string.")
@@ -649,6 +656,24 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ cmd1      Cmd1 help string.                                        │
         │ cmd2      Cmd2 help string.                                        │
         │ meta-cmd  Meta cmd help string.                                    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+    # Test that the meta command help parsing is correct.
+    with console.capture() as capture:
+        app.help_print(["meta-cmd"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app meta-cmd [ARGS] [OPTIONS]
+
+        Meta cmd help string.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  A,--a  Some value. [required]                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
