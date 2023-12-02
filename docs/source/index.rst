@@ -14,6 +14,8 @@ Cyclopts
    commands.rst
    parameters.rst
    validators.rst
+   help.rst
+   version.rst
    rules.rst
    api
 
