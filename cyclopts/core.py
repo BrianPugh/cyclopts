@@ -25,6 +25,23 @@ def _format_name(name: str):
     return name.lower().replace("_", "-").strip("-")
 
 
+class _CannotDeriveCallingModuleNameError(Exception):
+    pass
+
+
+def _get_root_module_name():
+    for elem in inspect.stack():
+        module = inspect.getmodule(elem.frame)
+        if module is None:
+            continue
+        root_module_name = module.__name__.split(".")[0]
+        if root_module_name == "cyclopts":
+            continue
+        return root_module_name
+
+    raise _CannotDeriveCallingModuleNameError
+
+
 def _default_version(default="0.0.0") -> str:
     """Attempts to get the calling code's ``module.__version__``.
 
@@ -33,16 +50,16 @@ def _default_version(default="0.0.0") -> str:
     version: str
         ``default`` if it cannot find ``__version__``.
     """
-    stack = inspect.stack()
-    calling_frame = stack[2]  # Assumes App is calling this
-    if (module := inspect.getmodule(calling_frame.frame)) is None:
+    try:
+        root_module_name = _get_root_module_name()
+    except _CannotDeriveCallingModuleNameError:
         return default
 
-    root_module_name = module.__name__.split(".")[0]
     try:
         module = importlib.import_module(root_module_name)
     except ImportError:
         return default
+
     return getattr(module, "__version__", default)
 
 
@@ -112,7 +129,10 @@ class App:
         if self._name:
             return self._name
         elif self.default_command is None:
-            return Path(sys.argv[0]).name
+            name = Path(sys.argv[0]).name
+            if name == "__main__.py":
+                name = _get_root_module_name()
+            return name
         else:
             return _format_name(self.default_command.__name__)
 
