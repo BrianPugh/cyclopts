@@ -4,7 +4,7 @@ import sys
 from functools import lru_cache
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Union, get_origin
 
-from cyclopts.coercion import resolve_annotated, resolve_optional, token_count
+from cyclopts.coercion import resolve, token_count
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
@@ -49,7 +49,7 @@ def cli2parameter(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
             continue
 
         if iparam.kind in (iparam.POSITIONAL_OR_KEYWORD, iparam.KEYWORD_ONLY):
-            hint = resolve_optional(resolve_annotated(annotation))
+            hint = resolve(annotation)
             keys = get_names(iparam)
 
             for key in keys:
