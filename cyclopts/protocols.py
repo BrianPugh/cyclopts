@@ -1,4 +1,5 @@
-from typing import Any, Protocol, Type
+import inspect
+from typing import Any, Callable, Protocol, Type
 
 
 class Converter(Protocol):
@@ -8,4 +9,9 @@ class Converter(Protocol):
 
 class Validator(Protocol):
     def __call__(self, type_: Type, value: Any, /) -> None:
+        ...
+
+
+class Dispatcher(Protocol):
+    def __call__(self, command: Callable, bound: inspect.BoundArguments, /) -> Any:
         ...

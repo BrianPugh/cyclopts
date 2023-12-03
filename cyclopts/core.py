@@ -2,6 +2,7 @@ import importlib
 import inspect
 import os
 import sys
+import traceback
 from contextlib import suppress
 from copy import copy
 from functools import partial
@@ -21,6 +22,7 @@ from cyclopts.exceptions import (
 )
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
 from cyclopts.parameter import validate_command
+from cyclopts.protocols import Dispatcher
 
 
 def _format_name(name: str):
@@ -497,6 +499,7 @@ class App:
         self,
         prompt: str = "$ ",
         quit: Union[None, str, Iterable[str]] = None,
+        dispatcher: Optional[Dispatcher] = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -510,8 +513,18 @@ class App:
         quit: Union[str, Iterable[str]]
             String or list of strings that will cause the shell to exit and this method to return.
             Defaults to ``["q", "quit"]``.
+        dispatcher: Optional[Dispatcher]
+            Optional function that subsequently invokes the command.
+            The ``dispatcher`` function must have signature:
+
+            .. code-block:: python
+
+                def dispatcher(command: Callable, bound: inspect.BoundArguments) -> Any:
+                    return command(*bound.args, **bound.kwargs)
+
+            The above is the default dispatcher implementation.
         `**kwargs`
-            Get passed along to :meth:`__call__` (and, subsequently :meth:`parse_args`).
+            Get passed along to :meth:`parse_args`.
         """
         if os.name == "posix":
             print("Interactive shell. Press Ctrl-D to exit.")
@@ -523,6 +536,12 @@ class App:
         if isinstance(quit, str):
             quit = [quit]
 
+        def default_dispatcher(command, bound):
+            return command(*bound.args, **bound.kwargs)
+
+        if dispatcher is None:
+            dispatcher = default_dispatcher
+
         kwargs.setdefault("exit_on_error", False)
 
         while True:
@@ -531,16 +550,17 @@ class App:
             except EOFError:
                 break
 
-            split_user_input = normalize_tokens(user_input)
-            if not split_user_input:
+            tokens = normalize_tokens(user_input)
+            if not tokens:
                 continue
-            if split_user_input[0] in quit:
+            if tokens[0] in quit:
                 break
 
             try:
-                self(split_user_input, **kwargs)
+                command, bound = self.parse_args(tokens, **kwargs)
+                dispatcher(command, bound)
             except CycloptsError:
                 # Upstream __call__->parse_args already printed the error
                 pass
-            except Exception as e:
-                print(e)
+            except Exception:
+                print(traceback.format_exc())
