@@ -6,8 +6,8 @@ __all__ = [
     "CoercionError",
     "CommandCollisionError",
     "Converter",
-    "create_bound_arguments",
     "CycloptsError",
+    "Dispatcher",
     "DocstringError",
     "InvalidCommandError",
     "MissingArgumentError",
@@ -17,6 +17,7 @@ __all__ = [
     "ValidationError",
     "Validator",
     "coerce",
+    "create_bound_arguments",
     "validators",
 ]
 
@@ -35,6 +36,6 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.parameter import Parameter
-from cyclopts.protocols import Converter, Validator
+from cyclopts.protocols import Converter, Dispatcher, Validator
 
 from . import validators
