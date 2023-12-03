@@ -59,7 +59,7 @@ _converters = {
 
 def _convert(type_, element):
     origin_type = get_origin(type_)
-    inner_types = get_args(type_)
+    inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
         return _convert(_implicit_iterable_type_mapping[type_], element)
@@ -129,11 +129,11 @@ def resolve(type_: Type) -> Type:
     while type_ != type_prev:
         type_prev = type_
         type_ = resolve_annotated(type_)
-        type_ = resolve_union(type_)
+        type_ = resolve_optional(type_)
     return type_
 
 
-def resolve_union(type_: Type) -> Type:
+def resolve_optional(type_: Type) -> Type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
     while get_origin(type_) is Union:
         non_none_types = [t for t in get_args(type_) if t is not NoneType]
@@ -144,7 +144,7 @@ def resolve_union(type_: Type) -> Type:
         elif len(non_none_types) == 1:
             type_ = non_none_types[0]
         elif len(non_none_types) > 1:
-            return Union[tuple(resolve_union(x) for x in non_none_types)]  # pyright: ignore
+            return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
     return type_
 
 
@@ -182,7 +182,7 @@ def coerce(type_: Type, *args: str):
     if type_ is inspect.Parameter.empty:
         type_ = str
 
-    type_ = resolve_annotated(type_)
+    type_ = resolve(type_)
 
     if type_ is Any:
         type_ = str
@@ -223,7 +223,7 @@ def token_count(type_: Type) -> Tuple[int, bool]:
     if param.token_count is not None:
         return abs(param.token_count), param.token_count < 0
 
-    type_ = resolve_annotated(type_)
+    type_ = resolve(type_)
     origin_type = get_origin_and_validate(type_)
 
     if origin_type is tuple:

@@ -1,7 +1,7 @@
 import sys
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 import pytest
 from typing_extensions import Annotated
@@ -62,9 +62,13 @@ def test_coerce_int():
 
 
 def test_coerce_annotated_int():
-    assert 1 == coerce(int, "1")
     assert [123, 456] == coerce(Annotated[int, "foo"], "123", "456")
     assert [123, 456] == coerce(Annotated[List[int], "foo"], "123", "456")
+
+
+def test_coerce_optional_annotated_int():
+    assert [123, 456] == coerce(Optional[Annotated[int, "foo"]], "123", "456")
+    assert [123, 456] == coerce(Optional[Annotated[List[int], "foo"]], "123", "456")
 
 
 def test_coerce_annotated_union_str_2nd_choice():
@@ -82,7 +86,6 @@ def test_coerce_annotated_nested_union_str_2nd_choice():
 
 def test_coerce_annotated_union_int():
     assert 123 == coerce(Annotated[Union[None, int, float], "foo"], "123")
-    assert 1 == coerce(int, "1")
     assert [123, 456] == coerce(Annotated[int, "foo"], "123", "456")
     assert [123, 456] == coerce(Annotated[Union[None, int, float], "foo"], "123", "456")
 
