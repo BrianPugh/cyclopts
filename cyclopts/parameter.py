@@ -6,7 +6,7 @@ from typing import Iterable, List, Optional, Tuple, Type, Union, get_origin
 from attrs import field, frozen
 from typing_extensions import Annotated
 
-from cyclopts.coercion import AnnotatedType, coerce, get_origin_and_validate, resolve
+from cyclopts.coercion import AnnotatedType, coerce, get_origin_and_validate, resolve, resolve_optional
 from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
 
@@ -187,7 +187,6 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
     return names
 
 
-@lru_cache
 def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
@@ -195,6 +194,8 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
     """
     if type_ is inspect.Parameter.empty:
         return str, Parameter()
+
+    type_ = resolve_optional(type_)
 
     if type(type_) is AnnotatedType:
         annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]

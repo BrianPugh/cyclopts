@@ -1,5 +1,4 @@
-import inspect
-from typing import List, Set
+from typing import List, Optional, Set
 
 import pytest
 from typing_extensions import Annotated
@@ -39,12 +38,19 @@ def test_get_hint_parameter_basic():
         help="Display this message and exit.",
     )
 
-    iparam = inspect.Parameter(
-        name="help",
-        kind=inspect.Parameter.KEYWORD_ONLY,
-        default=False,
-        annotation=Annotated[bool, expected_cparam],
+    type_, cparam = get_hint_parameter(Annotated[bool, expected_cparam])
+    assert type_ is bool
+    assert cparam == expected_cparam
+
+
+def test_get_hint_parameter_optional_annotated():
+    expected_cparam = Parameter(
+        name=["--help", "-h"],
+        negative="",
+        show_default=False,
+        help="Display this message and exit.",
     )
-    type_, cparam = get_hint_parameter(iparam.annotation)
+
+    type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]])
     assert type_ is bool
     assert cparam == expected_cparam
