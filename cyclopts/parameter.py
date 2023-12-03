@@ -115,10 +115,11 @@ class Parameter:
     Defaults to ``parse`` value (``True``).
     """
 
-    show_default: bool = field(default=True)
+    show_default: Optional[bool] = field(default=None)
     """
     If a variable has a default, display the default in the help page.
-    Defaults to ``True``.
+
+    Defaults to ``None``, which is similar to ``True``, but will not display the default if it's ``None``.
     """
 
     show_choices: bool = field(default=True)
