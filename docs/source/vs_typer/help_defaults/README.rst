@@ -45,3 +45,6 @@ Cyclopts fixes this:
    # │ *  SRC,--src  File to compress. [required]                         │
    # │    DST,--dst  Path to save compressed data to. [default: out.zip]  │
    # ╰────────────────────────────────────────────────────────────────────╯
+
+Additionally, if the default value is ``None``, cyclopts's default configuration will **not** display ``[default: None]``.
+Typically ``None`` is a sentinel value who's true value gets set inside the function.

@@ -288,7 +288,7 @@ def test_help_format_parameters_list_flag(app, console):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo,--empty-foo  Docstring for foo. [default: None]          │
+        │ FOO,--foo,--empty-foo  Docstring for foo.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

@@ -42,7 +42,7 @@ class SilentRich:
     """Dummy object that causes nothing to be printed."""
 
     def __rich_console__(self, console, options):
-        # This generator yields nothing, so 'rich' will print nothing for this object.
+        # This generator yields nothing, so ``rich`` will print nothing for this object.
         if False:
             yield
 
@@ -251,7 +251,9 @@ def format_parameters(app, title, show_special=True):
             if choices:
                 help_components.append(rf"[dim]\[choices: {choices}][/dim]")
 
-        if param.show_default and not is_required(parameter):
+        if not is_required(parameter) and (
+            param.show_default or (param.show_default is None and parameter.default is not None)
+        ):
             default = ""
             if isclass(type_) and issubclass(type_, Enum):
                 default = parameter.default.name.lower().replace("_", "-")
