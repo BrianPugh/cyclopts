@@ -187,7 +187,6 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
     return names
 
 
-@lru_cache
 def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
