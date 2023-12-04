@@ -48,6 +48,8 @@ The source resolution order is as follows (as applicable):
 
 
 3. The ``__doc__`` docstring of the registered :meth:`@app.default <cyclopts.App.default>` command.
+   Cyclopts parses the docstring to populate short-descriptions and long-descriptions
+   at the command-level, as well as at the parameter-level.
 
    .. code-block:: python
 
@@ -56,8 +58,14 @@ The source resolution order is as follows (as applicable):
 
 
       @app.default
-      def bar():
-          """This is the primary application docstring."""
+      def bar(val1: str):
+          """This is the primary application docstring.
+
+          Parameters
+          ----------
+          val1: str
+              This will be parsed for val1 help-string.
+          """
 
 
       @app["foo"].default
