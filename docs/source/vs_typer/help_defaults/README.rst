@@ -47,4 +47,32 @@ Cyclopts fixes this:
    # ╰────────────────────────────────────────────────────────────────────╯
 
 Additionally, if the default value is ``None``, cyclopts's default configuration will **not** display ``[default: None]``.
+Doing so doesn't convey much meaning to the end-user.
 Typically ``None`` is a sentinel value who's true value gets set inside the function.
+
+Additionally, the cleaner, docstring-centric way of writing this program with Cyclopts would be:
+
+.. code-block:: python
+
+   cyclopts_app = cyclopts.App()
+
+
+   @cyclopts_app.default()
+   def compress(src: Path, dst: Path = Path("out.zip")):
+       """Compress a file.
+
+       Parameters
+       ----------
+       src: Path
+          File to compress.
+       dst: Path
+          Path to save compressed data to.
+       """
+       print(f"Compressing data from {src} to {dst}")
+
+
+   cyclopts_app(["--help"])
+   # ╭─ Parameters ───────────────────────────────────────────────────────╮
+   # │ *  SRC,--src  File to compress. [required]                         │
+   # │    DST,--dst  Path to save compressed data to. [default: out.zip]  │
+   # ╰────────────────────────────────────────────────────────────────────╯

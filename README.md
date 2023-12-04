@@ -85,6 +85,7 @@ See [the docs](https://cyclopts.readthedocs.io) for more advanced usage.
 # Compared to Typer
 Cyclopts is what you thought Typer was.
 Cyclopts's includes information from docstrings, support more complex types (even Unions and Literals!), and include proper validation support.
+See [the documentation for a complete Typer comparison](https://cyclopts.readthedocs.io/en/latest/vs_typer/README.html).
 
 Consider the following short Cyclopts application:
 

@@ -62,6 +62,7 @@ However, if more control is required, we can use :class:`Parameter <cyclopts.Par
        pass
 
 :class:`Parameter <cyclopts.Parameter>` gives complete control on how Cyclopts processes the annotated parameter.
+See the API page for all configurable options.
 
 ----
 Help
