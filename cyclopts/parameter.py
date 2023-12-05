@@ -28,7 +28,7 @@ def _optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]
 
 
 def _token_count_validator(instance, attribute, value):
-    if value is not None and instance.converter is coerce:
+    if value is not None and instance.converter is None:
         raise ValueError('Must specify a "converter" if setting "token_count".')
 
 
@@ -60,7 +60,7 @@ class Parameter:
     Full-name options should start with ``--``.
     """
 
-    converter: Converter = field(default=coerce)
+    converter: Optional[Converter] = field(default=None)
     """
     A function that converts string token(s) into an object. The converter must have signature:
 
@@ -142,6 +142,13 @@ class Parameter:
             return True
         else:
             return False
+
+    @property
+    def converter_(self):
+        if self.converter:
+            return self.converter
+        else:
+            return coerce
 
     def get_negatives(self, type_, *names) -> Tuple[str, ...]:
         type_ = get_origin(type_) or type_
