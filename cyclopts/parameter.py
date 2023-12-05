@@ -122,7 +122,7 @@ class Parameter:
     Defaults to ``None``, which is similar to ``True``, but will not display the default if it's ``None``.
     """
 
-    show_choices: bool = field(default=True)
+    show_choices: Optional[bool] = field(default=None)
     """
     If a variable has a set of choices (``Literal``, ``Enum``), display the default in the help page.
     Defaults to ``True``.

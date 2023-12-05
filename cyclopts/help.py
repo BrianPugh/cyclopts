@@ -246,7 +246,7 @@ def format_parameters(app, title, show_special=True):
             with suppress(KeyError):
                 help_components.append(help_lookup[parameter].description)
 
-        if param.show_choices:
+        if param.show_choices in (None, True):
             choices = _get_choices(type_)
             if choices:
                 help_components.append(rf"[dim]\[choices: {choices}][/dim]")
