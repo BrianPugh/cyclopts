@@ -63,6 +63,8 @@ The registered command can either be a function, or another Cyclopts application
    $ my-script foo baz 5
    BAZ: 5
 
+.. _Changing Name:
+
 -------------
 Changing Name
 -------------
