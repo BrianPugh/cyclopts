@@ -33,3 +33,23 @@ def test_kwargs_int(app):
     actual_command, actual_bind = app.parse_args("foo 1")
     assert actual_command == foo
     assert actual_bind == expected_bind
+
+
+def test_args_and_kwargs_int(app):
+    @app.command
+    def foo(a: int, *args: int, **kwargs: int):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(1, 2, 3, 4, 5, bar=2, baz=3)
+
+    actual_command, actual_bind = app.parse_args("foo 1 2 3 4 5 --bar=2 --baz 3")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(1)
+
+    actual_command, actual_bind = app.parse_args("foo 1")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
