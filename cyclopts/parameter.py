@@ -1,7 +1,7 @@
 import inspect
 import typing
 from functools import lru_cache
-from typing import Iterable, List, Optional, Tuple, Type, Union, get_origin
+from typing import Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
 
 from attrs import field, frozen
 from typing_extensions import Annotated
@@ -43,9 +43,12 @@ def validate_command(f):
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
         _ = get_origin_and_validate(iparam.annotation)
-        _, cparam = get_hint_parameter(iparam.annotation)
+        type_, cparam = get_hint_parameter(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if get_origin(type_) is tuple:
+            if ... in get_args(type_):
+                raise ValueError("Cannot use a variable-length tuple.")
 
 
 @frozen
@@ -207,7 +210,7 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
 
     if type(type_) is AnnotatedType:
         annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-        type_ = typing.get_args(type_)[0]
+        type_ = get_args(type_)[0]
         cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
         if len(cyclopts_parameters) > 2:
             raise MultipleParameterAnnotationError
