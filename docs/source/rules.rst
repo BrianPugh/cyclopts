@@ -70,6 +70,7 @@ List
 * If provided as a positional parameter, all remaining positional tokens will be consumed.
 
   + It is frequently more appropriate to use ``*args`` to consume all remaining posiitonal tokens.
+    See :ref:`Args & Kwargs`.
 
 * If provided as a keyword parameter, a single element will be added per use.
 

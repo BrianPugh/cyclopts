@@ -24,6 +24,7 @@ Cyclopts
    :maxdepth: 2
    :caption: Advanced Usage
 
+   args_and_kwargs.rst
    packaging.rst
    app_calling.rst
    meta_app.rst

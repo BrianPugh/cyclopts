@@ -148,4 +148,7 @@ We can add application-level help documentation when creating our ``app``:
    │ --help,-h  Display this message and exit.                                       │
    ╰─────────────────────────────────────────────────────────────────────────────────╯
 
+If ``App(help=)`` is not set, Cyclopts will fallback to the first line
+(short description) of the registered ``@app.default`` function's docstring.
+
 .. _checkout the mypy cheatsheet: https://mypy.readthedocs.io/en/latest/cheat_sheet_py3.html
