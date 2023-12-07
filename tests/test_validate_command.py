@@ -26,15 +26,24 @@ def test_validate_command():
 
     validate_command(f4)
 
+    # Python automatically deduplicates the double None.
+    def f5(a: Union[None, None]):
+        pass
 
-def test_validate_command_exception():
+    validate_command(f5)
+
+
+def test_validate_command_exception_bare_tuple():
     def f1(a: tuple):
         pass
 
     with pytest.raises(TypeError):
         validate_command(f1)
 
-    def f2(a: Union[None, None]):
+
+def test_validate_command_exception_elipsis_tuple():
+    def f1(a: Tuple[int, ...]):
         pass
 
-    validate_command(f2)
+    with pytest.raises(ValueError):
+        validate_command(f1)
