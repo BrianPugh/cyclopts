@@ -2,7 +2,7 @@
 App Upgrade
 ===========
 
-The best practice is for users to install python-based CLIs via pipx_, where each application gets it's own python virtual environment.
+It's best practice for users to install python-based CLIs via pipx_, where each application gets it's own python virtual environment.
 Whether done via ``pipx`` or standard ``pip``, updating your application can be done via the ``upgrade`` command. i.e.:
 
 .. code-block:: console
@@ -31,6 +31,6 @@ If you would like your CLI application to be able to upgrade itself, you can add
        else:
            print(f"mypackage updated from v{old_version} to v{new_version}.")
 
-``sys.executable`` points to the current python interpreter's path; if your package was installed via pipx, then it points to the python interpreter in it's respective virtual environment.
+``sys.executable`` points to the currently used python interpreter's path; if your package was installed via pipx, then it points to the python interpreter in it's respective virtual environment.
 
 .. _pipx: https://github.com/pypa/pipx

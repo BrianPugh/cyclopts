@@ -36,6 +36,7 @@ Cyclopts
    :caption: Cookbook
 
    cookbook/app_upgrade.rst
+   cookbook/interactive_help.rst
 
 .. toctree::
    :maxdepth: 2
