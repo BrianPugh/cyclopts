@@ -445,6 +445,7 @@ class App:
         ----------
         tokens: Union[None, str, Iterable[str]]
             Tokens to interpret for traversing the application command structure.
+            If not provided, defaults to ``sys.argv``.
         """
         tokens = normalize_tokens(tokens)
 
