@@ -24,6 +24,10 @@ from cyclopts.help import create_panel_table_commands, format_command_rows, form
 from cyclopts.parameter import validate_command
 from cyclopts.protocols import Dispatcher
 
+with suppress(ImportError):
+    # By importing, makes things like the arrow-keys work.
+    import readline  # Not available on windows
+
 
 def _format_name(name: str):
     return name.lower().replace("_", "-").strip("-")

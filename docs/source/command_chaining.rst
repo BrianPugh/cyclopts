@@ -33,7 +33,7 @@ In this example, we will use a special delimiter token (e.g. ``"AND"``) to separ
        # tokens is ``["foo", "123", "AND", "foo", "456", "AND", "bar", "--flag"]``
        delimiter = "AND"
 
-       groups = [list(group) for key, group in itertools.groupby(tokens, lambda x: x == delimiter) if not key]
+       groups = [list(group) for key, group in itertools.groupby(tokens, lambda x: x == delimiter) if not key] or [[]]
        # groups is ``[['foo', '123'], ['foo', '456'], ['bar', '--flag']]``
 
        for group in groups:
