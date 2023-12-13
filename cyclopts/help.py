@@ -99,9 +99,11 @@ def format_usage(
 
 
 def format_doc(app, function: Optional[Callable]):
+    from cyclopts.core import App
+
     if function is None:
         raw_doc_string = app.help_
-    elif isinstance(function, type(app)):
+    elif isinstance(function, App):
         raw_doc_string = function.help_
     else:
         raw_doc_string = function.__doc__ or ""

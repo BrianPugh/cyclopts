@@ -33,6 +33,13 @@ Cyclopts
 
 .. toctree::
    :maxdepth: 2
+   :caption: Cookbook
+
+   cookbook/app_upgrade.rst
+   cookbook/interactive_help.rst
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alternative Libraries
 
    vs_typer/README.rst

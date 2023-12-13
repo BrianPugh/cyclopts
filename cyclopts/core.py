@@ -24,6 +24,10 @@ from cyclopts.help import create_panel_table_commands, format_command_rows, form
 from cyclopts.parameter import validate_command
 from cyclopts.protocols import Dispatcher
 
+with suppress(ImportError):
+    # By importing, makes things like the arrow-keys work.
+    import readline  # Not available on windows
+
 
 def _format_name(name: str):
     return name.lower().replace("_", "-").strip("-")
@@ -223,7 +227,7 @@ class App:
             Any argument that :class:`App` can take.
             ``name`` and ``help`` are common arguments.
         """
-        if obj is None:  # Called ``@app.command``
+        if obj is None:  # Called ``@app.command`` (no parenthesis)
             return partial(self.command, **kwargs)
 
         name = None
@@ -255,7 +259,7 @@ class App:
 
     def default(self, obj=None):
         """Decorator to register a function as the default action handler."""
-        if obj is None:  # Called ``@app.default_command``
+        if obj is None:  # Called ``@app.default_command`` (no parenthesis)
             return self.default
 
         if isinstance(obj, App):  # Registering a sub-App
@@ -445,6 +449,7 @@ class App:
         ----------
         tokens: Union[None, str, Iterable[str]]
             Tokens to interpret for traversing the application command structure.
+            If not provided, defaults to ``sys.argv``.
         """
         tokens = normalize_tokens(tokens)
 
@@ -560,7 +565,7 @@ class App:
                 command, bound = self.parse_args(tokens, **kwargs)
                 dispatcher(command, bound)
             except CycloptsError:
-                # Upstream __call__->parse_args already printed the error
+                # Upstream ``parse_args`` already printed the error
                 pass
             except Exception:
                 print(traceback.format_exc())
