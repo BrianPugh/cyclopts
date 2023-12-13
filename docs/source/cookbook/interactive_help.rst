@@ -85,6 +85,7 @@ To resolve this, we can explicitly add a ``help`` command:
        app.help_print([])
 
 .. code-block:: console
+
    $ python interactive-shell-demo.py
    Interactive shell. Press Ctrl-D to exit.
    cyclopts> help
