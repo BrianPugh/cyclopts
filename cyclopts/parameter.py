@@ -137,6 +137,19 @@ class Parameter:
     If not specified, defaults to the docstring.
     """
 
+    show_env_var: Optional[bool] = field(default=None)
+    """
+    If a variable has ``env_var`` set, display the variable name in the help page.
+    Defaults to ``True``.
+    """
+
+    env_var: Union[str, Iterable[str]] = field(default=[], converter=_str_to_tuple_converter)
+    """
+    Attempt to use these environment variable values in the absence of a CLI-provided value.
+    If the environment variable is unset, Cyclopts will default to the function-signature default.
+    If multiple values are given, the left-most environment variable with a set-value will be used.
+    """
+
     @property
     def show_(self):
         if self.show is not None:
