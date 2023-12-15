@@ -145,9 +145,9 @@ class Parameter:
 
     env_var: Union[str, Iterable[str]] = field(default=[], converter=_str_to_tuple_converter)
     """
-    Attempt to use these environment variable values in the absence of a CLI-provided value.
-    If the environment variable is unset, Cyclopts will default to the function-signature default.
-    If multiple values are given, the left-most environment variable with a set-value will be used.
+    Fallback to environment variable(s) if CLI value not provided.
+    If multiple environment variables are given, the left-most environment variable with a set value will be used.
+    If no environment variable is set, Cyclopts will fallback to the function-signature default.
     """
 
     @property

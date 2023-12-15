@@ -1,9 +1,10 @@
 import inspect
 import os
 
+import pytest
 from typing_extensions import Annotated
 
-from cyclopts import Parameter
+from cyclopts import MissingArgumentError, Parameter
 
 
 def test_env_var_unset_use_signature_default(app):
@@ -34,6 +35,26 @@ def test_env_var_set_use_env_var(app):
     actual_command, actual_bind = app.parse_args([])
     assert actual_command == foo
     assert actual_bind == expected_bind
+
+
+def test_env_var_set_use_env_var_no_default(app):
+    @app.default
+    def foo(bar: Annotated[int, Parameter(env_var="BAR")]):
+        pass
+
+    os.environ["BAR"] = "456"
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(456)
+
+    actual_command, actual_bind = app.parse_args([])
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+    os.environ.pop("BAR", None)
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args([], exit_on_error=False)
 
 
 def test_env_var_list_set_use_env_var(app):
