@@ -1,30 +1,19 @@
 import inspect
-import typing
-from functools import lru_cache
 from typing import Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
 
 from attrs import field, frozen
-from typing_extensions import Annotated
 
-from cyclopts.coercion import AnnotatedType, coerce, get_origin_and_validate, resolve, resolve_optional
+from cyclopts.coercion import (
+    AnnotatedType,
+    coerce,
+    get_origin_and_validate,
+    optional_str_to_tuple_converter,
+    resolve,
+    resolve_optional,
+    str_to_tuple_converter,
+)
 from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
-
-
-def _str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
-    if isinstance(input_value, str):
-        return (input_value,)
-    return tuple(input_value)
-
-
-def _optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Optional[Tuple[str, ...]]:
-    if input_value is None:
-        return None
-
-    if not input_value:
-        return ()
-
-    return _str_to_tuple_converter(input_value)
 
 
 def _token_count_validator(instance, attribute, value):
@@ -55,7 +44,7 @@ def validate_command(f):
 class Parameter:
     """Cyclopts configuration for individual function parameters."""
 
-    name: Union[str, Iterable[str]] = field(default=[], converter=_str_to_tuple_converter)
+    name: Union[str, Iterable[str]] = field(default=[], converter=str_to_tuple_converter)
     """
     Name(s) to expose to the CLI.
     Defaults to the python parameter's name, prepended with ``--``.
@@ -86,7 +75,7 @@ class Parameter:
             pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
     """
 
-    negative: Union[None, str, Iterable[str]] = field(default=None, converter=_optional_str_to_tuple_converter)
+    negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_str_to_tuple_converter)
     """
     Name(s) for empty iterables or false boolean flags.
     For booleans, defaults to ``--no-{name}``.
