@@ -253,6 +253,10 @@ def format_parameters(app, title, show_special=True):
             if choices:
                 help_components.append(rf"[dim]\[choices: {choices}][/dim]")
 
+        if param.show_env_var in (None, True) and param.env_var:
+            env_vars = " ".join(param.env_var)
+            help_components.append(rf"[dim]\[env var: {env_vars}][/dim]")
+
         if not is_required(parameter) and (
             param.show_default or (param.show_default is None and parameter.default is not None)
         ):

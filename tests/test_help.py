@@ -415,6 +415,27 @@ def test_help_format_parameters_choices_enum(app, console):
     assert actual == expected
 
 
+def test_help_format_parameters_env_var(app, console):
+    @app.command
+    def cmd(
+        foo: Annotated[int, Parameter(env_var=["FOO", "BAR"], help="Docstring for foo.")] = 123,
+    ):
+        pass
+
+    with console.capture() as capture:
+        console.print(format_parameters(app["cmd"], app.help_title_parameters))
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo. [env var: FOO BAR] [default: 123]    │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_function(app, console):
     with console.capture() as capture:
         app.help_print(console=console)
