@@ -235,7 +235,9 @@ class App:
             Function or :class:`App` to be registered as a command.
         name: Union[None, str, Iterable[str]]
             Name(s) to register the ``obj`` to.
-            If not provided, defaults to eithe
+            If not provided, defaults to:
+                * If registering an :class:`App`, then the app's name.
+                * If registering a function, then the function's name.
         `**kwargs`
             Any argument that :class:`App` can take.
             ``name`` and ``help`` are common arguments.
