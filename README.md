@@ -235,4 +235,4 @@ Try 'my-script deploy --help' for help.
 The Typer implementation is 43 lines long, while the Cyclopts implementation is just 30, all while including a proper docstring.
 Since Typer doesn't support Unions, the choices for ``replica`` could not be displayed on the help page.
 We also had to include a dummy callback since our application currently only has a single command.
-Cyclopts is much more terse, more more readable, and much more intuitive to use.
+Cyclopts is much more terse, much more readable, and much more intuitive to use.
