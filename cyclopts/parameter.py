@@ -132,7 +132,7 @@ class Parameter:
     Defaults to ``True``.
     """
 
-    env_var: Union[str, Iterable[str]] = field(default=[], converter=_str_to_tuple_converter)
+    env_var: Union[str, Iterable[str]] = field(default=[], converter=str_to_tuple_converter)
     """
     Fallback to environment variable(s) if CLI value not provided.
     If multiple environment variables are given, the left-most environment variable with a set value will be used.
