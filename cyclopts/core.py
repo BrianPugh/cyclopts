@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-from attrs import define, evolve, field
+from attrs import define, field
 from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
@@ -258,6 +258,7 @@ class App:
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
             app = App(default_command=obj, **kwargs)
+            # app.name will default to name of the function ``obj``.
 
         if name is None:
             name = app.name
