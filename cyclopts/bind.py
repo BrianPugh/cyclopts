@@ -1,4 +1,5 @@
 import inspect
+import os
 import shlex
 import sys
 from functools import lru_cache
@@ -198,6 +199,32 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
     return tokens
 
 
+def _parse_env(f, mapping):
+    """Populate argument defaults from environment variables.
+
+    In cyclopts, arguments are parsed with the following priority:
+
+    1. CLI-provided values
+    2. Values parsed from ``Parameter.env_var``.
+    3. Default values from the function signature.
+    """
+    for iparam in inspect.signature(f).parameters.values():
+        if iparam in mapping:
+            # Don't check environment variables for already-parsed parameters.
+            continue
+
+        _, cparam = get_hint_parameter(iparam.annotation)
+        for env_var_name in cparam.env_var:
+            try:
+                env_var_value = os.environ[env_var_name]
+            except KeyError:
+                pass
+            else:
+                mapping.setdefault(iparam, [])
+                mapping[iparam].append(env_var_value)
+                break
+
+
 def _is_required(parameter: inspect.Parameter) -> bool:
     return parameter.default is parameter.empty
 
@@ -326,6 +353,7 @@ def create_bound_arguments(f: Callable, tokens: List[str]) -> Tuple[inspect.Boun
         p2c = parameter2cli(f)
         unused_tokens = _parse_kw_and_flags(f, tokens, mapping)
         unused_tokens = _parse_pos(f, unused_tokens, mapping)
+        _parse_env(f, mapping)
         coerced = _convert(mapping)
         bound = _bind(f, coerced)
     except CycloptsError as e:
