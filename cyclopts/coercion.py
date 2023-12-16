@@ -2,7 +2,7 @@ import collections.abc
 import inspect
 from enum import Enum
 from inspect import isclass
-from typing import Any, List, Literal, Set, Tuple, Type, Union, get_args, get_origin
+from typing import Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
@@ -236,3 +236,27 @@ def token_count(type_: Type) -> Tuple[int, bool]:
         return token_count(get_args(type_)[0])[0], True
     else:
         return 1, False
+
+
+def str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
+    """Convert a string or Iterable into an Iterable.
+
+    Intended to be used in an ``attrs.Field``.
+    """
+    if isinstance(input_value, str):
+        return (input_value,)
+    return tuple(input_value)
+
+
+def optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Optional[Tuple[str, ...]]:
+    """Convert a string or Iterable or None into an Iterable or None.
+
+    Intended to be used in an ``attrs.Field``.
+    """
+    if input_value is None:
+        return None
+
+    if not input_value:
+        return ()
+
+    return str_to_tuple_converter(input_value)

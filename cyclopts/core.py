@@ -13,6 +13,7 @@ from attrs import define, field
 from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
+from cyclopts.coercion import str_to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -93,7 +94,11 @@ class App:
     ----------
     name: Optional[str]
         Name of application, or subcommand if registering to another application.
-        If not provided, defaults to ``sys.argv[0]``.
+        Name fallback resolution:
+            1. User specified ``name``.
+            2. If a ``default`` function has been registered, the name of that function.
+            3. If the module name is ``__main__.py``, the name of the encompassing package.
+            4. Finally: ``sys.argv[0]``.
     version: Optional[str]
         Version to be displayed when a token of ``version_flags`` is parsed.
         Defaults to attempting to use ``package.__version__`` from the package instantiating :class:`App`.
@@ -216,29 +221,35 @@ class App:
 
         return command_chain, app, unused_tokens
 
-    def command(self, obj: Optional[Callable] = None, **kwargs) -> Callable:
+    def command(
+        self,
+        obj: Optional[Callable] = None,
+        name: Union[None, str, Iterable[str]] = None,
+        **kwargs,
+    ) -> Callable:
         """Decorator to register a function as a CLI command.
 
         Parameters
         ----------
         obj: Optional[Callable]
             Function or :class:`App` to be registered as a command.
+        name: Union[None, str, Iterable[str]]
+            Name(s) to register the ``obj`` to.
+            If not provided, defaults to:
+                * If registering an :class:`App`, then the app's name.
+                * If registering a function, then the function's name.
         `**kwargs`
             Any argument that :class:`App` can take.
             ``name`` and ``help`` are common arguments.
         """
-        if obj is None:  # Called ``@app.command`` (no parenthesis)
-            return partial(self.command, **kwargs)
-
-        name = None
+        if obj is None:  # Called ``@app.command(...)``
+            return partial(self.command, name=name, **kwargs)
 
         if isinstance(obj, App):
             app = obj
 
-            if app._name is None:
-                name = kwargs.pop("name", None)
-                if name is None:
-                    raise ValueError("Sub-app MUST have a name specified.") from None
+            if app._name is None and name is None:
+                raise ValueError("Sub-app MUST have a name specified.")
 
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
@@ -247,19 +258,24 @@ class App:
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
             app = App(default_command=obj, **kwargs)
+            # app.name will default to name of the function ``obj``.
 
         if name is None:
             name = app.name
+        else:
+            app._name = str_to_tuple_converter(name)[0]
 
-        if name in self:
-            raise CommandCollisionError(f'Command "{name}" already registered.')
+        for n in str_to_tuple_converter(name):
+            if n in self:
+                raise CommandCollisionError(f'Command "{n}" already registered.')
 
-        self._commands[name] = app
+            self._commands[n] = app
+
         return obj
 
     def default(self, obj=None):
         """Decorator to register a function as the default action handler."""
-        if obj is None:  # Called ``@app.default_command`` (no parenthesis)
+        if obj is None:  # Called ``@app.default_command(...)``
             return self.default
 
         if isinstance(obj, App):  # Registering a sub-App

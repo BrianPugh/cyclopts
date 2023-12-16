@@ -62,6 +62,18 @@ def test_command_rename(app):
     assert actual_command == foo
 
 
+def test_command_multiple_alias(app):
+    @app.command(name=["bar", "baz"])
+    def foo():
+        pass
+
+    actual_command, _ = app.parse_args("bar")
+    assert actual_command == foo
+
+    actual_command, _ = app.parse_args("baz")
+    assert actual_command == foo
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [
