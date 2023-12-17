@@ -103,4 +103,4 @@ jobs:
       - name: Build HTML docs
         run: |
           source ${{ env.ACTIVATE_PYTHON_VENV }}
-          sphinx-build -b html docs/source/ docs/build/html
+          sphinx-build -b html -W docs/source/ docs/build/html
