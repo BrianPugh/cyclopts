@@ -60,6 +60,13 @@ exclude_patterns = []
 
 smartquotes = False
 
+
+# Myst
+myst_enable_extensions = [
+    "linkify",
+]
+
+
 # Napoleon settings
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
