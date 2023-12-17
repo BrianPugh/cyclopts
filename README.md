@@ -14,9 +14,9 @@
 
 ---
 
-**Documentation:** [https://cyclopts.readthedocs.io](https://cyclopts.readthedocs.io)
+**Documentation:** https://cyclopts.readthedocs.io
 
-**Source Code:** [https://github.com/BrianPugh/cyclopts](https://github.com/BrianPugh/cyclopts)
+**Source Code:** https://github.com/BrianPugh/cyclopts
 
 ---
 
