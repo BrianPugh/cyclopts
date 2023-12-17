@@ -95,10 +95,11 @@ class App:
     name: Optional[str]
         Name of application, or subcommand if registering to another application.
         Name fallback resolution:
-            1. User specified ``name``.
-            2. If a ``default`` function has been registered, the name of that function.
-            3. If the module name is ``__main__.py``, the name of the encompassing package.
-            4. Finally: ``sys.argv[0]``.
+
+        1. User specified ``name``.
+        2. If a ``default`` function has been registered, the name of that function.
+        3. If the module name is ``__main__.py``, the name of the encompassing package.
+        4. The value of ``sys.argv[0]``.
     version: Optional[str]
         Version to be displayed when a token of ``version_flags`` is parsed.
         Defaults to attempting to use ``package.__version__`` from the package instantiating :class:`App`.
@@ -236,8 +237,9 @@ class App:
         name: Union[None, str, Iterable[str]]
             Name(s) to register the ``obj`` to.
             If not provided, defaults to:
-                * If registering an :class:`App`, then the app's name.
-                * If registering a function, then the function's name.
+
+            * If registering an :class:`App`, then the app's name.
+            * If registering a function, then the function's name.
         `**kwargs`
             Any argument that :class:`App` can take.
             ``name`` and ``help`` are common arguments.
