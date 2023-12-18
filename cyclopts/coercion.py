@@ -238,14 +238,17 @@ def token_count(type_: Type) -> Tuple[int, bool]:
         return 1, False
 
 
-def str_to_tuple_converter(input_value: Union[str, Iterable[str]]) -> Tuple[str, ...]:
+def str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Tuple[str, ...]:
     """Convert a string or Iterable into an Iterable.
 
     Intended to be used in an ``attrs.Field``.
     """
-    if isinstance(input_value, str):
+    if input_value is None:
+        return ()
+    elif isinstance(input_value, str):
         return (input_value,)
-    return tuple(input_value)
+    else:
+        return tuple(input_value)
 
 
 def optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Optional[Tuple[str, ...]]:

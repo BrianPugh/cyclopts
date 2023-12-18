@@ -33,7 +33,7 @@ def validate_command(f):
     for iparam in signature.parameters.values():
         _ = get_origin_and_validate(iparam.annotation)
         type_, cparam = get_hint_parameter(iparam.annotation)
-        if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
+        if cparam.parse is False and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
         if get_origin(type_) is tuple:
             if ... in get_args(type_):
@@ -44,7 +44,9 @@ def validate_command(f):
 class Parameter:
     """Cyclopts configuration for individual function parameters."""
 
-    name: Union[str, Iterable[str]] = field(default=[], converter=str_to_tuple_converter)
+    _name: Union[None, str, Iterable[str]] = field(
+        default=None, converter=optional_str_to_tuple_converter, alias="name"
+    )
     """
     Name(s) to expose to the CLI.
     Defaults to the python parameter's name, prepended with ``--``.
@@ -92,7 +94,7 @@ class Parameter:
     Defaults to autodetecting based on type annotation.
     """
 
-    parse: bool = field(default=True)
+    parse: Optional[bool] = field(default=None)
     """
     Attempt to use this parameter while parsing.
     Intended only for advance usage with custom command invocation.
@@ -132,7 +134,9 @@ class Parameter:
     Defaults to ``True``.
     """
 
-    env_var: Union[str, Iterable[str]] = field(default=[], converter=str_to_tuple_converter)
+    _env_var: Union[None, str, Iterable[str]] = field(
+        default=None, converter=optional_str_to_tuple_converter, alias="env_var"
+    )
     """
     Fallback to environment variable(s) if CLI value not provided.
     If multiple environment variables are given, the left-most environment variable with a set value will be used.
@@ -140,13 +144,21 @@ class Parameter:
     """
 
     @property
+    def name(self):
+        return str_to_tuple_converter(self._name)
+
+    @property
+    def env_var(self):
+        return str_to_tuple_converter(self._env_var)
+
+    @property
     def show_(self):
         if self.show is not None:
             return self.show
-        elif self.parse:
-            return True
-        else:
+        elif self.parse is False:
             return False
+        else:
+            return True
 
     @property
     def converter_(self):

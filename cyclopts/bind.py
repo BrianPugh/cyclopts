@@ -46,7 +46,7 @@ def cli2parameter(f: Callable) -> Dict[str, Tuple[inspect.Parameter, Any]]:
         annotation = str if iparam.annotation is iparam.empty else iparam.annotation
         _, cparam = get_hint_parameter(annotation)
 
-        if not cparam.parse:
+        if cparam.parse is False:
             continue
 
         if iparam.kind in (iparam.POSITIONAL_OR_KEYWORD, iparam.KEYWORD_ONLY):
@@ -174,7 +174,7 @@ def _parse_pos(f: Callable, tokens: Iterable[str], mapping: Dict) -> List[str]:
     def remaining_parameters():
         for parameter in signature.parameters.values():
             _, cparam = get_hint_parameter(parameter.annotation)
-            if not cparam.parse:
+            if cparam.parse is False:
                 continue
             _, consume_all = token_count(parameter.annotation)
             if parameter in mapping and not consume_all:
@@ -269,7 +269,7 @@ def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any]):
     #     * Only args before a ``/`` are ``POSITIONAL_ONLY``.
     for iparam in signature.parameters.values():
         _, cparam = get_hint_parameter(iparam.annotation)
-        if not cparam.parse:
+        if cparam.parse is False:
             has_unparsed_parameters |= _is_required(iparam)
             continue
 
@@ -297,7 +297,7 @@ def _convert(mapping: Dict[inspect.Parameter, List[str]]) -> dict:
     for iparam, parameter_tokens in mapping.items():
         type_, cparam = get_hint_parameter(iparam.annotation)
 
-        if not cparam.parse:
+        if cparam.parse is False:
             continue
 
         # Checking if parameter_token is a string is a little jank,

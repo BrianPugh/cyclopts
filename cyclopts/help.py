@@ -157,7 +157,7 @@ def format_parameters(app, title, show_special=True):
         help_lookup = parameter2docstring(app.default_command)
         for parameter in inspect.signature(app.default_command).parameters.values():
             _, param = get_hint_parameter(parameter.annotation)
-            if not param.parse or not param.show_:
+            if param.parse is False or not param.show_:
                 continue
             parameters.append(parameter)
     else:
