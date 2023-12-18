@@ -196,6 +196,17 @@ class Parameter:
             out.append(f"{prefix}{negative_word}-{name}")
         return tuple(out)
 
+    def __repr__(self):
+        """Only shows non-default values."""
+        content = ", ".join(
+            [
+                f"{a.alias}={v!r}"
+                for a in self.__attrs_attrs__  # pyright: ignore[reportGeneralTypeIssues]
+                if (v := getattr(self, a.name)) != a.default
+            ]
+        )
+        return f"{type(self).__name__}({content})"
+
 
 def get_names(parameter: inspect.Parameter) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
