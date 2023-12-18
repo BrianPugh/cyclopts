@@ -587,3 +587,16 @@ class App:
                 pass
             except Exception:
                 print(traceback.format_exc())
+
+    def __repr__(self):
+        """Only shows non-default values."""
+        non_defaults = {}
+        for a in self.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
+            if not a.init:
+                continue
+            v = getattr(self, a.name)
+            if v != a.default:
+                non_defaults[a.alias] = v
+
+        signature = ", ".join(f"{k}={v!r}" for k, v in non_defaults.items())
+        return f"{type(self).__name__}({signature})"
