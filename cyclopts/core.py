@@ -139,6 +139,8 @@ class App:
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, "App"] = field(init=False, factory=dict)
 
+    _parents: List["App"] = field(init=False, factory=list)
+
     _meta: "App" = field(init=False, default=None)
     _meta_parent: "App" = field(init=False, default=None)
 
@@ -272,6 +274,8 @@ class App:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
             self._commands[n] = app
+
+        app._parents.append(self)
 
         return obj
 
