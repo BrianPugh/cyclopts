@@ -102,7 +102,7 @@ class Parameter:
     Defaults to ``True``.
     """
 
-    show: Optional[bool] = field(default=None)
+    _show: Optional[bool] = field(default=None, alias="show")
     """
     Show this parameter in the help screen.
     If ``False``, state of all other ``show_*`` flags are ignored.
@@ -152,9 +152,9 @@ class Parameter:
         return str_to_tuple_converter(self._env_var)
 
     @property
-    def show_(self):
-        if self.show is not None:
-            return self.show
+    def show(self):
+        if self._show is not None:
+            return self._show
         elif self.parse is False:
             return False
         else:

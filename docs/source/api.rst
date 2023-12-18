@@ -10,7 +10,7 @@ API
 
 .. autoclass:: cyclopts.Parameter
    :members:
-   :exclude-members: get_negatives, show_
+   :exclude-members: get_negatives
 
 .. autofunction:: cyclopts.coerce
 
