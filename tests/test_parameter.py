@@ -59,7 +59,7 @@ def test_get_hint_parameter_optional_annotated():
 def test_parameter_combine():
     p1 = Parameter(negative="--foo")
     p2 = Parameter(show_default=False)
-    p_combined = Parameter.combine(p1, p2)
+    p_combined = Parameter.combine(p1, None, p2)
 
     assert p_combined.negative == ("--foo",)
     assert p_combined.show_default is False

@@ -208,13 +208,15 @@ class Parameter:
         return f"{type(self).__name__}({content})"
 
     @classmethod
-    def combine(cls, *parameters: "Parameter") -> "Parameter":
+    def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
         """Returns a new Parameter with values of ``new_parameter`` overriding ``self``.
 
         Earlier parameters have higher attribute priority.
         """
         kwargs = {}
         for parameter in reversed(parameters):
+            if parameter is None:
+                continue
             for a in parameter.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
                 if not a.init:
                     continue
