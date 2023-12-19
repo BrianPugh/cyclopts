@@ -77,14 +77,14 @@ def parameter2cli(f: Callable, default_parameter: Optional[Parameter] = None) ->
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
         annotation = str if iparam.annotation is iparam.empty else iparam.annotation
-        _, cparam = get_hint_parameter(annotation)
+        _, cparam = get_hint_parameter(annotation, default_parameter=default_parameter)
 
-        if not cparam.parse:
+        if cparam.parse is False:
             continue
 
         # POSITIONAL_OR_KEYWORD and KEYWORD_ONLY already handled in cli2parameter
         if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_KEYWORD, iparam.VAR_POSITIONAL):
-            p2c[iparam] = get_names(iparam)
+            p2c[iparam] = get_names(iparam, default_parameter=default_parameter)
 
     return p2c
 
