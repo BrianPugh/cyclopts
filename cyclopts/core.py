@@ -124,7 +124,7 @@ class App:
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
-    default_parameter: Parameter = field(factory=Parameter)
+    _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter")
 
     _name: Optional[str] = field(default=None, alias="name")
 
@@ -150,6 +150,20 @@ class App:
     ###########
     # Methods #
     ###########
+    @property
+    def default_parameter(self) -> Parameter:
+        """Parameter value defaults for all Annotated Parameters.
+
+        Usually, an :class:`App` has at most one parent.
+
+        TODO: explain resolution-order.
+        """
+        return Parameter.combine(*(x.default_parameter for x in reversed(self._parents)), self._default_parameter)
+
+    @default_parameter.setter
+    def default_parameter(self, value: Optional[Parameter]):
+        self._default_parameter = value
+
     @property
     def name(self) -> str:
         """Application name. Dynamically derived if not previously set."""
@@ -261,7 +275,7 @@ class App:
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
         else:
-            validate_command(obj)
+            validate_command(obj, default_parameter=self.default_parameter)
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
             app = App(default_command=obj, **kwargs)
@@ -293,7 +307,7 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        validate_command(obj)
+        validate_command(obj, default_parameter=self.default_parameter)
         self.default_command = obj
         return obj
 
@@ -334,7 +348,9 @@ class App:
 
             if self.default_command:
                 command = self.default_command
-                bound, unused_tokens = create_bound_arguments(command, unused_tokens)
+                bound, unused_tokens = create_bound_arguments(
+                    command, unused_tokens, default_parameter=self.default_parameter
+                )
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:
@@ -510,6 +526,7 @@ class App:
                     subapp,
                     subapp.help_title_parameters,
                     show_special=show_special,
+                    default_parameter=self.default_parameter,
                 )
             )
 

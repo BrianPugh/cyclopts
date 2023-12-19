@@ -1,5 +1,5 @@
 import inspect
-from typing import Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
 
 from attrs import field, frozen
 
@@ -19,25 +19,6 @@ from cyclopts.protocols import Converter, Validator
 def _token_count_validator(instance, attribute, value):
     if value is not None and instance.converter is None:
         raise ValueError('Must specify a "converter" if setting "token_count".')
-
-
-def validate_command(f):
-    """Validate if a function abides by Cyclopts's rules.
-
-    Raises
-    ------
-    ValueError
-        Function has naming or parameter/signature inconsistencies.
-    """
-    signature = inspect.signature(f)
-    for iparam in signature.parameters.values():
-        _ = get_origin_and_validate(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam.annotation)
-        if cparam.parse is False and iparam.kind is not iparam.KEYWORD_ONLY:
-            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
-        if get_origin(type_) is tuple:
-            if ... in get_args(type_):
-                raise ValueError("Cannot use a variable-length tuple.")
 
 
 @frozen
@@ -211,10 +192,10 @@ class Parameter:
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
         """Returns a new Parameter with values of ``new_parameter`` overriding ``self``.
 
-        Earlier parameters have higher attribute priority.
+        ``*parameters`` ordered from least-to-highest attribute priority.
         """
         kwargs = {}
-        for parameter in reversed(parameters):
+        for parameter in parameters:
             if parameter is None:
                 continue
             for a in parameter.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
@@ -227,9 +208,28 @@ class Parameter:
         return cls(**kwargs)
 
 
-def get_names(parameter: inspect.Parameter) -> List[str]:
+def validate_command(f, default_parameter: Optional[Parameter] = None):
+    """Validate if a function abides by Cyclopts's rules.
+
+    Raises
+    ------
+    ValueError
+        Function has naming or parameter/signature inconsistencies.
+    """
+    signature = inspect.signature(f)
+    for iparam in signature.parameters.values():
+        _ = get_origin_and_validate(iparam.annotation)
+        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        if cparam.parse is False and iparam.kind is not iparam.KEYWORD_ONLY:
+            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if get_origin(type_) is tuple:
+            if ... in get_args(type_):
+                raise ValueError("Cannot use a variable-length tuple.")
+
+
+def get_names(parameter: inspect.Parameter, default_parameter: Optional[Parameter] = None) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
-    _, param = get_hint_parameter(parameter.annotation)
+    _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
     if param.name:
         names = list(param.name)
     else:
@@ -242,7 +242,7 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
     return names
 
 
-def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
+def get_hint_parameter(type_: Type, default_parameter: Optional[Parameter] = None) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
@@ -259,10 +259,10 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
         if len(cyclopts_parameters) > 2:
             raise MultipleParameterAnnotationError
         elif len(cyclopts_parameters) == 1:
-            cyclopts_parameter = cyclopts_parameters[0]
+            cyclopts_parameter = Parameter.combine(cyclopts_parameters[0], default_parameter)
         else:
-            cyclopts_parameter = Parameter()
+            cyclopts_parameter = Parameter.combine(default_parameter)
     else:
-        cyclopts_parameter = Parameter()
+        cyclopts_parameter = Parameter.combine(default_parameter)
 
     return resolve(type_), cyclopts_parameter

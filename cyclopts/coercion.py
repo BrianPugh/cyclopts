@@ -2,11 +2,14 @@ import collections.abc
 import inspect
 from enum import Enum
 from inspect import isclass
-from typing import Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
 
 from typing_extensions import Annotated
 
 from cyclopts.exceptions import CoercionError
+
+if TYPE_CHECKING:
+    from cyclopts.parameter import Parameter
 
 # from types import NoneType is available >=3.10
 NoneType = type(None)
@@ -57,22 +60,26 @@ _converters = {
 }
 
 
-def _convert(type_, element):
+def _convert(type_, element, default_parameter=None):
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
-        return _convert(_implicit_iterable_type_mapping[type_], element)
+        return _convert(_implicit_iterable_type_mapping[type_], element, default_parameter=default_parameter)
     elif origin_type is collections.abc.Iterable:
         assert len(inner_types) == 1
-        return _convert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
+        return _convert(
+            List[inner_types[0]],  # pyright: ignore[reportGeneralTypeIssues]
+            element,
+            default_parameter=default_parameter,
+        )
 
     elif origin_type is Union:
         for t in inner_types:
             if t is NoneType:
                 continue
             try:
-                return _convert(t, element)
+                return _convert(t, element, default_parameter=default_parameter)
             except Exception:
                 pass
         else:
@@ -80,7 +87,7 @@ def _convert(type_, element):
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
-                res = _convert(type(choice), (element))
+                res = _convert(type(choice), (element), default_parameter=default_parameter)
             except Exception:
                 continue
             if res == choice:
@@ -94,14 +101,16 @@ def _convert(type_, element):
                 return member
         raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in _iterable_types:
-        count, _ = token_count(inner_types[0])
+        count, _ = token_count(inner_types[0], default_parameter=default_parameter)
         if count > 1:
             gen = zip(*[iter(element)] * count)
         else:
             gen = element
-        return origin_type(_convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+        return origin_type(
+            _convert(inner_types[0], e, default_parameter=default_parameter) for e in gen
+        )  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
-        return tuple(_convert(t, e) for t, e in zip(inner_types, element))
+        return tuple(_convert(t, e, default_parameter=default_parameter) for t, e in zip(inner_types, element))
     else:
         try:
             return _converters.get(type_, type_)(element)
@@ -154,7 +163,7 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def coerce(type_: Type, *args: str):
+def coerce(type_: Type, *args: str, default_parameter=None):
     """Coerce variables into a specified type.
 
     Internally used to coercing string CLI tokens into python builtin types.
@@ -195,16 +204,18 @@ def coerce(type_: Type, *args: str):
             raise ValueError(
                 f"Number of arguments does not match the tuple structure: expected {len(inner_types)} but got {len(args)}"
             )
-        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
+        return tuple(
+            _convert(inner_type, arg, default_parameter=default_parameter) for inner_type, arg in zip(inner_types, args)
+        )
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return _convert(type_, args)
+        return _convert(type_, args, default_parameter=default_parameter)
     elif len(args) == 1:
-        return _convert(type_, args[0])
+        return _convert(type_, args[0], default_parameter=default_parameter)
     else:
-        return [_convert(type_, item) for item in args]
+        return [_convert(type_, item, default_parameter=default_parameter) for item in args]
 
 
-def token_count(type_: Type) -> Tuple[int, bool]:
+def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Returns
@@ -213,13 +224,15 @@ def token_count(type_: Type) -> Tuple[int, bool]:
         Number of tokens that constitute a single element.
     bool
         If this is ``True`` and positional, consume all remaining tokens.
+    default_parameter: Optional[Parameter]
+        Default Parameter configuration.
     """
     from cyclopts.parameter import get_hint_parameter
 
     if type_ is inspect.Parameter.empty:
         return 1, False
 
-    type_, param = get_hint_parameter(type_)
+    type_, param = get_hint_parameter(type_, default_parameter=default_parameter)
     if param.token_count is not None:
         return abs(param.token_count), param.token_count < 0
 
@@ -233,7 +246,7 @@ def token_count(type_: Type) -> Tuple[int, bool]:
     elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
-        return token_count(get_args(type_)[0])[0], True
+        return token_count(get_args(type_)[0], default_parameter=default_parameter)[0], True
     else:
         return 1, False
 
