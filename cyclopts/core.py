@@ -154,9 +154,13 @@ class App:
     def default_parameter(self) -> Parameter:
         """Parameter value defaults for all Annotated Parameters.
 
-        Usually, an :class:`App` has at most one parent.
+        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting ``App``s.
 
-        TODO: explain resolution-order.
+        Usually, an :class:`App` has at most one parent.
+        In the event of multiple parents, they are evaluated in reverse-registered order,
+        where each ``default_parameter`` attributes overwrites the previous.
+        I.e. the first registered parents have highest-priority of the parents.
+        The specified ``default_parameter`` for this ``App`` object has highest priority.
         """
         return Parameter.combine(*(x.default_parameter for x in reversed(self._parents)), self._default_parameter)
 

@@ -1,6 +1,6 @@
 import pytest
 
-from cyclopts import App
+from cyclopts import App, Parameter
 
 
 def test_subapp_basic(app):
@@ -43,3 +43,19 @@ def test_subapp_registering_cannot_have_other_kwargs(app):
 def test_subapp_cannot_be_default(app):
     with pytest.raises(TypeError):
         app.default(App(name="foo"))
+
+
+def test_subapp_default_parameter_resolution():
+    parent_app_1 = App(default_parameter=Parameter(show_default=True))
+
+    sub_app = App(name="foo")
+    parent_app_1.command(sub_app)
+
+    # Standard Single Resolution
+    assert sub_app.default_parameter == Parameter(show_default=True)
+
+    parent_app_2 = App(default_parameter=Parameter(show_default=False, negative=()))
+    parent_app_2.command(sub_app)
+
+    # 2-Parent Resolution
+    assert sub_app.default_parameter == Parameter(show_default=True, negative=())
