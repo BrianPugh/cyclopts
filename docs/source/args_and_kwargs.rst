@@ -63,12 +63,12 @@ Keyword name-conversion is the :ref:`same as commands <Changing Name>`.
 
    @app.command
    def add(**country_to_capitols):
-       for country, captiol in country_to_capitols.items():
-           print(f"Adding {country} with captiol {capitol}.")
+       for country, capitol in country_to_capitols.items():
+           print(f"Adding {country} with capitol {capitol}.")
 
 
 .. code-block:: console
 
    $ my-script add --united-states="Washington, D.C." --canada=Ottawa
-   Adding united_states with captiol Washington, D.C..
-   Adding canada with captiol Ottawa.
+   Adding united_states with capitol Washington, D.C..
+   Adding canada with capitol Ottawa.

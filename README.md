@@ -142,9 +142,9 @@ Deploying to staging with 7 replicas.
 $ my-script deploy staging performance
 Deploying to staging with 20 replicas.
 
-$ my-script deploy nonexistant-env
+$ my-script deploy nonexistent-env
 ╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Error converting value "nonexistant-env" to typing.Literal['dev', 'staging', 'prod'] for "--env".  │
+│ Error converting value "nonexistent-env" to typing.Literal['dev', 'staging', 'prod'] for "--env".  │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -224,11 +224,11 @@ Deploying to staging with 7 replicas.
 $ my-script deploy staging performance
 Deploying to staging with 20 replicas.
 
-$ my-script deploy nonexistant-env
+$ my-script deploy nonexistent-env
 Usage: my-script deploy [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
 Try 'my-script deploy --help' for help.
 ╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Invalid value for 'ENV:{dev|staging|prod}': 'nonexistant-env' is not one of 'dev', 'staging', 'prod'.                                  │
+│ Invalid value for 'ENV:{dev|staging|prod}': 'nonexistent-env' is not one of 'dev', 'staging', 'prod'.                                  │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
