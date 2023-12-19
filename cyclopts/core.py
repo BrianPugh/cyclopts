@@ -22,7 +22,7 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
-from cyclopts.parameter import validate_command
+from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 
 with suppress(ImportError):
@@ -119,9 +119,12 @@ class App:
     help_title_parameters: str
         Title for the "parameters" help-panel.
         Defaults to ``"Parameters"``.
+    default_parameter: Parameter
+        Default :class:`Parameter` configuration.
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
+    default_parameter: Parameter = field(factory=Parameter)
 
     _name: Optional[str] = field(default=None, alias="name")
 
