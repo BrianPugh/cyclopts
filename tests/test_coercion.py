@@ -71,7 +71,7 @@ def test_coerce_optional_annotated_int():
     assert [123, 456] == coerce(Optional[Annotated[List[int], "foo"]], "123", "456")
 
 
-def test_coerce_annotated_union_str_2nd_choice():
+def test_coerce_annotated_union_str_secondary_choice():
     assert 123 == coerce(Union[None, int, str], "123")
     assert "foo" == coerce(Union[None, int, str], "foo")
 
@@ -79,7 +79,7 @@ def test_coerce_annotated_union_str_2nd_choice():
         coerce(Union[None, int, float], "invalid-choice")
 
 
-def test_coerce_annotated_nested_union_str_2nd_choice():
+def test_coerce_annotated_nested_union_str_secondary_choice():
     assert 123 == coerce(Union[None, Union[int, str]], "123")
     assert "foo" == coerce(Union[None, Union[int, str]], "foo")
 
