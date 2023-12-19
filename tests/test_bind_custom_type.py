@@ -43,7 +43,7 @@ def test_custom_type_one_token_explicit_convert(app):
     assert res == OneToken(5)
 
 
-def test_custom_type_two_token_implicit_convert_must_take_conveter(app):
+def test_custom_type_two_token_implicit_convert_must_take_converter(app):
     with pytest.raises(ValueError):
 
         @app.default

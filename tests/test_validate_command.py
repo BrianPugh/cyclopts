@@ -41,7 +41,7 @@ def test_validate_command_exception_bare_tuple():
         validate_command(f1)
 
 
-def test_validate_command_exception_elipsis_tuple():
+def test_validate_command_exception_ellipsis_tuple():
     def f1(a: Tuple[int, ...]):
         pass
 
