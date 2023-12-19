@@ -54,3 +54,20 @@ def test_get_hint_parameter_optional_annotated():
     type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]])
     assert type_ is bool
     assert cparam == expected_cparam
+
+
+def test_parameter_combine():
+    p1 = Parameter(negative="--foo")
+    p2 = Parameter(show_default=False)
+    p_combined = Parameter.combine(p1, p2)
+
+    assert p_combined.negative == ("--foo",)
+    assert p_combined.show_default is False
+
+
+def test_parameter_combine_priority():
+    p1 = Parameter(negative="--foo")
+    p2 = Parameter(negative="--bar")
+    p_combined = Parameter.combine(p1, p2)
+
+    assert p_combined.negative == ("--foo",)

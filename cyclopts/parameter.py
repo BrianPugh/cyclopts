@@ -207,6 +207,23 @@ class Parameter:
         )
         return f"{type(self).__name__}({content})"
 
+    @classmethod
+    def combine(cls, *parameters: "Parameter") -> "Parameter":
+        """Returns a new Parameter with values of ``new_parameter`` overriding ``self``.
+
+        Earlier parameters have higher attribute priority.
+        """
+        kwargs = {}
+        for parameter in reversed(parameters):
+            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
+                if not a.init:
+                    continue
+                v = getattr(parameter, a.name)
+                if v != a.default:
+                    kwargs[a.alias] = v
+
+        return cls(**kwargs)
+
 
 def get_names(parameter: inspect.Parameter) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
