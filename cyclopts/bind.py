@@ -68,9 +68,21 @@ def parameter2cli(f: Callable) -> Dict[inspect.Parameter, List[str]]:
     p2c = {}
 
     for cli, tup in c2p.items():
-        parameter = tup[0]
-        p2c.setdefault(parameter, [])
-        p2c[parameter].append(cli)
+        iparam = tup[0]
+        p2c.setdefault(iparam, [])
+        p2c[iparam].append(cli)
+
+    signature = inspect.signature(f)
+    for iparam in signature.parameters.values():
+        annotation = str if iparam.annotation is iparam.empty else iparam.annotation
+        _, cparam = get_hint_parameter(annotation)
+
+        if not cparam.parse:
+            continue
+
+        # POSITIONAL_OR_KEYWORD and KEYWORD_ONLY already handled in cli2parameter
+        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_KEYWORD, iparam.VAR_POSITIONAL):
+            p2c[iparam] = get_names(iparam)
 
     return p2c
 
