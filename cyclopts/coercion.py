@@ -186,6 +186,8 @@ def coerce(type_: Type, *args: str, default_parameter=None):
         A type hint/annotation to coerce ``*args`` into.
     `*args`: str
         String tokens to coerce.
+    default_parameter: Optional[Parameter]
+        Default Parameter configuration.
 
     Returns
     -------
@@ -221,6 +223,13 @@ def coerce(type_: Type, *args: str, default_parameter=None):
 
 def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
+
+    Parameters
+    ----------
+    type_: Type
+        A type hint/annotation to infer token_count from if not explicitly specified.
+    default_parameter: Optional[Parameter]
+        Default Parameter configuration.
 
     Returns
     -------
