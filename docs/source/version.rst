@@ -19,7 +19,10 @@ The resolution order for determining the version string is as follows:
 
       app = cyclopts.App(version="7.5.8")
 
-2. The invoking-package's `defacto PEP8 standard`_ ``__version__`` string.
+2. The invoking-package's `Distribution Package's Version Number`_ via `importlib.metadata.version`_.
+   Cyclopts attempts to derive the package module that instantiated the :class:`App <cyclopts.App>` object by traversing the call stack.
+
+3. The invoking-package's `defacto PEP8 standard`_ ``__version__`` string.
    Cyclopts attempts to derive the package module that instantiated the :class:`App <cyclopts.App>` object by traversing the call stack.
 
    .. code-block:: python
@@ -31,7 +34,7 @@ The resolution order for determining the version string is as follows:
       # ``App`` will use ``mypackage.__version__``.
       app = cyclopts.App()
 
-3. If (2) fails, then the default version string ``"0.0.0"`` will be displayed.
+4. The default version string ``"0.0.0"`` will be displayed.
 
 The ``--version`` flag can be changed to a different name(s) via the ``version_flags`` parameter.
 
@@ -48,4 +51,6 @@ To disable the ``--version`` flag, set ``version_flags`` to an empty string or i
    app = cyclopts.App(version_flags=[])
 
 
+.. _Distribution Package's Version Number: https://packaging.python.org/en/latest/glossary/#term-Distribution-Package
+.. _importlib.metadata.version: https://docs.python.org/3.12/library/importlib.metadata.html#distribution-versions
 .. _defacto PEP8 standard: https://peps.python.org/pep-0008/#module-level-dunder-names
