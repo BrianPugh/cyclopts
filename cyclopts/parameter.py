@@ -27,104 +27,35 @@ def _token_count_validator(instance, attribute, value):
 class Parameter:
     """Cyclopts configuration for individual function parameters."""
 
+    # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
+
     _name: Union[None, str, Iterable[str]] = field(
         default=None, converter=optional_str_to_tuple_converter, alias="name"
     )
-    """
-    Name(s) to expose to the CLI.
-    Defaults to the python parameter's name, prepended with ``--``.
-    Single-character options should start with ``-``.
-    Full-name options should start with ``--``.
-    """
 
     converter: Optional[Converter] = field(default=None)
-    """
-    A function that converts string token(s) into an object. The converter must have signature:
-
-    .. code-block:: python
-
-        def converter(type_, *args) -> Any:
-            pass
-
-    where ``Any`` is the intended type of the annotated variable.
-    If not provided, defaults to :ref:`Cyclopts's internal coercion engine <Coercion Rules>`.
-    """
 
     validator: Optional[Validator] = field(default=None)
-    """
-    A function that validates data returned by the ``converter``.
-
-    .. code-block:: python
-
-        def validator(type_, value: Any) -> None:
-            pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
-    """
 
     negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_str_to_tuple_converter)
-    """
-    Name(s) for empty iterables or false boolean flags.
-    For booleans, defaults to ``--no-{name}``.
-    For iterables, defaults to ``--empty-{name}``.
-    Set to an empty list to disable this feature.
-    """
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
-    """
-    Number of CLI tokens this parameter consumes.
-    For advanced usage when the annotated parameter is a custom class that consumes more
-    (or less) than the standard single token.
-    If specified, a custom ``converter`` **must** also be specified.
-    Defaults to autodetecting based on type annotation.
-    """
 
     parse: Optional[bool] = field(default=None)
-    """
-    Attempt to use this parameter while parsing.
-    Intended only for advance usage with custom command invocation.
-    Annotated parameter **must** be keyword-only.
-    Defaults to ``True``.
-    """
 
     _show: Optional[bool] = field(default=None, alias="show")
-    """
-    Show this parameter in the help screen.
-    If ``False``, state of all other ``show_*`` flags are ignored.
-    Defaults to ``parse`` value (``True``).
-    """
 
     show_default: Optional[bool] = field(default=None)
-    """
-    If a variable has a default, display the default in the help page.
-
-    Defaults to ``None``, which is similar to ``True``, but will not display the default if it's ``None``.
-    """
 
     show_choices: Optional[bool] = field(default=None)
-    """
-    If a variable has a set of choices (``Literal``, ``Enum``), display the default in the help page.
-    Defaults to ``True``.
-    """
 
     help: Optional[str] = field(default=None)
-    """
-    Help string to be displayed in the help page.
-    If not specified, defaults to the docstring.
-    """
 
     show_env_var: Optional[bool] = field(default=None)
-    """
-    If a variable has ``env_var`` set, display the variable name in the help page.
-    Defaults to ``True``.
-    """
 
     _env_var: Union[None, str, Iterable[str]] = field(
         default=None, converter=optional_str_to_tuple_converter, alias="env_var"
     )
-    """
-    Fallback to environment variable(s) if CLI value not provided.
-    If multiple environment variables are given, the left-most environment variable with a set value will be used.
-    If no environment variable is set, Cyclopts will fallback to the function-signature default.
-    """
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
