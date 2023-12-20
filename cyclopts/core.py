@@ -22,7 +22,7 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
-from cyclopts.parameter import validate_command
+from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 
 with suppress(ImportError):
@@ -119,9 +119,12 @@ class App:
     help_title_parameters: str
         Title for the "parameters" help-panel.
         Defaults to ``"Parameters"``.
+    default_parameter: Parameter
+        Default :class:`Parameter` configuration.
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
+    _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter")
 
     _name: Optional[str] = field(default=None, alias="name")
 
@@ -139,12 +142,32 @@ class App:
     # Maps CLI-name of a command to a function handle.
     _commands: Dict[str, "App"] = field(init=False, factory=dict)
 
+    _parents: List["App"] = field(init=False, factory=list)
+
     _meta: "App" = field(init=False, default=None)
     _meta_parent: "App" = field(init=False, default=None)
 
     ###########
     # Methods #
     ###########
+    @property
+    def default_parameter(self) -> Parameter:
+        """Parameter value defaults for all Annotated Parameters.
+
+        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting ``App`` s.
+
+        Usually, an :class:`App` has at most one parent.
+        In the event of multiple parents, they are evaluated in reverse-registered order,
+        where each ``default_parameter`` attributes overwrites the previous.
+        I.e. the first registered parent has the highest-priority of the parents.
+        The specified ``default_parameter`` for this ``App`` object has higher priority over parents.
+        """
+        return Parameter.combine(*(x.default_parameter for x in reversed(self._parents)), self._default_parameter)
+
+    @default_parameter.setter
+    def default_parameter(self, value: Optional[Parameter]):
+        self._default_parameter = value
+
     @property
     def name(self) -> str:
         """Application name. Dynamically derived if not previously set."""
@@ -256,7 +279,7 @@ class App:
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
         else:
-            validate_command(obj)
+            validate_command(obj, default_parameter=self.default_parameter)
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
             app = App(default_command=obj, **kwargs)
@@ -273,6 +296,8 @@ class App:
 
             self._commands[n] = app
 
+        app._parents.append(self)
+
         return obj
 
     def default(self, obj=None):
@@ -286,7 +311,7 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        validate_command(obj)
+        validate_command(obj, default_parameter=self.default_parameter)
         self.default_command = obj
         return obj
 
@@ -327,7 +352,9 @@ class App:
 
             if self.default_command:
                 command = self.default_command
-                bound, unused_tokens = create_bound_arguments(command, unused_tokens)
+                bound, unused_tokens = create_bound_arguments(
+                    command, unused_tokens, default_parameter=self.default_parameter
+                )
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:
@@ -503,6 +530,7 @@ class App:
                     subapp,
                     subapp.help_title_parameters,
                     show_special=show_special,
+                    default_parameter=self.default_parameter,
                 )
             )
 
@@ -587,3 +615,16 @@ class App:
                 pass
             except Exception:
                 print(traceback.format_exc())
+
+    def __repr__(self):
+        """Only shows non-default values."""
+        non_defaults = {}
+        for a in self.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
+            if not a.init:
+                continue
+            v = getattr(self, a.name)
+            if v != a.default:
+                non_defaults[a.alias] = v
+
+        signature = ", ".join(f"{k}={v!r}" for k, v in non_defaults.items())
+        return f"{type(self).__name__}({signature})"

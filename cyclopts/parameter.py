@@ -12,8 +12,8 @@ from cyclopts.coercion import (
     resolve_optional,
     str_to_tuple_converter,
 )
-from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
+from cyclopts.utils import record_init_kwargs
 
 
 def _token_count_validator(instance, attribute, value):
@@ -21,132 +21,60 @@ def _token_count_validator(instance, attribute, value):
         raise ValueError('Must specify a "converter" if setting "token_count".')
 
 
-def validate_command(f):
-    """Validate if a function abides by Cyclopts's rules.
-
-    Raises
-    ------
-    ValueError
-        Function has naming or parameter/signature inconsistencies.
-    """
-    signature = inspect.signature(f)
-    for iparam in signature.parameters.values():
-        _ = get_origin_and_validate(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam.annotation)
-        if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
-            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
-        if get_origin(type_) is tuple:
-            if ... in get_args(type_):
-                raise ValueError("Cannot use a variable-length tuple.")
-
-
+@record_init_kwargs("_provided_args")
 @frozen
 class Parameter:
     """Cyclopts configuration for individual function parameters."""
 
-    name: Union[str, Iterable[str]] = field(default=[], converter=str_to_tuple_converter)
-    """
-    Name(s) to expose to the CLI.
-    Defaults to the python parameter's name, prepended with ``--``.
-    Single-character options should start with ``-``.
-    Full-name options should start with ``--``.
-    """
+    # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
+
+    _name: Union[None, str, Iterable[str]] = field(
+        default=None, converter=optional_str_to_tuple_converter, alias="name"
+    )
 
     converter: Optional[Converter] = field(default=None)
-    """
-    A function that converts string token(s) into an object. The converter must have signature:
-
-    .. code-block:: python
-
-        def converter(type_, *args) -> Any:
-            pass
-
-    where ``Any`` is the intended type of the annotated variable.
-    If not provided, defaults to :ref:`Cyclopts's internal coercion engine <Coercion Rules>`.
-    """
 
     validator: Optional[Validator] = field(default=None)
-    """
-    A function that validates data returned by the ``converter``.
-
-    .. code-block:: python
-
-        def validator(type_, value: Any) -> None:
-            pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
-    """
 
     negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_str_to_tuple_converter)
-    """
-    Name(s) for empty iterables or false boolean flags.
-    For booleans, defaults to ``--no-{name}``.
-    For iterables, defaults to ``--empty-{name}``.
-    Set to an empty list to disable this feature.
-    """
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
-    """
-    Number of CLI tokens this parameter consumes.
-    For advanced usage when the annotated parameter is a custom class that consumes more
-    (or less) than the standard single token.
-    If specified, a custom ``converter`` **must** also be specified.
-    Defaults to autodetecting based on type annotation.
-    """
 
-    parse: bool = field(default=True)
-    """
-    Attempt to use this parameter while parsing.
-    Intended only for advance usage with custom command invocation.
-    Annotated parameter **must** be keyword-only.
-    Defaults to ``True``.
-    """
+    parse: Optional[bool] = field(default=None)
 
-    show: Optional[bool] = field(default=None)
-    """
-    Show this parameter in the help screen.
-    If ``False``, state of all other ``show_*`` flags are ignored.
-    Defaults to ``parse`` value (``True``).
-    """
+    _show: Optional[bool] = field(default=None, alias="show")
 
     show_default: Optional[bool] = field(default=None)
-    """
-    If a variable has a default, display the default in the help page.
-
-    Defaults to ``None``, which is similar to ``True``, but will not display the default if it's ``None``.
-    """
 
     show_choices: Optional[bool] = field(default=None)
-    """
-    If a variable has a set of choices (``Literal``, ``Enum``), display the default in the help page.
-    Defaults to ``True``.
-    """
 
     help: Optional[str] = field(default=None)
-    """
-    Help string to be displayed in the help page.
-    If not specified, defaults to the docstring.
-    """
 
     show_env_var: Optional[bool] = field(default=None)
-    """
-    If a variable has ``env_var`` set, display the variable name in the help page.
-    Defaults to ``True``.
-    """
 
-    env_var: Union[str, Iterable[str]] = field(default=[], converter=str_to_tuple_converter)
-    """
-    Fallback to environment variable(s) if CLI value not provided.
-    If multiple environment variables are given, the left-most environment variable with a set value will be used.
-    If no environment variable is set, Cyclopts will fallback to the function-signature default.
-    """
+    _env_var: Union[None, str, Iterable[str]] = field(
+        default=None, converter=optional_str_to_tuple_converter, alias="env_var"
+    )
+
+    # Populated by the record_attrs_init_args decorator.
+    _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
     @property
-    def show_(self):
-        if self.show is not None:
-            return self.show
-        elif self.parse:
-            return True
-        else:
+    def name(self):
+        return str_to_tuple_converter(self._name)
+
+    @property
+    def env_var(self):
+        return str_to_tuple_converter(self._env_var)
+
+    @property
+    def show(self):
+        if self._show is not None:
+            return self._show
+        elif self.parse is False:
             return False
+        else:
+            return True
 
     @property
     def converter_(self):
@@ -184,10 +112,71 @@ class Parameter:
             out.append(f"{prefix}{negative_word}-{name}")
         return tuple(out)
 
+    def __repr__(self):
+        """Only shows non-default values."""
+        content = ", ".join(
+            [
+                f"{a.alias}={getattr(self, a.name)!r}"
+                for a in self.__attrs_attrs__  # pyright: ignore[reportGeneralTypeIssues]
+                if a.alias in self._provided_args
+            ]
+        )
+        return f"{type(self).__name__}({content})"
 
-def get_names(parameter: inspect.Parameter) -> List[str]:
+    @classmethod
+    def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
+        """Returns a new Parameter with values of ``new_parameters`` overriding ``self``.
+
+        Parameters
+        ----------
+        `*parameters`: Optional[Parameter]
+             Parameters who's attributes override ``self`` attributes.
+             Ordered from least-to-highest attribute priority.
+        """
+        kwargs = {}
+        for parameter in parameters:
+            if parameter is None:
+                continue
+            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
+                if a.init and a.alias in parameter._provided_args:
+                    kwargs[a.alias] = getattr(parameter, a.name)
+
+        return cls(**kwargs)
+
+    @classmethod
+    def default(cls) -> "Parameter":
+        """Create a Parameter with all Cyclopts-default values.
+
+        This is different than just ``Parameter()`` because it will override
+        all values of upstream Parameters.
+        """
+        return cls(
+            **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportGeneralTypeIssues]
+        )
+
+
+def validate_command(f, default_parameter: Optional[Parameter] = None):
+    """Validate if a function abides by Cyclopts's rules.
+
+    Raises
+    ------
+    ValueError
+        Function has naming or parameter/signature inconsistencies.
+    """
+    signature = inspect.signature(f)
+    for iparam in signature.parameters.values():
+        _ = get_origin_and_validate(iparam.annotation)
+        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        if cparam.parse is False and iparam.kind is not iparam.KEYWORD_ONLY:
+            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if get_origin(type_) is tuple:
+            if ... in get_args(type_):
+                raise ValueError("Cannot use a variable-length tuple.")
+
+
+def get_names(parameter: inspect.Parameter, default_parameter: Optional[Parameter] = None) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
-    _, param = get_hint_parameter(parameter.annotation)
+    _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
     if param.name:
         names = list(param.name)
     else:
@@ -200,7 +189,7 @@ def get_names(parameter: inspect.Parameter) -> List[str]:
     return names
 
 
-def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
+def get_hint_parameter(type_: Type, default_parameter: Optional[Parameter] = None) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
@@ -214,13 +203,8 @@ def get_hint_parameter(type_: Type) -> Tuple[Type, Parameter]:
         annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
         type_ = get_args(type_)[0]
         cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-        if len(cyclopts_parameters) > 2:
-            raise MultipleParameterAnnotationError
-        elif len(cyclopts_parameters) == 1:
-            cyclopts_parameter = cyclopts_parameters[0]
-        else:
-            cyclopts_parameter = Parameter()
     else:
-        cyclopts_parameter = Parameter()
+        cyclopts_parameters = []
 
+    cyclopts_parameter = Parameter.combine(default_parameter, *cyclopts_parameters)
     return resolve(type_), cyclopts_parameter

@@ -13,6 +13,7 @@ Cyclopts
    getting_started.rst
    commands.rst
    parameters.rst
+   default_parameter.rst
    validators.rst
    help.rst
    version.rst

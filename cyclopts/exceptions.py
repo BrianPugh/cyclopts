@@ -18,7 +18,6 @@ __all__ = [
     "DocstringError",
     "InvalidCommandError",
     "MissingArgumentError",
-    "MultipleParameterAnnotationError",
     "UnusedCliTokensError",
     "ValidationError",
 ]
@@ -30,19 +29,6 @@ def _get_function_info(func):
 
 class CommandCollisionError(Exception):
     """A command with the same name has already been registered to the app."""
-
-    # This doesn't derive from CycloptsError since this is a developer error
-    # rather than a runtime error.
-
-
-class MultipleParameterAnnotationError(Exception):
-    """Multiple ``cyclopts.Parameter`` objects found in type annotation.
-
-    For example::
-
-        def foo(a: Annotated[int, Parameter(), Parameter()]):
-            pass
-    """
 
     # This doesn't derive from CycloptsError since this is a developer error
     # rather than a runtime error.

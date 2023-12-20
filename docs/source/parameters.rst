@@ -87,6 +87,8 @@ It's recommended to use docstrings for your parameter help, but if necessary, yo
    │ *  VALUE,--value  THIS IS USED. [required]                    │
    ╰───────────────────────────────────────────────────────────────╯
 
+.. _Converters:
+
 ----------
 Converters
 ----------
@@ -187,3 +189,36 @@ If we had a program that accepted an integer user age as an input, ``-1`` is an 
    ╭─ Error ──────────────────────────────────────────────────────────────────╮
    │ Invalid value for --age. You are too old to be using this application.   │
    ╰──────────────────────────────────────────────────────────────────────────╯
+
+-------------------
+Multiple Parameters
+-------------------
+Say you want to define a new ``int`` type that uses the :ref:`byte-centric converter from above<Converters>`.
+
+We can define the type:
+
+.. code-block:: python
+
+   ByteSize = Annotated[int, Parameter(converter=byte_units)]
+
+We can then either directly annotate a function parameter with this:
+
+.. code-block:: python
+
+   @app.command
+   def zero(size: ByteSize):
+       pass
+
+or even stack annotations to add additional features, like a validator:
+
+.. code-block:: python
+
+   def must_be_multiple_of_4096(type_, value):
+       assert value % 4096 == 0
+
+
+   @app.command
+   def zero(size: Annotated[ByteSize, Parameter(validator=must_be_multiple_of_4096)]):
+       pass
+
+See :ref:`Parameter Resolution Order<Parameter Resolution Order>` for more details.

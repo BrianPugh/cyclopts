@@ -54,3 +54,41 @@ def test_get_hint_parameter_optional_annotated():
     type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]])
     assert type_ is bool
     assert cparam == expected_cparam
+
+
+def test_parameter_combine():
+    p1 = Parameter(negative="--foo")
+    p2 = Parameter(show_default=False)
+    p_combined = Parameter.combine(p1, None, p2)
+
+    assert p_combined.negative == ("--foo",)
+    assert p_combined.show_default is False
+
+
+def test_parameter_combine_priority():
+    p1 = Parameter(negative="--foo")
+    p2 = Parameter(negative="--bar")
+    p_combined = Parameter.combine(p1, p2)
+
+    assert p_combined.negative == ("--bar",)
+
+
+def test_parameter_combine_priority_none():
+    p1 = Parameter(negative="--foo")
+    p2 = Parameter(negative=None)
+    p_combined = Parameter.combine(p1, p2)
+
+    assert p_combined.negative is None
+
+
+def test_parameter_default():
+    p1 = Parameter()
+    p2 = Parameter.default()
+
+    # The two parameters should be equivalent.
+    assert p1 == p2
+
+    # However, the _provided_args field should differ
+    assert p1._provided_args == ()
+    # Just testing a few
+    assert {"name", "converter", "validator"}.issubset(p2._provided_args)
