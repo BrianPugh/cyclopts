@@ -71,3 +71,11 @@ def test_parameter_combine_priority():
     p_combined = Parameter.combine(p1, p2)
 
     assert p_combined.negative == ("--bar",)
+
+
+def test_parameter_combine_priority_none():
+    p1 = Parameter(negative="--foo")
+    p2 = Parameter(negative=None)
+    p_combined = Parameter.combine(p1, p2)
+
+    assert p_combined.negative is None
