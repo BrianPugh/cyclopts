@@ -5,7 +5,7 @@ API
 ===
 
 .. autoclass:: cyclopts.App
-   :members: name, default, command, version_print, help_print, interactive_shell, parse_known_args, parse_args
+   :members: name, default, default_parameter, command, version_print, help_print, interactive_shell, parse_known_args, parse_args
    :special-members: __call__, __getitem__
 
 .. autoclass:: cyclopts.Parameter

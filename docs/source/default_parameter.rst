@@ -1,7 +1,7 @@
 =================
 Default Parameter
 =================
-The default values of :class:`Parameter` can be configured via the ``default_parameter`` field of :class:`App`.
+The default values of :class:`Parameter` can be configured via :attr:`.App.default_parameter`.
 
 For example, to disable the ``negative`` flag feature across your entire app:
 
@@ -19,7 +19,7 @@ For example, to disable the ``negative`` flag feature across your entire app:
 
    app()
 
-We can see that ``--no-flag`` is no longer provided:
+Consequently, ``--no-flag`` is no longer provided:
 
 .. code-block::
 
@@ -30,18 +30,34 @@ We can see that ``--no-flag`` is no longer provided:
    │ *  --flag  [required]                                         │
    ╰───────────────────────────────────────────────────────────────╯
 
-However, if we explicitly set ``negative`` in the function signature, it works as expected:
+Explicitly setting ``negative`` in the function signature works as expected:
 
 
 .. code-block::
 
    @app.command
-   def foo(*, flag: Annotated[bool, Parameter(negative="--no-flag")]):
+   def foo(*, flag: Annotated[bool, Parameter(negative="--anti-flag")]):
        pass
 
+.. code-block::
 
-When resolving what the ``default_parameter`` values should be, explicitly set values from higher priority sources override lower-priority sources:
+   $ my-script foo --help
+   Usage: my-script foo [ARGS] [OPTIONS]
+
+   ╭─ Parameters ──────────────────────────────────────────────────╮
+   │ *  --flag,--anti-flag  [required]                             │
+   ╰───────────────────────────────────────────────────────────────╯
+
+.. _Parameter Resolution Order:
+
+----------------
+Resolution Order
+----------------
+
+When resolving what the Parameter values for an individual function parameter should be, explicitly set attributes of higher priority Parameters override lower priority Parameters. The resolution order is as follows:
 
 1. *Highest Priority:* Parameter-annotated command function signature ``Annotated[..., Parameter()]``.
 2. :class:`App` ``default_parameter`` that registered the command.
-3. *Lowest Priority:* :class:`App` parenting app(s)'s ``default_parameter``.
+3. *Lowest Priority:* :class:`App` parenting app(s)'s ``default_parameter`` (and their parents, and so on).
+
+Any of Parameter's fields can be set to `None` to revert back to the true-original Cyclopts default.
