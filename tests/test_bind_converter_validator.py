@@ -1,7 +1,12 @@
 import inspect
+import sys
 
 import pytest
-from typing_extensions import Annotated
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts import Parameter, ValidationError
 

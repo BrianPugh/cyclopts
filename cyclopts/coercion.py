@@ -1,10 +1,14 @@
 import collections.abc
 import inspect
+import sys
 from enum import Enum
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
 
-from typing_extensions import Annotated
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts.exceptions import CoercionError
 

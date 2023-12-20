@@ -1,8 +1,13 @@
+import sys
 from typing import Any, Union
 
 import pytest
 from attrs import frozen
-from typing_extensions import Annotated
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts import Parameter, coerce
 

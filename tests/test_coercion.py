@@ -4,7 +4,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 import pytest
-from typing_extensions import Annotated
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts import CoercionError
 from cyclopts.coercion import coerce, resolve, token_count
