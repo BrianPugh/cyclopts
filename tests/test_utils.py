@@ -17,6 +17,10 @@ def test_parameter_dict_immutable():
     for name, parameter in parameters.items():
         assert parameter_dict[parameter] == name
 
+    # Test __contains__
+    assert parameters["a"] in parameter_dict
+    assert parameters["b"] in parameter_dict
+
 
 def test_parameter_dict_mutable():
     def foo(a: int, b: List[int] = []):  # noqa: B006
@@ -30,3 +34,7 @@ def test_parameter_dict_mutable():
 
     for name, parameter in parameters.items():
         assert parameter_dict[parameter] == name
+
+    # Test __contains__
+    assert parameters["a"] in parameter_dict
+    assert parameters["b"] in parameter_dict
