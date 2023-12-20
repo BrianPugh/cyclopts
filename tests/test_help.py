@@ -1,9 +1,14 @@
+import sys
 from enum import Enum
 from textwrap import dedent
 from typing import List, Literal, Optional, Union
 
 import pytest
-from typing_extensions import Annotated
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts import App, Parameter
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage

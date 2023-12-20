@@ -1,8 +1,13 @@
 import inspect
+import sys
 from typing import Any, Optional
 
 import pytest
-from typing_extensions import Annotated
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError, UnusedCliTokensError

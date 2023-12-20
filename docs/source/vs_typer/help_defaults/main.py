@@ -1,8 +1,13 @@
+import sys
 from pathlib import Path
 from typing import List, Optional
 
 import typer
-from typing_extensions import Annotated
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 import cyclopts
 

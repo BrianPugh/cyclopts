@@ -1,6 +1,10 @@
 import inspect
+import sys
 
-from typing_extensions import Annotated
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 from cyclopts.bind import parameter2cli
 from cyclopts.parameter import Parameter
