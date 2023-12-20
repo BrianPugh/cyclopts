@@ -12,6 +12,13 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 from attrs import define, field
 from rich.console import Console
 
+if sys.version_info < (3, 10):
+    from importlib_metadata import PackageNotFoundError
+    from importlib_metadata import version as importlib_metadata_version
+else:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as importlib_metadata_version
+
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.coercion import str_to_tuple_converter
 from cyclopts.exceptions import (
@@ -39,6 +46,7 @@ class _CannotDeriveCallingModuleNameError(Exception):
 
 
 def _get_root_module_name():
+    """Get the calling package name from the call-stack."""
     for elem in inspect.stack():
         module = inspect.getmodule(elem.frame)
         if module is None:
@@ -52,24 +60,35 @@ def _get_root_module_name():
 
 
 def _default_version(default="0.0.0") -> str:
-    """Attempts to get the calling code's ``module.__version__``.
+    """Attempts to get the calling code's version.
 
     Returns
     -------
     version: str
-        ``default`` if it cannot find ``__version__``.
+        ``default`` if it cannot determine version.
     """
     try:
         root_module_name = _get_root_module_name()
     except _CannotDeriveCallingModuleNameError:
         return default
 
+    # Attempt to get the Distribution Package’s version number.
+    try:
+        return importlib_metadata_version(root_module_name)
+    except PackageNotFoundError:
+        pass
+
+    # Attempt packagename.__version__
+    # Not sure if this is redundant with ``importlib.metadata``,
+    # but there's no real harm in checking.
     try:
         module = importlib.import_module(root_module_name)
-    except ImportError:
-        return default
+        return module.__version__
+    except (ImportError, AttributeError):
+        pass
 
-    return getattr(module, "__version__", default)
+    # Final fallback
+    return default
 
 
 def _validate_default_command(x):

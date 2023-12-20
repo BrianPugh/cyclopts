@@ -28,6 +28,7 @@ generate-setup-file = false
 # Be as loose as possible if writing a library.
 python = "^3.8"
 typing-extensions = { version = ">=4.8.0", python = "^3.8.0" }
+importlib-metadata = { version = ">=4.4", python = '<3.10' }
 attrs = ">=23.1.0"
 rich = ">=13.6.0"
 docstring-parser = "^0.15"
@@ -142,6 +143,7 @@ ignore = [
     "F401",
     "PGH003",  # Use specific rule codes when ignoring type issues
     "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
+    "TRY300",  # Consider moving this statement to an `else` block
 ]
 line-length = 120  # Must agree with Black
 
@@ -189,6 +191,6 @@ paths=["cyclopts"]
 deps-file="pyproject.toml"
 sections=["tool.poetry.dependencies"]
 exclude-deps =[
+  "importlib-metadata",
   "typing-extensions",
-  "rich",
 ]
