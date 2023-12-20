@@ -102,6 +102,10 @@ API
       If multiple environment variables are given, the left-most environment variable with a set value will be used.
       If no environment variable is set, Cyclopts will fallback to the function-signature default.
 
+   .. automethod:: combine
+
+   .. automethod:: default
+
 .. autofunction:: cyclopts.coerce
 
 .. autofunction:: cyclopts.create_bound_arguments

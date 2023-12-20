@@ -79,3 +79,16 @@ def test_parameter_combine_priority_none():
     p_combined = Parameter.combine(p1, p2)
 
     assert p_combined.negative is None
+
+
+def test_parameter_default():
+    p1 = Parameter()
+    p2 = Parameter.default()
+
+    # The two parameters should be equivalent.
+    assert p1 == p2
+
+    # However, the _provided_args field should differ
+    assert p1._provided_args == ()
+    # Just testing a few
+    assert {"name", "converter", "validator"}.issubset(p2._provided_args)

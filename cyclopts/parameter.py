@@ -143,6 +143,17 @@ class Parameter:
 
         return cls(**kwargs)
 
+    @classmethod
+    def default(cls) -> "Parameter":
+        """Create a Parameter with all Cyclopts-default values.
+
+        This is different than just ``Parameter()`` because it will override
+        all values of upstream Parameters.
+        """
+        return cls(
+            **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportGeneralTypeIssues]
+        )
+
 
 def validate_command(f, default_parameter: Optional[Parameter] = None):
     """Validate if a function abides by Cyclopts's rules.
