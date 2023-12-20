@@ -7,6 +7,8 @@ from rich import box
 from rich.panel import Panel
 from rich.text import Text
 
+from cyclopts.utils import ParameterDict
+
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -77,7 +79,7 @@ class CycloptsError(Exception):
     Dictionary mapping CLI strings to python parameters.
     """
 
-    parameter2cli: Optional[Dict[inspect.Parameter, List[str]]] = None
+    parameter2cli: Optional[ParameterDict] = None
     """
     Dictionary mapping function parameters to possible CLI tokens.
     """

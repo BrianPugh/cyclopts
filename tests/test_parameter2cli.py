@@ -8,6 +8,7 @@ else:
 
 from cyclopts.bind import parameter2cli
 from cyclopts.parameter import Parameter
+from cyclopts.utils import ParameterDict
 
 
 def test_parameter2cli_positional_or_keyword():
@@ -16,7 +17,7 @@ def test_parameter2cli_positional_or_keyword():
 
     a_iparam = list(inspect.signature(foo).parameters.values())[0]
     actual = parameter2cli(foo)
-    assert actual == {a_iparam: ["--a"]}
+    assert actual == ParameterDict({a_iparam: ["--a"]})
 
 
 def test_parameter2cli_positional_only():
@@ -25,7 +26,7 @@ def test_parameter2cli_positional_only():
 
     a_iparam = list(inspect.signature(foo).parameters.values())[0]
     actual = parameter2cli(foo)
-    assert actual == {a_iparam: ["A"]}
+    assert actual == ParameterDict({a_iparam: ["A"]})
 
 
 def test_parameter2cli_keyword_only():
@@ -34,7 +35,7 @@ def test_parameter2cli_keyword_only():
 
     a_iparam = list(inspect.signature(foo).parameters.values())[0]
     actual = parameter2cli(foo)
-    assert actual == {a_iparam: ["--a"]}
+    assert actual == ParameterDict({a_iparam: ["--a"]})
 
 
 def test_parameter2cli_var_keyword():
@@ -43,7 +44,7 @@ def test_parameter2cli_var_keyword():
 
     a_iparam = list(inspect.signature(foo).parameters.values())[0]
     actual = parameter2cli(foo)
-    assert actual == {a_iparam: ["--a"]}
+    assert actual == ParameterDict({a_iparam: ["--a"]})
 
 
 def test_parameter2cli_var_positional():
@@ -52,4 +53,4 @@ def test_parameter2cli_var_positional():
 
     a_iparam = list(inspect.signature(foo).parameters.values())[0]
     actual = parameter2cli(foo)
-    assert actual == {a_iparam: ["A"]}
+    assert actual == ParameterDict({a_iparam: ["A"]})

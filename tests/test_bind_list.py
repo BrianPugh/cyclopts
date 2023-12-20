@@ -28,6 +28,25 @@ def test_keyword_list(app):
     assert actual_bind == expected_bind
 
 
+def test_keyword_list_mutable_default(app):
+    @app.command
+    def foo(a: List[int] = []):  # noqa: B006
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind([1, 2, 3])
+
+    actual_command, actual_bind = app.parse_args("foo --a=1 --a=2 --a 3")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+    expected_bind = signature.bind()
+
+    actual_command, actual_bind = app.parse_args("foo")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+
 def test_keyword_list_pos(app):
     @app.command
     def foo(a: List[int]):

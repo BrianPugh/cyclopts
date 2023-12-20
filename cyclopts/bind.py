@@ -14,6 +14,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.parameter import Parameter, get_hint_parameter, get_names, validate_command
+from cyclopts.utils import ParameterDict
 
 
 def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
@@ -65,9 +66,9 @@ def cli2parameter(
 
 
 @lru_cache(maxsize=16)
-def parameter2cli(f: Callable, default_parameter: Optional[Parameter] = None) -> Dict[inspect.Parameter, List[str]]:
+def parameter2cli(f: Callable, default_parameter: Optional[Parameter] = None) -> ParameterDict:
     c2p = cli2parameter(f, default_parameter=default_parameter)
-    p2c = {}
+    p2c = ParameterDict()
 
     for cli, tup in c2p.items():
         iparam = tup[0]
@@ -170,7 +171,7 @@ def _parse_kw_and_flags(f, tokens, mapping, default_parameter: Optional[Paramete
 
 
 def _parse_pos(
-    f: Callable, tokens: Iterable[str], mapping: Dict, default_parameter: Optional[Parameter] = None
+    f: Callable, tokens: Iterable[str], mapping: ParameterDict, default_parameter: Optional[Parameter] = None
 ) -> List[str]:
     tokens = list(tokens)
     signature = inspect.signature(f)
@@ -245,7 +246,7 @@ def _is_required(parameter: inspect.Parameter) -> bool:
     return parameter.default is parameter.empty
 
 
-def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any], default_parameter: Optional[Parameter] = None):
+def _bind(f: Callable, mapping: ParameterDict, default_parameter: Optional[Parameter] = None):
     """Bind the mapping to the function signature.
 
     Better than directly using ``signature.bind`` because this can handle
@@ -296,8 +297,8 @@ def _bind(f: Callable, mapping: Dict[inspect.Parameter, Any], default_parameter:
     return bound
 
 
-def _convert(mapping: Dict[inspect.Parameter, List[str]], default_parameter: Optional[Parameter] = None) -> dict:
-    coerced = {}
+def _convert(mapping: ParameterDict, default_parameter: Optional[Parameter] = None) -> ParameterDict:
+    coerced = ParameterDict()
     for iparam, parameter_tokens in mapping.items():
         type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
 
@@ -361,7 +362,7 @@ def create_bound_arguments(
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
     # Note: mapping is updated inplace
-    mapping: Dict[inspect.Parameter, List[str]] = {}
+    mapping = ParameterDict()
 
     validate_command(f, default_parameter=default_parameter)
 
