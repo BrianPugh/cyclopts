@@ -147,5 +147,3 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.CommandCollisionError
-
-.. autoexception:: cyclopts.MultipleParameterAnnotationError

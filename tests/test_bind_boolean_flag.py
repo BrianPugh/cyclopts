@@ -46,6 +46,26 @@ def test_boolean_flag_app_parameter_default(app):
         app.parse_args("--no-my-flag", exit_on_error=False)
 
 
+def test_boolean_flag_app_parameter_default_annotated_override(app):
+    app.default_parameter = Parameter(negative="")
+
+    @app.default
+    def foo(my_flag: Annotated[bool, Parameter(negative="--NO-flag")] = True):
+        pass
+
+    signature = inspect.signature(foo)
+
+    expected_bind = signature.bind(True)
+    actual_command, actual_bind = app.parse_args("--my-flag")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+    expected_bind = signature.bind(False)
+    actual_command, actual_bind = app.parse_args("--NO-flag")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+
 @pytest.mark.parametrize(
     "cmd_str,expected",
     [

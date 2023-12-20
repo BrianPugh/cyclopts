@@ -3,7 +3,7 @@ Default Parameter
 =================
 The default values of :class:`Parameter` can be configured via the ``default_parameter`` field of :class:`App`.
 
-For example, to disable the ``negative`` flag feature:
+For example, to disable the ``negative`` flag feature across your entire app:
 
 .. code-block:: python
 
@@ -13,7 +13,7 @@ For example, to disable the ``negative`` flag feature:
 
 
    @app.command
-   def foo(flag: bool):
+   def foo(*, flag: bool):
        pass
 
 
@@ -27,8 +27,18 @@ We can see that ``--no-flag`` is no longer provided:
    Usage: my-script foo [ARGS] [OPTIONS]
 
    ╭─ Parameters ──────────────────────────────────────────────────╮
-   │ *  FLAG,--flag  [required]                                    │
+   │ *  --flag  [required]                                         │
    ╰───────────────────────────────────────────────────────────────╯
+
+However, if we explicitly set ``negative`` in the function signature, it works as expected:
+
+
+.. code-block::
+
+   @app.command
+   def foo(*, flag: Annotated[bool, Parameter(negative="--no-flag")]):
+       pass
+
 
 When resolving what the ``default_parameter`` values should be, explicitly set values from higher priority sources override lower-priority sources:
 

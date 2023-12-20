@@ -12,7 +12,6 @@ from cyclopts.coercion import (
     resolve_optional,
     str_to_tuple_converter,
 )
-from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
 from cyclopts.utils import record_init_kwargs
 
@@ -126,9 +125,13 @@ class Parameter:
 
     @classmethod
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
-        """Returns a new Parameter with values of ``new_parameter`` overriding ``self``.
+        """Returns a new Parameter with values of ``new_parameters`` overriding ``self``.
 
-        ``*parameters`` ordered from least-to-highest attribute priority.
+        Parameters
+        ----------
+        `*parameters`: Optional[Parameter]
+             Parameters who's attributes override ``self`` attributes.
+             Ordered from least-to-highest attribute priority.
         """
         kwargs = {}
         for parameter in parameters:
@@ -189,13 +192,8 @@ def get_hint_parameter(type_: Type, default_parameter: Optional[Parameter] = Non
         annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
         type_ = get_args(type_)[0]
         cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-        if len(cyclopts_parameters) > 2:
-            raise MultipleParameterAnnotationError
-        elif len(cyclopts_parameters) == 1:
-            cyclopts_parameter = Parameter.combine(cyclopts_parameters[0], default_parameter)
-        else:
-            cyclopts_parameter = Parameter.combine(default_parameter)
     else:
-        cyclopts_parameter = Parameter.combine(default_parameter)
+        cyclopts_parameters = []
 
+    cyclopts_parameter = Parameter.combine(default_parameter, *cyclopts_parameters)
     return resolve(type_), cyclopts_parameter
