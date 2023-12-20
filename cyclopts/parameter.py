@@ -1,5 +1,5 @@
 import inspect
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
 
 from attrs import field, frozen
 
@@ -14,6 +14,7 @@ from cyclopts.coercion import (
 )
 from cyclopts.exceptions import MultipleParameterAnnotationError
 from cyclopts.protocols import Converter, Validator
+from cyclopts.utils import record_init_kwargs
 
 
 def _token_count_validator(instance, attribute, value):
@@ -21,6 +22,7 @@ def _token_count_validator(instance, attribute, value):
         raise ValueError('Must specify a "converter" if setting "token_count".')
 
 
+@record_init_kwargs("_provided_args")
 @frozen
 class Parameter:
     """Cyclopts configuration for individual function parameters."""
@@ -124,6 +126,9 @@ class Parameter:
     If no environment variable is set, Cyclopts will fallback to the function-signature default.
     """
 
+    # Populated by the record_attrs_init_args decorator.
+    _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
+
     @property
     def name(self):
         return str_to_tuple_converter(self._name)
@@ -181,9 +186,9 @@ class Parameter:
         """Only shows non-default values."""
         content = ", ".join(
             [
-                f"{a.alias}={v!r}"
+                f"{a.alias}={getattr(self, a.name)!r}"
                 for a in self.__attrs_attrs__  # pyright: ignore[reportGeneralTypeIssues]
-                if (v := getattr(self, a.name)) != a.default
+                if a.alias in self._provided_args
             ]
         )
         return f"{type(self).__name__}({content})"
@@ -199,11 +204,8 @@ class Parameter:
             if parameter is None:
                 continue
             for a in parameter.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
-                if not a.init:
-                    continue
-                v = getattr(parameter, a.name)
-                if v != a.default:
-                    kwargs[a.alias] = v
+                if a.init and a.alias in parameter._provided_args:
+                    kwargs[a.alias] = getattr(parameter, a.name)
 
         return cls(**kwargs)
 
