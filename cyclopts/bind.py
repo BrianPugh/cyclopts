@@ -316,17 +316,17 @@ def _convert(mapping: ParameterDict, default_parameter: Optional[Parameter] = No
                 if iparam.kind == iparam.VAR_KEYWORD:
                     coerced[iparam] = {}
                     for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
-                        val = cparam.converter_(type_, *values)
+                        val = cparam.converter(type_, *values)
                         if cparam.validator:
                             cparam.validator(type_, val)
                         coerced[iparam][key] = val
                 elif iparam.kind == iparam.VAR_POSITIONAL:
-                    val = cparam.converter_(List[type_], *parameter_tokens)
+                    val = cparam.converter(List[type_], *parameter_tokens)
                     if cparam.validator:
                         cparam.validator(type_, val)
                     coerced[iparam] = val
                 else:
-                    val = cparam.converter_(type_, *parameter_tokens)
+                    val = cparam.converter(type_, *parameter_tokens)
                     if cparam.validator:
                         cparam.validator(type_, val)
                     coerced[iparam] = val

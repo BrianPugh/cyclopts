@@ -23,6 +23,20 @@ def test_parameter_get_negatives_iterable_default(type_):
     assert ("--empty-foo", "--empty-bar") == p.get_negatives(type_, "--foo", "--bar")
 
 
+@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+def test_parameter_get_negatives_iterable_custom_prefix(type_):
+    p = Parameter(negative_iterable="--vacant-")
+    assert ("--vacant-foo", "--vacant-bar") == p.get_negatives(type_, "--foo", "--bar")
+
+
+@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+def test_parameter_get_negatives_iterable_custom_prefix_list(type_):
+    p = Parameter(negative_iterable=["--vacant-", "--blank-"])
+    assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(
+        p.get_negatives(type_, "--foo", "--bar")
+    )
+
+
 @pytest.mark.parametrize("type_", [bool, list, set])
 def test_parameter_get_negatives_custom_single(type_):
     p = Parameter(negative="--foo")
@@ -33,6 +47,18 @@ def test_parameter_get_negatives_custom_single(type_):
 def test_parameter_get_negatives_bool_custom_list(type_):
     p = Parameter(negative=["--foo", "--bar"])
     assert ("--foo", "--bar") == p.get_negatives(type_, "this-string-doesnt-matter")
+
+
+@pytest.mark.parametrize("type_", [bool, list, set])
+def test_parameter_get_negatives_bool_custom_prefix(type_):
+    p = Parameter(negative_bool="--yesnt-")
+    assert ("--yesnt-foo", "--yesnt-bar") == p.get_negatives(bool, "--foo", "--bar")
+
+
+@pytest.mark.parametrize("type_", [bool, list, set])
+def test_parameter_get_negatives_bool_custom_prefix_list(type_):
+    p = Parameter(negative_bool=["--yesnt-", "--not-"])
+    assert {"--yesnt-foo", "--yesnt-bar", "--not-foo", "--not-bar"} == set(p.get_negatives(bool, "--foo", "--bar"))
 
 
 def test_get_hint_parameter_basic():

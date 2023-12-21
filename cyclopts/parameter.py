@@ -17,8 +17,17 @@ from cyclopts.utils import record_init_kwargs
 
 
 def _token_count_validator(instance, attribute, value):
-    if value is not None and instance.converter is None:
+    if value is not None and instance._converter is None:
         raise ValueError('Must specify a "converter" if setting "token_count".')
+
+
+def _double_hyphen_validator(instance, attribute, values):
+    if not values:
+        return
+
+    for value in values:
+        if value is not None and not value.startswith("--"):
+            raise ValueError(f'{attribute.alias} value must start with "--".')
 
 
 @record_init_kwargs("_provided_args")
@@ -32,7 +41,7 @@ class Parameter:
         default=None, converter=optional_str_to_tuple_converter, alias="name"
     )
 
-    converter: Optional[Converter] = field(default=None)
+    _converter: Optional[Converter] = field(default=None, alias="converter")
 
     validator: Optional[Validator] = field(default=None)
 
@@ -56,6 +65,20 @@ class Parameter:
         default=None, converter=optional_str_to_tuple_converter, alias="env_var"
     )
 
+    _negative_bool: Union[None, str, Iterable[str]] = field(
+        default=None,
+        converter=optional_str_to_tuple_converter,
+        validator=_double_hyphen_validator,
+        alias="negative_bool",
+    )
+
+    _negative_iterable: Union[None, str, Iterable[str]] = field(
+        default=None,
+        converter=optional_str_to_tuple_converter,
+        validator=_double_hyphen_validator,
+        alias="negative_iterable",
+    )
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
@@ -77,11 +100,25 @@ class Parameter:
             return True
 
     @property
-    def converter_(self):
-        if self.converter:
-            return self.converter
+    def converter(self):
+        if self._converter:
+            return self._converter
         else:
             return coerce
+
+    @property
+    def negative_bool(self):
+        if self._negative_bool is None:
+            return ("--no-",)
+        else:
+            return self._negative_bool
+
+    @property
+    def negative_iterable(self):
+        if self._negative_iterable is None:
+            return ("--empty-",)
+        else:
+            return self._negative_iterable
 
     def get_negatives(self, type_, *names) -> Tuple[str, ...]:
         type_ = get_origin(type_) or type_
@@ -95,7 +132,6 @@ class Parameter:
         out = []
         for name in names:
             if name.startswith("--"):
-                prefix = "--"
                 name = name[2:]
             elif name.startswith("-"):
                 # Do not support automatic negation for short flags.
@@ -104,12 +140,10 @@ class Parameter:
                 # Should never reach here.
                 raise NotImplementedError("All parameters should have started with '-' or '--'.")
 
-            if type_ is bool:
-                negative_word = "no"
-            else:
-                negative_word = "empty"
+            negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
 
-            out.append(f"{prefix}{negative_word}-{name}")
+            for negative_prefix in negative_prefixes:
+                out.append(f"{negative_prefix}{name}")
         return tuple(out)
 
     def __repr__(self):

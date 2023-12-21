@@ -50,6 +50,20 @@ API
       For iterables, defaults to ``--empty-{name}``.
       Set to an empty list to disable this feature.
 
+   .. attribute:: negative_bool
+      :type: Optional[str]
+
+      Prefix for negative boolean flags.
+      Must start with ``"--"``.
+      Defaults to ``"--no-"``.
+
+   .. attribute:: negative_iterable
+      :type: Optional[str]
+
+      Prefix for empty iterables (like lists and sets) flags.
+      Must start with ``"--"``.
+      Defaults to ``"--empty-"``.
+
    .. attribute:: token_count
       :type: Optional[int]
 
