@@ -9,6 +9,7 @@ __all__ = [
     "CycloptsError",
     "Dispatcher",
     "DocstringError",
+    "Group",
     "InvalidCommandError",
     "MissingArgumentError",
     "Parameter",
@@ -33,6 +34,7 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
     ValidationError,
 )
+from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Converter, Dispatcher, Validator
 
