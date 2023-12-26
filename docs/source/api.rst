@@ -120,6 +120,9 @@ API
 
    .. automethod:: default
 
+.. autoclass:: cyclopts.Group
+   :members:
+
 .. autofunction:: cyclopts.coerce
 
 .. autofunction:: cyclopts.create_bound_arguments
@@ -128,6 +131,9 @@ API
 Validators
 ----------
 Cyclopts has several builtin validators for common CLI inputs.
+
+.. autoclass:: cyclopts.validators.LimitedChoice
+   :members:
 
 .. autoclass:: cyclopts.validators.Number
    :members:

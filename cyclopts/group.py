@@ -32,7 +32,7 @@ class Group:
         def validator(**kwargs):
             "Raise an exception if something is invalid."
 
-    *Not invoked on command groups.*
+    **Not invoked on command groups.**
     """
 
     default_parameter: Optional["Parameter"] = field(default=None, kw_only=True)
