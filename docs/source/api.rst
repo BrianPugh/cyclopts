@@ -197,7 +197,6 @@ API
 
       Only one group registered to an app can have each non-``None`` option. This parameter is keyword-only.
 
-
 .. autofunction:: cyclopts.coerce
 
 .. autofunction:: cyclopts.create_bound_arguments
@@ -206,6 +205,9 @@ API
 Validators
 ----------
 Cyclopts has several builtin validators for common CLI inputs.
+
+.. autoclass:: cyclopts.validators.LimitedChoice
+   :members:
 
 .. autoclass:: cyclopts.validators.Number
    :members:
