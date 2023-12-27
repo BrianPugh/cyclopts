@@ -120,6 +120,56 @@ API
 
    .. automethod:: default
 
+.. autoclass:: cyclopts.Group
+
+   A group of parameters and/or commands in a CLI application.
+
+   .. attribute:: name
+      :type: str
+
+      Group name used for the help-panel and for group-referenced-by-string.
+      Typically this is a title, so the first character should be capitalized.
+
+   .. attribute:: help
+      :type: str
+      :value: ""
+
+      Additional documentation shown on the help screen.
+
+   .. attribute:: show
+      :type: bool
+      :value: True
+
+      Show this group in the help-panel. This parameter is keyword-only.
+
+   .. attribute:: validator
+      :type: Optional[Callable]
+      :value: None
+
+      A function (or list of functions) where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
+
+      Example usage:
+
+      .. code-block:: python
+
+         def validator(**kwargs):
+             "Raise an exception if something is invalid."
+
+      Validators are **not** invoked on command groups. This parameter is keyword-only.
+
+   .. attribute:: default_parameter
+      :type: Optional[Parameter]
+      :value: None
+
+      Default Parameter in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter. This parameter is keyword-only.
+
+   .. attribute:: default
+      :type: Optional[Literal["Arguments", "Parameters", "Commands"]]
+      :value: None
+
+      Only one group registered to an app can have each non-``None`` option. This parameter is keyword-only.
+
+
 .. autofunction:: cyclopts.coerce
 
 .. autofunction:: cyclopts.create_bound_arguments
