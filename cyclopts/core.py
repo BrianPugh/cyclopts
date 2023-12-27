@@ -119,7 +119,7 @@ class App:
         2. If a ``default`` function has been registered, the name of that function.
         3. If the module name is ``__main__.py``, the name of the encompassing package.
         4. The value of ``sys.argv[0]``.
-    version: Optional[str]
+    version: Union[None, str, Callable]
         Version to be displayed when a token of ``version_flags`` is parsed.
         Defaults to attempting to use ``package.__version__`` from the package instantiating :class:`App`.
     version_flags: Union[str, Iterable[str]]
@@ -147,7 +147,7 @@ class App:
 
     _name: Optional[str] = field(default=None, alias="name")
 
-    version: str = field(factory=_default_version)
+    version: Union[None, str, Callable] = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
 
     help: Optional[str] = field(default=None)
@@ -217,7 +217,7 @@ class App:
 
     def version_print(self) -> None:
         """Print the application version."""
-        print(self.version)
+        print(self.version() if callable(self.version) else self.version)
 
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.

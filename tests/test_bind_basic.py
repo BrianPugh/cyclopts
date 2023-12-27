@@ -245,6 +245,16 @@ def test_bind_version(app, capsys):
     assert captured.out == "1.2.3\n"
 
 
+def test_bind_version_factory(app, capsys):
+    app.version = lambda: "1.2.3"
+    actual_command, actual_bind = app.parse_args("--version")
+    assert actual_command == app.version_print
+
+    actual_command(*actual_bind.args, **actual_bind.kwargs)
+    captured = capsys.readouterr()
+    assert captured.out == "1.2.3\n"
+
+
 @pytest.mark.parametrize(
     "cmd_str_e",
     [
