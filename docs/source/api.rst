@@ -33,9 +33,9 @@ API
       If not provided, defaults to Cyclopts's internal coercion engine.
 
    .. attribute:: validator
-      :type: Optional[Validator]
+      :type: Union[None, Validator, Iterable[Validator]]
 
-      A function that validates data returned by the ``converter``.
+      A function (or list of functions) that validates data returned by the ``converter``.
 
       .. code-block:: python
 

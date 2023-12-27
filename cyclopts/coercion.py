@@ -264,20 +264,31 @@ def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) ->
         return 1, False
 
 
-def str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Tuple[str, ...]:
-    """Convert a string or Iterable into an Iterable.
+def to_tuple_converter(input_value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
+    """Convert a single element or an iterable of elements into a tuple.
 
-    Intended to be used in an ``attrs.Field``.
+    Intended to be used in an `attrs.Field`. If `None` is provided, returns an empty tuple.
+    If a single element is provided, returns a tuple containing just that element.
+    If an iterable is provided, converts it into a tuple.
+
+    Parameters
+    ----------
+    input_value: Optional[Union[Any, Iterable[Any]]]
+        An element, an iterable of elements, or None.
+
+    Returns
+    -------
+    Tuple[Any, ...]: A tuple containing the elements.
     """
     if input_value is None:
         return ()
-    elif isinstance(input_value, str):
-        return (input_value,)
-    else:
+    elif isinstance(input_value, Iterable) and not isinstance(input_value, str):
         return tuple(input_value)
+    else:
+        return (input_value,)
 
 
-def optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]) -> Optional[Tuple[str, ...]]:
+def optional_to_tuple_converter(input_value: Union[None, Any, Iterable[Any]]) -> Optional[Tuple[Any, ...]]:
     """Convert a string or Iterable or None into an Iterable or None.
 
     Intended to be used in an ``attrs.Field``.
@@ -288,4 +299,4 @@ def optional_str_to_tuple_converter(input_value: Union[None, str, Iterable[str]]
     if not input_value:
         return ()
 
-    return str_to_tuple_converter(input_value)
+    return to_tuple_converter(input_value)

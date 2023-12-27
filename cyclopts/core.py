@@ -20,7 +20,7 @@ else:
     from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import str_to_tuple_converter
+from cyclopts.coercion import to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -307,9 +307,9 @@ class App:
         if name is None:
             name = app.name
         else:
-            app._name = str_to_tuple_converter(name)[0]
+            app._name = to_tuple_converter(name)[0]
 
-        for n in str_to_tuple_converter(name):
+        for n in to_tuple_converter(name):
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
