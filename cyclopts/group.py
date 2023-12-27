@@ -1,5 +1,5 @@
 import inspect
-from typing import TYPE_CHECKING, Iterable, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Callable, Iterable, List, Literal, Optional, Union
 
 from attrs import define, field
 
@@ -19,6 +19,8 @@ class Group:
 
     # All below parameters are keyword-only
     show: bool = field(default=True, kw_only=True)
+
+    converter: Optional[Callable] = field(default=None)
 
     validator: Union[None, Validator, Iterable[Validator]] = field(default=None, converter=to_tuple_converter)
 
