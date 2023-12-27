@@ -46,7 +46,7 @@ class Parameter:
 
     negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
 
-    group: Union[None, str, Group, Iterable[str], Iterable[Group]] = field(
+    group: Union[None, str, Group, Iterable[Union[str, Group]]] = field(
         default=None, converter=optional_to_tuple_converter
     )
 

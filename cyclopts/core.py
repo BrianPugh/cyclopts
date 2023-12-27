@@ -20,7 +20,7 @@ else:
     from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import to_tuple_converter
+from cyclopts.coercion import optional_to_tuple_converter, to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -28,6 +28,7 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
     format_cyclopts_error,
 )
+from cyclopts.group import Group
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -140,6 +141,45 @@ class App:
         Defaults to ``"Parameters"``.
     default_parameter: Parameter
         Default :class:`Parameter` configuration.
+    group: Union[None, str, Iterable[Union[str, Group]]]
+        The group(s) that ``default_command`` belongs to.
+        Used by the *parenting* app.
+
+        * If ``None``, defaults to the ``"Commands"`` group.
+
+        * If ``str``, use an existing Group (from app-parent ``groups``) with name,
+          or create a :class:`Group` with provided name if it does not exist.
+
+        * If :class:`Group`, directly use it.
+    groups: List[Group]
+        List of groups used by ``default_command`` parameters, and ``commands``.
+        The order of groups dictates the order displayed in the help page.
+        This field is lazily populated on-demand.
+        If default groups (Parameters, Arguments, Commands) are not found in the list, they
+        will be **prepended** to this list (in that order).
+    converter: Optional[Callable]
+        A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+
+        .. code-block:: python
+
+            def converter(**kwargs) -> Dict[str, Any]:
+                "Return an updated dictionary."
+
+        The returned dictionary will be used passed along to the command invocation.
+        The app-converter runs **after** :class:`Parameter` and :class:`Group` converters.
+        This parameter is keyword-only.
+    validator: Optional[Callable]
+        A function (or list of functions) where the CLI-provided group variables of ``default_command`` will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+
+        Example usage:
+
+        .. code-block:: python
+
+           def validator(**kwargs):
+               "Raise an exception if something is invalid."
+
+        The app-validator runs **last**.
+        This parameter is keyword-only.
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
@@ -154,6 +194,15 @@ class App:
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
     help_title_commands: str = "Commands"
     help_title_parameters: str = "Parameters"
+
+    group: Union[None, str, Group, Iterable[Union[str, Group]]] = field(
+        default=None, converter=optional_to_tuple_converter
+    )
+
+    groups: List[Group] = field(init=False, factory=list)
+
+    converter: Optional[Callable] = field(default=None)
+    validator: Union[None, Callable, Iterable[Callable]] = field(default=None)
 
     ######################
     # Private Attributes #

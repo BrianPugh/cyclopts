@@ -43,7 +43,7 @@ API
               pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
 
    .. attribute:: group
-      :type: Union[None, str, Group, Iterable[str], Iterable[Group]]
+      :type: Union[None, str, Group, Iterable[Union[str, Group]]]
 
       The group(s) that this parameter belongs to.
       This can be used to better organize the help-page, and/or to add additional conversion/validation logic (such as ensuring mutually-exclusive arguments).
