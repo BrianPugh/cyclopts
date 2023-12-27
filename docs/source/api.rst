@@ -142,11 +142,25 @@ API
 
       Show this group in the help-panel. This parameter is keyword-only.
 
+   .. attribute:: converter
+      :type: Optional[Callable]
+
+      A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+
+      .. code-block:: python
+
+          def converter(**kwargs) -> Dict[str, Any]:
+              """Return an updated dictionary."""
+
+      The returned dictionary will be used passed along to the command invocation.
+      The group converter runs **after** :class:`Parameter` converters and validators.
+      This parameter is keyword-only.
+
    .. attribute:: validator
       :type: Optional[Callable]
       :value: None
 
-      A function (or list of functions) where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
+      A function (or list of functions) where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
 
       Example usage:
 
@@ -155,7 +169,9 @@ API
          def validator(**kwargs):
              "Raise an exception if something is invalid."
 
-      Validators are **not** invoked on command groups. This parameter is keyword-only.
+      Validators are **not** invoked on command groups.
+      The group-validator runs **after** the group-converter.
+      This parameter is keyword-only.
 
    .. attribute:: default_parameter
       :type: Optional[Parameter]
