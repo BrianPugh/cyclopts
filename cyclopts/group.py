@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
 
 from cyclopts.coercion import to_tuple_converter
-from cyclopts.protocols import Validator
 
 
 @define
@@ -22,7 +21,7 @@ class Group:
 
     converter: Optional[Callable] = field(default=None)
 
-    validator: Union[None, Validator, Iterable[Validator]] = field(default=None, converter=to_tuple_converter)
+    validator: Union[None, Callable, Iterable[Callable]] = field(default=None, converter=to_tuple_converter)
 
     default_parameter: Optional["Parameter"] = field(default=None, kw_only=True)
 
