@@ -13,11 +13,21 @@ By default, cyclopts parses the special flag ``--version``.
 
 The resolution order for determining the version string is as follows:
 
-1. An explicitly supplied version string to the root Cyclopts application:
+1. An explicitly supplied version string or callable to the root Cyclopts application:
 
    .. code-block:: python
 
       app = cyclopts.App(version="7.5.8")
+
+   If a callable is provided, it will be invoked when running the ``--version`` command:
+
+   .. code-block:: python
+
+      def get_my_application_version() -> str:
+          return "7.5.8"
+
+
+      app = cyclopts.App(version=get_my_application_version)
 
 2. The invoking-package's `Distribution Package's Version Number`_ via `importlib.metadata.version`_.
    Cyclopts attempts to derive the package module that instantiated the :class:`App <cyclopts.App>` object by traversing the call stack.
