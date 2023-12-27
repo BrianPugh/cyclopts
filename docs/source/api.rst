@@ -42,6 +42,18 @@ API
           def validator(type_, value: Any) -> None:
               pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
 
+   .. attribute:: group
+      :type: Union[None, str, Group, Iterable[str], Iterable[Group]]
+
+      The group(s) that this parameter belongs to.
+      This can be used to better organize the help-page, and/or to add additional conversion/validation logic (such as ensuring mutually-exclusive arguments).
+
+      If ``None``, defaults to one of the following groups:
+
+      1. ``"Arguments"`` if the parameter is ``POSITIONAL_ONLY``.
+
+      2. ``"Parameters"`` otherwise.
+
    .. attribute:: negative
       :type: Union[None, str, Iterable[str]]
 
