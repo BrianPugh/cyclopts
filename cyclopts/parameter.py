@@ -7,10 +7,10 @@ from cyclopts.coercion import (
     AnnotatedType,
     coerce,
     get_origin_and_validate,
-    optional_str_to_tuple_converter,
+    optional_to_tuple_converter,
     resolve,
     resolve_optional,
-    str_to_tuple_converter,
+    to_tuple_converter,
 )
 from cyclopts.protocols import Converter, Validator
 from cyclopts.utils import record_init_kwargs
@@ -37,15 +37,13 @@ class Parameter:
 
     # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
 
-    _name: Union[None, str, Iterable[str]] = field(
-        default=None, converter=optional_str_to_tuple_converter, alias="name"
-    )
+    _name: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter, alias="name")
 
     _converter: Optional[Converter] = field(default=None, alias="converter")
 
-    validator: Optional[Validator] = field(default=None)
+    validator: Union[None, Validator, Iterable[Validator]] = field(default=None, converter=to_tuple_converter)
 
-    negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_str_to_tuple_converter)
+    negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
 
@@ -62,19 +60,19 @@ class Parameter:
     show_env_var: Optional[bool] = field(default=None)
 
     _env_var: Union[None, str, Iterable[str]] = field(
-        default=None, converter=optional_str_to_tuple_converter, alias="env_var"
+        default=None, converter=optional_to_tuple_converter, alias="env_var"
     )
 
     _negative_bool: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=optional_str_to_tuple_converter,
+        converter=optional_to_tuple_converter,
         validator=_double_hyphen_validator,
         alias="negative_bool",
     )
 
     _negative_iterable: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=optional_str_to_tuple_converter,
+        converter=optional_to_tuple_converter,
         validator=_double_hyphen_validator,
         alias="negative_iterable",
     )
@@ -84,11 +82,11 @@ class Parameter:
 
     @property
     def name(self):
-        return str_to_tuple_converter(self._name)
+        return to_tuple_converter(self._name)
 
     @property
     def env_var(self):
-        return str_to_tuple_converter(self._env_var)
+        return to_tuple_converter(self._env_var)
 
     @property
     def show(self):

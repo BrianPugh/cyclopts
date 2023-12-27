@@ -47,6 +47,33 @@ def test_custom_validator(app):
         app.parse_args("200", print_error=False, exit_on_error=False)
 
 
+def test_custom_validators(app):
+    def lower_bound(type_, value):
+        if value <= 0:
+            raise ValueError("An unreasonable age was entered.")
+
+    def upper_bound(type_, value):
+        if value > 150:
+            raise ValueError("An unreasonable age was entered.")
+
+    @app.default
+    def foo(age: Annotated[int, Parameter(validator=[lower_bound, upper_bound])]):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(age=10)
+
+    actual_command, actual_bind = app.parse_args("10")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+    with pytest.raises(ValidationError):
+        app.parse_args("0", print_error=False, exit_on_error=False)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("200", print_error=False, exit_on_error=False)
+
+
 def test_custom_converter_and_validator(app):
     def custom_validator(type_, value):
         if not (0 < value < 150):

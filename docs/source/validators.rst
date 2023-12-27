@@ -15,6 +15,7 @@ A validator is any callable object (such as a function) that has the signature:
 
 Validation happens after the data converter runs.
 Any of ``AssertionError``, ``TypeError`` or ``ValidationError`` will be promoted into a :exc:`cyclopts.ValidationError`.
+More than one validator can be supplied as a list to the ``validator`` field.
 
 Cyclopts has some builtin common validators in the ``cyclopts.validators`` module.
 
