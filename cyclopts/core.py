@@ -29,6 +29,7 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.group import Group
+from cyclopts.group_extractors import groups_from_commands, groups_from_function
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -200,6 +201,10 @@ class App:
     )
 
     groups: List[Group] = field(init=False, factory=list)
+
+    default_group_arguments: Optional[Group] = field(default=None)
+    default_group_parameters: Optional[Group] = field(default=None)
+    default_group_commands: Optional[Group] = field(default=None)
 
     converter: Optional[Callable] = field(default=None)
     validator: Union[None, Callable, Iterable[Callable]] = field(default=None)
