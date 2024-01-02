@@ -162,7 +162,7 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
         help_lookup = parameter2docstring(app.default_command)
         for parameter in inspect.signature(app.default_command).parameters.values():
             _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
-            if param.parse is False or not param.show:
+            if not param.parse or not param.show:
                 continue
             parameters.append(parameter)
     else:
@@ -253,12 +253,12 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
             with suppress(KeyError):
                 help_components.append(help_lookup[parameter].description)
 
-        if param.show_choices in (None, True):
+        if param.show_choices:
             choices = _get_choices(type_)
             if choices:
                 help_components.append(rf"[dim]\[choices: {choices}][/dim]")
 
-        if param.show_env_var in (None, True) and param.env_var:
+        if param.show_env_var and param.env_var:
             env_vars = " ".join(param.env_var)
             help_components.append(rf"[dim]\[env var: {env_vars}][/dim]")
 

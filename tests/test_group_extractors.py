@@ -4,43 +4,48 @@ import pytest
 from typing_extensions import Annotated
 
 from cyclopts import Group, Parameter
-from cyclopts.group_extractors import groups_from_commands, groups_from_function
+from cyclopts.group_extractors import groups_from_app, groups_from_function
 
 
-def test_groups_unannotated_parameters_positional_or_keyword():
+@pytest.fixture
+def groups_from_function_defaults():
+    return (Parameter(), Group("Arguments"), Group("Parameters"))
+
+
+def test_groups_unannotated_parameters_positional_or_keyword(groups_from_function_defaults):
     """Simple, unannotated POSITIONAL_OR_KEYWORD should be assigned to "Parameters" group."""
 
     def foo(bar):
         pass
 
     bar_parameter = list(inspect.signature(foo).parameters.values())[0]
-    actual_groups = groups_from_function(foo)
+    actual_groups = groups_from_function(foo, *groups_from_function_defaults)
     assert actual_groups == [(Group("Parameters"), [bar_parameter])]
 
 
-def test_groups_unannotated_parameters_positional_only():
+def test_groups_unannotated_parameters_positional_only(groups_from_function_defaults):
     """Simple, unannotated KEYWORD_ONLY should be assigned to "Parameters" group."""
 
     def foo(*, bar):
         pass
 
     bar_parameter = list(inspect.signature(foo).parameters.values())[0]
-    actual_groups = groups_from_function(foo)
+    actual_groups = groups_from_function(foo, *groups_from_function_defaults)
     assert actual_groups == [(Group("Parameters"), [bar_parameter])]
 
 
-def test_groups_unannotated_arguments():
+def test_groups_unannotated_arguments(groups_from_function_defaults):
     """Simple, unannotated POSITIONAL_ONLY should be assigned to "Arguments" group."""
 
     def foo(bar, /):
         pass
 
     bar_parameter = list(inspect.signature(foo).parameters.values())[0]
-    actual_groups = groups_from_function(foo)
+    actual_groups = groups_from_function(foo, *groups_from_function_defaults)
     assert actual_groups == [(Group("Arguments"), [bar_parameter])]
 
 
-def test_groups_annotated_implicit():
+def test_groups_annotated_implicit(groups_from_function_defaults):
     def foo(
         food1: Annotated[str, Parameter(group="Food")],
         drink1: Annotated[str, Parameter(group="Drink")],
@@ -49,14 +54,14 @@ def test_groups_annotated_implicit():
         pass
 
     parameters = list(inspect.signature(foo).parameters.values())
-    actual_groups = groups_from_function(foo)
+    actual_groups = groups_from_function(foo, *groups_from_function_defaults)
     assert actual_groups == [
         (Group("Food"), [parameters[0], parameters[2]]),
         (Group("Drink"), [parameters[1]]),
     ]
 
 
-def test_groups_annotated_explicit():
+def test_groups_annotated_explicit(groups_from_function_defaults):
     food_group = Group("Food")
     drink_group = Group("Drink")
 
@@ -68,7 +73,7 @@ def test_groups_annotated_explicit():
         pass
 
     parameters = list(inspect.signature(foo).parameters.values())
-    actual_groups = groups_from_function(foo)
+    actual_groups = groups_from_function(foo, *groups_from_function_defaults)
     assert actual_groups == [
         (food_group, [parameters[0], parameters[2]]),
         (drink_group, [parameters[1]]),

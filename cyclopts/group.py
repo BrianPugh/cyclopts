@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Iterable, Optional, Tuple, Union, cast
 
 from attrs import define, field
 
@@ -28,9 +28,9 @@ class Group:
 
     converter: Optional[Callable] = field(default=None, kw_only=True)
 
-    validator: Union[None, Callable, Iterable[Callable]] = field(
+    validator: Tuple[Callable, ...] = field(
         default=None,
-        converter=to_tuple_converter,
+        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
         kw_only=True,
     )
 
@@ -40,12 +40,6 @@ class Group:
         kw_only=True,
     )
 
-    # Flags for default groups
-    # These are flags instead of an enum since a Group can be multiple defaults.
-    is_default_arguments: bool = field(default=False, kw_only=True)
-    is_default_parameters: bool = field(default=False, kw_only=True)
-    is_default_commands: bool = field(default=False, kw_only=True)
-
     def __str__(self):
         return self.name
 
@@ -54,6 +48,31 @@ class Group:
             return self.name == other.name
         else:
             return False
+
+
+def to_group_converter(default_group: Group):
+    def converter(input_value: Union[None, str, Group]) -> Group:
+        if input_value is None:
+            return default_group
+        elif isinstance(input_value, str):
+            return Group(input_value)
+        elif isinstance(input_value, Group):
+            return input_value
+        else:
+            raise TypeError
+
+    return converter
+
+
+def to_groups_converter(input_value: Union[None, str, Group, Iterable[Union[str, Group]]]) -> Tuple[Group, ...]:
+    if input_value is None:
+        return ()
+    elif isinstance(input_value, str):
+        return (Group(input_value),)
+    elif isinstance(input_value, Group):
+        return (input_value,)
+    else:
+        return tuple(Group(x) if isinstance(x, str) else x for x in input_value)
 
 
 def get_group_default_parameter(app: "App", group: Group) -> "Parameter":
