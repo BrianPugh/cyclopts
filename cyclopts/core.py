@@ -7,7 +7,7 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union, cast
 
 from attrs import define, field
 from rich.console import Console
@@ -190,10 +190,7 @@ class App:
     help_title_commands: str = "Commands"
     help_title_parameters: str = "Parameters"
 
-    group: Tuple[Group, ...] = field(
-        default=None,
-        converter=to_groups_converter,
-    )
+    group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)
 
     default_group_arguments: Group = field(default=None, converter=to_group_converter(Group("Arguments")))
     default_group_parameters: Group = field(default=None, converter=to_group_converter(Group("Parameters")))

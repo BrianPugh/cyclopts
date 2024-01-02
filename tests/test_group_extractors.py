@@ -3,7 +3,7 @@ import inspect
 import pytest
 from typing_extensions import Annotated
 
-from cyclopts import Group, Parameter
+from cyclopts import App, Group, Parameter
 from cyclopts.group_extractors import groups_from_app, groups_from_function
 
 
@@ -85,3 +85,25 @@ def test_groups_annotated_invalid_recursive_definition():
     default_parameter = Parameter(group="Drink")
     with pytest.raises(ValueError):
         Group("Food", default_parameter=default_parameter)
+
+
+def test_groups_from_app_implicit():
+    app = App()
+
+    @app.command(group="Food")
+    def food1():
+        pass
+
+    @app.command(group="Food")
+    def food2():
+        pass
+
+    @app.command(group="Drink")
+    def drink1():
+        pass
+
+    actual_groups = groups_from_app(app)
+    assert actual_groups == [
+        (Group("Food"), [app["food1"], app["food2"]]),
+        (Group("Drink"), [app["drink1"]]),
+    ]
