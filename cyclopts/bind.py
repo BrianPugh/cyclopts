@@ -49,7 +49,7 @@ def cli2parameter(
         annotation = str if iparam.annotation is iparam.empty else iparam.annotation
         _, cparam = get_hint_parameter(annotation, default_parameter=default_parameter)
 
-        if cparam.parse is False:
+        if not cparam.parse:
             continue
 
         if iparam.kind in (iparam.POSITIONAL_OR_KEYWORD, iparam.KEYWORD_ONLY):
@@ -80,7 +80,7 @@ def parameter2cli(f: Callable, default_parameter: Optional[Parameter] = None) ->
         annotation = str if iparam.annotation is iparam.empty else iparam.annotation
         _, cparam = get_hint_parameter(annotation, default_parameter=default_parameter)
 
-        if cparam.parse is False:
+        if not cparam.parse:
             continue
 
         # POSITIONAL_OR_KEYWORD and KEYWORD_ONLY already handled in cli2parameter
@@ -179,7 +179,7 @@ def _parse_pos(
     def remaining_parameters():
         for parameter in signature.parameters.values():
             _, cparam = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
-            if cparam.parse is False:
+            if not cparam.parse:
                 continue
             _, consume_all = token_count(parameter.annotation, default_parameter=default_parameter)
             if parameter in mapping and not consume_all:
@@ -274,7 +274,7 @@ def _bind(f: Callable, mapping: ParameterDict, default_parameter: Optional[Param
     #     * Only args before a ``/`` are ``POSITIONAL_ONLY``.
     for iparam in signature.parameters.values():
         _, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
-        if cparam.parse is False:
+        if not cparam.parse:
             has_unparsed_parameters |= _is_required(iparam)
             continue
 
@@ -302,7 +302,7 @@ def _convert(mapping: ParameterDict, default_parameter: Optional[Parameter] = No
     for iparam, parameter_tokens in mapping.items():
         type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
 
-        if cparam.parse is False:
+        if not cparam.parse:
             continue
 
         # Checking if parameter_token is a string is a little jank,
@@ -315,19 +315,19 @@ def _convert(mapping: ParameterDict, default_parameter: Optional[Parameter] = No
             try:
                 if iparam.kind == iparam.VAR_KEYWORD:
                     coerced[iparam] = {}
-                    for key, values in parameter_tokens.items():  # pyright: ignore[reportGeneralTypeIssues]
+                    for key, values in parameter_tokens.items():
                         val = cparam.converter(type_, *values)
-                        for validator in cparam.validator:  # pyright: ignore
+                        for validator in cparam.validator:
                             validator(type_, val)
                         coerced[iparam][key] = val
                 elif iparam.kind == iparam.VAR_POSITIONAL:
                     val = cparam.converter(List[type_], *parameter_tokens)
-                    for validator in cparam.validator:  # pyright: ignore
+                    for validator in cparam.validator:
                         validator(type_, val)
                     coerced[iparam] = val
                 else:
                     val = cparam.converter(type_, *parameter_tokens)
-                    for validator in cparam.validator:  # pyright: ignore
+                    for validator in cparam.validator:
                         validator(type_, val)
                     coerced[iparam] = val
             except CoercionError as e:

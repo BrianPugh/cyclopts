@@ -10,7 +10,7 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-from cyclopts import App, Parameter
+from cyclopts import App, Group, Parameter
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
 
 

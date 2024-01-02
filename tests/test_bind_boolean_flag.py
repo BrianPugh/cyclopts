@@ -80,7 +80,7 @@ def test_boolean_flag_app_parameter_default_nested_annotated_override(app):
     my_int = Annotated[int, Parameter(converter=my_converter)]
 
     @app.default
-    def foo(*, foo: Annotated[my_int, Parameter(name="--bar")] = True):
+    def foo(*, foo: Annotated[my_int, Parameter(name="--bar")] = True):  # pyright: ignore[reportGeneralTypeIssues]
         pass
 
     signature = inspect.signature(foo)
