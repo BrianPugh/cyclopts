@@ -20,7 +20,7 @@ else:
     from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import optional_to_tuple_converter, to_tuple_converter
+from cyclopts.coercion import to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -29,7 +29,6 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.group import Group, to_group_converter, to_groups_converter
-from cyclopts.group_extractors import groups_from_app, groups_from_function
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -192,9 +191,9 @@ class App:
 
     group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)
 
-    default_group_arguments: Group = field(default=None, converter=to_group_converter(Group("Arguments")))
-    default_group_parameters: Group = field(default=None, converter=to_group_converter(Group("Parameters")))
-    default_group_commands: Group = field(default=None, converter=to_group_converter(Group("Commands")))
+    group_arguments: Group = field(default=None, converter=to_group_converter(Group.create_default_arguments()))
+    group_parameters: Group = field(default=None, converter=to_group_converter(Group.create_default_parameters()))
+    group_commands: Group = field(default=None, converter=to_group_converter(Group.create_default_commands()))
 
     converter: Optional[Callable] = field(default=None)
     validator: Union[None, Callable, Iterable[Callable]] = field(default=None)
@@ -416,8 +415,13 @@ class App:
             if self.default_command:
                 command = self.default_command
                 bound, unused_tokens = create_bound_arguments(
-                    command, unused_tokens, default_parameter=self.default_parameter
+                    command,
+                    unused_tokens,
+                    default_parameter=self.default_parameter,
+                    group_arguments=self.group_arguments,
+                    group_parameters=self.group_parameters,
                 )
+                # TODO: need to add app-group logic here.
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:

@@ -13,6 +13,8 @@ from cyclopts.exceptions import (
     RepeatArgumentError,
     ValidationError,
 )
+from cyclopts.group import Group
+from cyclopts.group_extractors import groups_from_function
 from cyclopts.parameter import Parameter, get_hint_parameter, get_names, validate_command
 from cyclopts.utils import ParameterDict
 
@@ -340,7 +342,11 @@ def _convert(mapping: ParameterDict, default_parameter: Optional[Parameter] = No
 
 
 def create_bound_arguments(
-    f: Callable, tokens: List[str], default_parameter: Optional[Parameter] = None
+    f: Callable,
+    tokens: List[str],
+    default_parameter: Optional[Parameter] = None,
+    group_arguments: Optional[Group] = None,
+    group_parameters: Optional[Group] = None,
 ) -> Tuple[inspect.BoundArguments, List[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -368,6 +374,14 @@ def create_bound_arguments(
 
     c2p, p2c = None, None
     unused_tokens = []
+
+    groups = groups_from_function(
+        f,
+        default_parameter or Parameter(),
+        group_arguments or Group.create_default_arguments(),
+        group_parameters or Group.create_default_parameters(),
+    )
+    # TODO: iterate over groups in all these functions
 
     try:
         c2p = cli2parameter(f, default_parameter=default_parameter)
