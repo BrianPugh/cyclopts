@@ -1,12 +1,9 @@
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Literal, Optional, Tuple, Union
-
-from attrs import define, field
+from typing import TYPE_CHECKING, Any, Callable, List, Tuple, Union
 
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts.coercion import to_tuple_converter
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter
 
@@ -35,16 +32,16 @@ def _create_or_append(
 def groups_from_function(
     f: Callable,
     default_parameter: Parameter,
-    default_group_arguments: Group,
-    default_group_parameters: Group,
+    group_arguments: Group,
+    group_parameters: Group,
 ) -> List[Tuple[Group, List[inspect.Parameter]]]:
     """Get a list of all groups WITH their children populated.
 
     The exact Group instances are not guarenteeed to be the same.
     """
     group_mapping: List[Tuple[Group, List[inspect.Parameter]]] = [
-        (default_group_arguments, []),
-        (default_group_parameters, []),
+        (group_arguments, []),
+        (group_parameters, []),
     ]
 
     # Assign each parameter to a group
@@ -61,9 +58,9 @@ def groups_from_function(
                 _create_or_append(group_mapping, group, iparam)
         else:
             if iparam.kind == iparam.POSITIONAL_ONLY:
-                _create_or_append(group_mapping, default_group_arguments, iparam)
+                _create_or_append(group_mapping, group_arguments, iparam)
             else:
-                _create_or_append(group_mapping, default_group_parameters, iparam)
+                _create_or_append(group_mapping, group_parameters, iparam)
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]
@@ -73,7 +70,7 @@ def groups_from_function(
 
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     group_mapping: List[Tuple[Group, List["App"]]] = [
-        (app.default_group_commands, []),
+        (app.group_commands, []),
     ]
 
     for subapp in app._commands.values():
@@ -81,7 +78,7 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
             for group in subapp.group:
                 _create_or_append(group_mapping, group, subapp)
         else:
-            _create_or_append(group_mapping, app.default_group_commands, subapp)
+            _create_or_append(group_mapping, app.group_commands, subapp)
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]
