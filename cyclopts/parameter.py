@@ -162,7 +162,7 @@ class Parameter:
 
     @classmethod
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
-        """Returns a new Parameter with values of ``new_parameters`` overriding ``self``.
+        """Returns a new Parameter with values of ``parameters`` overriding ``self``.
 
         Parameters
         ----------
