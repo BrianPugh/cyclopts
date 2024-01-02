@@ -49,6 +49,18 @@ class Group:
         else:
             return False
 
+    @classmethod
+    def create_default_arguments(cls):
+        return cls("Arguments")
+
+    @classmethod
+    def create_default_parameters(cls):
+        return cls("Parameters")
+
+    @classmethod
+    def create_default_commands(cls):
+        return cls("Commands")
+
 
 def to_group_converter(default_group: Group):
     def converter(input_value: Union[None, str, Group]) -> Group:
