@@ -28,8 +28,8 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
     format_cyclopts_error,
 )
-from cyclopts.group import Group
-from cyclopts.group_extractors import groups_from_commands, groups_from_function
+from cyclopts.group import Group, to_group_converter, to_groups_converter
+from cyclopts.group_extractors import groups_from_app, groups_from_function
 from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -152,12 +152,6 @@ class App:
           or create a :class:`Group` with provided name if it does not exist.
 
         * If :class:`Group`, directly use it.
-    groups: List[Group]
-        List of groups used by ``default_command`` parameters, and ``commands``.
-        The order of groups dictates the order displayed in the help page.
-        This field is lazily populated on-demand.
-        If default groups (Parameters, Arguments, Commands) are not found in the list, they
-        will be **prepended** to this list (in that order).
     converter: Optional[Callable]
         A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
 
@@ -196,15 +190,14 @@ class App:
     help_title_commands: str = "Commands"
     help_title_parameters: str = "Parameters"
 
-    group: Union[None, str, Group, Iterable[Union[str, Group]]] = field(
-        default=None, converter=optional_to_tuple_converter
+    group: Tuple[Group, ...] = field(
+        default=None,
+        converter=to_groups_converter,
     )
 
-    groups: List[Group] = field(init=False, factory=list)
-
-    default_group_arguments: Optional[Group] = field(default=None)
-    default_group_parameters: Optional[Group] = field(default=None)
-    default_group_commands: Optional[Group] = field(default=None)
+    default_group_arguments: Group = field(default=None, converter=to_group_converter(Group("Arguments")))
+    default_group_parameters: Group = field(default=None, converter=to_group_converter(Group("Parameters")))
+    default_group_commands: Group = field(default=None, converter=to_group_converter(Group("Commands")))
 
     converter: Optional[Callable] = field(default=None)
     validator: Union[None, Callable, Iterable[Callable]] = field(default=None)
