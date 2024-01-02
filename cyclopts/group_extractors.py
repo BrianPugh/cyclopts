@@ -1,5 +1,5 @@
 import inspect
-from typing import TYPE_CHECKING, Callable, Iterable, List, Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Literal, Optional, Tuple, Union
 
 from attrs import define, field
 
@@ -12,9 +12,9 @@ from cyclopts.parameter import Parameter, get_hint_parameter
 
 
 def _create_or_append(
-    group_mapping: List[Tuple[Group, List[inspect.Parameter]]],
+    group_mapping: List[Tuple[Group, List[Any]]],
     group: Union[str, Group],
-    iparam: inspect.Parameter,
+    element: Any,
 ):
     # updates group_mapping inplace.
     if isinstance(group, str):
@@ -26,10 +26,10 @@ def _create_or_append(
 
     for mapping in group_mapping:
         if mapping[0] == group:
-            mapping[1].append(iparam)
+            mapping[1].append(element)
             break
     else:
-        group_mapping.append((group, [iparam]))
+        group_mapping.append((group, [element]))
 
 
 def groups_from_function(
@@ -55,11 +55,7 @@ def groups_from_function(
 
         if cparam.group:
             for group in cparam.group:
-                if (
-                    isinstance(group, Group)
-                    and group.default_parameter is not None
-                    and group.default_parameter.group is not None
-                ):
+                if isinstance(group, Group) and group.default_parameter is not None and group.default_parameter.group:
                     # This shouldn't be possible due to ``Group`` internal checks.
                     raise ValueError("Group.default_parameter cannot have a specified group.")
                 _create_or_append(group_mapping, group, iparam)
@@ -81,9 +77,11 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     ]
 
     for subapp in app._commands.values():
-        if subapp.group is None:
-            raise NotImplementedError
-        pass
+        if subapp.group:
+            for group in subapp.group:
+                _create_or_append(group_mapping, group, subapp)
+        else:
+            _create_or_append(group_mapping, app.default_group_commands, subapp)
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]
