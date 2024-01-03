@@ -48,7 +48,7 @@ def iparam_to_groups(
 
 def groups_from_function(
     f: Callable,
-    default_parameter: Parameter,
+    default_parameter: Optional[Parameter],
     group_arguments: Group,
     group_parameters: Group,
 ) -> List[Tuple[Group, List[inspect.Parameter]]]:
