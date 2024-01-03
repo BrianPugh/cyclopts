@@ -21,7 +21,7 @@ else:
     from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import to_tuple_converter
+from cyclopts.coercion import optional_to_tuple_converter, to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -185,7 +185,7 @@ class App:
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
     _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter")
 
-    _name: Optional[str] = field(default=None, alias="name")
+    _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
     version: Union[None, str, Callable] = field(factory=_default_version)
     version_flags: Iterable[str] = field(factory=lambda: ["--version"])
@@ -255,7 +255,7 @@ class App:
         self._default_parameter = value
 
     @property
-    def name(self) -> str:
+    def name(self) -> Tuple[str, ...]:
         """Application name. Dynamically derived if not previously set."""
         if self._name:
             return self._name
@@ -263,9 +263,9 @@ class App:
             name = Path(sys.argv[0]).name
             if name == "__main__.py":
                 name = _get_root_module_name()
-            return name
+            return (name,)
         else:
-            return _format_name(self.default_command.__name__)
+            return (_format_name(self.default_command.__name__),)
 
     @property
     def help_(self) -> str:
@@ -377,7 +377,7 @@ class App:
         if name is None:
             name = app.name
         else:
-            app._name = to_tuple_converter(name)[0]
+            app._name = name
 
         for n in to_tuple_converter(name):
             if n in self:
