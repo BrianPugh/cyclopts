@@ -69,7 +69,7 @@ def test_get_hint_parameter_basic():
         help="Display this message and exit.",
     )
 
-    type_, cparam = get_hint_parameter(Annotated[bool, expected_cparam])
+    type_, cparam = get_hint_parameter(Annotated[bool, expected_cparam], Parameter())
     assert type_ is bool
     assert cparam == expected_cparam
 
@@ -82,7 +82,7 @@ def test_get_hint_parameter_optional_annotated():
         help="Display this message and exit.",
     )
 
-    type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]])
+    type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]], Parameter())
     assert type_ is bool
     assert cparam == expected_cparam
 

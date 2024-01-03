@@ -171,7 +171,12 @@ class Parameter:
         )
 
 
-def validate_command(f, default_parameter: Optional[Parameter] = None):
+def validate_command(
+    f,
+    default_parameter: Optional[Parameter],
+    group_arguments: Group,
+    group_parameters: Group,
+):
     """Validate if a function abides by Cyclopts's rules.
 
     Raises
@@ -179,10 +184,13 @@ def validate_command(f, default_parameter: Optional[Parameter] = None):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
+    from cyclopts.group_extractors import iparam_to_groups
+
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
         _ = get_origin_and_validate(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
         if get_origin(type_) is tuple:
@@ -190,9 +198,9 @@ def validate_command(f, default_parameter: Optional[Parameter] = None):
                 raise ValueError("Cannot use a variable-length tuple.")
 
 
-def get_names(parameter: inspect.Parameter, default_parameter: Optional[Parameter] = None) -> List[str]:
+def get_names(parameter: inspect.Parameter, *default_parameters: Optional[Parameter]) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
-    _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
+    _, param = get_hint_parameter(parameter.annotation, *default_parameters)
     if param.name:
         names = list(param.name)
     else:
@@ -205,7 +213,7 @@ def get_names(parameter: inspect.Parameter, default_parameter: Optional[Paramete
     return names
 
 
-def get_hint_parameter(type_: Type, default_parameter: Optional[Parameter] = None) -> Tuple[Type, Parameter]:
+def get_hint_parameter(type_: Type, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
@@ -222,5 +230,5 @@ def get_hint_parameter(type_: Type, default_parameter: Optional[Parameter] = Non
     else:
         cyclopts_parameters = []
 
-    cyclopts_parameter = Parameter.combine(default_parameter, *cyclopts_parameters)
-    return resolve(type_), cyclopts_parameter
+    cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
+    return resolve(type_), cparam
