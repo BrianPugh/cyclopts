@@ -31,11 +31,11 @@ def _create_or_append(
 
 def iparam_to_groups(
     iparam: inspect.Parameter,
-    default_parameter: Parameter,
+    default_parameter: Optional[Parameter],
     group_arguments: Group,
     group_parameters: Group,
 ) -> Tuple[Group, ...]:
-    _, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+    _, cparam = get_hint_parameter(iparam.annotation, default_parameter)
     if not cparam.parse:
         return ()
     elif cparam.group:
@@ -63,7 +63,7 @@ def groups_from_function(
 
     # Assign each parameter to a group
     for iparam in inspect.signature(f).parameters.values():
-        _, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        _, cparam = get_hint_parameter(iparam.annotation, default_parameter)
         if not cparam.parse:
             continue
 

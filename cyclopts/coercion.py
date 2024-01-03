@@ -105,7 +105,7 @@ def _convert(type_, element, default_parameter=None):
                 return member
         raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in _iterable_types:
-        count, _ = token_count(inner_types[0], default_parameter=default_parameter)
+        count, _ = token_count(inner_types[0], default_parameter)
         if count > 1:
             gen = zip(*[iter(element)] * count)
         else:
@@ -138,6 +138,9 @@ def get_origin_and_validate(type_: Type):
 
 def resolve(type_: Type) -> Type:
     """Perform all simplifying resolutions."""
+    if type_ is inspect.Parameter.empty:
+        return str
+
     type_prev = None
     while type_ != type_prev:
         type_prev = type_
@@ -221,7 +224,7 @@ def coerce(type_: Type, *args: str, default_parameter=None):
         return [_convert(type_, item, default_parameter=default_parameter) for item in args]
 
 
-def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) -> Tuple[int, bool]:
+def token_count(type_: Type, *default_parameters: Optional["Parameter"]) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -245,7 +248,7 @@ def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) ->
     if type_ is inspect.Parameter.empty:
         return 1, False
 
-    type_, param = get_hint_parameter(type_, default_parameter=default_parameter)
+    type_, param = get_hint_parameter(type_, *default_parameters)
     if param.token_count is not None:
         return abs(param.token_count), param.token_count < 0
 
@@ -259,7 +262,7 @@ def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) ->
     elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
-        return token_count(get_args(type_)[0], default_parameter=default_parameter)[0], True
+        return token_count(get_args(type_)[0], *default_parameters)[0], True
     else:
         return 1, False
 
