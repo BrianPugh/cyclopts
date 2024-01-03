@@ -156,25 +156,24 @@ def _get_choices(type_: Type) -> str:
     return choices
 
 
-# def format_parameters_(app, title, show_special=True, default_parameter: Optional[Parameter] = None):
-def format_group_parameters(app, group, parameters_):
+def format_group_parameters(app, group, iparams_):
     from cyclopts.group_extractors import iparam_to_groups
 
     panel, table = create_panel_table(title=group.name)
 
     has_required, has_short = False, False
 
-    parameters = []
+    iparams = []
     if app.default_command:
         help_lookup = parameter2docstring(app.default_command)
-        for parameter in parameters_:
-            groups = iparam_to_groups(parameter, app.default_parameter, app.group_arguments, app.group_parameters)
+        for iparam in iparams_:
+            groups = iparam_to_groups(iparam, app.default_parameter, app.group_arguments, app.group_parameters)
             _, param = get_hint_parameter(
-                parameter.annotation, app.default_parameter, *(x.default_parameter for x in groups)
+                iparam.annotation, app.default_parameter, *(x.default_parameter for x in groups)
             )
             if not param.parse or not param.show:
                 continue
-            parameters.append(parameter)
+            iparams.append(iparam)
     else:
         help_lookup = {}
 
@@ -184,17 +183,17 @@ def format_group_parameters(app, group, parameters_):
     def is_short(s):
         return not s.startswith("--") and s.startswith("-")
 
-    has_required = any(is_required(p) for p in parameters)
+    has_required = any(is_required(p) for p in iparams)
 
-    for parameter in parameters:
-        groups = iparam_to_groups(parameter, app.default_parameter, app.group_arguments, app.group_parameters)
+    for iparam in iparams:
+        groups = iparam_to_groups(iparam, app.default_parameter, app.group_arguments, app.group_parameters)
         type_, param = get_hint_parameter(
-            parameter.annotation, app.default_parameter, *(x.default_parameter for x in groups)
+            iparam.annotation, app.default_parameter, *(x.default_parameter for x in groups)
         )
         if not param.show:
             continue
         has_short = any(
-            is_short(x) for x in get_names(parameter, app.default_parameter, *(x.default_parameter for x in groups))
+            is_short(x) for x in get_names(iparam, app.default_parameter, *(x.default_parameter for x in groups))
         )
         if has_short:
             break
@@ -206,16 +205,16 @@ def format_group_parameters(app, group, parameters_):
         table.add_column(justify="left", no_wrap=True, style="green")  # For short options
     table.add_column(justify="left")  # For main help text.
 
-    for parameter in parameters:
-        groups = iparam_to_groups(parameter, app.default_parameter, app.group_arguments, app.group_parameters)
+    for iparam in iparams:
+        groups = iparam_to_groups(iparam, app.default_parameter, app.group_arguments, app.group_parameters)
         type_, param = get_hint_parameter(
-            parameter.annotation, app.default_parameter, *(x.default_parameter for x in groups)
+            iparam.annotation, app.default_parameter, *(x.default_parameter for x in groups)
         )
 
-        options = get_names(parameter, app.default_parameter, *(x.default_parameter for x in groups))
+        options = get_names(iparam, app.default_parameter, *(x.default_parameter for x in groups))
         options.extend(param.get_negatives(type_, *options))
 
-        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
+        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
             arg_name = options[0].lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]
@@ -232,7 +231,7 @@ def format_group_parameters(app, group, parameters_):
             help_components.append(param.help)
         else:
             with suppress(KeyError):
-                help_components.append(help_lookup[parameter].description)
+                help_components.append(help_lookup[iparam].description)
 
         if param.show_choices:
             choices = _get_choices(type_)
@@ -243,23 +242,23 @@ def format_group_parameters(app, group, parameters_):
             env_vars = " ".join(param.env_var)
             help_components.append(rf"[dim]\[env var: {env_vars}][/dim]")
 
-        if not is_required(parameter) and (
-            param.show_default or (param.show_default is None and parameter.default is not None)
+        if not is_required(iparam) and (
+            param.show_default or (param.show_default is None and iparam.default is not None)
         ):
             default = ""
             if isclass(type_) and issubclass(type_, Enum):
-                default = parameter.default.name.lower().replace("_", "-")
+                default = iparam.default.name.lower().replace("_", "-")
             else:
-                default = parameter.default
+                default = iparam.default
 
             help_components.append(rf"[dim]\[default: {default}][/dim]")
-        if is_required(parameter):
+        if is_required(iparam):
             help_components.append(r"[red][dim]\[required][/dim][/red]")
 
         # populate row
         row_args = []
         if has_required:
-            row_args.append("*" if is_required(parameter) else "")
+            row_args.append("*" if is_required(iparam) else "")
         row_args.append(",".join(long_options) + " ")  # a little extra padding
         if has_short:
             row_args.append(",".join(short_options) + " ")  # a little extra padding
