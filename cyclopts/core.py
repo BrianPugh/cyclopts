@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union, cast
 
+import attrs
 from attrs import define, field
 from rich.console import Console
 
@@ -209,6 +210,22 @@ class App:
     _meta: "App" = field(init=False, default=None)
     _meta_parent: "App" = field(init=False, default=None)
 
+    def __attrs_post_init__(self):
+        if self.help_flags:
+            self.command(
+                self.help_print,
+                name=self.help_flags,
+                help_flags=[],
+                version_flags=[],
+            )
+        if self.version_flags:
+            self.command(
+                self.version_print,
+                name=self.version_flags,
+                help_flags=[],
+                version_flags=[],
+            )
+
     ###########
     # Methods #
     ###########
@@ -297,6 +314,8 @@ class App:
         command_mapping = _combined_meta_command_mapping(app)
 
         for i, token in enumerate(tokens):
+            if token in self.help_flags:
+                break
             try:
                 app = command_mapping[token]
                 unused_tokens = tokens[i + 1 :]
@@ -349,14 +368,12 @@ class App:
 
         if name is None:
             name = app.name
-        else:
-            app._name = to_tuple_converter(name)[0]
 
         for n in to_tuple_converter(name):
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
-            self._commands[n] = app
+            self._commands[n] = attrs.evolve(app, name=n)
 
         app._parents.append(self)
 
