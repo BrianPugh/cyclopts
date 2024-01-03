@@ -114,10 +114,10 @@ def _parse_kw_and_flags(
     group_parameters: Group,
 ):
     cli2kw = cli2parameter(f, default_parameter, group_arguments, group_parameters)
-    kwargs_parameter = next((p for p in inspect.signature(f).parameters.values() if p.kind == p.VAR_KEYWORD), None)
+    kwargs_iparam = next((p for p in inspect.signature(f).parameters.values() if p.kind == p.VAR_KEYWORD), None)
 
-    if kwargs_parameter:
-        mapping[kwargs_parameter] = {}
+    if kwargs_iparam:
+        mapping[kwargs_iparam] = {}
 
     unused_tokens = []
 
@@ -144,42 +144,46 @@ def _parse_kw_and_flags(
             cli_key = token
 
         try:
-            parameter, implicit_value = cli2kw[cli_key]
+            iparam, implicit_value = cli2kw[cli_key]
         except KeyError:
-            if kwargs_parameter:
-                parameter = kwargs_parameter
+            if kwargs_iparam:
+                iparam = kwargs_iparam
                 kwargs_key = _cli_kw_to_f_kw(cli_key)
                 implicit_value = None
             else:
                 unused_tokens.append(token)
                 continue
 
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+
         if implicit_value is not None:
             cli_values.append(implicit_value)
         else:
-            consume_count += max(1, token_count(parameter.annotation, default_parameter)[0])
+            consume_count += max(
+                1, token_count(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))[0]
+            )
 
             try:
                 for j in range(consume_count):
                     cli_values.append(tokens[i + 1 + j])
             except IndexError:
-                raise MissingArgumentError(parameter=parameter, tokens_so_far=cli_values) from None
+                raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
 
         skip_next_iterations = consume_count
 
-        _, repeatable = token_count(parameter.annotation, default_parameter)
-        if parameter is kwargs_parameter:
+        _, repeatable = token_count(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
+        if iparam is kwargs_iparam:
             assert kwargs_key is not None
-            if kwargs_key in mapping[parameter] and not repeatable:
-                raise RepeatArgumentError(parameter=parameter)
-            mapping[parameter].setdefault(kwargs_key, [])
-            mapping[parameter][kwargs_key].extend(cli_values)
+            if kwargs_key in mapping[iparam] and not repeatable:
+                raise RepeatArgumentError(parameter=iparam)
+            mapping[iparam].setdefault(kwargs_key, [])
+            mapping[iparam][kwargs_key].extend(cli_values)
         else:
-            if parameter in mapping and not repeatable:
-                raise RepeatArgumentError(parameter=parameter)
+            if iparam in mapping and not repeatable:
+                raise RepeatArgumentError(parameter=iparam)
 
-            mapping.setdefault(parameter, [])
-            mapping[parameter].extend(cli_values)
+            mapping.setdefault(iparam, [])
+            mapping[iparam].extend(cli_values)
 
     return unused_tokens
 
@@ -201,7 +205,7 @@ def _parse_pos(
             _, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
             if not cparam.parse:
                 continue
-            _, consume_all = token_count(iparam.annotation, default_parameter)
+            _, consume_all = token_count(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
             if iparam in mapping and not consume_all:
                 continue
             if iparam.kind is iparam.KEYWORD_ONLY:  # pragma: no cover
@@ -218,7 +222,10 @@ def _parse_pos(
             tokens = []
             break
 
-        consume_count, consume_all = token_count(iparam.annotation, default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        consume_count, consume_all = token_count(
+            iparam.annotation, default_parameter, *(x.default_parameter for x in groups)
+        )
         if consume_all:
             mapping.setdefault(iparam, [])
             mapping[iparam] = tokens + mapping[iparam]
@@ -337,7 +344,8 @@ def _convert(
     coerced = ParameterDict()
     for iparam, parameter_tokens in mapping.items():
         groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
-        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
+        combined_parameter = Parameter.combine(default_parameter, *(x.default_parameter for x in groups))
+        type_, cparam = get_hint_parameter(iparam.annotation, combined_parameter)
 
         if not cparam.parse:
             continue
