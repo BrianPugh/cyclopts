@@ -8,7 +8,7 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-from cyclopts import CoercionError, Parameter
+from cyclopts import CoercionError, Group, Parameter
 
 
 @pytest.mark.parametrize(
@@ -87,6 +87,21 @@ def test_boolean_flag_app_parameter_default_nested_annotated_override(app):
 
     expected_bind = signature.bind(foo=5)
     actual_command, actual_bind = app.parse_args("--bar=10")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+
+
+def test_boolean_flag_group_default_parameter_resolution_1(app):
+    food_group = Group("Food", default_parameter=Parameter(negative_bool="--group-"))
+
+    @app.default
+    def foo(flag: Annotated[bool, Parameter(group=food_group)]):
+        pass
+
+    signature = inspect.signature(foo)
+
+    expected_bind = signature.bind(False)
+    actual_command, actual_bind = app.parse_args("--group-flag", exit_on_error=False)
     assert actual_command == foo
     assert actual_bind == expected_bind
 

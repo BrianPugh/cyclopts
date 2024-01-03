@@ -2,7 +2,6 @@ import inspect
 import os
 import shlex
 import sys
-from functools import lru_cache
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union, get_origin
 
 from cyclopts.coercion import resolve, token_count
@@ -14,7 +13,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.group import Group
-from cyclopts.group_extractors import groups_from_function
+from cyclopts.group_extractors import iparam_to_groups
 from cyclopts.parameter import Parameter, get_hint_parameter, get_names, validate_command
 from cyclopts.utils import ParameterDict
 
@@ -29,9 +28,11 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
-@lru_cache(maxsize=16)
 def cli2parameter(
-    f: Callable, default_parameter: Optional[Parameter] = None
+    f: Callable,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
 ) -> Dict[str, Tuple[inspect.Parameter, Any]]:
     """Creates a dictionary mapping CLI keywords to python keywords.
 
@@ -48,15 +49,15 @@ def cli2parameter(
     mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
-        annotation = str if iparam.annotation is iparam.empty else iparam.annotation
-        _, cparam = get_hint_parameter(annotation, default_parameter=default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        _, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
 
         if not cparam.parse:
             continue
 
         if iparam.kind in (iparam.POSITIONAL_OR_KEYWORD, iparam.KEYWORD_ONLY):
-            hint = resolve(annotation)
-            keys = get_names(iparam, default_parameter=default_parameter)
+            hint = resolve(iparam.annotation)
+            keys = get_names(iparam, default_parameter, *(x.default_parameter for x in groups))
 
             for key in keys:
                 mapping[key] = (iparam, True if hint is bool else None)
@@ -67,9 +68,13 @@ def cli2parameter(
     return mapping
 
 
-@lru_cache(maxsize=16)
-def parameter2cli(f: Callable, default_parameter: Optional[Parameter] = None) -> ParameterDict:
-    c2p = cli2parameter(f, default_parameter=default_parameter)
+def parameter2cli(
+    f: Callable,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
+) -> ParameterDict:
+    c2p = cli2parameter(f, default_parameter, group_arguments, group_parameters)
     p2c = ParameterDict()
 
     for cli, tup in c2p.items():
@@ -79,15 +84,15 @@ def parameter2cli(f: Callable, default_parameter: Optional[Parameter] = None) ->
 
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
-        annotation = str if iparam.annotation is iparam.empty else iparam.annotation
-        _, cparam = get_hint_parameter(annotation, default_parameter=default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        _, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
 
         if not cparam.parse:
             continue
 
         # POSITIONAL_OR_KEYWORD and KEYWORD_ONLY already handled in cli2parameter
         if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_KEYWORD, iparam.VAR_POSITIONAL):
-            p2c[iparam] = get_names(iparam, default_parameter=default_parameter)
+            p2c[iparam] = get_names(iparam, default_parameter, *(x.default_parameter for x in groups))
 
     return p2c
 
@@ -100,8 +105,15 @@ def _cli_kw_to_f_kw(cli_key: str):
     return cli_key
 
 
-def _parse_kw_and_flags(f, tokens, mapping, default_parameter: Optional[Parameter] = None):
-    cli2kw = cli2parameter(f, default_parameter=default_parameter)
+def _parse_kw_and_flags(
+    f,
+    tokens,
+    mapping,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
+):
+    cli2kw = cli2parameter(f, default_parameter, group_arguments, group_parameters)
     kwargs_parameter = next((p for p in inspect.signature(f).parameters.values() if p.kind == p.VAR_KEYWORD), None)
 
     if kwargs_parameter:
@@ -145,7 +157,7 @@ def _parse_kw_and_flags(f, tokens, mapping, default_parameter: Optional[Paramete
         if implicit_value is not None:
             cli_values.append(implicit_value)
         else:
-            consume_count += max(1, token_count(parameter.annotation, default_parameter=default_parameter)[0])
+            consume_count += max(1, token_count(parameter.annotation, default_parameter)[0])
 
             try:
                 for j in range(consume_count):
@@ -155,7 +167,7 @@ def _parse_kw_and_flags(f, tokens, mapping, default_parameter: Optional[Paramete
 
         skip_next_iterations = consume_count
 
-        _, repeatable = token_count(parameter.annotation, default_parameter=default_parameter)
+        _, repeatable = token_count(parameter.annotation, default_parameter)
         if parameter is kwargs_parameter:
             assert kwargs_key is not None
             if kwargs_key in mapping[parameter] and not repeatable:
@@ -173,23 +185,29 @@ def _parse_kw_and_flags(f, tokens, mapping, default_parameter: Optional[Paramete
 
 
 def _parse_pos(
-    f: Callable, tokens: Iterable[str], mapping: ParameterDict, default_parameter: Optional[Parameter] = None
+    f: Callable,
+    tokens: Iterable[str],
+    mapping: ParameterDict,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
 ) -> List[str]:
     tokens = list(tokens)
     signature = inspect.signature(f)
 
     def remaining_parameters():
-        for parameter in signature.parameters.values():
-            _, cparam = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
+        for iparam in signature.parameters.values():
+            groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+            _, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
             if not cparam.parse:
                 continue
-            _, consume_all = token_count(parameter.annotation, default_parameter=default_parameter)
-            if parameter in mapping and not consume_all:
+            _, consume_all = token_count(iparam.annotation, default_parameter)
+            if iparam in mapping and not consume_all:
                 continue
-            if parameter.kind is parameter.KEYWORD_ONLY:  # pragma: no cover
+            if iparam.kind is iparam.KEYWORD_ONLY:  # pragma: no cover
                 # the kwargs parameter should always be in mapping.
                 break
-            yield parameter
+            yield iparam
 
     for iparam in remaining_parameters():
         if not tokens:
@@ -200,7 +218,7 @@ def _parse_pos(
             tokens = []
             break
 
-        consume_count, consume_all = token_count(iparam.annotation, default_parameter=default_parameter)
+        consume_count, consume_all = token_count(iparam.annotation, default_parameter)
         if consume_all:
             mapping.setdefault(iparam, [])
             mapping[iparam] = tokens + mapping[iparam]
@@ -218,7 +236,13 @@ def _parse_pos(
     return tokens
 
 
-def _parse_env(f, mapping, default_parameter: Optional[Parameter] = None):
+def _parse_env(
+    f,
+    mapping,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
+):
     """Populate argument defaults from environment variables.
 
     In cyclopts, arguments are parsed with the following priority:
@@ -232,7 +256,8 @@ def _parse_env(f, mapping, default_parameter: Optional[Parameter] = None):
             # Don't check environment variables for already-parsed parameters.
             continue
 
-        _, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        _, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
         for env_var_name in cparam.env_var:
             try:
                 env_var_value = os.environ[env_var_name]
@@ -248,7 +273,13 @@ def _is_required(parameter: inspect.Parameter) -> bool:
     return parameter.default is parameter.empty
 
 
-def _bind(f: Callable, mapping: ParameterDict, default_parameter: Optional[Parameter] = None):
+def _bind(
+    f: Callable,
+    mapping: ParameterDict,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
+):
     """Bind the mapping to the function signature.
 
     Better than directly using ``signature.bind`` because this can handle
@@ -271,11 +302,9 @@ def _bind(f: Callable, mapping: ParameterDict, default_parameter: Optional[Param
 
     has_unparsed_parameters = False
 
-    # Unintuitive notes:
-    # * Parameters before a ``*args`` may have type ``POSITIONAL_OR_KEYWORD``.
-    #     * Only args before a ``/`` are ``POSITIONAL_ONLY``.
     for iparam in signature.parameters.values():
-        _, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        _, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
         if not cparam.parse:
             has_unparsed_parameters |= _is_required(iparam)
             continue
@@ -299,10 +328,16 @@ def _bind(f: Callable, mapping: ParameterDict, default_parameter: Optional[Param
     return bound
 
 
-def _convert(mapping: ParameterDict, default_parameter: Optional[Parameter] = None) -> ParameterDict:
+def _convert(
+    mapping: ParameterDict,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
+) -> ParameterDict:
     coerced = ParameterDict()
     for iparam, parameter_tokens in mapping.items():
-        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
 
         if not cparam.parse:
             continue
@@ -369,28 +404,27 @@ def create_bound_arguments(
     """
     # Note: mapping is updated inplace
     mapping = ParameterDict()
-
-    validate_command(f, default_parameter=default_parameter)
-
     c2p, p2c = None, None
     unused_tokens = []
 
-    groups = groups_from_function(
-        f,
-        default_parameter or Parameter(),
-        group_arguments or Group.create_default_arguments(),
-        group_parameters or Group.create_default_parameters(),
-    )
-    # TODO: iterate over groups in all these functions
+    default_parameter = default_parameter or Parameter()
+    group_arguments = group_arguments or Group.create_default_arguments()
+    group_parameters = group_parameters or Group.create_default_parameters()
+
+    validate_command(f, default_parameter, group_arguments, group_parameters)
+
+    # groups = groups_from_function(f, default_parameter, group_arguments, group_parameters)
 
     try:
-        c2p = cli2parameter(f, default_parameter=default_parameter)
-        p2c = parameter2cli(f, default_parameter=default_parameter)
-        unused_tokens = _parse_kw_and_flags(f, tokens, mapping, default_parameter=default_parameter)
-        unused_tokens = _parse_pos(f, unused_tokens, mapping, default_parameter=default_parameter)
-        _parse_env(f, mapping, default_parameter=default_parameter)
-        coerced = _convert(mapping, default_parameter=default_parameter)
-        bound = _bind(f, coerced, default_parameter=default_parameter)
+        c2p = cli2parameter(f, default_parameter, group_arguments, group_parameters)
+        p2c = parameter2cli(f, default_parameter, group_arguments, group_parameters)
+        unused_tokens = _parse_kw_and_flags(f, tokens, mapping, default_parameter, group_arguments, group_parameters)
+        unused_tokens = _parse_pos(f, unused_tokens, mapping, default_parameter, group_arguments, group_parameters)
+        _parse_env(f, mapping, default_parameter, group_arguments, group_parameters)
+        coerced = _convert(mapping, default_parameter, group_arguments, group_parameters)
+        bound = _bind(f, coerced, default_parameter, group_arguments, group_parameters)
+
+        # TODO: invoke groups validators
     except CycloptsError as e:
         e.target = f
         e.root_input_tokens = tokens

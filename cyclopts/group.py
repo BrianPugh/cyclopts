@@ -13,7 +13,7 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
     if value is None:
         return
 
-    if value.group is not None:
+    if value.group:
         raise ValueError("Group default_parameter cannot have a group.")
 
 
@@ -48,6 +48,9 @@ class Group:
             return self.name == other.name
         else:
             return False
+
+    def __hash__(self):
+        return hash(self.name)
 
     @classmethod
     def create_default_arguments(cls):
@@ -85,10 +88,3 @@ def to_groups_converter(input_value: Union[None, str, Group, Iterable[Union[str,
         return (input_value,)
     else:
         return tuple(Group(x) if isinstance(x, str) else x for x in input_value)
-
-
-def get_group_default_parameter(app: "App", group: Group) -> "Parameter":
-    # TODO: get rid of this
-    from cyclopts.parameter import Parameter
-
-    return Parameter.combine(app.default_parameter, group.default_parameter)

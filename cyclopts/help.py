@@ -161,7 +161,7 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
     if app.default_command:
         help_lookup = parameter2docstring(app.default_command)
         for parameter in inspect.signature(app.default_command).parameters.values():
-            _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
+            _, param = get_hint_parameter(parameter.annotation, default_parameter)
             if not param.parse or not param.show:
                 continue
             parameters.append(parameter)
@@ -214,10 +214,10 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
     has_required = any(is_required(p) for p in parameters)
 
     for parameter in parameters:
-        type_, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
+        type_, param = get_hint_parameter(parameter.annotation, default_parameter)
         if not param.show:
             continue
-        has_short = any(is_short(x) for x in get_names(parameter, default_parameter=default_parameter))
+        has_short = any(is_short(x) for x in get_names(parameter, default_parameter))
         if has_short:
             break
 
@@ -229,9 +229,9 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
     table.add_column(justify="left")  # For main help text.
 
     for parameter in parameters:
-        type_, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
+        type_, param = get_hint_parameter(parameter.annotation, default_parameter)
 
-        options = get_names(parameter, default_parameter=default_parameter)
+        options = get_names(parameter, default_parameter)
         options.extend(param.get_negatives(type_, *options))
 
         if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):

@@ -341,7 +341,7 @@ class App:
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
         else:
-            validate_command(obj, default_parameter=self.default_parameter)
+            validate_command(obj, self.default_parameter, self.group_arguments, self.group_parameters)
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
             app = App(default_command=obj, **kwargs)
@@ -373,7 +373,7 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        validate_command(obj, default_parameter=self.default_parameter)
+        validate_command(obj, self.default_parameter, self.group_arguments, self.group_parameters)
         self.default_command = obj
         return obj
 
