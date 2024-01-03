@@ -162,7 +162,7 @@ class App:
         The returned dictionary will be used passed along to the command invocation.
         The app-converter runs **after** :class:`Parameter` and :class:`Group` converters.
         This parameter is keyword-only.
-    validator: Optional[Callable]
+    validator: Union[None, Callable, List[Callable]]
         A function (or list of functions) where the CLI-provided group variables of ``default_command`` will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
 
         Example usage:

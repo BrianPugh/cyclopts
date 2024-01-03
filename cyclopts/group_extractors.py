@@ -1,5 +1,5 @@
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, List, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Tuple, Union
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -29,6 +29,23 @@ def _create_or_append(
         group_mapping.append((group, [element]))
 
 
+def iparam_to_groups(
+    iparam: inspect.Parameter,
+    default_parameter: Parameter,
+    group_arguments: Group,
+    group_parameters: Group,
+) -> Tuple[Group, ...]:
+    _, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
+    if not cparam.parse:
+        return ()
+    elif cparam.group:
+        return cparam.group
+    elif iparam.kind == iparam.POSITIONAL_ONLY:
+        return (group_arguments,)
+    else:
+        return (group_parameters,)
+
+
 def groups_from_function(
     f: Callable,
     default_parameter: Parameter,
@@ -50,17 +67,12 @@ def groups_from_function(
         if not cparam.parse:
             continue
 
-        if cparam.group:
-            for group in cparam.group:
-                if isinstance(group, Group) and group.default_parameter is not None and group.default_parameter.group:
-                    # This shouldn't be possible due to ``Group`` internal checks.
-                    raise ValueError("Group.default_parameter cannot have a specified group.")
-                _create_or_append(group_mapping, group, iparam)
-        else:
-            if iparam.kind == iparam.POSITIONAL_ONLY:
-                _create_or_append(group_mapping, group_arguments, iparam)
-            else:
-                _create_or_append(group_mapping, group_parameters, iparam)
+        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
+        for group in groups:
+            if isinstance(group, Group) and group.default_parameter is not None and group.default_parameter.group:
+                # This shouldn't be possible due to ``Group`` internal checks.
+                raise ValueError("Group.default_parameter cannot have a specified group.")
+            _create_or_append(group_mapping, group, iparam)
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]
