@@ -322,6 +322,7 @@ class App:
 
         for i, token in enumerate(tokens):
             if token in self.help_flags:
+                # app = self
                 break
             try:
                 app = command_mapping[token]
@@ -375,12 +376,15 @@ class App:
 
         if name is None:
             name = app.name
+        else:
+            app._name = to_tuple_converter(name)[0]
 
         for n in to_tuple_converter(name):
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
-            self._commands[n] = attrs.evolve(app, name=n)
+            # TODO: app._name may not align with command name
+            self._commands[n] = app
 
         app._parents.append(self)
 
@@ -445,7 +449,7 @@ class App:
                     group_arguments=self.group_arguments,
                     group_parameters=self.group_parameters,
                 )
-                # TODO: need to add app-group logic here.
+                # TODO: need to add app-group validation logic here.
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:
