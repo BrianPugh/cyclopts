@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Callable, Iterable, Optional, Tuple, Union, cast
 
-from attrs import define, field
+from attrs import define, field, frozen
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -17,7 +17,7 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
         raise ValueError("Group default_parameter cannot have a group.")
 
 
-@define
+@frozen
 class Group:
     name: str
 
@@ -42,15 +42,6 @@ class Group:
 
     def __str__(self):
         return self.name
-
-    def __eq__(self, other):
-        if isinstance(other, type(self)):
-            return self.name == other.name
-        else:
-            return False
-
-    def __hash__(self):
-        return hash(self.name)
 
     @classmethod
     def create_default_arguments(cls):
@@ -87,4 +78,12 @@ def to_groups_converter(input_value: Union[None, str, Group, Iterable[Union[str,
     elif isinstance(input_value, Group):
         return (input_value,)
     else:
-        return tuple(Group(x) if isinstance(x, str) else x for x in input_value)
+        out = []
+        for x in input_value:
+            if isinstance(x, str):
+                out.append(Group(x))
+            elif isinstance(x, Group):
+                out.append(x)
+            else:
+                raise TypeError
+        return tuple(out)
