@@ -4,7 +4,7 @@ from contextlib import suppress
 from enum import Enum
 from functools import lru_cache
 from inspect import isclass
-from typing import Callable, Dict, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Callable, Dict, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
 from docstring_parser import DocstringParam
 from docstring_parser import parse as docstring_parse
@@ -18,7 +18,11 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
+if TYPE_CHECKING:
+    from cyclopts.core import App
+
 from cyclopts.exceptions import DocstringError
+from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter, get_names
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
@@ -152,16 +156,22 @@ def _get_choices(type_: Type) -> str:
     return choices
 
 
-def format_parameters(app, title, show_special=True, default_parameter: Optional[Parameter] = None):
-    panel, table = create_panel_table(title=title)
+# def format_parameters_(app, title, show_special=True, default_parameter: Optional[Parameter] = None):
+def format_group_parameters(app, group, parameters_):
+    from cyclopts.group_extractors import iparam_to_groups
+
+    panel, table = create_panel_table(title=group.name)
 
     has_required, has_short = False, False
 
     parameters = []
     if app.default_command:
         help_lookup = parameter2docstring(app.default_command)
-        for parameter in inspect.signature(app.default_command).parameters.values():
-            _, param = get_hint_parameter(parameter.annotation, default_parameter)
+        for parameter in parameters_:
+            groups = iparam_to_groups(parameter, app.default_parameter, app.group_arguments, app.group_parameters)
+            _, param = get_hint_parameter(
+                parameter.annotation, app.default_parameter, *(x.default_parameter for x in groups)
+            )
             if not param.parse or not param.show:
                 continue
             parameters.append(parameter)
@@ -174,50 +184,18 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
     def is_short(s):
         return not s.startswith("--") and s.startswith("-")
 
-    if show_special:
-        if app.version_flags:
-            parameters.append(
-                inspect.Parameter(
-                    name="version",
-                    kind=inspect.Parameter.KEYWORD_ONLY,
-                    default=False,
-                    annotation=Annotated[
-                        bool,
-                        Parameter(
-                            name=app.version_flags,
-                            negative="",
-                            show_default=False,
-                            help="Display application version.",
-                        ),
-                    ],
-                )
-            )
-
-        if app.help_flags:
-            parameters.append(
-                inspect.Parameter(
-                    name="help",
-                    kind=inspect.Parameter.KEYWORD_ONLY,
-                    default=False,
-                    annotation=Annotated[
-                        bool,
-                        Parameter(
-                            name=app.help_flags,
-                            negative="",
-                            show_default=False,
-                            help="Display this message and exit.",
-                        ),
-                    ],
-                )
-            )
-
     has_required = any(is_required(p) for p in parameters)
 
     for parameter in parameters:
-        type_, param = get_hint_parameter(parameter.annotation, default_parameter)
+        groups = iparam_to_groups(parameter, app.default_parameter, app.group_arguments, app.group_parameters)
+        type_, param = get_hint_parameter(
+            parameter.annotation, app.default_parameter, *(x.default_parameter for x in groups)
+        )
         if not param.show:
             continue
-        has_short = any(is_short(x) for x in get_names(parameter, default_parameter))
+        has_short = any(
+            is_short(x) for x in get_names(parameter, app.default_parameter, *(x.default_parameter for x in groups))
+        )
         if has_short:
             break
 
@@ -229,9 +207,12 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
     table.add_column(justify="left")  # For main help text.
 
     for parameter in parameters:
-        type_, param = get_hint_parameter(parameter.annotation, default_parameter)
+        groups = iparam_to_groups(parameter, app.default_parameter, app.group_arguments, app.group_parameters)
+        type_, param = get_hint_parameter(
+            parameter.annotation, app.default_parameter, *(x.default_parameter for x in groups)
+        )
 
-        options = get_names(parameter, default_parameter)
+        options = get_names(parameter, app.default_parameter, *(x.default_parameter for x in groups))
         options.extend(param.get_negatives(type_, *options))
 
         if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
@@ -287,5 +268,32 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
 
     if table.row_count == 0:
         return _silent
+
+    return panel
+
+
+def format_command_group(group: Group, elements: List):
+    from cyclopts.core import App
+
+    if not elements:
+        return _silent
+
+    panel, table = create_panel_table(title=group.name)
+
+    table.add_column(justify="left", no_wrap=True, style="cyan")  # For command names
+    table.add_column(justify="left")  # For main help text.
+
+    # Need to deduplicate commands
+    mapping = {}
+    for element in elements:
+        key = (element.default_command, element.help_)
+        mapping.setdefault(key, [])
+        mapping[key].append(element)
+
+    # Add them as rules
+    for subapps in mapping.values():
+        subapps.sort(key=lambda x: x.name)
+        name = ",".join(x.name for x in subapps) + " "
+        table.add_row(name, subapps[0].help_)
 
     return panel

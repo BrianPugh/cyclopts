@@ -30,7 +30,12 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.group import Group, to_group_converter, to_groups_converter
-from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
+from cyclopts.help import (
+    format_command_group,
+    format_doc,
+    format_group_parameters,
+    format_usage,
+)
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 
@@ -217,6 +222,7 @@ class App:
                 name=self.help_flags,
                 help_flags=[],
                 version_flags=[],
+                help="Display this message and exit.",
             )
         if self.version_flags:
             self.command(
@@ -224,6 +230,7 @@ class App:
                 name=self.version_flags,
                 help_flags=[],
                 version_flags=[],
+                help="Display application version.",
             )
 
     ###########
@@ -595,7 +602,7 @@ class App:
         console.print(format_doc(self, app))
 
         def walk_apps():
-            # Iterates from deepest to shallowest
+            # Iterates from deepest to shallowest meta-apps
             meta_list = [app]  # shallowest to deepest
             meta = app
             while (meta := meta._meta) and meta.default_command:
@@ -604,8 +611,27 @@ class App:
 
         show_special = True
 
+        from cyclopts.group_extractors import groups_from_app, groups_from_function
+
         command_rows = {}
         for subapp in walk_apps():
+            # Print command groups
+            for group, elements in groups_from_app(subapp):
+                console.print(format_command_group(group, elements))
+
+            # Print default_command argument/parameter groups
+            if subapp.default_command:
+                for group, elements in groups_from_function(
+                    subapp.default_command, self.default_parameter, self.group_arguments, self.group_parameters
+                ):
+                    console.print(format_group_parameters(subapp, group, elements))
+                    # TODO
+                    # console.print(format_command_group(group, elements))
+                    pass
+
+            # asdfkljflsdjkfalsdjkf
+
+        """
             command_rows.setdefault(subapp.help_title_commands, [])
             command_rows[subapp.help_title_commands].extend(format_command_rows(subapp))
 
@@ -629,6 +655,7 @@ class App:
             for row in rows:
                 table.add_row(*row)
             console.print(panel)
+        """
 
     def interactive_shell(
         self,
