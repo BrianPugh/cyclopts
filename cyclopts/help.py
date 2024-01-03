@@ -86,7 +86,7 @@ def format_usage(
 ):
     usage = []
     usage.append("Usage:")
-    usage.append(app.name)
+    usage.append(app.name[0])
     usage.extend(command_chain)
 
     for command in command_chain:
@@ -283,17 +283,13 @@ def format_command_group(group: Group, elements: List):
     table.add_column(justify="left", no_wrap=True, style="cyan")  # For command names
     table.add_column(justify="left")  # For main help text.
 
-    # Need to deduplicate commands
-    mapping = {}
+    rows = []
     for element in elements:
-        key = (element.default_command, element.help_)
-        mapping.setdefault(key, [])
-        mapping[key].append(element)
+        row = (",".join(element.name) + " ", element.help_)
+        if row not in rows:
+            rows.append(row)
 
-    # Add them as rules
-    for subapps in mapping.values():
-        subapps.sort(key=lambda x: x.name)
-        name = ",".join(x.name for x in subapps) + " "
-        table.add_row(name, subapps[0].help_)
+    for row in rows:
+        table.add_row(*row)
 
     return panel
