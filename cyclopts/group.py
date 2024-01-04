@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Iterable, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, Tuple, Union, cast
 
 from attrs import define, field, frozen
 

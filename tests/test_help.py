@@ -708,9 +708,6 @@ def test_help_print_commands_plus_meta_short(app, console):
     app.version_flags = ["--version"]
     app.help_flags = ["--help", "-h"]
 
-    with console.capture() as capture:
-        app.help_print(console=console)
-
     @app.command(help="Cmd1 help string.")
     def cmd1():
         pass
