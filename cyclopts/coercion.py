@@ -110,7 +110,9 @@ def _convert(type_, element, default_parameter=None):
             gen = zip(*[iter(element)] * count)
         else:
             gen = element
-        return origin_type(_convert(inner_types[0], e, default_parameter=default_parameter) for e in gen)
+        return origin_type(
+            _convert(inner_types[0], e, default_parameter=default_parameter) for e in gen
+        )  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
         return tuple(_convert(t, e, default_parameter=default_parameter) for t, e in zip(inner_types, element))
     else:
