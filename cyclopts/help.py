@@ -132,16 +132,6 @@ def format_doc(app, function: Optional[Callable]):
     return Text.assemble(*components)
 
 
-def format_command_rows(app):
-    out = []
-    for command_name, command_app in app._commands.items():
-        row_args = []
-        row_args.append(command_name + " ")  # A little extra padding
-        row_args.append(docstring_parse(command_app.help_).short_description)
-        out.append(row_args)
-    return out
-
-
 def _get_choices(type_: Type) -> str:
     if get_origin(type_) is Union:
         inner_choices = [_get_choices(inner) for inner in get_args(type_)]
@@ -292,3 +282,12 @@ def format_command_group(group: Group, elements: List):
         table.add_row(*row)
 
     return panel
+
+
+def format_command_rows(elements) -> List:
+    rows = []
+    for element in elements:
+        row = (",".join(element.name) + " ", docstring_parse(element.help_).short_description)
+        if row not in rows:
+            rows.append(row)
+    return rows

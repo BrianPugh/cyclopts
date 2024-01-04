@@ -31,7 +31,9 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group, to_group_converter, to_groups_converter
 from cyclopts.help import (
+    create_panel_table_commands,
     format_command_group,
+    format_command_rows,
     format_doc,
     format_group_parameters,
     format_usage,
@@ -139,12 +141,6 @@ class App:
         Tokens that trigger :meth:`help_print`.
         Set to an empty list to disable help feature.
         Defaults to ``["--help", "-h"]``.
-    help_title_commands: str
-        Title for the "commands" help-panel.
-        Defaults to ``"Commands"``.
-    help_title_parameters: str
-        Title for the "parameters" help-panel.
-        Defaults to ``"Parameters"``.
     default_parameter: Parameter
         Default :class:`Parameter` configuration.
     group: Union[None, str, Iterable[Union[str, Group]]]
@@ -192,8 +188,6 @@ class App:
 
     help: Optional[str] = field(default=None)
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
-    help_title_commands: str = "Commands"
-    help_title_parameters: str = "Parameters"
 
     group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)
 
@@ -308,7 +302,8 @@ class App:
     def meta(self) -> "App":
         if self._meta is None:
             self._meta = type(self)(
-                help_title_parameters="Session Parameters",
+                group_arguments=Group("Session Arguments"),
+                group_parameters=Group("Session Parameters"),
             )
             self._meta._meta_parent = self
         return self._meta
@@ -613,53 +608,32 @@ class App:
                 meta_list.append(meta)
             yield from reversed(meta_list)
 
-        show_special = True
-
         from cyclopts.group_extractors import groups_from_app, groups_from_function
 
         command_rows = {}
         for subapp in walk_apps():
-            # Print command groups
-            for group, elements in groups_from_app(subapp):
-                console.print(format_command_group(group, elements))
-
             # Print default_command argument/parameter groups
             if subapp.default_command:
                 for group, elements in groups_from_function(
-                    subapp.default_command, self.default_parameter, self.group_arguments, self.group_parameters
+                    subapp.default_command, subapp.default_parameter, subapp.group_arguments, subapp.group_parameters
                 ):
                     console.print(format_group_parameters(subapp, group, elements))
-                    # TODO
-                    # console.print(format_command_group(group, elements))
-                    pass
 
-            # asdfkljflsdjkfalsdjkf
+            # Print command groups
+            for group, elements in groups_from_app(subapp):
+                command_rows.setdefault(group.name, [])
+                command_rows[group.name].extend(format_command_rows(elements))
+                # console.print(format_command_group(group, elements))
 
-        """
-            command_rows.setdefault(subapp.help_title_commands, [])
-            command_rows[subapp.help_title_commands].extend(format_command_rows(subapp))
-
-            console.print(
-                format_parameters(
-                    subapp,
-                    subapp.help_title_parameters,
-                    show_special=show_special,
-                    default_parameter=self.default_parameter,
-                )
-            )
-
-            show_special = False
-
-        # Rely on dictionary insertion order.
+        # Rely on dictionary insertion order for panel-order.
         for title, rows in command_rows.items():
             if not rows:
                 continue
-            rows.sort(key=lambda x: x[0])  # sort by command name
+            rows.sort(key=lambda x: (x[0].startswith("-"), x[0]))  # sort by command name
             panel, table = create_panel_table_commands(title=title)
             for row in rows:
                 table.add_row(*row)
             console.print(panel)
-        """
 
     def interactive_shell(
         self,
