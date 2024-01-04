@@ -16,8 +16,8 @@ from cyclopts.help import (
     create_panel_table_commands,
     format_command_rows,
     format_doc,
-    format_usage,
     format_group_parameters,
+    format_usage,
 )
 
 
@@ -200,7 +200,6 @@ def test_help_format_group_parameters(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_short_name(app, console):
     @app.command
     def cmd(
@@ -209,7 +208,13 @@ def test_help_format_group_parameters_short_name(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -222,7 +227,6 @@ def test_help_format_group_parameters_short_name(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_from_docstring(app, console):
     @app.command
     def cmd(foo: str, bar: str):
@@ -230,15 +234,21 @@ def test_help_format_group_parameters_from_docstring(app, console):
 
         Parameters
         ----------
-                foo: str
-                    Docstring for foo.
-                bar: str
-                    Docstring for bar.
+        foo: str
+            Docstring for foo.
+        bar: str
+            Docstring for bar.
         """
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -252,7 +262,6 @@ def test_help_format_group_parameters_from_docstring(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_bool_flag(app, console):
     @app.command
     def cmd(
@@ -261,7 +270,13 @@ def test_help_format_group_parameters_bool_flag(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -274,7 +289,6 @@ def test_help_format_group_parameters_bool_flag(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_bool_flag_custom_negative(app, console):
     @app.command
     def cmd(
@@ -283,7 +297,13 @@ def test_help_format_group_parameters_bool_flag_custom_negative(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -296,7 +316,6 @@ def test_help_format_group_parameters_bool_flag_custom_negative(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_list_flag(app, console):
     @app.command
     def cmd(
@@ -305,7 +324,13 @@ def test_help_format_group_parameters_list_flag(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -318,7 +343,6 @@ def test_help_format_group_parameters_list_flag(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_defaults(app, console):
     @app.command
     def cmd(
@@ -328,7 +352,13 @@ def test_help_format_group_parameters_defaults(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -342,7 +372,6 @@ def test_help_format_group_parameters_defaults(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_defaults_no_show(app, console):
     @app.command
     def cmd(
@@ -352,7 +381,13 @@ def test_help_format_group_parameters_defaults_no_show(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -366,7 +401,6 @@ def test_help_format_group_parameters_defaults_no_show(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_choices_literal_no_show(app, console):
     @app.command
     def cmd(
@@ -376,7 +410,13 @@ def test_help_format_group_parameters_choices_literal_no_show(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -390,7 +430,6 @@ def test_help_format_group_parameters_choices_literal_no_show(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_choices_literal_union(app, console):
     @app.command
     def cmd(
@@ -401,7 +440,13 @@ def test_help_format_group_parameters_choices_literal_union(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -415,7 +460,6 @@ def test_help_format_group_parameters_choices_literal_union(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_choices_enum(app, console):
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"
@@ -429,7 +473,13 @@ def test_help_format_group_parameters_choices_enum(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
@@ -443,7 +493,6 @@ def test_help_format_group_parameters_choices_enum(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="need to update to format_group_parameters")
 def test_help_format_group_parameters_env_var(app, console):
     @app.command
     def cmd(
@@ -452,7 +501,13 @@ def test_help_format_group_parameters_env_var(app, console):
         pass
 
     with console.capture() as capture:
-        console.print(format_group_parameters(app["cmd"], app.help_title_parameters))
+        console.print(
+            format_group_parameters(
+                app["cmd"],
+                Group("Parameters"),
+                list(inspect.signature(cmd).parameters.values()),
+            )
+        )
 
     actual = capture.get()
     expected = dedent(
