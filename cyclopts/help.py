@@ -150,22 +150,16 @@ def format_group_parameters(app, group, iparams_):
     from cyclopts.group_extractors import iparam_to_groups
 
     panel, table = create_panel_table(title=group.name)
-
     has_required, has_short = False, False
+    help_lookup = parameter2docstring(app.default_command) if app.default_command else {}
 
     iparams = []
-    if app.default_command:
-        help_lookup = parameter2docstring(app.default_command)
-        for iparam in iparams_:
-            groups = iparam_to_groups(iparam, app.default_parameter, app.group_arguments, app.group_parameters)
-            _, param = get_hint_parameter(
-                iparam.annotation, app.default_parameter, *(x.default_parameter for x in groups)
-            )
-            if not param.parse or not param.show:
-                continue
-            iparams.append(iparam)
-    else:
-        help_lookup = {}
+    for iparam in iparams_:
+        groups = iparam_to_groups(iparam, app.default_parameter, app.group_arguments, app.group_parameters)
+        _, param = get_hint_parameter(iparam.annotation, app.default_parameter, *(x.default_parameter for x in groups))
+        if not param.parse or not param.show:
+            continue
+        iparams.append(iparam)
 
     def is_required(parameter):
         return parameter.default is parameter.empty
@@ -257,29 +251,6 @@ def format_group_parameters(app, group, iparams_):
 
     if table.row_count == 0:
         return _silent
-
-    return panel
-
-
-def format_command_group(group: Group, elements: List):
-    from cyclopts.core import App
-
-    if not elements:
-        return _silent
-
-    panel, table = create_panel_table(title=group.name)
-
-    table.add_column(justify="left", no_wrap=True, style="cyan")  # For command names
-    table.add_column(justify="left")  # For main help text.
-
-    rows = []
-    for element in elements:
-        row = (",".join(element.name) + " ", element.help_)
-        if row not in rows:
-            rows.append(row)
-
-    for row in rows:
-        table.add_row(*row)
 
     return panel
 

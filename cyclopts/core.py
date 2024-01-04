@@ -32,7 +32,6 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group, to_group_converter, to_groups_converter
 from cyclopts.help import (
     create_panel_table_commands,
-    format_command_group,
     format_command_rows,
     format_doc,
     format_group_parameters,
@@ -623,7 +622,6 @@ class App:
             for group, elements in groups_from_app(subapp):
                 command_rows.setdefault(group.name, [])
                 command_rows[group.name].extend(format_command_rows(elements))
-                # console.print(format_command_group(group, elements))
 
         # Rely on dictionary insertion order for panel-order.
         for title, rows in command_rows.items():
