@@ -1,4 +1,5 @@
 import inspect
+from functools import lru_cache
 from typing import Iterable, List, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
 import attrs
@@ -213,6 +214,7 @@ def get_names(parameter: inspect.Parameter, *default_parameters: Optional[Parame
     return names
 
 
+@lru_cache
 def get_hint_parameter(type_: Type, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
