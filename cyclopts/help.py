@@ -108,7 +108,7 @@ def format_usage(
 
 
 def format_doc(app, function: Optional[Callable]):
-    from cyclopts.core import App
+    from cyclopts.core import App  # noqa: F811
 
     if function is None:
         raw_doc_string = app.help_
@@ -215,7 +215,8 @@ def format_group_parameters(app, group, iparams_):
             help_components.append(param.help)
         else:
             with suppress(KeyError):
-                help_components.append(help_lookup[iparam].description)
+                if help_lookup[iparam].description is not None:
+                    help_components.append(help_lookup[iparam].description)
 
         if param.show_choices:
             choices = _get_choices(type_)
