@@ -16,7 +16,7 @@ from cyclopts.coercion import (
 )
 from cyclopts.group import Group, to_groups_converter
 from cyclopts.protocols import Converter, Validator
-from cyclopts.utils import record_init_kwargs
+from cyclopts.utils import record_init
 
 
 def _token_count_validator(instance, attribute, value):
@@ -43,7 +43,7 @@ def _negative_converter(default: Tuple[str, ...]):
     return converter
 
 
-@record_init_kwargs("_provided_args")
+@record_init("_provided_args")
 @frozen
 class Parameter:
     """Cyclopts configuration for individual function parameters."""

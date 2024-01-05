@@ -4,17 +4,19 @@ from collections.abc import MutableMapping
 from typing import Any, Dict, Iterator, Optional
 
 
-def record_init_kwargs(target: str):
+def record_init(target: str):
     """Class decorator that records init argument names as a tuple to ``target``."""
 
     def decorator(cls):
         original_init = cls.__init__
+        signature = inspect.signature(original_init)
 
         @functools.wraps(original_init)
-        def new_init(self, **kwargs):
-            original_init(self, **kwargs)
+        def new_init(self, *args, **kwargs):
+            bound = signature.bind(self, *args, **kwargs)
+            original_init(self, *args, **kwargs)
             # Circumvent frozen protection.
-            object.__setattr__(self, target, tuple(kwargs.keys()))
+            object.__setattr__(self, target, tuple(k for k, v in bound.arguments.items() if v is not self))
 
         cls.__init__ = new_init
         return cls
