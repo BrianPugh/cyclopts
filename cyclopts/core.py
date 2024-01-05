@@ -443,7 +443,6 @@ class App:
                     group_arguments=self.group_arguments,
                     group_parameters=self.group_parameters,
                 )
-                # TODO: need to add app-group validation logic here.
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:

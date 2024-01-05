@@ -13,7 +13,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.group import Group
-from cyclopts.group_extractors import iparam_to_groups
+from cyclopts.group_extractors import groups_from_function, iparam_to_groups
 from cyclopts.parameter import Parameter, get_hint_parameter, get_names, validate_command
 from cyclopts.utils import ParameterDict
 
@@ -421,8 +421,6 @@ def create_bound_arguments(
 
     validate_command(f, default_parameter, group_arguments, group_parameters)
 
-    # groups = groups_from_function(f, default_parameter, group_arguments, group_parameters)
-
     try:
         c2p = cli2parameter(f, default_parameter, group_arguments, group_parameters)
         p2c = parameter2cli(f, default_parameter, group_arguments, group_parameters)
@@ -432,7 +430,10 @@ def create_bound_arguments(
         coerced = _convert(mapping, default_parameter, group_arguments, group_parameters)
         bound = _bind(f, coerced, default_parameter, group_arguments, group_parameters)
 
-        # TODO: invoke groups validators
+        for group, iparams in groups_from_function(f, default_parameter, group_arguments, group_parameters):
+            names = tuple(x.name for x in iparams)
+            for validator in group.validator:
+                validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
     except CycloptsError as e:
         e.target = f
         e.root_input_tokens = tokens
