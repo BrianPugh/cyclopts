@@ -437,14 +437,10 @@ class App:
 
             if self.default_command:
                 command = self.default_command
-                resolver = ResolvedCommand(command, self.default_parameter, self.group_arguments, self.group_parameters)
-                bound, unused_tokens = create_bound_arguments(
-                    command,
-                    unused_tokens,
-                    default_parameter=self.default_parameter,
-                    group_arguments=self.group_arguments,
-                    group_parameters=self.group_parameters,
+                resolved_command = ResolvedCommand(
+                    command, self.default_parameter, self.group_arguments, self.group_parameters
                 )
+                bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:

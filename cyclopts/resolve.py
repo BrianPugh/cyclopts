@@ -141,13 +141,29 @@ class ResolvedCommand:
         # Fully Resolve each Cyclopts Parameter
         self.iparam_to_cparam = ParameterDict()
         iparam_to_docstring_cparam = _resolve_docstring(f)
+        has_unparsed_parameters = False
         for iparam, groups in self.iparam_to_groups.items():
-            self.iparam_to_cparam[iparam] = get_hint_parameter(
+            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                # Name is only used for help-string
+                names = [iparam.name.upper()]
+            else:
+                names = ["--" + iparam.name.replace("_", "-")]
+
+            default_name_parameter = Parameter(name=names)
+
+            cparam = get_hint_parameter(
                 iparam.annotation,
                 app_parameter,
                 *(x.default_parameter for x in groups),
                 iparam_to_docstring_cparam.get(iparam),
+                default_name_parameter,
             )[1]
+            if not cparam.parse:
+                has_unparsed_parameters = True
+                continue
+            self.iparam_to_cparam[iparam] = cparam
+
+        self.bind = signature.bind_partial if has_unparsed_parameters else signature.bind
 
         # Create a convenient group-to-iparam structure
         self.groups_iparams = [

@@ -58,6 +58,12 @@ class ParameterDict(MutableMapping):
     def __len__(self) -> int:
         return len(self.store)
 
+    def __repr__(self) -> str:
+        inner = []
+        for key, value in self.store.items():
+            inner.append(f"Parameter(name={key[0]!r}, kind={key[1]}, annotation={key[2]}): {value}")
+        return "{" + ", ".join(inner) + "}"
+
     def __contains__(self, key: object) -> bool:
         if not isinstance(key, inspect.Parameter):
             raise TypeError(f"Key must be an inspect.Parameter; got {type(key)}.")
