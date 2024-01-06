@@ -44,7 +44,8 @@ def _int(s: str) -> int:
     elif s.startswith("0b"):
         return int(s, 2)
     else:
-        return int(s, 0)
+        # Casting to a float first allows for things like "30.0"
+        return int(float(s))
 
 
 def _bytes(s: str) -> bytes:
@@ -224,7 +225,7 @@ def coerce(type_: Type, *args: str, default_parameter=None):
         return [_convert(type_, item, default_parameter=default_parameter) for item in args]
 
 
-def token_count(type_: Type, *default_parameters: Optional["Parameter"]) -> Tuple[int, bool]:
+def token_count(type_: Type, cparam: Optional["Parameter"] = None) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -245,12 +246,12 @@ def token_count(type_: Type, *default_parameters: Optional["Parameter"]) -> Tupl
     """
     from cyclopts.parameter import get_hint_parameter
 
-    if type_ is inspect.Parameter.empty:
+    if type_ is inspect.Parameter.empty:  # str
         return 1, False
 
-    type_, param = get_hint_parameter(type_, *default_parameters)
-    if param.token_count is not None:
-        return abs(param.token_count), param.token_count < 0
+    type_, cparam = get_hint_parameter(type_, cparam)
+    if cparam.token_count is not None:
+        return abs(cparam.token_count), cparam.token_count < 0
 
     type_ = resolve(type_)
     origin_type = get_origin_and_validate(type_)
@@ -262,7 +263,7 @@ def token_count(type_: Type, *default_parameters: Optional["Parameter"]) -> Tupl
     elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
-        return token_count(get_args(type_)[0], *default_parameters)[0], True
+        return token_count(get_args(type_)[0], cparam)[0], True
     else:
         return 1, False
 

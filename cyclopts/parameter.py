@@ -199,6 +199,7 @@ def validate_command(
                 raise ValueError("Cannot use a variable-length tuple.")
 
 
+# DEPRECATE
 def get_names(parameter: inspect.Parameter, *default_parameters: Optional[Parameter]) -> List[str]:
     """Derive the CLI name for an ``inspect.Parameter``."""
     _, param = get_hint_parameter(parameter.annotation, *default_parameters)
@@ -234,3 +235,12 @@ def get_hint_parameter(type_: Type, *default_parameters: Optional[Parameter]) ->
 
     cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
     return type_, cparam
+
+
+def get_hint(type_: Type) -> Type:
+    if type_ is inspect.Parameter.empty:
+        return str
+    type_ = resolve_optional(type_)
+    if type(type_) is AnnotatedType:
+        type_ = get_args(type_)[0]
+    return resolve(type_)
