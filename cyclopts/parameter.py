@@ -64,7 +64,7 @@ class Parameter:
 
     negative: Union[None, Tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)
 
-    group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)
+    group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)  # TODO: change to to_tuple_converter
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
 
@@ -220,17 +220,17 @@ def get_hint_parameter(type_: Type, *default_parameters: Optional[Parameter]) ->
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
     """
+    cyclopts_parameters = []
     if type_ is inspect.Parameter.empty:
-        return str, Parameter()
-
-    type_ = resolve_optional(type_)
-
-    if type(type_) is AnnotatedType:
-        annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-        type_ = get_args(type_)[0]
-        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+        type_ = str
     else:
-        cyclopts_parameters = []
+        type_ = resolve_optional(type_)
+
+        if type(type_) is AnnotatedType:
+            annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+            type_ = get_args(type_)[0]
+            cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+        type_ = resolve(type_)
 
     cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
-    return resolve(type_), cparam
+    return type_, cparam
