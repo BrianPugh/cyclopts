@@ -39,6 +39,7 @@ from cyclopts.help import (
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
+from cyclopts.resolve import ResolvedCommand
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -436,6 +437,7 @@ class App:
 
             if self.default_command:
                 command = self.default_command
+                resolver = ResolvedCommand(command, self.default_parameter, self.group_arguments, self.group_parameters)
                 bound, unused_tokens = create_bound_arguments(
                     command,
                     unused_tokens,

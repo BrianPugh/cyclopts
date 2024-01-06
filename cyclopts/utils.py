@@ -68,3 +68,9 @@ class ParameterDict(MutableMapping):
         if processed_key not in self.store:
             self.reverse_mapping[processed_key] = key
         return self.store.setdefault(processed_key, default)
+
+    def get(self, key: inspect.Parameter, default: Any = None):
+        try:
+            return self[key]
+        except KeyError:
+            return default

@@ -22,7 +22,7 @@ def _create_or_append(
         raise TypeError
 
     for mapping in group_mapping:
-        if mapping[0] == group:
+        if mapping[0].name == group.name:
             mapping[1].append(element)
             break
     else:
