@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Callable, Optional, Tuple, Union, cast
 
-from attrs import define, field, frozen
+from attrs import field, frozen
 
 if TYPE_CHECKING:
-    from cyclopts.core import App
     from cyclopts.parameter import Parameter
 
 from cyclopts.coercion import to_tuple_converter

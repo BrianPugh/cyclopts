@@ -1,23 +1,14 @@
 import inspect
-import sys
 from enum import Enum
 from functools import lru_cache
 from inspect import isclass
-from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
 from docstring_parser import parse as docstring_parse
 from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
-if TYPE_CHECKING:
-    from cyclopts.core import App
 
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint
