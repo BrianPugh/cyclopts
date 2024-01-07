@@ -1,5 +1,6 @@
 import inspect
 import sys
+from unittest.mock import Mock
 
 import pytest
 
@@ -27,13 +28,11 @@ def test_custom_converter(app):
     assert actual_bind == expected_bind
 
 
-def test_custom_validator(app):
-    def custom_validator(type_, value):
-        if not (0 < value < 150):
-            raise ValueError("An unreasonable age was entered.")
+def test_custom_validator_positional_or_keyword(app):
+    validator = Mock()
 
     @app.default
-    def foo(age: Annotated[int, Parameter(validator=custom_validator)]):
+    def foo(age: Annotated[int, Parameter(validator=validator)]):
         pass
 
     signature = inspect.signature(foo)
@@ -43,8 +42,39 @@ def test_custom_validator(app):
     assert actual_command == foo
     assert actual_bind == expected_bind
 
-    with pytest.raises(ValidationError):
-        app.parse_args("200", print_error=False, exit_on_error=False)
+    validator.assert_called_once_with(int, 10)
+
+
+def test_custom_validator_var_keyword(app):
+    validator = Mock()
+
+    @app.default
+    def foo(**age: Annotated[int, Parameter(validator=validator)]):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(age=10)
+
+    actual_command, actual_bind = app.parse_args("--age=10")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+    validator.assert_called_once_with(int, 10)
+
+
+def test_custom_validator_var_positional(app):
+    validator = Mock()
+
+    @app.default
+    def foo(*age: Annotated[int, Parameter(validator=validator)]):
+        pass
+
+    signature = inspect.signature(foo)
+    expected_bind = signature.bind(10)
+
+    actual_command, actual_bind = app.parse_args("10")
+    assert actual_command == foo
+    assert actual_bind == expected_bind
+    validator.assert_called_once_with(int, 10)
 
 
 def test_custom_validators(app):

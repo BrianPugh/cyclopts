@@ -43,6 +43,9 @@ def cli2parameter(command: ResolvedCommand) -> Dict[str, Tuple[inspect.Parameter
     mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
 
     for iparam, cparam in command.iparam_to_cparam.items():
+        if iparam.kind is iparam.VAR_KEYWORD:
+            # Don't directly expose the kwarg variable name
+            continue
         hint = get_hint(iparam.annotation)
         for name in cparam.name:
             mapping[name] = (iparam, True if hint is bool else None)
@@ -290,7 +293,8 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
                 elif iparam.kind == iparam.VAR_POSITIONAL:
                     val = cparam.converter(List[type_], *parameter_tokens)
                     for validator in cparam.validator:
-                        validator(type_, val)
+                        for v in val:
+                            validator(type_, v)
                     coerced[iparam] = val
                 else:
                     val = cparam.converter(type_, *parameter_tokens)
