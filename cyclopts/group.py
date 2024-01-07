@@ -68,22 +68,3 @@ def to_group_converter(default_group: Group):
             raise TypeError
 
     return converter
-
-
-def to_groups_converter(input_value: Union[None, str, Group, Iterable[Union[str, Group]]]) -> Tuple[Group, ...]:
-    if input_value is None:
-        return ()
-    elif isinstance(input_value, str):
-        return (Group(input_value),)
-    elif isinstance(input_value, Group):
-        return (input_value,)
-    else:
-        out = []
-        for x in input_value:
-            if isinstance(x, str):
-                out.append(Group(x))
-            elif isinstance(x, Group):
-                out.append(x)
-            else:
-                raise TypeError
-        return tuple(out)
