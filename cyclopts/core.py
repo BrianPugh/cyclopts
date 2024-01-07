@@ -437,7 +437,11 @@ class App:
             if self.default_command:
                 command = self.default_command
                 resolved_command = ResolvedCommand(
-                    command, self.default_parameter, self.group_arguments, self.group_parameters
+                    command,
+                    self.default_parameter,
+                    self.group_arguments,
+                    self.group_parameters,
+                    parse_docstring=False,
                 )
                 bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
                 for validator in self.validator:
