@@ -1,6 +1,6 @@
 import inspect
 from functools import lru_cache
-from typing import Iterable, List, Optional, Tuple, Type, Union, cast, get_args, get_origin
+from typing import Callable, List, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
@@ -175,12 +175,7 @@ class Parameter:
         )
 
 
-def validate_command(
-    f,
-    default_parameter: Optional[Parameter],
-    group_arguments: Group,
-    group_parameters: Group,
-):
+def validate_command(f: Callable):
     """Validate if a function abides by Cyclopts's rules.
 
     Raises
@@ -188,13 +183,10 @@ def validate_command(
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
-    from cyclopts.group_extractors import iparam_to_groups
-
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
-        _ = get_origin_and_validate(iparam.annotation)
-        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
-        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter, *(x.default_parameter for x in groups))
+        get_origin_and_validate(iparam.annotation)
+        type_, cparam = get_hint_parameter(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
         if get_origin(type_) is tuple:
