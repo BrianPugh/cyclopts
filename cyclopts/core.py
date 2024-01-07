@@ -20,7 +20,7 @@ else:
     from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import optional_to_tuple_converter, to_tuple_converter
+from cyclopts.coercion import optional_to_tuple_converter, to_list_converter, to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -195,7 +195,7 @@ class App:
     group_commands: Group = field(default=None, converter=to_group_converter(Group.create_default_commands()))
 
     converter: Optional[Callable] = field(default=None)
-    validator: Union[None, Callable, Iterable[Callable]] = field(default=None)
+    validator: List[Callable] = field(default=None, converter=to_list_converter)
 
     ######################
     # Private Attributes #
@@ -440,6 +440,8 @@ class App:
                     command, self.default_parameter, self.group_arguments, self.group_parameters
                 )
                 bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
+                for validator in self.validator:
+                    validator(**bound.arguments)
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:
