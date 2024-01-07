@@ -152,16 +152,22 @@ def resolve(type_: Type) -> Type:
 
 def resolve_optional(type_: Type) -> Type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
-    while get_origin(type_) is Union:
-        non_none_types = [t for t in get_args(type_) if t is not NoneType]
-        if not non_none_types:  # pragma: no cover
-            # This should never happen; python simplifies:
-            #    ``Union[None, None] -> NoneType``
-            raise ValueError("Union type cannot be all NoneType")
-        elif len(non_none_types) == 1:
-            type_ = non_none_types[0]
-        elif len(non_none_types) > 1:
-            return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
+    # Python will automatically flatten out nested unions when possible.
+    # So we don't need to loop over resolution.
+
+    if get_origin(type_) is not Union:
+        return type_
+
+    non_none_types = [t for t in get_args(type_) if t is not NoneType]
+    if not non_none_types:  # pragma: no cover
+        # This should never happen; python simplifies:
+        #    ``Union[None, None] -> NoneType``
+        raise ValueError("Union type cannot be all NoneType")
+    elif len(non_none_types) == 1:
+        type_ = non_none_types[0]
+    elif len(non_none_types) > 1:
+        return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
+
     return type_
 
 
