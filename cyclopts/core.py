@@ -617,7 +617,7 @@ class App:
                 )
                 for group, iparams in command.groups_iparams:
                     cparams = [command.iparam_to_cparam[x] for x in iparams]
-                    console.print(format_group_parameters(subapp, group, iparams, cparams))
+                    console.print(format_group_parameters(group, iparams, cparams))
 
             # Print command groups
             for group, elements in groups_from_app(subapp):
