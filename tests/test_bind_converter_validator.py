@@ -12,7 +12,12 @@ else:
 from cyclopts import Parameter, ValidationError
 
 
-def test_custom_converter(app):
+@pytest.fixture
+def validator():
+    return Mock()
+
+
+def test_custom_converter(app, assert_parse_args):
     def custom_converter(type_, *args):
         return 2 * int(args[0])
 
@@ -20,64 +25,37 @@ def test_custom_converter(app):
     def foo(age: Annotated[int, Parameter(converter=custom_converter)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(age=10)
-
-    actual_command, actual_bind = app.parse_args("5")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, "5", age=10)
 
 
-def test_custom_validator_positional_or_keyword(app):
-    validator = Mock()
-
+def test_custom_validator_positional_or_keyword(app, assert_parse_args, validator):
     @app.default
     def foo(age: Annotated[int, Parameter(validator=validator)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(age=10)
-
-    actual_command, actual_bind = app.parse_args("10")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
-
+    assert_parse_args(foo, "10", age=10)
     validator.assert_called_once_with(int, 10)
 
 
-def test_custom_validator_var_keyword(app):
-    validator = Mock()
-
+def test_custom_validator_var_keyword(app, assert_parse_args, validator):
     @app.default
     def foo(**age: Annotated[int, Parameter(validator=validator)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(age=10)
-
-    actual_command, actual_bind = app.parse_args("--age=10")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, "--age=10", age=10)
     validator.assert_called_once_with(int, 10)
 
 
-def test_custom_validator_var_positional(app):
-    validator = Mock()
-
+def test_custom_validator_var_positional(app, assert_parse_args, validator):
     @app.default
     def foo(*age: Annotated[int, Parameter(validator=validator)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(10)
-
-    actual_command, actual_bind = app.parse_args("10")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, "10", 10)
     validator.assert_called_once_with(int, 10)
 
 
-def test_custom_validators(app):
+def test_custom_validators(app, assert_parse_args):
     def lower_bound(type_, value):
         if value <= 0:
             raise ValueError("An unreasonable age was entered.")
@@ -90,12 +68,7 @@ def test_custom_validators(app):
     def foo(age: Annotated[int, Parameter(validator=[lower_bound, upper_bound])]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(age=10)
-
-    actual_command, actual_bind = app.parse_args("10")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, "10", 10)
 
     with pytest.raises(ValidationError):
         app.parse_args("0", print_error=False, exit_on_error=False)
@@ -104,7 +77,7 @@ def test_custom_validators(app):
         app.parse_args("200", print_error=False, exit_on_error=False)
 
 
-def test_custom_converter_and_validator(app):
+def test_custom_converter_and_validator(app, assert_parse_args, validator):
     def custom_validator(type_, value):
         if not (0 < value < 150):
             raise ValueError("An unreasonable age was entered.")
@@ -113,15 +86,9 @@ def test_custom_converter_and_validator(app):
         return 2 * int(args[0])
 
     @app.default
-    def foo(age: Annotated[int, Parameter(converter=custom_converter, validator=custom_validator)]):
+    def foo(age: Annotated[int, Parameter(converter=custom_converter, validator=validator)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(age=10)
+    assert_parse_args(foo, "5", 10)
 
-    actual_command, actual_bind = app.parse_args("5")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
-
-    with pytest.raises(ValidationError):
-        app.parse_args("200", print_error=False, exit_on_error=False)
+    validator.assert_called_once_with(int, 10)
