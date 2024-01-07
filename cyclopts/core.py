@@ -377,7 +377,7 @@ class App:
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
-            # TODO: app._name may not align with command name
+            # Warning: app._name may not align with command name
             self._commands[n] = app
 
         app._parents.append(self)
