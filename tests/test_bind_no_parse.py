@@ -11,17 +11,12 @@ else:
 from cyclopts import Parameter
 
 
-def test_no_parse_pos(app):
+def test_no_parse_pos(app, assert_parse_args_partial):
     @app.default
     def foo(buzz: str, *, fizz: Annotated[str, Parameter(parse=False)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind_partial("buzz_value")
-
-    actual_command, actual_bind = app.parse_args("buzz_value")
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args_partial(foo, "buzz_value", "buzz_value")
 
 
 def test_no_parse_invalid_kind(app):
