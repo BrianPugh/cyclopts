@@ -95,7 +95,7 @@ def _resolve_groups(
     return resolved_groups, iparam_to_groups
 
 
-def _resolve_docstring(f):
+def _resolve_docstring(f) -> ParameterDict:
     signature = inspect.signature(f)
     f_docstring = docstring_parse(f.__doc__)
 
@@ -130,9 +130,24 @@ class ResolvedCommand:
         app_parameter: Optional[Parameter] = None,
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
+        parse_docstring: bool = True,
     ):
         """
         ``app_parameter`` implicitly has the command-group parameter already resolved.
+
+        Parameters
+        ----------
+        f: Callable
+            Function to resolve annotated :class:`Parameters`.
+        app_parameter:
+            Default :class:`Parameter` to inherit configuration from.
+        group_arguments: Optional[Group]
+            Default :class:`Group` for positional-only arguments.
+        group_parameters: Optional[Group]
+            Default :class:`Group` for non-positional-only arguments.
+        parse_docstring: bool
+            Parse the docstring to populate Parameter ``help``, if not explicitly set.
+            Disable for improved performance if ``help`` won't be used in the resulting :class:`Parameter`.
         """
         if group_arguments is None:
             group_arguments = Group.create_default_arguments()
@@ -150,7 +165,7 @@ class ResolvedCommand:
 
         # Fully Resolve each Cyclopts Parameter
         self.iparam_to_cparam = ParameterDict()
-        iparam_to_docstring_cparam = _resolve_docstring(f)
+        iparam_to_docstring_cparam = _resolve_docstring(f) if parse_docstring else ParameterDict()
         for iparam, groups in self.iparam_to_groups.items():
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
                 # Name is only used for help-string

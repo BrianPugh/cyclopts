@@ -97,3 +97,7 @@ def test_create_burger():
         "ketchup": False,
         "mustard": True,
     }
+
+
+if __name__ == "__main__":
+    test_create_burger()
