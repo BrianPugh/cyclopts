@@ -5,7 +5,7 @@ from inspect import isclass
 from typing import Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
 from docstring_parser import parse as docstring_parse
-from rich import box
+from rich import box, console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -29,24 +29,25 @@ _silent = SilentRich()
 
 
 def create_panel_table(**kwargs):
+    text = Text(end="")
     table = Table.grid(padding=(0, 1))
     panel = Panel(
-        table,
+        console.Group(text, table),
         box=box.ROUNDED,
         expand=True,
         title_align="left",
         **kwargs,
     )
-    return panel, table
+    return panel, table, text
 
 
 def create_panel_table_commands(**kwargs):
-    panel, table = create_panel_table(**kwargs)
+    panel, table, text = create_panel_table(**kwargs)
 
     table.add_column(justify="left", style="cyan")
     table.add_column(justify="left")
 
-    return panel, table
+    return panel, table, text
 
 
 def format_usage(
@@ -116,7 +117,7 @@ def _get_choices(type_: Type) -> str:
 
 
 def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
-    panel, table = create_panel_table(title=group.name)
+    panel, table, text = create_panel_table(title=group.name)
     has_required, has_short = False, False
 
     cparams = [x for x in cparams if x.show]
@@ -125,6 +126,9 @@ def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
         return not s.startswith("--") and s.startswith("-")
 
     has_required = any(p.required for p in cparams)
+
+    if group.help:
+        text.append(group.help + "\n\n")
 
     for cparam in cparams:
         assert cparam.name is not None

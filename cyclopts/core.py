@@ -626,7 +626,7 @@ class App:
 
         from cyclopts.group_extractors import groups_from_app
 
-        command_rows = {}
+        command_rows, command_descriptions = {}, {}
         for subapp in walk_apps():
             # Print default_command argument/parameter groups
             if subapp.default_command:
@@ -642,6 +642,7 @@ class App:
 
             # Print command groups
             for group, elements in groups_from_app(subapp):
+                command_descriptions.setdefault(group.name, group.help)
                 command_rows.setdefault(group.name, [])
                 command_rows[group.name].extend(format_command_rows(elements))
 
@@ -649,8 +650,11 @@ class App:
         for title, rows in command_rows.items():
             if not rows:
                 continue
+            panel, table, text = create_panel_table_commands(title=title)
+            description = command_descriptions[title]
+            if description:
+                text.append(description + "\n\n")
             rows.sort(key=lambda x: (x[0].startswith("-"), x[0]))  # sort by command name
-            panel, table = create_panel_table_commands(title=title)
             for row in rows:
                 table.add_row(*row)
             console.print(panel)
