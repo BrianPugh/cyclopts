@@ -28,9 +28,25 @@ def _create_or_append(
 
 
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
+    """Extract Group/App association."""
     group_mapping: List[Tuple[Group, List["App"]]] = [
         (app.group_commands, []),
     ]
+
+    # 2 iterations need to be performed:
+    # 1. Extract out all Group objects as they may have additional configuration.
+    # 2. Assign/Create Groups out of the strings, as necessary.
+
+    for subapp in app._commands.values():
+        for group in subapp.group:
+            if isinstance(group, Group):
+                for mapping in group_mapping:
+                    if mapping[0] == group:
+                        break
+                    elif mapping[0].name == group.name:
+                        raise ValueError(f'Command Group "{group.name}" already exists.')
+                else:
+                    group_mapping.append((group, []))
 
     for subapp in app._commands.values():
         if subapp.group:
@@ -41,5 +57,8 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]
+
+    # Sort alphabetically by name
+    group_mapping.sort(key=lambda x: x[0].name)
 
     return group_mapping
