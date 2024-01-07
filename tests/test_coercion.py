@@ -43,6 +43,10 @@ def test_token_count_list():
     assert (1, True) == token_count(List[int])
 
 
+def test_token_count_list_generic():
+    assert (1, True) == token_count(list)
+
+
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Native Typing")
 def test_token_count_list_direct():
     assert (1, True) == token_count(list[int])  # pyright: ignore
