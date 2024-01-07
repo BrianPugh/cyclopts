@@ -15,7 +15,6 @@ from cyclopts.coercion import (
     to_tuple_converter,
 )
 from cyclopts.group import Group
-from cyclopts.protocols import Converter, Validator
 from cyclopts.utils import record_init
 
 
@@ -55,11 +54,11 @@ class Parameter:
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Converter = field(default=None, converter=attrs.converters.default_if_none(coerce))
+    converter: Callable = field(default=None, converter=attrs.converters.default_if_none(coerce))
 
-    validator: Tuple[Validator, ...] = field(
+    validator: Tuple[Callable, ...] = field(
         default=(),
-        converter=lambda x: cast(Tuple[Validator, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
     )
 
     negative: Union[None, Tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)

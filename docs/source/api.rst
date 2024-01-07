@@ -21,7 +21,7 @@ API
       Full-name options should start with ``--``.
 
    .. attribute:: converter
-      :type: Optional[Converter]
+      :type: Optional[Callable]
 
       A function that converts string token(s) into an object. The converter must have signature:
 
@@ -33,7 +33,7 @@ API
       If not provided, defaults to Cyclopts's internal coercion engine.
 
    .. attribute:: validator
-      :type: Union[None, Validator, Iterable[Validator]]
+      :type: Union[None, Callable, Iterable[Callable]]
 
       A function (or list of functions) that validates data returned by the ``converter``.
 
