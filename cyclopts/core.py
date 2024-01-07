@@ -28,7 +28,7 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
     format_cyclopts_error,
 )
-from cyclopts.group import Group, to_group_converter, to_groups_converter
+from cyclopts.group import Group, to_group_converter
 from cyclopts.help import (
     create_panel_table_commands,
     format_command_rows,
@@ -188,7 +188,7 @@ class App:
     help: Optional[str] = field(default=None)
     help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
 
-    group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)
+    group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter)
 
     group_arguments: Group = field(default=None, converter=to_group_converter(Group.create_default_arguments()))
     group_parameters: Group = field(default=None, converter=to_group_converter(Group.create_default_parameters()))

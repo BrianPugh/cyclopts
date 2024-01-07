@@ -14,7 +14,7 @@ from cyclopts.coercion import (
     resolve_optional,
     to_tuple_converter,
 )
-from cyclopts.group import Group, to_groups_converter
+from cyclopts.group import Group
 from cyclopts.protocols import Converter, Validator
 from cyclopts.utils import record_init
 
@@ -65,7 +65,7 @@ class Parameter:
 
     negative: Union[None, Tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)
 
-    group: Tuple[Group, ...] = field(default=None, converter=to_groups_converter)  # TODO: change to to_tuple_converter
+    group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter)
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
 
