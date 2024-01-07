@@ -12,7 +12,7 @@ from cyclopts.exceptions import (
     RepeatArgumentError,
     ValidationError,
 )
-from cyclopts.parameter import get_hint
+from cyclopts.parameter import get_hint, validate_command
 from cyclopts.resolve import ResolvedCommand
 from cyclopts.utils import ParameterDict
 
@@ -331,7 +331,7 @@ def create_bound_arguments(
     c2p, p2c = None, None
     unused_tokens = []
 
-    # validate_command(f, default_parameter, group_arguments, group_parameters)
+    validate_command(command.command)
 
     try:
         c2p = cli2parameter(command)
