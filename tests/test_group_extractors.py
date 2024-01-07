@@ -12,13 +12,16 @@ def test_groups_annotated_invalid_recursive_definition():
 
 
 def test_groups_from_app_implicit():
+    def validator(**kwargs):
+        pass
+
     app = App(help_flags=[], version_flags=[])
 
     @app.command(group="Food")
     def food1():
         pass
 
-    @app.command(group="Food")
+    @app.command(group=Group("Food", validator=validator))
     def food2():
         pass
 
@@ -28,6 +31,6 @@ def test_groups_from_app_implicit():
 
     actual_groups = groups_from_app(app)
     assert actual_groups == [
-        (Group("Food"), [app["food1"], app["food2"]]),
         (Group("Drink"), [app["drink1"]]),
+        (Group("Food", validator=validator), [app["food1"], app["food2"]]),
     ]
