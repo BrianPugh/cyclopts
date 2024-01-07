@@ -15,7 +15,7 @@ from rich.console import Console
 if sys.version_info < (3, 10):
     from importlib_metadata import PackageNotFoundError
     from importlib_metadata import version as importlib_metadata_version
-else:
+else:  # pragma: no cover
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as importlib_metadata_version
 
@@ -64,7 +64,7 @@ def _get_root_module_name():
             continue
         return root_module_name
 
-    raise _CannotDeriveCallingModuleNameError
+    raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
 def _default_version(default="0.0.0") -> str:
@@ -77,7 +77,7 @@ def _default_version(default="0.0.0") -> str:
     """
     try:
         root_module_name = _get_root_module_name()
-    except _CannotDeriveCallingModuleNameError:
+    except _CannotDeriveCallingModuleNameError:  # pragma: no cover
         return default
 
     # Attempt to get the Distribution Package’s version number.
