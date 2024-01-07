@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 from cyclopts.group import Group
-from cyclopts.parameter import Parameter, get_hint, get_hint_parameter, get_names
+from cyclopts.parameter import Parameter, get_hint
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
 
@@ -124,9 +124,7 @@ def _get_choices(type_: Type) -> str:
     return choices
 
 
-def format_group_parameters(app, group: "Group", iparams, cparams: List[Parameter]):
-    from cyclopts.group_extractors import iparam_to_groups
-
+def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
     panel, table = create_panel_table(title=group.name)
     has_required, has_short = False, False
 
