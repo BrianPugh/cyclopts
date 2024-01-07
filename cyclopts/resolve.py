@@ -134,7 +134,6 @@ class ResolvedCommand:
         """
         ``app_parameter`` implicitly has the command-group parameter already resolved.
         """
-        # TODO: we also need to fully resolve commands' groups (outside this class)
         if group_arguments is None:
             group_arguments = Group.create_default_arguments()
         if group_parameters is None:

@@ -2,7 +2,7 @@ import difflib
 import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
-from attrs import define, field
+from attrs import define
 from rich import box
 from rich.panel import Panel
 from rich.text import Text
