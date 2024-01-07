@@ -167,6 +167,8 @@ def resolve_optional(type_: Type) -> Type:
         type_ = non_none_types[0]
     elif len(non_none_types) > 1:
         return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
+    else:
+        raise NotImplementedError
 
     return type_
 
