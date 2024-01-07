@@ -50,10 +50,9 @@ class Parameter:
 
     # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
 
-    # TODO: I think we can just make this a Tuple[str, ...]
-    name: Optional[Tuple[str, ...]] = field(
+    name: Tuple[str, ...] = field(
         default=None,
-        converter=lambda x: cast(Optional[Tuple[str, ...]], to_tuple_converter(x)),
+        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
 
     converter: Converter = field(default=None, converter=attrs.converters.default_if_none(coerce))
