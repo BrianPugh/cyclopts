@@ -1,6 +1,6 @@
 import inspect
 from functools import lru_cache
-from typing import Callable, List, Optional, Tuple, Type, Union, cast, get_args, get_origin
+from typing import Callable, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
@@ -192,22 +192,6 @@ def validate_command(f: Callable):
         if get_origin(type_) is tuple:
             if ... in get_args(type_):
                 raise ValueError("Cannot use a variable-length tuple.")
-
-
-# DEPRECATE
-def get_names(parameter: inspect.Parameter, *default_parameters: Optional[Parameter]) -> List[str]:
-    """Derive the CLI name for an ``inspect.Parameter``."""
-    _, param = get_hint_parameter(parameter.annotation, *default_parameters)
-    if param.name:
-        names = list(param.name)
-    else:
-        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL):
-            # Name is only used for help-string
-            names = [parameter.name.upper()]
-        else:
-            names = ["--" + parameter.name.replace("_", "-")]
-
-    return names
 
 
 @lru_cache
