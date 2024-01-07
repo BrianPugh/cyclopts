@@ -84,6 +84,10 @@ exclude_lines = [
     "if False:",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
+
+    "if sys.version_info < (3, 9):",
+    "if sys.version_info < (3, 10):",
+    "from typing import Annotated",
 ]
 
 omit = [
