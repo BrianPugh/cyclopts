@@ -162,7 +162,6 @@ class App:
 
         The returned dictionary will be used passed along to the command invocation.
         The app-converter runs **after** :class:`Parameter` and :class:`Group` converters.
-        This parameter is keyword-only.
     validator: Union[None, Callable, List[Callable]]
         A function (or list of functions) where the CLI-provided group variables of ``default_command`` will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
 
@@ -174,7 +173,6 @@ class App:
                "Raise an exception if something is invalid."
 
         The app-validator runs **last**.
-        This parameter is keyword-only.
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
@@ -384,10 +382,16 @@ class App:
 
         return obj
 
-    def default(self, obj=None):
+    def default(
+        self,
+        obj=None,
+        *,
+        converter=None,
+        validator=None,
+    ):
         """Decorator to register a function as the default action handler."""
         if obj is None:  # Called ``@app.default_command(...)``
-            return self.default
+            return partial(self.default, converter=converter, validator=validator)
 
         if isinstance(obj, App):  # Registering a sub-App
             raise TypeError("Cannot register a sub-App to default.")
@@ -397,6 +401,10 @@ class App:
 
         validate_command(obj)
         self.default_command = obj
+        if converter:
+            self.converter = converter
+        if validator:
+            self.validator = validator
         return obj
 
     def parse_known_args(
@@ -444,6 +452,8 @@ class App:
                     parse_docstring=False,
                 )
                 bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
+                if self.converter:
+                    bound.arguments = self.converter(**bound.arguments)
                 for validator in self.validator:
                     validator(**bound.arguments)
                 return command, bound, unused_tokens
