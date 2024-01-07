@@ -46,40 +46,6 @@ def iparam_to_groups(
         return (group_parameters,)
 
 
-def groups_from_function(
-    f: Callable,
-    default_parameter: Optional[Parameter],
-    group_arguments: Group,
-    group_parameters: Group,
-) -> List[Tuple[Group, List[inspect.Parameter]]]:
-    """Get a list of all groups WITH their children populated.
-
-    The exact Group instances are not guarenteeed to be the same.
-    """
-    group_mapping: List[Tuple[Group, List[inspect.Parameter]]] = [
-        (group_arguments, []),
-        (group_parameters, []),
-    ]
-
-    # Assign each parameter to a group
-    for iparam in inspect.signature(f).parameters.values():
-        _, cparam = get_hint_parameter(iparam.annotation, default_parameter)
-        if not cparam.parse:
-            continue
-
-        groups = iparam_to_groups(iparam, default_parameter, group_arguments, group_parameters)
-        for group in groups:
-            if isinstance(group, Group) and group.default_parameter is not None and group.default_parameter.group:
-                # This shouldn't be possible due to ``Group`` internal checks.
-                raise ValueError("Group.default_parameter cannot have a specified group.")
-            _create_or_append(group_mapping, group, iparam)
-
-    # Remove the empty groups
-    group_mapping = [x for x in group_mapping if x[1]]
-
-    return group_mapping
-
-
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     group_mapping: List[Tuple[Group, List["App"]]] = [
         (app.group_commands, []),
