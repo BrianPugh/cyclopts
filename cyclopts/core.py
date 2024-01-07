@@ -119,7 +119,7 @@ class App:
 
     Parameters
     ----------
-    name: Optional[str]
+    name: Optional[Union[str, Iterable[str]]]
         Name of application, or subcommand if registering to another application.
         Name fallback resolution:
 
@@ -127,9 +127,12 @@ class App:
         2. If a ``default`` function has been registered, the name of that function.
         3. If the module name is ``__main__.py``, the name of the encompassing package.
         4. The value of ``sys.argv[0]``.
+
+        Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
     version: Union[None, str, Callable]
         Version to be displayed when a token of ``version_flags`` is parsed.
-        Defaults to attempting to use ``package.__version__`` from the package instantiating :class:`App`.
+        Defaults to attempting to using version of the package instantiating :class:`App`.
+        If a ``Callable``, it will be invoked with no arguments when version is queried.
     version_flags: Union[str, Iterable[str]]
         Token(s) that trigger :meth:`version_print`.
         Set to an empty list to disable version feature.
@@ -142,18 +145,19 @@ class App:
         Defaults to ``["--help", "-h"]``.
     default_parameter: Parameter
         Default :class:`Parameter` configuration.
-    group: Union[None, str, Iterable[Union[str, Group]]]
+    group: Union[None, str, Group, Iterable[Union[str, Group]]]
         The group(s) that ``default_command`` belongs to.
-        Used by the *parenting* app.
 
         * If ``None``, defaults to the ``"Commands"`` group.
 
-        * If ``str``, use an existing Group (from app-parent ``groups``) with name,
-          or create a :class:`Group` with provided name if it does not exist.
+        * If ``str``, use an existing Group (from neighboring sub-commands) with name,
+          **or** create a :class:`Group` with provided name if it does not exist.
 
         * If :class:`Group`, directly use it.
     converter: Optional[Callable]
-        A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+        A function where all the converted CLI-provided variables will be keyword-unpacked,
+        regardless of their positional/keyword-type in the command function signature.
+        The python variable names will be used, which may differ from their CLI names.
 
         .. code-block:: python
 
@@ -161,9 +165,11 @@ class App:
                 "Return an updated dictionary."
 
         The returned dictionary will be used passed along to the command invocation.
-        The app-converter runs **after** :class:`Parameter` and :class:`Group` converters.
+        This converter runs **after** :class:`Parameter` and :class:`Group` converters.
     validator: Union[None, Callable, List[Callable]]
-        A function (or list of functions) where the CLI-provided group variables of ``default_command`` will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+        A function where all the converted CLI-provided variables will be keyword-unpacked,
+        regardless of their positional/keyword-type in the command function signature.
+        The python variable names will be used, which may differ from their CLI names.
 
         Example usage:
 
@@ -172,7 +178,7 @@ class App:
            def validator(**kwargs):
                "Raise an exception if something is invalid."
 
-        The app-validator runs **last**.
+        This validator runs **after** :class:`Parameter` and :class:`Group` validators.
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
@@ -229,15 +235,15 @@ class App:
     ###########
     @property
     def default_parameter(self) -> Parameter:
-        """Parameter value defaults for all Annotated Parameters.
+        """Parameter value defaults for all functions' Parameters.
 
-        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting ``App`` s.
+        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting :class:`App` s.
 
         Usually, an :class:`App` has at most one parent.
         In the event of multiple parents, they are evaluated in reverse-registered order,
         where each ``default_parameter`` attributes overwrites the previous.
         I.e. the first registered parent has the highest-priority of the parents.
-        The specified ``default_parameter`` for this ``App`` object has higher priority over parents.
+        The specified ``default_parameter`` for this :class:`App` object has higher priority over parents.
         """
         return Parameter.combine(*(x.default_parameter for x in reversed(self._parents)), self._default_parameter)
 
@@ -247,7 +253,7 @@ class App:
 
     @property
     def name(self) -> Tuple[str, ...]:
-        """Application name. Dynamically derived if not previously set."""
+        """Application name(s). Dynamically derived if not previously set."""
         if self._name:
             return self._name
         elif self.default_command is None:
@@ -346,7 +352,6 @@ class App:
             * If registering a function, then the function's name.
         `**kwargs`
             Any argument that :class:`App` can take.
-            ``name`` and ``help`` are common arguments.
         """
         if obj is None:  # Called ``@app.command(...)``
             return partial(self.command, name=name, **kwargs)
