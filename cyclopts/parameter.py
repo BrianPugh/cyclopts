@@ -50,6 +50,7 @@ class Parameter:
 
     # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
 
+    # TODO: I think we can just make this a Tuple[str, ...]
     name: Optional[Tuple[str, ...]] = field(
         default=None,
         converter=lambda x: cast(Optional[Tuple[str, ...]], to_tuple_converter(x)),
@@ -97,6 +98,8 @@ class Parameter:
         validator=_double_hyphen_validator,
     )
 
+    required: Optional[bool] = field(default=None)
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
@@ -104,7 +107,7 @@ class Parameter:
     def show(self):
         return self._show if self._show is not None else self.parse
 
-    def get_negatives(self, type_, *names) -> Tuple[str, ...]:
+    def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:
         type_ = get_origin(type_) or type_
 
         if self.negative is not None:

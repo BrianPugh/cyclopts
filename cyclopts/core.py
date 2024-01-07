@@ -7,9 +7,8 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import attrs
 from attrs import define, field
 from rich.console import Console
 
@@ -604,16 +603,21 @@ class App:
                 meta_list.append(meta)
             yield from reversed(meta_list)
 
-        from cyclopts.group_extractors import groups_from_app, groups_from_function
+        from cyclopts.group_extractors import groups_from_app
 
         command_rows = {}
         for subapp in walk_apps():
             # Print default_command argument/parameter groups
             if subapp.default_command:
-                for group, elements in groups_from_function(
-                    subapp.default_command, subapp.default_parameter, subapp.group_arguments, subapp.group_parameters
-                ):
-                    console.print(format_group_parameters(subapp, group, elements))
+                command = ResolvedCommand(
+                    subapp.default_command,
+                    subapp.default_parameter,
+                    subapp.group_arguments,
+                    subapp.group_parameters,
+                )
+                for group, iparams in command.groups_iparams:
+                    cparams = [command.iparam_to_cparam[x] for x in iparams]
+                    console.print(format_group_parameters(subapp, group, iparams, cparams))
 
             # Print command groups
             for group, elements in groups_from_app(subapp):
