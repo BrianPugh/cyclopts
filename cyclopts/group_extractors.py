@@ -1,11 +1,9 @@
-import inspect
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Tuple, Union
 
 if TYPE_CHECKING:
     from cyclopts.core import App
 
 from cyclopts.group import Group
-from cyclopts.parameter import Parameter, get_hint_parameter
 
 
 def _create_or_append(
@@ -27,23 +25,6 @@ def _create_or_append(
             break
     else:
         group_mapping.append((group, [element]))
-
-
-def iparam_to_groups(
-    iparam: inspect.Parameter,
-    default_parameter: Optional[Parameter],
-    group_arguments: Group,
-    group_parameters: Group,
-) -> Tuple[Group, ...]:
-    _, cparam = get_hint_parameter(iparam.annotation, default_parameter)
-    if not cparam.parse:
-        return ()
-    elif cparam.group:
-        return cparam.group
-    elif iparam.kind == iparam.POSITIONAL_ONLY:
-        return (group_arguments,)
-    else:
-        return (group_parameters,)
 
 
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
