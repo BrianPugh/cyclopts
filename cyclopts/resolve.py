@@ -11,7 +11,6 @@ from docstring_parser import parse as docstring_parse
 
 from cyclopts.exceptions import DocstringError
 from cyclopts.group import Group
-from cyclopts.group_extractors import groups_from_function
 from cyclopts.parameter import Parameter, get_hint_parameter
 from cyclopts.utils import ParameterDict
 
@@ -22,6 +21,16 @@ def _list_index(lst: List, key: Callable) -> int:
         if key(element):
             return i
     raise ValueError
+
+
+def _has_unparsed_parameters(f: Callable, *args) -> bool:
+    signature = inspect.signature(f)
+    for iparam in signature.parameters.values():
+        _, cparam = get_hint_parameter(iparam.annotation, *args)
+
+        if not cparam.parse:
+            return True
+    return False
 
 
 def _resolve_groups(
@@ -41,6 +50,9 @@ def _resolve_groups(
 
     for iparam in signature.parameters.values():
         _, cparam = get_hint_parameter(iparam.annotation, app_parameter)
+
+        if not cparam.parse:
+            continue
 
         if cparam.group:
             groups = cparam.group
@@ -129,7 +141,6 @@ class ResolvedCommand:
             group_parameters = Group.create_default_parameters()
 
         self.command = f
-
         signature = inspect.signature(f)
         self.name_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
 
@@ -141,7 +152,6 @@ class ResolvedCommand:
         # Fully Resolve each Cyclopts Parameter
         self.iparam_to_cparam = ParameterDict()
         iparam_to_docstring_cparam = _resolve_docstring(f)
-        has_unparsed_parameters = False
         for iparam, groups in self.iparam_to_groups.items():
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
                 # Name is only used for help-string
@@ -157,13 +167,11 @@ class ResolvedCommand:
                 *(x.default_parameter for x in groups),
                 iparam_to_docstring_cparam.get(iparam),
                 default_name_parameter,
+                Parameter(required=iparam.default is iparam.empty),
             )[1]
-            if not cparam.parse:
-                has_unparsed_parameters = True
-                continue
             self.iparam_to_cparam[iparam] = cparam
 
-        self.bind = signature.bind_partial if has_unparsed_parameters else signature.bind
+        self.bind = signature.bind_partial if _has_unparsed_parameters(f, app_parameter) else signature.bind
 
         # Create a convenient group-to-iparam structure
         self.groups_iparams = [
