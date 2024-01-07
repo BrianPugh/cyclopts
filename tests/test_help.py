@@ -19,6 +19,7 @@ from cyclopts.help import (
     format_group_parameters,
     format_usage,
 )
+from cyclopts.resolve import ResolvedCommand
 
 
 @pytest.fixture
@@ -171,25 +172,28 @@ def test_help_empty(console):
     assert actual == "Usage: foo\n\n"
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters(app, console):
-    @app.command
+@pytest.fixture
+def capture_format_group_parameters(console, default_function_groups):
+    def inner(cmd):
+        command = ResolvedCommand(cmd, *default_function_groups)
+        with console.capture() as capture:
+            group, iparams = command.groups_iparams[0]
+            cparams = [command.iparam_to_cparam[x] for x in iparams]
+            console.print(format_group_parameters(group, iparams, cparams))
+
+        return capture.get()
+
+    return inner
+
+
+def test_help_format_group_parameters(capture_format_group_parameters):
     def cmd(
         foo: Annotated[str, Parameter(help="Docstring for foo.")],
         bar: Annotated[str, Parameter(help="Docstring for bar.")],
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app,
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -201,24 +205,13 @@ def test_help_format_group_parameters(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_short_name(app, console):
-    @app.command
+def test_help_format_group_parameters_short_name(capture_format_group_parameters):
     def cmd(
         foo: Annotated[str, Parameter(name=["--foo", "-f"], help="Docstring for foo.")],
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -229,9 +222,7 @@ def test_help_format_group_parameters_short_name(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_from_docstring(app, console):
-    @app.command
+def test_help_format_group_parameters_from_docstring(capture_format_group_parameters):
     def cmd(foo: str, bar: str):
         """
 
@@ -244,16 +235,7 @@ def test_help_format_group_parameters_from_docstring(app, console):
         """
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -265,24 +247,13 @@ def test_help_format_group_parameters_from_docstring(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_bool_flag(app, console):
-    @app.command
+def test_help_format_group_parameters_bool_flag(capture_format_group_parameters):
     def cmd(
         foo: Annotated[bool, Parameter(help="Docstring for foo.")] = True,
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -293,24 +264,13 @@ def test_help_format_group_parameters_bool_flag(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_bool_flag_custom_negative(app, console):
-    @app.command
+def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_group_parameters):
     def cmd(
         foo: Annotated[bool, Parameter(negative="--yesnt-foo", help="Docstring for foo.")] = True,
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -321,24 +281,13 @@ def test_help_format_group_parameters_bool_flag_custom_negative(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_list_flag(app, console):
-    @app.command
+def test_help_format_group_parameters_list_flag(capture_format_group_parameters):
     def cmd(
         foo: Annotated[Optional[List[int]], Parameter(help="Docstring for foo.")] = None,
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -349,25 +298,14 @@ def test_help_format_group_parameters_list_flag(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_defaults(app, console):
-    @app.command
+def test_help_format_group_parameters_defaults(capture_format_group_parameters):
     def cmd(
         foo: Annotated[str, Parameter(help="Docstring for foo.")] = "fizz",
         bar: Annotated[str, Parameter(help="Docstring for bar.")] = "buzz",
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -379,25 +317,14 @@ def test_help_format_group_parameters_defaults(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_defaults_no_show(app, console):
-    @app.command
+def test_help_format_group_parameters_defaults_no_show(capture_format_group_parameters):
     def cmd(
         foo: Annotated[str, Parameter(show_default=False, help="Docstring for foo.")] = "fizz",
         bar: Annotated[str, Parameter(help="Docstring for bar.")] = "buzz",
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -409,25 +336,14 @@ def test_help_format_group_parameters_defaults_no_show(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_choices_literal_no_show(app, console):
-    @app.command
+def test_help_format_group_parameters_choices_literal_no_show(capture_format_group_parameters):
     def cmd(
         foo: Annotated[Literal["fizz", "buzz"], Parameter(show_choices=False, help="Docstring for foo.")] = "fizz",
         bar: Annotated[Literal["fizz", "buzz"], Parameter(help="Docstring for bar.")] = "buzz",
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -439,9 +355,7 @@ def test_help_format_group_parameters_choices_literal_no_show(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_choices_literal_union(app, console):
-    @app.command
+def test_help_format_group_parameters_choices_literal_union(capture_format_group_parameters):
     def cmd(
         foo: Annotated[
             Union[int, Literal["fizz", "buzz"], Literal["bar"]], Parameter(help="Docstring for foo.")
@@ -449,16 +363,7 @@ def test_help_format_group_parameters_choices_literal_union(app, console):
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -470,29 +375,18 @@ def test_help_format_group_parameters_choices_literal_union(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_choices_enum(app, console):
+def test_help_format_group_parameters_choices_enum(capture_format_group_parameters):
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"
         buzz = "blop bleep bloop"
 
-    @app.command
     def cmd(
         foo: Annotated[CompSciProblem, Parameter(help="Docstring for foo.")] = CompSciProblem.fizz,
         bar: Annotated[CompSciProblem, Parameter(help="Docstring for bar.")] = CompSciProblem.buzz,
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -504,24 +398,13 @@ def test_help_format_group_parameters_choices_enum(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="refactor")
-def test_help_format_group_parameters_env_var(app, console):
-    @app.command
+def test_help_format_group_parameters_env_var(capture_format_group_parameters):
     def cmd(
         foo: Annotated[int, Parameter(env_var=["FOO", "BAR"], help="Docstring for foo.")] = 123,
     ):
         pass
 
-    with console.capture() as capture:
-        console.print(
-            format_group_parameters(
-                app["cmd"],
-                Group("Parameters"),
-                list(inspect.signature(cmd).parameters.values()),
-            )
-        )
-
-    actual = capture.get()
+    actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
