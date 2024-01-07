@@ -140,7 +140,7 @@ API
       :type: str
 
       Group name used for the help-panel and for group-referenced-by-string.
-      Typically this is a title, so the first character should be capitalized.
+      This is a title, so the first character should be capitalized.
 
    .. attribute:: help
       :type: str
@@ -152,7 +152,7 @@ API
       :type: bool
       :value: True
 
-      Show this group in the help-panel. This parameter is keyword-only.
+      Show this group in the help-panel.
 
    .. attribute:: converter
       :type: Optional[Callable]
@@ -166,7 +166,6 @@ API
 
       The returned dictionary will be used passed along to the command invocation.
       The group converter runs **after** :class:`Parameter` converters and validators.
-      This parameter is keyword-only.
 
    .. attribute:: validator
       :type: Optional[Callable]
@@ -183,23 +182,16 @@ API
 
       Validators are **not** invoked on command groups.
       The group-validator runs **after** the group-converter.
-      This parameter is keyword-only.
 
    .. attribute:: default_parameter
       :type: Optional[Parameter]
       :value: None
 
-      Default Parameter in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter. This parameter is keyword-only.
+      Default :class:`Parameter` in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter.
+      The provided :class:`Parameter` is not allowed to have a ``group`` value.
 
-   .. attribute:: default
-      :type: Optional[Literal["Arguments", "Parameters", "Commands"]]
-      :value: None
-
-      Only one group registered to an app can have each non-``None`` option. This parameter is keyword-only.
 
 .. autofunction:: cyclopts.coerce
-
-.. autofunction:: cyclopts.create_bound_arguments
 
 ----------
 Validators
