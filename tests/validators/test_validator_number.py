@@ -47,3 +47,9 @@ def test_validator_number_gte():
 
     with pytest.raises(ValueError):
         validator(int, 4)
+
+
+def test_validator_number_typeerror():
+    validator = Number(gte=5)
+    with pytest.raises(TypeError):
+        validator(str, "foo")
