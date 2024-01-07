@@ -1,4 +1,3 @@
-import inspect
 import sys
 from typing import Union
 from unittest.mock import Mock
@@ -28,18 +27,14 @@ def test_group_equality():
     assert Group("foo") in [Group("foo"), Group("bar")]
 
 
-def test_group_default_parameter_converter(app):
+def test_group_default_parameter_converter(app, assert_parse_args):
     food_group = Group("Food", default_parameter=Parameter(converter=upper))
 
     @app.default
     def foo(ice_cream: Annotated[str, Parameter(group=food_group)]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind("CHOCOLATE")
-
-    actual_command, actual_bind = app.parse_args("chocolate")
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, "chocolate", "CHOCOLATE")
 
 
 def test_group_default_parameter_validator(app):
