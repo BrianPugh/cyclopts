@@ -154,7 +154,7 @@ def resolve_optional(type_: Type) -> Type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
     while get_origin(type_) is Union:
         non_none_types = [t for t in get_args(type_) if t is not NoneType]
-        if not non_none_types:
+        if not non_none_types:  # pragma: no cover
             # This should never happen; python simplifies:
             #    ``Union[None, None] -> NoneType``
             raise ValueError("Union type cannot be all NoneType")
