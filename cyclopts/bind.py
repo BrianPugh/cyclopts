@@ -359,10 +359,15 @@ def create_bound_arguments(
                     del bound.arguments[name]
 
         # Apply group validators
-        for group, iparams in command.groups_iparams:
-            names = tuple(x.name for x in iparams)
-            for validator in group.validator:
-                validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
+        try:
+            for group, iparams in command.groups_iparams:
+                names = tuple(x.name for x in iparams)
+                for validator in group.validator:
+                    validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
+        except (AssertionError, ValueError, TypeError) as e:
+            new_exception = ValidationError(value=e.args[0])
+            raise new_exception from e
+
     except CycloptsError as e:
         e.target = command.command
         e.root_input_tokens = tokens

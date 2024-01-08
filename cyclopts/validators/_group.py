@@ -18,8 +18,14 @@ class LimitedChoice:
         self.min = min
         self.max = (self.min or 1) if max is None else max
         if self.max < self.min:
-            raise ValueError("max must be greater-than-or-qual to min.")
+            raise ValueError("max must be >=min.")
 
     def __call__(self, **kwargs):
         if not (self.min <= len(kwargs) <= self.max):
-            raise ValueError(f"Received {len(kwargs)} arguments, outside of valid range [{self.min}, {self.max}]")
+            offenders = "{" + ", ".join(f"--{k}" for k in kwargs.keys()) + "}"
+            if self.min == 0 and self.max == 1:
+                raise ValueError(f"Mutually exclusive arguments: {offenders}")
+            else:
+                raise ValueError(
+                    f"Received {len(kwargs)} arguments: {offenders}. Only [{self.min}, {self.max}] choices may be specified."
+                )
