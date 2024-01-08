@@ -4,17 +4,19 @@ from collections.abc import MutableMapping
 from typing import Any, Dict, Iterator, Optional
 
 
-def record_init_kwargs(target: str):
+def record_init(target: str):
     """Class decorator that records init argument names as a tuple to ``target``."""
 
     def decorator(cls):
         original_init = cls.__init__
+        signature = inspect.signature(original_init)
 
         @functools.wraps(original_init)
-        def new_init(self, **kwargs):
-            original_init(self, **kwargs)
+        def new_init(self, *args, **kwargs):
+            bound = signature.bind(self, *args, **kwargs)
+            original_init(self, *args, **kwargs)
             # Circumvent frozen protection.
-            object.__setattr__(self, target, tuple(kwargs.keys()))
+            object.__setattr__(self, target, tuple(k for k, v in bound.arguments.items() if v is not self))
 
         cls.__init__ = new_init
         return cls
@@ -56,6 +58,12 @@ class ParameterDict(MutableMapping):
     def __len__(self) -> int:
         return len(self.store)
 
+    def __repr__(self) -> str:
+        inner = []
+        for key, value in self.store.items():
+            inner.append(f"Parameter(name={key[0]!r}, kind={key[1]}, annotation={key[2]}): {value}")
+        return "{" + ", ".join(inner) + "}"
+
     def __contains__(self, key: object) -> bool:
         if not isinstance(key, inspect.Parameter):
             raise TypeError(f"Key must be an inspect.Parameter; got {type(key)}.")
@@ -66,3 +74,9 @@ class ParameterDict(MutableMapping):
         if processed_key not in self.store:
             self.reverse_mapping[processed_key] = key
         return self.store.setdefault(processed_key, default)
+
+    def get(self, key: inspect.Parameter, default: Any = None):
+        try:
+            return self[key]
+        except KeyError:
+            return default

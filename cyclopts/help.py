@@ -1,46 +1,19 @@
 import inspect
-import sys
-from contextlib import suppress
 from enum import Enum
 from functools import lru_cache
 from inspect import isclass
-from typing import Callable, Dict, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
-from docstring_parser import DocstringParam
 from docstring_parser import parse as docstring_parse
-from rich import box
+from rich import box, console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
-from cyclopts.exceptions import DocstringError
-from cyclopts.parameter import Parameter, get_hint_parameter, get_names
+from cyclopts.group import Group
+from cyclopts.parameter import Parameter, get_hint
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
-
-
-def parameter2docstring(f: Callable) -> Dict[inspect.Parameter, DocstringParam]:
-    parsed = docstring_parse(f.__doc__)
-    inspect_parameters = inspect.signature(f).parameters
-
-    out = {}
-    for doc_param in parsed.params:
-        try:
-            inspect_parameter = inspect_parameters[doc_param.arg_name]
-            out[inspect_parameter] = doc_param
-        except KeyError:
-            # Even though we could pass/continue, we're raising
-            # an exception because the developer really aught to know.
-            raise DocstringError(
-                f"Docstring parameter {doc_param.arg_name} has no equivalent in function signature."
-            ) from None
-
-    return out
 
 
 class SilentRich:
@@ -56,24 +29,25 @@ _silent = SilentRich()
 
 
 def create_panel_table(**kwargs):
+    text = Text(end="")
     table = Table.grid(padding=(0, 1))
     panel = Panel(
-        table,
+        console.Group(text, table),
         box=box.ROUNDED,
         expand=True,
         title_align="left",
         **kwargs,
     )
-    return panel, table
+    return panel, table, text
 
 
 def create_panel_table_commands(**kwargs):
-    panel, table = create_panel_table(**kwargs)
+    panel, table, text = create_panel_table(**kwargs)
 
     table.add_column(justify="left", style="cyan")
     table.add_column(justify="left")
 
-    return panel, table
+    return panel, table, text
 
 
 def format_usage(
@@ -82,7 +56,7 @@ def format_usage(
 ):
     usage = []
     usage.append("Usage:")
-    usage.append(app.name)
+    usage.append(app.name[0])
     usage.extend(command_chain)
 
     for command in command_chain:
@@ -104,7 +78,7 @@ def format_usage(
 
 
 def format_doc(app, function: Optional[Callable]):
-    from cyclopts.core import App
+    from cyclopts.core import App  # noqa: F811
 
     if function is None:
         raw_doc_string = app.help_
@@ -128,16 +102,6 @@ def format_doc(app, function: Optional[Callable]):
     return Text.assemble(*components)
 
 
-def format_command_rows(app):
-    out = []
-    for command_name, command_app in app._commands.items():
-        row_args = []
-        row_args.append(command_name + " ")  # A little extra padding
-        row_args.append(docstring_parse(command_app.help_).short_description)
-        out.append(row_args)
-    return out
-
-
 def _get_choices(type_: Type) -> str:
     if get_origin(type_) is Union:
         inner_choices = [_get_choices(inner) for inner in get_args(type_)]
@@ -152,72 +116,23 @@ def _get_choices(type_: Type) -> str:
     return choices
 
 
-def format_parameters(app, title, show_special=True, default_parameter: Optional[Parameter] = None):
-    panel, table = create_panel_table(title=title)
-
+def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
+    panel, table, text = create_panel_table(title=group.name)
     has_required, has_short = False, False
 
-    parameters = []
-    if app.default_command:
-        help_lookup = parameter2docstring(app.default_command)
-        for parameter in inspect.signature(app.default_command).parameters.values():
-            _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
-            if param.parse is False or not param.show:
-                continue
-            parameters.append(parameter)
-    else:
-        help_lookup = {}
-
-    def is_required(parameter):
-        return parameter.default is parameter.empty
+    cparams = [x for x in cparams if x.show]
 
     def is_short(s):
         return not s.startswith("--") and s.startswith("-")
 
-    if show_special:
-        if app.version_flags:
-            parameters.append(
-                inspect.Parameter(
-                    name="version",
-                    kind=inspect.Parameter.KEYWORD_ONLY,
-                    default=False,
-                    annotation=Annotated[
-                        bool,
-                        Parameter(
-                            name=app.version_flags,
-                            negative="",
-                            show_default=False,
-                            help="Display application version.",
-                        ),
-                    ],
-                )
-            )
+    has_required = any(p.required for p in cparams)
 
-        if app.help_flags:
-            parameters.append(
-                inspect.Parameter(
-                    name="help",
-                    kind=inspect.Parameter.KEYWORD_ONLY,
-                    default=False,
-                    annotation=Annotated[
-                        bool,
-                        Parameter(
-                            name=app.help_flags,
-                            negative="",
-                            show_default=False,
-                            help="Display this message and exit.",
-                        ),
-                    ],
-                )
-            )
+    if group.help:
+        text.append(group.help + "\n\n")
 
-    has_required = any(is_required(p) for p in parameters)
-
-    for parameter in parameters:
-        type_, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
-        if not param.show:
-            continue
-        has_short = any(is_short(x) for x in get_names(parameter, default_parameter=default_parameter))
+    for cparam in cparams:
+        assert cparam.name is not None
+        has_short = any(is_short(x) for x in cparam.name)
         if has_short:
             break
 
@@ -228,13 +143,14 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
         table.add_column(justify="left", no_wrap=True, style="green")  # For short options
     table.add_column(justify="left")  # For main help text.
 
-    for parameter in parameters:
-        type_, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
+    for iparam, cparam in zip(iparams, cparams):
+        assert cparam.name is not None
+        type_ = get_hint(iparam.annotation)
+        options = list(cparam.name)
+        options.extend(cparam.get_negatives(type_, *options))
 
-        options = get_names(parameter, default_parameter=default_parameter)
-        options.extend(param.get_negatives(type_, *options))
-
-        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD):
+        # Add an all-uppercase name if it's an argument
+        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
             arg_name = options[0].lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]
@@ -247,41 +163,40 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
                 long_options.append(option)
 
         help_components = []
-        if param.help is not None:
-            help_components.append(param.help)
-        else:
-            with suppress(KeyError):
-                help_components.append(help_lookup[parameter].description)
 
-        if param.show_choices in (None, True):
+        if cparam.help:
+            help_components.append(cparam.help)
+
+        if cparam.show_choices:
             choices = _get_choices(type_)
             if choices:
                 help_components.append(rf"[dim]\[choices: {choices}][/dim]")
 
-        if param.show_env_var in (None, True) and param.env_var:
-            env_vars = " ".join(param.env_var)
+        if cparam.show_env_var and cparam.env_var:
+            env_vars = " ".join(cparam.env_var)
             help_components.append(rf"[dim]\[env var: {env_vars}][/dim]")
 
-        if not is_required(parameter) and (
-            param.show_default or (param.show_default is None and parameter.default is not None)
+        if not cparam.required and (
+            cparam.show_default or (cparam.show_default is None and iparam.default is not None)
         ):
             default = ""
             if isclass(type_) and issubclass(type_, Enum):
-                default = parameter.default.name.lower().replace("_", "-")
+                default = iparam.default.name.lower().replace("_", "-")
             else:
-                default = parameter.default
+                default = iparam.default
 
             help_components.append(rf"[dim]\[default: {default}][/dim]")
-        if is_required(parameter):
+
+        if cparam.required:
             help_components.append(r"[red][dim]\[required][/dim][/red]")
 
         # populate row
         row_args = []
         if has_required:
-            row_args.append("*" if is_required(parameter) else "")
-        row_args.append(",".join(long_options) + " ")  # a little extra padding
+            row_args.append("*" if cparam.required else "")
+        row_args.append(",".join(long_options) + " ")
         if has_short:
-            row_args.append(",".join(short_options) + " ")  # a little extra padding
+            row_args.append(",".join(short_options) + " ")
         row_args.append(" ".join(help_components))
         table.add_row(*row_args)
 
@@ -289,3 +204,12 @@ def format_parameters(app, title, show_special=True, default_parameter: Optional
         return _silent
 
     return panel
+
+
+def format_command_rows(elements) -> List:
+    rows = []
+    for element in elements:
+        row = (",".join(element.name) + " ", docstring_parse(element.help_).short_description)
+        if row not in rows:
+            rows.append(row)
+    return rows

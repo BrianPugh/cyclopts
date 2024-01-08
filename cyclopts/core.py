@@ -9,28 +9,38 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import attrs
 from attrs import define, field
 from rich.console import Console
 
 if sys.version_info < (3, 10):
     from importlib_metadata import PackageNotFoundError
     from importlib_metadata import version as importlib_metadata_version
-else:
+else:  # pragma: no cover
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import to_tuple_converter
+from cyclopts.coercion import optional_to_tuple_converter, to_list_converter, to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
     InvalidCommandError,
     UnusedCliTokensError,
+    ValidationError,
     format_cyclopts_error,
 )
-from cyclopts.help import create_panel_table_commands, format_command_rows, format_doc, format_parameters, format_usage
+from cyclopts.group import Group, to_group_converter
+from cyclopts.help import (
+    create_panel_table_commands,
+    format_command_rows,
+    format_doc,
+    format_group_parameters,
+    format_usage,
+)
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
+from cyclopts.resolve import ResolvedCommand
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -56,7 +66,7 @@ def _get_root_module_name():
             continue
         return root_module_name
 
-    raise _CannotDeriveCallingModuleNameError
+    raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
 def _default_version(default="0.0.0") -> str:
@@ -69,7 +79,7 @@ def _default_version(default="0.0.0") -> str:
     """
     try:
         root_module_name = _get_root_module_name()
-    except _CannotDeriveCallingModuleNameError:
+    except _CannotDeriveCallingModuleNameError:  # pragma: no cover
         return default
 
     # Attempt to get the Distribution Package’s version number.
@@ -105,13 +115,22 @@ def _combined_meta_command_mapping(app):
     return command_mapping
 
 
+def _remove_duplicates(seq: List) -> List:
+    seen, out = set(), []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
 @define(kw_only=True)
 class App:
     """Cyclopts Application.
 
     Parameters
     ----------
-    name: Optional[str]
+    name: Optional[Union[str, Iterable[str]]]
         Name of application, or subcommand if registering to another application.
         Name fallback resolution:
 
@@ -119,9 +138,12 @@ class App:
         2. If a ``default`` function has been registered, the name of that function.
         3. If the module name is ``__main__.py``, the name of the encompassing package.
         4. The value of ``sys.argv[0]``.
+
+        Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
     version: Union[None, str, Callable]
         Version to be displayed when a token of ``version_flags`` is parsed.
-        Defaults to attempting to use ``package.__version__`` from the package instantiating :class:`App`.
+        Defaults to attempting to using version of the package instantiating :class:`App`.
+        If a ``Callable``, it will be invoked with no arguments when version is queried.
     version_flags: Union[str, Iterable[str]]
         Token(s) that trigger :meth:`version_print`.
         Set to an empty list to disable version feature.
@@ -132,28 +154,71 @@ class App:
         Tokens that trigger :meth:`help_print`.
         Set to an empty list to disable help feature.
         Defaults to ``["--help", "-h"]``.
-    help_title_commands: str
-        Title for the "commands" help-panel.
-        Defaults to ``"Commands"``.
-    help_title_parameters: str
-        Title for the "parameters" help-panel.
-        Defaults to ``"Parameters"``.
     default_parameter: Parameter
         Default :class:`Parameter` configuration.
+    group: Union[None, str, Group, Iterable[Union[str, Group]]]
+        The group(s) that ``default_command`` belongs to.
+
+        * If ``None``, defaults to the ``"Commands"`` group.
+
+        * If ``str``, use an existing Group (from neighboring sub-commands) with name,
+          **or** create a :class:`Group` with provided name if it does not exist.
+
+        * If :class:`Group`, directly use it.
+    converter: Optional[Callable]
+        A function where all the converted CLI-provided variables will be keyword-unpacked,
+        regardless of their positional/keyword-type in the command function signature.
+        The python variable names will be used, which may differ from their CLI names.
+
+        .. code-block:: python
+
+            def converter(**kwargs) -> Dict[str, Any]:
+                "Return an updated dictionary."
+
+        The returned dictionary will be used passed along to the command invocation.
+        This converter runs **after** :class:`Parameter` and :class:`Group` converters.
+    validator: Union[None, Callable, List[Callable]]
+        A function where all the converted CLI-provided variables will be keyword-unpacked,
+        regardless of their positional/keyword-type in the command function signature.
+        The python variable names will be used, which may differ from their CLI names.
+
+        Example usage:
+
+        .. code-block:: python
+
+           def validator(**kwargs):
+               "Raise an exception if something is invalid."
+
+        This validator runs **after** :class:`Parameter` and :class:`Group` validators.
     """
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
     _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter")
 
-    _name: Optional[str] = field(default=None, alias="name")
+    _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
     version: Union[None, str, Callable] = field(factory=_default_version)
-    version_flags: Iterable[str] = field(factory=lambda: ["--version"])
+    version_flags: Tuple[str, ...] = field(
+        default=["--version"],
+        on_setattr=attrs.setters.frozen,
+        converter=to_tuple_converter,
+    )
 
     help: Optional[str] = field(default=None)
-    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
-    help_title_commands: str = "Commands"
-    help_title_parameters: str = "Parameters"
+    help_flags: Tuple[str, ...] = field(
+        default=["--help", "-h"],
+        on_setattr=attrs.setters.frozen,
+        converter=to_tuple_converter,
+    )
+
+    group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter)
+
+    group_arguments: Group = field(default=None, converter=to_group_converter(Group.create_default_arguments()))
+    group_parameters: Group = field(default=None, converter=to_group_converter(Group.create_default_parameters()))
+    group_commands: Group = field(default=None, converter=to_group_converter(Group.create_default_commands()))
+
+    converter: Optional[Callable] = field(default=None)
+    validator: List[Callable] = field(default=None, converter=to_list_converter)
 
     ######################
     # Private Attributes #
@@ -166,20 +231,38 @@ class App:
     _meta: "App" = field(init=False, default=None)
     _meta_parent: "App" = field(init=False, default=None)
 
+    def __attrs_post_init__(self):
+        if self.help_flags:
+            self.command(
+                self.help_print,
+                name=self.help_flags,
+                help_flags=[],
+                version_flags=[],
+                help="Display this message and exit.",
+            )
+        if self.version_flags:
+            self.command(
+                self.version_print,
+                name=self.version_flags,
+                help_flags=[],
+                version_flags=[],
+                help="Display application version.",
+            )
+
     ###########
     # Methods #
     ###########
     @property
     def default_parameter(self) -> Parameter:
-        """Parameter value defaults for all Annotated Parameters.
+        """Parameter value defaults for all functions' Parameters.
 
-        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting ``App`` s.
+        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting :class:`App` s.
 
         Usually, an :class:`App` has at most one parent.
         In the event of multiple parents, they are evaluated in reverse-registered order,
         where each ``default_parameter`` attributes overwrites the previous.
         I.e. the first registered parent has the highest-priority of the parents.
-        The specified ``default_parameter`` for this ``App`` object has higher priority over parents.
+        The specified ``default_parameter`` for this :class:`App` object has higher priority over parents.
         """
         return Parameter.combine(*(x.default_parameter for x in reversed(self._parents)), self._default_parameter)
 
@@ -188,17 +271,17 @@ class App:
         self._default_parameter = value
 
     @property
-    def name(self) -> str:
-        """Application name. Dynamically derived if not previously set."""
+    def name(self) -> Tuple[str, ...]:
+        """Application name(s). Dynamically derived if not previously set."""
         if self._name:
             return self._name
         elif self.default_command is None:
             name = Path(sys.argv[0]).name
             if name == "__main__.py":
                 name = _get_root_module_name()
-            return name
+            return (name,)
         else:
-            return _format_name(self.default_command.__name__)
+            return (_format_name(self.default_command.__name__),)
 
     @property
     def help_(self) -> str:
@@ -241,7 +324,8 @@ class App:
     def meta(self) -> "App":
         if self._meta is None:
             self._meta = type(self)(
-                help_title_parameters="Session Parameters",
+                group_arguments=Group("Session Arguments"),
+                group_parameters=Group("Session Parameters"),
             )
             self._meta._meta_parent = self
         return self._meta
@@ -254,6 +338,9 @@ class App:
         command_mapping = _combined_meta_command_mapping(app)
 
         for i, token in enumerate(tokens):
+            if token in self.help_flags:
+                # app = self
+                break
             try:
                 app = command_mapping[token]
                 unused_tokens = tokens[i + 1 :]
@@ -284,7 +371,6 @@ class App:
             * If registering a function, then the function's name.
         `**kwargs`
             Any argument that :class:`App` can take.
-            ``name`` and ``help`` are common arguments.
         """
         if obj is None:  # Called ``@app.command(...)``
             return partial(self.command, name=name, **kwargs)
@@ -298,7 +384,7 @@ class App:
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
         else:
-            validate_command(obj, default_parameter=self.default_parameter)
+            validate_command(obj)
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
             app = App(default_command=obj, **kwargs)
@@ -307,22 +393,29 @@ class App:
         if name is None:
             name = app.name
         else:
-            app._name = to_tuple_converter(name)[0]
+            app._name = name
 
         for n in to_tuple_converter(name):
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
+            # Warning: app._name may not align with command name
             self._commands[n] = app
 
         app._parents.append(self)
 
         return obj
 
-    def default(self, obj=None):
+    def default(
+        self,
+        obj=None,
+        *,
+        converter=None,
+        validator=None,
+    ):
         """Decorator to register a function as the default action handler."""
         if obj is None:  # Called ``@app.default_command(...)``
-            return self.default
+            return partial(self.default, converter=converter, validator=validator)
 
         if isinstance(obj, App):  # Registering a sub-App
             raise TypeError("Cannot register a sub-App to default.")
@@ -330,8 +423,12 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        validate_command(obj, default_parameter=self.default_parameter)
+        validate_command(obj)
         self.default_command = obj
+        if converter:
+            self.converter = converter
+        if validator:
+            self.validator = validator
         return obj
 
     def parse_known_args(
@@ -340,7 +437,7 @@ class App:
         *,
         console: Optional[Console] = None,
     ) -> Tuple[Callable, inspect.BoundArguments, List[str]]:
-        """Interpret arguments into a function, BoundArguments, and any remaining unknown tokens.
+        """Interpret arguments into a function, ``BoundArguments``, and any remaining unknown tokens.
 
         **Does NOT** handle special flags like "version" or "help".
 
@@ -371,9 +468,23 @@ class App:
 
             if self.default_command:
                 command = self.default_command
-                bound, unused_tokens = create_bound_arguments(
-                    command, unused_tokens, default_parameter=self.default_parameter
+                resolved_command = ResolvedCommand(
+                    command,
+                    self.default_parameter,
+                    self.group_arguments,
+                    self.group_parameters,
+                    parse_docstring=False,
                 )
+                bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
+                if self.converter:
+                    bound.arguments = self.converter(**bound.arguments)
+                try:
+                    for validator in self.validator:
+                        validator(**bound.arguments)
+                except (AssertionError, ValueError, TypeError) as e:
+                    new_exception = ValidationError(value=e.args[0])
+                    raise new_exception from e
+
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:
@@ -401,7 +512,7 @@ class App:
         exit_on_error: bool = True,
         verbose: bool = False,
     ) -> Tuple[Callable, inspect.BoundArguments]:
-        """Interpret arguments into a function and BoundArguments.
+        """Interpret arguments into a function and ``BoundArguments``.
 
         **Does** handle special flags like "version" or "help".
 
@@ -530,37 +641,50 @@ class App:
         console.print(format_doc(self, app))
 
         def walk_apps():
-            # Iterates from deepest to shallowest
+            # Iterates from deepest to shallowest meta-apps
             meta_list = [app]  # shallowest to deepest
             meta = app
             while (meta := meta._meta) and meta.default_command:
                 meta_list.append(meta)
             yield from reversed(meta_list)
 
-        show_special = True
+        from cyclopts.group_extractors import groups_from_app
 
-        command_rows = {}
+        command_rows, command_descriptions = {}, {}
         for subapp in walk_apps():
-            command_rows.setdefault(subapp.help_title_commands, [])
-            command_rows[subapp.help_title_commands].extend(format_command_rows(subapp))
-
-            console.print(
-                format_parameters(
-                    subapp,
-                    subapp.help_title_parameters,
-                    show_special=show_special,
-                    default_parameter=self.default_parameter,
+            # Print default_command argument/parameter groups
+            if subapp.default_command:
+                command = ResolvedCommand(
+                    subapp.default_command,
+                    subapp.default_parameter,
+                    subapp.group_arguments,
+                    subapp.group_parameters,
                 )
-            )
+                for group, iparams in command.groups_iparams:
+                    if not group.show:
+                        continue
+                    cparams = [command.iparam_to_cparam[x] for x in iparams]
+                    console.print(format_group_parameters(group, iparams, cparams))
 
-            show_special = False
+            # Print command groups
+            for group, elements in groups_from_app(subapp):
+                if not group.show:
+                    continue
 
-        # Rely on dictionary insertion order.
+                command_descriptions.setdefault(group.name, group.help)
+                command_rows.setdefault(group.name, [])
+                command_rows[group.name].extend(format_command_rows(elements))
+
+        # Rely on dictionary insertion order for panel-order.
         for title, rows in command_rows.items():
             if not rows:
                 continue
-            rows.sort(key=lambda x: x[0])  # sort by command name
-            panel, table = create_panel_table_commands(title=title)
+            panel, table, text = create_panel_table_commands(title=title)
+            description = command_descriptions[title]
+            if description:
+                text.append(description + "\n\n")
+            rows = _remove_duplicates(rows)
+            rows.sort(key=lambda x: (x[0].startswith("-"), x[0]))  # sort by command name
             for row in rows:
                 table.add_row(*row)
             console.print(panel)

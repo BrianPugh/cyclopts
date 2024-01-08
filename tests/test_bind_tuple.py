@@ -1,4 +1,3 @@
-import inspect
 from typing import List, Tuple
 
 import pytest
@@ -14,17 +13,12 @@ from cyclopts.exceptions import MissingArgumentError
         "--color 80 160 255 --coordinates 1 2",
     ],
 )
-def test_bind_tuple_basic(app, cmd_str):
+def test_bind_tuple_basic(app, cmd_str, assert_parse_args):
     @app.default
     def foo(coordinates: Tuple[int, int], color: Tuple[int, int, int]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind((1, 2), (80, 160, 255))
-
-    actual_command, actual_bind = app.parse_args(cmd_str)
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, cmd_str, (1, 2), (80, 160, 255))
 
 
 @pytest.mark.parametrize(
@@ -52,14 +46,9 @@ def test_bind_tuple_insufficient_tokens(app, cmd_str):
         "1 2 3 4 --color 80 160 255",
     ],
 )
-def test_bind_list_of_tuple(app, cmd_str):
+def test_bind_list_of_tuple(app, cmd_str, assert_parse_args):
     @app.default
     def foo(coordinates: List[Tuple[int, int]], color: Tuple[int, int, int]):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind([(1, 2), (3, 4)], (80, 160, 255))
-
-    actual_command, actual_bind = app.parse_args(cmd_str)
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, cmd_str, [(1, 2), (3, 4)], (80, 160, 255))

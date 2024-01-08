@@ -44,7 +44,8 @@ def _int(s: str) -> int:
     elif s.startswith("0b"):
         return int(s, 2)
     else:
-        return int(s, 0)
+        # Casting to a float first allows for things like "30.0"
+        return int(float(s))
 
 
 def _bytes(s: str) -> bytes:
@@ -105,7 +106,7 @@ def _convert(type_, element, default_parameter=None):
                 return member
         raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in _iterable_types:
-        count, _ = token_count(inner_types[0], default_parameter=default_parameter)
+        count, _ = token_count(inner_types[0], default_parameter)
         if count > 1:
             gen = zip(*[iter(element)] * count)
         else:
@@ -127,8 +128,12 @@ _unsupported_target_types = {dict}
 
 def get_origin_and_validate(type_: Type):
     origin_type = get_origin(type_)
-    if type_ in _unsupported_target_types:
-        raise TypeError(f"Unsupported Type: {type_}")
+    if origin_type is None:
+        if type_ in _unsupported_target_types:
+            raise TypeError(f"Unsupported Type: {type_}")
+    else:
+        if origin_type in _unsupported_target_types:
+            raise TypeError(f"Unsupported Type: {type_}")
     if origin_type in _unsupported_target_types:
         raise TypeError(f"Unsupported Type: {origin_type}")
     if type_ is tuple:
@@ -138,6 +143,9 @@ def get_origin_and_validate(type_: Type):
 
 def resolve(type_: Type) -> Type:
     """Perform all simplifying resolutions."""
+    if type_ is inspect.Parameter.empty:
+        return str
+
     type_prev = None
     while type_ != type_prev:
         type_prev = type_
@@ -148,16 +156,24 @@ def resolve(type_: Type) -> Type:
 
 def resolve_optional(type_: Type) -> Type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
-    while get_origin(type_) is Union:
-        non_none_types = [t for t in get_args(type_) if t is not NoneType]
-        if not non_none_types:
-            # This should never happen; python simplifies:
-            #    ``Union[None, None] -> NoneType``
-            raise ValueError("Union type cannot be all NoneType")
-        elif len(non_none_types) == 1:
-            type_ = non_none_types[0]
-        elif len(non_none_types) > 1:
-            return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
+    # Python will automatically flatten out nested unions when possible.
+    # So we don't need to loop over resolution.
+
+    if get_origin(type_) is not Union:
+        return type_
+
+    non_none_types = [t for t in get_args(type_) if t is not NoneType]
+    if not non_none_types:  # pragma: no cover
+        # This should never happen; python simplifies:
+        #    ``Union[None, None] -> NoneType``
+        raise ValueError("Union type cannot be all NoneType")
+    elif len(non_none_types) == 1:
+        type_ = non_none_types[0]
+    elif len(non_none_types) > 1:
+        return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
+    else:
+        raise NotImplementedError
+
     return type_
 
 
@@ -221,7 +237,7 @@ def coerce(type_: Type, *args: str, default_parameter=None):
         return [_convert(type_, item, default_parameter=default_parameter) for item in args]
 
 
-def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) -> Tuple[int, bool]:
+def token_count(type_: Type, cparam: Optional["Parameter"] = None) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -242,12 +258,12 @@ def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) ->
     """
     from cyclopts.parameter import get_hint_parameter
 
-    if type_ is inspect.Parameter.empty:
+    if type_ is inspect.Parameter.empty:  # str
         return 1, False
 
-    type_, param = get_hint_parameter(type_, default_parameter=default_parameter)
-    if param.token_count is not None:
-        return abs(param.token_count), param.token_count < 0
+    type_, cparam = get_hint_parameter(type_, cparam)
+    if cparam.token_count is not None:
+        return abs(cparam.token_count), cparam.token_count < 0
 
     type_ = resolve(type_)
     origin_type = get_origin_and_validate(type_)
@@ -259,44 +275,48 @@ def token_count(type_: Type, default_parameter: Optional["Parameter"] = None) ->
     elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
-        return token_count(get_args(type_)[0], default_parameter=default_parameter)[0], True
+        return token_count(get_args(type_)[0], cparam)[0], True
     else:
         return 1, False
 
 
-def to_tuple_converter(input_value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
+def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
     """Convert a single element or an iterable of elements into a tuple.
 
-    Intended to be used in an `attrs.Field`. If `None` is provided, returns an empty tuple.
+    Intended to be used in an ``attrs.Field``. If ``None`` is provided, returns an empty tuple.
     If a single element is provided, returns a tuple containing just that element.
     If an iterable is provided, converts it into a tuple.
 
     Parameters
     ----------
-    input_value: Optional[Union[Any, Iterable[Any]]]
+    value: Optional[Union[Any, Iterable[Any]]]
         An element, an iterable of elements, or None.
 
     Returns
     -------
     Tuple[Any, ...]: A tuple containing the elements.
     """
-    if input_value is None:
+    if value is None:
         return ()
-    elif isinstance(input_value, Iterable) and not isinstance(input_value, str):
-        return tuple(input_value)
+    elif isinstance(value, Iterable) and not isinstance(value, str):
+        return tuple(value)
     else:
-        return (input_value,)
+        return (value,)
 
 
-def optional_to_tuple_converter(input_value: Union[None, Any, Iterable[Any]]) -> Optional[Tuple[Any, ...]]:
+def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> List[Any]:
+    return list(to_tuple_converter(value))
+
+
+def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[Tuple[Any, ...]]:
     """Convert a string or Iterable or None into an Iterable or None.
 
     Intended to be used in an ``attrs.Field``.
     """
-    if input_value is None:
+    if value is None:
         return None
 
-    if not input_value:
+    if not value:
         return ()
 
-    return to_tuple_converter(input_value)
+    return to_tuple_converter(value)

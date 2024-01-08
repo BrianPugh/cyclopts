@@ -1,5 +1,3 @@
-import inspect
-
 import pytest
 
 from cyclopts import CoercionError, MissingArgumentError
@@ -13,17 +11,12 @@ from cyclopts import CoercionError, MissingArgumentError
         "foo 3 4 5 --b=2 --a=1",
     ],
 )
-def test_star_args(app, cmd_str):
+def test_star_args(app, cmd_str, assert_parse_args):
     @app.command
     def foo(a: int, b: int, *args: int):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(1, 2, 3, 4, 5)
-
-    actual_command, actual_bind = app.parse_args(cmd_str)
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, cmd_str, 1, 2, 3, 4, 5)
 
 
 @pytest.mark.parametrize(
@@ -32,17 +25,12 @@ def test_star_args(app, cmd_str):
         "foo 1 2 3",
     ],
 )
-def test_pos_only(app, cmd_str):
+def test_pos_only(app, cmd_str, assert_parse_args):
     @app.command
     def foo(a: int, b: int, c: int, /):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(1, 2, 3)
-
-    actual_command, actual_bind = app.parse_args(cmd_str)
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, cmd_str, 1, 2, 3)
 
 
 @pytest.mark.parametrize(
@@ -70,17 +58,12 @@ def test_pos_only_exceptions(app, cmd_str_e):
         "foo 1 2 --d=4 3",
     ],
 )
-def test_pos_only_extended(app, cmd_str):
+def test_pos_only_extended(app, cmd_str, assert_parse_args):
     @app.command
     def foo(a: int, b: int, c: int, /, d: int):
         pass
 
-    signature = inspect.signature(foo)
-    expected_bind = signature.bind(1, 2, 3, 4)
-
-    actual_command, actual_bind = app.parse_args(cmd_str)
-    assert actual_command == foo
-    assert actual_bind == expected_bind
+    assert_parse_args(foo, cmd_str, 1, 2, 3, 4)
 
 
 @pytest.mark.parametrize(

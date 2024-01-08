@@ -247,3 +247,6 @@ cyclopts/*.html
 
 # Poetry
 poetry.toml
+
+# line-profiler
+*.lprof

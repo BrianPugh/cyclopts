@@ -1,3 +1,4 @@
+import inspect
 import sys
 from enum import Enum, auto
 from pathlib import Path
@@ -40,6 +41,10 @@ def test_token_count_bool():
 
 def test_token_count_list():
     assert (1, True) == token_count(List[int])
+
+
+def test_token_count_list_generic():
+    assert (1, True) == token_count(list)
 
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Native Typing")
@@ -127,6 +132,11 @@ def test_coerce_tuple():
     )
 
 
+def test_coerce_tuple_len_mismatch():
+    with pytest.raises(ValueError):
+        coerce(Tuple[int, int], "1")
+
+
 def test_coerce_list():
     assert [123, 456] == coerce(int, "123", "456")
     assert [123, 456] == coerce(List[int], "123", "456")
@@ -178,7 +188,16 @@ def test_coerce_bytearray():
     assert [bytearray(b"foo"), bytearray(b"bar")] == coerce(bytearray, "foo", "bar")
 
 
+def test_coerce_empty():
+    assert "foo" == coerce(inspect.Parameter.empty, "foo")
+
+
 def test_resolve_annotated():
     type_ = Annotated[Literal["foo", "bar"], "fizz"]
     res = resolve(type_)
     assert res == Literal["foo", "bar"]
+
+
+def test_resolve_empty():
+    res = resolve(inspect.Parameter.empty)
+    assert res == str

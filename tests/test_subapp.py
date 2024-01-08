@@ -44,6 +44,9 @@ def test_subapp_cannot_be_default(app):
     with pytest.raises(TypeError):
         app.default(App(name="foo"))
 
+    with pytest.raises(TypeError):
+        App(default_command=App(name="foo"))
+
 
 def test_subapp_default_parameter_resolution():
     parent_app_1 = App(default_parameter=Parameter(show_default=True))

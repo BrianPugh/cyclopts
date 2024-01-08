@@ -1,6 +1,8 @@
 import inspect
-from typing import Iterable, List, Optional, Tuple, Type, Union, get_args, get_origin
+from functools import lru_cache
+from typing import Callable, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
+import attrs
 from attrs import field, frozen
 
 from cyclopts.coercion import (
@@ -12,12 +14,12 @@ from cyclopts.coercion import (
     resolve_optional,
     to_tuple_converter,
 )
-from cyclopts.protocols import Converter, Validator
-from cyclopts.utils import record_init_kwargs
+from cyclopts.group import Group
+from cyclopts.utils import record_init
 
 
 def _token_count_validator(instance, attribute, value):
-    if value is not None and instance._converter is None:
+    if value is not None and instance.converter is coerce:
         raise ValueError('Must specify a "converter" if setting "token_count".')
 
 
@@ -30,99 +32,83 @@ def _double_hyphen_validator(instance, attribute, values):
             raise ValueError(f'{attribute.alias} value must start with "--".')
 
 
-@record_init_kwargs("_provided_args")
+def _negative_converter(default: Tuple[str, ...]):
+    def converter(value) -> Tuple[str, ...]:
+        if value is None:
+            return default
+        else:
+            return to_tuple_converter(value)
+
+    return converter
+
+
+@record_init("_provided_args")
 @frozen
 class Parameter:
     """Cyclopts configuration for individual function parameters."""
 
     # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
 
-    _name: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter, alias="name")
+    name: Tuple[str, ...] = field(
+        default=None,
+        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
+    )
 
-    _converter: Optional[Converter] = field(default=None, alias="converter")
+    converter: Callable = field(default=None, converter=attrs.converters.default_if_none(coerce))
 
-    validator: Union[None, Validator, Iterable[Validator]] = field(default=None, converter=to_tuple_converter)
+    validator: Tuple[Callable, ...] = field(
+        default=(),
+        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
+    )
 
-    negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
+    negative: Union[None, Tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)
+
+    group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter, hash=False)
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
 
-    parse: Optional[bool] = field(default=None)
+    parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
     _show: Optional[bool] = field(default=None, alias="show")
 
     show_default: Optional[bool] = field(default=None)
 
-    show_choices: Optional[bool] = field(default=None)
+    show_choices: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
     help: Optional[str] = field(default=None)
 
-    show_env_var: Optional[bool] = field(default=None)
+    show_env_var: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
-    _env_var: Union[None, str, Iterable[str]] = field(
-        default=None, converter=optional_to_tuple_converter, alias="env_var"
-    )
-
-    _negative_bool: Union[None, str, Iterable[str]] = field(
+    env_var: Tuple[str, ...] = field(
         default=None,
-        converter=optional_to_tuple_converter,
-        validator=_double_hyphen_validator,
-        alias="negative_bool",
+        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
 
-    _negative_iterable: Union[None, str, Iterable[str]] = field(
+    negative_bool: Tuple[str, ...] = field(
         default=None,
-        converter=optional_to_tuple_converter,
+        converter=_negative_converter(("--no-",)),
         validator=_double_hyphen_validator,
-        alias="negative_iterable",
     )
+
+    negative_iterable: Tuple[str, ...] = field(
+        default=None,
+        converter=_negative_converter(("--empty-",)),
+        validator=_double_hyphen_validator,
+    )
+
+    required: Optional[bool] = field(default=None)
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
     @property
-    def name(self):
-        return to_tuple_converter(self._name)
-
-    @property
-    def env_var(self):
-        return to_tuple_converter(self._env_var)
-
-    @property
     def show(self):
-        if self._show is not None:
-            return self._show
-        elif self.parse is False:
-            return False
-        else:
-            return True
+        return self._show if self._show is not None else self.parse
 
-    @property
-    def converter(self):
-        if self._converter:
-            return self._converter
-        else:
-            return coerce
-
-    @property
-    def negative_bool(self):
-        if self._negative_bool is None:
-            return ("--no-",)
-        else:
-            return self._negative_bool
-
-    @property
-    def negative_iterable(self):
-        if self._negative_iterable is None:
-            return ("--empty-",)
-        else:
-            return self._negative_iterable
-
-    def get_negatives(self, type_, *names) -> Tuple[str, ...]:
+    def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:
         type_ = get_origin(type_) or type_
 
         if self.negative is not None:
-            assert isinstance(self.negative, tuple)
             return self.negative
         elif type_ not in (bool, list, set):
             return ()
@@ -157,7 +143,7 @@ class Parameter:
 
     @classmethod
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
-        """Returns a new Parameter with values of ``new_parameters`` overriding ``self``.
+        """Returns a new Parameter with values of ``parameters`` overriding ``self``.
 
         Parameters
         ----------
@@ -187,7 +173,7 @@ class Parameter:
         )
 
 
-def validate_command(f, default_parameter: Optional[Parameter] = None):
+def validate_command(f: Callable):
     """Validate if a function abides by Cyclopts's rules.
 
     Raises
@@ -197,46 +183,41 @@ def validate_command(f, default_parameter: Optional[Parameter] = None):
     """
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
-        _ = get_origin_and_validate(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam.annotation, default_parameter=default_parameter)
-        if cparam.parse is False and iparam.kind is not iparam.KEYWORD_ONLY:
+        get_origin_and_validate(iparam.annotation)
+        type_, cparam = get_hint_parameter(iparam.annotation)
+        if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
         if get_origin(type_) is tuple:
             if ... in get_args(type_):
                 raise ValueError("Cannot use a variable-length tuple.")
 
 
-def get_names(parameter: inspect.Parameter, default_parameter: Optional[Parameter] = None) -> List[str]:
-    """Derive the CLI name for an ``inspect.Parameter``."""
-    _, param = get_hint_parameter(parameter.annotation, default_parameter=default_parameter)
-    if param.name:
-        names = list(param.name)
-    else:
-        if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL):
-            # Name is only used for help-string
-            names = [parameter.name.upper()]
-        else:
-            names = ["--" + parameter.name.replace("_", "-")]
-
-    return names
-
-
-def get_hint_parameter(type_: Type, default_parameter: Optional[Parameter] = None) -> Tuple[Type, Parameter]:
+@lru_cache
+def get_hint_parameter(type_: Type, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
     """
+    cyclopts_parameters = []
     if type_ is inspect.Parameter.empty:
-        return str, Parameter()
-
-    type_ = resolve_optional(type_)
-
-    if type(type_) is AnnotatedType:
-        annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-        type_ = get_args(type_)[0]
-        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+        type_ = str
     else:
-        cyclopts_parameters = []
+        type_ = resolve_optional(type_)
 
-    cyclopts_parameter = Parameter.combine(default_parameter, *cyclopts_parameters)
-    return resolve(type_), cyclopts_parameter
+        if type(type_) is AnnotatedType:
+            annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+            type_ = get_args(type_)[0]
+            cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+        type_ = resolve(type_)
+
+    cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
+    return type_, cparam
+
+
+def get_hint(type_: Type) -> Type:
+    if type_ is inspect.Parameter.empty:
+        return str
+    type_ = resolve_optional(type_)
+    if type(type_) is AnnotatedType:
+        type_ = get_args(type_)[0]
+    return resolve(type_)
