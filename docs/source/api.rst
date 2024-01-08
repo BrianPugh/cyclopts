@@ -166,6 +166,7 @@ API
 
       The returned dictionary will be used passed along to the command invocation.
       The group converter runs **after** :class:`Parameter` converters and validators.
+      Not used with ``@app.command``.
 
    .. attribute:: validator
       :type: Optional[Callable]
@@ -189,6 +190,7 @@ API
 
       Default :class:`Parameter` in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter.
       The provided :class:`Parameter` is not allowed to have a ``group`` value.
+      Not used with ``@app.command``.
 
 
 .. autofunction:: cyclopts.coerce

@@ -27,6 +27,7 @@ from cyclopts.exceptions import (
     CycloptsError,
     InvalidCommandError,
     UnusedCliTokensError,
+    ValidationError,
     format_cyclopts_error,
 )
 from cyclopts.group import Group, to_group_converter
@@ -477,8 +478,13 @@ class App:
                 bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
                 if self.converter:
                     bound.arguments = self.converter(**bound.arguments)
-                for validator in self.validator:
-                    validator(**bound.arguments)
+                try:
+                    for validator in self.validator:
+                        validator(**bound.arguments)
+                except (AssertionError, ValueError, TypeError) as e:
+                    new_exception = ValidationError(value=e.args[0])
+                    raise new_exception from e
+
                 return command, bound, unused_tokens
             else:
                 if unused_tokens:

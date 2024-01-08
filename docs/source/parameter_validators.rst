@@ -1,6 +1,6 @@
-==========
-Validators
-==========
+====================
+Parameter Validators
+====================
 In a CLI application, users have the freedom to input a wide range of data.
 This flexibility can lead to inputs the application does not expect.
 By coercing the input into a data type (like an ``int``), we are already limiting the input to a certain degree.
