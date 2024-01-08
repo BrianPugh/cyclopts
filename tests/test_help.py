@@ -4,6 +4,7 @@ from enum import Enum
 from textwrap import dedent
 from typing import List, Literal, Optional, Union
 
+import attrs
 import pytest
 
 if sys.version_info < (3, 9):
@@ -27,8 +28,6 @@ def app():
     return App(
         name="app",
         help="App Help String Line 1.",
-        version_flags=[],
-        help_flags=[],
     )
 
 
@@ -38,7 +37,19 @@ def test_help_default_action(app, console):
         app([], console=console)
 
     actual = capture.get()
-    assert actual == ("Usage: app\n\nApp Help String Line 1.\n\n")
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
 
 def test_help_default_help_flags(console):
@@ -64,7 +75,14 @@ def test_help_default_help_flags(console):
     assert actual == expected
 
 
-def test_help_format_usage_empty(app, console):
+def test_help_format_usage_empty(console):
+    app = App(
+        name="app",
+        help="App Help String Line 1.",
+        help_flags=[],
+        version_flags=[],
+    )
+
     with console.capture() as capture:
         console.print(format_usage(app, []))
     actual = capture.get()
@@ -517,6 +535,10 @@ def test_help_print_command_group_description(app, console):
 
         App Help String Line 1.
 
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
         │ Command description.                                               │
         │                                                                    │
@@ -548,8 +570,10 @@ def test_help_print_commands(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1  Cmd1 help string.                                            │
-        │ cmd2  Cmd2 help string.                                            │
+        │ cmd1       Cmd1 help string.                                       │
+        │ cmd2       Cmd2 help string.                                       │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -588,8 +612,33 @@ def test_help_print_commands_and_function(app, console):
         │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1  Cmd1 help string.                                            │
-        │ cmd2  Cmd2 help string.                                            │
+        │ cmd1       Cmd1 help string.                                       │
+        │ cmd2       Cmd2 help string.                                       │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_print_commands_special_flag_reassign(app, console):
+    app["--help"].group = "Admin"
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Admin ────────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -597,9 +646,6 @@ def test_help_print_commands_and_function(app, console):
 
 
 def test_help_print_commands_plus_meta(app, console):
-    app.version_flags = ["--version"]
-    app.help_flags = ["--help", "-h"]
-
     @app.command(help="Cmd1 help string.")
     def cmd1():
         pass
@@ -646,8 +692,6 @@ def test_help_print_commands_plus_meta(app, console):
 
 def test_help_print_commands_plus_meta_short(app, console):
     app.help = None
-    app.version_flags = ["--version"]
-    app.help_flags = ["--help", "-h"]
 
     @app.command(help="Cmd1 help string.")
     def cmd1():

@@ -9,6 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import attrs
 from attrs import define, field
 from rich.console import Console
 
@@ -113,6 +114,15 @@ def _combined_meta_command_mapping(app):
     return command_mapping
 
 
+def _remove_duplicates(seq: List) -> List:
+    seen, out = set(), []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
 @define(kw_only=True)
 class App:
     """Cyclopts Application.
@@ -187,10 +197,18 @@ class App:
     _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
     version: Union[None, str, Callable] = field(factory=_default_version)
-    version_flags: Iterable[str] = field(factory=lambda: ["--version"])
+    version_flags: Tuple[str, ...] = field(
+        default=["--version"],
+        on_setattr=attrs.setters.frozen,
+        converter=to_tuple_converter,
+    )
 
     help: Optional[str] = field(default=None)
-    help_flags: Iterable[str] = field(factory=lambda: ["--help", "-h"])
+    help_flags: Tuple[str, ...] = field(
+        default=["--help", "-h"],
+        on_setattr=attrs.setters.frozen,
+        converter=to_tuple_converter,
+    )
 
     group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter)
 
@@ -654,6 +672,7 @@ class App:
             description = command_descriptions[title]
             if description:
                 text.append(description + "\n\n")
+            rows = _remove_duplicates(rows)
             rows.sort(key=lambda x: (x[0].startswith("-"), x[0]))  # sort by command name
             for row in rows:
                 table.add_row(*row)
