@@ -128,8 +128,12 @@ _unsupported_target_types = {dict}
 
 def get_origin_and_validate(type_: Type):
     origin_type = get_origin(type_)
-    if type_ in _unsupported_target_types:
-        raise TypeError(f"Unsupported Type: {type_}")
+    if origin_type is None:
+        if type_ in _unsupported_target_types:
+            raise TypeError(f"Unsupported Type: {type_}")
+    else:
+        if origin_type in _unsupported_target_types:
+            raise TypeError(f"Unsupported Type: {type_}")
     if origin_type in _unsupported_target_types:
         raise TypeError(f"Unsupported Type: {origin_type}")
     if type_ is tuple:

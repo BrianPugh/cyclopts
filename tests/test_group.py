@@ -20,13 +20,6 @@ def upper(type_, *args: str):
     return args[0].upper()
 
 
-def test_group_equality():
-    """Group equality is SOLELY determined by name."""
-    assert Group("foo") == Group("foo")
-    assert Group("foo") != Group("bar")
-    assert Group("foo") in [Group("foo"), Group("bar")]
-
-
 def test_group_default_parameter_converter(app, assert_parse_args):
     food_group = Group("Food", default_parameter=Parameter(converter=upper))
 

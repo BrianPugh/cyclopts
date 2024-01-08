@@ -41,7 +41,7 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
         for group in subapp.group:
             if isinstance(group, Group):
                 for mapping in group_mapping:
-                    if mapping[0] == group:
+                    if mapping[0] is group:
                         break
                     elif mapping[0].name == group.name:
                         raise ValueError(f'Command Group "{group.name}" already exists.')
