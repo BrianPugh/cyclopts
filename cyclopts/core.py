@@ -655,11 +655,16 @@ class App:
                     subapp.group_parameters,
                 )
                 for group, iparams in command.groups_iparams:
+                    if not group.show:
+                        continue
                     cparams = [command.iparam_to_cparam[x] for x in iparams]
                     console.print(format_group_parameters(group, iparams, cparams))
 
             # Print command groups
             for group, elements in groups_from_app(subapp):
+                if not group.show:
+                    continue
+
                 command_descriptions.setdefault(group.name, group.help)
                 command_rows.setdefault(group.name, [])
                 command_rows[group.name].extend(format_command_rows(elements))
