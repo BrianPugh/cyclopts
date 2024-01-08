@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Callable, Optional, Tuple, Union, cast
 
-from attrs import field, frozen
+from attrs import define, field
 
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
@@ -16,7 +16,7 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
         raise ValueError("Group default_parameter cannot have a group.")
 
 
-@frozen
+@define
 class Group:
     name: str
 
