@@ -115,6 +115,15 @@ class CycloptsError(Exception):
         else:
             return ""
 
+    def _find_and_replace(self, s: str) -> str:
+        """Replaces all instances of "--python-variable-name" with "--cli-variable-name"."""
+        assert self.parameter2cli is not None
+        for p, names in self.parameter2cli.items():
+            target = f"--{p.name}"
+            replacement = names[0]
+            s = s.replace(target, replacement)
+        return s
+
 
 @define(kw_only=True)
 class ValidationError(CycloptsError):
@@ -123,13 +132,17 @@ class ValidationError(CycloptsError):
     value: str
     """Parenting Assertion/Value/Type Error message."""
 
-    parameter: inspect.Parameter
+    parameter: Optional[inspect.Parameter] = None
     """Parameter who's ``validator`` function failed."""
 
     def __str__(self):
-        assert self.parameter2cli is not None
-        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-        return super().__str__() + f"Invalid value for {parameter_cli_name}. {self.value}"
+        if self.parameter is None:
+            self.value = self._find_and_replace(self.value)
+            return super().__str__() + self.value
+        else:
+            assert self.parameter2cli is not None
+            parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
+            return super().__str__() + f"Invalid value for {parameter_cli_name}. {self.value}"
 
 
 @define(kw_only=True)

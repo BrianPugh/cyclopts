@@ -14,8 +14,9 @@ Cyclopts
    commands.rst
    parameters.rst
    default_parameter.rst
-   validators.rst
    groups.rst
+   parameter_validators.rst
+   group_validators.rst
    help.rst
    version.rst
    rules.rst
