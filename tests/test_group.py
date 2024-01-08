@@ -20,6 +20,22 @@ def upper(type_, *args: str):
     return args[0].upper()
 
 
+def test_group_parameter_converter(app, assert_parse_args):
+    def converter(**kwargs):
+        return {k: v.upper() for k, v in kwargs.items()}
+
+    food_group = Group("Food", converter=converter)
+
+    @app.default
+    def foo(
+        ice_cream: Annotated[str, Parameter(group=food_group)],
+        cone: Annotated[str, Parameter(group="Food")],
+    ):
+        pass
+
+    assert_parse_args(foo, "chocolate sugar", "CHOCOLATE", "SUGAR")
+
+
 def test_group_default_parameter_converter(app, assert_parse_args):
     food_group = Group("Food", default_parameter=Parameter(converter=upper))
 

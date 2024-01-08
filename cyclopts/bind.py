@@ -346,8 +346,19 @@ def create_bound_arguments(
         coerced = _convert(command, mapping)
         bound = _bind(command, coerced)
 
-        # TODO: We need to apply the group converter here.
+        # Apply group converters
+        for group, iparams in command.groups_iparams:
+            if not group.converter:
+                continue
+            names = tuple(x.name for x in iparams)
+            converted = group.converter(**{k: bound.arguments[k] for k in names if k in bound.arguments})
+            for name in names:  # Merge back in the result
+                try:
+                    bound.arguments[name] = converted[name]
+                except KeyError:
+                    del bound.arguments[name]
 
+        # Apply group validators
         for group, iparams in command.groups_iparams:
             names = tuple(x.name for x in iparams)
             for validator in group.validator:

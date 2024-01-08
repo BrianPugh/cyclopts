@@ -21,8 +21,11 @@ A converter is any callable object (such as a function) that has signature:
 
 Parsed and converted arguments belonging to the group will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
 The python variable names will be used, which may differ from their CLI names.
+If a variable isn't populated from the CLI or environment variable, it will not be provided to the converter.
+I.e. defaults from the function signature are **not** applied prior.
 
 The returned dictionary will be used for subsequent execution.
+Removing variables from the returned dictionary will unbound them from the function.
 
 ----------
 Validators
