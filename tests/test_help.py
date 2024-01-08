@@ -516,6 +516,33 @@ def test_help_print_parameter_group_description(app, console):
     assert actual == expected
 
 
+def test_help_print_parameter_group_no_show(app, console):
+    no_show_group = Group("Custom Title", help="Parameter description.", show=False)
+
+    @app.command
+    def cmd(
+        foo: Annotated[str, Parameter(help="Docstring for foo.")],
+        bar: Annotated[str, Parameter(help="Docstring for foo.", group=no_show_group)],
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app cmd [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
 def test_help_print_command_group_description(app, console):
     @app.command(group=Group("Custom Title", help="Command description."))
     def cmd(
@@ -543,6 +570,38 @@ def test_help_print_command_group_description(app, console):
         │ Command description.                                               │
         │                                                                    │
         │ cmd                                                                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_help_print_command_group_no_show(app, console):
+    no_show_group = Group("Custom Title", show=False)
+
+    @app.command(group=no_show_group)
+    def cmd1():
+        pass
+
+    @app.command()
+    def cmd2():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ cmd2                                                               │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
