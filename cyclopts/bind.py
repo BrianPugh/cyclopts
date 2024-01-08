@@ -346,6 +346,8 @@ def create_bound_arguments(
         coerced = _convert(command, mapping)
         bound = _bind(command, coerced)
 
+        # TODO: We need to apply the group converter here.
+
         for group, iparams in command.groups_iparams:
             names = tuple(x.name for x in iparams)
             for validator in group.validator:
