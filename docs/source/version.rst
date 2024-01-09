@@ -9,7 +9,7 @@ All CLI applications should have the basic ability to check the installed versio
    $ my-application --version
    7.5.8
 
-By default, cyclopts parses the special flag ``--version``.
+By default, cyclopts adds a command, :meth:`--version <cyclopts.App.version_print>`:, that does exactly this.
 
 The resolution order for determining the version string is as follows:
 
@@ -45,6 +45,8 @@ The resolution order for determining the version string is as follows:
       app = cyclopts.App()
 
 4. The default version string ``"0.0.0"`` will be displayed.
+
+In short, if your CLI application is a properly structured python package, Cyclopts will automatically derive the correct version.
 
 The ``--version`` flag can be changed to a different name(s) via the ``version_flags`` parameter.
 

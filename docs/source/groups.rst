@@ -8,14 +8,14 @@ Groups can be created in 2 ways:
 
 1. Creating an instance of the :class:`.Group` object.
 
-2. Implicitly with just a string identifier.
+2. Implicitly with string title name.
    This is short for ``Group(my_group_name)``.
-   If a :class:`.Group` object with the same name within the command/parameter context, it will join that existing group.
+   If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
 
 Every command and parameter belongs to one (or more) groups.
 
-Group(s) can be provided to the ``group`` keyword argument to :meth:`@app.command <cyclopts.App.command>` and :class:`.Parameter`.
-The :class:`.Group` class just marks objects with metadata and doesn't actually contain a set of it's members.
+Group(s) can be provided to the ``group`` keyword argument of :meth:`@app.command <cyclopts.App.command>` and :class:`.Parameter`.
+The :class:`.Group` class itself only marks objects with metadata and doesn't contain a set of it's members.
 This means that groups can be re-used across commands.
 
 --------------
@@ -70,7 +70,6 @@ An example of using groups with commands:
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
 The default group is defined by the registering app's :attr:`.App.group_command`, which defaults to a group named ``"Commands"``.
-For commands, the fields :attr:`.Group.converter` and :attr:`.Group.validator` have no effect.
 
 ----------------
 Parameter Groups
@@ -136,20 +135,20 @@ An example of using groups with parameters:
 
 The default groups are defined by the registering app:
 
-* :attr:`App.group_arguments` for positional-only arguments, which defaults to a group named ``"Arguments"``.
+* :attr:`.App.group_arguments` for positional-only arguments, which defaults to a group named ``"Arguments"``.
 
-* :attr:`group_parameters` for all other parameters, which defaults to a group named ``"Parameters"``.
+* :attr:`.App.group_parameters` for all other parameters, which defaults to a group named ``"Parameters"``.
 
 ----------
 Converters
 ----------
-Parameter group converters offer a way of having parameter conversions interact.
+Converters offer a way of having parameters within a group interact during processing.
 See :attr:`.Group.converter` for details.
 
 ----------
 Validators
 ----------
-Parameter group validators offer a way of validating combinations of CLI-provided values.
+Group validators offer a way of jointly validating group parameter members of CLI-provided values.
 See :attr:`.Group.validator` for details.
 
 Cyclopts has some :ref:`builtin group-validators for common use-cases.<Group Validators>`

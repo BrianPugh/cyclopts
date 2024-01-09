@@ -64,7 +64,7 @@ When resolving what the :class:`Parameter` values for an individual function par
 
 4. :attr:`.Group.default_parameter` of the **app** that the function belongs to.
 
-5. **Lowest Priority:** (2-3) of the parenting app(s).
+5. **Lowest Priority:** (2-4) recursively of the parenting app call-chain.
 
 Any of Parameter's fields can be set to `None` to revert back to the true-original Cyclopts default.
 All App/Group/Parameter ``default_parameter`` values default to ``None``.
