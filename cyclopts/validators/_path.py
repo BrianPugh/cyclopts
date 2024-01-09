@@ -6,7 +6,7 @@ from attrs import frozen
 
 @frozen(kw_only=True)
 class Path:
-    """Assertions on properties of ``pathlib.Path``."""
+    """Assertions on properties of :class:`pathlib.Path`."""
 
     exists: bool = False
     """If ``True``, specified path must exist. Defaults to ``False``."""
