@@ -9,7 +9,7 @@ Cyclopts provides the option of launching an app from an app; a meta app!
 ------------
 Meta Sub App
 ------------
-Typically, a Cyclopts application is launched by calling the :class:`App <cyclopts.App>` object:
+Typically, a Cyclopts application is launched by calling the :class:`.App` object:
 
 .. code-block:: python
 

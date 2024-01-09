@@ -1,7 +1,7 @@
 ===========================
 App Calling & Return Values
 ===========================
-In this section, we'll take a closer look at the :meth:`~cyclopts.app.__call__` method of the :class:`App <cyclopts.App>` class.
+In this section, we'll take a closer look at the :meth:`.App.__call__` method.
 
 
 -------------
@@ -26,7 +26,7 @@ Typically, a Cyclopts app looks something like:
    $ my-script 1 2 3
    6
 
-:meth:`~cyclopts.app.__call__` takes in an optional input that it parses into an action.
+:meth:`.App.__call__` takes in an optional input that it parses into an action.
 If not specified, Cyclopts defaults to ``sys.argv[1:]``, i.e. the list of command line arguments.
 An explicit string or list of strings can instead be passed in.
 
@@ -70,7 +70,7 @@ If you decide you want each command to return an exit code, you could invoke you
 Exception Handling and Exiting
 ------------------------------
 For the most part, Cyclopts is hands-off when it comes to exiting the application.
-However, by default, if there is a Cyclopts runtime error, like :exc:`CoercionError <cyclopts.CoercionError>` or a :exc:`ValidationError <cyclopts.ValidationError>`, then Cyclopts will perform a ``sys.exit(1)``.
+However, by default, if there is a Cyclopts runtime error, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a ``sys.exit(1)``.
 This is to avoid displaying the unformatted, uncaught exception to the CLI user.
 This can be disabled by specifying ``exit_on_error=False`` when calling the app.
 At the same time, you may want to set ``print_error=False`` to disable the printing

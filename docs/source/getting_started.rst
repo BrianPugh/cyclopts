@@ -36,8 +36,8 @@ Save this as ``main.py`` and execute it to see:
    Hello World!
 
 
-The :class:`App <cyclopts.App>` class offers various configuration options that we'll investigate in future guides.
-The ``app`` object has a decorator method, ``default``, which registers a function as the default action.
+The :class:`.App` class offers various configuration options that we'll investigate in future guides.
+The ``app`` object has a decorator method, :meth:`default <cyclopts.App.default>`, which registers a function as the default action.
 An application can have only a single default action.
 In this example, the ``main`` function is our default, and is executed when no CLI command is provided.
 
