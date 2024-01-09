@@ -1,10 +1,15 @@
+.. _Group Validators:
+
 ================
 Group Validators
 ================
+Cyclopts has some builtin common group validators in the ``cyclopts.validators`` module.
 
 -------------
 LimitedChoice
 -------------
+Limits the number of specified arguments within the group.
+Most commonly used for mutually-exclusive arguments (default behavior).
 
 
 .. code-block:: python
