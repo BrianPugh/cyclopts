@@ -25,7 +25,7 @@ Cyclopts derives the components of the help string from a variety of sources.
 The source resolution order is as follows (as applicable):
 
 1. The ``help`` field in the :meth:`@app.command <cyclopts.App.command>` decorator.
-   When registering an :class:`App <cyclopts.App>` object, supplying ``help`` via the :meth:`@app.command <cyclopts.App.command>` decorator is forbidden to reduce ambiguity and will raise a ``ValueError``.
+   When registering an :class:`.App` object, supplying ``help`` via the :meth:`@app.command <cyclopts.App.command>` decorator is forbidden to reduce ambiguity and will raise a ``ValueError``.
 
    .. code-block:: python
 
@@ -36,7 +36,7 @@ The source resolution order is as follows (as applicable):
       def bar():
           pass
 
-2. The ``help`` field of :class:`App <cyclopts.App>`.
+2. The ``help`` field of :class:`.App`.
 
    .. code-block:: python
 

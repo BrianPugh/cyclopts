@@ -8,7 +8,7 @@ If a specific type (including custom types) is not specified, the coercion defau
 For example, Cyclopts does not have an explicit rule for ``pathlib.Path``, so if the value ``"foo.bin"`` is
 provided, Cyclopts will default to coercing it as ``pathlib.Path("foo.bin")``.
 
-Automatic coercion can always be overridden by the ``converter`` field of :class:`Parameter <cyclopts.Parameter>`.
+Automatic coercion can always be overridden by the ``converter`` field of :class:`.Parameter`.
 Typically, the ``converter`` function will receive a single token, but it may receive multiple tokens
 if the annotated type is iterable (e.g. ``list``, ``set``).
 
@@ -95,7 +95,7 @@ List
      $ my-program --empty-favorite-numbers
      # favorite_numbers argument is an empty list: ``[]``.
 
-  See the ``negative`` field of :class:`Parameter <cyclopts.Parameter>` for more about this feature.
+  See :attr:`.Parameter.negative` for more about this feature.
 
 
 ********
@@ -179,7 +179,7 @@ Bool
 ****
 * If specified as a keyword, booleans get converted into flags that take no parameter.
   The false-like flag defaults to ``--no-FLAG-NAME``.
-  See the ``negative`` field of :class:`Parameter <cyclopts.Parameter>` for more about this feature.
+  See :attr:`.Parameter.negative` for more about this feature.
 
   Example:
 
