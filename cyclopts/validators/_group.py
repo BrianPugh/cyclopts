@@ -13,7 +13,7 @@ class LimitedChoice:
             The minimum (inclusive) number of CLI parameters allowed.
         max: Optional[int]
             The maximum (inclusive) number of CLI parameters allowed.
-            Defaults to 1 if ``min==0``, ``min`` otherwise.
+            Defaults to ``1`` if ``min==0``, ``min`` otherwise.
         """
         self.min = min
         self.max = (self.min or 1) if max is None else max

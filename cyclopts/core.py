@@ -391,7 +391,7 @@ class App:
         *,
         console: Optional[Console] = None,
     ) -> Tuple[Callable, inspect.BoundArguments, List[str]]:
-        """Interpret arguments into a function, ``BoundArguments``, and any remaining unknown tokens.
+        """Interpret arguments into a function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
         Parameters
         ----------
@@ -479,7 +479,7 @@ class App:
         exit_on_error: bool = True,
         verbose: bool = False,
     ) -> Tuple[Callable, inspect.BoundArguments]:
-        """Interpret arguments into a function and ``BoundArguments``.
+        """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
         **Does** handle special flags like "version" or "help".
 
