@@ -294,8 +294,6 @@ API
       The returned dictionary will be used for subsequent execution.
       Removing variables from the returned dictionary will unbound them from the function.
 
-      Not used with ``@app.command`` groups.
-
    .. attribute:: validator
       :type: Optional[Callable]
       :value: None
@@ -349,9 +347,6 @@ API
          ╭─ Error ─────────────────────────────────────────────────╮
          │ --buzz value "bob" needs to be uppercase.               │
          ╰─────────────────────────────────────────────────────────╯
-
-      Not used with ``@app.command`` groups.
-
 
 
 .. autofunction:: cyclopts.coerce

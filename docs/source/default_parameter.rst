@@ -58,13 +58,13 @@ When resolving what the :class:`Parameter` values for an individual function par
 
 1. **Highest Priority:** Parameter-annotated command function signature ``Annotated[..., Parameter()]``.
 
-2. :attr:`.Group.default_parameter` that the Parameter belongs to.
+2. :attr:`.Group.default_parameter` that the **parameter** belongs to.
 
-.. 3. :attr:`.Group.default_parameter` of the :class:`App` that the function belongs to.
+3. :attr:`App.default_parameter` of the **app** that registered the command.
 
-3. :class:`App` ``default_parameter`` of the :class:`App` that registered the command.
+4. :attr:`.Group.default_parameter` of the **app** that the function belongs to.
 
-4. **Lowest Priority:** (2-3) of the parenting app(s).
+5. **Lowest Priority:** (2-3) of the parenting app(s).
 
 Any of Parameter's fields can be set to `None` to revert back to the true-original Cyclopts default.
 All App/Group/Parameter ``default_parameter`` values default to ``None``.
