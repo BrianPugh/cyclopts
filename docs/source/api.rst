@@ -22,6 +22,18 @@ API
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
+   .. attribute:: help
+      :type: Optional[str]
+
+      Text to display on help screen.
+
+   .. attribute:: help_flags
+      :type: Union[str, Iterable[str]]
+
+      Tokens that trigger :meth:`help_print`.
+      Set to an empty list to disable help feature.
+      Defaults to ``["--help", "-h"]``.
+
    .. attribute:: version
       :type: Union[None, str, Callable]
 
@@ -35,18 +47,6 @@ API
       Token(s) that trigger :meth:`version_print`.
       Set to an empty list to disable version feature.
       Defaults to ``["--version"]``.
-
-   .. attribute:: help
-      :type: Optional[str]
-
-      Text to display on help screen.
-
-   .. attribute:: help_flags
-      :type: Union[str, Iterable[str]]
-
-      Tokens that trigger :meth:`help_print`.
-      Set to an empty list to disable help feature.
-      Defaults to ``["--help", "-h"]``.
 
    .. attribute:: default_parameter
       :type: Parameter
@@ -96,12 +96,15 @@ API
 
       This validator runs **after** :class:`Parameter` and :class:`Group` validators.
 
+      The raised error message will be presented to the user with python-variables prepended with "--" remapped to their CLI counterparts.
+
 .. autoclass:: cyclopts.Parameter
 
    Cyclopts configuration for individual function parameters.
 
    .. attribute:: name
       :type: Union[None, str, Iterable[str]]
+      :value: None
 
       Name(s) to expose to the CLI.
       Defaults to the python parameter's name, prepended with ``--``.
@@ -110,6 +113,7 @@ API
 
    .. attribute:: converter
       :type: Optional[Callable]
+      :value: None
 
       A function that converts string token(s) into an object. The converter must have signature:
 
@@ -122,6 +126,7 @@ API
 
    .. attribute:: validator
       :type: Union[None, Callable, Iterable[Callable]]
+      :value: None
 
       A function (or list of functions) that validates data returned by the ``converter``.
 
@@ -132,6 +137,7 @@ API
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
+      :value: None
 
       The group(s) that this parameter belongs to.
       This can be used to better organize the help-page, and/or to add additional conversion/validation logic (such as ensuring mutually-exclusive arguments).
@@ -144,6 +150,7 @@ API
 
    .. attribute:: negative
       :type: Union[None, str, Iterable[str]]
+      :value: None
 
       Name(s) for empty iterables or false boolean flags.
       For booleans, defaults to ``--no-{name}``.
@@ -152,6 +159,7 @@ API
 
    .. attribute:: negative_bool
       :type: Optional[str]
+      :value: None
 
       Prefix for negative boolean flags.
       Must start with ``"--"``.
@@ -159,6 +167,7 @@ API
 
    .. attribute:: negative_iterable
       :type: Optional[str]
+      :value: None
 
       Prefix for empty iterables (like lists and sets) flags.
       Must start with ``"--"``.
@@ -166,6 +175,7 @@ API
 
    .. attribute:: token_count
       :type: Optional[int]
+      :value: None
 
       Number of CLI tokens this parameter consumes.
       If specified, a custom ``converter`` **must** also be specified.
@@ -173,13 +183,21 @@ API
 
    .. attribute:: parse
       :type: Optional[bool]
+      :value: True
 
       Attempt to use this parameter while parsing.
       Annotated parameter **must** be keyword-only.
-      Defaults to ``True``.
+
+   .. attribute:: required
+      :type: Optional[bool]
+      :value: None
+
+      Parameter must be supplied.
+      Defaults to required if parameter does not have a default from the function signature.
 
    .. attribute:: show
       :type: Optional[bool]
+      :value: None
 
       Show this parameter in the help screen.
       If ``False``, state of all other ``show_*`` flags are ignored.
@@ -187,30 +205,35 @@ API
 
    .. attribute:: show_default
       :type: Optional[bool]
+      :value: None
 
       If a variable has a default, display the default in the help page.
       Defaults to ``None``, similar to ``True``, but will not display the default if it's ``None``.
 
    .. attribute:: show_choices
       :type: Optional[bool]
+      :value: True
 
       If a variable has a set of choices, display the choices in the help page.
       Defaults to ``True``.
 
    .. attribute:: help
       :type: Optional[str]
+      :value: None
 
       Help string to be displayed in the help page.
       If not specified, defaults to the docstring.
 
    .. attribute:: show_env_var
       :type: Optional[bool]
+      :value: True
 
       If a variable has ``env_var`` set, display the variable name in the help page.
       Defaults to ``True``.
 
    .. attribute:: env_var
       :type: Union[None, str, Iterable[str]]
+      :value: None
 
       Fallback to environment variable(s) if CLI value not provided.
       If multiple environment variables are given, the left-most environment variable with a set value will be used.
@@ -226,6 +249,7 @@ API
 
    .. attribute:: name
       :type: str
+      :value: ""
 
       Group name used for the help-panel and for group-referenced-by-string.
       This is a title, so the first character should be capitalized.
@@ -237,10 +261,20 @@ API
       Additional documentation shown on the help screen.
 
    .. attribute:: show
-      :type: bool
-      :value: True
+      :type: Optional[bool]
+      :value: None
 
       Show this group in the help-panel.
+      Defaults to ``None``, which will only show the group if a ``name`` is provided.
+
+   .. attribute:: default_parameter
+      :type: Optional[Parameter]
+      :value: None
+
+      Default :class:`Parameter` in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter.
+      The provided :class:`Parameter` is not allowed to have a ``group`` value.
+      When used with ``@app.command``, all arguments are provided.
+      Not used with ``@app.command``.
 
    .. attribute:: converter
       :type: Optional[Callable]
@@ -252,9 +286,15 @@ API
           def converter(**kwargs) -> Dict[str, Any]:
               """Return an updated dictionary."""
 
-      The returned dictionary will be used passed along to the command invocation.
-      The group converter runs **after** :class:`Parameter` converters and validators.
-      Not used with ``@app.command``.
+      Parsed and converted arguments belonging to the group will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
+      The python variable names will be used, which may differ from their CLI names.
+      If a variable isn't populated from the CLI or environment variable, it will not be provided to the converter.
+      I.e. defaults from the function signature are **not** applied prior.
+
+      The returned dictionary will be used for subsequent execution.
+      Removing variables from the returned dictionary will unbound them from the function.
+
+      Not used with ``@app.command`` groups.
 
    .. attribute:: validator
       :type: Optional[Callable]
@@ -272,13 +312,46 @@ API
       Validators are **not** invoked on command groups.
       The group-validator runs **after** the group-converter.
 
-   .. attribute:: default_parameter
-      :type: Optional[Parameter]
-      :value: None
+      The raised error message will be presented to the user with python-variables prepended with "--" remapped to their CLI counterparts.
 
-      Default :class:`Parameter` in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter.
-      The provided :class:`Parameter` is not allowed to have a ``group`` value.
-      Not used with ``@app.command``.
+      In the following example, the python variable name ``"--bar"`` in the error message is remapped to ``"--buzz"``.
+
+      .. code-block:: python
+
+         from cyclopts import Parameter, App, Group
+         from typing import Annotated
+
+         app = App()
+
+
+         def upper_case_only(**kwargs):
+             for k, v in kwargs.items():
+                 if not v.isupper():
+                     raise ValueError(f'--{k} value "{v}" needs to be uppercase.')
+
+
+         group = Group("", validator=upper_case_only)
+
+
+         @app.default
+         def foo(
+             bar: Annotated[str, Parameter(name="--fizz", group=group)],
+             baz: Annotated[str, Parameter(name="--buzz", group=group)],
+         ):
+             pass
+
+
+         app()
+
+      .. code-block:: console
+
+         $ python meow.py ALICE bob
+         ╭─ Error ─────────────────────────────────────────────────╮
+         │ --buzz value "bob" needs to be uppercase.               │
+         ╰─────────────────────────────────────────────────────────╯
+
+      Not used with ``@app.command`` groups.
+
 
 
 .. autofunction:: cyclopts.coerce
