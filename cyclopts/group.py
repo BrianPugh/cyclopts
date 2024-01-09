@@ -18,12 +18,12 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
 
 @define
 class Group:
-    name: str
+    name: str = ""
 
     help: str = ""
 
     # All below parameters are keyword-only
-    show: bool = field(default=True, kw_only=True)
+    _show: Optional[bool] = field(default=None, alias="show", kw_only=True)
 
     converter: Optional[Callable] = field(default=None, kw_only=True)
 
@@ -41,6 +41,14 @@ class Group:
 
     def __str__(self):
         return self.name
+
+    @property
+    def show(self):
+        return bool(self.name) if self._show is None else self._show
+
+    @show.setter
+    def show(self, value):
+        self._show = value
 
     @classmethod
     def create_default_arguments(cls):

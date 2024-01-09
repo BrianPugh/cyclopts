@@ -3,7 +3,7 @@ Default Parameter
 =================
 The default values of :class:`Parameter` can be configured via :attr:`.App.default_parameter`.
 
-For example, to disable the ``negative`` flag feature across your entire app:
+For example, to disable the :attr:`~.Parameter.negative` flag feature across your entire app:
 
 .. code-block:: python
 
@@ -30,7 +30,7 @@ Consequently, ``--no-flag`` is no longer provided:
    │ *  --flag  [required]                                         │
    ╰───────────────────────────────────────────────────────────────╯
 
-Explicitly setting ``negative`` in the function signature works as expected:
+Explicitly setting :attr:`~.Parameter.negative` in the function signature overrides this configuration and works as expected:
 
 
 .. code-block::
@@ -54,13 +54,17 @@ Explicitly setting ``negative`` in the function signature works as expected:
 Resolution Order
 ----------------
 
-When resolving what the Parameter values for an individual function parameter should be, explicitly set attributes of higher priority Parameters override lower priority Parameters. The resolution order is as follows:
+When resolving what the :class:`Parameter` values for an individual function parameter should be, explicitly set attributes of higher priority Parameters override lower priority Parameters. The resolution order is as follows:
 
-1. *Highest Priority:* Parameter-annotated command function signature ``Annotated[..., Parameter()]``.
-2. :class:`Group` ``default_parameter`` that the Parameter belongs to.
-3. :class:`Group` ``default_parameter`` of the :class:`App` that the function belongs to.
-4. :class:`App` ``default_parameter`` of the :class:`App` that registered the command.
-5. *Lowest Priority:* (2-4) of the parenting app(s).
+1. **Highest Priority:** Parameter-annotated command function signature ``Annotated[..., Parameter()]``.
+
+2. :attr:`.Group.default_parameter` that the Parameter belongs to.
+
+.. 3. :attr:`.Group.default_parameter` of the :class:`App` that the function belongs to.
+
+3. :class:`App` ``default_parameter`` of the :class:`App` that registered the command.
+
+4. **Lowest Priority:** (2-3) of the parenting app(s).
 
 Any of Parameter's fields can be set to `None` to revert back to the true-original Cyclopts default.
 All App/Group/Parameter ``default_parameter`` values default to ``None``.

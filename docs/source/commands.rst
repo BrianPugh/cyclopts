@@ -2,7 +2,7 @@
 Commands
 ========
 
-For a given Cyclopts application, there are 2 primary registering actions:
+There are 2 primary function registering decorators:
 
 1. :meth:`@app.default <cyclopts.App.default>` -
    Registers an action for when no valid command is provided by the CLI.
@@ -15,13 +15,13 @@ For a given Cyclopts application, there are 2 primary registering actions:
 2. :meth:`@app.command <cyclopts.App.command>` - Registers a function or :class:`.App` as a command.
    Commands require explicit CLI invocation.
 
-This section will detail how to use the ``@app.command`` decorator.
+This section will detail how to use the :meth:`@app.command <cyclopts.App.command>` decorator.
 
 ---------------------
 Registering a Command
 ---------------------
 The :meth:`@app.command <cyclopts.App.command>` decorator adds a command to a Cyclopts application.
-The registered command can either be a function, or another Cyclopts application.
+The registered command can either be a function, or another Cyclopts :class:`.App`.
 
 
 .. code-block:: python
@@ -72,7 +72,8 @@ By default, a command is registered to the function name with underscores replac
 Any leading or trailing underscore/hyphens will also be stripped.
 For example, ``def _foo_bar()`` will become the command ``foo-bar``.
 
-The name can be manually changed in the :meth:`@app.command <cyclopts.App.command>` decorator:
+The name can be manually changed in the :meth:`@app.command <cyclopts.App.command>` decorator.
+Manually set names are not subject to this name conversion.
 
 .. code-block:: python
 
@@ -91,6 +92,7 @@ There are a few ways to adding a help string to a command:
 
 1. If the function has a docstring, the short description will be
    used as the help string for the command.
+   This is generally the preferred method.
 
 2. If the registered command is a sub app, the sub app's ``help`` field
    will be used.
@@ -100,11 +102,9 @@ There are a few ways to adding a help string to a command:
       sub_app = App(name="foo", help="Help text for foo.")
       app.command(sub_app)
 
-3. The ``help`` field of ``@app.command``. If provided, the docstring or subapp help field will **not** be used.
+3. The :attr:`help <cyclopts.App.help>` field of :meth:`@app.command <cyclopts.App.command>`. If provided, the docstring or subapp help field will **not** be used.
 
-.. code-block
-
-.. code-block:: console
+.. code-block:: python
 
    app = cyclopts.App()
 
@@ -117,7 +117,9 @@ There are a few ways to adding a help string to a command:
 
    @app.command(help="Help string for bar.")
    def bar():
-       pass
+       """This got overridden."""
+
+.. code-block:: console
 
    $ my-script --help
    ╭─ Commands ─────────────────────╮

@@ -75,7 +75,7 @@ Here's what's happening:
 2. Calling ``app()`` triggers Cyclopts to parse CLI inputs.
 
 3. Cyclopts identifies ``"Alice"`` as a positional argument, matching it to the parameter ``name``.
-   In the absence of an explicit type hint for ``name``, Cyclopts defaults to treating it as a string.
+   In the absence of an explicit type hint, Cyclopts defaults to ``str``.
 
 4. Cyclopts calls the registered default ``main("Alice")``, and the greeting is printed.
 
@@ -108,7 +108,7 @@ Extending the example, lets add more arguments and type hints:
    Hello Alice!
    Hello Alice!
 
-The command line input ``"3"`` is automatically converted to an integer because of the ``count`` type hint ``int``.
+The command line input ``"3"`` is converted to an integer because of ``count``'s type hint ``int``.
 Cyclopts natively handles all python builtin types, see :ref:`Coercion Rules` for more details.
 Cyclopts adheres to Python's argument binding rules, allowing both positional and keyword arguments.
 Therefore, all these commands are equivalent:
@@ -148,7 +148,7 @@ We can add application-level help documentation when creating our ``app``:
    │ --help,-h  Display this message and exit.                                       │
    ╰─────────────────────────────────────────────────────────────────────────────────╯
 
-If ``App(help=)`` is not set, Cyclopts will fallback to the first line
+If :attr:`.App.help` is not set, Cyclopts will fallback to the first line
 (short description) of the registered ``@app.default`` function's docstring.
 
 .. _checkout the mypy cheatsheet: https://mypy.readthedocs.io/en/latest/cheat_sheet_py3.html
