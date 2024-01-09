@@ -31,7 +31,7 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.group import Group, to_group_converter
-from cyclopts.group_extractors import groups_from_app
+from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     create_panel_table_commands,
     format_command_rows,
@@ -285,6 +285,7 @@ class App:
     def _parse_command_chain(self, tokens):
         command_chain = []
         app = self
+        apps = [app]
         unused_tokens = tokens
 
         command_mapping = _combined_meta_command_mapping(app)
@@ -295,13 +296,14 @@ class App:
                 break
             try:
                 app = command_mapping[token]
+                apps.append(app)
                 unused_tokens = tokens[i + 1 :]
             except KeyError:
                 break
             command_chain.append(token)
             command_mapping = _combined_meta_command_mapping(app)
 
-        return command_chain, app, unused_tokens
+        return command_chain, apps, unused_tokens
 
     def command(
         self,
@@ -391,8 +393,6 @@ class App:
     ) -> Tuple[Callable, inspect.BoundArguments, List[str]]:
         """Interpret arguments into a function, ``BoundArguments``, and any remaining unknown tokens.
 
-        **Does NOT** handle special flags like "version" or "help".
-
         Parameters
         ----------
         tokens: Union[None, str, Iterable[str]]
@@ -412,27 +412,42 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        command_chain, app, unused_tokens = self._parse_command_chain(tokens)
+        command_chain, apps, unused_tokens = self._parse_command_chain(tokens)
+        app = apps[-1]
 
         try:
-            if app is not self:
-                return app.parse_known_args(unused_tokens)
+            parent_app = apps[-2]
+        except IndexError:
+            parent_app = None
 
-            if self.default_command:
-                command = self.default_command
+        try:
+            if app.default_command:
+                command = app.default_command
                 resolved_command = ResolvedCommand(
                     command,
-                    self.default_parameter,
-                    self.group_arguments,
-                    self.group_parameters,
+                    app.default_parameter,
+                    app.group_arguments,
+                    app.group_parameters,
                     parse_docstring=False,
                 )
+                # We want the resolved group that ``app`` belongs to.
+                if parent_app is None:
+                    command_groups = []
+                else:
+                    command_groups = next(x for x in inverse_groups_from_app(parent_app) if x[0] is app)[1]
+
                 bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
-                if self.converter:
-                    bound.arguments = self.converter(**bound.arguments)
                 try:
-                    for validator in self.validator:
+                    if app.converter:
+                        bound.arguments = app.converter(**bound.arguments)
+                    for command_group in command_groups:
+                        if command_group.converter:
+                            bound.arguments = command_group.converter(**bound.arguments)
+                    for validator in app.validator:
                         validator(**bound.arguments)
+                    for command_group in command_groups:
+                        for validator in command_group.validator:
+                            validator(**bound.arguments)
                 except (AssertionError, ValueError, TypeError) as e:
                     new_exception = ValidationError(value=e.args[0])
                     raise new_exception from e
@@ -583,7 +598,8 @@ class App:
         if console is None:
             console = Console()
 
-        command_chain, app, _ = self._parse_command_chain(tokens)
+        command_chain, apps, _ = self._parse_command_chain(tokens)
+        app = apps[-1]
 
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
@@ -594,7 +610,8 @@ class App:
 
         def walk_apps():
             # Iterates from deepest to shallowest meta-apps
-            meta_list = [app]  # shallowest to deepest
+            meta_list = []  # shallowest to deepest
+            meta_list.append(app)
             meta = app
             while (meta := meta._meta) and meta.default_command:
                 meta_list.append(meta)

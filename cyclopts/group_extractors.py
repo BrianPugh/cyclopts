@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Tuple, Union
+from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Tuple, Union
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -62,3 +62,18 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     group_mapping.sort(key=lambda x: x[0].name)
 
     return group_mapping
+
+
+def inverse_groups_from_app(app: "App") -> List[Tuple["App", List[Group]]]:
+    out = []
+    seen_apps = []
+    for group, apps in groups_from_app(app):
+        for app in apps:
+            try:
+                index = seen_apps.index(app)
+            except ValueError:
+                index = len(out)
+                out.append((app, []))
+                seen_apps.append(app)
+            out[index][1].append(group)
+    return out
