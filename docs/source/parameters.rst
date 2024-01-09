@@ -49,7 +49,7 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
    ╰─────────────────────────────────────────────────────────────────────────────────────╯
 
 This keeps the code as terse and clean as possible.
-However, if more control is required, we can use :class:`Parameter <cyclopts.Parameter>` along with the builtin ``Annotated``.
+However, if more control is required, we can use :class:`.Parameter` along with the builtin ``Annotated``.
 
 .. code-block:: python
 
@@ -61,7 +61,7 @@ However, if more control is required, we can use :class:`Parameter <cyclopts.Par
    def foo(bar: Annotated[int, Parameter(...)]):
        pass
 
-:class:`Parameter <cyclopts.Parameter>` gives complete control on how Cyclopts processes the annotated parameter.
+:class:`.Parameter` gives complete control on how Cyclopts processes the annotated parameter.
 See the API page for all configurable options.
 
 ----

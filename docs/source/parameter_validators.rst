@@ -4,7 +4,7 @@ Parameter Validators
 In a CLI application, users have the freedom to input a wide range of data.
 This flexibility can lead to inputs the application does not expect.
 By coercing the input into a data type (like an ``int``), we are already limiting the input to a certain degree.
-To further restrict the user input, you can populate the ``validator`` field in the :class:`Parameter <cyclopts.Parameter>`.
+To further restrict the user input, you can populate the ``validator`` field in the :class:`.Parameter`.
 
 A validator is any callable object (such as a function) that has the signature:
 
@@ -22,7 +22,7 @@ Cyclopts has some builtin common validators in the ``cyclopts.validators`` modul
 ------
 Number
 ------
-The :class:`Number <cyclopts.validators.Number>` validator can set minimum and maximum input values.
+The :class:`.Number` validator can set minimum and maximum input values.
 
 .. code-block:: python
 
@@ -55,7 +55,7 @@ The :class:`Number <cyclopts.validators.Number>` validator can set minimum and m
 ----
 Path
 ----
-The :class:`Path <cyclopts.validators.Path>` validator ensures certain properties
+The :class:`.Path` validator ensures certain properties
 of the parsed ``pathlib.Path`` object, such as asserting the file must exist.
 
 .. code-block:: python

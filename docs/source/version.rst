@@ -30,10 +30,10 @@ The resolution order for determining the version string is as follows:
       app = cyclopts.App(version=get_my_application_version)
 
 2. The invoking-package's `Distribution Package's Version Number`_ via `importlib.metadata.version`_.
-   Cyclopts attempts to derive the package module that instantiated the :class:`App <cyclopts.App>` object by traversing the call stack.
+   Cyclopts attempts to derive the package module that instantiated the :class:`.App` object by traversing the call stack.
 
 3. The invoking-package's `defacto PEP8 standard`_ ``__version__`` string.
-   Cyclopts attempts to derive the package module that instantiated the :class:`App <cyclopts.App>` object by traversing the call stack.
+   Cyclopts attempts to derive the package module that instantiated the :class:`.App` object by traversing the call stack.
 
    .. code-block:: python
 

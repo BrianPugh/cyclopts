@@ -8,11 +8,11 @@ For a given Cyclopts application, there are 2 primary registering actions:
    Registers an action for when no valid command is provided by the CLI.
    This was previously demonstrated in :ref:`Getting Started`.
 
-   A sub-app **cannot** be registered with :meth:`app.default <cyclopts.App.default>`.
+   A sub-app **cannot** be registered with :meth:`@app.default <cyclopts.App.default>`.
 
    The default :meth:`app.default <cyclopts.App.default>` handler runs :meth:`app.help_print <cyclopts.App.help_print>`.
 
-2. :meth:`@app.command <cyclopts.App.command>` - Registers a function or :class:`App <cyclopts.App>` as a command.
+2. :meth:`@app.command <cyclopts.App.command>` - Registers a function or :class:`.App` as a command.
    Commands require explicit CLI invocation.
 
 This section will detail how to use the ``@app.command`` decorator.
@@ -72,7 +72,7 @@ By default, a command is registered to the function name with underscores replac
 Any leading or trailing underscore/hyphens will also be stripped.
 For example, ``def _foo_bar()`` will become the command ``foo-bar``.
 
-The name can be manually changed in the :meth:`command <cyclopts.App.command>` decorator:
+The name can be manually changed in the :meth:`@app.command <cyclopts.App.command>` decorator:
 
 .. code-block:: python
 
