@@ -63,7 +63,7 @@ class Parameter:
 
     negative: Union[None, Tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)
 
-    group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter, hash=False)
+    group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter, hash=False)
 
     token_count: Optional[int] = field(default=None, validator=_token_count_validator)
 
