@@ -8,13 +8,15 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-from cyclopts import CoercionError, Group, Parameter
+from cyclopts import CoercionError, Group, Parameter, ValidationError
 
 
 @pytest.mark.parametrize(
     "cmd_str,expected",
     [
         ("--my-flag", True),
+        ("--my-flag=true", True),
+        ("--my-flag=false", False),
         ("--no-my-flag", False),
     ],
 )
@@ -24,6 +26,22 @@ def test_boolean_flag_default(app, cmd_str, expected, assert_parse_args):
         pass
 
     assert_parse_args(foo, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "--no-my-flag=True",
+        "--no-my-flag=False",
+    ],
+)
+def test_boolean_flag_negative_assignment_not_allowed(app, cmd_str, assert_parse_args):
+    @app.default
+    def foo(my_flag: bool = True):
+        pass
+
+    with pytest.raises(ValidationError):
+        app.parse_args(cmd_str, exit_on_error=False, print_error=True)
 
 
 def test_boolean_flag_app_parameter_default(app, assert_parse_args):
@@ -39,6 +57,24 @@ def test_boolean_flag_app_parameter_default(app, assert_parse_args):
     # The negative flag should be disabled.
     with pytest.raises(CoercionError):
         app.parse_args("--no-my-flag", exit_on_error=False)
+
+
+def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args):
+    @app.default
+    def foo(my_flag: Annotated[bool, Parameter("", negative="--no-my-flag")] = True):
+        pass
+
+    assert_parse_args(foo, "--no-my-flag", False)
+
+    with pytest.raises(Exception):  # noqa: B017
+        # TODO: refine this exception with allow_leading_hyphen
+        app.parse_args("--my-flag", exit_on_error=False, print_error=True)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--no-my-flag=True", exit_on_error=False, print_error=True)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--no-my-flag=False", exit_on_error=False, print_error=True)
 
 
 def test_boolean_flag_app_parameter_default_annotated_override(app, assert_parse_args):
