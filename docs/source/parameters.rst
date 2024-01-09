@@ -2,7 +2,7 @@
 Parameters
 ==========
 
-Typically, Cyclopts gets all the information it needs from object names, type hints, or the function docstring:
+Typically, Cyclopts gets all the information it needs from object names, type hints, and the function docstring:
 
 .. code-block:: python
 
@@ -49,7 +49,8 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
    ╰─────────────────────────────────────────────────────────────────────────────────────╯
 
 This keeps the code as terse and clean as possible.
-However, if more control is required, we can use :class:`.Parameter` along with the builtin ``Annotated``.
+However, if more control is required, we can use :class:`.Parameter` along with the python builtin :obj:`~typing.Annotated`.
+Prior to Python 3.9, :obj:`~typing.Annotated` has to be imported from ``typing_extensions``; in more recent python versions it can be directly imported from the :mod:`typing` module.
 
 .. code-block:: python
 
@@ -190,9 +191,9 @@ If we had a program that accepted an integer user age as an input, ``-1`` is an 
    │ Invalid value for --age. You are too old to be using this application.   │
    ╰──────────────────────────────────────────────────────────────────────────╯
 
--------------------
-Multiple Parameters
--------------------
+--------------------
+Parameter Resolution
+--------------------
 Say you want to define a new ``int`` type that uses the :ref:`byte-centric converter from above<Converters>`.
 
 We can define the type:

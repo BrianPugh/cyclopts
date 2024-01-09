@@ -46,6 +46,28 @@ def test_group_default_parameter_converter(app, assert_parse_args):
     assert_parse_args(foo, "chocolate", "CHOCOLATE")
 
 
+def test_group_command_default_parameter_resolution(app):
+    app_validator = Mock()
+    sub_app_validator = Mock()
+    command_validator = Mock()
+    group_validator = Mock()
+
+    app.validator = app_validator
+    app.command(bar := App("bar", validator=sub_app_validator))
+
+    @bar.command(validator=command_validator, group=Group("Test", validator=group_validator))
+    def cmd(foo=5):
+        return 100
+
+    assert 100 == app("bar cmd")
+
+    app_validator.assert_not_called()
+    sub_app_validator.assert_not_called()
+    # TODO: the group_validator should probably be called.
+    # group_validator.assert_called_once()
+    command_validator.assert_called_once()
+
+
 def test_group_default_parameter_validator(app):
     validator = Mock()
 

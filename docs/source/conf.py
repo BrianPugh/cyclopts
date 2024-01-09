@@ -45,6 +45,7 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.autodoc",
     "sphinx_autodoc_typehints",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx.ext.linkcode",
     "sphinx_copybutton",
@@ -66,6 +67,11 @@ myst_enable_extensions = [
     "linkify",
 ]
 
+# Intersphinx
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "typing_extensions": ("https://typing-extensions.readthedocs.io/en/latest/", None),
+}
 
 # Napoleon settings
 napoleon_google_docstring = True

@@ -31,6 +31,7 @@ from cyclopts.exceptions import (
     format_cyclopts_error,
 )
 from cyclopts.group import Group, to_group_converter
+from cyclopts.group_extractors import groups_from_app
 from cyclopts.help import (
     create_panel_table_commands,
     format_command_rows,
@@ -124,35 +125,52 @@ def _remove_duplicates(seq: List) -> List:
     return out
 
 
-@define(kw_only=True)
+@define
 class App:
-    default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
-    _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter")
-
     _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
-    version: Union[None, str, Callable] = field(factory=_default_version)
+    help: Optional[str] = field(default=None)
+
+    # Everything below must be kw_only
+
+    default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
+    _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter", kw_only=True)
+
+    version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
     version_flags: Tuple[str, ...] = field(
         default=["--version"],
         on_setattr=attrs.setters.frozen,
         converter=to_tuple_converter,
+        kw_only=True,
     )
 
-    help: Optional[str] = field(default=None)
     help_flags: Tuple[str, ...] = field(
         default=["--help", "-h"],
         on_setattr=attrs.setters.frozen,
         converter=to_tuple_converter,
+        kw_only=True,
     )
 
-    group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter)
+    group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter, kw_only=True)
 
-    group_arguments: Group = field(default=None, converter=to_group_converter(Group.create_default_arguments()))
-    group_parameters: Group = field(default=None, converter=to_group_converter(Group.create_default_parameters()))
-    group_commands: Group = field(default=None, converter=to_group_converter(Group.create_default_commands()))
+    group_arguments: Group = field(
+        default=None,
+        converter=to_group_converter(Group.create_default_arguments()),
+        kw_only=True,
+    )
+    group_parameters: Group = field(
+        default=None,
+        converter=to_group_converter(Group.create_default_parameters()),
+        kw_only=True,
+    )
+    group_commands: Group = field(
+        default=None,
+        converter=to_group_converter(Group.create_default_commands()),
+        kw_only=True,
+    )
 
-    converter: Optional[Callable] = field(default=None)
-    validator: List[Callable] = field(default=None, converter=to_list_converter)
+    converter: Optional[Callable] = field(default=None, kw_only=True)
+    validator: List[Callable] = field(default=None, converter=to_list_converter, kw_only=True)
 
     ######################
     # Private Attributes #
@@ -581,8 +599,6 @@ class App:
             while (meta := meta._meta) and meta.default_command:
                 meta_list.append(meta)
             yield from reversed(meta_list)
-
-        from cyclopts.group_extractors import groups_from_app
 
         command_rows, command_descriptions = {}, {}
         for subapp in walk_apps():

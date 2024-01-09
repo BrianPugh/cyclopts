@@ -70,7 +70,7 @@ An example of using groups with commands:
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
 The default group is defined by the registering app's :attr:`.App.group_command`, which defaults to a group named ``"Commands"``.
-Meow :attr:`.Group.converter`.
+For commands, the fields :attr:`.Group.converter` and :attr:`.Group.validator` have no effect.
 
 ----------------
 Parameter Groups
@@ -140,36 +140,16 @@ The default groups are defined by the registering app:
 
 * :attr:`group_parameters` for all other parameters, which defaults to a group named ``"Parameters"``.
 
-Cyclopts has some :ref:`builtin group-validators for common use-cases.<Group Validators>`
-
 ----------
 Converters
 ----------
-A converter is any callable object (such as a function) that has signature:
-
-.. code-block:: python
-
-   def converter(**kwargs: Any) -> Dict[str, Any]:
-       # This is a no-op converter
-       return kwargs
-
-Parsed and converted arguments belonging to the group will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
-The python variable names will be used, which may differ from their CLI names.
-If a variable isn't populated from the CLI or environment variable, it will not be provided to the converter.
-I.e. defaults from the function signature are **not** applied prior.
-
-The returned dictionary will be used for subsequent execution.
-Removing variables from the returned dictionary will unbound them from the function.
+Parameter group converters offer a way of having parameter conversions interact.
+See :attr:`.Group.converter` for details.
 
 ----------
 Validators
 ----------
-A validator is any callable object (such as a function) that has signature:
+Parameter group validators offer a way of validating combinations of CLI-provided values.
+See :attr:`.Group.validator` for details.
 
-.. code-block:: python
-
-   def validator(**kwargs: Any):
-       pass  # Raise any exception here if ``kwargs`` is invalid.
-
-Parsed and converted arguments belonging to the group will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
-The python variable names will be used, which may differ from their CLI names.
+Cyclopts has some :ref:`builtin group-validators for common use-cases.<Group Validators>`
