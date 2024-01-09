@@ -274,7 +274,6 @@ API
       Default :class:`Parameter` in the parameter-resolution-stack that goes between ``app.default_parameter`` and the function signature's Annotated Parameter.
       The provided :class:`Parameter` is not allowed to have a ``group`` value.
       When used with ``@app.command``, all arguments are provided.
-      Not used with ``@app.command``.
 
    .. attribute:: converter
       :type: Optional[Callable]
