@@ -40,6 +40,7 @@ def cli2parameter(command: ResolvedCommand) -> Dict[str, Tuple[inspect.Parameter
     2. A predefined value. If this value is ``None``, the value should be
        inferred from subsequent tokens.
     """
+    # The tuple's second element is an implicit value for flags.
     mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
 
     for iparam, cparam in command.iparam_to_cparam.items():
@@ -126,7 +127,15 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
         cparam = command.iparam_to_cparam[iparam]
 
         if implicit_value is not None:
-            cli_values.append(implicit_value)
+            # A flag was parsed
+            if cli_values:
+                # A value was parsed from "--key=value", and the ``value`` is in ``cli_values``.
+                if implicit_value:  # Only accept values to the positive flag
+                    pass
+                else:
+                    raise ValidationError(value=f'Cannot assign value to negative flag "{cli_key}".')
+            else:
+                cli_values.append(implicit_value)
         else:
             consume_count += max(1, token_count(iparam.annotation, cparam)[0])
 
