@@ -126,72 +126,6 @@ def _remove_duplicates(seq: List) -> List:
 
 @define(kw_only=True)
 class App:
-    """Cyclopts Application.
-
-    Parameters
-    ----------
-    name: Optional[Union[str, Iterable[str]]]
-        Name of application, or subcommand if registering to another application.
-        Name fallback resolution:
-
-        1. User specified ``name``.
-        2. If a ``default`` function has been registered, the name of that function.
-        3. If the module name is ``__main__.py``, the name of the encompassing package.
-        4. The value of ``sys.argv[0]``.
-
-        Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
-    version: Union[None, str, Callable]
-        Version to be displayed when a token of ``version_flags`` is parsed.
-        Defaults to attempting to using version of the package instantiating :class:`App`.
-        If a ``Callable``, it will be invoked with no arguments when version is queried.
-    version_flags: Union[str, Iterable[str]]
-        Token(s) that trigger :meth:`version_print`.
-        Set to an empty list to disable version feature.
-        Defaults to ``["--version"]``.
-    help: Optional[str]
-        Text to display on help screen.
-    help_flags: Union[str, Iterable[str]]
-        Tokens that trigger :meth:`help_print`.
-        Set to an empty list to disable help feature.
-        Defaults to ``["--help", "-h"]``.
-    default_parameter: Parameter
-        Default :class:`Parameter` configuration.
-    group: Union[None, str, Group, Iterable[Union[str, Group]]]
-        The group(s) that ``default_command`` belongs to.
-
-        * If ``None``, defaults to the ``"Commands"`` group.
-
-        * If ``str``, use an existing Group (from neighboring sub-commands) with name,
-          **or** create a :class:`Group` with provided name if it does not exist.
-
-        * If :class:`Group`, directly use it.
-    converter: Optional[Callable]
-        A function where all the converted CLI-provided variables will be keyword-unpacked,
-        regardless of their positional/keyword-type in the command function signature.
-        The python variable names will be used, which may differ from their CLI names.
-
-        .. code-block:: python
-
-            def converter(**kwargs) -> Dict[str, Any]:
-                "Return an updated dictionary."
-
-        The returned dictionary will be used passed along to the command invocation.
-        This converter runs **after** :class:`Parameter` and :class:`Group` converters.
-    validator: Union[None, Callable, List[Callable]]
-        A function where all the converted CLI-provided variables will be keyword-unpacked,
-        regardless of their positional/keyword-type in the command function signature.
-        The python variable names will be used, which may differ from their CLI names.
-
-        Example usage:
-
-        .. code-block:: python
-
-           def validator(**kwargs):
-               "Raise an exception if something is invalid."
-
-        This validator runs **after** :class:`Parameter` and :class:`Group` validators.
-    """
-
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command)
     _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter")
 
@@ -211,7 +145,7 @@ class App:
         converter=to_tuple_converter,
     )
 
-    group: Tuple[Group, ...] = field(default=None, converter=to_tuple_converter)
+    group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter)
 
     group_arguments: Group = field(default=None, converter=to_group_converter(Group.create_default_arguments()))
     group_parameters: Group = field(default=None, converter=to_group_converter(Group.create_default_parameters()))

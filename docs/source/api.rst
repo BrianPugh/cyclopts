@@ -5,8 +5,96 @@ API
 ===
 
 .. autoclass:: cyclopts.App
-   :members: name, default, default_parameter, command, version_print, help_print, interactive_shell, parse_known_args, parse_args
+   :members: default, command, version_print, help_print, interactive_shell, parse_known_args, parse_args
    :special-members: __call__, __getitem__
+
+   Cyclopts Application.
+
+   .. attribute:: name
+      :type: Optional[Union[str, Iterable[str]]]
+
+      Name of application, or subcommand if registering to another application. Name fallback resolution:
+
+      1. User specified ``name``.
+      2. If a ``default`` function has been registered, the name of that function.
+      3. If the module name is ``__main__.py``, the name of the encompassing package.
+      4. The value of ``sys.argv[0]``.
+
+      Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
+
+   .. attribute:: version
+      :type: Union[None, str, Callable]
+
+      Version to be displayed when a token of ``version_flags`` is parsed.
+      Defaults to attempting to using version of the package instantiating :class:`App`.
+      If a ``Callable``, it will be invoked with no arguments when version is queried.
+
+   .. attribute:: version_flags
+      :type: Union[str, Iterable[str]]
+
+      Token(s) that trigger :meth:`version_print`.
+      Set to an empty list to disable version feature.
+      Defaults to ``["--version"]``.
+
+   .. attribute:: help
+      :type: Optional[str]
+
+      Text to display on help screen.
+
+   .. attribute:: help_flags
+      :type: Union[str, Iterable[str]]
+
+      Tokens that trigger :meth:`help_print`.
+      Set to an empty list to disable help feature.
+      Defaults to ``["--help", "-h"]``.
+
+   .. attribute:: default_parameter
+      :type: Parameter
+
+      Default :class:`Parameter` configuration.
+
+   .. attribute:: group
+      :type: Union[None, str, Group, Iterable[Union[str, Group]]]
+
+      The group(s) that ``default_command`` belongs to.
+
+      * If ``None``, defaults to the ``"Commands"`` group.
+
+      * If ``str``, use an existing Group (from neighboring sub-commands) with name,
+        **or** create a :class:`Group` with provided name if it does not exist.
+
+      * If :class:`Group`, directly use it.
+
+   .. attribute:: converter
+      :type: Optional[Callable]
+
+      A function where all the converted CLI-provided variables will be keyword-unpacked,
+      regardless of their positional/keyword-type in the command function signature.
+      The python variable names will be used, which may differ from their CLI names.
+
+      .. code-block:: python
+
+          def converter(**kwargs) -> Dict[str, Any]:
+              "Return an updated dictionary."
+
+      The returned dictionary will be used passed along to the command invocation.
+      This converter runs **after** :class:`Parameter` and :class:`Group` converters.
+
+   .. attribute:: validator
+      :type: Union[None, Callable, List[Callable]]
+
+      A function where all the converted CLI-provided variables will be keyword-unpacked,
+      regardless of their positional/keyword-type in the command function signature.
+      The python variable names will be used, which may differ from their CLI names.
+
+      Example usage:
+
+      .. code-block:: python
+
+         def validator(**kwargs):
+             "Raise an exception if something is invalid."
+
+      This validator runs **after** :class:`Parameter` and :class:`Group` validators.
 
 .. autoclass:: cyclopts.Parameter
 
