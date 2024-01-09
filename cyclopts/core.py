@@ -125,6 +125,23 @@ def _remove_duplicates(seq: List) -> List:
     return out
 
 
+def _get_command_groups(parent_app, child_app):
+    return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
+
+
+def _resolve_default_parameter(apps):
+    """The default_parameter resolution depends on the parent-child path traversed."""
+    cparams = []
+    for parent_app, child_app in zip(apps[:-1], apps[1:]):
+        groups = _get_command_groups(parent_app, child_app)
+        cparams.extend([group.default_parameter for group in groups])
+        cparams.append(parent_app.default_parameter)
+
+    cparams.append(apps[-1].default_parameter)
+
+    return Parameter.combine(*cparams)
+
+
 @define
 class App:
     _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
@@ -134,7 +151,7 @@ class App:
     # Everything below must be kw_only
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
-    _default_parameter: Optional[Parameter] = field(default=None, alias="default_parameter", kw_only=True)
+    default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
     version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
     version_flags: Tuple[str, ...] = field(
@@ -204,23 +221,6 @@ class App:
     ###########
     # Methods #
     ###########
-    @property
-    def default_parameter(self) -> Parameter:
-        """Parameter value defaults for all functions' Parameters.
-
-        The ``default_parameter`` is treated as a hierarchical configuration, inheriting from parenting :class:`App` s.
-
-        Usually, an :class:`App` has at most one parent.
-        In the event of multiple parents, they are evaluated in reverse-registered order,
-        where each ``default_parameter`` attributes overwrites the previous.
-        I.e. the first registered parent has the highest-priority of the parents.
-        The specified ``default_parameter`` for this :class:`App` object has higher priority over parents.
-        """
-        return Parameter.combine(*(x.default_parameter for x in reversed(self._parents)), self._default_parameter)
-
-    @default_parameter.setter
-    def default_parameter(self, value: Optional[Parameter]):
-        self._default_parameter = value
 
     @property
     def name(self) -> Tuple[str, ...]:
@@ -413,7 +413,7 @@ class App:
         tokens = normalize_tokens(tokens)
 
         command_chain, apps, unused_tokens = self._parse_command_chain(tokens)
-        app = apps[-1]
+        command_app = apps[-1]
 
         try:
             parent_app = apps[-2]
@@ -421,29 +421,29 @@ class App:
             parent_app = None
 
         try:
-            if app.default_command:
-                command = app.default_command
+            if command_app.default_command:
+                command = command_app.default_command
                 resolved_command = ResolvedCommand(
                     command,
-                    app.default_parameter,
-                    app.group_arguments,
-                    app.group_parameters,
+                    _resolve_default_parameter(apps),
+                    command_app.group_arguments,
+                    command_app.group_parameters,
                     parse_docstring=False,
                 )
                 # We want the resolved group that ``app`` belongs to.
                 if parent_app is None:
                     command_groups = []
                 else:
-                    command_groups = next(x for x in inverse_groups_from_app(parent_app) if x[0] is app)[1]
+                    command_groups = _get_command_groups(parent_app, command_app)
 
                 bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
                 try:
-                    if app.converter:
-                        bound.arguments = app.converter(**bound.arguments)
+                    if command_app.converter:
+                        bound.arguments = command_app.converter(**bound.arguments)
                     for command_group in command_groups:
                         if command_group.converter:
                             bound.arguments = command_group.converter(**bound.arguments)
-                    for validator in app.validator:
+                    for validator in command_app.validator:
                         validator(**bound.arguments)
                     for command_group in command_groups:
                         for validator in command_group.validator:
@@ -463,7 +463,7 @@ class App:
                     bound = inspect.signature(command).bind(tokens=tokens, console=console)
                     return command, bound, []
         except CycloptsError as e:
-            e.app = app
+            e.app = command_app
             if command_chain:
                 e.command_chain = command_chain
             raise

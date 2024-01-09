@@ -1,6 +1,7 @@
 import pytest
 
 from cyclopts import App, Parameter
+from cyclopts.core import _resolve_default_parameter
 
 
 def test_subapp_basic(app):
@@ -48,17 +49,21 @@ def test_subapp_cannot_be_default(app):
         App(default_command=App(name="foo"))
 
 
-def test_subapp_default_parameter_resolution():
-    parent_app_1 = App(default_parameter=Parameter(show_default=True))
+def test_resolve_default_parameter_1():
+    parent_app_1 = App(default_parameter=Parameter("foo"))
 
-    sub_app = App(name="foo")
+    sub_app = App(name="bar")
     parent_app_1.command(sub_app)
 
-    # Standard Single Resolution
-    assert sub_app.default_parameter == Parameter(show_default=True)
+    actual_parameter = _resolve_default_parameter([parent_app_1, sub_app])
+    assert actual_parameter == Parameter("foo")
 
-    parent_app_2 = App(default_parameter=Parameter(show_default=False, negative=()))
-    parent_app_2.command(sub_app)
 
-    # 2-Parent Resolution
-    assert sub_app.default_parameter == Parameter(show_default=True, negative=())
+def test_resolve_default_parameter_2():
+    parent_app_1 = App(default_parameter=Parameter("foo"))
+
+    sub_app = App(name="bar", default_parameter=Parameter("bar"))
+    parent_app_1.command(sub_app)
+
+    actual_parameter = _resolve_default_parameter([parent_app_1, sub_app])
+    assert actual_parameter == Parameter("bar")
