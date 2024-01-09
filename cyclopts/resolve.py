@@ -75,7 +75,7 @@ def _resolve_groups(
                 iparam_to_groups[iparam].append(group)
             elif isinstance(group, Group):
                 # Ensure a different, but same-named group doesn't already exist
-                if sum(x.name == group.name for x in resolved_groups) > 1:
+                if any(group is not x and x.name == group.name for x in resolved_groups):
                     raise ValueError("Cannot register 2 distinct Group objects with same name.")
 
                 if group.default_parameter is not None and group.default_parameter.group:
