@@ -2,6 +2,8 @@ import sys
 
 import pytest
 
+from cyclopts.exceptions import DocstringError
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
@@ -39,6 +41,20 @@ def test_resolve_docstring_parameter_priority():
     res = ResolvedCommand(foo)
     cparam = res.iparam_to_cparam[res.name_to_iparam["bar"]]
     assert cparam.help == "This has priority."
+
+
+def test_resolve_docstring_bad_parameter():
+    def foo(bar):
+        """
+        Parameters
+        ----------
+        fizz
+            Fizz Docstring.
+        """
+        pass
+
+    with pytest.raises(DocstringError):
+        ResolvedCommand(foo)
 
 
 def test_group_name_collision():
