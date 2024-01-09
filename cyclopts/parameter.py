@@ -143,7 +143,7 @@ class Parameter:
 
     @classmethod
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
-        """Returns a new Parameter with values of ``parameters`` overriding ``self``.
+        """Returns a new Parameter with values of ``parameters``.
 
         Parameters
         ----------
@@ -165,8 +165,8 @@ class Parameter:
     def default(cls) -> "Parameter":
         """Create a Parameter with all Cyclopts-default values.
 
-        This is different than just ``Parameter()`` because it will override
-        all values of upstream Parameters.
+        This is different than just :class:`Parameter` because the default
+        values will be recorded and override all upstream parameter values.
         """
         return cls(
             **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportGeneralTypeIssues]

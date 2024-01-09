@@ -45,7 +45,7 @@ def _int(s: str) -> int:
         return int(s, 2)
     else:
         # Casting to a float first allows for things like "30.0"
-        return int(float(s))
+        return int(round(float(s)))
 
 
 def _bytes(s: str) -> bytes:

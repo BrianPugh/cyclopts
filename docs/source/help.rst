@@ -12,20 +12,17 @@ Cyclopts by-default adds ``--help`` and ``-h`` flags to the application:
 
    My application short description.
 
-   ╭─ Parameters ───────────────────────────────────────────────────────╮
-   │ --version      Display application version.                        │
-   │ --help     -h  Display this message and exit.                      │
-   ╰────────────────────────────────────────────────────────────────────╯
    ╭─ Commands ─────────────────────────────────────────────────────────╮
-   │ foo  Foo help string.                                              │
-   │ bar  Bar help string.                                              │
+   │ foo        Foo help string.                                        │
+   │ bar        Bar help string.                                        │
+   │ --help,-h  Display this message and exit.                          │
+   │ --version  Display application version.                            │
    ╰────────────────────────────────────────────────────────────────────╯
 
 Cyclopts derives the components of the help string from a variety of sources.
 The source resolution order is as follows (as applicable):
 
 1. The ``help`` field in the :meth:`@app.command <cyclopts.App.command>` decorator.
-   When registering an :class:`.App` object, supplying ``help`` via the :meth:`@app.command <cyclopts.App.command>` decorator is forbidden to reduce ambiguity and will raise a ``ValueError``.
 
    .. code-block:: python
 
@@ -36,7 +33,9 @@ The source resolution order is as follows (as applicable):
       def bar():
           pass
 
-2. The ``help`` field of :class:`.App`.
+   When registering an :class:`.App` object, supplying ``help`` via the :meth:`@app.command <cyclopts.App.command>` decorator is forbidden to reduce ambiguity and will raise a :exc:`ValueError`. See (2).
+
+2. Via :attr:`.App.help`.
 
    .. code-block:: python
 
@@ -68,7 +67,7 @@ The source resolution order is as follows (as applicable):
           """
 
 
-      @app["foo"].default
+      @app["foo"].default  # You can access sub-apps like a dictionary.
       def foo_handler():
           """This will be shown for the "foo" command."""
 
@@ -92,7 +91,7 @@ The ``--help`` flags can be changed to different name(s) via the ``help_flags`` 
    app = cyclopts.App(help_flags="--show-help")
    app = cyclopts.App(help_flags=["--send-help", "--send-help-plz", "-h"])
 
-To disable the ``--help`` flag, set ``help_flags`` to an empty string or iterable.
+To disable the help-page, set ``help_flags`` to an empty string or iterable.
 
 .. code-block:: python
 

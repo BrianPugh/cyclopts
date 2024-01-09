@@ -3,7 +3,7 @@
 ================
 Group Validators
 ================
-Cyclopts has some builtin common group validators in the ``cyclopts.validators`` module.
+Cyclopts has some builtin common group validators in the :ref:`cyclopts.validators <API Validators>` module.
 
 -------------
 LimitedChoice

@@ -5,12 +5,12 @@ Coercion Rules
 ==============
 This page intends to serve as a terse set of type coercion rules that Cyclopts follows.
 If a specific type (including custom types) is not specified, the coercion defaults to ``type(token: str)``.
-For example, Cyclopts does not have an explicit rule for ``pathlib.Path``, so if the value ``"foo.bin"`` is
+For example, Cyclopts does not have an explicit rule for :class:`pathlib.Path`, so if the value ``"foo.bin"`` is
 provided, Cyclopts will default to coercing it as ``pathlib.Path("foo.bin")``.
 
-Automatic coercion can always be overridden by the ``converter`` field of :class:`.Parameter`.
+Automatic coercion can always be overridden by the :attr:`.Parameter.converter` field.
 Typically, the ``converter`` function will receive a single token, but it may receive multiple tokens
-if the annotated type is iterable (e.g. ``list``, ``set``).
+if the annotated type is iterable (e.g. :class:`list`, :class:`set`).
 
 *******
 No Hint
@@ -28,12 +28,12 @@ If no explicit type hint is provided, the token will be parsed as a string. See 
    $ my-program foo
    value='foo' type(value)=<class 'str'>
 
+TODO: interpret type of default value if not None.
 
 ***
 Any
 ***
 A standalone ``Any`` type hint is equivalent to `No Hint`_
-Data will be treated as a string. See `Str`_.
 
 .. code-block:: python
 
@@ -106,7 +106,7 @@ Follows the same rules as `List`_. The passed in data will be a list.
 ***
 Set
 ***
-Follows the same rules as `List`_, but the resulting datatype is a ``set``.
+Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
 
 *****
 Tuple
@@ -123,7 +123,7 @@ And invoke our script:
 
 .. code-block:: console
 
-   my-program --coordinates 3.14 2.718 my-coord-name
+   $ my-program --coordinates 3.14 2.718 my-coord-name
    # coordinates argument is a tuple containing two floats and a string: ``(3.14, 2.718, "my-coord-name")``
 
 .. _Coercion Rules - Union:
@@ -160,7 +160,7 @@ Int
 ***
 For convenience, Cyclopts provides a richer feature-set of parsing integers than just naively calling ``int``.
 
-* Accepts vanilla decimal values (e.g. `123`, `3.1415`).
+* Accepts vanilla decimal values (e.g. `123`, `3.1415`). Floating-point values will be rounded prior to casting to an ``int``.
 * Accepts hexadecimal values (strings starting with `0x`).
 * Accepts binary values (strings starting with `0b`)
 
@@ -177,11 +177,41 @@ Not explicitly handled by Cyclopts, token gets cast as ``complex(token)``. For e
 ****
 Bool
 ****
-* If specified as a keyword, booleans get converted into flags that take no parameter.
-  The false-like flag defaults to ``--no-FLAG-NAME``.
-  See :attr:`.Parameter.negative` for more about this feature.
+1. If specified as a keyword, booleans are interpreted flags that take no parameter.
+   The false-like flag name defaults to ``--no-FLAG-NAME``.
+   See :attr:`.Parameter.negative` for more about this feature.
 
-  Example:
+   Example:
+
+   .. code-block:: python
+
+     @app.command
+     def foo(my_flag: bool):
+         print(my_flag)
+
+   .. code-block:: console
+
+       $ my-program foo --my-flag
+       True
+
+       $ my-program foo --no-my-flag
+       False
+
+2. If specified as a positional argument, a case-insensitive lookup is performed.
+   If the token is in the set of **false-like values** ``{"no", "n", "0", "false", "f"}``, then it is parsed as ``False``.
+   If the token is in the set of **true-like values** ``{"yes", "y", "1", "true", "t"}``, then it is parsed as ``True``.
+   Otherwise, a :exc:`CoercionError` will be raised.
+
+   .. code-block:: console
+
+       $ my-program foo 1
+       True
+
+       $ my-program foo 0
+       False
+
+3. If specified as a keyword with a value attached with an ``=``, then the provided value will be parsed according to positional argument rules above (2).
+   Only the positive flag can be specified this way, attempting to assign a value to the negative value will result in a :exc:`ValidationError`.
 
   .. code-block:: python
 
@@ -191,32 +221,25 @@ Bool
 
   .. code-block:: console
 
-      $ my-program foo --my-flag
+      $ my-program foo --my-flag=true
       True
 
-      $ my-program foo --no-my-flag
+      $ my-program foo --my-flag=false
       False
 
-* If specified as a positional argument, a case-insensitive lookup is performed.
-  If the token is in the set of false-like values ``{"no", "n", "0", "false", "f"}``, then it is parsed as ``False``.
-  Otherwise, the value is interpreted as ``True``.
-
-  .. code-block:: console
-
-      $ my-program foo 1
-      True
-
-      $ my-program foo 0
-      False
+      $ my-program foo --no-my-flag=true
+      ╭─ Error ───────────────────────────────────────────────────────────╮
+      │ Cannot assign value to negative flag "--no-my-flag".              │
+      ╰───────────────────────────────────────────────────────────────────╯
 
 .. _Coercion Rules - Literal:
 
 *******
 Literal
 *******
-The ``Literal`` type is a good option for limiting the user input to a set of choices.
-The ``Literal`` options will be iterated left-to-right until a successful coercion is performed.
-Cyclopts attempts to coerce the input token into the **type** of each ``Literal`` option.
+The :obj:`~typing.Literal` type is a good option for limiting the user input to a set of choices.
+The :obj:`~typing.Literal` options will be iterated left-to-right until a successful coercion is performed.
+Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typing.Literal` option.
 
 
 .. code-block:: python
@@ -245,10 +268,10 @@ Cyclopts attempts to coerce the input token into the **type** of each ``Literal`
 ****
 Enum
 ****
-While `Literal`_ is the recommended way of providing the user options, another method is using ``Enum``.
+While `Literal`_ is the recommended way of providing the user options, another method is using :class:`~enum.Enum`.
 
 For a user provided token, a **case-insensitive name** lookup is performed.
-If an enum name contains an underscore, the CLI parameter may instead contain a hyphen, ``-``.
+If an enum name contains an underscore, the CLI parameter **may** instead contain a hyphen, ``-``.
 Leading/Trailing underscores will be stripped.
 
 If coming from Typer_, **Cyclopts Enum handling is reversed compared to Typer**.

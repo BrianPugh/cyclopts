@@ -182,6 +182,7 @@ def test_bind_any_hint(app, cmd_str, annotated, assert_parse_args):
         "0b1",
         "0x01",
         "1.0",
+        "0.9",
     ],
 )
 def test_bind_int_advanced(app, cmd_str, assert_parse_args):
