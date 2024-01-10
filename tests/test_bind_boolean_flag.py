@@ -66,8 +66,7 @@ def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args
 
     assert_parse_args(foo, "--no-my-flag", False)
 
-    with pytest.raises(Exception):  # noqa: B017
-        # TODO: refine this exception with allow_leading_hyphen
+    with pytest.raises(ValidationError):
         app.parse_args("--my-flag", exit_on_error=False, print_error=True)
 
     with pytest.raises(ValidationError):
