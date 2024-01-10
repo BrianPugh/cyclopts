@@ -236,7 +236,7 @@ def coerce(type_: Type, *args: str):
         return [_convert(type_, item) for item in args]
 
 
-def token_count(type_: Type) -> Tuple[int, bool]:
+def token_count(type_: Union[Type, inspect.Parameter]) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -254,22 +254,21 @@ def token_count(type_: Type) -> Tuple[int, bool]:
     """
     from cyclopts.parameter import get_hint_parameter
 
-    if type_ is inspect.Parameter.empty:  # str
-        return 1, False
+    annotation = get_hint_parameter(type_)[0]
 
-    type_ = resolve(type_)
-    origin_type = get_origin_and_validate(type_)
+    annotation = resolve(annotation)
+    origin_type = get_origin_and_validate(annotation)
 
     if origin_type is tuple:
-        args = get_args(type_)
+        args = get_args(annotation)
         return sum(token_count(x)[0] for x in args if x is not ...), ... in args
-    elif (origin_type or type_) is bool:
+    elif (origin_type or annotation) is bool:
         return 0, False
-    elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
+    elif annotation in _iterable_types or (origin_type in _iterable_types and len(get_args(annotation)) == 0):
         return 1, True
-    elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
-        return token_count(get_args(type_)[0])[0], True
-    else:  # Unknown Type
+    elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
+        return token_count(get_args(annotation)[0])[0], True
+    else:
         return 1, False
 
 

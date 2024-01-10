@@ -11,7 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from cyclopts.group import Group
-from cyclopts.parameter import Parameter, get_hint
+from cyclopts.parameter import Parameter, get_hint_parameter
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
 
@@ -145,7 +145,7 @@ def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
 
     for iparam, cparam in zip(iparams, cparams):
         assert cparam.name is not None
-        type_ = get_hint(iparam.annotation)
+        type_ = get_hint_parameter(iparam)[0]
         options = list(cparam.name)
         options.extend(cparam.get_negatives(type_, *options))
 

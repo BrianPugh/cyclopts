@@ -26,7 +26,7 @@ def _list_index(lst: List, key: Callable) -> int:
 def _has_unparsed_parameters(f: Callable, *args) -> bool:
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
-        _, cparam = get_hint_parameter(iparam.annotation, *args)
+        _, cparam = get_hint_parameter(iparam, *args)
 
         if not cparam.parse:
             return True
@@ -49,7 +49,7 @@ def _resolve_groups(
     signature = inspect.signature(f)
 
     for iparam in signature.parameters.values():
-        _, cparam = get_hint_parameter(iparam.annotation, app_parameter)
+        _, cparam = get_hint_parameter(iparam, app_parameter)
 
         if not cparam.parse:
             continue
@@ -176,7 +176,7 @@ class ResolvedCommand:
             default_name_parameter = Parameter(name=names)
 
             cparam = get_hint_parameter(
-                iparam.annotation,
+                iparam,
                 app_parameter,
                 *(x.default_parameter for x in groups),
                 iparam_to_docstring_cparam.get(iparam),

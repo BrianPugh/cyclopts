@@ -158,6 +158,84 @@ def test_exception_unused_token(app):
     ],
 )
 @pytest.mark.parametrize("annotated", [False, True])
+def test_bind_no_hint_no_default(app, cmd_str, annotated, assert_parse_args):
+    """Parameter with no type hint & no default should be treated as a ``str``."""
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[Any, Parameter(help="help for a")]):
+            pass
+
+    else:
+
+        @app.command
+        def foo(a):
+            pass
+
+    assert_parse_args(foo, cmd_str, "1")
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
+    ],
+)
+@pytest.mark.parametrize("annotated", [False, True])
+def test_bind_no_hint_none_default(app, cmd_str, annotated, assert_parse_args):
+    """Parameter with no type hint & ``None`` default should be treated as a ``str``."""
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = None):
+            pass
+
+    else:
+
+        @app.command
+        def foo(a=None):
+            pass
+
+    assert_parse_args(foo, cmd_str, "1")
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
+    ],
+)
+@pytest.mark.parametrize("annotated", [False, True])
+def test_bind_no_hint_typed_default(app, cmd_str, annotated, assert_parse_args):
+    """Parameter with no type hint & typed default should be treated as a ``type(default)``."""
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = 5):
+            pass
+
+    else:
+
+        @app.command
+        def foo(a=5):
+            pass
+
+    assert_parse_args(foo, cmd_str, 1)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
+    ],
+)
+@pytest.mark.parametrize("annotated", [False, True])
 def test_bind_any_hint(app, cmd_str, annotated, assert_parse_args):
     """The ``Any`` type hint should be treated as a ``str``."""
     if annotated:

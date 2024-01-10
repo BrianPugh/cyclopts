@@ -1,6 +1,5 @@
 import inspect
-from functools import lru_cache
-from typing import Callable, Optional, Tuple, Type, Union, cast, get_args, get_origin
+from typing import Any, Callable, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
@@ -179,7 +178,7 @@ def validate_command(f: Callable):
     signature = inspect.signature(f)
     for iparam in signature.parameters.values():
         get_origin_and_validate(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam.annotation)
+        type_, cparam = get_hint_parameter(iparam)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
         if get_origin(type_) is tuple:
@@ -187,32 +186,39 @@ def validate_command(f: Callable):
                 raise ValueError("Cannot use a variable-length tuple.")
 
 
-@lru_cache
-def get_hint_parameter(type_: Type, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
+def get_hint_parameter(
+    type_: Union[Type, inspect.Parameter], *default_parameters: Optional[Parameter]
+) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
     """
     cyclopts_parameters = []
-    if type_ is inspect.Parameter.empty:
-        type_ = str
-    else:
-        type_ = resolve_optional(type_)
 
-        if type(type_) is AnnotatedType:
-            annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-            type_ = get_args(type_)[0]
+    if isinstance(type_, inspect.Parameter):
+        annotation = type_.annotation
+
+        if annotation is inspect.Parameter.empty or resolve(annotation) is Any:
+            if type_.default in (inspect.Parameter.empty, None):
+                annotation = str
+            else:
+                return get_hint_parameter(type(type_.default), *default_parameters)
+    else:
+        annotation = type_
+
+        if annotation is inspect.Parameter.empty:
+            annotation = str
+
+    if annotation is inspect.Parameter.empty:
+        annotation = str
+    else:
+        annotation = resolve_optional(annotation)
+
+        if type(annotation) is AnnotatedType:
+            annotations = annotation.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+            annotation = get_args(annotation)[0]
             cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-        type_ = resolve(type_)
+        annotation = resolve(annotation)
 
     cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
-    return type_, cparam
-
-
-def get_hint(type_: Type) -> Type:
-    if type_ is inspect.Parameter.empty:
-        return str
-    type_ = resolve_optional(type_)
-    if type(type_) is AnnotatedType:
-        type_ = get_args(type_)[0]
-    return resolve(type_)
+    return annotation, cparam

@@ -15,7 +15,22 @@ if the annotated type is iterable (e.g. :class:`list`, :class:`set`).
 *******
 No Hint
 *******
-If no explicit type hint is provided, the token will be parsed as a string. See `Str`_.
+If no explicit type hint is provided:
+
+* If the parameter has a non-None default value, interpret the type ``type(default_value)``.
+
+.. code-block:: python
+
+   @app.default
+   def default(value=5):
+       print(f"{value=} {type(value)=}")
+
+.. code-block:: console
+
+   $ my-program 3
+   value=3 type(value)=<class 'int'>
+
+* Otherwise, interpret the type as string. See `Str`_.
 
 .. code-block:: python
 
@@ -28,23 +43,10 @@ If no explicit type hint is provided, the token will be parsed as a string. See 
    $ my-program foo
    value='foo' type(value)=<class 'str'>
 
-TODO: interpret type of default value if not None.
-
 ***
 Any
 ***
 A standalone ``Any`` type hint is equivalent to `No Hint`_
-
-.. code-block:: python
-
-   @app.default
-   def default(value: Any):
-       print(f"{value=} {type(value)=}")
-
-.. code-block:: console
-
-   $ my-program foo
-   value='foo' type(value)=<class 'str'>
 
 ***
 Str
