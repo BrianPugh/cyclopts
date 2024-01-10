@@ -1,4 +1,5 @@
 import inspect
+import itertools
 import os
 import shlex
 import sys
@@ -136,31 +137,50 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                     raise ValidationError(value=f'Cannot assign value to negative flag "{cli_key}".')
             else:
                 cli_values.append(implicit_value)
+            tokens_per_element, consume_all = 0, False
         else:
-            consume_count += max(1, token_count(iparam.annotation)[0])
+            tokens_per_element, consume_all = token_count(iparam.annotation)
 
-            try:
-                for j in range(consume_count):
-                    token = tokens[i + 1 + j]
+            if cparam.token_count is not None:
+                tokens_per_element = abs(cparam.token_count)
+                if cparam.token_count < 0:
+                    if consume_all:
+                        raise ValueError("Cannot have nested types of undetermined length.")
+                    consume_all = True
 
-                    if not cparam.allow_leading_hyphen:
-                        _validate_is_not_option_like(token)
+            if consume_all:
+                try:
+                    for j in itertools.count():
+                        token = tokens[i + 1 + j]
+                        if not cparam.allow_leading_hyphen and _is_option_like(token):
+                            break
+                        cli_values.append(token)
+                        skip_next_iterations += 1
+                except IndexError:
+                    pass
+            else:
+                consume_count += tokens_per_element
+                try:
+                    for j in range(consume_count):
+                        token = tokens[i + 1 + j]
 
-                    cli_values.append(token)
-            except IndexError:
-                raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
+                        if not cparam.allow_leading_hyphen:
+                            _validate_is_not_option_like(token)
 
-        skip_next_iterations = consume_count
+                        cli_values.append(token)
+                        skip_next_iterations += 1
+                except IndexError:
+                    raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
 
-        _, repeatable = token_count(iparam.annotation)
+        # Update mapping
         if iparam is kwargs_iparam:
             assert kwargs_key is not None
-            if kwargs_key in mapping[iparam] and not repeatable:
+            if kwargs_key in mapping[iparam] and not consume_all:
                 raise RepeatArgumentError(parameter=iparam)
             mapping[iparam].setdefault(kwargs_key, [])
             mapping[iparam][kwargs_key].extend(cli_values)
         else:
-            if iparam in mapping and not repeatable:
+            if iparam in mapping and not consume_all:
                 raise RepeatArgumentError(parameter=iparam)
 
             mapping.setdefault(iparam, [])
@@ -169,14 +189,21 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
     return unused_tokens
 
 
-def _validate_is_not_option_like(token):
+def _is_option_like(token: str) -> bool:
     try:
         complex(token)
+        return False
     except ValueError:
         pass
-    else:
-        return
+
     if token.startswith("-"):
+        return True
+
+    return False
+
+
+def _validate_is_not_option_like(token):
+    if _is_option_like(token):
         raise ValidationError(value=f'Unknown option: "{token}".')
 
 
@@ -211,7 +238,14 @@ def _parse_pos(
             tokens = []
             break
 
-        consume_count, consume_all = token_count(iparam.annotation)
+        tokens_per_element, consume_all = token_count(iparam.annotation)
+        if cparam.token_count is not None:
+            tokens_per_element = abs(cparam.token_count)
+            if cparam.token_count < 0:
+                if consume_all:
+                    raise ValueError("Cannot have a nested consume-all.")  # TODO: better message.
+                consume_all = True
+
         if consume_all:
             # Prepend the positional values to the keyword values.
             mapping.setdefault(iparam, [])
@@ -225,19 +259,19 @@ def _parse_pos(
             tokens = []
             break
 
-        consume_count = max(1, consume_count)
+        tokens_per_element = max(1, tokens_per_element)
 
-        if len(tokens) < consume_count:
+        if len(tokens) < tokens_per_element:
             raise MissingArgumentError(parameter=iparam, tokens_so_far=tokens)
 
         mapping.setdefault(iparam, [])
-        for token in tokens[:consume_count]:
+        for token in tokens[:tokens_per_element]:
             if not cparam.allow_leading_hyphen:
                 _validate_is_not_option_like(token)
 
             mapping[iparam].append(token)
 
-        tokens = tokens[consume_count:]
+        tokens = tokens[tokens_per_element:]
 
     return tokens
 
