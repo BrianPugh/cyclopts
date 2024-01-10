@@ -65,18 +65,17 @@ _converters = {
 }
 
 
-def _convert(type_, element, default_parameter=None):
+def _convert(type_, element):
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
-        return _convert(_implicit_iterable_type_mapping[type_], element, default_parameter=default_parameter)
+        return _convert(_implicit_iterable_type_mapping[type_], element)
     elif origin_type is collections.abc.Iterable:
         assert len(inner_types) == 1
         return _convert(
             List[inner_types[0]],  # pyright: ignore[reportGeneralTypeIssues]
             element,
-            default_parameter=default_parameter,
         )
 
     elif origin_type is Union:
@@ -84,7 +83,7 @@ def _convert(type_, element, default_parameter=None):
             if t is NoneType:
                 continue
             try:
-                return _convert(t, element, default_parameter=default_parameter)
+                return _convert(t, element)
             except Exception:
                 pass
         else:
@@ -92,7 +91,7 @@ def _convert(type_, element, default_parameter=None):
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
-                res = _convert(type(choice), (element), default_parameter=default_parameter)
+                res = _convert(type(choice), (element))
             except Exception:
                 continue
             if res == choice:
@@ -105,17 +104,15 @@ def _convert(type_, element, default_parameter=None):
             if member.name.lower().strip("_") == element_lower:
                 return member
         raise CoercionError(input_value=element, target_type=type_)
-    elif origin_type in _iterable_types:
-        count, _ = token_count(inner_types[0], default_parameter)
+    elif origin_type in _iterable_types:  # NOT including tuple
+        count, _ = token_count(inner_types[0])
         if count > 1:
             gen = zip(*[iter(element)] * count)
         else:
             gen = element
-        return origin_type(
-            _convert(inner_types[0], e, default_parameter=default_parameter) for e in gen
-        )  # pyright: ignore[reportOptionalCall]
+        return origin_type(_convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
-        return tuple(_convert(t, e, default_parameter=default_parameter) for t, e in zip(inner_types, element))
+        return tuple(_convert(t, e) for t, e in zip(inner_types, element))
     else:
         try:
             return _converters.get(type_, type_)(element)
@@ -183,7 +180,7 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def coerce(type_: Type, *args: str, default_parameter=None):
+def coerce(type_: Type, *args: str):
     """Coerce variables into a specified type.
 
     Internally used to coercing string CLI tokens into python builtin types.
@@ -202,8 +199,6 @@ def coerce(type_: Type, *args: str, default_parameter=None):
         A type hint/annotation to coerce ``*args`` into.
     `*args`: str
         String tokens to coerce.
-    default_parameter: Optional[Parameter]
-        Default Parameter configuration.
 
     Returns
     -------
@@ -226,56 +221,48 @@ def coerce(type_: Type, *args: str, default_parameter=None):
             raise ValueError(
                 f"Number of arguments does not match the tuple structure: expected {len(inner_types)} but got {len(args)}"
             )
-        return tuple(
-            _convert(inner_type, arg, default_parameter=default_parameter) for inner_type, arg in zip(inner_types, args)
-        )
+        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return _convert(type_, args, default_parameter=default_parameter)
+        return _convert(type_, args)
     elif len(args) == 1:
-        return _convert(type_, args[0], default_parameter=default_parameter)
+        return _convert(type_, args[0])
     else:
-        return [_convert(type_, item, default_parameter=default_parameter) for item in args]
+        return [_convert(type_, item) for item in args]
 
 
-def token_count(type_: Type, cparam: Optional["Parameter"] = None) -> Tuple[int, bool]:
+def token_count(type_: Type) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
     ----------
     type_: Type
         A type hint/annotation to infer token_count from if not explicitly specified.
-    default_parameter: Optional[Parameter]
-        Default Parameter configuration.
 
     Returns
     -------
     int
-        Number of tokens that constitute a single element.
+        Number of tokens to consume.
     bool
         If this is ``True`` and positional, consume all remaining tokens.
-    default_parameter: Optional[Parameter]
-        Default Parameter configuration.
+        The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
     from cyclopts.parameter import get_hint_parameter
 
     if type_ is inspect.Parameter.empty:  # str
         return 1, False
 
-    type_, cparam = get_hint_parameter(type_, cparam)
-    if cparam.token_count is not None:
-        return abs(cparam.token_count), cparam.token_count < 0
-
     type_ = resolve(type_)
     origin_type = get_origin_and_validate(type_)
 
     if origin_type is tuple:
-        return len(get_args(type_)), False
+        args = get_args(type_)
+        return sum(token_count(x)[0] for x in args if x is not ...), ... in args
     elif (origin_type or type_) is bool:
         return 0, False
     elif type_ in _iterable_types or (origin_type in _iterable_types and len(get_args(type_)) == 0):
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
-        return token_count(get_args(type_)[0], cparam)[0], True
+        return token_count(get_args(type_)[0])[0], True
     else:
         return 1, False
 

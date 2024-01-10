@@ -137,7 +137,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             else:
                 cli_values.append(implicit_value)
         else:
-            consume_count += max(1, token_count(iparam.annotation, cparam)[0])
+            consume_count += max(1, token_count(iparam.annotation)[0])
 
             try:
                 for j in range(consume_count):
@@ -152,7 +152,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
 
         skip_next_iterations = consume_count
 
-        _, repeatable = token_count(iparam.annotation, cparam)
+        _, repeatable = token_count(iparam.annotation)
         if iparam is kwargs_iparam:
             assert kwargs_key is not None
             if kwargs_key in mapping[iparam] and not repeatable:
@@ -189,7 +189,7 @@ def _parse_pos(
 
     def remaining_parameters():
         for iparam, cparam in command.iparam_to_cparam.items():
-            _, consume_all = token_count(iparam.annotation, cparam)
+            _, consume_all = token_count(iparam.annotation)
             if iparam in mapping and not consume_all:
                 continue
             if iparam.kind is iparam.KEYWORD_ONLY:  # pragma: no cover
@@ -211,7 +211,7 @@ def _parse_pos(
             tokens = []
             break
 
-        consume_count, consume_all = token_count(iparam.annotation, cparam)
+        consume_count, consume_all = token_count(iparam.annotation)
         if consume_all:
             # Prepend the positional values to the keyword values.
             mapping.setdefault(iparam, [])

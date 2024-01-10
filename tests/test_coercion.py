@@ -27,6 +27,18 @@ def test_token_count_tuple():
     assert (3, False) == token_count(Tuple[int, int, int])
 
 
+def test_token_count_tuple_nested():
+    assert (4, False) == token_count(Tuple[Tuple[int, int], int, int])
+
+
+def test_token_count_tuple_ellipsis():
+    assert (1, True) == token_count(Tuple[int, ...])
+
+
+def test_token_count_tuple_ellipsis_nested():
+    assert (2, True) == token_count(Tuple[Tuple[int, int], ...])
+
+
 def test_token_union():
     assert (1, False) == token_count(Union[None, int])
 
@@ -54,6 +66,10 @@ def test_token_count_list_direct():
 
 def test_token_count_list_of_tuple():
     assert (3, True) == token_count(List[Tuple[int, int, int]])
+
+
+def test_token_count_list_of_tuple_nested():
+    assert (4, True) == token_count(List[Tuple[Tuple[int, int], int, int]])
 
 
 def test_token_count_iterable():
