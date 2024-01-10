@@ -9,6 +9,12 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+try:
+    from pydantic import ValidationError as PydanticValidationError
+except ImportError:
+    PydanticValidationError = None
+
+
 import attrs
 from attrs import define, field
 from rich.console import Console
@@ -558,7 +564,11 @@ class App:
     def __call__(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
-        **kwargs,
+        *,
+        console: Optional[Console] = None,
+        print_error: bool = True,
+        exit_on_error: bool = True,
+        verbose: bool = False,
     ):
         """Interprets and executes a command.
 
@@ -567,8 +577,16 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        `**kwargs`
-            Passed along to :meth:`parse_args`.
+        print_error: bool
+            Print a rich-formatted error on error.
+            Defaults to ``True``.
+        exit_on_error: bool
+            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            Otherwise, continue to raise the exception.
+            Defaults to ``True``.
+        verbose: bool
+            Populate exception strings with more information intended for developers.
+            Defaults to ``False``.
 
         Returns
         -------
@@ -576,8 +594,25 @@ class App:
             The value the parsed command handler returns.
         """
         tokens = normalize_tokens(tokens)
-        command, bound = self.parse_args(tokens, **kwargs)
-        return command(*bound.args, **bound.kwargs)
+        command, bound = self.parse_args(
+            tokens,
+            console=console,
+            print_error=print_error,
+            exit_on_error=exit_on_error,
+            verbose=verbose,
+        )
+        try:
+            return command(*bound.args, **bound.kwargs)
+        except Exception as e:
+            if PydanticValidationError is not None and isinstance(e, PydanticValidationError):
+                if print_error:
+                    if console is None:
+                        console = Console()
+                    console.print(format_cyclopts_error(e))
+
+                if exit_on_error:
+                    sys.exit(1)
+            raise
 
     def help_print(
         self,
@@ -733,7 +768,8 @@ class App:
             if not a.init:
                 continue
             v = getattr(self, a.name)
-            if v != a.default:
+            # Compare types first because of some weird attribute issues.
+            if type(v) != type(a.default) or v != a.default:  # noqa: E721
                 non_defaults[a.alias] = v
 
         signature = ", ".join(f"{k}={v!r}" for k, v in non_defaults.items())

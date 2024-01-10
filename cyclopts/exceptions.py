@@ -117,7 +117,8 @@ class CycloptsError(Exception):
 
     def _find_and_replace(self, s: str) -> str:
         """Replaces all instances of "--python-variable-name" with "--cli-variable-name"."""
-        assert self.parameter2cli is not None
+        if self.parameter2cli is None:
+            return s
         for p, names in self.parameter2cli.items():
             target = f"--{p.name}"
             replacement = names[0]
@@ -257,7 +258,7 @@ class RepeatArgumentError(CycloptsError):
         return super().__str__() + f"Parameter {parameter_cli_name} specified multiple times."
 
 
-def format_cyclopts_error(e: CycloptsError):
+def format_cyclopts_error(e: Any):
     panel = Panel(
         Text(str(e), "default"),
         title="Error",

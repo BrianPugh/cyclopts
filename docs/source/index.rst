@@ -32,6 +32,7 @@ Cyclopts
    app_calling.rst
    meta_app.rst
    command_chaining.rst
+   pydantic.rst
    autoregistry
 
 .. toctree::
