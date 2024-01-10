@@ -60,8 +60,6 @@ class Parameter:
 
     group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter, hash=False)
 
-    token_count: Optional[int] = field(default=None)
-
     parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
     _show: Optional[bool] = field(default=None, alias="show")
