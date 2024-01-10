@@ -212,6 +212,13 @@ API
       If specified, a custom ``converter`` **must** also be specified.
       Defaults to autodetecting based on type annotation.
 
+   .. attribute:: allow_leading_hyphen
+      :type: bool
+      :value: False
+
+      Allow parsing non-numeric values that begin with a hyphen ``-``.
+      This is disabled by default, allowing for more helpful error messages for unknown CLI options.
+
    .. attribute:: parse
       :type: Optional[bool]
       :value: True

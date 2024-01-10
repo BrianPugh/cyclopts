@@ -36,7 +36,7 @@ To change how the primary app is run, you can use the meta-app feature of Cyclop
 
 
    @app.meta.default
-   def my_app_launcher(*tokens: Annotated[str, Parameter(show=False)], user: str):
+   def my_app_launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
        print(f"Hello {user}")
        app(tokens)
 
@@ -51,7 +51,7 @@ To change how the primary app is run, you can use the meta-app feature of Cyclop
    Looping! 1
    Looping! 2
 
-The variable positional ``*tokens`` (with implicit type ``str``) will aggregate all remaining tokens.
+The variable positional ``*tokens`` will aggregate all remaining tokens, including those starting with a hyphen (typically options).
 We can then pass them along to the primary ``app``.
 
 The ``meta`` app is mostly a normal Cyclopts app; the only thing special about it is that it will

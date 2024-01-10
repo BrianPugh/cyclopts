@@ -98,6 +98,8 @@ class Parameter:
 
     required: Optional[bool] = field(default=None)
 
+    allow_leading_hyphen: bool = field(default=False)
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
