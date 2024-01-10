@@ -1,4 +1,13 @@
+import sys
+
 import pytest
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
+
+from cyclopts import Parameter
 
 
 @pytest.mark.parametrize(
@@ -17,7 +26,7 @@ def test_meta_basic(app, cmd_str):
         assert c == "c-value-manual"
 
     @app.meta.default
-    def meta(*tokens, meta_flag: bool = False):
+    def meta(*tokens: Annotated[str, Parameter(allow_leading_hyphen=True)], meta_flag: bool = False):
         assert meta_flag
         app(tokens)
 
