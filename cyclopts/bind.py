@@ -141,13 +141,6 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
         else:
             tokens_per_element, consume_all = token_count(iparam.annotation)
 
-            if cparam.token_count is not None:
-                tokens_per_element = abs(cparam.token_count)
-                if cparam.token_count < 0:
-                    if consume_all:
-                        raise ValueError("Cannot have nested types of undetermined length.")
-                    consume_all = True
-
             if consume_all:
                 try:
                     for j in itertools.count():
@@ -239,12 +232,6 @@ def _parse_pos(
             break
 
         tokens_per_element, consume_all = token_count(iparam.annotation)
-        if cparam.token_count is not None:
-            tokens_per_element = abs(cparam.token_count)
-            if cparam.token_count < 0:
-                if consume_all:
-                    raise ValueError("Cannot have a nested consume-all.")  # TODO: better message.
-                consume_all = True
 
         if consume_all:
             # Prepend the positional values to the keyword values.
@@ -408,7 +395,7 @@ def create_bound_arguments(
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
     # Note: mapping is updated inplace
-    mapping = ParameterDict()
+    mapping = ParameterDict()  # Each value should be a list
     c2p, p2c = None, None
     unused_tokens = []
 
@@ -417,9 +404,13 @@ def create_bound_arguments(
     try:
         c2p = cli2parameter(command)
         p2c = parameter2cli(command)
+
+        # Build up a mapping of inspect.Parameter->List[str]
         unused_tokens = _parse_kw_and_flags(command, tokens, mapping)
         unused_tokens = _parse_pos(command, unused_tokens, mapping)
         _parse_env(command, mapping)
+
+        # For each parameter, convert the list of string tokens.
         coerced = _convert(command, mapping)
         bound = _bind(command, coerced)
 
