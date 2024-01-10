@@ -36,6 +36,24 @@ def test_group_parameter_converter(app, assert_parse_args):
     assert_parse_args(foo, "chocolate sugar", "CHOCOLATE", "SUGAR")
 
 
+def test_group_parameter_converter_delete_arg(app, assert_parse_args):
+    def converter(**kwargs):
+        # This doesn't have a "cone" key in the response, meaning it should not be
+        # in the resulting bound arguments.
+        return {k: v.upper() for k, v in kwargs.items() if k != "cone"}
+
+    food_group = Group("Food", converter=converter)
+
+    @app.default
+    def foo(
+        ice_cream: Annotated[str, Parameter(group=food_group)],
+        cone: Annotated[str, Parameter(group="Food")] = "waffle",
+    ):
+        pass
+
+    assert_parse_args(foo, "chocolate sugar", "CHOCOLATE")
+
+
 def test_group_default_parameter_converter(app, assert_parse_args):
     food_group = Group("Food", default_parameter=Parameter(converter=upper))
 
