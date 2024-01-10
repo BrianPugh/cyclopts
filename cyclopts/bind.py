@@ -13,7 +13,7 @@ from cyclopts.exceptions import (
     RepeatArgumentError,
     ValidationError,
 )
-from cyclopts.parameter import get_hint, validate_command
+from cyclopts.parameter import get_hint_parameter, validate_command
 from cyclopts.resolve import ResolvedCommand
 from cyclopts.utils import ParameterDict
 
@@ -48,7 +48,7 @@ def cli2parameter(command: ResolvedCommand) -> Dict[str, Tuple[inspect.Parameter
         if iparam.kind is iparam.VAR_KEYWORD:
             # Don't directly expose the kwarg variable name
             continue
-        hint = get_hint(iparam.annotation)
+        hint = get_hint_parameter(iparam)[0]
         for name in cparam.name:
             mapping[name] = (iparam, True if hint is bool else None)
         for name in cparam.get_negatives(hint, *cparam.name):
@@ -139,7 +139,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False
         else:
-            tokens_per_element, consume_all = token_count(iparam.annotation)
+            tokens_per_element, consume_all = token_count(iparam)
 
             if consume_all:
                 try:
@@ -209,7 +209,7 @@ def _parse_pos(
 
     def remaining_parameters():
         for iparam, cparam in command.iparam_to_cparam.items():
-            _, consume_all = token_count(iparam.annotation)
+            _, consume_all = token_count(iparam)
             if iparam in mapping and not consume_all:
                 continue
             if iparam.kind is iparam.KEYWORD_ONLY:  # pragma: no cover
@@ -231,7 +231,7 @@ def _parse_pos(
             tokens = []
             break
 
-        tokens_per_element, consume_all = token_count(iparam.annotation)
+        tokens_per_element, consume_all = token_count(iparam)
 
         if consume_all:
             # Prepend the positional values to the keyword values.
@@ -337,7 +337,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
     coerced = ParameterDict()
     for iparam, parameter_tokens in mapping.items():
         cparam = command.iparam_to_cparam[iparam]
-        type_ = get_hint(iparam.annotation)
+        type_ = get_hint_parameter(iparam)[0]
 
         # Checking if parameter_token is a string is a little jank,
         # but works for all current use-cases
