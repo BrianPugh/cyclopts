@@ -54,9 +54,9 @@ def test_boolean_flag_app_parameter_default(app, assert_parse_args):
     # Normal positive flag should still work.
     assert_parse_args(foo, "--my-flag", True)
 
-    # The negative flag should be disabled.
-    with pytest.raises(CoercionError):
+    with pytest.raises(ValidationError) as e:
         app.parse_args("--no-my-flag", exit_on_error=False)
+    assert e.value.value == 'Unknown option: "--no-my-flag".'
 
 
 def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args):
@@ -168,5 +168,5 @@ def test_boolean_flag_disable_negative(app, negative, assert_parse_args):
         pass
 
     assert_parse_args(foo, "--my-flag", True)
-    with pytest.raises(CoercionError):
+    with pytest.raises(ValidationError):
         assert_parse_args(foo, "--no-my-flag", True)

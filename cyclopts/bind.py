@@ -141,7 +141,12 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
 
             try:
                 for j in range(consume_count):
-                    cli_values.append(tokens[i + 1 + j])
+                    token = tokens[i + 1 + j]
+
+                    if not cparam.allow_leading_hyphen:
+                        _validate_is_not_option_like(token)
+
+                    cli_values.append(token)
             except IndexError:
                 raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
 
@@ -162,6 +167,17 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             mapping[iparam].extend(cli_values)
 
     return unused_tokens
+
+
+def _validate_is_not_option_like(token):
+    try:
+        complex(token)
+    except ValueError:
+        pass
+    else:
+        return
+    if token.startswith("-"):
+        raise ValidationError(value=f'Unknown option: "{token}".')
 
 
 def _parse_pos(
@@ -186,14 +202,26 @@ def _parse_pos(
             break
 
         if iparam.kind is iparam.VAR_POSITIONAL:  # ``*args``
-            mapping[iparam] = tokens
+            mapping.setdefault(iparam, [])
+            for token in tokens:
+                if not cparam.allow_leading_hyphen:
+                    _validate_is_not_option_like(token)
+
+                mapping[iparam].append(token)
             tokens = []
             break
 
         consume_count, consume_all = token_count(iparam.annotation, cparam)
         if consume_all:
+            # Prepend the positional values to the keyword values.
             mapping.setdefault(iparam, [])
-            mapping[iparam] = tokens + mapping[iparam]
+            pos_tokens = []
+
+            for token in tokens:
+                if not cparam.allow_leading_hyphen:
+                    _validate_is_not_option_like(token)
+                pos_tokens.append(token)
+            mapping[iparam] = pos_tokens + mapping[iparam]
             tokens = []
             break
 
@@ -202,7 +230,13 @@ def _parse_pos(
         if len(tokens) < consume_count:
             raise MissingArgumentError(parameter=iparam, tokens_so_far=tokens)
 
-        mapping[iparam] = tokens[:consume_count]
+        mapping.setdefault(iparam, [])
+        for token in tokens[:consume_count]:
+            if not cparam.allow_leading_hyphen:
+                _validate_is_not_option_like(token)
+
+            mapping[iparam].append(token)
+
         tokens = tokens[consume_count:]
 
     return tokens
