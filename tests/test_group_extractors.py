@@ -34,3 +34,16 @@ def test_groups_from_app_implicit():
         (Group("Drink"), [app["drink1"]]),
         (Group("Food", validator=validator), [app["food1"], app["food2"]]),
     ]
+
+
+def test_commands_groups_name_collision(app):
+    @app.command(group=Group("Foo"))
+    def foo():
+        pass
+
+    @app.command(group=Group("Foo"))
+    def bar():
+        pass
+
+    with pytest.raises(ValueError):
+        groups_from_app(app)
