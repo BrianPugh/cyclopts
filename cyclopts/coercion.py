@@ -217,11 +217,17 @@ def coerce(type_: Type, *args: str):
 
     if origin_type is tuple:
         inner_types = get_args(type_)
-        if len(inner_types) != len(args):
+        inner_token_count = token_count(type_)[0]
+        if inner_token_count != len(args):
             raise ValueError(
-                f"Number of arguments does not match the tuple structure: expected {len(inner_types)} but got {len(args)}"
+                f"Number of arguments does not match the tuple structure: expected {inner_token_count} but got {len(args)}"
             )
-        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, args))
+        # This assumes each inner_type consumes a single token...
+        args_per_convert = [token_count(x)[0] for x in inner_types]
+        it = iter(args)
+        batched = [[next(it) for _ in range(size)] for size in args_per_convert]
+        batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
+        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
         return _convert(type_, args)
     elif len(args) == 1:
@@ -263,7 +269,7 @@ def token_count(type_: Type) -> Tuple[int, bool]:
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(type_)):
         return token_count(get_args(type_)[0])[0], True
-    else:
+    else:  # Unknown Type
         return 1, False
 
 

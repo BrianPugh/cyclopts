@@ -148,6 +148,13 @@ def test_coerce_tuple():
     )
 
 
+def test_coerce_tuple_nested():
+    _assert_tuple(
+        (1, (2.0, "foo")),
+        coerce(Tuple[int, Tuple[float, Union[None, str, int]]], "1", "2", "foo"),
+    )
+
+
 def test_coerce_tuple_len_mismatch():
     with pytest.raises(ValueError):
         coerce(Tuple[int, int], "1")
