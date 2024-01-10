@@ -23,6 +23,11 @@ class TwoToken:
     value2: Any
 
 
+class AllToken:
+    def __init__(self, *args):
+        self.args = args
+
+
 def test_custom_type_one_token_implicit_convert(app):
     @app.default
     def default(value: OneToken):
@@ -46,33 +51,3 @@ def test_custom_type_one_token_explicit_convert(app):
 
     res = app("5")
     assert res == OneToken(5)
-
-
-@pytest.mark.parametrize(
-    "cmd_str",
-    [
-        "--value1 foo bar 3",
-        "foo bar 3",
-        "foo bar --value2=3",
-        "foo bar --value2 3",
-    ],
-)
-def test_custom_type_two_token_explicit_convert(app, cmd_str):
-    def converter(type_, *args):
-        assert len(args) == 2
-        return type_(coerce(Union[int, str], args[0]), coerce(Union[int, str], args[1]))
-
-    @app.default
-    def default(
-        value1: Annotated[TwoToken, Parameter(converter=converter, token_count=2)],
-        value2: int,
-    ):
-        assert value2 == 3
-        return value1
-
-    res = app(cmd_str, exit_on_error=False, print_error=True)
-    assert res == TwoToken("foo", "bar")
-
-
-# TODO: list of custom class
-# TODO: tuple of custom class

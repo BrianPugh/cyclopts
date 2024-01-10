@@ -204,14 +204,6 @@ API
       Must start with ``"--"``.
       Defaults to ``"--empty-"``.
 
-   .. attribute:: token_count
-      :type: Optional[int]
-      :value: None
-
-      Number of CLI tokens this parameter consumes.
-      If specified, a custom ``converter`` **must** also be specified.
-      Defaults to autodetecting based on type annotation.
-
    .. attribute:: allow_leading_hyphen
       :type: bool
       :value: False
