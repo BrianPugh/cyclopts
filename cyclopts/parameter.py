@@ -18,11 +18,6 @@ from cyclopts.group import Group
 from cyclopts.utils import record_init
 
 
-def _token_count_validator(instance, attribute, value):
-    if value is not None and instance.converter is coerce:
-        raise ValueError('Must specify a "converter" if setting "token_count".')
-
-
 def _double_hyphen_validator(instance, attribute, values):
     if not values:
         return
@@ -65,7 +60,7 @@ class Parameter:
 
     group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter, hash=False)
 
-    token_count: Optional[int] = field(default=None, validator=_token_count_validator)
+    token_count: Optional[int] = field(default=None)
 
     parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
