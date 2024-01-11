@@ -33,11 +33,15 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
         (app.group_commands, []),
     ]
 
+    subapps = [subapp for subapp in app._commands.values() if subapp.show]
+
     # 2 iterations need to be performed:
     # 1. Extract out all Group objects as they may have additional configuration.
     # 2. Assign/Create Groups out of the strings, as necessary.
+    for subapp in subapps:
+        if not subapp.show:
+            continue
 
-    for subapp in app._commands.values():
         for group in subapp.group:
             if isinstance(group, Group):
                 for mapping in group_mapping:
@@ -48,7 +52,7 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
                 else:
                     group_mapping.append((group, []))
 
-    for subapp in app._commands.values():
+    for subapp in subapps:
         if subapp.group:
             for group in subapp.group:
                 _create_or_append(group_mapping, group, subapp)

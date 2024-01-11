@@ -158,6 +158,8 @@ class App:
         kw_only=True,
     )
 
+    show: bool = field(default=True, kw_only=True)
+
     help_flags: Tuple[str, ...] = field(
         default=["--help", "-h"],
         on_setattr=attrs.setters.frozen,
