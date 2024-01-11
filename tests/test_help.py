@@ -137,6 +137,40 @@ def test_format_commands_docstring(app, console):
     )
 
 
+def test_format_commands_no_show(app, console):
+    @app.command
+    def foo():
+        """Docstring for foo."""
+        pass
+
+    @app.command(show=False)
+    def bar():
+        """Should not be shown."""
+        pass
+
+    panel = HelpPanel(title="Commands", format="command")
+    panel.entries.extend(format_command_entries((app,)))
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo        Docstring for foo.                                      │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_format_commands_explicit_help(app, console):
     @app.command(help="Docstring for foo.")
     def foo():
