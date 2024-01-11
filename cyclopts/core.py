@@ -39,6 +39,7 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group, to_group_converter
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
+    HelpPanel,
     create_panel_table_commands,
     format_command_rows,
     format_doc,
@@ -120,15 +121,6 @@ def _combined_meta_command_mapping(app):
     while (app := app._meta) and app._commands:
         command_mapping.update(app._commands)
     return command_mapping
-
-
-def _remove_duplicates(seq: List) -> List:
-    seen, out = set(), []
-    for item in seq:
-        if item not in seen:
-            seen.add(item)
-            out.append(item)
-    return out
 
 
 def _get_command_groups(parent_app, child_app):
@@ -652,7 +644,7 @@ class App:
                 meta_list.append(meta)
             yield from reversed(meta_list)
 
-        command_rows, command_descriptions = {}, {}
+        command_panels = {}
         for subapp in walk_apps():
             # Print default_command argument/parameter groups
             if subapp.default_command:
@@ -669,27 +661,27 @@ class App:
                     console.print(format_group_parameters(group, iparams, cparams))
 
             # Print command groups
+            # We need to deduplicate groups from meta-app.
             for group, elements in groups_from_app(subapp):
                 if not group.show:
                     continue
 
-                command_descriptions.setdefault(group.name, group.help)
-                command_rows.setdefault(group.name, [])
-                command_rows[group.name].extend(format_command_rows(elements))
+                try:
+                    command_panel = command_panels[group.name]
+                except KeyError:
+                    command_panels[group.name] = command_panel = HelpPanel(title=group.name)
 
-        # Rely on dictionary insertion order for panel-order.
-        for title, rows in command_rows.items():
-            if not rows:
+                if group.help:
+                    command_panel.description = group.help
+
+                command_panel.entries.extend(format_command_rows(elements))
+
+        for _, help_panel in sorted(command_panels.items()):
+            if not help_panel.entries:
                 continue
-            panel, table, text = create_panel_table_commands(title=title)
-            description = command_descriptions[title]
-            if description:
-                text.append(description + "\n\n")
-            rows = _remove_duplicates(rows)
-            rows.sort(key=lambda x: (x[0].startswith("-"), x[0]))  # sort by command name
-            for row in rows:
-                table.add_row(*row)
-            console.print(panel)
+            help_panel.remove_duplicates()
+            help_panel.sort()
+            console.print(help_panel)
 
     def interactive_shell(
         self,
