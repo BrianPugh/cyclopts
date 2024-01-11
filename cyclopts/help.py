@@ -4,6 +4,7 @@ from functools import lru_cache
 from inspect import isclass
 from typing import Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
+from attrs import define, field
 from docstring_parser import parse as docstring_parse
 from rich import box, console
 from rich.panel import Panel
@@ -14,6 +15,32 @@ from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
+
+
+@define
+class HelpPanel:
+    title: str
+    description: str = ""
+    entries: List[Tuple[str, ...]] = field(factory=list)
+
+    def remove_duplicates(self):
+        seen, out = set(), []
+        for item in self.entries:
+            if item not in seen:
+                seen.add(item)
+                out.append(item)
+        self.entries = out
+
+    def sort(self):
+        self.entries.sort(key=lambda x: (x[0].startswith("-"), x[0]))
+
+    def __rich__(self):
+        panel, table, text = create_panel_table_commands(title=self.title)
+        if self.description:
+            text.append(self.description + "\n\n")
+        for row in self.entries:
+            table.add_row(*row)
+        return panel
 
 
 class SilentRich:
