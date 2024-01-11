@@ -40,7 +40,6 @@ from cyclopts.group import Group, to_group_converter
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     HelpPanel,
-    create_panel_table_commands,
     format_command_rows,
     format_doc,
     format_group_parameters,
@@ -669,7 +668,10 @@ class App:
                 try:
                     command_panel = command_panels[group.name]
                 except KeyError:
-                    command_panels[group.name] = command_panel = HelpPanel(title=group.name)
+                    command_panels[group.name] = command_panel = HelpPanel(
+                        format="command",
+                        title=group.name,
+                    )
 
                 if group.help:
                     command_panel.description = group.help
