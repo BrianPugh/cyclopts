@@ -291,7 +291,6 @@ class App:
 
         for i, token in enumerate(tokens):
             if token in self.help_flags:
-                # app = self
                 break
             try:
                 app = command_mapping[token]
@@ -692,8 +691,6 @@ class App:
                 command_panel.entries.extend(format_command_entries(elements))
 
         for _, help_panel in sorted(command_panels.items()):
-            if not help_panel.entries:
-                continue
             help_panel.remove_duplicates()
             help_panel.sort()
             console.print(help_panel)
