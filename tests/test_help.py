@@ -733,6 +733,13 @@ def test_help_print_commands_special_flag_reassign(app, console):
 
 
 def test_help_print_commands_plus_meta(app, console):
+    app = App(
+        name="app",
+        help_flags=[],
+        version_flags=[],
+        help="App Help String Line 1.",
+    )
+
     @app.command(help="Cmd1 help string.")
     def cmd1():
         pass
@@ -752,6 +759,8 @@ def test_help_print_commands_plus_meta(app, console):
     ):
         pass
 
+    app.meta["--help"].group = "Admin"
+
     with console.capture() as capture:
         app.help_print([], console=console)
 
@@ -765,11 +774,13 @@ def test_help_print_commands_plus_meta(app, console):
         ╭─ Session Parameters ───────────────────────────────────────────────╮
         │ *  --hostname  Hostname to connect to. [required]                  │
         ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Admin ────────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
         │ meta-cmd   Meta cmd help string.                                   │
-        │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """

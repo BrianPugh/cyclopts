@@ -26,7 +26,10 @@ To change how the primary app is run, you can use the meta-app feature of Cyclop
    from cyclopts import App, Parameter
    from typing_extensions import Annotated
 
-   app = App()
+   app = App(
+       help_flags=[],  # Disable help & version flags since the meta-app
+       version_flags=[],  # will handle them.
+   )
 
 
    @app.command
