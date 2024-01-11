@@ -171,7 +171,7 @@ def _get_choices(type_: Type) -> str:
     return choices
 
 
-def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]) -> HelpPanel:
+def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter]) -> HelpPanel:
     icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
     iparams, cparams = (list(x) for x in zip(*icparams))
 
@@ -240,7 +240,7 @@ def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]) -
     return help_panel
 
 
-def format_command_rows(elements) -> List:
+def format_command_entries(elements) -> List:
     entries = []
     for element in elements:
         entry = HelpEntry(
