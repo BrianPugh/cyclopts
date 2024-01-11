@@ -14,7 +14,8 @@ else:
 
 from cyclopts import App, Group, Parameter
 from cyclopts.help import (
-    create_panel_table_commands,
+    HelpEntry,
+    HelpPanel,
     format_command_rows,
     format_doc,
     format_group_parameters,
@@ -123,10 +124,9 @@ def test_format_commands_docstring(app, console):
         """
         pass
 
-    panel, table, text = create_panel_table_commands(title="Commands")
+    panel = HelpPanel(title="Commands", format="command")
+    panel.entries.extend(format_command_rows((app["foo"],)))
     with console.capture() as capture:
-        for row in format_command_rows((app["foo"],)):
-            table.add_row(*row)
         console.print(panel)
 
     actual = capture.get()
@@ -143,10 +143,9 @@ def test_format_commands_explicit_help(app, console):
         """Should not be shown."""
         pass
 
-    panel, table, text = create_panel_table_commands(title="Commands")
+    panel = HelpPanel(title="Commands", format="command")
+    panel.entries.extend(format_command_rows((app["foo"],)))
     with console.capture() as capture:
-        for row in format_command_rows((app["foo"],)):
-            table.add_row(*row)
         console.print(panel)
 
     actual = capture.get()
@@ -166,10 +165,9 @@ def test_format_commands_explicit_name(app, console):
         """
         pass
 
-    panel, table, text = create_panel_table_commands(title="Commands")
+    panel = HelpPanel(title="Commands", format="command")
+    panel.entries.extend(format_command_rows((app["bar"],)))
     with console.capture() as capture:
-        for row in format_command_rows((app["bar"],)):
-            table.add_row(*row)
         console.print(panel)
 
     actual = capture.get()
