@@ -461,6 +461,34 @@ def test_help_print_function(app, console):
     assert actual == expected
 
 
+def test_help_print_function_defaults(app, console):
+    @app.command(help="Cmd help string.")
+    def cmd(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        bar: Annotated[str, Parameter(help="Docstring for bar.")] = "bar-value",
+        baz: Annotated[str, Parameter(help="Docstring for bar.", env_var="BAZ")] = "baz-value",
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app cmd [ARGS] [OPTIONS]
+
+        Cmd help string.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --bar  Docstring for bar. [default: bar-value]                     │
+        │ --baz  Docstring for bar. [env var: BAZ] [default: baz-value]      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_function_no_parse(app, console):
     @app.command(help="Cmd help string.")
     def cmd(
