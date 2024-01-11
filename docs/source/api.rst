@@ -38,6 +38,12 @@ API
       Defaults to ``["--help", "-h"]``.
       Cannot be changed after instantiating the app.
 
+   .. attribute:: show
+      :type: bool
+      :value: True
+
+      Show this command on the help screen.
+
    .. attribute:: version
       :type: Union[None, str, Callable]
       :value: None
@@ -229,7 +235,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      Show this parameter in the help screen.
+      Show this parameter on the help screen.
       If ``False``, state of all other ``show_*`` flags are ignored.
       Defaults to ``parse`` value (``True``).
 
@@ -237,28 +243,28 @@ API
       :type: Optional[bool]
       :value: None
 
-      If a variable has a default, display the default in the help page.
+      If a variable has a default, display the default on the help page.
       Defaults to ``None``, similar to ``True``, but will not display the default if it's ``None``.
 
    .. attribute:: show_choices
       :type: Optional[bool]
       :value: True
 
-      If a variable has a set of choices, display the choices in the help page.
+      If a variable has a set of choices, display the choices on the help page.
       Defaults to ``True``.
 
    .. attribute:: help
       :type: Optional[str]
       :value: None
 
-      Help string to be displayed in the help page.
+      Help string to be displayed on the help page.
       If not specified, defaults to the docstring.
 
    .. attribute:: show_env_var
       :type: Optional[bool]
       :value: True
 
-      If a variable has ``env_var`` set, display the variable name in the help page.
+      If a variable has ``env_var`` set, display the variable name on the help page.
       Defaults to ``True``.
 
    .. attribute:: env_var
@@ -283,7 +289,7 @@ API
 
       Group name used for the help-page and for group-referenced-by-string.
       This is a title, so the first character should be capitalized.
-      If a name is not specified, it will not be shown in the help-page.
+      If a name is not specified, it will not be shown on the help-page.
 
    .. attribute:: help
       :type: str
@@ -296,7 +302,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      Show this group in the help-panel.
+      Show this group on the help-page.
       Defaults to ``None``, which will only show the group if a ``name`` is provided.
 
    .. attribute:: default_parameter
