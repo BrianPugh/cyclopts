@@ -24,6 +24,22 @@ def test_bind_tuple_basic(app, cmd_str, assert_parse_args):
 @pytest.mark.parametrize(
     "cmd_str",
     [
+        "1 2 alice 100 200",
+        "--coordinates 1 2 --data alice 100 200",
+        "--data alice 100 200 --coordinates 1 2",
+    ],
+)
+def test_bind_tuple_nested(app, cmd_str, assert_parse_args):
+    @app.default
+    def foo(coordinates: Tuple[int, int], data: Tuple[Tuple[str, int], int]):
+        pass
+
+    assert_parse_args(foo, cmd_str, (1, 2), (("alice", 100), 200))
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
         "1",
         "--coordinates 1",
     ],
