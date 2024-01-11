@@ -39,9 +39,6 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     # 1. Extract out all Group objects as they may have additional configuration.
     # 2. Assign/Create Groups out of the strings, as necessary.
     for subapp in subapps:
-        if not subapp.show:
-            continue
-
         for group in subapp.group:
             if isinstance(group, Group):
                 for mapping in group_mapping:

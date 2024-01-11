@@ -80,7 +80,7 @@ def _resolve_groups(
 
                 if group.default_parameter is not None and group.default_parameter.group:
                     # This shouldn't be possible due to ``Group`` internal checks.
-                    raise ValueError("Group.default_parameter cannot have a specified group.")
+                    raise ValueError("Group.default_parameter cannot have a specified group.")  # pragma: no cover
 
                 try:
                     index = resolved_groups.index(group)
@@ -90,7 +90,7 @@ def _resolve_groups(
                     group = resolved_groups[index]
                 iparam_to_groups[iparam].append(group)
             else:
-                raise TypeError
+                raise TypeError  # pragma: no cover
 
     return resolved_groups, iparam_to_groups
 
