@@ -120,7 +120,8 @@ def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
     panel, table, text = create_panel_table(title=group.name)
     has_required, has_short = False, False
 
-    cparams = [x for x in cparams if x.show]
+    icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
+    iparams, cparams = (list(x) for x in zip(*icparams))
 
     def is_short(s):
         return not s.startswith("--") and s.startswith("-")
@@ -143,7 +144,7 @@ def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
         table.add_column(justify="left", no_wrap=True, style="green")  # For short options
     table.add_column(justify="left")  # For main help text.
 
-    for iparam, cparam in zip(iparams, cparams):
+    for iparam, cparam in icparams:
         assert cparam.name is not None
         type_ = get_hint_parameter(iparam)[0]
         options = list(cparam.name)
