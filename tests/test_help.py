@@ -16,9 +16,9 @@ from cyclopts import App, Group, Parameter
 from cyclopts.help import (
     HelpEntry,
     HelpPanel,
-    format_command_rows,
+    create_parameter_help_panel,
+    format_command_entries,
     format_doc,
-    format_group_parameters,
     format_usage,
 )
 from cyclopts.resolve import ResolvedCommand
@@ -125,7 +125,7 @@ def test_format_commands_docstring(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_rows((app["foo"],)))
+    panel.entries.extend(format_command_entries((app["foo"],)))
     with console.capture() as capture:
         console.print(panel)
 
@@ -144,7 +144,7 @@ def test_format_commands_explicit_help(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_rows((app["foo"],)))
+    panel.entries.extend(format_command_entries((app["foo"],)))
     with console.capture() as capture:
         console.print(panel)
 
@@ -166,7 +166,7 @@ def test_format_commands_explicit_name(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_rows((app["bar"],)))
+    panel.entries.extend(format_command_entries((app["bar"],)))
     with console.capture() as capture:
         console.print(panel)
 
@@ -195,7 +195,7 @@ def capture_format_group_parameters(console, default_function_groups):
         with console.capture() as capture:
             group, iparams = command.groups_iparams[0]
             cparams = [command.iparam_to_cparam[x] for x in iparams]
-            console.print(format_group_parameters(group, iparams, cparams))
+            console.print(create_parameter_help_panel(group, iparams, cparams))
 
         return capture.get()
 

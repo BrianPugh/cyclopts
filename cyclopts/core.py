@@ -40,9 +40,9 @@ from cyclopts.group import Group, to_group_converter
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     HelpPanel,
-    format_command_rows,
+    create_parameter_help_panel,
+    format_command_entries,
     format_doc,
-    format_group_parameters,
     format_usage,
 )
 from cyclopts.parameter import Parameter, validate_command
@@ -657,7 +657,7 @@ class App:
                     if not group.show:
                         continue
                     cparams = [command.iparam_to_cparam[x] for x in iparams]
-                    console.print(format_group_parameters(group, iparams, cparams))
+                    console.print(create_parameter_help_panel(group, iparams, cparams))
 
             # Print command groups
             # We need to deduplicate groups from meta-app.
@@ -676,7 +676,7 @@ class App:
                 if group.help:
                     command_panel.description = group.help
 
-                command_panel.entries.extend(format_command_rows(elements))
+                command_panel.entries.extend(format_command_entries(elements))
 
         for _, help_panel in sorted(command_panels.items()):
             if not help_panel.entries:
