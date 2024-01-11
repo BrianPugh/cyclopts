@@ -4,7 +4,7 @@ from functools import lru_cache
 from inspect import isclass
 from typing import Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
-from attrs import define, field
+from attrs import define, field, frozen
 from docstring_parser import parse as docstring_parse
 from rich import box, console
 from rich.panel import Panel
@@ -17,11 +17,20 @@ from cyclopts.parameter import Parameter, get_hint_parameter
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
 
 
+@frozen
+class HelpEntry:
+    name: str
+    short: str = ""
+    description: str = ""
+    required: bool = False
+
+
 @define
 class HelpPanel:
+    format: Literal["command", "parameter"]
     title: str
     description: str = ""
-    entries: List[Tuple[str, ...]] = field(factory=list)
+    entries: List[HelpEntry] = field(factory=list)
 
     def remove_duplicates(self):
         seen, out = set(), []
@@ -32,14 +41,55 @@ class HelpPanel:
         self.entries = out
 
     def sort(self):
-        self.entries.sort(key=lambda x: (x[0].startswith("-"), x[0]))
+        self.entries.sort(key=lambda x: (x.name.startswith("-"), x.name))
 
     def __rich__(self):
-        panel, table, text = create_panel_table_commands(title=self.title)
+        if not self.entries:
+            return _silent
+        table = Table.grid(padding=(0, 1))
+        text = Text(end="")
         if self.description:
             text.append(self.description + "\n\n")
-        for row in self.entries:
-            table.add_row(*row)
+        panel = Panel(
+            console.Group(text, table),
+            box=box.ROUNDED,
+            expand=True,
+            title_align="left",
+            title=self.title,
+        )
+
+        if self.format == "command":
+            table.add_column(justify="left", style="cyan")
+            table.add_column(justify="left")
+
+            for entry in self.entries:
+                table.add_row(entry.name + " ", entry.description)
+        elif self.format == "parameter":
+            has_short = any(entry.short for entry in self.entries)
+            has_required = any(entry.required for entry in self.entries)
+
+            if has_required:
+                table.add_column(justify="left", width=1, style="red bold")  # For asterisk
+            table.add_column(justify="left", no_wrap=True, style="cyan")  # For option names
+            if has_short:
+                table.add_column(justify="left", no_wrap=True, style="green")  # For short options
+            table.add_column(justify="left")  # For main help text.
+
+            for entry in self.entries:
+                row = []
+                if has_required:
+                    if entry.required:
+                        row.append("*")
+                    else:
+                        row.append("")
+                row.append(entry.name + " ")
+                if has_short:
+                    row.append(entry.short + " ")
+                row.append(entry.description)
+                table.add_row(*row)
+        else:
+            raise NotImplementedError
+
         return panel
 
 
@@ -53,28 +103,6 @@ class SilentRich:
 
 
 _silent = SilentRich()
-
-
-def create_panel_table(**kwargs):
-    text = Text(end="")
-    table = Table.grid(padding=(0, 1))
-    panel = Panel(
-        console.Group(text, table),
-        box=box.ROUNDED,
-        expand=True,
-        title_align="left",
-        **kwargs,
-    )
-    return panel, table, text
-
-
-def create_panel_table_commands(**kwargs):
-    panel, table, text = create_panel_table(**kwargs)
-
-    table.add_column(justify="left", style="cyan")
-    table.add_column(justify="left")
-
-    return panel, table, text
 
 
 def format_usage(
@@ -143,33 +171,14 @@ def _get_choices(type_: Type) -> str:
     return choices
 
 
-def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
-    panel, table, text = create_panel_table(title=group.name)
-    has_required, has_short = False, False
-
+def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]) -> HelpPanel:
     icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
     iparams, cparams = (list(x) for x in zip(*icparams))
 
     def is_short(s):
         return not s.startswith("--") and s.startswith("-")
 
-    has_required = any(p.required for p in cparams)
-
-    if group.help:
-        text.append(group.help + "\n\n")
-
-    for cparam in cparams:
-        assert cparam.name is not None
-        has_short = any(is_short(x) for x in cparam.name)
-        if has_short:
-            break
-
-    if has_required:
-        table.add_column(justify="left", width=1, style="red bold")  # For asterisk
-    table.add_column(justify="left", no_wrap=True, style="cyan")  # For option names
-    if has_short:
-        table.add_column(justify="left", no_wrap=True, style="green")  # For short options
-    table.add_column(justify="left")  # For main help text.
+    help_panel = HelpPanel(format="parameter", title=group.name, description=group.help)
 
     for iparam, cparam in icparams:
         assert cparam.name is not None
@@ -219,25 +228,24 @@ def format_group_parameters(group: "Group", iparams, cparams: List[Parameter]):
             help_components.append(r"[red][dim]\[required][/dim][/red]")
 
         # populate row
-        row_args = []
-        if has_required:
-            row_args.append("*" if cparam.required else "")
-        row_args.append(",".join(long_options) + " ")
-        if has_short:
-            row_args.append(",".join(short_options) + " ")
-        row_args.append(" ".join(help_components))
-        table.add_row(*row_args)
+        help_panel.entries.append(
+            HelpEntry(
+                name=",".join(long_options),
+                description=" ".join(help_components),
+                short=",".join(short_options),
+                required=bool(cparam.required),
+            )
+        )
 
-    if table.row_count == 0:
-        return _silent
-
-    return panel
+    return help_panel
 
 
 def format_command_rows(elements) -> List:
-    rows = []
+    entries = []
     for element in elements:
-        row = (",".join(element.name) + " ", docstring_parse(element.help_).short_description)
-        if row not in rows:
-            rows.append(row)
-    return rows
+        entry = HelpEntry(
+            name=",".join(element.name), description=docstring_parse(element.help_).short_description or ""
+        )
+        if entry not in entries:
+            entries.append(entry)
+    return entries
