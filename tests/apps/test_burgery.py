@@ -72,14 +72,14 @@ def test_create_burger_help(console):
         │              [required]                                            │
         │    QUANTITY  [default: 1]                                          │
         ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Condiments ───────────────────────────────────────────────────────╮
+        │ --mustard,--no-mustard  Add mustard. [default: True]               │
+        │ --ketchup,--no-ketchup  Add ketchup. [default: True]               │
+        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Toppings ─────────────────────────────────────────────────────────╮
         │ --lettuce,--no-lettuce  Add lettuce. [default: True]               │
         │ --tomato,--no-tomato    Add tomato. [default: True]                │
         │ --onion,--no-onion      Add onion. [default: True]                 │
-        ╰────────────────────────────────────────────────────────────────────╯
-        ╭─ Condiments ───────────────────────────────────────────────────────╮
-        │ --mustard,--no-mustard  Add mustard. [default: True]               │
-        │ --ketchup,--no-ketchup  Add ketchup. [default: True]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
