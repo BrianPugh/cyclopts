@@ -184,7 +184,7 @@ def test_coerce_tuple_len_mismatch_overflow():
 def test_coerce_tuple_ellipsis_too_many_inner_types():
     with pytest.raises(ValueError):  # This is a ValueError because it happens prior to runtime.
         # Only 1 inner type annotation allowed
-        coerce(Tuple[int, int, ...], "1", "2")
+        coerce(Tuple[int, int, ...], "1", "2")  # pyright: ignore
 
 
 def test_coerce_tuple_ellipsis_non_divisible():
