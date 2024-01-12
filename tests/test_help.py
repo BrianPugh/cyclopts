@@ -669,6 +669,38 @@ def test_help_print_command_group_no_show(app, console):
     assert actual == expected
 
 
+def test_help_print_combined_parameter_command_group(app, console):
+    group = Group("Custom Title")
+
+    app["--help"].group = group
+
+    @app.default
+    def default(value1: Annotated[int, Parameter(group=group)]):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Custom Title ─────────────────────────────────────────────────────╮
+        │ *  VALUE1,--value1  [required]                                     │
+        │    --help,-h        Display this message and exit.                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
 def test_help_print_commands(app, console):
     @app.command(help="Cmd1 help string.")
     def cmd1():
@@ -726,15 +758,15 @@ def test_help_print_commands_and_function(app, console):
 
         App Help String Line 1.
 
-        ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
-        │ *  --bar      Docstring for bar. [required]                        │
-        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -803,9 +835,6 @@ def test_help_print_commands_plus_meta(app, console):
 
         App Help String Line 1.
 
-        ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  Hostname to connect to. [required]                  │
-        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Admin ────────────────────────────────────────────────────────────╮
         │ --help,-h  Display this message and exit.                          │
         ╰────────────────────────────────────────────────────────────────────╯
@@ -814,6 +843,9 @@ def test_help_print_commands_plus_meta(app, console):
         │ cmd2       Cmd2 help string.                                       │
         │ meta-cmd   Meta cmd help string.                                   │
         │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  --hostname  Hostname to connect to. [required]                  │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -860,16 +892,16 @@ def test_help_print_commands_plus_meta_short(app, console):
 
         App Help String Line 1 from meta.
 
-        ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  TOKENS          [required]                                      │
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
-        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
         │ meta-cmd   Meta cmd help string.                                   │
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  TOKENS          [required]                                      │
+        │ *  --hostname  -n  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -897,19 +929,19 @@ def test_help_print_commands_plus_meta_short(app, console):
 
         Root Default Command Short Description.
 
-        ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  TOKENS          [required]                                      │
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
-        ╰────────────────────────────────────────────────────────────────────╯
-        ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  RDP,--rdp  RDP description. [required]                          │
-        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
         │ meta-cmd   Meta cmd help string.                                   │
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  RDP,--rdp  RDP description. [required]                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Parameters ───────────────────────────────────────────────╮
+        │ *  TOKENS          [required]                                      │
+        │ *  --hostname  -n  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

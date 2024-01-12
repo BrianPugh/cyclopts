@@ -360,7 +360,7 @@ class App:
 
     def default(
         self,
-        obj=None,
+        obj: Optional[Callable] = None,
         *,
         converter=None,
         validator=None,
@@ -655,9 +655,33 @@ class App:
                 meta_list.append(meta)
             yield from reversed(meta_list)
 
-        command_panels = {}
+        panels: Dict[str, HelpPanel] = {}
+        # Handle commands first; there's an off chance they may be "upgraded"
+        # to an argument/parameter panel.
         for subapp in walk_apps():
-            # Print default_command argument/parameter groups
+            # Handle Commands
+            for group, elements in groups_from_app(subapp):
+                if not group.show:
+                    continue
+
+                try:
+                    command_panel = panels[group.name]
+                except KeyError:
+                    panels[group.name] = command_panel = HelpPanel(
+                        format="command",
+                        title=group.name,
+                    )
+
+                if group.help:
+                    if command_panel.description:
+                        command_panel.description += "\n" + group.help
+                    else:
+                        command_panel.description = group.help
+
+                command_panel.entries.extend(format_command_entries(elements))
+
+        # Handle Arguments/Parameters
+        for subapp in walk_apps():
             if subapp.default_command:
                 command = ResolvedCommand(
                     subapp.default_command,
@@ -669,30 +693,27 @@ class App:
                     if not group.show:
                         continue
                     cparams = [command.iparam_to_cparam[x] for x in iparams]
-                    console.print(create_parameter_help_panel(group, iparams, cparams))
+                    existing_panel = panels.get(group.name)
+                    new_panel = create_parameter_help_panel(group, iparams, cparams)
 
-            # Print command groups
-            # We need to deduplicate groups from meta-app.
-            for group, elements in groups_from_app(subapp):
-                if not group.show:
-                    continue
+                    if existing_panel:
+                        # An imperfect merging process
+                        existing_panel.format = "parameter"
+                        existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
+                        if new_panel.description:
+                            if existing_panel.description:
+                                existing_panel.description += "\n" + new_panel.description
+                            else:
+                                existing_panel.description = new_panel.description
+                    else:
+                        panels[group.name] = new_panel
 
-                try:
-                    command_panel = command_panels[group.name]
-                except KeyError:
-                    command_panels[group.name] = command_panel = HelpPanel(
-                        format="command",
-                        title=group.name,
-                    )
-
-                if group.help:
-                    command_panel.description = group.help
-
-                command_panel.entries.extend(format_command_entries(elements))
-
-        for _, help_panel in sorted(command_panels.items()):
+        # Display help panels.
+        for _, help_panel in sorted(panels.items()):
             help_panel.remove_duplicates()
-            help_panel.sort()
+            if help_panel.format == "command":
+                # don't sort format == "parameter" because order may matter there!
+                help_panel.sort()
             console.print(help_panel)
 
     def interactive_shell(
