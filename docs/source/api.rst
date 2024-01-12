@@ -305,6 +305,12 @@ API
       Show this group on the help-page.
       Defaults to ``None``, which will only show the group if a ``name`` is provided.
 
+   .. attribute:: sort_key
+      :type: Any
+      :value: None
+
+      TODO
+
    .. attribute:: default_parameter
       :type: Optional[Parameter]
       :value: None

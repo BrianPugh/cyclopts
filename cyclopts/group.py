@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, Union, cast
 
 from attrs import define, field
 
@@ -24,6 +24,8 @@ class Group:
 
     # All below parameters are keyword-only
     _show: Optional[bool] = field(default=None, alias="show", kw_only=True)
+
+    sort_key: Any = field(default=None)
 
     converter: Optional[Callable] = field(default=None, kw_only=True)
 
