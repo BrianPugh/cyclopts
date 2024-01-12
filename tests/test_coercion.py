@@ -87,6 +87,11 @@ def test_coerce_bool():
     assert False is coerce(bool, "false")
 
 
+def test_coerce_error():
+    with pytest.raises(CoercionError):
+        coerce(bool, "foo")
+
+
 def test_coerce_int():
     assert 123 == coerce(int, "123")
 
@@ -165,9 +170,25 @@ def test_coerce_tuple_nested():
     )
 
 
-def test_coerce_tuple_len_mismatch():
-    with pytest.raises(ValueError):
+def test_coerce_tuple_len_mismatch_underflow():
+    with pytest.raises(CoercionError):
         coerce(Tuple[int, int], "1")
+
+
+def test_coerce_tuple_len_mismatch_overflow():
+    with pytest.raises(CoercionError):
+        coerce(Tuple[int, int], "1", "2", "3")
+
+
+def test_coerce_tuple_ellipsis_too_many_inner_types():
+    with pytest.raises(ValueError):  # This is a ValueError because it happens prior to runtime.
+        # Only 1 inner type annotation allowed
+        coerce(Tuple[int, int, ...], "1", "2")
+
+
+def test_coerce_tuple_ellipsis_non_divisible():
+    with pytest.raises(CoercionError):
+        coerce(Tuple[Tuple[int, int], ...], "1", "2", "3")
 
 
 def test_coerce_list():
