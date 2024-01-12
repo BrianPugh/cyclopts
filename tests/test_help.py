@@ -692,8 +692,8 @@ def test_help_print_combined_parameter_command_group(app, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
-        │ *  VALUE1,--value1  [required]                                     │
-        │    --help,-h        Display this message and exit.                 │
+        │ *  VALUE1,--value1      [required]                                 │
+        │    --help           -h  Display this message and exit.             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

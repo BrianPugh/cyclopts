@@ -63,7 +63,10 @@ class HelpPanel:
             table.add_column(justify="left")
 
             for entry in self.entries:
-                table.add_row(entry.name + " ", entry.description)
+                name = entry.name
+                if entry.short:
+                    name += "," + entry.short
+                table.add_row(name + " ", entry.description)
         elif self.format == "parameter":
             has_short = any(entry.short for entry in self.entries)
             has_required = any(entry.required for entry in self.entries)
@@ -103,6 +106,10 @@ class SilentRich:
 
 
 _silent = SilentRich()
+
+
+def _is_short(s):
+    return not s.startswith("--") and s.startswith("-")
 
 
 def format_usage(
@@ -175,9 +182,6 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
     icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
     iparams, cparams = (list(x) for x in zip(*icparams))
 
-    def is_short(s):
-        return not s.startswith("--") and s.startswith("-")
-
     help_panel = HelpPanel(format="parameter", title=group.name, description=group.help)
 
     for iparam, cparam in icparams:
@@ -194,7 +198,7 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
 
         short_options, long_options = [], []
         for option in options:
-            if is_short(option):
+            if _is_short(option):
                 short_options.append(option)
             else:
                 long_options.append(option)
@@ -243,8 +247,13 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
 def format_command_entries(elements) -> List:
     entries = []
     for element in elements:
+        short_names, long_names = [], []
+        for name in element.name:
+            short_names.append(name) if _is_short(name) else long_names.append(name)
         entry = HelpEntry(
-            name=",".join(element.name), description=docstring_parse(element.help_).short_description or ""
+            name=",".join(long_names),
+            short=",".join(short_names),
+            description=docstring_parse(element.help_).short_description or "",
         )
         if entry not in entries:
             entries.append(entry)
