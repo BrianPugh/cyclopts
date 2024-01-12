@@ -31,19 +31,3 @@ def test_validate_command():
         pass
 
     validate_command(f5)
-
-
-def test_validate_command_exception_bare_tuple():
-    def f1(a: tuple):
-        pass
-
-    with pytest.raises(TypeError):
-        validate_command(f1)
-
-
-def test_validate_command_exception_ellipsis_tuple():
-    def f1(a: Tuple[int, ...]):
-        pass
-
-    with pytest.raises(ValueError):
-        validate_command(f1)

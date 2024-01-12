@@ -6,9 +6,9 @@ from inspect import isclass
 from typing import TYPE_CHECKING, Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
 
 if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
+    from typing_extensions import Annotated  # pragma: no cover
 else:
-    from typing import Annotated
+    from typing import Annotated  # pragma: no cover
 
 from cyclopts.exceptions import CoercionError
 
@@ -131,10 +131,6 @@ def get_origin_and_validate(type_: Type):
     else:
         if origin_type in _unsupported_target_types:
             raise TypeError(f"Unsupported Type: {type_}")
-    if origin_type in _unsupported_target_types:
-        raise TypeError(f"Unsupported Type: {origin_type}")
-    if type_ is tuple:
-        raise TypeError("Tuple type hints must contain inner hints.")
     return origin_type
 
 
@@ -216,18 +212,42 @@ def coerce(type_: Type, *args: str):
     origin_type = get_origin_and_validate(type_)
 
     if origin_type is tuple:
-        inner_types = get_args(type_)
-        inner_token_count = token_count(type_)[0]
-        if inner_token_count != len(args):
-            raise ValueError(
-                f"Number of arguments does not match the tuple structure: expected {inner_token_count} but got {len(args)}"
-            )
-        # This assumes each inner_type consumes a single token...
-        args_per_convert = [token_count(x)[0] for x in inner_types]
-        it = iter(args)
-        batched = [[next(it) for _ in range(size)] for size in args_per_convert]
-        batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
-        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
+        inner_types = tuple(x for x in get_args(type_) if x is not ...)
+        inner_token_count, consume_all = token_count(type_)
+        if consume_all:
+            # variable-length tuple (list-like)
+            remainder = len(args) % inner_token_count
+            if remainder:
+                raise CoercionError(
+                    msg=f"Incorrect number of arguments: expected multiple of {inner_token_count} but got {len(args)}."
+                )
+            if len(inner_types) == 1:
+                inner_type = inner_types[0]
+            elif len(inner_types) == 0:
+                inner_type = str
+            else:
+                raise ValueError("A tuple must have 0 or 1 inner-types.")
+
+            if inner_token_count == 1:
+                out = tuple(_convert(inner_type, x) for x in args)
+            else:
+                out = tuple(
+                    _convert(inner_type, args[i : i + inner_token_count])
+                    for i in range(0, len(args), inner_token_count)
+                )
+            return out
+        else:
+            # Fixed-length tuple
+            if inner_token_count != len(args):
+                raise CoercionError(
+                    msg=f"Incorrect number of arguments: expected {inner_token_count} but got {len(args)}."
+                )
+            args_per_convert = [token_count(x)[0] for x in inner_types]
+            it = iter(args)
+            batched = [[next(it) for _ in range(size)] for size in args_per_convert]
+            batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
+            out = tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
+        return out
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
         return _convert(type_, args)
     elif len(args) == 1:
@@ -259,9 +279,12 @@ def token_count(type_: Union[Type, inspect.Parameter]) -> Tuple[int, bool]:
     annotation = resolve(annotation)
     origin_type = get_origin_and_validate(annotation)
 
-    if origin_type is tuple:
+    if (origin_type or annotation) is tuple:
         args = get_args(annotation)
-        return sum(token_count(x)[0] for x in args if x is not ...), ... in args
+        if args:
+            return sum(token_count(x)[0] for x in args if x is not ...), ... in args
+        else:
+            return 1, True
     elif (origin_type or annotation) is bool:
         return 0, False
     elif annotation in _iterable_types or (origin_type in _iterable_types and len(get_args(annotation)) == 0):
