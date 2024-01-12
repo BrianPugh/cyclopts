@@ -55,7 +55,6 @@ def test_bind_tuple_ellipsis(app, cmd_str, assert_parse_args):
     assert_parse_args(foo, cmd_str, (1, 2), (("alice", 100), ("bob", 200)))
 
 
-@pytest.mark.skip(reason="wip")
 @pytest.mark.parametrize(
     "cmd_str",
     [
@@ -74,7 +73,7 @@ def test_bind_tuple_no_inner_types(app, cmd_str, assert_parse_args):
     #     2. Any is treated the same as no annotation.
     #     3. Even if a default value was supplied, we couldn't unambiguously infer a type.
     #     4. This falls back to string.
-    assert_parse_args(foo, cmd_str, "1", "2", "3")
+    assert_parse_args(foo, cmd_str, ("1", "2", "3"))
 
 
 @pytest.mark.parametrize(

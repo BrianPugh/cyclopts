@@ -23,8 +23,13 @@ def _assert_tuple(expected, actual):
         assert e == a
 
 
-def test_token_count_tuple():
+def test_token_count_tuple_basic():
     assert (3, False) == token_count(Tuple[int, int, int])
+
+
+def test_token_count_tuple_no_inner_type():
+    assert (1, True) == token_count(Tuple)
+    assert (1, True) == token_count(tuple)
 
 
 def test_token_count_tuple_nested():
@@ -141,11 +146,16 @@ def test_coerce_dict_error():
         coerce(Annotated[dict, "foo"], "this-doesnt-matter")
 
 
-def test_coerce_tuple():
-    _assert_tuple(
-        (1, 2.0),
-        coerce(Tuple[int, Union[None, float, int]], "1", "2"),
-    )
+def test_coerce_tuple_basic_single():
+    _assert_tuple((1,), coerce(Tuple[int], "1"))
+
+
+def test_coerce_tuple_basic_double():
+    _assert_tuple((1, 2.0), coerce(Tuple[int, Union[None, float, int]], "1", "2"))
+
+
+def test_coerce_tuple_no_inner_types():
+    _assert_tuple(("1", "2"), coerce(Tuple, "1", "2"))
 
 
 def test_coerce_tuple_nested():
