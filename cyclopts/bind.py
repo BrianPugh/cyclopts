@@ -340,9 +340,10 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
         type_ = get_hint_parameter(iparam)[0]
 
         # Checking if parameter_token is a string is a little jank,
-        # but works for all current use-cases
+        # but works for all current use-cases.
         for parameter_token in parameter_tokens:
             if not isinstance(parameter_token, str):
+                # A token would be non-string if it's the implied-value (from a flag).
                 coerced[iparam] = parameter_tokens[0]
                 break
         else:

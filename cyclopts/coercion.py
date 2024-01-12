@@ -133,8 +133,6 @@ def get_origin_and_validate(type_: Type):
             raise TypeError(f"Unsupported Type: {type_}")
     if origin_type in _unsupported_target_types:
         raise TypeError(f"Unsupported Type: {origin_type}")
-    if type_ is tuple:
-        raise TypeError("Tuple type hints must contain inner hints.")
     return origin_type
 
 
@@ -225,11 +223,21 @@ def coerce(type_: Type, *args: str):
                 raise ValueError(
                     f"Number of arguments does not match the variable-length tuple structure: expected multiple of {inner_token_count} but got {len(args)}"
                 )
-            assert len(inner_types) == 1
-            return tuple(
-                _convert(inner_types[0], args[i : i + inner_token_count])
-                for i in range(0, len(args), inner_token_count)
-            )
+            if len(inner_types) == 1:
+                inner_type = inner_types[0]
+            elif len(inner_types) == 0:
+                inner_type = str
+            else:
+                raise ValueError("A tuple must have 0 or 1 inner-types.")
+
+            if inner_token_count == 1:
+                out = tuple(_convert(inner_type, x) for x in args)
+            else:
+                out = tuple(
+                    _convert(inner_type, args[i : i + inner_token_count])
+                    for i in range(0, len(args), inner_token_count)
+                )
+            return out
         else:
             # Fixed-length tuple
             if inner_token_count != len(args):
@@ -273,9 +281,12 @@ def token_count(type_: Union[Type, inspect.Parameter]) -> Tuple[int, bool]:
     annotation = resolve(annotation)
     origin_type = get_origin_and_validate(annotation)
 
-    if origin_type is tuple:
+    if (origin_type or annotation) is tuple:
         args = get_args(annotation)
-        return sum(token_count(x)[0] for x in args if x is not ...), ... in args
+        if args:
+            return sum(token_count(x)[0] for x in args if x is not ...), ... in args
+        else:
+            return 1, True
     elif (origin_type or annotation) is bool:
         return 0, False
     elif annotation in _iterable_types or (origin_type in _iterable_types and len(get_args(annotation)) == 0):
