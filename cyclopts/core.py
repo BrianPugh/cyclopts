@@ -36,7 +36,7 @@ from cyclopts.exceptions import (
     ValidationError,
     format_cyclopts_error,
 )
-from cyclopts.group import Group, to_group_converter
+from cyclopts.group import Group, GroupConverter
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     HelpPanel,
@@ -167,21 +167,25 @@ class App:
         kw_only=True,
     )
 
-    group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter, kw_only=True)
+    # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
+    # The other types is to make mypy happy for Cyclopts users.
+    group: Union[Group, str, Tuple[Union[Group, str], ...]] = field(
+        default=None, converter=to_tuple_converter, kw_only=True
+    )
 
     group_arguments: Group = field(
         default=None,
-        converter=to_group_converter(Group.create_default_arguments()),
+        converter=GroupConverter(Group.create_default_arguments()),
         kw_only=True,
     )
     group_parameters: Group = field(
         default=None,
-        converter=to_group_converter(Group.create_default_parameters()),
+        converter=GroupConverter(Group.create_default_parameters()),
         kw_only=True,
     )
     group_commands: Group = field(
         default=None,
-        converter=to_group_converter(Group.create_default_commands()),
+        converter=GroupConverter(Group.create_default_commands()),
         kw_only=True,
     )
 

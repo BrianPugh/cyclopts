@@ -63,15 +63,16 @@ class Group:
         return cls("Commands")
 
 
-def to_group_converter(default_group: Group):
-    def converter(input_value: Union[None, str, Group]) -> Group:
+@define
+class GroupConverter:
+    default_group: Group
+
+    def __call__(self, input_value: Union[None, str, Group]) -> Group:
         if input_value is None:
-            return default_group
+            return self.default_group
         elif isinstance(input_value, str):
             return Group(input_value)
         elif isinstance(input_value, Group):
             return input_value
         else:
             raise TypeError
-
-    return converter

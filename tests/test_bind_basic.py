@@ -163,13 +163,13 @@ def test_bind_no_hint_no_default(app, cmd_str, annotated, assert_parse_args):
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Any, Parameter(help="help for a")]):
+        def foo(a: Annotated[Any, Parameter(help="help for a")]):  # pyright: ignore[reportGeneralTypeIssues]
             pass
 
     else:
 
         @app.command
-        def foo(a):
+        def foo(a):  # pyright: ignore[reportGeneralTypeIssues]
             pass
 
     assert_parse_args(foo, cmd_str, "1")
@@ -189,13 +189,13 @@ def test_bind_no_hint_none_default(app, cmd_str, annotated, assert_parse_args):
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Any, Parameter(help="help for a")] = None):
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = None):  # pyright: ignore[reportGeneralTypeIssues]
             pass
 
     else:
 
         @app.command
-        def foo(a=None):
+        def foo(a=None):  # pyright: ignore[reportGeneralTypeIssues]
             pass
 
     assert_parse_args(foo, cmd_str, "1")
@@ -215,13 +215,13 @@ def test_bind_no_hint_typed_default(app, cmd_str, annotated, assert_parse_args):
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Any, Parameter(help="help for a")] = 5):
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = 5):  # pyright: ignore[reportGeneralTypeIssues]
             pass
 
     else:
 
         @app.command
-        def foo(a=5):
+        def foo(a=5):  # pyright: ignore[reportGeneralTypeIssues]
             pass
 
     assert_parse_args(foo, cmd_str, 1)
