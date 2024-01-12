@@ -659,7 +659,7 @@ class App:
                 meta_list.append(meta)
             yield from reversed(meta_list)
 
-        panels: Dict[str, HelpPanel] = {}
+        panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
         for subapp in walk_apps():
@@ -669,12 +669,13 @@ class App:
                     continue
 
                 try:
-                    command_panel = panels[group.name]
+                    command_panel = panels[group.name][1]
                 except KeyError:
-                    panels[group.name] = command_panel = HelpPanel(
+                    command_panel = HelpPanel(
                         format="command",
                         title=group.name,
                     )
+                    panels[group.name] = (group, command_panel)
 
                 if group.help:
                     if command_panel.description:
@@ -697,7 +698,10 @@ class App:
                     if not group.show:
                         continue
                     cparams = [command.iparam_to_cparam[x] for x in iparams]
-                    existing_panel = panels.get(group.name)
+                    try:
+                        existing_panel = panels[group.name][1]
+                    except KeyError:
+                        existing_panel = None
                     new_panel = create_parameter_help_panel(group, iparams, cparams)
 
                     if existing_panel:
@@ -710,10 +714,12 @@ class App:
                             else:
                                 existing_panel.description = new_panel.description
                     else:
-                        panels[group.name] = new_panel
+                        panels[group.name] = (group, new_panel)
+
+        # TODO: sort panels here!
 
         # Display help panels.
-        for _, help_panel in sorted(panels.items()):
+        for _, (_, help_panel) in sorted(panels.items()):
             help_panel.remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
