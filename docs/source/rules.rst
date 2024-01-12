@@ -17,7 +17,7 @@ No Hint
 *******
 If no explicit type hint is provided:
 
-* If the parameter has a non-None default value, interpret the type ``type(default_value)``.
+* If the parameter is optional and has a non-None default value, interpret the type ``type(default_value)``.
 
 .. code-block:: python
 
@@ -69,25 +69,20 @@ List
 ****
 * The inner annotation type will be applied independently to each element.
 
-* If provided as a positional parameter, all remaining positional tokens will be consumed.
+* If ``Parameter.allow_leading_hyphen=False`` (default behavior), all tokens will be consumed until a hyphenated-option is reached.
 
-  + It is frequently more appropriate to use ``*args`` to consume all remaining posiitonal tokens.
-    See :ref:`Args & Kwargs`.
+* If ``Parameter.allow_leading_hyphen=True``, all remaining tokens will be unconditionally consumed.
 
-* If provided as a keyword parameter, a single element will be added per use.
+.. code-block:: python
 
-  Example:
+    @app.default
+    def main(*, favorite_numbers: List[int]):
+        pass
 
-  .. code-block:: python
+.. code-block:: console
 
-      @app.default
-      def main(favorite_numbers: List[int]):
-          pass
-
-  .. code-block:: console
-
-     $ my-program --favorite-numbers 1 --favorite-numbers 2
-     # favorite_numbers argument is a list containing 2 integers: ``[1, 2]``.
+   $ my-program --favorite-numbers 1 2 3
+   # favorite_numbers argument is a list containing 3 integers: ``[1, 2, 3]``.
 
 * To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
   Continuing the previous example:
@@ -113,7 +108,13 @@ Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
 *****
 Tuple
 *****
-A Tuple will parse the same number of tokens as the size of the annotated tuple.
+* Parses the same number of tokens as the size of the annotated tuple.
+
+* The inner annotation type will be applied independently to each element.
+
+* Nested fixed-length tuples are allowed: E.g. ``Tuple[Tuple[int, str], str]`` will consume 3 CLI tokens.
+
+* Indeterminite-size tuples ``Tuple[type, ...]`` are only supported at the root-annotation level and behave similarly to `List`_.
 
 .. code-block:: python
 

@@ -181,9 +181,6 @@ def validate_command(f: Callable):
         type_, cparam = get_hint_parameter(iparam)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
-        if get_origin(type_) is tuple:
-            if ... in get_args(type_):
-                raise ValueError("Cannot use a variable-length tuple.")
 
 
 def get_hint_parameter(

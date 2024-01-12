@@ -216,18 +216,32 @@ def coerce(type_: Type, *args: str):
     origin_type = get_origin_and_validate(type_)
 
     if origin_type is tuple:
-        inner_types = get_args(type_)
-        inner_token_count = token_count(type_)[0]
-        if inner_token_count != len(args):
-            raise ValueError(
-                f"Number of arguments does not match the tuple structure: expected {inner_token_count} but got {len(args)}"
+        inner_types = tuple(x for x in get_args(type_) if x is not ...)
+        inner_token_count, consume_all = token_count(type_)
+        if consume_all:
+            # variable-length tuple (list-like)
+            remainder = len(args) % inner_token_count
+            if remainder:
+                raise ValueError(
+                    f"Number of arguments does not match the variable-length tuple structure: expected multiple of {inner_token_count} but got {len(args)}"
+                )
+            assert len(inner_types) == 1
+            return tuple(
+                _convert(inner_types[0], args[i : i + inner_token_count])
+                for i in range(0, len(args), inner_token_count)
             )
-        # This assumes each inner_type consumes a single token...
-        args_per_convert = [token_count(x)[0] for x in inner_types]
-        it = iter(args)
-        batched = [[next(it) for _ in range(size)] for size in args_per_convert]
-        batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
-        return tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
+        else:
+            # Fixed-length tuple
+            if inner_token_count != len(args):
+                raise ValueError(
+                    f"Number of arguments does not match the tuple structure: expected {inner_token_count} but got {len(args)}"
+                )
+            args_per_convert = [token_count(x)[0] for x in inner_types]
+            it = iter(args)
+            batched = [[next(it) for _ in range(size)] for size in args_per_convert]
+            batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
+            out = tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
+        return out
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
         return _convert(type_, args)
     elif len(args) == 1:
