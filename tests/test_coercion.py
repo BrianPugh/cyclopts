@@ -180,6 +180,7 @@ def test_coerce_tuple_len_mismatch_overflow():
         coerce(Tuple[int, int], "1", "2", "3")
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="Typing")
 def test_coerce_tuple_ellipsis_too_many_inner_types():
     with pytest.raises(ValueError):  # This is a ValueError because it happens prior to runtime.
         # Only 1 inner type annotation allowed
