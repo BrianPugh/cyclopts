@@ -6,9 +6,9 @@ from inspect import isclass
 from typing import TYPE_CHECKING, Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
 
 if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
+    from typing_extensions import Annotated  # pragma: no cover
 else:
-    from typing import Annotated
+    from typing import Annotated  # pragma: no cover
 
 from cyclopts.exceptions import CoercionError
 
@@ -131,8 +131,6 @@ def get_origin_and_validate(type_: Type):
     else:
         if origin_type in _unsupported_target_types:
             raise TypeError(f"Unsupported Type: {type_}")
-    if origin_type in _unsupported_target_types:
-        raise TypeError(f"Unsupported Type: {origin_type}")
     return origin_type
 
 
@@ -220,8 +218,8 @@ def coerce(type_: Type, *args: str):
             # variable-length tuple (list-like)
             remainder = len(args) % inner_token_count
             if remainder:
-                raise ValueError(
-                    f"Number of arguments does not match the variable-length tuple structure: expected multiple of {inner_token_count} but got {len(args)}"
+                raise CoercionError(
+                    msg=f"Incorrect number of arguments: expected multiple of {inner_token_count} but got {len(args)}."
                 )
             if len(inner_types) == 1:
                 inner_type = inner_types[0]
@@ -241,8 +239,8 @@ def coerce(type_: Type, *args: str):
         else:
             # Fixed-length tuple
             if inner_token_count != len(args):
-                raise ValueError(
-                    f"Number of arguments does not match the tuple structure: expected {inner_token_count} but got {len(args)}"
+                raise CoercionError(
+                    msg=f"Incorrect number of arguments: expected {inner_token_count} but got {len(args)}."
                 )
             args_per_convert = [token_count(x)[0] for x in inner_types]
             it = iter(args)

@@ -150,12 +150,12 @@ class ValidationError(CycloptsError):
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
 
-    input_value: str
+    input_value: str = ""
     """
     String input token that couldn't be coerced.
     """
 
-    target_type: Type
+    target_type: Optional[Type] = None
     """
     Intended type to coerce into.
     """
@@ -163,12 +163,24 @@ class CoercionError(CycloptsError):
     parameter: Optional[inspect.Parameter] = None
 
     def __str__(self):
-        response = f'Error converting value "{self.input_value}" to {self.target_type}'
-
         if self.parameter:
             assert self.parameter2cli is not None
             parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-            response += f' for "{parameter_cli_name}"'
+
+        if self.msg is not None:
+            if self.parameter:
+                return f"{parameter_cli_name}: " + self.msg  # pyright: ignore[reportUnboundVariable]
+            else:
+                return self.msg
+
+        response = f'Error converting value "{self.input_value}"'
+
+        if self.target_type is not None:
+            target_type = str(self.target_type).lstrip("typing.")  # lessens the verbosity a little bit.
+            response += f" to {target_type}"
+
+        if self.parameter:
+            response += f' for "{parameter_cli_name}"'  # pyright: ignore[reportUnboundVariable]
 
         return super().__str__() + response + "."
 
