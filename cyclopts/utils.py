@@ -1,7 +1,7 @@
 import functools
 import inspect
 from collections.abc import MutableMapping
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Iterable, Iterator, Optional
 
 
 def record_init(target: str):
@@ -22,6 +22,18 @@ def record_init(target: str):
         return cls
 
     return decorator
+
+
+def is_iterable(obj):
+    return isinstance(obj, Iterable) and not isinstance(obj, str)
+
+
+class Sentinel:
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return self.name
 
 
 class ParameterDict(MutableMapping):

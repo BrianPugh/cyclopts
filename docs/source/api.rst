@@ -280,6 +280,7 @@ API
    .. automethod:: default
 
 .. autoclass:: cyclopts.Group
+   :members: create_ordered
 
    A group of parameters and/or commands in a CLI application.
 
@@ -304,6 +305,68 @@ API
 
       Show this group on the help-page.
       Defaults to ``None``, which will only show the group if a ``name`` is provided.
+
+   .. attribute:: sort_key
+      :type: Any
+      :value: None
+
+      Modifies group-panel display order on the help-page.
+
+      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the returned value to (2) if ``None``, (3) otherwise.
+
+      2. For all groups with ``sort_key==None`` (default value), sort them alphabetically.
+         These sorted groups will be displayed **after** ``sort_key != None`` list (see 3).
+
+      3. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
+         It is the user's responsibility that ``sort_key`` s are comparable.
+
+      Example usage:
+
+      .. code-block:: python
+
+         @app.command(group=Group("4", sort_key=5))
+         def cmd1():
+             pass
+
+
+         @app.command(group=Group("3", sort_key=lambda x: 10))
+         def cmd2():
+             pass
+
+
+         @app.command(group=Group("2", sort_key=lambda x: None))
+         def cmd3():
+             pass
+
+
+         @app.command(group=Group("1"))
+         def cmd4():
+             pass
+
+      Resulting help-page:
+
+      .. code-block:: bash
+
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ 4 ────────────────────────────────────────────────────────────────╮
+        │ cmd1                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ 3 ────────────────────────────────────────────────────────────────╮
+        │ cmd2                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ 1 ────────────────────────────────────────────────────────────────╮
+        │ cmd4                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ 2 ────────────────────────────────────────────────────────────────╮
+        │ cmd3                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
 
    .. attribute:: default_parameter
       :type: Optional[Parameter]

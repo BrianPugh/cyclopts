@@ -5,6 +5,8 @@ from enum import Enum
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
 
+from cyclopts.utils import is_iterable
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated  # pragma: no cover
 else:
@@ -313,7 +315,7 @@ def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...
     """
     if value is None:
         return ()
-    elif isinstance(value, Iterable) and not isinstance(value, str):
+    elif is_iterable(value):
         return tuple(value)
     else:
         return (value,)

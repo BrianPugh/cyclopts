@@ -731,6 +731,54 @@ def test_help_print_commands(app, console):
     assert actual == expected
 
 
+def test_help_print_commands_sort_key(app, console):
+    @app.command(group=Group("4", sort_key=5))
+    def cmd1():
+        pass
+
+    @app.command(group=Group("3", sort_key=lambda x: 10))
+    def cmd2():
+        pass
+
+    @app.command(group=Group("2", sort_key=lambda x: None))
+    def cmd3():
+        pass
+
+    @app.command(group=Group("1"))
+    def cmd4():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ 4 ────────────────────────────────────────────────────────────────╮
+        │ cmd1                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ 3 ────────────────────────────────────────────────────────────────╮
+        │ cmd2                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ 1 ────────────────────────────────────────────────────────────────╮
+        │ cmd4                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ 2 ────────────────────────────────────────────────────────────────╮
+        │ cmd3                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_commands_and_function(app, console):
     @app.command(help="Cmd1 help string.")
     def cmd1():
