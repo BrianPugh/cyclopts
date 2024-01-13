@@ -852,6 +852,9 @@ def test_help_print_commands_plus_meta(app, console):
         help="App Help String Line 1.",
     )
 
+    app.meta.group_arguments = "Session Arguments"
+    app.meta.group_parameters = "Session Parameters"
+
     @app.command(help="Cmd1 help string.")
     def cmd1():
         pass
@@ -907,6 +910,9 @@ def test_help_print_commands_plus_meta_short(app, console):
     def cmd1():
         pass
 
+    app.meta.group_arguments = "Session Arguments"
+    app.meta.group_parameters = "Session Parameters"
+
     @app.meta.command(help="Meta cmd help string.")
     def meta_cmd(a: int):
         """
@@ -917,6 +923,9 @@ def test_help_print_commands_plus_meta_short(app, console):
             Some value.
         """
         pass
+
+    # Otherwise it will use the default meta
+    app["meta-cmd"].group_parameters = app.group_parameters
 
     @app.command(help="Cmd2 help string.")
     def cmd2():
