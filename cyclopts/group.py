@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional,
 
 from attrs import define, field
 
+from cyclopts.utils import Sentinel, is_iterable
+
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
 
@@ -21,6 +23,9 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
 _sort_key_counter = itertools.count()
 
 
+NO_USER_SORT_KEY = Sentinel("NO_USER_SORT_KEY")
+
+
 @define
 class Group:
     name: str = ""
@@ -30,7 +35,11 @@ class Group:
     # All below parameters are keyword-only
     _show: Optional[bool] = field(default=None, alias="show", kw_only=True)
 
-    sort_key: Any = field(default=None)
+    _sort_key: Any = field(
+        default=None,
+        alias="sort_key",
+        converter=lambda x: NO_USER_SORT_KEY if x is None else x,
+    )
 
     converter: Optional[Callable] = field(default=None, kw_only=True)
 
@@ -57,6 +66,14 @@ class Group:
     def show(self, value):
         self._show = value
 
+    @property
+    def sort_key(self):
+        return None if self._sort_key is NO_USER_SORT_KEY else self._sort_key
+
+    @sort_key.setter
+    def sort_key(self, value):
+        self._sort_key = value
+
     @classmethod
     def create_default_arguments(cls):
         return cls("Arguments")
@@ -77,10 +94,13 @@ class Group:
 
         If a :attr:`~Group.sort_key` is provided, it is **prepended** to the globally incremented counter value (i.e. has priority during sorting).
         """
-        if callable(sort_key):
-            raise TypeError(f"Cannot use a callable sort_key with {cls.__name__}.create_ordered.")
         count = next(_sort_key_counter)
-        sort_key = count if sort_key is None else (sort_key, count)
+        if sort_key is None:
+            sort_key = (NO_USER_SORT_KEY, count)
+        elif is_iterable(sort_key):
+            sort_key = (tuple(sort_key), count)
+        else:
+            sort_key = ((sort_key,), count)
         return cls(*args, sort_key=sort_key, **kwargs)
 
 
@@ -99,6 +119,22 @@ class GroupConverter:
             raise TypeError
 
 
+def _resolve_callables(t, *args):
+    """Recursively resolves callable elements in a tuple."""
+    if callable(t):
+        return t(*args)
+
+    resolved = []
+    for element in t:
+        if callable(element):
+            resolved.append(element(*args))
+        elif is_iterable(element):
+            resolved.append(_resolve_callables(element, *args))
+        else:
+            resolved.append(element)
+    return tuple(resolved)
+
+
 def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group], List[Any]]:
     """Sort groups for the help-page."""
     assert len(groups) == len(attributes)
@@ -106,28 +142,33 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
         return groups, attributes
 
     # Resolve callable ``sort_key``
-    sort_key__group_attributes = [
-        (
-            group.sort_key if group.sort_key is None or not callable(group.sort_key) else group.sort_key(group),
-            (group, attribute),
-        )
-        for group, attribute in zip(groups, attributes)
-    ]
+    sort_key__group_attributes = []
+    for group, attribute in zip(groups, attributes):
+        value = (group, attribute)
+        if callable(group._sort_key) or is_iterable(group._sort_key):
+            sort_key__group_attributes.append((_resolve_callables(group._sort_key, group), value))
+        else:
+            sort_key__group_attributes.append((group._sort_key, value))
 
-    # Sort panels here!
-    sort_key_panels, none_sort_key_panels = [], []
+    sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
+    ordered_no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
+    no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
 
     for sort_key, (group, attribute) in sort_key__group_attributes:
-        if sort_key is None:
-            none_sort_key_panels.append(((group.name, 1), (group, attribute)))
+        value = (group, attribute)
+        if sort_key in (NO_USER_SORT_KEY, None):
+            no_user_sort_key_panels.append(((group.name,), value))
+        elif is_iterable(sort_key) and sort_key[0] in (NO_USER_SORT_KEY, None):
+            ordered_no_user_sort_key_panels.append((sort_key[1:] + (group.name,), value))
         else:
-            sort_key_panels.append(((sort_key, group.name), (group, attribute)))
+            sort_key_panels.append(((sort_key, group.name), value))
 
     sort_key_panels.sort()
-    none_sort_key_panels.sort()
+    ordered_no_user_sort_key_panels.sort()
+    no_user_sort_key_panels.sort()
 
-    combined = sort_key_panels + none_sort_key_panels
+    combined = sort_key_panels + ordered_no_user_sort_key_panels + no_user_sort_key_panels
 
     out_groups, out_attributes = zip(*[x[1] for x in combined])
 
-    return out_groups, out_attributes
+    return list(out_groups), list(out_attributes)
