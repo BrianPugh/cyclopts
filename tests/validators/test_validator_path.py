@@ -44,3 +44,8 @@ def test_path_dir_okay(tmp_path):
     file = tmp_path / "file"
     file.touch()
     validator(Path, file)
+
+
+def test_path_invalid_values():
+    with pytest.raises(ValueError):
+        validators.Path(dir_okay=False, file_okay=False)
