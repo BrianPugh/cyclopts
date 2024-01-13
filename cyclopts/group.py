@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple, Union, cast
 
 from attrs import define, field
 
@@ -78,3 +78,37 @@ class GroupConverter:
             return input_value
         else:
             raise TypeError
+
+
+def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group], List[Any]]:
+    """Sort groups for the help-page."""
+    assert len(groups) == len(attributes)
+    if not groups:
+        return groups, attributes
+
+    # Resolve callable ``sort_key``
+    sort_key__group_attributes = [
+        (
+            group.sort_key if group.sort_key is None or not callable(group.sort_key) else group.sort_key(group),
+            (group, attribute),
+        )
+        for group, attribute in zip(groups, attributes)
+    ]
+
+    # Sort panels here!
+    sort_key_panels, none_sort_key_panels = [], []
+
+    for sort_key, (group, attribute) in sort_key__group_attributes:
+        if sort_key is None:
+            none_sort_key_panels.append(((group.name, 1), (group, attribute)))
+        else:
+            sort_key_panels.append(((sort_key, group.name), (group, attribute)))
+
+    sort_key_panels.sort()
+    none_sort_key_panels.sort()
+
+    combined = sort_key_panels + none_sort_key_panels
+
+    out_groups, out_attributes = zip(*[x[1] for x in combined])
+
+    return out_groups, out_attributes

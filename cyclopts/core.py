@@ -36,7 +36,7 @@ from cyclopts.exceptions import (
     ValidationError,
     format_cyclopts_error,
 )
-from cyclopts.group import Group, GroupConverter
+from cyclopts.group import Group, GroupConverter, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     HelpPanel,
@@ -669,7 +669,7 @@ class App:
                     continue
 
                 try:
-                    command_panel = panels[group.name][1]
+                    _, command_panel = panels[group.name]
                 except KeyError:
                     command_panel = HelpPanel(
                         format="command",
@@ -699,7 +699,7 @@ class App:
                         continue
                     cparams = [command.iparam_to_cparam[x] for x in iparams]
                     try:
-                        existing_panel = panels[group.name][1]
+                        _, existing_panel = panels[group.name]
                     except KeyError:
                         existing_panel = None
                     new_panel = create_parameter_help_panel(group, iparams, cparams)
@@ -716,10 +716,10 @@ class App:
                     else:
                         panels[group.name] = (group, new_panel)
 
-        # TODO: sort panels here!
+        groups = [x[0] for x in panels.values()]
+        help_panels = [x[1] for x in panels.values()]
 
-        # Display help panels.
-        for _, (_, help_panel) in sorted(panels.items()):
+        for help_panel in sort_groups(groups, help_panels)[1]:
             help_panel.remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
