@@ -278,7 +278,11 @@ class App:
     @property
     def meta(self) -> "App":
         if self._meta is None:
-            self._meta = type(self)()
+            self._meta = type(self)(
+                group_commands=copy(self.group_commands),
+                group_arguments=copy(self.group_arguments),
+                group_parameters=copy(self.group_parameters),
+            )
             self._meta._meta_parent = self
         return self._meta
 
