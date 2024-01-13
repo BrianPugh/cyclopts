@@ -189,7 +189,7 @@ This is useful for applying additional grouping logic (such as applying a :class
 By default, the ordering of panels is alphabetical.
 However, the sorting can be manipulated by :attr:`.Group.sort_key`. See it's documentation for usage.
 
-The :meth:`.Group.create_sorted` convenience classmethod creates a :class:`.Group` with a :attr:`~.Group.sort_key` value drawn drawn from a global monotonically increasing counter.
+The :meth:`.Group.create_ordered` convenience classmethod creates a :class:`.Group` with a :attr:`~.Group.sort_key` value drawn drawn from a global monotonically increasing counter.
 This means that the order in the help-page will match the order that the groups were instantiated.
 
 .. code-block:: python
@@ -198,9 +198,9 @@ This means that the order in the help-page will match the order that the groups 
 
    app = App()
 
-   g_plants = Group.create_sorted("Plants")
-   g_animals = Group.create_sorted("Animals")
-   g_mushrooms = Group.create_sorted("Mushrooms")
+   g_plants = Group.create_ordered("Plants")
+   g_animals = Group.create_ordered("Animals")
+   g_mushrooms = Group.create_ordered("Mushrooms")
 
 
    @app.command(group=g_animals)
