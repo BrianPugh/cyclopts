@@ -1,12 +1,12 @@
 import itertools
 import sys
-from typing import Union
 from unittest.mock import Mock
 
 import pytest
 
 import cyclopts.group
 from cyclopts import App, Group, Parameter
+from cyclopts.group import sort_groups
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -119,17 +119,19 @@ def test_group_validator(app):
     validator.assert_called_once_with(salt=True, pepper=True)
 
 
-def test_group_sorted_classmethod(mocker):
+def test_group_sorted_classmethod_basic(mocker):
     mock_sort_key_counter = mocker.patch("cyclopts.group._sort_key_counter")
     mock_sort_key_counter.__next__.side_effect = itertools.count()
 
+    g4 = Group("unsorted group")
     g1 = Group.create_ordered("foo")
     g2 = Group.create_ordered("bar")
-    g3 = Group.create_ordered("baz", sort_key=100)
+    g3 = Group.create_ordered("baz", sort_key="non-int value")
 
-    assert g1.sort_key == 0
-    assert g2.sort_key == 1
-    assert g3.sort_key == (100, 2)
+    assert g1.sort_key == (cyclopts.group.NO_USER_SORT_KEY, 0)
+    assert g2.sort_key == (cyclopts.group.NO_USER_SORT_KEY, 1)
+    assert g3.sort_key == (("non-int value",), 2)
+    assert g4.sort_key is None
 
-    with pytest.raises(TypeError):
-        Group.create_ordered("fizz", sort_key=lambda: 100)
+    res = sort_groups([g1, g2, g3, g4], ["a", "b", "c", "d"])
+    assert ([g3, g1, g2, g4], ["c", "a", "b", "d"]) == res
