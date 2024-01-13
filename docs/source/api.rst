@@ -312,10 +312,10 @@ API
 
       Modifies group-panel display order on the help-page.
 
-      1. If ``sort_key`` is a ``Callable``, then invoke it ``sort_key(group)`` and apply the returned value to (2) if ``None``, (3) otherwise.
+      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the returned value to (2) if ``None``, (3) otherwise.
 
       2. For all groups with ``sort_key==None`` (default value), sort them alphabetically.
-         These sorted groups will be displayed **after** `sort_key != None` list (see 3).
+         These sorted groups will be displayed **after** ``sort_key != None`` list (see 3).
 
       3. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
          It is the user's responsibility that ``sort_key`` s are comparable.
