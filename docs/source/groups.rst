@@ -143,12 +143,97 @@ The default groups are defined by the registering app:
 Converters
 ----------
 Converters offer a way of having parameters within a group interact during processing.
+Groups with an empty name, or with ``show=False``, are a way of using converters without impacting the help-page.
 See :attr:`.Group.converter` for details.
 
 ----------
 Validators
 ----------
 Group validators offer a way of jointly validating group parameter members of CLI-provided values.
+Groups with an empty name, or with ``show=False``, are a way of using validators without impacting the help-page.
+
+.. code-block:: python
+
+   mutually_exclusive = Group(validator=LimitedChoice(), default_parameter=Parameter(show_default=False, negative=""))
+
+
+   @app.command
+   def foo(
+       car: Annotated[bool, Parameter(group=(app.group_parameters, mutually_exclusive))],
+       truck: Annotated[bool, Parameter(group=(app.group_parameters, mutually_exclusive))],
+   ):
+       pass
+
+.. code-block:: console
+
+   $ python demo.py foo --help
+   Usage: demo.py foo [ARGS] [OPTIONS]
+
+   ╭─ Parameters ──────────────────────────────────────────────────────╮
+   │ CAR,--car                                                         │
+   │ TRUCK,--truck                                                     │
+   ╰───────────────────────────────────────────────────────────────────╯
+
 See :attr:`.Group.validator` for details.
 
 Cyclopts has some :ref:`builtin group-validators for common use-cases.<Group Validators>`
+
+---------
+Help Page
+---------
+Groups form titled panels on the help-page.
+
+Groups with an empty name, or with :attr:`show=False <.Group.show>`, are **not** shown on the help-page.
+This is useful for applying additional grouping logic (such as applying a :class:`.LimitedChoice` validator) without impacting the help-page.
+
+By default, the ordering of panels is alphabetical.
+However, the sorting can be manipulated by :attr:`.Group.sort_key`. See it's documentation for usage.
+
+The :meth:`.Group.create_sorted` convenience classmethod creates a :class:`.Group` with a :attr:`~.Group.sort_key` value drawn drawn from a global monotonically increasing counter.
+This means that the order in the help-page will match the order that the groups were instantiated.
+
+.. code-block:: python
+
+   from cyclopts import App, Group
+
+   app = App()
+
+   g_plants = Group.create_sorted("Plants")
+   g_animals = Group.create_sorted("Animals")
+   g_mushrooms = Group.create_sorted("Mushrooms")
+
+
+   @app.command(group=g_animals)
+   def zebra():
+       pass
+
+
+   @app.command(group=g_plants)
+   def daisy():
+       pass
+
+
+   @app.command(group=g_mushrooms)
+   def portobello():
+       pass
+
+
+   app()
+
+.. code-block:: bash
+
+   ╭─ Plants ───────────────────────────────────────────────────────────╮
+   │ daisy                                                              │
+   ╰────────────────────────────────────────────────────────────────────╯
+   ╭─ Animals ──────────────────────────────────────────────────────────╮
+   │ zebra                                                              │
+   ╰────────────────────────────────────────────────────────────────────╯
+   ╭─ Mushrooms ────────────────────────────────────────────────────────╮
+   │ portobello                                                         │
+   ╰────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ─────────────────────────────────────────────────────────╮
+   │ --help,-h  Display this message and exit.                          │
+   │ --version  Display application version.                            │
+   ╰────────────────────────────────────────────────────────────────────╯
+
+A :attr:`~.Group.sort_key` can still be supplied; the global counter will only be used to break sorting ties.

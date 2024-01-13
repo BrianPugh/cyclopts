@@ -1,3 +1,4 @@
+import itertools
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple, Union, cast
 
 from attrs import define, field
@@ -14,6 +15,10 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
 
     if value.group:
         raise ValueError("Group default_parameter cannot have a group.")
+
+
+# Used for Group.sorted
+_sort_key_counter = itertools.count()
 
 
 @define
@@ -63,6 +68,20 @@ class Group:
     @classmethod
     def create_default_commands(cls):
         return cls("Commands")
+
+    @classmethod
+    def create_sorted(cls, *args, sort_key=None, **kwargs):
+        """Create a group with a globally incremented :attr:`~Group.sort_key`.
+
+        Used to create a group that will be displayed **after** a previously declared :meth:`Group.create_sorted` group on the help-page.
+
+        If a :attr:`~Group.sort_key` is provided, it is **prepended** to the globally incremented counter value (i.e. has priority during sorting).
+        """
+        if callable(sort_key):
+            raise TypeError(f"Cannot use a callable sort_key with {cls.__name__}.create_sorted.")
+        count = next(_sort_key_counter)
+        sort_key = count if sort_key is None else (sort_key, count)
+        return cls(*args, sort_key=sort_key, **kwargs)
 
 
 @define
