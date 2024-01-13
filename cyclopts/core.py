@@ -278,10 +278,7 @@ class App:
     @property
     def meta(self) -> "App":
         if self._meta is None:
-            self._meta = type(self)(
-                group_arguments=Group("Session Arguments"),
-                group_parameters=Group("Session Parameters"),
-            )
+            self._meta = type(self)()
             self._meta._meta_parent = self
         return self._meta
 
@@ -343,8 +340,14 @@ class App:
             validate_command(obj)
             kwargs.setdefault("help_flags", [])
             kwargs.setdefault("version_flags", [])
+            if "group_commands" not in kwargs:
+                kwargs["group_commands"] = copy(self.group_commands)
+            if "group_parameters" not in kwargs:
+                kwargs["group_parameters"] = copy(self.group_parameters)
+            if "group_arguments" not in kwargs:
+                kwargs["group_arguments"] = copy(self.group_arguments)
             app = App(default_command=obj, **kwargs)
-            # app.name will default to name of the function ``obj``.
+            # app.name is handled below
 
         if name is None:
             name = app.name
