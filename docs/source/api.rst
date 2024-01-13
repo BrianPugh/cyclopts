@@ -280,6 +280,7 @@ API
    .. automethod:: default
 
 .. autoclass:: cyclopts.Group
+   :members: create_sorted
 
    A group of parameters and/or commands in a CLI application.
 

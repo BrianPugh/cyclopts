@@ -1,9 +1,11 @@
+import itertools
 import sys
 from typing import Union
 from unittest.mock import Mock
 
 import pytest
 
+import cyclopts.group
 from cyclopts import App, Group, Parameter
 
 if sys.version_info < (3, 9):
@@ -115,3 +117,19 @@ def test_group_validator(app):
     app.parse_args("--rock-salt --peppercorn --ketchup")
 
     validator.assert_called_once_with(salt=True, pepper=True)
+
+
+def test_group_sorted_classmethod(mocker):
+    mock_sort_key_counter = mocker.patch("cyclopts.group._sort_key_counter")
+    mock_sort_key_counter.__next__.side_effect = itertools.count()
+
+    g1 = Group.create_sorted("foo")
+    g2 = Group.create_sorted("bar")
+    g3 = Group.create_sorted("baz", sort_key=100)
+
+    assert g1.sort_key == 0
+    assert g2.sort_key == 1
+    assert g3.sort_key == (100, 2)
+
+    with pytest.raises(TypeError):
+        Group.create_sorted("fizz", sort_key=lambda: 100)
