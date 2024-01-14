@@ -22,6 +22,21 @@ def upper(type_, *args: str):
     return args[0].upper()
 
 
+def test_group_str_method():
+    food_group = Group("Food")
+    assert "Food" == str(food_group)
+
+
+def test_group_show_property():
+    assert Group().show is False
+    assert Group("Foo").show is True
+    assert Group("Foo", show=False).show is False
+
+    g = Group("foo")
+    g.show = False
+    assert g.show is False
+
+
 def test_group_parameter_converter(app, assert_parse_args):
     def converter(**kwargs):
         return {k: v.upper() for k, v in kwargs.items()}
@@ -119,10 +134,29 @@ def test_group_validator(app):
     validator.assert_called_once_with(salt=True, pepper=True)
 
 
-def test_group_sorted_classmethod_basic(mocker):
-    mock_sort_key_counter = mocker.patch("cyclopts.group._sort_key_counter")
-    mock_sort_key_counter.__next__.side_effect = itertools.count()
+def test_group_sort_key_property():
+    assert Group().sort_key is None
+    assert Group()._sort_key is cyclopts.group.NO_USER_SORT_KEY
 
+    g = Group(sort_key=1)
+    assert g.sort_key == 1
+
+    g.sort_key = 2
+    assert g.sort_key == 2
+
+    g.sort_key = None
+    assert g.sort_key is None
+    assert g._sort_key == cyclopts.group.NO_USER_SORT_KEY
+
+
+@pytest.fixture
+def mock_sort_key_counter(mocker):
+    mock = mocker.patch("cyclopts.group._sort_key_counter")
+    mock.__next__.side_effect = itertools.count()
+    return mock
+
+
+def test_group_sorted_classmethod_basic(mock_sort_key_counter):
     g4 = Group("unsorted group")
     g1 = Group.create_ordered("foo")
     g2 = Group.create_ordered("bar")
@@ -130,8 +164,22 @@ def test_group_sorted_classmethod_basic(mocker):
 
     assert g1.sort_key == (cyclopts.group.NO_USER_SORT_KEY, 0)
     assert g2.sort_key == (cyclopts.group.NO_USER_SORT_KEY, 1)
-    assert g3.sort_key == (("non-int value",), 2)
+    assert g3.sort_key == ("non-int value", 2)
     assert g4.sort_key is None
 
     res = sort_groups([g1, g2, g3, g4], ["a", "b", "c", "d"])
     assert ([g3, g1, g2, g4], ["c", "a", "b", "d"]) == res
+
+
+def test_group_sorted_classmethod_tuple(mock_sort_key_counter):
+    g1 = Group.create_ordered("foo1", sort_key=("tuple", 7))
+    g2 = Group.create_ordered("foo2", sort_key=lambda x: ("tuple", 5))
+
+    def f_tuple_str(x):
+        return "tuple"
+
+    g3 = Group.create_ordered("foo3", sort_key=(f_tuple_str, 3))
+    g4 = Group.create_ordered("foo4", sort_key=("tuple", 3))
+
+    res = sort_groups([g1, g2, g3, g4], ["a", "b", "c", "d"])
+    assert ([g3, g4, g2, g1], ["c", "d", "b", "a"]) == res

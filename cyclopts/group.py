@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
 
 from cyclopts.coercion import to_tuple_converter
+from cyclopts.utils import resolve_callables
 
 
 def _group_default_parameter_must_be_none(instance, attribute, value: Optional["Parameter"]):
@@ -100,7 +101,7 @@ class Group:
         elif is_iterable(sort_key):
             sort_key = (tuple(sort_key), count)
         else:
-            sort_key = ((sort_key,), count)
+            sort_key = (sort_key, count)
         return cls(*args, sort_key=sort_key, **kwargs)
 
 
@@ -119,22 +120,6 @@ class GroupConverter:
             raise TypeError
 
 
-def _resolve_callables(t, *args):
-    """Recursively resolves callable elements in a tuple."""
-    if callable(t):
-        return t(*args)
-
-    resolved = []
-    for element in t:
-        if callable(element):
-            resolved.append(element(*args))
-        elif is_iterable(element):
-            resolved.append(_resolve_callables(element, *args))
-        else:
-            resolved.append(element)
-    return tuple(resolved)
-
-
 def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group], List[Any]]:
     """Sort groups for the help-page."""
     assert len(groups) == len(attributes)
@@ -146,7 +131,7 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
     for group, attribute in zip(groups, attributes):
         value = (group, attribute)
         if callable(group._sort_key) or is_iterable(group._sort_key):
-            sort_key__group_attributes.append((_resolve_callables(group._sort_key, group), value))
+            sort_key__group_attributes.append((resolve_callables(group._sort_key, group), value))
         else:
             sort_key__group_attributes.append((group._sort_key, value))
 

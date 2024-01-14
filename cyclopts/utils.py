@@ -92,3 +92,19 @@ class ParameterDict(MutableMapping):
             return self[key]
         except KeyError:
             return default
+
+
+def resolve_callables(t, *args, **kwargs):
+    """Recursively resolves callable elements in a tuple."""
+    if callable(t):
+        return t(*args, **kwargs)
+
+    resolved = []
+    for element in t:
+        if callable(element):
+            resolved.append(element(*args, **kwargs))
+        elif is_iterable(element):
+            resolved.append(resolve_callables(element, *args, **kwargs))
+        else:
+            resolved.append(element)
+    return tuple(resolved)

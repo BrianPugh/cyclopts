@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 import pytest
 
+from cyclopts.group import Group
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
@@ -278,6 +280,20 @@ def test_bind_int_advanced_coercion_error(app):
 
     with pytest.raises(CoercionError):
         app.parse_args("foo", exit_on_error=False)
+
+
+def test_bind_override_app_groups(app):
+    g_commands = Group("Custom Commands")
+    g_arguments = Group("Custom Arguments")
+    g_parameters = Group("Custom Parameters")
+
+    @app.command(group_commands=g_commands, group_arguments=g_arguments, group_parameters=g_parameters)
+    def foo():
+        pass
+
+    assert app["foo"].group_commands == g_commands
+    assert app["foo"].group_arguments == g_arguments
+    assert app["foo"].group_parameters == g_parameters
 
 
 def test_bind_version(app, capsys):
