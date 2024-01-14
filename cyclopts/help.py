@@ -145,7 +145,7 @@ def format_usage(
 def format_doc(root_app, app: "App"):
     from cyclopts.core import App  # noqa: F811
 
-    raw_doc_string = app.help_
+    raw_doc_string = app.help
 
     if not raw_doc_string:
         return _silent
@@ -251,7 +251,7 @@ def format_command_entries(elements) -> List:
         entry = HelpEntry(
             name=",".join(long_names),
             short=",".join(short_names),
-            description=docstring_parse(element.help_).short_description or "",
+            description=docstring_parse(element.help).short_description or "",
         )
         if entry not in entries:
             entries.append(entry)
