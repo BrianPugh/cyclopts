@@ -143,7 +143,7 @@ def _resolve_default_parameter(apps):
 class App:
     _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
-    help: Optional[str] = field(default=None)
+    _help: Optional[str] = field(default=None, alias="help")
 
     # Everything below must be kw_only
 
@@ -239,19 +239,23 @@ class App:
             return (_format_name(self.default_command.__name__),)
 
     @property
-    def help_(self) -> str:
-        if self.help is not None:
-            return self.help
+    def help(self) -> str:
+        if self._help is not None:
+            return self._help
         elif self.default_command is None:
             # Try and fallback to a meta-app docstring.
             if self._meta is None:
                 return ""
             else:
-                return self.meta.help_
+                return self.meta.help
         elif self.default_command.__doc__ is None:
             return ""
         else:
             return self.default_command.__doc__
+
+    @help.setter
+    def help(self, value):
+        self._help = value
 
     def version_print(self) -> None:
         """Print the application version."""
