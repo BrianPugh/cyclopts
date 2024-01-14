@@ -9,7 +9,7 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-from cyclopts import Parameter, coerce
+from cyclopts import Parameter, convert
 
 
 @frozen

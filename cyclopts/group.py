@@ -8,7 +8,7 @@ from cyclopts.utils import Sentinel, is_iterable
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
 
-from cyclopts.coercion import to_tuple_converter
+from cyclopts._convert import to_tuple_converter
 from cyclopts.utils import resolve_callables
 
 

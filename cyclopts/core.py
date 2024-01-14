@@ -26,8 +26,8 @@ else:  # pragma: no cover
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as importlib_metadata_version
 
+from cyclopts._convert import optional_to_tuple_converter, to_list_converter, to_tuple_converter
 from cyclopts.bind import create_bound_arguments, normalize_tokens
-from cyclopts.coercion import optional_to_tuple_converter, to_list_converter, to_tuple_converter
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,

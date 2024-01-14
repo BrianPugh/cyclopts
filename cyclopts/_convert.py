@@ -2,8 +2,23 @@ import collections.abc
 import inspect
 import sys
 from enum import Enum
+from functools import partial
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Iterable, List, Literal, Optional, Set, Tuple, Type, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from cyclopts.utils import is_iterable
 
@@ -67,25 +82,23 @@ _converters = {
 }
 
 
-def _convert(type_, element):
+def _convert(type_, element, converter=None):
+    pconvert = partial(_convert, converter=converter)
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
-        return _convert(_implicit_iterable_type_mapping[type_], element)
-    elif origin_type is collections.abc.Iterable:
-        assert len(inner_types) == 1
-        return _convert(
-            List[inner_types[0]],  # pyright: ignore[reportGeneralTypeIssues]
-            element,
-        )
+        return pconvert(_implicit_iterable_type_mapping[type_], element)
 
+    if origin_type is collections.abc.Iterable:
+        assert len(inner_types) == 1
+        return pconvert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
     elif origin_type is Union:
         for t in inner_types:
             if t is NoneType:
                 continue
             try:
-                return _convert(t, element)
+                return pconvert(t, element)
             except Exception:
                 pass
         else:
@@ -93,31 +106,38 @@ def _convert(type_, element):
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
-                res = _convert(type(choice), (element))
+                res = pconvert(type(choice), (element))
             except Exception:
                 continue
             if res == choice:
                 return res
         else:
             raise CoercionError(input_value=element, target_type=type_)
-    elif isclass(type_) and issubclass(type_, Enum):
-        element_lower = element.lower().replace("-", "_")
-        for member in type_:
-            if member.name.lower().strip("_") == element_lower:
-                return member
-        raise CoercionError(input_value=element, target_type=type_)
     elif origin_type in _iterable_types:  # NOT including tuple
         count, _ = token_count(inner_types[0])
         if count > 1:
             gen = zip(*[iter(element)] * count)
         else:
             gen = element
-        return origin_type(_convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+        return origin_type(pconvert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
-        return tuple(_convert(t, e) for t, e in zip(inner_types, element))
+        return tuple(pconvert(t, e) for t, e in zip(inner_types, element))
+    elif isclass(type_) and issubclass(type_, Enum):
+        if converter is None:
+            element_lower = element.lower().replace("-", "_")
+            for member in type_:
+                if member.name.lower().strip("_") == element_lower:
+                    return member
+            raise CoercionError(input_value=element, target_type=type_)
+        else:
+            return converter(type_, element)
     else:
+        # The actual casting/converting of the underlying type is performed here.
         try:
-            return _converters.get(type_, type_)(element)
+            if converter is None:
+                return _converters.get(type_, type_)(element)
+            else:
+                return converter(type_, element)
         except ValueError:
             raise CoercionError(input_value=element, target_type=type_) from None
 
@@ -178,7 +198,7 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def coerce(type_: Type, *args: str):
+def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
     """Coerce variables into a specified type.
 
     Internally used to coercing string CLI tokens into python builtin types.
@@ -197,6 +217,19 @@ def coerce(type_: Type, *args: str):
         A type hint/annotation to coerce ``*args`` into.
     `*args`: str
         String tokens to coerce.
+    converter: Optional[Callable]
+
+        An optional function to convert tokens to the inner-most types.
+        The converter should have signature:
+
+        .. code-block:: python
+
+            def converter(type_: type, value: str) -> Any:
+                ...
+
+        This allows to use the :func:`convert` function to handle the the difficult task
+        of traversing lists/tuples/unions/etc, while leaving the final conversion logic to
+        the caller.
 
     Returns
     -------
