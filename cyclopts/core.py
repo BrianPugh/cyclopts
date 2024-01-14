@@ -19,7 +19,7 @@ import attrs
 from attrs import define, field
 from rich.console import Console
 
-if sys.version_info < (3, 10):
+if sys.version_info < (3, 10):  # pragma: no cover
     from importlib_metadata import PackageNotFoundError
     from importlib_metadata import version as importlib_metadata_version
 else:  # pragma: no cover
