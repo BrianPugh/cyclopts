@@ -1,3 +1,4 @@
+import inspect
 import sys
 from typing import List, Optional, Set
 
@@ -37,6 +38,12 @@ def test_parameter_get_negatives_iterable_custom_prefix_list(type_):
     )
 
 
+def test_parameter_negative_iterable_invalid_name(app, assert_parse_args):
+    Parameter(negative_iterable=())  # Valid
+    with pytest.raises(ValueError):
+        Parameter(negative_iterable="doesnt-start-with-hyphens")
+
+
 @pytest.mark.parametrize("type_", [bool, list, set])
 def test_parameter_get_negatives_custom_single(type_):
     p = Parameter(negative="--foo")
@@ -53,6 +60,12 @@ def test_parameter_get_negatives_bool_custom_list(type_):
 def test_parameter_get_negatives_bool_custom_prefix(type_):
     p = Parameter(negative_bool="--yesnt-")
     assert ("--yesnt-foo", "--yesnt-bar") == p.get_negatives(bool, "--foo", "--bar")
+
+
+def test_parameter_negative_bool_invalid_name(app, assert_parse_args):
+    Parameter(negative_bool=())  # Valid
+    with pytest.raises(ValueError):
+        Parameter(negative_bool="doesnt-start-with-hyphens")
 
 
 @pytest.mark.parametrize("type_", [bool, list, set])
@@ -85,6 +98,23 @@ def test_get_hint_parameter_optional_annotated():
     type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]], Parameter())
     assert type_ is bool
     assert cparam == expected_cparam
+
+
+def test_get_hint_parameter_empty_iparam_1():
+    p = inspect.Parameter("foo", inspect.Parameter.POSITIONAL_ONLY)
+    type_, _ = get_hint_parameter(p, Parameter())
+    assert type_ is str
+
+
+def test_get_hint_parameter_empty_iparam_2():
+    type_, _ = get_hint_parameter(inspect.Parameter.empty, Parameter())
+    assert type_ is str
+
+
+def test_get_hint_parameter_empty_iparam_w_default():
+    p = inspect.Parameter("foo", inspect.Parameter.POSITIONAL_ONLY, default=5)
+    type_, _ = get_hint_parameter(p, Parameter())
+    assert type_ is int
 
 
 def test_parameter_combine():

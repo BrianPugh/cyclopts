@@ -206,16 +206,13 @@ def get_hint_parameter(
         if annotation is inspect.Parameter.empty:
             annotation = str
 
-    if annotation is inspect.Parameter.empty:
-        annotation = str
-    else:
-        annotation = resolve_optional(annotation)
+    annotation = resolve_optional(annotation)
 
-        if type(annotation) is AnnotatedType:
-            annotations = annotation.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-            annotation = get_args(annotation)[0]
-            cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-        annotation = resolve(annotation)
+    if type(annotation) is AnnotatedType:
+        annotations = annotation.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+        annotation = get_args(annotation)[0]
+        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+    annotation = resolve(annotation)
 
     cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
     return annotation, cparam
