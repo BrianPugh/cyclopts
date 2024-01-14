@@ -225,7 +225,7 @@ class MissingArgumentError(CycloptsError):
     """
 
     def __str__(self):
-        from cyclopts.coercion import token_count
+        from cyclopts._convert import token_count
 
         count, _ = token_count(self.parameter)
         if count == 0:

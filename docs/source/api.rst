@@ -456,7 +456,7 @@ API
          ╰─────────────────────────────────────────────────────────╯
 
 
-.. autofunction:: cyclopts.coerce
+.. autofunction:: cyclopts.convert
 
 
 .. _API Validators:
@@ -475,6 +475,15 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.Path
    :members:
 
+
+-----
+Types
+-----
+Cyclopts has builtin pre-defined annotated-types for common validation configurations.
+
+.. automodule:: cyclopts.types
+   :members:
+   :undoc-members:
 
 ----------
 Exceptions

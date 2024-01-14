@@ -4,9 +4,9 @@ from typing import Any, Callable, Optional, Tuple, Type, Union, cast, get_args, 
 import attrs
 from attrs import field, frozen
 
-from cyclopts.coercion import (
+from cyclopts._convert import (
     AnnotatedType,
-    coerce,
+    convert,
     get_origin_and_validate,
     optional_to_tuple_converter,
     resolve,
@@ -48,7 +48,7 @@ class Parameter:
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Callable = field(default=None, converter=attrs.converters.default_if_none(coerce))
+    converter: Callable = field(default=None, converter=attrs.converters.default_if_none(convert))
 
     validator: Tuple[Callable, ...] = field(
         default=(),

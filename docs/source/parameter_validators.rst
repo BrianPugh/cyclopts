@@ -52,6 +52,20 @@ The :class:`.Number` validator can set minimum and maximum input values.
    │ Invalid value for --n. Must be < 16                              │
    ╰──────────────────────────────────────────────────────────────────╯
 
+The following pre-defined annotated types are available in :mod:`cyclopts.types`:
+
+.. code-block::
+
+   PositiveFloat = Annotated[float, Parameter(validator=validators.Number(gt=0))]
+   NonNegativeFloat = Annotated[float, Parameter(validator=validators.Number(gte=0))]
+   NegativeFloat = Annotated[float, Parameter(validator=validators.Number(lt=0))]
+   NonPositiveFloat = Annotated[float, Parameter(validator=validators.Number(lte=0))]
+
+   PositiveInt = Annotated[int, Parameter(validator=validators.Number(gt=0))]
+   NonNegativeInt = Annotated[int, Parameter(validator=validators.Number(gte=0))]
+   NegativeInt = Annotated[int, Parameter(validator=validators.Number(lt=0))]
+   NonPositiveInt = Annotated[int, Parameter(validator=validators.Number(lte=0))]
+
 ----
 Path
 ----
@@ -86,3 +100,13 @@ of the parsed :class:`pathlib.Path` object, such as asserting the file must exis
    ╭─ Error ─────────────────────────────────────────────────────────────────╮
    │ Invalid value for --path. this_file_does_not_exist.txt does not exist.  │
    ╰─────────────────────────────────────────────────────────────────────────╯
+
+The following pre-defined annotated types are available in :mod:`cyclopts.types`:
+
+.. code-block::
+
+   Directory = Annotated[Path, Parameter(validator=validators.Path(file_okay=False))]
+   File = Annotated[Path, Parameter(validator=validators.Path(dir_okay=False))]
+   ExistingPath = Annotated[Path, Parameter(validator=validators.Path(exists=True))]
+   ExistingDirectory = Annotated[Path, Parameter(validator=validators.Path(exists=True, file_okay=False))]
+   ExistingFile = Annotated[Path, Parameter(validator=validators.Path(exists=True, dir_okay=False))]
