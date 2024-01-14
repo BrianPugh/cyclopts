@@ -145,6 +145,8 @@ class App:
 
     _help: Optional[str] = field(default=None, alias="help")
 
+    usage: Optional[str] = field(default=None)
+
     # Everything below must be kw_only
 
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
@@ -652,20 +654,23 @@ class App:
             console = Console()
 
         command_chain, apps, _ = self._parse_command_chain(tokens)
-        app = apps[-1]
+        executing_app = apps[-1]
 
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
-        console.print(format_usage(self, command_chain))
+        if executing_app.usage is None:
+            console.print(format_usage(self, command_chain))
+        elif executing_app.usage:  # i.e. skip empty-string.
+            console.print(executing_app.usage + "\n")
 
         # Print the App/Command's Doc String.
-        console.print(format_doc(self, app))
+        console.print(format_doc(self, executing_app))
 
         def walk_apps():
             # Iterates from deepest to shallowest meta-apps
             meta_list = []  # shallowest to deepest
-            meta_list.append(app)
-            meta = app
+            meta_list.append(executing_app)
+            meta = executing_app
             while (meta := meta._meta) and meta.default_command:
                 meta_list.append(meta)
             yield from reversed(meta_list)
