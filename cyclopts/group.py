@@ -100,7 +100,7 @@ class Group:
         elif is_iterable(sort_key):
             sort_key = (tuple(sort_key), count)
         else:
-            sort_key = ((sort_key,), count)
+            sort_key = (sort_key, count)
         return cls(*args, sort_key=sort_key, **kwargs)
 
 
