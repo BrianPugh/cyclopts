@@ -32,6 +32,16 @@ def app():
     )
 
 
+def test_empty_help_panel_rich_silent(console):
+    help_panel = HelpPanel(format="command", title="test")
+
+    with console.capture() as capture:
+        console.print(help_panel)
+
+    actual = capture.get()
+    assert actual == ""
+
+
 def test_help_default_action(app, console):
     """No command should default to help."""
     with console.capture() as capture:
@@ -99,20 +109,6 @@ def test_help_format_usage_command(app, console):
         console.print(format_usage(app, []))
     actual = capture.get()
     assert actual == "Usage: app COMMAND\n\n"
-
-
-def test_format_doc_function(app, console):
-    def foo():
-        """Foo Doc String Line 1.
-
-        Foo Doc String Line 3.
-        """
-
-    with console.capture() as capture:
-        console.print(format_doc(app, foo))
-
-    actual = capture.get()
-    assert actual == "Foo Doc String Line 1.\n\nFoo Doc String Line 3.\n\n"
 
 
 def test_format_commands_docstring(app, console):

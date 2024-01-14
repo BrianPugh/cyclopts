@@ -90,7 +90,7 @@ def _resolve_groups(
                     group = resolved_groups[index]
                 iparam_to_groups[iparam].append(group)
             else:
-                raise TypeError  # pragma: no cover
+                raise TypeError
 
     return resolved_groups, iparam_to_groups
 

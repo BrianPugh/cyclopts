@@ -2,7 +2,7 @@ import inspect
 from enum import Enum
 from functools import lru_cache
 from inspect import isclass
-from typing import Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
 
 from attrs import define, field, frozen
 from docstring_parser import parse as docstring_parse
@@ -13,6 +13,9 @@ from rich.text import Text
 
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter
+
+if TYPE_CHECKING:
+    from cyclopts.core import App
 
 docstring_parse = lru_cache(maxsize=16)(docstring_parse)
 
@@ -139,15 +142,10 @@ def format_usage(
     return Text(" ".join(usage) + "\n", style="bold")
 
 
-def format_doc(app, function: Optional[Callable]):
+def format_doc(root_app, app: "App"):
     from cyclopts.core import App  # noqa: F811
 
-    if function is None:
-        raw_doc_string = app.help_
-    elif isinstance(function, App):
-        raw_doc_string = function.help_
-    else:
-        raw_doc_string = function.__doc__ or ""
+    raw_doc_string = app.help_
 
     if not raw_doc_string:
         return _silent
