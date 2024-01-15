@@ -501,8 +501,27 @@ Path
 ^^^^
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
 
-.. automodule:: cyclopts.types
-   :members: ExistingPath, ResolvedPath, ResolvedExistingPath, Directory, ExistingDirectory, ResolvedDirectory, ResolvedExistingDirectory, File, ExistingFile, ResolvedFile, ResolvedExistingFile
+.. autodata:: cyclopts.types.ExistingPath
+
+.. autodata:: cyclopts.types.ResolvedPath
+
+.. autodata:: cyclopts.types.ResolvedExistingPath
+
+.. autodata:: cyclopts.types.Directory
+
+.. autodata:: cyclopts.types.ExistingDirectory
+
+.. autodata:: cyclopts.types.ResolvedDirectory
+
+.. autodata:: cyclopts.types.ResolvedExistingDirectory
+
+.. autodata:: cyclopts.types.File
+
+.. autodata:: cyclopts.types.ExistingFile
+
+.. autodata:: cyclopts.types.ResolvedFile
+
+.. autodata:: cyclopts.types.ResolvedExistingFile
 
 .. _Annotated Number Types:
 
@@ -511,9 +530,21 @@ Number
 ^^^^^^
 Annotated types for checking common int/float value constraints.
 
-.. automodule:: cyclopts.types
-   :noindex:
-   :members: PositiveFloat, NonNegativeFloat, NegativeFloat, NonPositiveFloat, PositiveInt, NonNegativeInt, NegativeInt, NonPositiveInt
+.. autodata:: cyclopts.types.PositiveFloat
+
+.. autodata:: cyclopts.types.NonNegativeFloat
+
+.. autodata:: cyclopts.types.NegativeFloat
+
+.. autodata:: cyclopts.types.NonPositiveFloat
+
+.. autodata:: cyclopts.types.PositiveInt
+
+.. autodata:: cyclopts.types.NonNegativeInt
+
+.. autodata:: cyclopts.types.NegativeInt
+
+.. autodata:: cyclopts.types.NonPositiveInt
 
 ----------
 Exceptions
