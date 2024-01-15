@@ -292,7 +292,26 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
-    def _parse_command_chain(self, tokens):
+    def parse_commands(self, tokens: Union[None, str, Iterable[str]] = None):
+        """Extract out the command tokens from a command.
+
+        Parameters
+        ----------
+        tokens: Union[None, str, Iterable[str]]
+            Either a string, or a list of strings to launch a command.
+            Defaults to ``sys.argv[1:]``
+
+        Returns
+        -------
+        List[str]
+            Tokens that are interpreted as a valid command chain.
+        List[App]
+            The associated :class:`App` object with each of those tokens.
+        List[str]
+            The remaining non-command tokens.
+        """
+        tokens = normalize_tokens(tokens)
+
         command_chain = []
         app = self
         apps = [app]
@@ -427,7 +446,7 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        command_chain, apps, unused_tokens = self._parse_command_chain(tokens)
+        command_chain, apps, unused_tokens = self.parse_commands(tokens)
         command_app = apps[-1]
 
         try:
@@ -653,7 +672,7 @@ class App:
         if console is None:
             console = Console()
 
-        command_chain, apps, _ = self._parse_command_chain(tokens)
+        command_chain, apps, _ = self.parse_commands(tokens)
         executing_app = apps[-1]
 
         # Print the:
