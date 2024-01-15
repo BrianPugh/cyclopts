@@ -9,7 +9,7 @@ class Path:
     """Assertions on properties of :class:`pathlib.Path`."""
 
     exists: bool = False
-    """If ``True``, specified path must exist. Defaults to ``False``."""
+    """If ``True``, specified path **must** exist. Defaults to ``False``."""
 
     file_okay: bool = True
     """
@@ -33,11 +33,11 @@ class Path:
         if not isinstance(path, pathlib.Path):
             raise TypeError
 
-        if self.exists and not path.exists():
+        if path.exists():
+            if not self.file_okay and path.is_file():
+                raise ValueError(f"Only directory input is allowed but {path} is a file.")
+
+            if not self.dir_okay and path.is_dir():
+                raise ValueError(f"Only file input is allowed but {path} is a directory.")
+        elif self.exists:
             raise ValueError(f"{path} does not exist.")
-
-        if not self.file_okay and path.is_file():
-            raise ValueError(f"Only directory input is allowed but {path} is a file.")
-
-        if not self.dir_okay and path.is_dir():
-            raise ValueError(f"Only file input is allowed but {path} is a directory.")
