@@ -41,6 +41,7 @@ Cyclopts
 
    cookbook/app_upgrade.rst
    cookbook/interactive_help.rst
+   cookbook/pyproject.rst
 
 .. toctree::
    :maxdepth: 2
