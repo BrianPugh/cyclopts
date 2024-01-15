@@ -38,6 +38,13 @@ API
       Defaults to ``["--help", "-h"]``.
       Cannot be changed after instantiating the app.
 
+   .. attribute:: usage
+      :type: Optional[str]
+      :value: None
+
+      Text to be displayed in lieue of the default ``Usage: app COMMAND ...`` at the beginning of the help-page.
+      Set to an empty-string ``""`` to disable showing the default usage.
+
    .. attribute:: show
       :type: bool
       :value: True

@@ -63,6 +63,47 @@ def test_help_default_action(app, console):
     assert actual == expected
 
 
+def test_help_custom_usage(app, console):
+    app.usage = "My custom usage."
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        My custom usage.
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_custom_usage_subapp(app, console):
+    app.command(App(name="foo", usage="My custom usage."))
+
+    with console.capture() as capture:
+        app(["foo", "--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        My custom usage.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_default_help_flags(console):
     """Standard help flags."""
     app = App(name="app", help="App Help String Line 1.")
