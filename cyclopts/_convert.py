@@ -264,10 +264,10 @@ def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
                 raise ValueError("A tuple must have 0 or 1 inner-types.")
 
             if inner_token_count == 1:
-                out = tuple(_convert(inner_type, x) for x in args)
+                out = tuple(_convert(inner_type, x, converter=converter) for x in args)
             else:
                 out = tuple(
-                    _convert(inner_type, args[i : i + inner_token_count])
+                    _convert(inner_type, args[i : i + inner_token_count], converter=converter)
                     for i in range(0, len(args), inner_token_count)
                 )
             return out
@@ -281,14 +281,14 @@ def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
             it = iter(args)
             batched = [[next(it) for _ in range(size)] for size in args_per_convert]
             batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
-            out = tuple(_convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
+            out = tuple(_convert(inner_type, arg, converter=converter) for inner_type, arg in zip(inner_types, batched))
         return out
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return _convert(type_, args)
+        return _convert(type_, args, converter=converter)
     elif len(args) == 1:
-        return _convert(type_, args[0])
+        return _convert(type_, args[0], converter=converter)
     else:
-        return [_convert(type_, item) for item in args]
+        return [_convert(type_, item, converter=converter) for item in args]
 
 
 def token_count(type_: Union[Type, inspect.Parameter]) -> Tuple[int, bool]:

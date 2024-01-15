@@ -1,7 +1,9 @@
 import sys
 from pathlib import Path
 
-from cyclopts import Parameter, validators
+from cyclopts import validators
+from cyclopts._convert import convert
+from cyclopts.parameter import Parameter
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated  # pragma: no cover
@@ -15,6 +17,11 @@ __all__ = [
     "ExistingDirectory",
     "Directory",
     "File",
+    "ResolvedExistingPath",
+    "ResolvedExistingFile",
+    "ResolvedExistingDirectory",
+    "ResolvedDirectory",
+    "ResolvedFile",
     # Number
     "PositiveFloat",
     "NonNegativeFloat",
@@ -30,8 +37,8 @@ __all__ = [
 ########
 # Path #
 ########
-def _resolve_converter(type_, *args):
-    pass
+def _path_resolve_converter(type_, *args):
+    return convert(type_, *args, converter=lambda _, x: Path(x).resolve())
 
 
 Directory = Annotated[Path, Parameter(validator=validators.Path(file_okay=False))]
@@ -39,6 +46,12 @@ File = Annotated[Path, Parameter(validator=validators.Path(dir_okay=False))]
 ExistingPath = Annotated[Path, Parameter(validator=validators.Path(exists=True))]
 ExistingDirectory = Annotated[Path, Parameter(validator=validators.Path(exists=True, file_okay=False))]
 ExistingFile = Annotated[Path, Parameter(validator=validators.Path(exists=True, dir_okay=False))]
+
+ResolvedDirectory = Annotated[Directory, Parameter(converter=_path_resolve_converter)]
+ResolvedFile = Annotated[File, Parameter(converter=_path_resolve_converter)]
+ResolvedExistingPath = Annotated[ExistingPath, Parameter(converter=_path_resolve_converter)]
+ResolvedExistingDirectory = Annotated[ExistingDirectory, Parameter(converter=_path_resolve_converter)]
+ResolvedExistingFile = Annotated[ExistingFile, Parameter(converter=_path_resolve_converter)]
 
 
 ##########
