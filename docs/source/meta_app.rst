@@ -23,13 +23,13 @@ To change how the primary app is run, you can use the meta-app feature of Cyclop
 
 .. code-block:: python
 
-   from cyclopts import App, Parameter
+   from cyclopts import App, Group, Parameter
    from typing_extensions import Annotated
 
-   app = App(
-       help_flags=[],  # Disable help & version flags since the meta-app
-       version_flags=[],  # will handle them.
-   )
+   app = App()
+   # Rename the meta's "Parameter" -> "Session Parameters".
+   # Set sort_key so it will be drawn higher up the help-page.
+   app.meta.group_parameters = Group("Session Parameters", sort_key=0)
 
 
    @app.command
@@ -66,14 +66,14 @@ be additionally scanned when generate help screens
    $ my-script --help
    Usage: my-script COMMAND
 
-   ╭─ Session Parameters ───────────────────────────────────────────────────╮
-   │ *  --user     [required]                                               │
-   │    --version  Display application version.                             │
-   │    --help,-h  Display this message and exit.                           │
-   ╰────────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ─────────────────────────────────────────────────────────────╮
-   │ foo                                                                    │
-   ╰────────────────────────────────────────────────────────────────────────╯
+   ╭─ Session Parameters ────────────────────────────────────────────────────╮
+   │ *  --user  [required]                                                   │
+   ╰─────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ──────────────────────────────────────────────────────────────╮
+   │ foo                                                                     │
+   │ --help,-h  Display this message and exit.                               │
+   │ --version  Display application version.                                 │
+   ╰─────────────────────────────────────────────────────────────────────────╯
 
 -------------
 Meta Commands
@@ -94,15 +94,15 @@ If you want a command to circumvent ``my_app_launcher``, add it as you would any
    $ my-script --help
    Usage: my-script COMMAND
 
-   ╭─ Session Parameters ───────────────────────────────────────────────────╮
-   │ *  --user     [required]                                               │
-   │    --version  Display application version.                             │
-   │    --help,-h  Display this message and exit.                           │
-   ╰────────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ─────────────────────────────────────────────────────────────╮
-   │ foo                                                                    │
-   │ info                                                                   │
-   ╰────────────────────────────────────────────────────────────────────────╯
+   ╭─ Session Parameters ────────────────────────────────────────────────────╮
+   │ *  --user  [required]                                                   │
+   ╰─────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ──────────────────────────────────────────────────────────────╮
+   │ foo                                                                     │
+   │ info                                                                    │
+   │ --help,-h  Display this message and exit.                               │
+   │ --version  Display application version.                                 │
+   ╰─────────────────────────────────────────────────────────────────────────╯
 
 Just like a standard application, the parsed ``command`` executes instead of ``default``.
 
@@ -145,7 +145,7 @@ This might be useful to share an expensive-to-create object amongst commands in 
 
 
    @app.meta.default
-   def launcher(*tokens: Annotated[str, Parameter(show=False)], user: str):
+   def launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
        user_obj = User(user)
        command, bound = app.parse_args(tokens)
        return command(*bound.args, **bound.kwargs, user_obj=user_obj)
