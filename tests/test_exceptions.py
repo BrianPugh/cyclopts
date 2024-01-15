@@ -61,7 +61,6 @@ def test_exceptions_coercion_error_verbose(app, console):
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ CoercionError                                                      │
-        │ Function defined in file                                           │
         """
     )
     assert actual.startswith(expected)

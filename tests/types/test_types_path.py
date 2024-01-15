@@ -16,52 +16,52 @@ def tmp_file(tmp_path):
 
 # ExistingPath
 def test_types_existing_path(convert, tmp_file):
-    assert tmp_file == convert(ct.ExistingPath, str(tmp_file))
+    assert tmp_file == convert(ct.ExistingPath, tmp_file)
 
 
 def test_types_existing_path_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
-        convert(ct.ExistingPath, str(tmp_path / "foo"))
+        convert(ct.ExistingPath, tmp_path / "foo")
 
 
 # ExistingFile
 def test_types_existing_file(convert, tmp_file):
-    assert tmp_file == convert(ct.ExistingFile, str(tmp_file))
+    assert tmp_file == convert(ct.ExistingFile, tmp_file)
 
 
 def test_types_existing_file_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
-        convert(ct.ExistingFile, str(tmp_path))
+        convert(ct.ExistingFile, tmp_path)
 
 
 # ExistingDirectory
 def test_types_existing_directory(convert, tmp_path):
-    assert tmp_path == convert(ct.ExistingDirectory, str(tmp_path))
+    assert tmp_path == convert(ct.ExistingDirectory, tmp_path)
 
 
 def test_types_existing_directory_validation_error(convert, tmp_file):
     with pytest.raises(ValidationError):
-        convert(ct.ExistingDirectory, str(tmp_file))
+        convert(ct.ExistingDirectory, tmp_file)
 
 
 # Directory
 def test_types_directory(convert, tmp_path):
-    assert tmp_path == convert(ct.Directory, str(tmp_path))
+    assert tmp_path == convert(ct.Directory, tmp_path)
 
 
 def test_types_directory_validation_error(convert, tmp_file):
     with pytest.raises(ValidationError):
-        convert(ct.Directory, str(tmp_file))
+        convert(ct.Directory, tmp_file)
 
 
 # File
 def test_types_file(convert, tmp_file):
-    assert tmp_file == convert(ct.File, str(tmp_file))
+    assert tmp_file == convert(ct.File, tmp_file)
 
 
 def test_types_file_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
-        convert(ct.File, str(tmp_path))
+        convert(ct.File, tmp_path)
 
 
 # ResolvedExistingPath
@@ -69,60 +69,60 @@ def test_types_file_validation_error(convert, tmp_path):
 def test_types_resolved_existing_path(convert, tmp_path, action):
     src = tmp_path / ".." / tmp_path.name / "foo"
     getattr(src, action)()
-    assert src.resolve() == convert(ct.ResolvedExistingPath, str(src))
+    assert src.resolve() == convert(ct.ResolvedExistingPath, src)
 
 
 def test_types_resolved_existing_path_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
-        convert(ct.ResolvedExistingPath, str(tmp_path / "foo"))
+        convert(ct.ResolvedExistingPath, tmp_path / "foo")
 
 
 # ResolvedExistingFile
 def test_types_resolved_existing_file(convert, tmp_path):
     src = tmp_path / ".." / tmp_path.name / "foo"
     src.touch()
-    assert src.resolve() == convert(ct.ResolvedExistingFile, str(src))
+    assert src.resolve() == convert(ct.ResolvedExistingFile, src)
 
 
 def test_types_resolved_existing_file_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
-        convert(ct.ResolvedExistingFile, str(tmp_path / "foo"))
+        convert(ct.ResolvedExistingFile, tmp_path / "foo")
 
 
 # ResolvedExistingDirectory
 def test_types_resolved_existing_directory(convert, tmp_path):
     src = tmp_path / ".." / tmp_path.name / "foo"
     src.mkdir()
-    assert src.resolve() == convert(ct.ResolvedExistingDirectory, str(src))
+    assert src.resolve() == convert(ct.ResolvedExistingDirectory, src)
 
 
 def test_types_resolved_existing_directory_validation_error(convert, tmp_path):
     src = tmp_path / ".." / tmp_path.name / "foo"
 
     with pytest.raises(ValidationError):
-        convert(ct.ResolvedExistingDirectory, str(src))
+        convert(ct.ResolvedExistingDirectory, src)
 
 
 # ResolvedDirectory
-def test_types_resolved_directory(convert):
-    assert Path("/bar") == convert(ct.ResolvedDirectory, "/foo/../bar/")
+def test_types_resolved_directory(convert, tmp_path):
+    assert tmp_path == convert(ct.ResolvedDirectory, tmp_path / "foo" / "..")
 
 
 def test_types_resolved_directory_validation_error(convert, tmp_file):
     with pytest.raises(ValidationError):
-        convert(ct.ResolvedDirectory, str(tmp_file))
+        convert(ct.ResolvedDirectory, tmp_file)
 
 
 # ResolvedFile
 def test_types_resolved_file(convert, tmp_path):
     src = tmp_path / ".." / tmp_path.name / "foo"
     src.touch()
-    assert src.resolve() == convert(ct.ResolvedFile, str(src))
+    assert src.resolve() == convert(ct.ResolvedFile, src)
 
 
 def test_types_resolved_file_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
-        convert(ct.ResolvedFile, str(tmp_path))
+        convert(ct.ResolvedFile, tmp_path)
 
 
 # Misc
@@ -134,4 +134,6 @@ def test_types_path_resolve_converter(convert, tmp_path):
     dir1.mkdir()
     dir2.mkdir()
 
-    assert (dir1, dir2) == convert(Tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [str(dir1), str(dir2)])
+    assert (dir1, dir2) == convert(
+        Tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [dir1.as_posix(), dir2.as_posix()]
+    )

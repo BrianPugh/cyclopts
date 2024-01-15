@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 
 import pytest
 from rich.console import Console
@@ -60,6 +61,9 @@ def convert(app):
         if n_times_called:
             raise pytest.UsageError("convert fixture can only be called once per test.")
         n_times_called += 1
+
+        if isinstance(cmd, Path):
+            cmd = cmd.as_posix()
 
         @app.default
         def target(arg1: type_):
