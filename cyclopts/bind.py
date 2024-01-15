@@ -5,7 +5,7 @@ import shlex
 import sys
 from typing import Any, Dict, Iterable, List, Tuple, Union, get_origin
 
-from cyclopts.coercion import token_count
+from cyclopts._convert import token_count
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,

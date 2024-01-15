@@ -14,11 +14,12 @@ __all__ = [
     "Parameter",
     "UnusedCliTokensError",
     "ValidationError",
-    "coerce",
+    "convert",
+    "types",
     "validators",
 ]
 
-from cyclopts.coercion import coerce
+from cyclopts._convert import convert
 from cyclopts.core import App
 from cyclopts.exceptions import (
     CoercionError,
@@ -34,4 +35,4 @@ from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 
-from . import validators
+from . import types, validators

@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 
 import pytest
 from rich.console import Console
@@ -42,5 +43,32 @@ def assert_parse_args_partial(app):
         actual_command, actual_bind = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f
         assert actual_bind == expected_bind
+
+    return inner
+
+
+@pytest.fixture
+def convert(app):
+    """Function that performs a conversion for a given type/cmd pair.
+
+    Goes through the whole app stack.
+    Can only be called once per test.
+    """
+    n_times_called = 0
+
+    def inner(type_, cmd):
+        nonlocal n_times_called
+        if n_times_called:
+            raise pytest.UsageError("convert fixture can only be called once per test.")
+        n_times_called += 1
+
+        if isinstance(cmd, Path):
+            cmd = cmd.as_posix()
+
+        @app.default
+        def target(arg1: type_):
+            return arg1
+
+        return app(cmd, exit_on_error=False)
 
     return inner
