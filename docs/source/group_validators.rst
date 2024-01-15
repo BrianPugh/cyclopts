@@ -61,3 +61,5 @@ Most commonly used for mutually-exclusive arguments (default behavior).
    ╭─ Error ───────────────────────────────────────────────────────────────╮
    │ Mutually exclusive arguments: {--car, --truck}                        │
    ╰───────────────────────────────────────────────────────────────────────╯
+
+See the :class:`.LimitedChoice` docs for more info.
