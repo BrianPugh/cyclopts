@@ -469,14 +469,44 @@ Cyclopts has several builtin validators for common CLI inputs.
    :members:
 
 
+.. _Annotated Types:
+
 -----
 Types
 -----
 Cyclopts has builtin pre-defined annotated-types for common validation configurations.
+All definitions in this section are just predefined annotations for convenience:
+
+.. code-block:: python
+
+   Annotated[..., Parameter(...)]
+
+Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated. E.g:
+
+.. code-block::
+
+   Annotated[PositiveInt, Parameter(...)]
+
+.. _Annotated Path Types:
+
+^^^^
+Path
+^^^^
+:class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
 
 .. automodule:: cyclopts.types
-   :members:
-   :undoc-members:
+   :members: ExistingPath, ResolvedPath, ResolvedExistingPath, Directory, ExistingDirectory, ResolvedDirectory, ResolvedExistingDirectory, File, ExistingFile, ResolvedFile, ResolvedExistingFile
+
+.. _Annotated Number Types:
+
+^^^^^^
+Number
+^^^^^^
+Annotated types for checking common int/float value constraints.
+
+.. automodule:: cyclopts.types
+   :noindex:
+   :members: PositiveFloat, NonNegativeFloat, NegativeFloat, NonPositiveFloat, PositiveInt, NonNegativeInt, NegativeInt, NonPositiveInt
 
 ----------
 Exceptions
