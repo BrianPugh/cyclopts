@@ -273,6 +273,17 @@ def capture_format_group_parameters(console, default_function_groups):
     return inner
 
 
+def test_help_format_group_parameters_empty(capture_format_group_parameters):
+    def cmd(
+        foo: Annotated[str, Parameter(show=False)],
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = ""
+    assert actual == expected
+
+
 def test_help_format_group_parameters(capture_format_group_parameters):
     def cmd(
         foo: Annotated[str, Parameter(help="Docstring for foo.")],

@@ -177,10 +177,13 @@ def _get_choices(type_: Type) -> str:
 
 
 def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter]) -> HelpPanel:
-    icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
-    iparams, cparams = (list(x) for x in zip(*icparams))
-
     help_panel = HelpPanel(format="parameter", title=group.name, description=group.help)
+    icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
+
+    if not icparams:
+        return help_panel
+
+    iparams, cparams = (list(x) for x in zip(*icparams))
 
     for iparam, cparam in icparams:
         assert cparam.name is not None
