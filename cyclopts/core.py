@@ -155,7 +155,8 @@ class App:
     default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
     version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
-    version_flags: Tuple[str, ...] = field(
+    # This can ONLY ever be a Tuple[str, ...]
+    version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
         on_setattr=attrs.setters.frozen,
         converter=to_tuple_converter,
@@ -164,7 +165,8 @@ class App:
 
     show: bool = field(default=True, kw_only=True)
 
-    help_flags: Tuple[str, ...] = field(
+    # This can ONLY ever be a Tuple[str, ...]
+    help_flags: Union[str, Iterable[str]] = field(
         default=["--help", "-h"],
         on_setattr=attrs.setters.frozen,
         converter=to_tuple_converter,
@@ -482,7 +484,7 @@ class App:
                     for validator in command_app.validator:
                         validator(**bound.arguments)
                     for command_group in command_groups:
-                        for validator in command_group.validator:
+                        for validator in command_group.validator:  # pyright: ignore
                             validator(**bound.arguments)
                 except (AssertionError, ValueError, TypeError) as e:
                     new_exception = ValidationError(value=e.args[0])

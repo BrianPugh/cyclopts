@@ -63,7 +63,7 @@ def _resolve_groups(
 
         iparam_to_groups.setdefault(iparam, [])
 
-        for group in groups:
+        for group in groups:  # pyright: ignore
             if isinstance(group, str):
                 try:
                     index = _list_index(resolved_groups, lambda x: x.name == group)  # noqa: B023
