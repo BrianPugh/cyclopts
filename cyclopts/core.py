@@ -141,7 +141,9 @@ def _resolve_default_parameter(apps):
 
 @define
 class App:
-    _name: Optional[Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
+    # This can ONLY ever be Tuple[str, ...] due to converter.
+    # The other types is to make mypy happy for Cyclopts users.
+    _name: Union[None, str, Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
     _help: Optional[str] = field(default=None, alias="help")
 
@@ -231,7 +233,7 @@ class App:
     def name(self) -> Tuple[str, ...]:
         """Application name(s). Dynamically derived if not previously set."""
         if self._name:
-            return self._name
+            return self._name  # pyright: ignore[reportGeneralTypeIssues]
         elif self.default_command is None:
             name = Path(sys.argv[0]).name
             if name == "__main__.py":
