@@ -112,6 +112,36 @@ def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated, assert_
     assert_parse_args(foo, cmd_str, 1)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo 1",
+        "foo --a=1",
+        "foo --a 1",
+    ],
+)
+@pytest.mark.parametrize("annotated", [False, True])
+def test_optional_nonrequired_implicit_coercion_python310_syntax(app, cmd_str, annotated, assert_parse_args):
+    """
+    For a union without an explicit coercion, the first non-None type annotation
+    should be used. In this case, it's ``int``.
+    """
+    if annotated:
+
+        @app.command
+        def foo(a: Annotated[int | None, Parameter(help="help for a")] = None):  # pyright: ignore
+            pass
+
+    else:
+
+        @app.command
+        def foo(a: int | None = None):  # pyright: ignore
+            pass
+
+    assert_parse_args(foo, cmd_str, 1)
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [
