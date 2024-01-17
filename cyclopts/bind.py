@@ -431,7 +431,7 @@ def create_bound_arguments(
         try:
             for group, iparams in command.groups_iparams:
                 names = tuple(x.name for x in iparams)
-                for validator in group.validator:
+                for validator in group.validator:  # pyright: ignore
                     validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
         except (AssertionError, ValueError, TypeError) as e:
             new_exception = ValidationError(value=e.args[0])

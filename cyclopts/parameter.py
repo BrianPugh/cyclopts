@@ -1,5 +1,5 @@
 import inspect
-from typing import Any, Callable, Optional, Tuple, Type, Union, cast, get_args, get_origin
+from typing import Any, Callable, Iterable, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
@@ -43,21 +43,27 @@ class Parameter:
 
     # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
 
-    name: Tuple[str, ...] = field(
+    # This can ONLY ever be a Tuple[str, ...]
+    name: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
 
     converter: Callable = field(default=None, converter=attrs.converters.default_if_none(convert))
 
-    validator: Tuple[Callable, ...] = field(
+    # This can ONLY ever be a Tuple[Callable, ...]
+    validator: Union[None, Callable, Iterable[Callable]] = field(
         default=(),
         converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
     )
 
-    negative: Union[None, Tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)
+    # This can ONLY ever be a Tuple[str, ...]
+    negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
 
-    group: Tuple[Union[Group, str], ...] = field(default=None, converter=to_tuple_converter, hash=False)
+    # This can ONLY ever be a Tuple[Union[Group, str], ...]
+    group: Union[None, Group, str, Iterable[Union[Group, str]]] = field(
+        default=None, converter=to_tuple_converter, hash=False
+    )
 
     parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
@@ -71,7 +77,8 @@ class Parameter:
 
     show_env_var: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
-    env_var: Tuple[str, ...] = field(
+    # This can ONLY ever be a Tuple[str, ...]
+    env_var: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
@@ -103,7 +110,7 @@ class Parameter:
         type_ = get_origin(type_) or type_
 
         if self.negative is not None:
-            return self.negative
+            return self.negative  # pyright: ignore
         elif type_ not in (bool, list, set):
             return ()
 

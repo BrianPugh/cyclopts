@@ -44,7 +44,8 @@ class Group:
 
     converter: Optional[Callable] = field(default=None, kw_only=True)
 
-    validator: Tuple[Callable, ...] = field(
+    # This can ONLY ever be a Tuple[Callable, ...]
+    validator: Union[None, Callable, Iterable[Callable]] = field(
         default=None,
         converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
         kw_only=True,

@@ -198,7 +198,7 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
+def convert(type_: Type[Any], *args: str, converter: Optional[Callable] = None):
     """Coerce variables into a specified type.
 
     Internally used to coercing string CLI tokens into python builtin types.
@@ -291,7 +291,7 @@ def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
         return [_convert(type_, item, converter=converter) for item in args]
 
 
-def token_count(type_: Union[Type, inspect.Parameter]) -> Tuple[int, bool]:
+def token_count(type_: Union[Type[Any], inspect.Parameter]) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
