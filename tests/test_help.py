@@ -159,7 +159,6 @@ def test_format_commands_docstring(app, console):
 
         This should not be shown.
         """
-        pass
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],)))
@@ -170,6 +169,34 @@ def test_format_commands_docstring(app, console):
     assert actual == (
         "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
         "│ foo  Docstring for foo.                                            │\n"
+        "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
+
+
+def test_format_commands_docstring_long_only(app, console):
+    """
+    PEP-0257 says that the short_description and long_description should be separated by an empty newline.
+    We hijack the docstring parsing a little bit to enforce this.
+
+    See https://github.com/BrianPugh/cyclopts/issues/74
+    """
+
+    @app.command
+    def foo():
+        """
+        This function doesn't have a short description.
+        This is a continuation of the long description.
+        """  # noqa: D404
+
+    panel = HelpPanel(title="Commands", format="command")
+    panel.entries.extend(format_command_entries((app["foo"],)))
+    with console.capture() as capture:
+        console.print(panel)
+
+    actual = capture.get()
+    assert actual == (
+        "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
+        "│ foo                                                                │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 

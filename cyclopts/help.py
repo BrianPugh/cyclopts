@@ -2,10 +2,10 @@ import inspect
 from enum import Enum
 from functools import lru_cache
 from inspect import isclass
-from typing import TYPE_CHECKING, Callable, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, List, Literal, Tuple, Type, Union, get_args, get_origin
 
+import docstring_parser
 from attrs import define, field, frozen
-from docstring_parser import parse as docstring_parse
 from rich import box, console
 from rich.panel import Panel
 from rich.table import Table
@@ -17,7 +17,20 @@ from cyclopts.parameter import Parameter, get_hint_parameter
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-docstring_parse = lru_cache(maxsize=16)(docstring_parse)
+
+@lru_cache(maxsize=16)
+def docstring_parse(doc: str):
+    """Addon to :func:`docstring_parser.parse` that double checks the `short_description`."""
+    res = docstring_parser.parse(doc)
+    cleaned_doc = inspect.cleandoc(doc)
+    short = cleaned_doc.split("\n\n")[0]
+    if res.short_description != short:
+        if res.long_description is None:
+            res.long_description = res.short_description
+        elif res.short_description is not None:
+            res.long_description = res.short_description + "\n" + res.long_description
+        res.short_description = None
+    return res
 
 
 @frozen
@@ -157,7 +170,9 @@ def format_doc(root_app, app: "App"):
         components.append((parsed.short_description + "\n", "default"))
 
     if parsed.long_description:
-        components.append(("\n" + parsed.long_description + "\n", "info"))
+        if parsed.short_description:
+            components.append(("\n", "default"))
+        components.append((parsed.long_description + "\n", "info"))
 
     return Text.assemble(*components)
 
