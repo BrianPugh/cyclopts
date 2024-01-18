@@ -122,10 +122,12 @@ There are a few ways to adding a help string to a command:
 .. code-block:: console
 
    $ my-script --help
-   ╭─ Commands ─────────────────────╮
-   │ foo  Help string for foo.      │
-   │ bar  Help string for bar.      │
-   ╰────────────────────────────────╯
+   ╭─ Commands ────────────────────────────────────────────────────────────╮
+   │ bar        Help string for bar.                                       │
+   │ foo        Help string for foo.                                       │
+   │ --help,-h  Display this message and exit.                             │
+   │ --version  Display application version.                               │
+   ╰───────────────────────────────────────────────────────────────────────╯
 
 --------------------------
 Decorated Function Details

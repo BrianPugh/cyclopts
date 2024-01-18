@@ -139,15 +139,16 @@ We can add application-level help documentation when creating our ``app``:
 .. code-block:: console
 
    $ my-script --help
-   Usage:
+   Usage: my-script COMMAND
 
    Help string for this demo application.
 
-   ╭─ Parameters ────────────────────────────────────────────────────────────────────╮
-   │ --version  Display application version.                                         │
-   │ --help,-h  Display this message and exit.                                       │
-   ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ──────────────────────────────────────────────────────────╮
+   │ --help,-h  Display this message and exit.                           │
+   │ --version  Display application version.                             │
+   ╰─────────────────────────────────────────────────────────────────────╯
 
+By default, Cyclopts adds ``--help`` and ``--version`` commands to your CLI.
 If :attr:`.App.help` is not set, Cyclopts will fallback to the first line
 (short description) of the registered ``@app.default`` function's docstring.
 
