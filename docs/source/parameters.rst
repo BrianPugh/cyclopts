@@ -31,13 +31,11 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
 
    This is help for the root application.
 
-   ╭─ Commands ──────────────────────────────────────────────────────────────────────────╮
-   │ foo  Cyclopts uses this short description for help.                                 │
-   ╰─────────────────────────────────────────────────────────────────────────────────────╯
-   ╭─ Parameters ────────────────────────────────────────────────────────────────────────╮
-   │ --version  Display application version.                                             │
-   │ --help,-h  Display this message and exit.                                           │
-   ╰─────────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ──────────────────────────────────────────────────────────╮
+   │ foo        Cyclopts uses this short description for help.           │
+   │ --help,-h  Display this message and exit.                           │
+   │ --version  Display application version.                             │
+   ╰─────────────────────────────────────────────────────────────────────╯
 
    $ my-script foo --help
    Usage: my-script [ARGS] [OPTIONS]
