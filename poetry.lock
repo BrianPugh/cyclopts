@@ -1346,6 +1346,20 @@ typing-extensions = {version = ">=4.0.0,<5.0", markers = "python_version < \"3.9
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
+name = "rich-rst"
+version = "1.1.7"
+description = "A beautiful reStructuredText renderer for rich"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "rich-rst-1.1.7.tar.gz", hash = "sha256:898bd5defd6bde9fba819614575dc5bff18047af38ae1981de0c1e78f17bbfd5"},
+    {file = "rich_rst-1.1.7-py3-none-any.whl", hash = "sha256:9acf096a5902ef762498e5e510c15dab4ed92bb1f16b2f294f397e4f40048785"},
+]
+
+[package.dependencies]
+docutils = "*"
+
+[[package]]
 name = "setuptools"
 version = "69.0.3"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
@@ -1758,4 +1772,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "ea1ce8b23114bf32b38466e538262e711afc71232e62a63b69e29494c4fc43e3"
+content-hash = "91f3dd9462b70fe988f671c70de9d4e40415c2a80870a194e965ce3a79fad1f4"

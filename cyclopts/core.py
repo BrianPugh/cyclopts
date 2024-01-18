@@ -178,7 +178,7 @@ class App:
         converter=to_tuple_converter,
         kw_only=True,
     )
-    help_format: Union[None, Literal["markdown", "text"]] = None
+    help_format: Union[None, Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]] = None
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
@@ -695,7 +695,7 @@ class App:
 
         # Print the App/Command's Doc String.
         # Resolve help_format; None fallsback to parent; non-None overwrites parent.
-        help_format = "text"
+        help_format = "restructuredtext"
         for app in apps:
             if app.help_format is not None:
                 help_format = app.help_format

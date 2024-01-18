@@ -39,12 +39,12 @@ API
       Cannot be changed after instantiating the app.
 
    .. attribute:: help_format
-      :type: Optional[Literal["text", "markdown"]]
+      :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
 
       The markup language of docstring function descriptions.
       If ``None``, fallback to parenting :attr:`~.App.help_format`.
-      If no :attr:`~.App.help_format` is defined, falls back to ``"text"``.
+      If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
 
    .. attribute:: usage
       :type: Optional[str]

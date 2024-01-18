@@ -2,12 +2,11 @@ import inspect
 from enum import Enum
 from functools import lru_cache
 from inspect import isclass
-from typing import TYPE_CHECKING, List, Literal, Optional, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, List, Literal, Tuple, Type, Union, get_args, get_origin
 
 import docstring_parser
 from attrs import define, field, frozen
 from rich import box, console
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -156,7 +155,7 @@ def format_usage(
     return Text(" ".join(usage) + "\n", style="bold")
 
 
-def format_doc(root_app, app: "App", format: str = "text"):
+def format_doc(root_app, app: "App", format: str = "plaintext"):
     from cyclopts.core import App  # noqa: F811
 
     raw_doc_string = app.help
@@ -176,10 +175,16 @@ def format_doc(root_app, app: "App", format: str = "text"):
         components.append((parsed.long_description + "\n", "info"))
 
     format = format.lower()
-    if format == "text":
+    if format == "plaintext":
         return Text.assemble(*components)
-    elif format == "markdown":
+    elif format in ("markdown", "md"):
+        from rich.markdown import Markdown
+
         return console.Group(Markdown("".join(x[0] for x in components)), Text(""))
+    elif format in ("restructuredtext", "rst"):
+        from rich_rst import RestructuredText
+
+        return RestructuredText("".join(x[0] for x in components))
     else:
         raise ValueError(f'Unknown help_format "{format}"')
 
