@@ -919,6 +919,29 @@ def test_help_print_commands_special_flag_reassign(app, console):
     assert actual == expected
 
 
+def test_help_print_parameters_no_negative_from_default_parameter(app, console):
+    app.default_parameter = Parameter(negative=())
+
+    @app.command
+    def foo(*, flag: bool):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["foo"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app foo [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --flag  [required]                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_commands_plus_meta(app, console):
     app = App(
         name="app",

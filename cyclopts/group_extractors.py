@@ -28,11 +28,12 @@ def _create_or_append(
 
 
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
-    """Extract Group/App association."""
+    """Extract Group/App association from all commands of ``app``."""
     group_mapping: List[Tuple[Group, List["App"]]] = [
         (app.group_commands, []),
     ]
 
+    # This does NOT include app._meta commands
     subapps = [subapp for subapp in app._commands.values() if subapp.show]
 
     # 2 iterations need to be performed:
@@ -67,10 +68,10 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     return group_mapping
 
 
-def inverse_groups_from_app(app: "App") -> List[Tuple["App", List[Group]]]:
+def inverse_groups_from_app(input_app: "App") -> List[Tuple["App", List[Group]]]:
     out = []
     seen_apps = []
-    for group, apps in groups_from_app(app):
+    for group, apps in groups_from_app(input_app):
         for app in apps:
             try:
                 index = seen_apps.index(app)
