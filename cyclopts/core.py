@@ -7,7 +7,7 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Tuple, Union
 
 try:
     from pydantic import ValidationError as PydanticValidationError
@@ -178,6 +178,7 @@ class App:
         converter=to_tuple_converter,
         kw_only=True,
     )
+    help_format: Union[None, Literal["markdown", "text"]] = None
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
@@ -693,7 +694,12 @@ class App:
             console.print(executing_app.usage + "\n")
 
         # Print the App/Command's Doc String.
-        console.print(format_doc(self, executing_app))
+        # Resolve help_format; None fallsback to parent; non-None overwrites parent.
+        help_format = "text"
+        for app in apps:
+            if app.help_format is not None:
+                help_format = app.help_format
+        console.print(format_doc(self, executing_app, help_format))
 
         def walk_apps():
             # Iterates from deepest to shallowest meta-apps

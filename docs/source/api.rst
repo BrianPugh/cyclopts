@@ -38,6 +38,14 @@ API
       Defaults to ``["--help", "-h"]``.
       Cannot be changed after instantiating the app.
 
+   .. attribute:: help_format
+      :type: Optional[Literal["text", "markdown"]]
+      :value: None
+
+      The markup language of docstring function descriptions.
+      If ``None``, fallback to parenting :attr:`~.App.help_format`.
+      If no :attr:`~.App.help_format` is defined, falls back to ``"text"``.
+
    .. attribute:: usage
       :type: Optional[str]
       :value: None
