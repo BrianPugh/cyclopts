@@ -1166,4 +1166,8 @@ def test_help_markdown(app, console):
         """
     )
 
+    # Rich sticks a bunch of trailing spaces on lines.
+    expected = [x.strip() for x in expected.split("\n")]
+    actual = [x.strip() for x in actual.split("\n")]
+
     assert actual == expected
