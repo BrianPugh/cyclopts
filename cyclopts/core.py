@@ -123,6 +123,7 @@ def _combined_meta_command_mapping(app):
 
 
 def _get_command_groups(parent_app, child_app):
+    """Extract out the command groups from the ``parent_app`` for a given ``child_app``."""
     return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
 
 
@@ -130,6 +131,11 @@ def _resolve_default_parameter(apps):
     """The default_parameter resolution depends on the parent-child path traversed."""
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
+        # child_app could be a command of parent_app.meta
+        if parent_app._meta and child_app in parent_app._meta._commands.values():
+            cparams = []  # meta-apps do NOT inherit from their parenting app.
+            parent_app = parent_app._meta
+
         groups = _get_command_groups(parent_app, child_app)
         cparams.extend([group.default_parameter for group in groups])
         cparams.append(parent_app.default_parameter)
@@ -729,7 +735,7 @@ class App:
             if subapp.default_command:
                 command = ResolvedCommand(
                     subapp.default_command,
-                    subapp.default_parameter,
+                    _resolve_default_parameter(apps),
                     subapp.group_arguments,
                     subapp.group_parameters,
                 )
