@@ -1,10 +1,8 @@
-import inspect
 import sys
 from enum import Enum
 from textwrap import dedent
 from typing import List, Literal, Optional, Union
 
-import attrs
 import pytest
 
 if sys.version_info < (3, 9):
@@ -14,11 +12,9 @@ else:
 
 from cyclopts import App, Group, Parameter
 from cyclopts.help import (
-    HelpEntry,
     HelpPanel,
     create_parameter_help_panel,
     format_command_entries,
-    format_doc,
     format_usage,
 )
 from cyclopts.resolve import ResolvedCommand

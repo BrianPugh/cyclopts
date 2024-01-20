@@ -83,17 +83,167 @@ The source resolution order is as follows (as applicable):
       def bar():
           """This is the primary application docstring."""
 
+-------------
+Markup Format
+-------------
+The standard markup language for docstrings in python is reStructuredText (see `PEP-0287`_).
+By default, Cyclopts parses docstring descriptions as restructuredtext and renders it appropriately.
+To change the markup format, set the :attr:`.App.help_format` field accordingly.
 
-The ``--help`` flags can be changed to different name(s) via the ``help_flags`` parameter.
+Subapps inherit their parent's :attr:`.App.help_format` unless explicitly overridden. I.e. you only need
+to set :attr:`.App.help_format` in your main root application for all docstrings to be parsed appropriately.
+
+^^^^^^^^^
+PlainText
+^^^^^^^^^
+Do not perform any additional parsing, display supplied text as-is.
+
+.. code-block:: python
+
+   app = App(help_format="plaintext")
+
+
+   @app.default
+   def default():
+       """My application summary.
+
+       This is a pretty standard docstring; if there's a really long sentence
+       I should probably wrap it because people don't like code that is more
+       than 80 columns long.
+
+       In this new paragraph, I would like to discuss the benefits of relaxing 80 cols to 120 cols.
+       More text in this paragraph.
+
+       Some new paragraph.
+       """
+
+
+.. code-block:: text
+
+   Usage: default COMMAND
+
+   My application summary.
+
+   This is a pretty standard docstring; if there's a really long
+   sentence
+   I should probably wrap it because people don't like code that is
+   more
+   than 80 columns long.
+
+   In this new paragraph, I would like to discuss the benefits of
+   relaxing 80 cols to 120 cols.
+   More text in this paragraph.
+
+   Some new paragraph.
+
+   ╭─ Commands ─────────────────────────────────────────────────────╮
+   │ --help,-h  Display this message and exit.                      │
+   │ --version  Display application version.                        │
+   ╰────────────────────────────────────────────────────────────────╯
+
+Most noteworthy, is no additional text reflow is performed; newlines are presented as-is.
+
+^^^^^^^^^^^^^^^^
+ReStructuredText
+^^^^^^^^^^^^^^^^
+ReStructuredText is the default parsing behavior of Cyclopts, so `help_format` won't need to be explicitly set.
+
+.. code-block:: python
+
+   app = App(help_format="restructuredtext")  # or "rst"
+   # or don't supply help_format at all; rst is default.
+
+
+   @app.default
+   def default():
+       """My application summary.
+
+       We can do RST things like have **bold text**.
+       More words in this paragraph.
+
+       This is a new paragraph with some bulletpoints below:
+
+       * bullet point 1.
+       * bullet point 2.
+       """
+
+
+Resulting help:
+
+.. raw:: html
+
+   <div class="custom-code-block"><pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-style: italic">Usage: default COMMAND
+
+   My application summary.
+
+   We can do RST things like have <span style="font-weight: bold">bold text</span>. More words in this
+   paragraph.
+
+   This is a new paragraph with some bulletpoints below:
+
+   • bullet point 1.
+   • bullet point 2.
+
+   ╭─ Commands ──────────────────────────────────────────────────────────╮
+   │ --help,-h  Display this message and exit.                           │
+   │ --version  Display application version.                             │
+   ╰─────────────────────────────────────────────────────────────────────╯
+   </pre></div>
+
+Under most circumstances, plaintext (without any additional markup) looks prettier and reflows better when interpreted as restructuredtext (or markdown, for that matter).
+
+^^^^^^^^^
+Markdown
+^^^^^^^^^
+Markdown is another popular markup language that Cyclopts can render.
+
+.. code-block:: python
+
+   app = App(help_format="markdown")  # or "md"
+
+
+   @app.default
+   def default():
+       """My application summary.
+
+       We can do markdown things like have **bold text**.
+       [Hyperlinks work as well.](https://cyclopts.readthedocs.io)
+       """
+
+Resulting help:
+
+.. raw:: html
+
+   <div class="custom-code-block"><pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-style: italic">Usage: default COMMAND
+
+   My application summary.
+
+   We can do markdown things like have <span style="font-weight: bold">bold text</span>. <a href="https://cyclopts.readthedocs.io">Hyperlinks work as well</a>.
+
+   ╭─ Commands ──────────────────────────────────────────────────────────╮
+   │ --help,-h  Display this message and exit.                           │
+   │ --version  Display application version.                             │
+   ╰─────────────────────────────────────────────────────────────────────╯
+   </pre></div>
+
+
+----------
+Help Flags
+----------
+The default ``--help`` flags can be changed to different name(s) via the ``help_flags`` parameter.
 
 .. code-block:: python
 
    app = cyclopts.App(help_flags="--show-help")
    app = cyclopts.App(help_flags=["--send-help", "--send-help-plz", "-h"])
 
-To disable the help-page, set ``help_flags`` to an empty string or iterable.
+To disable the help-page entirely, set ``help_flags`` to an empty string or iterable.
 
 .. code-block:: python
 
    app = cyclopts.App(help_flags="")
    app = cyclopts.App(help_flags=[])
+
+
+.. _PEP-0257: https://peps.python.org/pep-0257/
+.. _PEP-0287: https://peps.python.org/pep-0287/

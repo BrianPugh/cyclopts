@@ -155,7 +155,7 @@ def format_usage(
     return Text(" ".join(usage) + "\n", style="bold")
 
 
-def format_doc(root_app, app: "App", format: str = "plaintext"):
+def format_doc(root_app, app: "App", format: str = "restructuredtext"):
     from cyclopts.core import App  # noqa: F811
 
     raw_doc_string = app.help

@@ -11,3 +11,11 @@
 .wy-table-responsive {
     overflow: visible !important;
 }
+
+.custom-code-block {
+    border: 1px solid #CCCCCC;
+    background-color: #F9F9F9;
+    padding: 10px;
+    font-family: monospace;
+    overflow: auto;
+}
