@@ -8,7 +8,7 @@ Choices
 Enum
 ----
 Frequently, a CLI will want to limit values provided to a parameter to a specific set of choices.
-With Typer, this is accomplished via declaring an enum.
+With Typer, this is accomplished via declaring an :class:`~enum.Enum`.
 
 .. code-block:: python
 
@@ -54,9 +54,9 @@ Literal
 -------
 Enums don't work well with everyone's workflow.
 Many people prefer to directly use strings for their functions' options.
-The much more intuitive, convenient method of doing this is with the ``Literal`` type annotation.
+The much more intuitive, convenient method of doing this is with the :obj:`~typing.Literal` type annotation.
 Unfortuneately, Typer has not provided support, despite `a feature request dating back to early 2020`_
-Cyclopts has builtin support for ``Literal``, see :ref:`Coercion Rules - Literal <Coercion Rules - Literal>`.
+Cyclopts has builtin support for :obj:`~typing.Literal`, see :ref:`Coercion Rules - Literal <Coercion Rules - Literal>`.
 
 .. code-block:: python
 

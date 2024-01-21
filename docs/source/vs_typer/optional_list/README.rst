@@ -34,7 +34,8 @@ However, Typer supplies an empty list instead of ``None``.
 
 Cyclopts has a more intuitive solution.
 If no CLI option is specified, no argument is bound, so the parameter's default value ``None`` is used.
-If we wish to pass an empty iterable (``set``, ``list``), cyclopts provides an ``--empty-*`` flag for each iterable parameter.
+If we wish to pass an empty iterable (e.g. :class:`set` or :class:`list`), Cyclopts provides an ``--empty-*`` flag for each iterable parameter.
+This feature is configurable via :attr:`.Parameter.negative_iterable`.
 
 .. code-block:: python
 

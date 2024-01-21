@@ -5,6 +5,12 @@ Cyclopts
 .. include:: ../../README.md
    :parser: myst_parser.sphinx_
 
+
+---
+API
+---
+For extensive documentation on all the features Cyclopts has to offer, checkout the :ref:`API` page.
+
 .. toctree::
    :maxdepth: 1
    :caption: Usage

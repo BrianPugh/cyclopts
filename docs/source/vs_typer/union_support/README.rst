@@ -2,7 +2,7 @@
 Union/Optional Support
 ======================
 
-Currently, Typer does not support ``Union`` type annotations.
+Currently, Typer does not support :obj:`~typing.Union` type annotations.
 
 .. code-block:: python
 
@@ -18,7 +18,7 @@ Currently, Typer does not support ``Union`` type annotations.
    # AssertionError: Typer Currently doesn't support Union types
 
 
-Cyclopts fully supports ``Union`` annotations.
+Cyclopts fully supports :obj:`~typing.Union` annotations.
 Cyclopt's :ref:`Coercion Rules <Coercion Rules - Union>` iterate left-to-right over the unioned types until a coercion can be performed without error.
 
 .. code-block:: python
@@ -37,4 +37,4 @@ Cyclopt's :ref:`Coercion Rules <Coercion Rules - Union>` iterate left-to-right o
    cyclopts_app(["bar"])
    # type(value)=<class 'str'> value='bar'
 
-Naturally, Cyclopts also supports ``Optional`` types, since ``Optional`` is syntactic sugar for ``Union[..., None]``.
+Naturally, Cyclopts also supports :obj:`~typing.Optional` types, since :obj:`~typing.Optional` is syntactic sugar for ``Union[..., None]``.

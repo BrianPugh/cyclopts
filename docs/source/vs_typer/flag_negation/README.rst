@@ -50,7 +50,7 @@ To use a different negative flag, you can supply the name after a slash in your 
    typer_app(["--your-flag"], standalone_mode=False)
    # my_flag=False
 
-Cyclopts's :class:`Parameter <cyclopts.Parameter>` takes in an optional ``negative`` flag.
+Cyclopts's :class:`Parameter <cyclopts.Parameter>` takes in an optional :attr:`~.Parameter.negative` flag.
 To suppress the negative-flag generation, set this argument to either an empty string or list.
 
 .. code-block:: python
@@ -85,4 +85,19 @@ To define your own custom negative flag, just provide it as a string or list of 
    cyclopts_app(["--my-flag"])
    # my_flag=True
    cyclopts_app(["--your-flag"])
+   # my_flag=False
+
+The default ``--no-`` negation prefix can also be customized with :attr:`~.Parameter.negative_bool`.
+
+.. code-block:: python
+
+   @cyclopts_app.default
+   def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative_bool="--disable-")] = False):
+       print(f"{my_flag=}")
+
+
+   print("Cyclopts:")
+   cyclopts_app(["--my-flag"])
+   # my_flag=True
+   cyclopts_app(["--disable-my-flag"])
    # my_flag=False
