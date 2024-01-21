@@ -51,7 +51,7 @@ When does ``version_callback`` get called?
 What is ``value``?
 
 With Cyclopts, the version is automatically detected by checking the version of the package instantiating :class:`App <cyclopts.App>`.
-If you prefer explicitness, ``version`` can also be explicitly supplied to :class:`App <cyclopts.App>`.
+If you prefer explicitness, :attr:`~.App.version` can also be explicitly supplied to :class:`App <cyclopts.App>`.
 
 
 .. code-block:: python

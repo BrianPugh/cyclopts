@@ -4,7 +4,6 @@
 Default Command
 ===============
 Typer has an annoying design quirk where if you register a single command, it **won't** expect you to provide the command name in the CLI.
-
 For example:
 
 
@@ -51,8 +50,8 @@ Github user `ajlive's callback solution`_ is copied below.
 
 To avoid this confusion, Cyclopts has two ways of registering a function:
 
-1. ``app.command`` - Register a function as a command.
-2. ``app.default`` - Invoked if no registered command can be parsed from the CLI.
+1. :meth:`@app.command <.App.command>` - Register a function as a command.
+2. :meth:`@app.default <.App.default>` - Invoked if no registered command can be parsed from the CLI.
 
 .. code-block:: python
 

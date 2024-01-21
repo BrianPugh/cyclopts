@@ -71,7 +71,7 @@ The ``typer.Argument`` signature has a ridiculous number of fields that only app
    ) -> Any:
        ...
 
-Cyclopts has an explicit ``validator`` field that accepts a function:
+Cyclopts has an explicit :attr:`~.Parameter.validator` field that accepts a function:
 
 .. code-block:: python
 

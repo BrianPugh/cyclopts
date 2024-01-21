@@ -9,7 +9,7 @@ Despite it's popularity, Typer has some traits that I (and others) find less tha
 Part of this stems from Typer's age, with it's first release in late 2019, soon after Python 3.8's release.
 Because of this, most of it's API was initially designed around assigning proxy default values to function parameters.
 This made the decorated command functions difficult to use outside of Typer.
-With the introduction of ``Annotated`` in python3.9, type-hints were able to be directly annotated, allowing for the removal of these proxy defaults.
+With the introduction of :obj:`~.typing.Annotated` in python3.9, type-hints were able to be directly annotated, allowing for the removal of these proxy defaults.
 
 Additionally, Typer is built on top of `Click`_.
 This makes it difficult for newcomers to figure out which elements are Typer-related and which elements are click-related.

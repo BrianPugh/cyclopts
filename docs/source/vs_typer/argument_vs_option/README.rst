@@ -1,3 +1,5 @@
+.. _Typer Argument vs Option:
+
 ==================
 Argument vs Option
 ==================
