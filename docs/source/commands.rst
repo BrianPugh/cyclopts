@@ -2,10 +2,10 @@
 Commands
 ========
 
-There are 2 primary function registering decorators:
+There are 2 function-registering decorators:
 
 1. :meth:`@app.default <cyclopts.App.default>` -
-   Registers an action for when no valid command is provided by the CLI.
+   Registers an action for when no registered command is provided.
    This was previously demonstrated in :ref:`Getting Started`.
 
    A sub-app **cannot** be registered with :meth:`@app.default <cyclopts.App.default>`.
@@ -21,22 +21,48 @@ This section will detail how to use the :meth:`@app.command <cyclopts.App.comman
 Registering a Command
 ---------------------
 The :meth:`@app.command <cyclopts.App.command>` decorator adds a command to a Cyclopts application.
-The registered command can either be a function, or another Cyclopts :class:`.App`.
-
 
 .. code-block:: python
 
    from cyclopts import App
 
    app = App()
-   sub_app = App(name="foo")
-   app.command(sub_app)  # Registers sub_app to command "foo"
-   # Or, as a one-liner:  app.command(sub_app := App(name="foo"))
 
 
    @app.command
    def fizz(n: int):
        print(f"FIZZ: {n}")
+
+
+   @app.command
+   def buzz(n: int):
+       print(f"BUZZ: {n}")
+
+
+   app()
+
+.. code-block:: console
+
+   $ my-script fizz 3
+   FIZZ: 3
+
+   $ my-script buzz 4
+   BUZZ: 4
+
+------------------------
+Registering a SubCommand
+------------------------
+The :meth:`@app.command <cyclopts.App.command>` method can also register another Cyclopts :class:`.App` as a command.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+   sub_app = App(name="foo")  # "foo" would be a better variable name than "sub_app".
+   # "sub_app" in this example emphasizes the name comes from name="foo".
+   app.command(sub_app)  # Registers sub_app to command "foo"
+   # Or, as a one-liner:  app.command(sub_app := App(name="foo"))
 
 
    @sub_app.command
@@ -52,16 +78,17 @@ The registered command can either be a function, or another Cyclopts :class:`.Ap
 
    app()
 
+
 .. code-block:: console
 
-   $ my-script fizz 3
-   FIZZ: 3
+   $ my-script foo bar 3
+   BAR: 3
 
    $ my-script foo bar 4
-   BAR: 4
+   BAZ: 4
 
-   $ my-script foo baz 5
-   BAZ: 5
+The subcommand may have it's own registered ``default`` action.
+Cyclopts's command structure is fully recursive.
 
 .. _Changing Name:
 
@@ -94,7 +121,7 @@ There are a few ways to adding a help string to a command:
    used as the help string for the command.
    This is generally the preferred method.
 
-2. If the registered command is a sub app, the sub app's ``help`` field
+2. If the registered command is a sub app, the sub app's :attr:`help <cyclopts.App.help>` field
    will be used.
 
    .. code-block:: python
