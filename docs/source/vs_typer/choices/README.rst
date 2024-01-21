@@ -1,3 +1,5 @@
+.. _Typer Choices:
+
 =======
 Choices
 =======

@@ -1,3 +1,5 @@
+.. _Typer Docstring Parsing:
+
 =================
 Docstring Parsing
 =================

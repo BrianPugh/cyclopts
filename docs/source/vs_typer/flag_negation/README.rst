@@ -1,3 +1,5 @@
+.. _Typer Flag Negation:
+
 =============
 Flag Negation
 =============

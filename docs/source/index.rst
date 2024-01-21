@@ -45,6 +45,12 @@ Cyclopts
 
 .. toctree::
    :maxdepth: 2
+   :caption: Migration
+
+   migration/typer.rst
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alternative Libraries
 
    vs_typer/README.rst
