@@ -155,7 +155,7 @@ def format_usage(
     return Text(" ".join(usage) + "\n", style="bold")
 
 
-def format_doc(root_app, app: "App"):
+def format_doc(root_app, app: "App", format: str = "restructuredtext"):
     from cyclopts.core import App  # noqa: F811
 
     raw_doc_string = app.help
@@ -174,7 +174,19 @@ def format_doc(root_app, app: "App"):
             components.append(("\n", "default"))
         components.append((parsed.long_description + "\n", "info"))
 
-    return Text.assemble(*components)
+    format = format.lower()
+    if format == "plaintext":
+        return Text.assemble(*components)
+    elif format in ("markdown", "md"):
+        from rich.markdown import Markdown
+
+        return console.Group(Markdown("".join(x[0] for x in components)), Text(""))
+    elif format in ("restructuredtext", "rst"):
+        from rich_rst import RestructuredText
+
+        return RestructuredText("".join(x[0] for x in components))
+    else:
+        raise ValueError(f'Unknown help_format "{format}"')
 
 
 def _get_choices(type_: Type) -> str:

@@ -1,10 +1,8 @@
-import inspect
 import sys
 from enum import Enum
 from textwrap import dedent
 from typing import List, Literal, Optional, Union
 
-import attrs
 import pytest
 
 if sys.version_info < (3, 9):
@@ -14,11 +12,9 @@ else:
 
 from cyclopts import App, Group, Parameter
 from cyclopts.help import (
-    HelpEntry,
     HelpPanel,
     create_parameter_help_panel,
     format_command_entries,
-    format_doc,
     format_usage,
 )
 from cyclopts.resolve import ResolvedCommand
@@ -1118,4 +1114,56 @@ def test_help_print_commands_plus_meta_short(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
+    assert actual == expected
+
+
+def test_help_markdown(app, console):
+    markdown = dedent(
+        """\
+    This is a long sentence that
+    is spread across
+    three lines.
+
+    This is a new paragraph.
+    This is another sentence of that paragraph.
+    [This is a hyperlink.](https://cyclopts.readthedocs.io)
+
+    The following are bulletpoints:
+
+    * bulletpoint 1
+    * bulletpoint 2
+    """
+    )
+    app = App(help=markdown, help_format="markdown")
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_help COMMAND
+
+        This is a long sentence that is spread across three lines.
+
+        This is a new paragraph. This is another sentence of that paragraph.
+        This is a hyperlink.
+
+        The following are bulletpoints:
+
+         • bulletpoint 1
+         • bulletpoint 2
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    # Rich sticks a bunch of trailing spaces on lines.
+    expected = [x.strip() for x in expected.split("\n")]
+    actual = [x.strip() for x in actual.split("\n")]
+
     assert actual == expected
