@@ -285,6 +285,9 @@ class App:
                 return self.meta[key]
         return self._commands[key]
 
+    def __delitem__(self, key: str):
+        del self._commands[key]
+
     def __contains__(self, k: str) -> bool:
         if k in self._commands:
             return True
