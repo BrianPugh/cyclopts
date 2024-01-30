@@ -12,7 +12,13 @@ else:
     from typing import Annotated
 
 from cyclopts import Parameter
-from cyclopts.exceptions import CoercionError, MissingArgumentError, RepeatArgumentError, UnusedCliTokensError
+from cyclopts.exceptions import (
+    CoercionError,
+    InvalidCommandError,
+    MissingArgumentError,
+    RepeatArgumentError,
+    UnusedCliTokensError,
+)
 
 
 @pytest.mark.parametrize(
@@ -56,6 +62,17 @@ def test_command_rename(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "bar")
+
+
+def test_command_delete(app, assert_parse_args):
+    @app.command
+    def foo():
+        pass
+
+    del app["foo"]
+
+    with pytest.raises(InvalidCommandError):
+        assert_parse_args(foo, "foo")
 
 
 def test_command_multiple_alias(app, assert_parse_args):
