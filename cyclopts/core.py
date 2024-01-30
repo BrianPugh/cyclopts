@@ -565,17 +565,17 @@ class App:
         meta_parent = self
 
         try:
-            # Special flags (help/version) get bubbled up to the root app.
-            # The root ``help_print`` will then traverse the meta app linked list.
+            # Special flags (help/version) get intercepted by the root app.
+            # Special flags are allows to be **anywhere** in the token stream.
 
-            # The Help Flag is allowed to be anywhere in the token stream.
-            help_flag_index = None
             for help_flag in self.help_flags:
                 try:
                     help_flag_index = tokens.index(help_flag)
                     break
                 except ValueError:
                     pass
+            else:
+                help_flag_index = None
 
             if help_flag_index is not None:
                 tokens.pop(help_flag_index)
