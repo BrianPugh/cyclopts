@@ -127,7 +127,7 @@ def _get_command_groups(parent_app, child_app):
     return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
 
 
-def _resolve_default_parameter(apps):
+def resolve_default_parameter_from_apps(apps) -> Parameter:
     """The default_parameter resolution depends on the parent-child path traversed."""
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
@@ -473,7 +473,7 @@ class App:
                 command = command_app.default_command
                 resolved_command = ResolvedCommand(
                     command,
-                    _resolve_default_parameter(apps),
+                    resolve_default_parameter_from_apps(apps),
                     command_app.group_arguments,
                     command_app.group_parameters,
                     parse_docstring=False,
@@ -704,6 +704,16 @@ class App:
                 help_format = app.help_format
         console.print(format_doc(self, executing_app, help_format))
 
+        for help_panel in self._assemble_help_panels(tokens):
+            console.print(help_panel)
+
+    def _assemble_help_panels(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+    ) -> List[HelpPanel]:
+        command_chain, apps, _ = self.parse_commands(tokens)
+        executing_app = apps[-1]
+
         def walk_apps():
             # Iterates from deepest to shallowest meta-apps
             meta_list = []  # shallowest to deepest
@@ -744,7 +754,7 @@ class App:
             if subapp.default_command:
                 command = ResolvedCommand(
                     subapp.default_command,
-                    _resolve_default_parameter(apps),
+                    resolve_default_parameter_from_apps(apps),
                     subapp.group_arguments,
                     subapp.group_parameters,
                 )
@@ -773,12 +783,14 @@ class App:
         groups = [x[0] for x in panels.values()]
         help_panels = [x[1] for x in panels.values()]
 
+        out = []
         for help_panel in sort_groups(groups, help_panels)[1]:
             help_panel.remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
                 help_panel.sort()
-            console.print(help_panel)
+            out.append(help_panel)
+        return out
 
     def interactive_shell(
         self,
