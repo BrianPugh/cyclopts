@@ -145,6 +145,15 @@ def resolve_default_parameter_from_apps(apps) -> Parameter:
     return Parameter.combine(*cparams)
 
 
+def _walk_metas(app):
+    # Iterates from deepest to shallowest meta-apps
+    meta_list = [app]  # shallowest to deepest
+    meta = app
+    while (meta := meta._meta) and meta.default_command:
+        meta_list.append(meta)
+    yield from reversed(meta_list)
+
+
 @define
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
@@ -707,26 +716,24 @@ class App:
         for help_panel in self._assemble_help_panels(tokens):
             console.print(help_panel)
 
+    def _resolve_command(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+    ):
+        _, apps, _ = self.parse_commands(tokens)
+        raise NotImplementedError
+        pass
+
     def _assemble_help_panels(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
     ) -> List[HelpPanel]:
-        command_chain, apps, _ = self.parse_commands(tokens)
-        executing_app = apps[-1]
-
-        def walk_apps():
-            # Iterates from deepest to shallowest meta-apps
-            meta_list = []  # shallowest to deepest
-            meta_list.append(executing_app)
-            meta = executing_app
-            while (meta := meta._meta) and meta.default_command:
-                meta_list.append(meta)
-            yield from reversed(meta_list)
+        _, apps, _ = self.parse_commands(tokens)
 
         panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in walk_apps():
+        for subapp in _walk_metas(apps[-1]):
             # Handle Commands
             for group, elements in groups_from_app(subapp):
                 if not group.show:
@@ -750,35 +757,36 @@ class App:
                 command_panel.entries.extend(format_command_entries(elements))
 
         # Handle Arguments/Parameters
-        for subapp in walk_apps():
-            if subapp.default_command:
-                command = ResolvedCommand(
-                    subapp.default_command,
-                    resolve_default_parameter_from_apps(apps),
-                    subapp.group_arguments,
-                    subapp.group_parameters,
-                )
-                for group, iparams in command.groups_iparams:
-                    if not group.show:
-                        continue
-                    cparams = [command.iparam_to_cparam[x] for x in iparams]
-                    try:
-                        _, existing_panel = panels[group.name]
-                    except KeyError:
-                        existing_panel = None
-                    new_panel = create_parameter_help_panel(group, iparams, cparams)
+        for subapp in _walk_metas(apps[-1]):
+            if not subapp.default_command:
+                continue
+            command = ResolvedCommand(
+                subapp.default_command,
+                resolve_default_parameter_from_apps(apps),
+                subapp.group_arguments,
+                subapp.group_parameters,
+            )
+            for group, iparams in command.groups_iparams:
+                if not group.show:
+                    continue
+                cparams = [command.iparam_to_cparam[x] for x in iparams]
+                try:
+                    _, existing_panel = panels[group.name]
+                except KeyError:
+                    existing_panel = None
+                new_panel = create_parameter_help_panel(group, iparams, cparams)
 
-                    if existing_panel:
-                        # An imperfect merging process
-                        existing_panel.format = "parameter"
-                        existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
-                        if new_panel.description:
-                            if existing_panel.description:
-                                existing_panel.description += "\n" + new_panel.description
-                            else:
-                                existing_panel.description = new_panel.description
-                    else:
-                        panels[group.name] = (group, new_panel)
+                if existing_panel:
+                    # An imperfect merging process
+                    existing_panel.format = "parameter"
+                    existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
+                    if new_panel.description:
+                        if existing_panel.description:
+                            existing_panel.description += "\n" + new_panel.description
+                        else:
+                            existing_panel.description = new_panel.description
+                else:
+                    panels[group.name] = (group, new_panel)
 
         groups = [x[0] for x in panels.values()]
         help_panels = [x[1] for x in panels.values()]
