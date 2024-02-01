@@ -145,7 +145,7 @@ def resolve_default_parameter_from_apps(apps) -> Parameter:
     return Parameter.combine(*cparams)
 
 
-def _walk_metas(app):
+def walk_metas(app):
     # Iterates from deepest to shallowest meta-apps
     meta_list = [app]  # shallowest to deepest
     meta = app
@@ -480,11 +480,8 @@ class App:
         try:
             if command_app.default_command:
                 command = command_app.default_command
-                resolved_command = ResolvedCommand(
-                    command,
-                    resolve_default_parameter_from_apps(apps),
-                    command_app.group_arguments,
-                    command_app.group_parameters,
+                resolved_command = self._resolve_command(
+                    tokens,
                     parse_docstring=False,
                 )
                 # We want the resolved group that ``app`` belongs to.
@@ -719,10 +716,18 @@ class App:
     def _resolve_command(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
-    ):
-        _, apps, _ = self.parse_commands(tokens)
-        raise NotImplementedError
-        pass
+        parse_docstring: bool = True,
+    ) -> ResolvedCommand:
+        command_chain, apps, unused_tokens = self.parse_commands(tokens)
+
+        resolved_command = ResolvedCommand(
+            apps[-1].default_command,
+            resolve_default_parameter_from_apps(apps),
+            apps[-1].group_arguments,
+            apps[-1].group_parameters,
+            parse_docstring=parse_docstring,
+        )
+        return resolved_command
 
     def _assemble_help_panels(
         self,
@@ -733,7 +738,7 @@ class App:
         panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in _walk_metas(apps[-1]):
+        for subapp in walk_metas(apps[-1]):
             # Handle Commands
             for group, elements in groups_from_app(subapp):
                 if not group.show:
@@ -757,7 +762,7 @@ class App:
                 command_panel.entries.extend(format_command_entries(elements))
 
         # Handle Arguments/Parameters
-        for subapp in _walk_metas(apps[-1]):
+        for subapp in walk_metas(apps[-1]):
             if not subapp.default_command:
                 continue
             command = ResolvedCommand(
