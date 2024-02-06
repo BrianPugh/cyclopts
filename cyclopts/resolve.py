@@ -166,6 +166,7 @@ class ResolvedCommand:
         # Fully Resolve each Cyclopts Parameter
         self.iparam_to_cparam = ParameterDict()
         iparam_to_docstring_cparam = _resolve_docstring(f) if parse_docstring else ParameterDict()
+        empty_help_string_parameter = Parameter(help="")
         for iparam, groups in self.iparam_to_groups.items():
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
                 # Name is only used for help-string
@@ -177,6 +178,7 @@ class ResolvedCommand:
 
             cparam = get_hint_parameter(
                 iparam,
+                empty_help_string_parameter,
                 app_parameter,
                 *(x.default_parameter for x in groups),
                 iparam_to_docstring_cparam.get(iparam),
