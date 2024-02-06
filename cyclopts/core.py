@@ -683,7 +683,7 @@ class App:
         self,
         tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
         *,
-        console: Optional[Console] = None,
+        console: Annotated[Optional[Console], Parameter(parse=False)] = None,
     ) -> None:
         """Print the help page.
 
