@@ -7,7 +7,7 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import Annotated, Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
 
 try:
     from pydantic import ValidationError as PydanticValidationError
@@ -304,6 +304,14 @@ class App:
             return k in self._meta_parent
         return False
 
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over command & meta command names."""
+        for k in self._commands:
+            yield k
+        if self._meta_parent:
+            for k in self._meta_parent:
+                yield k
+
     @property
     def meta(self) -> "App":
         if self._meta is None:
@@ -343,8 +351,6 @@ class App:
         command_mapping = _combined_meta_command_mapping(app)
 
         for i, token in enumerate(tokens):
-            if token in self.help_flags:
-                break
             try:
                 app = command_mapping[token]
                 apps.append(app)
@@ -675,7 +681,7 @@ class App:
 
     def help_print(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
         *,
         console: Optional[Console] = None,
     ) -> None:
@@ -718,7 +724,7 @@ class App:
         tokens: Union[None, str, Iterable[str]] = None,
         parse_docstring: bool = True,
     ) -> ResolvedCommand:
-        command_chain, apps, unused_tokens = self.parse_commands(tokens)
+        _, apps, _ = self.parse_commands(tokens)
 
         resolved_command = ResolvedCommand(
             apps[-1].default_command,
