@@ -5,7 +5,8 @@ All downstream functions should consume data "as is" without fallbacks.
 """
 
 import inspect
-from typing import Callable, Dict, List, Optional, Tuple, cast
+from functools import cached_property
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast, get_origin
 
 from docstring_parser import parse as docstring_parse
 
@@ -197,3 +198,49 @@ class ResolvedCommand:
             )
             for group in self.groups
         ]
+
+    @cached_property
+    def cli2parameter(self) -> Dict[str, Tuple[inspect.Parameter, Any]]:
+        """Creates a dictionary mapping CLI keywords to python keywords.
+
+        Typically the mapping is something like::
+
+            {"--foo": (<Parameter "foo">, None)}
+
+        Each value is a tuple containing:
+
+        1. The corresponding ``inspect.Parameter``.
+        2. A predefined value. If this value is ``None``, the value should be
+           inferred from subsequent tokens.
+        """
+        # The tuple's second element is an implicit value for flags.
+        mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
+
+        for iparam, cparam in self.iparam_to_cparam.items():
+            if iparam.kind is iparam.VAR_KEYWORD:
+                # Don't directly expose the kwarg variable name
+                continue
+            hint = get_hint_parameter(iparam)[0]
+            for name in cparam.name:
+                mapping[name] = (iparam, True if hint is bool else None)
+            for name in cparam.get_negatives(hint, *cparam.name):
+                mapping[name] = (iparam, (get_origin(hint) or hint)())
+
+        return mapping
+
+    @cached_property
+    def parameter2cli(self) -> ParameterDict:
+        c2p = self.cli2parameter
+        p2c = ParameterDict()
+
+        for cli, tup in c2p.items():
+            iparam = tup[0]
+            p2c.setdefault(iparam, [])
+            p2c[iparam].append(cli)
+
+        for iparam, cparam in self.iparam_to_cparam.items():
+            # POSITIONAL_OR_KEYWORD and KEYWORD_ONLY already handled in cli2parameter
+            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_KEYWORD, iparam.VAR_POSITIONAL):
+                p2c[iparam] = list(cparam.name)
+
+        return p2c
