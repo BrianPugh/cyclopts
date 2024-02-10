@@ -726,6 +726,9 @@ class App:
     ) -> ResolvedCommand:
         _, apps, _ = self.parse_commands(tokens)
 
+        if not apps[-1].default_command:
+            raise InvalidCommandError
+
         resolved_command = ResolvedCommand(
             apps[-1].default_command,
             resolve_default_parameter_from_apps(apps),
