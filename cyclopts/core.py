@@ -7,7 +7,12 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 try:
     from pydantic import ValidationError as PydanticValidationError
@@ -127,7 +132,7 @@ def _get_command_groups(parent_app, child_app):
     return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
 
 
-def _resolve_default_parameter(apps):
+def resolve_default_parameter_from_apps(apps) -> Parameter:
     """The default_parameter resolution depends on the parent-child path traversed."""
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
@@ -143,6 +148,15 @@ def _resolve_default_parameter(apps):
     cparams.append(apps[-1].default_parameter)
 
     return Parameter.combine(*cparams)
+
+
+def walk_metas(app):
+    # Iterates from deepest to shallowest meta-apps
+    meta_list = [app]  # shallowest to deepest
+    meta = app
+    while (meta := meta._meta) and meta.default_command:
+        meta_list.append(meta)
+    yield from reversed(meta_list)
 
 
 @define
@@ -295,6 +309,14 @@ class App:
             return k in self._meta_parent
         return False
 
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over command & meta command names."""
+        for k in self._commands:
+            yield k
+        if self._meta_parent:
+            for k in self._meta_parent:
+                yield k
+
     @property
     def meta(self) -> "App":
         if self._meta is None:
@@ -334,8 +356,6 @@ class App:
         command_mapping = _combined_meta_command_mapping(app)
 
         for i, token in enumerate(tokens):
-            if token in self.help_flags:
-                break
             try:
                 app = command_mapping[token]
                 apps.append(app)
@@ -471,11 +491,8 @@ class App:
         try:
             if command_app.default_command:
                 command = command_app.default_command
-                resolved_command = ResolvedCommand(
-                    command,
-                    _resolve_default_parameter(apps),
-                    command_app.group_arguments,
-                    command_app.group_parameters,
+                resolved_command = self._resolve_command(
+                    tokens,
                     parse_docstring=False,
                 )
                 # We want the resolved group that ``app`` belongs to.
@@ -669,9 +686,9 @@ class App:
 
     def help_print(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
         *,
-        console: Optional[Console] = None,
+        console: Annotated[Optional[Console], Parameter(parse=False)] = None,
     ) -> None:
         """Print the help page.
 
@@ -704,19 +721,38 @@ class App:
                 help_format = app.help_format
         console.print(format_doc(self, executing_app, help_format))
 
-        def walk_apps():
-            # Iterates from deepest to shallowest meta-apps
-            meta_list = []  # shallowest to deepest
-            meta_list.append(executing_app)
-            meta = executing_app
-            while (meta := meta._meta) and meta.default_command:
-                meta_list.append(meta)
-            yield from reversed(meta_list)
+        for help_panel in self._assemble_help_panels(tokens):
+            console.print(help_panel)
+
+    def _resolve_command(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        parse_docstring: bool = True,
+    ) -> ResolvedCommand:
+        _, apps, _ = self.parse_commands(tokens)
+
+        if not apps[-1].default_command:
+            raise InvalidCommandError
+
+        resolved_command = ResolvedCommand(
+            apps[-1].default_command,
+            resolve_default_parameter_from_apps(apps),
+            apps[-1].group_arguments,
+            apps[-1].group_parameters,
+            parse_docstring=parse_docstring,
+        )
+        return resolved_command
+
+    def _assemble_help_panels(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+    ) -> List[HelpPanel]:
+        _, apps, _ = self.parse_commands(tokens)
 
         panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in walk_apps():
+        for subapp in walk_metas(apps[-1]):
             # Handle Commands
             for group, elements in groups_from_app(subapp):
                 if not group.show:
@@ -740,45 +776,48 @@ class App:
                 command_panel.entries.extend(format_command_entries(elements))
 
         # Handle Arguments/Parameters
-        for subapp in walk_apps():
-            if subapp.default_command:
-                command = ResolvedCommand(
-                    subapp.default_command,
-                    _resolve_default_parameter(apps),
-                    subapp.group_arguments,
-                    subapp.group_parameters,
-                )
-                for group, iparams in command.groups_iparams:
-                    if not group.show:
-                        continue
-                    cparams = [command.iparam_to_cparam[x] for x in iparams]
-                    try:
-                        _, existing_panel = panels[group.name]
-                    except KeyError:
-                        existing_panel = None
-                    new_panel = create_parameter_help_panel(group, iparams, cparams)
+        for subapp in walk_metas(apps[-1]):
+            if not subapp.default_command:
+                continue
+            command = ResolvedCommand(
+                subapp.default_command,
+                resolve_default_parameter_from_apps(apps),
+                subapp.group_arguments,
+                subapp.group_parameters,
+            )
+            for group, iparams in command.groups_iparams:
+                if not group.show:
+                    continue
+                cparams = [command.iparam_to_cparam[x] for x in iparams]
+                try:
+                    _, existing_panel = panels[group.name]
+                except KeyError:
+                    existing_panel = None
+                new_panel = create_parameter_help_panel(group, iparams, cparams)
 
-                    if existing_panel:
-                        # An imperfect merging process
-                        existing_panel.format = "parameter"
-                        existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
-                        if new_panel.description:
-                            if existing_panel.description:
-                                existing_panel.description += "\n" + new_panel.description
-                            else:
-                                existing_panel.description = new_panel.description
-                    else:
-                        panels[group.name] = (group, new_panel)
+                if existing_panel:
+                    # An imperfect merging process
+                    existing_panel.format = "parameter"
+                    existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
+                    if new_panel.description:
+                        if existing_panel.description:
+                            existing_panel.description += "\n" + new_panel.description
+                        else:
+                            existing_panel.description = new_panel.description
+                else:
+                    panels[group.name] = (group, new_panel)
 
         groups = [x[0] for x in panels.values()]
         help_panels = [x[1] for x in panels.values()]
 
+        out = []
         for help_panel in sort_groups(groups, help_panels)[1]:
             help_panel.remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
                 help_panel.sort()
-            console.print(help_panel)
+            out.append(help_panel)
+        return out
 
     def interactive_shell(
         self,

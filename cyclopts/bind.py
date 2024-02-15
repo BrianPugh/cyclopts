@@ -3,7 +3,7 @@ import itertools
 import os
 import shlex
 import sys
-from typing import Any, Dict, Iterable, List, Tuple, Union, get_origin
+from typing import Iterable, List, Tuple, Union
 
 from cyclopts._convert import token_count
 from cyclopts.exceptions import (
@@ -28,52 +28,6 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
-def cli2parameter(command: ResolvedCommand) -> Dict[str, Tuple[inspect.Parameter, Any]]:
-    """Creates a dictionary mapping CLI keywords to python keywords.
-
-    Typically the mapping is something like::
-
-        {"--foo": (<Parameter "foo">, None)}
-
-    Each value is a tuple containing:
-
-    1. The corresponding ``inspect.Parameter``.
-    2. A predefined value. If this value is ``None``, the value should be
-       inferred from subsequent tokens.
-    """
-    # The tuple's second element is an implicit value for flags.
-    mapping: Dict[str, Tuple[inspect.Parameter, Any]] = {}
-
-    for iparam, cparam in command.iparam_to_cparam.items():
-        if iparam.kind is iparam.VAR_KEYWORD:
-            # Don't directly expose the kwarg variable name
-            continue
-        hint = get_hint_parameter(iparam)[0]
-        for name in cparam.name:
-            mapping[name] = (iparam, True if hint is bool else None)
-        for name in cparam.get_negatives(hint, *cparam.name):
-            mapping[name] = (iparam, (get_origin(hint) or hint)())
-
-    return mapping
-
-
-def parameter2cli(command: ResolvedCommand) -> ParameterDict:
-    c2p = cli2parameter(command)
-    p2c = ParameterDict()
-
-    for cli, tup in c2p.items():
-        iparam = tup[0]
-        p2c.setdefault(iparam, [])
-        p2c[iparam].append(cli)
-
-    for iparam, cparam in command.iparam_to_cparam.items():
-        # POSITIONAL_OR_KEYWORD and KEYWORD_ONLY already handled in cli2parameter
-        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_KEYWORD, iparam.VAR_POSITIONAL):
-            p2c[iparam] = list(cparam.name)
-
-    return p2c
-
-
 def _cli_kw_to_f_kw(cli_key: str):
     """Only used for converting unknown CLI key/value keys for ``**kwargs``."""
     assert cli_key.startswith("--")
@@ -83,7 +37,7 @@ def _cli_kw_to_f_kw(cli_key: str):
 
 
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
-    cli2kw = cli2parameter(command)
+    cli2kw = command.cli2parameter
 
     kwargs_iparam = next((x for x in command.iparam_to_cparam.keys() if x.kind == x.VAR_KEYWORD), None)
 
@@ -397,15 +351,11 @@ def create_bound_arguments(
     """
     # Note: mapping is updated inplace
     mapping = ParameterDict()  # Each value should be a list
-    c2p, p2c = None, None
     unused_tokens = []
 
     validate_command(command.command)
 
     try:
-        c2p = cli2parameter(command)
-        p2c = parameter2cli(command)
-
         # Build up a mapping of inspect.Parameter->List[str]
         unused_tokens = _parse_kw_and_flags(command, tokens, mapping)
         unused_tokens = _parse_pos(command, unused_tokens, mapping)
@@ -440,8 +390,8 @@ def create_bound_arguments(
     except CycloptsError as e:
         e.target = command.command
         e.root_input_tokens = tokens
-        e.cli2parameter = c2p
-        e.parameter2cli = p2c
+        e.cli2parameter = command.cli2parameter
+        e.parameter2cli = command.parameter2cli
         e.unused_tokens = unused_tokens
         raise
 

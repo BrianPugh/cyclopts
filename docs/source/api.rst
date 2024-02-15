@@ -6,7 +6,7 @@ API
 
 .. autoclass:: cyclopts.App
    :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args
-   :special-members: __call__, __getitem__
+   :special-members: __call__, __getitem__, __iter__
 
    Cyclopts Application.
 
