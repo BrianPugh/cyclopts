@@ -7,7 +7,12 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 try:
     from pydantic import ValidationError as PydanticValidationError

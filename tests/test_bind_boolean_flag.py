@@ -1,4 +1,3 @@
-import inspect
 import sys
 
 import pytest
@@ -8,7 +7,7 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-from cyclopts import CoercionError, Group, Parameter, ValidationError
+from cyclopts import Group, Parameter, ValidationError
 
 
 @pytest.mark.parametrize(
