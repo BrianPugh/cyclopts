@@ -185,6 +185,8 @@ class App:
 
     show: bool = field(default=True, kw_only=True)
 
+    console: Optional[Console] = field(default=None, kw_only=True)
+
     # This can ONLY ever be a Tuple[str, ...]
     help_flags: Union[str, Iterable[str]] = field(
         default=["--help", "-h"],
@@ -531,6 +533,8 @@ class App:
             e.app = command_app
             if command_chain:
                 e.command_chain = command_chain
+            assert e.console is None
+            e.console = console if console else self._resolve_console(tokens)
             raise
 
         raise NotImplementedError("Should never get here.")
@@ -581,52 +585,49 @@ class App:
 
         meta_parent = self
 
-        try:
-            # Special flags (help/version) get intercepted by the root app.
-            # Special flags are allows to be **anywhere** in the token stream.
+        # Special flags (help/version) get intercepted by the root app.
+        # Special flags are allows to be **anywhere** in the token stream.
 
-            for help_flag in self.help_flags:
-                try:
-                    help_flag_index = tokens.index(help_flag)
-                    break
-                except ValueError:
-                    pass
-            else:
-                help_flag_index = None
+        for help_flag in self.help_flags:
+            try:
+                help_flag_index = tokens.index(help_flag)
+                break
+            except ValueError:
+                pass
+        else:
+            help_flag_index = None
 
-            if help_flag_index is not None:
-                tokens.pop(help_flag_index)
-                command = self.help_print
-                while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.help_print
-                bound = inspect.signature(command).bind(tokens, console=console)
-                unused_tokens = []
-            elif any(flag in tokens for flag in self.version_flags):
-                # Version
-                command = self.version_print
-                while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.version_print
-                bound = inspect.signature(command).bind()
-                unused_tokens = []
-            else:
-                # Normal parsing
+        if help_flag_index is not None:
+            tokens.pop(help_flag_index)
+            command = self.help_print
+            while meta_parent := meta_parent._meta_parent:
+                command = meta_parent.help_print
+            bound = inspect.signature(command).bind(tokens, console=console)
+            unused_tokens = []
+        elif any(flag in tokens for flag in self.version_flags):
+            # Version
+            command = self.version_print
+            while meta_parent := meta_parent._meta_parent:
+                command = meta_parent.version_print
+            bound = inspect.signature(command).bind()
+            unused_tokens = []
+        else:
+            # Normal parsing
+            try:
                 command, bound, unused_tokens = self.parse_known_args(tokens, console=console)
                 if unused_tokens:
                     raise UnusedCliTokensError(
                         target=command,
                         unused_tokens=unused_tokens,
                     )
-        except CycloptsError as e:
-            e.verbose = verbose
-            e.root_input_tokens = tokens
-            if print_error:
-                if console is None:
-                    console = Console()
-                console.print(format_cyclopts_error(e))
-
-            if exit_on_error:
-                sys.exit(1)
-            else:
+            except CycloptsError as e:
+                e.verbose = verbose
+                e.root_input_tokens = tokens
+                if print_error:
+                    assert e.console
+                    e.console.print(format_cyclopts_error(e))
+                if exit_on_error:
+                    sys.exit(1)
                 raise
 
         return command, bound
@@ -676,13 +677,21 @@ class App:
         except Exception as e:
             if PydanticValidationError is not None and isinstance(e, PydanticValidationError):
                 if print_error:
-                    if console is None:
-                        console = Console()
+                    console = self._resolve_console(tokens, console)
                     console.print(format_cyclopts_error(e))
 
                 if exit_on_error:
                     sys.exit(1)
             raise
+
+    def _resolve_console(self, tokens: Union[None, str, Iterable[str]], console: Optional[Console] = None) -> Console:
+        if console is not None:
+            return console
+        _, apps, _ = self.parse_commands(tokens)
+        for app in reversed(apps):
+            if app.console:
+                return app.console
+        return Console()
 
     def help_print(
         self,
@@ -700,11 +709,10 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        if console is None:
-            console = Console()
-
         command_chain, apps, _ = self.parse_commands(tokens)
         executing_app = apps[-1]
+
+        console = self._resolve_console(tokens, console)
 
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]

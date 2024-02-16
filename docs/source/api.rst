@@ -76,6 +76,12 @@ API
       Defaults to ``["--version"]``.
       Cannot be changed after instantiating the app.
 
+   .. attribute:: console
+      :type: rich.Console
+      :value: None
+
+      Default :class:`rich.Console` to use when displaying runtime errors.
+
    .. attribute:: default_parameter
       :type: Parameter
       :value: None

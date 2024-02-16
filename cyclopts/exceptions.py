@@ -2,8 +2,9 @@ import difflib
 import inspect
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
-from attrs import define
+from attrs import define, field
 from rich import box
+from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
@@ -92,6 +93,11 @@ class CycloptsError(Exception):
     app: Optional["App"] = None
     """
     The Cyclopts application itself.
+    """
+
+    console: Optional[Console] = field(default=None, kw_only=True)
+    """
+    Rich console to display runtime errors.
     """
 
     def __str__(self):
