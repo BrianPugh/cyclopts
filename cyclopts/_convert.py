@@ -340,7 +340,7 @@ def token_count(type_: Union[Type[Any], inspect.Parameter]) -> Tuple[int, bool]:
 def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
     """Convert a single element or an iterable of elements into a tuple.
 
-    Intended to be used in an ``attrs.Field``. If ``None`` is provided, returns an empty tuple.
+    Intended to be used in an ``attrs.Field``. If :obj:`None` is provided, returns an empty tuple.
     If a single element is provided, returns a tuple containing just that element.
     If an iterable is provided, converts it into a tuple.
 

@@ -136,7 +136,7 @@ Union
 *****
 
 The unioned types will be iterated left-to-right until a successful coercion is performed.
-``None`` type hints are ignored.
+:obj:`None` type hints are ignored.
 
 .. code-block:: python
 
