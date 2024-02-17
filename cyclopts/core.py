@@ -562,6 +562,9 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
+        console: rich.console.Console
+            Console to print help and runtime Cyclopts errors.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
             Print a rich-formatted error on error.
             Defaults to ``True``.
@@ -648,6 +651,9 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
+        console: rich.console.Console
+            Console to print help and runtime Cyclopts errors.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
             Print a rich-formatted error on error.
             Defaults to ``True``.
@@ -706,6 +712,9 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Tokens to interpret for traversing the application command structure.
             If not provided, defaults to ``sys.argv``.
+        console: rich.console.Console
+            Console to print help and runtime Cyclopts errors.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
         """
         tokens = normalize_tokens(tokens)
 

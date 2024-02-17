@@ -81,6 +81,13 @@ API
       :value: None
 
       Default :class:`rich.console.Console` to use when displaying runtime errors.
+      Cyclopts console resolution is as follows:
+
+      #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
+      #. The relevant subcommand's :attr:`App.console` attribute, if not ``None``.
+      #. The parenting :attr:`App.console` (and so on), if not ``None``.
+      #. If all values are ``None``, then the default :class:`~rich.console.Console` is used.
+
 
    .. attribute:: default_parameter
       :type: Parameter
