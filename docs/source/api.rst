@@ -43,7 +43,7 @@ API
       :value: None
 
       The markup language of docstring function descriptions.
-      If ``None``, fallback to parenting :attr:`~.App.help_format`.
+      If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
 
    .. attribute:: usage
@@ -84,9 +84,9 @@ API
       Cyclopts console resolution is as follows:
 
       #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
-      #. The relevant subcommand's :attr:`App.console` attribute, if not ``None``.
-      #. The parenting :attr:`App.console` (and so on), if not ``None``.
-      #. If all values are ``None``, then the default :class:`~rich.console.Console` is used.
+      #. The relevant subcommand's :attr:`App.console` attribute, if not :obj:`None`.
+      #. The parenting :attr:`App.console` (and so on), if not :obj:`None`.
+      #. If all values are :obj:`None`, then the default :class:`~rich.console.Console` is used.
 
 
    .. attribute:: default_parameter
@@ -101,7 +101,7 @@ API
 
       The group(s) that ``default_command`` belongs to.
 
-      * If ``None``, defaults to the ``"Commands"`` group.
+      * If :obj:`None`, defaults to the ``"Commands"`` group.
 
       * If ``str``, use an existing Group (from neighboring sub-commands) with name,
         **or** create a :class:`Group` with provided name if it does not exist.
@@ -205,7 +205,7 @@ API
       The group(s) that this parameter belongs to.
       This can be used to better organize the help-page, and/or to add additional conversion/validation logic (such as ensuring mutually-exclusive arguments).
 
-      If ``None``, defaults to one of the following groups:
+      If :obj:`None`, defaults to one of the following groups:
 
       1. Parenting :attr:`.App.group_arguments` if the parameter is ``POSITIONAL_ONLY``.
          By default, this is ``Group("Arguments")``.
@@ -272,7 +272,7 @@ API
       :value: None
 
       If a variable has a default, display the default on the help page.
-      Defaults to ``None``, similar to ``True``, but will not display the default if it's ``None``.
+      Defaults to :obj:`None`, similar to ``True``, but will not display the default if it's :obj:`None`.
 
    .. attribute:: show_choices
       :type: Optional[bool]
@@ -332,7 +332,7 @@ API
       :value: None
 
       Show this group on the help-page.
-      Defaults to ``None``, which will only show the group if a ``name`` is provided.
+      Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
 
    .. attribute:: sort_key
       :type: Any
@@ -340,7 +340,7 @@ API
 
       Modifies group-panel display order on the help-page.
 
-      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the returned value to (2) if ``None``, (3) otherwise.
+      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the returned value to (2) if :obj:`None`, (3) otherwise.
 
       2. For all groups with ``sort_key==None`` (default value), sort them alphabetically.
          These sorted groups will be displayed **after** ``sort_key != None`` list (see 3).

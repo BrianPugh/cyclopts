@@ -60,7 +60,7 @@ Cyclopts and Typer mostly handle type-hints the same way, but there are a few no
 
    * - ``Optional[List] = None``
      - When no CLI argument is specified, Typer passes in an empty list ``[]``.
-       :ref:`Cyclopts will not bind an argument, <Typer Optional Lists>` resulting in the default ``None``.
+       :ref:`Cyclopts will not bind an argument, <Typer Optional Lists>` resulting in the default :obj:`None`.
 
 -------------
 General Steps

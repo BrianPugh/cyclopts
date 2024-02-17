@@ -46,9 +46,9 @@ Cyclopts fixes this:
    # │    DST,--dst  Path to save compressed data to. [default: out.zip]  │
    # ╰────────────────────────────────────────────────────────────────────╯
 
-Additionally, if the default value is ``None``, cyclopts's default configuration will **not** display ``[default: None]``.
+Additionally, if the default value is :obj:`None`, cyclopts's default configuration will **not** display ``[default: None]``.
 Doing so doesn't convey much meaning to the end-user.
-Typically ``None`` is a sentinel value who's true value gets set inside the function.
+Typically :obj:`None` is a sentinel value who's true value gets set inside the function.
 
 Additionally, the cleaner, docstring-centric way of writing this program with Cyclopts would be:
 

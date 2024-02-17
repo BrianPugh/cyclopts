@@ -210,7 +210,7 @@ class ResolvedCommand:
         Each value is a tuple containing:
 
         1. The corresponding ``inspect.Parameter``.
-        2. A predefined value. If this value is ``None``, the value should be
+        2. A predefined value. If this value is :obj:`None`, the value should be
            inferred from subsequent tokens.
         """
         # The tuple's second element is an implicit value for flags.
