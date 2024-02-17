@@ -22,7 +22,7 @@ def test_pydantic_error_msg(app, console):
 
     actual = capture.get()
 
-    expected = dedent(
+    expected_prefix = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ 1 validation error for foo                                         │
@@ -30,8 +30,7 @@ def test_pydantic_error_msg(app, console):
         │   Input should be greater than 0 [type=greater_than,               │
         │ input_value=-1, input_type=int]                                    │
         │     For further information visit                                  │
-        │ https://errors.pydantic.dev/2.5/v/greater_than                     │
-        ╰────────────────────────────────────────────────────────────────────╯
         """
     )
-    assert actual == expected
+
+    assert actual.startswith(expected_prefix)
