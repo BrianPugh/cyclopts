@@ -89,6 +89,43 @@ _converters = {
 }
 
 
+def _convert_tuple(type_: Type[Any], *args: str, converter: Optional[Callable] = None) -> Tuple:
+    inner_types = tuple(x for x in get_args(type_) if x is not ...)
+    inner_token_count, consume_all = token_count(type_)
+    if consume_all:
+        # variable-length tuple (list-like)
+        remainder = len(args) % inner_token_count
+        if remainder:
+            raise CoercionError(
+                msg=f"Incorrect number of arguments: expected multiple of {inner_token_count} but got {len(args)}."
+            )
+        if len(inner_types) == 1:
+            inner_type = inner_types[0]
+        elif len(inner_types) == 0:
+            inner_type = str
+        else:
+            raise ValueError("A tuple must have 0 or 1 inner-types.")
+
+        if inner_token_count == 1:
+            out = tuple(_convert(inner_type, x, converter=converter) for x in args)
+        else:
+            out = tuple(
+                _convert(inner_type, args[i : i + inner_token_count], converter=converter)
+                for i in range(0, len(args), inner_token_count)
+            )
+        return out
+    else:
+        # Fixed-length tuple
+        if inner_token_count != len(args):
+            raise CoercionError(msg=f"Incorrect number of arguments: expected {inner_token_count} but got {len(args)}.")
+        args_per_convert = [token_count(x)[0] for x in inner_types]
+        it = iter(args)
+        batched = [[next(it) for _ in range(size)] for size in args_per_convert]
+        batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
+        out = tuple(_convert(inner_type, arg, converter=converter) for inner_type, arg in zip(inner_types, batched))
+    return out
+
+
 def _convert(type_, element, converter=None):
     pconvert = partial(_convert, converter=converter)
     origin_type = get_origin(type_)
@@ -128,7 +165,11 @@ def _convert(type_, element, converter=None):
             gen = element
         return origin_type(pconvert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
-        return tuple(pconvert(t, e) for t, e in zip(inner_types, element))
+        if isinstance(element, str):
+            # E.g. Tuple[str] (Annotation: tuple containing a single string)
+            return _convert_tuple(type_, element, converter=converter)
+        else:
+            return _convert_tuple(type_, *element, converter=converter)
     elif isclass(type_) and issubclass(type_, Enum):
         if converter is None:
             element_lower = element.lower().replace("-", "_")
@@ -254,42 +295,7 @@ def convert(type_: Type[Any], *args: str, converter: Optional[Callable] = None):
     origin_type = get_origin_and_validate(type_)
 
     if origin_type is tuple:
-        inner_types = tuple(x for x in get_args(type_) if x is not ...)
-        inner_token_count, consume_all = token_count(type_)
-        if consume_all:
-            # variable-length tuple (list-like)
-            remainder = len(args) % inner_token_count
-            if remainder:
-                raise CoercionError(
-                    msg=f"Incorrect number of arguments: expected multiple of {inner_token_count} but got {len(args)}."
-                )
-            if len(inner_types) == 1:
-                inner_type = inner_types[0]
-            elif len(inner_types) == 0:
-                inner_type = str
-            else:
-                raise ValueError("A tuple must have 0 or 1 inner-types.")
-
-            if inner_token_count == 1:
-                out = tuple(_convert(inner_type, x, converter=converter) for x in args)
-            else:
-                out = tuple(
-                    _convert(inner_type, args[i : i + inner_token_count], converter=converter)
-                    for i in range(0, len(args), inner_token_count)
-                )
-            return out
-        else:
-            # Fixed-length tuple
-            if inner_token_count != len(args):
-                raise CoercionError(
-                    msg=f"Incorrect number of arguments: expected {inner_token_count} but got {len(args)}."
-                )
-            args_per_convert = [token_count(x)[0] for x in inner_types]
-            it = iter(args)
-            batched = [[next(it) for _ in range(size)] for size in args_per_convert]
-            batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
-            out = tuple(_convert(inner_type, arg, converter=converter) for inner_type, arg in zip(inner_types, batched))
-        return out
+        return _convert_tuple(type_, *args, converter=converter)
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
         return _convert(type_, args, converter=converter)
     elif len(args) == 1:

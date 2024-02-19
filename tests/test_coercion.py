@@ -155,6 +155,10 @@ def test_coerce_tuple_basic_single():
     _assert_tuple((1,), convert(Tuple[int], "1"))
 
 
+def test_coerce_tuple_str_single():
+    _assert_tuple(("foo",), convert(Tuple[str], "foo"))
+
+
 def test_coerce_tuple_basic_double():
     _assert_tuple((1, 2.0), convert(Tuple[int, Union[None, float, int]], "1", "2"))
 
@@ -196,6 +200,21 @@ def test_coerce_list():
     assert [123, 456] == convert(int, "123", "456")
     assert [123, 456] == convert(List[int], "123", "456")
     assert [123] == convert(List[int], "123")
+
+
+def test_coerce_list_of_tuple_str_single_1():
+    res = convert(List[Tuple[str]], "foo")
+    assert isinstance(res, list)
+    assert len(res) == 1
+    _assert_tuple(("foo",), res[0])
+
+
+def test_coerce_list_of_tuple_str_single_2():
+    res = convert(List[Tuple[str]], "foo", "bar")
+    assert isinstance(res, list)
+    assert len(res) == 2
+    _assert_tuple(("foo",), res[0])
+    _assert_tuple(("bar",), res[1])
 
 
 def test_coerce_bare_list():
