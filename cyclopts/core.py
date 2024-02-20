@@ -533,8 +533,8 @@ class App:
             e.app = command_app
             if command_chain:
                 e.command_chain = command_chain
-            assert e.console is None
-            e.console = console if console else self._resolve_console(tokens)
+            if e.console is None:
+                e.console = self._resolve_console(tokens, console)
             raise
 
         raise NotImplementedError("Should never get here.")
@@ -626,6 +626,9 @@ class App:
             except CycloptsError as e:
                 e.verbose = verbose
                 e.root_input_tokens = tokens
+
+                if e.console is None:
+                    e.console = self._resolve_console(tokens, console)
                 if print_error:
                     assert e.console
                     e.console.print(format_cyclopts_error(e))
