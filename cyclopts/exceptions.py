@@ -242,7 +242,8 @@ class MissingArgumentError(CycloptsError):
             only_got_string = ""
         else:
             required_string = f"requires {count} arguments"
-            only_got_string = f" Only got {len(self.tokens_so_far)}."
+            received_count = len(self.tokens_so_far) % count
+            only_got_string = f" Only got {received_count}." if received_count else ""
 
         assert self.parameter2cli is not None
         parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
