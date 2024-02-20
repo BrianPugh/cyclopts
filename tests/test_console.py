@@ -3,6 +3,7 @@ from contextlib import suppress
 import pytest
 
 from cyclopts import App, CycloptsError
+from cyclopts.exceptions import UnusedCliTokensError
 
 
 @pytest.fixture
@@ -58,3 +59,17 @@ def test_root_subapp_arg_console(app, subapp, mocker, cmd):
     console.print.assert_called()
     app.console.print.assert_not_called()
     subapp.console.print.assert_not_called()
+
+
+def test_console_populated_issue_103(app):
+    """Ensures console is populated for an UnusedCliTokensError.
+
+    https://github.com/BrianPugh/cyclopts/issues/103
+    """
+
+    @app.command
+    def foo():
+        pass
+
+    with pytest.raises(UnusedCliTokensError):
+        app("foo bar", exit_on_error=False)
