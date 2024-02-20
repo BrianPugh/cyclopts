@@ -1,4 +1,8 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
+
+import pytest
+
+from cyclopts.exceptions import MissingArgumentError
 
 
 def test_pos_list(app, assert_parse_args):
@@ -40,3 +44,25 @@ def test_keyword_optional_list_none_default(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "foo")
+
+
+def test_list_tuple_missing_arguments_no_arguments(app, assert_parse_args):
+    """Missing values."""
+
+    @app.command
+    def foo(item: List[Tuple[int, str]]):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app("foo --item", exit_on_error=False)
+
+
+def test_list_tuple_missing_arguments_non_divisible(app, assert_parse_args):
+    """Missing values."""
+
+    @app.command
+    def foo(item: List[Tuple[int, str]]):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app("foo --item 1 alice 2", exit_on_error=False)

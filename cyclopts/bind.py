@@ -96,6 +96,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             tokens_per_element, consume_all = token_count(iparam)
 
             if consume_all:
+                j = 0  # Makes pyright[reportUnboundVariable] happy
                 try:
                     for j in itertools.count():
                         token = tokens[i + 1 + j]
@@ -104,7 +105,10 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                         cli_values.append(token)
                         skip_next_iterations += 1
                 except IndexError:
-                    pass
+                    if j == 0:
+                        raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
+                    elif j % tokens_per_element != 0:
+                        raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
             else:
                 consume_count += tokens_per_element
                 try:
