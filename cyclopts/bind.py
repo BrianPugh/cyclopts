@@ -3,6 +3,7 @@ import itertools
 import os
 import shlex
 import sys
+from contextlib import suppress
 from typing import Iterable, List, Tuple, Union
 
 from cyclopts._convert import token_count
@@ -95,33 +96,25 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
         else:
             tokens_per_element, consume_all = token_count(iparam)
 
-            if consume_all:
-                j = 0  # Makes pyright[reportUnboundVariable] happy
-                try:
+            with suppress(IndexError):
+                if consume_all:
                     for j in itertools.count():
                         token = tokens[i + 1 + j]
                         if not cparam.allow_leading_hyphen and _is_option_like(token):
                             break
                         cli_values.append(token)
                         skip_next_iterations += 1
-                except IndexError:
-                    if j == 0:
-                        raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
-                    elif j % tokens_per_element != 0:
-                        raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
-            else:
-                consume_count += tokens_per_element
-                try:
+                else:
+                    consume_count += tokens_per_element
                     for j in range(consume_count):
                         token = tokens[i + 1 + j]
-
                         if not cparam.allow_leading_hyphen:
                             _validate_is_not_option_like(token)
-
                         cli_values.append(token)
                         skip_next_iterations += 1
-                except IndexError:
-                    raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values) from None
+
+            if not cli_values or len(cli_values) % tokens_per_element:
+                raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values)
 
         # Update mapping
         if iparam is kwargs_iparam:

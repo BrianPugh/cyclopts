@@ -46,7 +46,13 @@ def test_keyword_optional_list_none_default(app, assert_parse_args):
     assert_parse_args(foo, "foo")
 
 
-def test_list_tuple_missing_arguments_no_arguments(app, assert_parse_args):
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "foo --item",
+    ],
+)
+def test_list_tuple_missing_arguments_no_arguments(app, cmd):
     """Missing values."""
 
     @app.command
@@ -54,15 +60,22 @@ def test_list_tuple_missing_arguments_no_arguments(app, assert_parse_args):
         pass
 
     with pytest.raises(MissingArgumentError):
-        app("foo --item", exit_on_error=False)
+        app(cmd, exit_on_error=False)
 
 
-def test_list_tuple_missing_arguments_non_divisible(app, assert_parse_args):
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "foo --item 1 alice 2",
+        "foo --item a --stuff g",
+    ],
+)
+def test_list_tuple_missing_arguments_non_divisible(app, cmd):
     """Missing values."""
 
     @app.command
-    def foo(item: List[Tuple[int, str]]):
+    def foo(item: List[Tuple[int, str]], stuff: str = ""):
         pass
 
     with pytest.raises(MissingArgumentError):
-        app("foo --item 1 alice 2", exit_on_error=False)
+        app(cmd, exit_on_error=False)
