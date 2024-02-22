@@ -12,6 +12,7 @@ from cyclopts.exceptions import (
     CycloptsError,
     MissingArgumentError,
     RepeatArgumentError,
+    UnknownOptionError,
     ValidationError,
 )
 from cyclopts.parameter import get_hint_parameter, validate_command
@@ -89,7 +90,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                 if implicit_value:  # Only accept values to the positive flag
                     pass
                 else:
-                    raise ValidationError(value=f'Cannot assign value to negative flag "{cli_key}".')
+                    raise CycloptsError(msg=f'Cannot assign value to negative flag "{cli_key}".')
             else:
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False
@@ -148,7 +149,7 @@ def _is_option_like(token: str) -> bool:
 
 def _validate_is_not_option_like(token):
     if _is_option_like(token):
-        raise ValidationError(value=f'Unknown option: "{token}".')
+        raise UnknownOptionError(token=token)
 
 
 def _parse_pos(

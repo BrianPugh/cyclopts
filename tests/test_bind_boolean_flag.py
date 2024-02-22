@@ -7,7 +7,7 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-from cyclopts import Group, Parameter, ValidationError
+from cyclopts import CycloptsError, Group, Parameter, UnknownOptionError, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -39,8 +39,10 @@ def test_boolean_flag_negative_assignment_not_allowed(app, cmd_str, assert_parse
     def foo(my_flag: bool = True):
         pass
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CycloptsError) as e:
         app.parse_args(cmd_str, exit_on_error=False, print_error=True)
+
+    assert str(e.value) == 'Cannot assign value to negative flag "--no-my-flag".'
 
 
 def test_boolean_flag_app_parameter_default(app, assert_parse_args):
@@ -53,9 +55,9 @@ def test_boolean_flag_app_parameter_default(app, assert_parse_args):
     # Normal positive flag should still work.
     assert_parse_args(foo, "--my-flag", True)
 
-    with pytest.raises(ValidationError) as e:
+    with pytest.raises(UnknownOptionError) as e:
         app.parse_args("--no-my-flag", exit_on_error=False)
-    assert e.value.value == 'Unknown option: "--no-my-flag".'
+    assert str(e.value) == 'Unknown option: "--no-my-flag".'
 
 
 def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args):
@@ -65,13 +67,13 @@ def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args
 
     assert_parse_args(foo, "--no-my-flag", False)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(UnknownOptionError):
         app.parse_args("--my-flag", exit_on_error=False, print_error=True)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CycloptsError):
         app.parse_args("--no-my-flag=True", exit_on_error=False, print_error=True)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(CycloptsError):
         app.parse_args("--no-my-flag=False", exit_on_error=False, print_error=True)
 
 
@@ -166,5 +168,5 @@ def test_boolean_flag_disable_negative(app, negative, assert_parse_args):
         pass
 
     assert_parse_args(foo, "--my-flag", True)
-    with pytest.raises(ValidationError):
+    with pytest.raises(UnknownOptionError):
         assert_parse_args(foo, "--no-my-flag", True)

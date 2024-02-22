@@ -154,6 +154,16 @@ class ValidationError(CycloptsError):
 
 
 @define(kw_only=True)
+class UnknownOptionError(CycloptsError):
+    """Unknown/unregistered option provided by the cli."""
+
+    token: str
+
+    def __str__(self):
+        return super().__str__() + f'Unknown option: "{self.token}".'
+
+
+@define(kw_only=True)
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
 
