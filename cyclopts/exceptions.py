@@ -1,5 +1,6 @@
 import difflib
 import inspect
+import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
 from attrs import define, field
@@ -126,9 +127,9 @@ class CycloptsError(Exception):
         if self.parameter2cli is None:
             return s
         for p, names in self.parameter2cli.items():
-            target = f"--{p.name}"
+            pattern = rf"--\b{re.escape(p.name)}\b(?=\W|$)"
             replacement = names[0]
-            s = s.replace(target, replacement)
+            s = re.sub(pattern, replacement, s)
         return s
 
 
