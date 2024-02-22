@@ -122,8 +122,7 @@ class Parameter:
                 # Do not support automatic negation for short flags.
                 continue
             else:
-                # Should never reach here.
-                raise NotImplementedError("All parameters should have started with '-' or '--'.")
+                raise ValueError("All parameters should have started with '-' or '--'.")
 
             negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
 

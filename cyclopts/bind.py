@@ -382,7 +382,8 @@ def create_bound_arguments(
                 for validator in group.validator:  # pyright: ignore
                     validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
         except (AssertionError, ValueError, TypeError) as e:
-            new_exception = ValidationError(value=e.args[0])
+            # group will always be set from the above for loop if an exception occurs.
+            new_exception = ValidationError(value=e.args[0], group=group)  # pyright: ignore[reportUnboundVariable]
             raise new_exception from e
 
     except CycloptsError as e:
