@@ -322,8 +322,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
                 e.parameter = iparam
                 raise
             except (AssertionError, ValueError, TypeError) as e:
-                new_exception = ValidationError(value=e.args[0], parameter=iparam)
-                raise new_exception from e
+                raise ValidationError(value=e.args[0], parameter=iparam) from e
     return coerced
 
 
@@ -383,8 +382,7 @@ def create_bound_arguments(
                     validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
         except (AssertionError, ValueError, TypeError) as e:
             # group will always be set from the above for loop if an exception occurs.
-            new_exception = ValidationError(value=e.args[0], group=group)  # pyright: ignore[reportUnboundVariable]
-            raise new_exception from e
+            raise ValidationError(value=e.args[0], group=group) from e  # pyright: ignore[reportUnboundVariable]
 
     except CycloptsError as e:
         e.target = command.command

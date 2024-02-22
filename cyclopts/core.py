@@ -516,8 +516,7 @@ class App:
                         for validator in command_group.validator:  # pyright: ignore
                             validator(**bound.arguments)
                 except (AssertionError, ValueError, TypeError) as e:
-                    new_exception = ValidationError(value=e.args[0])
-                    raise new_exception from e
+                    raise ValidationError(value=e.args[0]) from e
 
                 return command, bound, unused_tokens
             else:
