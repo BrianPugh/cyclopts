@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import inspect
 import os
@@ -682,6 +683,8 @@ class App:
             verbose=verbose,
         )
         try:
+            if inspect.iscoroutinefunction(command):
+                return asyncio.run(command(*bound.args, **bound.kwargs))
             return command(*bound.args, **bound.kwargs)
         except Exception as e:
             if PydanticValidationError is not None and isinstance(e, PydanticValidationError):
