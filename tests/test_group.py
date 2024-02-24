@@ -6,6 +6,7 @@ import pytest
 
 import cyclopts.group
 from cyclopts import App, Group, Parameter
+from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
 if sys.version_info < (3, 9):
@@ -92,6 +93,22 @@ def test_group_command_converter(app, mocker):
     app("foo 10")
 
     group_converter.assert_called_once_with(bar=10)
+
+
+def test_group_command_validator(app, assert_parse_args):
+    def bar_must_be_1(bar):
+        if bar == 1:
+            return
+        raise ValueError
+
+    @app.command(validator=bar_must_be_1)
+    def foo(bar: int):
+        pass
+
+    assert_parse_args(foo, "foo 1", bar=1)
+
+    with pytest.raises(ValidationError):
+        app("foo 2", exit_on_error=False)
 
 
 def test_group_command_default_parameter_resolution(app):

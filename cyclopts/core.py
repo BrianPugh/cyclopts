@@ -517,7 +517,7 @@ class App:
                             validator(**bound.arguments)
                 except (AssertionError, ValueError, TypeError) as e:
                     raise ValidationError(
-                        value=e.args[0], group=command_group  # pyright: ignore[reportUnboundVariable]
+                        value=e.args[0] if e.args else "", group=command_group  # pyright: ignore[reportUnboundVariable]
                     ) from e
 
                 return command, bound, unused_tokens
