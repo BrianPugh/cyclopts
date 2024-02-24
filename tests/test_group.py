@@ -81,6 +81,19 @@ def test_group_default_parameter_converter(app, assert_parse_args):
     assert_parse_args(foo, "chocolate", "CHOCOLATE")
 
 
+def test_group_command_converter(app, mocker):
+    group_converter = mocker.MagicMock(side_effect=lambda **kwargs: kwargs)
+    group = Group("Group Name", converter=group_converter)
+
+    @app.command(group=group)
+    def foo(bar: int):
+        pass
+
+    app("foo 10")
+
+    group_converter.assert_called_once_with(bar=10)
+
+
 def test_group_command_default_parameter_resolution(app):
     app_validator = Mock()
     sub_app_validator = Mock()
