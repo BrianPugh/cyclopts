@@ -180,11 +180,23 @@ def validate_command(f: Callable):
         Function has naming or parameter/signature inconsistencies.
     """
     signature = inspect.signature(f)
-    for iparam in signature.parameters.values():
+    parse_false_error_msg = (
+        "Parameter.parse=False must be used with a KEYWORD_ONLY function parameter or trailing POSITIONAL parameters."
+    )
+
+    seen_parse_positional = False
+    for iparam in reversed(signature.parameters.values()):
         get_origin_and_validate(iparam.annotation)
         type_, cparam = get_hint_parameter(iparam)
-        if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
-            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if cparam.parse:
+            if iparam.kind in (iparam.POSITIONAL_OR_KEYWORD, iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                seen_parse_positional = True
+        else:
+            if iparam.kind in (iparam.POSITIONAL_OR_KEYWORD, iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                if seen_parse_positional:
+                    raise ValueError(parse_false_error_msg)
+            elif iparam.kind is not iparam.KEYWORD_ONLY:
+                raise ValueError(parse_false_error_msg)
 
 
 def get_hint_parameter(

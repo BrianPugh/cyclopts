@@ -709,7 +709,7 @@ class App:
 
     def help_print(
         self,
-        tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
+        tokens: Annotated[Union[None, str, Iterable[str]], Parameter(parse=False)] = None,
         *,
         console: Annotated[Optional[Console], Parameter(parse=False)] = None,
     ) -> None:
