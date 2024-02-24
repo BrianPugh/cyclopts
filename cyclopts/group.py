@@ -1,5 +1,5 @@
 import itertools
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Tuple, Union, cast
 
 from attrs import define, field
 
@@ -8,8 +8,7 @@ from cyclopts.utils import Sentinel, is_iterable
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
 
-from cyclopts._convert import to_tuple_converter
-from cyclopts.utils import resolve_callables
+from cyclopts.utils import resolve_callables, to_tuple_converter
 
 
 def _group_default_parameter_must_be_none(instance, attribute, value: Optional["Parameter"]):

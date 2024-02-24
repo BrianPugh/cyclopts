@@ -9,11 +9,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from cyclopts.group import Group
 from cyclopts.utils import ParameterDict
 
 if TYPE_CHECKING:
     from cyclopts.core import App
-    from cyclopts.group import Group
 
 
 __all__ = [
@@ -144,7 +144,7 @@ class ValidationError(CycloptsError):
     parameter: Optional[inspect.Parameter] = None
     """Parameter who's ``validator`` function failed."""
 
-    group: Optional["Group"] = None
+    group: Optional[Group] = None
     """Group who's ``validator`` function failed."""
 
     def __str__(self):

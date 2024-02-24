@@ -1,7 +1,7 @@
 import functools
 import inspect
 from collections.abc import MutableMapping
-from typing import Any, Dict, Iterable, Iterator, Optional
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 
 def record_init(target: str):
@@ -108,3 +108,45 @@ def resolve_callables(t, *args, **kwargs):
         else:
             resolved.append(element)
     return tuple(resolved)
+
+
+def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
+    """Convert a single element or an iterable of elements into a tuple.
+
+    Intended to be used in an ``attrs.Field``. If :obj:`None` is provided, returns an empty tuple.
+    If a single element is provided, returns a tuple containing just that element.
+    If an iterable is provided, converts it into a tuple.
+
+    Parameters
+    ----------
+    value: Optional[Union[Any, Iterable[Any]]]
+        An element, an iterable of elements, or None.
+
+    Returns
+    -------
+    Tuple[Any, ...]: A tuple containing the elements.
+    """
+    if value is None:
+        return ()
+    elif is_iterable(value):
+        return tuple(value)
+    else:
+        return (value,)
+
+
+def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> List[Any]:
+    return list(to_tuple_converter(value))
+
+
+def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[Tuple[Any, ...]]:
+    """Convert a string or Iterable or None into an Iterable or None.
+
+    Intended to be used in an ``attrs.Field``.
+    """
+    if value is None:
+        return None
+
+    if not value:
+        return ()
+
+    return to_tuple_converter(value)
