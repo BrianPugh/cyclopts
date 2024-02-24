@@ -109,7 +109,7 @@ Just like a standard application, the parsed ``command`` executes instead of ``d
 -------------------------
 Custom Command Invocation
 -------------------------
-The :meth:`App.__call__` method is really quite simple internally:
+The core logic of :meth:`App.__call__` method is the following:
 
 .. code-block:: python
 

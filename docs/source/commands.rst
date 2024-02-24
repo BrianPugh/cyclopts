@@ -158,6 +158,24 @@ There are a few ways to adding a help string to a command:
    │ --version  Display application version.                               │
    ╰───────────────────────────────────────────────────────────────────────╯
 
+-----
+Async
+-----
+Cyclopts works with async functions too, it will run async function with ``asyncio.run``
+
+.. code-block:: python
+
+   app = cyclopts.App()
+
+
+   @app.command
+   async def foo():
+       await asyncio.sleep(10)
+
+
+   app()
+
+
 --------------------------
 Decorated Function Details
 --------------------------
