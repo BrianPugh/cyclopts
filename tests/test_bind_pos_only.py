@@ -1,6 +1,6 @@
 import pytest
 
-from cyclopts import CoercionError, MissingArgumentError, ValidationError
+from cyclopts import CoercionError, MissingArgumentError, UnknownOptionError, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -36,7 +36,7 @@ def test_pos_only(app, cmd_str, assert_parse_args):
 @pytest.mark.parametrize(
     "cmd_str_e",
     [
-        ("foo 1 2 --c=3", ValidationError),  # Unknown option "--c"
+        ("foo 1 2 --c=3", UnknownOptionError),  # Unknown option "--c"
     ],
 )
 def test_pos_only_exceptions(app, cmd_str_e):

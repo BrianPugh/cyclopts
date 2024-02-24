@@ -12,6 +12,7 @@ from cyclopts.exceptions import (
     CycloptsError,
     MissingArgumentError,
     RepeatArgumentError,
+    UnknownOptionError,
     ValidationError,
 )
 from cyclopts.parameter import get_hint_parameter, validate_command
@@ -89,7 +90,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                 if implicit_value:  # Only accept values to the positive flag
                     pass
                 else:
-                    raise ValidationError(value=f'Cannot assign value to negative flag "{cli_key}".')
+                    raise CycloptsError(msg=f'Cannot assign value to negative flag "{cli_key}".')
             else:
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False
@@ -148,7 +149,7 @@ def _is_option_like(token: str) -> bool:
 
 def _validate_is_not_option_like(token):
     if _is_option_like(token):
-        raise ValidationError(value=f'Unknown option: "{token}".')
+        raise UnknownOptionError(token=token)
 
 
 def _parse_pos(
@@ -321,8 +322,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
                 e.parameter = iparam
                 raise
             except (AssertionError, ValueError, TypeError) as e:
-                new_exception = ValidationError(value=e.args[0], parameter=iparam)
-                raise new_exception from e
+                raise ValidationError(value=e.args[0] if e.args else "", parameter=iparam) from e
     return coerced
 
 
@@ -381,8 +381,10 @@ def create_bound_arguments(
                 for validator in group.validator:  # pyright: ignore
                     validator(**{k: bound.arguments[k] for k in names if k in bound.arguments})
         except (AssertionError, ValueError, TypeError) as e:
-            new_exception = ValidationError(value=e.args[0])
-            raise new_exception from e
+            # group will always be set from the above for loop if an exception occurs.
+            raise ValidationError(
+                value=e.args[0] if e.args else "", group=group  # pyright: ignore[reportUnboundVariable]
+            ) from e
 
     except CycloptsError as e:
         e.target = command.command

@@ -12,6 +12,7 @@ __all__ = [
     "InvalidCommandError",
     "MissingArgumentError",
     "Parameter",
+    "UnknownOptionError",
     "UnusedCliTokensError",
     "ValidationError",
     "convert",
@@ -28,6 +29,7 @@ from cyclopts.exceptions import (
     DocstringError,
     InvalidCommandError,
     MissingArgumentError,
+    UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
 )

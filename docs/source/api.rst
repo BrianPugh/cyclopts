@@ -579,6 +579,10 @@ Exceptions
    :show-inheritance:
    :members:
 
+.. autoexception:: cyclopts.UnknownOptionError
+   :show-inheritance:
+   :members:
+
 .. autoexception:: cyclopts.CoercionError
    :show-inheritance:
    :members:

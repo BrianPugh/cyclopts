@@ -31,7 +31,6 @@ else:  # pragma: no cover
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as importlib_metadata_version
 
-from cyclopts._convert import optional_to_tuple_converter, to_list_converter, to_tuple_converter
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
@@ -53,6 +52,7 @@ from cyclopts.help import (
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.resolve import ResolvedCommand
+from cyclopts.utils import optional_to_tuple_converter, to_list_converter, to_tuple_converter
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -516,8 +516,9 @@ class App:
                         for validator in command_group.validator:  # pyright: ignore
                             validator(**bound.arguments)
                 except (AssertionError, ValueError, TypeError) as e:
-                    new_exception = ValidationError(value=e.args[0])
-                    raise new_exception from e
+                    raise ValidationError(
+                        value=e.args[0] if e.args else "", group=command_group  # pyright: ignore[reportUnboundVariable]
+                    ) from e
 
                 return command, bound, unused_tokens
             else:

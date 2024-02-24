@@ -1,5 +1,6 @@
 import difflib
 import inspect
+import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
 from attrs import define, field
@@ -8,6 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from cyclopts.group import Group
 from cyclopts.utils import ParameterDict
 
 if TYPE_CHECKING:
@@ -126,9 +128,9 @@ class CycloptsError(Exception):
         if self.parameter2cli is None:
             return s
         for p, names in self.parameter2cli.items():
-            target = f"--{p.name}"
+            pattern = rf"--\b{re.escape(p.name)}\b(?=\W|$)"
             replacement = names[0]
-            s = s.replace(target, replacement)
+            s = re.sub(pattern, replacement, s)
         return s
 
 
@@ -142,14 +144,37 @@ class ValidationError(CycloptsError):
     parameter: Optional[inspect.Parameter] = None
     """Parameter who's ``validator`` function failed."""
 
+    group: Optional[Group] = None
+    """Group who's ``validator`` function failed."""
+
     def __str__(self):
-        if self.parameter is None:
-            self.value = self._find_and_replace(self.value)
-            return super().__str__() + self.value
-        else:
+        # Either parameter or group must be set (but not both!)
+        assert bool(self.parameter) is not bool(self.group)
+
+        if self.parameter:
             assert self.parameter2cli is not None
+            # TODO: The displayed ``parameter_cli_name`` may not match the actual offending
+            # cli --option token provided (i.e. aliases).
+            # It would be much nicer to directly get the offending raw cli --option token.
             parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-            return super().__str__() + f"Invalid value for {parameter_cli_name}. {self.value}"
+            return super().__str__() + f'Invalid value for "{parameter_cli_name}". {self.value}'
+        elif self.group:
+            # TODO: it would be much nicer to directly get the offending raw cli --option token(s).
+            # However, this information is not available to the validator, so it's a bit hopeless.
+            self.value = self._find_and_replace(self.value)
+            return super().__str__() + f'Invalid values for group "{self.group}". {self.value}'
+        else:
+            raise NotImplementedError
+
+
+@define(kw_only=True)
+class UnknownOptionError(CycloptsError):
+    """Unknown/unregistered option provided by the cli."""
+
+    token: str
+
+    def __str__(self):
+        return super().__str__() + f'Unknown option: "{self.token}".'
 
 
 @define(kw_only=True)

@@ -8,13 +8,11 @@ from cyclopts._convert import (
     AnnotatedType,
     convert,
     get_origin_and_validate,
-    optional_to_tuple_converter,
     resolve,
     resolve_optional,
-    to_tuple_converter,
 )
 from cyclopts.group import Group
-from cyclopts.utils import record_init
+from cyclopts.utils import optional_to_tuple_converter, record_init, to_tuple_converter
 
 
 def _double_hyphen_validator(instance, attribute, values):
@@ -122,8 +120,7 @@ class Parameter:
                 # Do not support automatic negation for short flags.
                 continue
             else:
-                # Should never reach here.
-                raise NotImplementedError("All parameters should have started with '-' or '--'.")
+                raise ValueError("All parameters should have started with '-' or '--'.")
 
             negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
 
