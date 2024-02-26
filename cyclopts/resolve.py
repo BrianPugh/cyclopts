@@ -169,13 +169,12 @@ class ResolvedCommand:
         iparam_to_docstring_cparam = _resolve_docstring(f) if parse_docstring else ParameterDict()
         empty_help_string_parameter = Parameter(help="")
         for iparam, groups in self.iparam_to_groups.items():
-            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
-                # Name is only used for help-string
-                names = [iparam.name.upper()]
-            else:
-                names = ["--" + iparam.name.replace("_", "-")]
+            name = iparam.name.replace("_", "-")
 
-            default_name_parameter = Parameter(name=names)
+            if iparam.kind not in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                name = "--" + name
+
+            default_name_parameter = Parameter(name=[name])
 
             cparam = get_hint_parameter(
                 iparam,

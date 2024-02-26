@@ -219,7 +219,9 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
         options.extend(cparam.get_negatives(type_, *options))
 
         # Add an all-uppercase name if it's an argument
-        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
+        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+            options = [x.upper() for x in options]
+        elif iparam.kind is iparam.POSITIONAL_OR_KEYWORD:
             arg_name = options[0].lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]
