@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: steps.check_test_files.outputs.files_exists == 'true'
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
