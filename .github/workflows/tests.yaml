@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cache $HOME/.local # Significantly speeds up Poetry Install
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local
           key: dotlocal-${{ runner.os }}-${{matrix.python-version}}-${{ hashFiles('.github/workflows/tests.yaml') }}
@@ -65,7 +65,7 @@ jobs:
       - name: Install library
         run: poetry install --no-interaction
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit/
           key: pre-commit-4|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
@@ -77,7 +77,7 @@ jobs:
 
       - name: Check tests folder existence
         id: check_test_files
-        uses: andstor/file-existence-action@v2
+        uses: andstor/file-existence-action@v3
         with:
           files: "tests"
 
