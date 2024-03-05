@@ -519,9 +519,8 @@ def test_help_format_group_parameters_choices_enum(capture_format_group_paramete
     assert actual == expected
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ type annotations")
 def test_help_format_group_parameters_choices_enum_list(capture_format_group_parameters):
-    if sys.version_info < (3, 9):
-        return
 
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"
@@ -569,10 +568,8 @@ def test_help_format_group_parameters_choices_enum_list_typing(capture_format_gr
     )
     assert actual == expected
 
-
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ type annotations")
 def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
-    if sys.version_info < (3, 9):
-        return
 
     def cmd(
         steps_to_skip: Annotated[
@@ -616,10 +613,8 @@ def test_help_format_group_parameters_choices_literal_set_typing(capture_format_
     assert actual == expected
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ type annotations")
 def test_help_format_group_parameters_choices_literal_tuple(capture_format_group_parameters):
-    if sys.version_info < (3, 9):
-        return
-
     def cmd(
         steps_to_skip: Annotated[
             Optional[tuple[Literal["build", "deploy"]]],
