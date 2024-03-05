@@ -1,7 +1,7 @@
 import sys
 from enum import Enum
 from textwrap import dedent
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional, Set, Tuple, Union
 
 import pytest
 
@@ -513,6 +513,149 @@ def test_help_format_group_parameters_choices_enum(capture_format_group_paramete
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ FOO,--foo  Docstring for foo. [choices: fizz,buzz] [default: fizz] │
         │ BAR,--bar  Docstring for bar. [choices: fizz,buzz] [default: buzz] │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_enum_list(capture_format_group_parameters):
+    if sys.version_info < (3, 9):
+        return
+
+    class CompSciProblem(Enum):
+        fizz = "bleep bloop blop"
+        buzz = "blop bleep bloop"
+
+    def cmd(
+        foo: Annotated[
+            Optional[list[CompSciProblem]],
+            Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz]                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_enum_list_typing(capture_format_group_parameters):
+    class CompSciProblem(Enum):
+        fizz = "bleep bloop blop"
+        buzz = "blop bleep bloop"
+
+    def cmd(
+        foo: Annotated[
+            Optional[List[CompSciProblem]],
+            Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz]                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
+    if sys.version_info < (3, 9):
+        return
+
+    def cmd(
+        steps_to_skip: Annotated[
+            Optional[set[Literal["build", "deploy"]]],
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
+        │                                [choices: build,deploy]             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    print(expected)
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_literal_set_typing(capture_format_group_parameters):
+    def cmd(
+        steps_to_skip: Annotated[
+            Optional[Set[Literal["build", "deploy"]]],
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
+        │                                [choices: build,deploy]             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_literal_tuple(capture_format_group_parameters):
+    if sys.version_info < (3, 9):
+        return
+
+    def cmd(
+        steps_to_skip: Annotated[
+            Optional[tuple[Literal["build", "deploy"]]],
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
+        │                                [choices: build,deploy]             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    print(actual)
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_literal_tuple_typing(capture_format_group_parameters):
+    def cmd(
+        steps_to_skip: Annotated[
+            Optional[Tuple[Literal["build", "deploy"]]],
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
+        │                                [choices: build,deploy]             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
