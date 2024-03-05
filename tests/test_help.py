@@ -519,16 +519,17 @@ def test_help_format_group_parameters_choices_enum(capture_format_group_paramete
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ type annotations")
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
+)
 def test_help_format_group_parameters_choices_enum_list(capture_format_group_parameters):
-
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"
         buzz = "blop bleep bloop"
 
     def cmd(
         foo: Annotated[
-            Optional[list[CompSciProblem]],
+            Optional[list[CompSciProblem]],  # pyright: ignore
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -568,12 +569,14 @@ def test_help_format_group_parameters_choices_enum_list_typing(capture_format_gr
     )
     assert actual == expected
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ type annotations")
-def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
+)
+def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[set[Literal["build", "deploy"]]],
+            Optional[set[Literal["build", "deploy"]]],  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -613,11 +616,13 @@ def test_help_format_group_parameters_choices_literal_set_typing(capture_format_
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ type annotations")
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
+)
 def test_help_format_group_parameters_choices_literal_tuple(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[tuple[Literal["build", "deploy"]]],
+            Optional[tuple[Literal["build", "deploy"]]],  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
