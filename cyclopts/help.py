@@ -191,16 +191,17 @@ def format_doc(root_app, app: "App", format: str = "restructuredtext"):
 
 def _get_choices(type_: Type) -> str:
     choices: str = ""
-    if get_origin(type_) is Union:
+    _origin = get_origin(type_)
+    if isclass(type_) and issubclass(type_, Enum):
+        choices = ",".join(x.name.lower().replace("_", "-") for x in type_)
+    elif _origin is Union:
         inner_choices = [_get_choices(inner) for inner in get_args(type_)]
         choices = ",".join(x for x in inner_choices if x)
-    elif get_origin(type_) is Literal:
+    elif _origin is Literal:
         choices = ",".join(str(x) for x in get_args(type_))
-    elif isclass(type_) and issubclass(type_, Enum):
-        choices = ",".join(x.name.lower().replace("_", "-") for x in type_)
-    elif get_origin(type_) in (list, set, tuple):
+    elif _origin in (list, set, tuple):
         args = get_args(type_)
-        if len(args) == 1:
+        if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices = _get_choices(args[0])
     return choices
 

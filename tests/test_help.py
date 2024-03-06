@@ -644,9 +644,9 @@ def test_help_format_group_parameters_choices_literal_tuple(capture_format_group
 def test_help_format_group_parameters_choices_literal_tuple_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[Tuple[Literal["build", "deploy"]]],
-            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
-        ] = None,
+            Tuple[Literal["build", "deploy"]],
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
+        ] = ("build", "deploy"),
     ):
         pass
 
@@ -655,10 +655,57 @@ def test_help_format_group_parameters_choices_literal_tuple_typing(capture_forma
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy]             │
+        │                                [choices: build,deploy] [default:   │
+        │                                ('build', 'deploy')]                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_literal_tuple_variadic_typing(capture_format_group_parameters):
+    def cmd(
+        steps_to_skip: Annotated[
+            Tuple[Literal["build", "deploy"], ...],
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
+        ] = (),
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
+        │                                [default: ()]                       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
+)
+def test_help_format_group_parameters_choices_literal_tuple_variadic(capture_format_group_parameters):
+    def cmd(
+        steps_to_skip: Annotated[
+            tuple[Literal["build", "deploy"], ...],  # pyright: ignore
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
+        ] = ("build",),
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
+        │                                [default: ('build',)]               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    print(actual)
     assert actual == expected
 
 
