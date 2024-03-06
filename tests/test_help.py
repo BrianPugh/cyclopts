@@ -646,7 +646,7 @@ def test_help_format_group_parameters_choices_literal_tuple_typing(capture_forma
         steps_to_skip: Annotated[
             Tuple[Literal["build", "deploy"]],
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
-        ] = ("build", "deploy"),
+        ] = ("build",),
     ):
         pass
 
@@ -656,7 +656,7 @@ def test_help_format_group_parameters_choices_literal_tuple_typing(capture_forma
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
         │                                [choices: build,deploy] [default:   │
-        │                                ('build', 'deploy')]                │
+        │                                ('build',)]                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -677,7 +677,8 @@ def test_help_format_group_parameters_choices_literal_tuple_variadic_typing(capt
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [default: ()]                       │
+        │                                [choices: build,deploy] [default:   │
+        │                                ()]                                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -701,7 +702,8 @@ def test_help_format_group_parameters_choices_literal_tuple_variadic(capture_for
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [default: ('build',)]               │
+        │                                [choices: build,deploy] [default:   │
+        │                                ('build',)]                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
