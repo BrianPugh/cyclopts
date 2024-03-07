@@ -8,7 +8,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Iterable,
+    Dict,
     List,
     Literal,
     Optional,
@@ -19,8 +19,6 @@ from typing import (
     get_args,
     get_origin,
 )
-
-from cyclopts.utils import is_iterable
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated  # pragma: no cover
@@ -43,9 +41,10 @@ if TYPE_CHECKING:
 NoneType = type(None)
 AnnotatedType = type(Annotated[int, 0])
 
-_implicit_iterable_type_mapping = {
+_implicit_iterable_type_mapping: Dict[Type, Type] = {
     list: List[str],
     set: Set[str],
+    tuple: Tuple[str, ...],
 }
 
 _iterable_types = {list, set}
@@ -246,7 +245,7 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def convert(type_: Type[Any], *args: str, converter: Optional[Callable] = None):
+def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
     """Coerce variables into a specified type.
 
     Internally used to coercing string CLI tokens into python builtin types.
@@ -284,13 +283,12 @@ def convert(type_: Type[Any], *args: str, converter: Optional[Callable] = None):
     Any
         Coerced version of input ``*args``.
     """
-    if type_ is inspect.Parameter.empty:
-        type_ = str
-
     type_ = resolve(type_)
 
     if type_ is Any:
         type_ = str
+
+    type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
     origin_type = get_origin_and_validate(type_)
 
