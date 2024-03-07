@@ -1,7 +1,15 @@
 import functools
 import inspect
+import sys
 from collections.abc import MutableMapping
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
+
+_union_types = set()
+_union_types.add(Union)
+if sys.version_info >= (3, 10):
+    from types import UnionType
+
+    _union_types.add(UnionType)
 
 
 def record_init(target: str):
@@ -24,8 +32,12 @@ def record_init(target: str):
     return decorator
 
 
-def is_iterable(obj):
+def is_iterable(obj) -> bool:
     return isinstance(obj, Iterable) and not isinstance(obj, str)
+
+
+def is_union(type_: Optional[Type]) -> bool:
+    return type_ in _union_types
 
 
 class Sentinel:

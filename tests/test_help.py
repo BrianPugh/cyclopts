@@ -496,6 +496,43 @@ def test_help_format_group_parameters_choices_literal_union(capture_format_group
     assert actual == expected
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
+def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(capture_format_group_parameters):
+    def cmd(
+        foo: Annotated[
+            Literal["fizz", "buzz"] | Literal["bar"], Parameter(help="Docstring for foo.")  # pyright: ignore
+        ] = "fizz",
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz,bar] [default:   │
+        │            fizz]                                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
+def test_help_format_group_parameters_choices_literal_union_python310_syntax_1(capture_format_group_parameters):
+    def cmd(foo: Literal["fizz", "buzz"] | Literal["bar"] = "fizz"):  # pyright: ignore
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  [choices: fizz,buzz,bar] [default: fizz]                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_choices_enum(capture_format_group_parameters):
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"

@@ -163,8 +163,12 @@ def test_coerce_tuple_basic_double():
     _assert_tuple((1, 2.0), convert(Tuple[int, Union[None, float, int]], "1", "2"))
 
 
-def test_coerce_tuple_no_inner_types():
+def test_coerce_tuple_typing_no_inner_types():
     _assert_tuple(("1", "2"), convert(Tuple, "1", "2"))
+
+
+def test_coerce_tuple_builtin_no_inner_types():
+    _assert_tuple(("1", "2"), convert(tuple, "1", "2"))
 
 
 def test_coerce_tuple_nested():
