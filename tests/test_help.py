@@ -499,7 +499,9 @@ def test_help_format_group_parameters_choices_literal_union(capture_format_group
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(capture_format_group_parameters):
     def cmd(
-        foo: Annotated[Literal["fizz", "buzz"] | Literal["bar"], Parameter(help="Docstring for foo.")] = "fizz",
+        foo: Annotated[
+            Literal["fizz", "buzz"] | Literal["bar"], Parameter(help="Docstring for foo.")  # pyright: ignore
+        ] = "fizz",
     ):
         pass
 
@@ -517,7 +519,7 @@ def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(c
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_1(capture_format_group_parameters):
-    def cmd(foo: Literal["fizz", "buzz"] | Literal["bar"] = "fizz"):
+    def cmd(foo: Literal["fizz", "buzz"] | Literal["bar"] = "fizz"):  # pyright: ignore
         pass
 
     actual = capture_format_group_parameters(cmd)
