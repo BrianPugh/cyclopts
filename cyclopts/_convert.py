@@ -25,14 +25,9 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated  # pragma: no cover
 
-_union_types = set()
-_union_types.add(Union)
-if sys.version_info >= (3, 10):
-    from types import UnionType
-
-    _union_types.add(UnionType)
 
 from cyclopts.exceptions import CoercionError
+from cyclopts.utils import is_union
 
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
@@ -136,7 +131,7 @@ def _convert(type_, element, converter=None):
     if origin_type is collections.abc.Iterable:
         assert len(inner_types) == 1
         return pconvert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
-    elif origin_type in _union_types:
+    elif is_union(origin_type):
         for t in inner_types:
             if t is NoneType:
                 continue
@@ -221,7 +216,7 @@ def resolve_optional(type_: Type) -> Type:
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.
 
-    if get_origin(type_) not in _union_types:
+    if not is_union(get_origin(type_)):
         return type_
 
     non_none_types = [t for t in get_args(type_) if t is not NoneType]
