@@ -266,13 +266,12 @@ class App:
 
     @version_flags.setter
     def version_flags(self, value):
-        value = to_tuple_converter(value)
-        self._delete_commands(self._version_flags, default=self.version_print)
         self._version_flags = value
-        if value:
+        self._delete_commands(self._version_flags, default=self.version_print)
+        if self._version_flags:
             self.command(
                 self.version_print,
-                name=value,
+                name=self._version_flags,
                 help_flags=[],
                 version_flags=[],
                 help="Display application version.",
@@ -284,13 +283,12 @@ class App:
 
     @help_flags.setter
     def help_flags(self, value):
-        value = to_tuple_converter(value)
-        self._delete_commands(self._help_flags, default=self.help_print)
         self._help_flags = value
-        if value:
+        self._delete_commands(self._help_flags, default=self.help_print)
+        if self._help_flags:
             self.command(
                 self.help_print,
-                name=value,
+                name=self._help_flags,
                 help_flags=[],
                 version_flags=[],
                 help="Display this message and exit.",
