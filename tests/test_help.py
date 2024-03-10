@@ -1197,6 +1197,7 @@ def test_help_print_commands_plus_meta(app, console):
     ):
         pass
 
+    app.meta.help_flags = "--help"
     app.meta["--help"].group = "Admin"
 
     with console.capture() as capture:
@@ -1210,13 +1211,12 @@ def test_help_print_commands_plus_meta(app, console):
         App Help String Line 1.
 
         ╭─ Admin ────────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help  Display this message and exit.                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1       Cmd1 help string.                                       │
-        │ cmd2       Cmd2 help string.                                       │
-        │ meta-cmd   Meta cmd help string.                                   │
-        │ --version  Display application version.                            │
+        │ cmd1      Cmd1 help string.                                        │
+        │ cmd2      Cmd2 help string.                                        │
+        │ meta-cmd  Meta cmd help string.                                    │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
         │ *  --hostname  Hostname to connect to. [required]                  │

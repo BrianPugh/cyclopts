@@ -177,10 +177,10 @@ class App:
 
     version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
-    version_flags: Union[str, Iterable[str]] = field(
+    _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
-        on_setattr=attrs.setters.frozen,
         converter=to_tuple_converter,
+        alias="version_flags",
         kw_only=True,
     )
 
@@ -189,10 +189,10 @@ class App:
     console: Optional[Console] = field(default=None, kw_only=True)
 
     # This can ONLY ever be a Tuple[str, ...]
-    help_flags: Union[str, Iterable[str]] = field(
+    _help_flags: Union[str, Iterable[str]] = field(
         default=["--help", "-h"],
-        on_setattr=attrs.setters.frozen,
         converter=to_tuple_converter,
+        alias="help_flags",
         kw_only=True,
     )
     help_format: Union[None, Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]] = None
@@ -234,26 +234,65 @@ class App:
     _meta_parent: "App" = field(init=False, default=None)
 
     def __attrs_post_init__(self):
-        if self.help_flags:
-            self.command(
-                self.help_print,
-                name=self.help_flags,
-                help_flags=[],
-                version_flags=[],
-                help="Display this message and exit.",
-            )
-        if self.version_flags:
+        # Trigger the setters
+        self.help_flags = self._help_flags
+        self.version_flags = self._version_flags
+
+    ###########
+    # Methods #
+    ###########
+    def _delete_commands(self, commands: Iterable[str], default=None):
+        """Safely delete commands.
+
+        Will **not** raise an exception if command(s) do not exist.
+
+        Parameters
+        ----------
+        commands: Iterable[str, ...]
+            Strings of commands to delete.
+        """
+        # Remove all the old version-flag commands.
+        for command in commands:
+            with suppress(KeyError):
+                if default:
+                    if self[command].default == self.version_print:
+                        del self[command]
+                else:
+                    del self[command]
+
+    @property
+    def version_flags(self):
+        return self._version_flags
+
+    @version_flags.setter
+    def version_flags(self, value):
+        self._version_flags = value
+        self._delete_commands(self._version_flags, default=self.version_print)
+        if self._version_flags:
             self.command(
                 self.version_print,
-                name=self.version_flags,
+                name=self._version_flags,
                 help_flags=[],
                 version_flags=[],
                 help="Display application version.",
             )
 
-    ###########
-    # Methods #
-    ###########
+    @property
+    def help_flags(self):
+        return self._help_flags
+
+    @help_flags.setter
+    def help_flags(self, value):
+        self._help_flags = value
+        self._delete_commands(self._help_flags, default=self.help_print)
+        if self._help_flags:
+            self.command(
+                self.help_print,
+                name=self._help_flags,
+                help_flags=[],
+                version_flags=[],
+                help="Display this message and exit.",
+            )
 
     @property
     def name(self) -> Tuple[str, ...]:
@@ -324,6 +363,8 @@ class App:
     def meta(self) -> "App":
         if self._meta is None:
             self._meta = type(self)(
+                help_flags=copy(self.help_flags),
+                version_flags=copy(self.version_flags),
                 group_commands=copy(self.group_commands),
                 group_arguments=copy(self.group_arguments),
                 group_parameters=copy(self.group_parameters),
