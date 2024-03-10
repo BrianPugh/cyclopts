@@ -524,6 +524,8 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
+        meta_parent = self
+
         command_chain, apps, unused_tokens = self.parse_commands(tokens)
         command_app = apps[-1]
 
@@ -532,55 +534,82 @@ class App:
         except IndexError:
             parent_app = None
 
-        try:
-            if command_app.default_command:
-                command = command_app.default_command
-                resolved_command = self._resolve_command(
-                    tokens,
-                    parse_docstring=False,
-                )
-                # We want the resolved group that ``app`` belongs to.
-                if parent_app is None:
-                    command_groups = []
-                else:
-                    command_groups = _get_command_groups(parent_app, command_app)
+        # Special flags (help/version) get intercepted by the root app.
+        # Special flags are allows to be **anywhere** in the token stream.
 
-                bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
-                try:
-                    if command_app.converter:
-                        bound.arguments = command_app.converter(**bound.arguments)
-                    for command_group in command_groups:
-                        if command_group.converter:
-                            bound.arguments = command_group.converter(**bound.arguments)
-                    for validator in command_app.validator:
-                        validator(**bound.arguments)
-                    for command_group in command_groups:
-                        for validator in command_group.validator:  # pyright: ignore
+        for help_flag in self.help_flags:
+            try:
+                help_flag_index = tokens.index(help_flag)
+                break
+            except ValueError:
+                pass
+        else:
+            help_flag_index = None
+
+        if help_flag_index is not None:
+            tokens.pop(help_flag_index)
+            command = self.help_print
+            while meta_parent := meta_parent._meta_parent:
+                command = meta_parent.help_print
+            bound = inspect.signature(command).bind(tokens, console=console)
+            unused_tokens = []
+        elif any(flag in tokens for flag in self.version_flags):
+            # Version
+            command = self.version_print
+            while meta_parent := meta_parent._meta_parent:
+                command = meta_parent.version_print
+            bound = inspect.signature(command).bind()
+            unused_tokens = []
+        else:
+            try:
+                if command_app.default_command:
+                    command = command_app.default_command
+                    resolved_command = self._resolve_command(
+                        tokens,
+                        parse_docstring=False,
+                    )
+                    # We want the resolved group that ``app`` belongs to.
+                    if parent_app is None:
+                        command_groups = []
+                    else:
+                        command_groups = _get_command_groups(parent_app, command_app)
+
+                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
+                    try:
+                        if command_app.converter:
+                            bound.arguments = command_app.converter(**bound.arguments)
+                        for command_group in command_groups:
+                            if command_group.converter:
+                                bound.arguments = command_group.converter(**bound.arguments)
+                        for validator in command_app.validator:
                             validator(**bound.arguments)
-                except (AssertionError, ValueError, TypeError) as e:
-                    raise ValidationError(
-                        value=e.args[0] if e.args else "", group=command_group  # pyright: ignore[reportUnboundVariable]
-                    ) from e
+                        for command_group in command_groups:
+                            for validator in command_group.validator:  # pyright: ignore
+                                validator(**bound.arguments)
+                    except (AssertionError, ValueError, TypeError) as e:
+                        raise ValidationError(
+                            value=e.args[0] if e.args else "",
+                            group=command_group,  # pyright: ignore[reportUnboundVariable]
+                        ) from e
 
-                return command, bound, unused_tokens
-            else:
-                if unused_tokens:
-                    raise InvalidCommandError(unused_tokens=unused_tokens)
                 else:
-                    # Running the application with no arguments and no registered
-                    # ``default_command`` will default to ``help_print``.
-                    command = self.help_print
-                    bound = inspect.signature(command).bind(tokens=tokens, console=console)
-                    return command, bound, []
-        except CycloptsError as e:
-            e.app = command_app
-            if command_chain:
-                e.command_chain = command_chain
-            if e.console is None:
-                e.console = self._resolve_console(tokens, console)
-            raise
+                    if unused_tokens:
+                        raise InvalidCommandError(unused_tokens=unused_tokens)
+                    else:
+                        # Running the application with no arguments and no registered
+                        # ``default_command`` will default to ``help_print``.
+                        command = self.help_print
+                        bound = inspect.signature(command).bind(tokens=tokens, console=console)
+                        unused_tokens = []
+            except CycloptsError as e:
+                e.app = command_app
+                if command_chain:
+                    e.command_chain = command_chain
+                if e.console is None:
+                    e.console = self._resolve_console(tokens, console)
+                raise
 
-        raise NotImplementedError("Should never get here.")
+        return command, bound, unused_tokens
 
     def parse_args(
         self,
@@ -592,8 +621,6 @@ class App:
         verbose: bool = False,
     ) -> Tuple[Callable, inspect.BoundArguments]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
-
-        **Does** handle special flags like "version" or "help".
 
         Raises
         ------
@@ -629,55 +656,26 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        meta_parent = self
+        # Normal parsing
+        try:
+            command, bound, unused_tokens = self.parse_known_args(tokens, console=console)
+            if unused_tokens:
+                raise UnusedCliTokensError(
+                    target=command,
+                    unused_tokens=unused_tokens,
+                )
+        except CycloptsError as e:
+            e.verbose = verbose
+            e.root_input_tokens = tokens
 
-        # Special flags (help/version) get intercepted by the root app.
-        # Special flags are allows to be **anywhere** in the token stream.
-
-        for help_flag in self.help_flags:
-            try:
-                help_flag_index = tokens.index(help_flag)
-                break
-            except ValueError:
-                pass
-        else:
-            help_flag_index = None
-
-        if help_flag_index is not None:
-            tokens.pop(help_flag_index)
-            command = self.help_print
-            while meta_parent := meta_parent._meta_parent:
-                command = meta_parent.help_print
-            bound = inspect.signature(command).bind(tokens, console=console)
-            unused_tokens = []
-        elif any(flag in tokens for flag in self.version_flags):
-            # Version
-            command = self.version_print
-            while meta_parent := meta_parent._meta_parent:
-                command = meta_parent.version_print
-            bound = inspect.signature(command).bind()
-            unused_tokens = []
-        else:
-            # Normal parsing
-            try:
-                command, bound, unused_tokens = self.parse_known_args(tokens, console=console)
-                if unused_tokens:
-                    raise UnusedCliTokensError(
-                        target=command,
-                        unused_tokens=unused_tokens,
-                    )
-            except CycloptsError as e:
-                e.verbose = verbose
-                e.root_input_tokens = tokens
-
-                if e.console is None:
-                    e.console = self._resolve_console(tokens, console)
-                if print_error:
-                    assert e.console
-                    e.console.print(format_cyclopts_error(e))
-                if exit_on_error:
-                    sys.exit(1)
-                raise
+            if e.console is None:
+                e.console = self._resolve_console(tokens, console)
+            if print_error:
+                assert e.console
+                e.console.print(format_cyclopts_error(e))
+            if exit_on_error:
+                sys.exit(1)
+            raise
 
         return command, bound
 
