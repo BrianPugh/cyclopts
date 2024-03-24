@@ -1,6 +1,8 @@
+import sys
+
 import pytest
 
-from cyclopts import CoercionError, MissingArgumentError, UnknownOptionError, ValidationError
+from cyclopts import MissingArgumentError, UnknownOptionError, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -82,3 +84,22 @@ def test_pos_only_extended_exceptions(app, cmd_str_e):
 
     with pytest.raises(e):
         app.parse_args(cmd_str, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 10), reason="https://peps.python.org/pep-0563/ Postponed Evaluation of Annotations"
+)
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo a 2 3 4",
+        "foo a 2 3 --d 4",
+        "foo a 2 --d=4 3",
+    ],
+)
+def test_pos_only_extended_str_type(app, cmd_str, assert_parse_args):
+    @app.command
+    def foo(a: "str", b: "int", c: int, /, d: "int"):
+        pass
+
+    assert_parse_args(foo, cmd_str, "a", 2, 3, 4)

@@ -10,6 +10,8 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
 
+import cyclopts.utils
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
@@ -551,14 +553,14 @@ class App:
             command = self.help_print
             while meta_parent := meta_parent._meta_parent:
                 command = meta_parent.help_print
-            bound = inspect.signature(command).bind(tokens, console=console)
+            bound = cyclopts.utils.signature(command).bind(tokens, console=console)
             unused_tokens = []
         elif any(flag in tokens for flag in self.version_flags):
             # Version
             command = self.version_print
             while meta_parent := meta_parent._meta_parent:
                 command = meta_parent.version_print
-            bound = inspect.signature(command).bind()
+            bound = cyclopts.utils.signature(command).bind()
             unused_tokens = []
         else:
             try:
@@ -599,7 +601,7 @@ class App:
                         # Running the application with no arguments and no registered
                         # ``default_command`` will default to ``help_print``.
                         command = self.help_print
-                        bound = inspect.signature(command).bind(tokens=tokens, console=console)
+                        bound = cyclopts.utils.signature(command).bind(tokens=tokens, console=console)
                         unused_tokens = []
             except CycloptsError as e:
                 e.app = command_app

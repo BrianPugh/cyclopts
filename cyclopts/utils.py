@@ -11,17 +11,26 @@ if sys.version_info >= (3, 10):
 
     _union_types.add(UnionType)
 
+# fmt: off
+if sys.version_info >= (3, 10):
+    def signature(f: Any) -> inspect.Signature:
+        return inspect.signature(f, eval_str=True)
+else:
+    def signature(f: Any) -> inspect.Signature:
+        return inspect.signature(f)
+# fmt: on
+
 
 def record_init(target: str):
     """Class decorator that records init argument names as a tuple to ``target``."""
 
     def decorator(cls):
         original_init = cls.__init__
-        signature = inspect.signature(original_init)
+        function_signature = signature(original_init)
 
         @functools.wraps(original_init)
         def new_init(self, *args, **kwargs):
-            bound = signature.bind(self, *args, **kwargs)
+            bound = function_signature.bind(self, *args, **kwargs)
             original_init(self, *args, **kwargs)
             # Circumvent frozen protection.
             object.__setattr__(self, target, tuple(k for k, v in bound.arguments.items() if v is not self))

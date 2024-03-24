@@ -4,6 +4,7 @@ from typing import Any, Callable, Iterable, Optional, Tuple, Type, Union, cast, 
 import attrs
 from attrs import field, frozen
 
+import cyclopts.utils
 from cyclopts._convert import (
     AnnotatedType,
     convert,
@@ -179,7 +180,7 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
-    signature = inspect.signature(f)
+    signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
         get_origin_and_validate(iparam.annotation)
         type_, cparam = get_hint_parameter(iparam)

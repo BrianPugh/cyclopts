@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+import cyclopts.utils
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter
 
@@ -145,7 +146,7 @@ def format_usage(
 
     if app.default_command:
         to_show = set()
-        for parameter in inspect.signature(app.default_command).parameters.values():
+        for parameter in cyclopts.utils.signature(app.default_command).parameters.values():
             if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL, parameter.POSITIONAL_OR_KEYWORD):
                 to_show.add("[ARGS]")
             if parameter.kind in (parameter.KEYWORD_ONLY, parameter.VAR_KEYWORD, parameter.POSITIONAL_OR_KEYWORD):

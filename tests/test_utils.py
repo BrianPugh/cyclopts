@@ -1,9 +1,8 @@
-import inspect
 from typing import List
 
 import pytest
 
-from cyclopts.utils import ParameterDict
+from cyclopts.utils import ParameterDict, signature
 
 
 @pytest.fixture
@@ -15,7 +14,7 @@ def test_parameter_dict_immutable(parameter_dict):
     def foo(a: int, b: int = 3):
         pass
 
-    parameters = dict(inspect.signature(foo).parameters)
+    parameters = dict(signature(foo).parameters)
 
     for name, parameter in parameters.items():
         parameter_dict[parameter] = name
@@ -32,7 +31,7 @@ def test_parameter_dict_mutable(parameter_dict):
     def foo(a: int, b: List[int] = []):  # noqa: B006
         pass
 
-    parameters = dict(inspect.signature(foo).parameters)
+    parameters = dict(signature(foo).parameters)
 
     for name, parameter in parameters.items():
         parameter_dict[parameter] = name
