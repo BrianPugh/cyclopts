@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+import cyclopts.utils
 from cyclopts.group import Group
 from cyclopts.utils import ParameterDict
 
@@ -112,7 +113,7 @@ class CycloptsError(Exception):
             if self.target:
                 file, lineno = _get_function_info(self.target)
                 strings.append(f'Function defined in file "{file}", line {lineno}:')
-                strings.append(f"    {self.target.__name__}{inspect.signature(self.target)}")
+                strings.append(f"    {self.target.__name__}{cyclopts.utils.signature(self.target)}")
             if self.root_input_tokens is not None:
                 strings.append(f"Root Input Tokens: {self.root_input_tokens}")
         else:

@@ -632,6 +632,31 @@ def test_help_format_group_parameters_choices_literal_set(capture_format_group_p
     assert actual == expected
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10), reason="https://peps.python.org/pep-0563/ Postponed Evaluation of Annotations"
+)
+def test_help_parameter_string_annotation(capture_format_group_parameters):
+    def cmd(number: "Annotated[int,Parameter(name=['--number','-n'])]"):
+        """Print number.
+
+        Args:
+            number (int): a number to print.
+        """
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+╭─ Parameters ───────────────────────────────────────────────────────╮
+│ *  NUMBER,--number  -n  a number to print. [required]              │
+╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    print(actual)
+    print(expected)
+    assert actual == expected
+
+
 def test_help_format_group_parameters_choices_literal_set_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[

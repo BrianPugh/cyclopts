@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, cast, get_origin
 
 from docstring_parser import parse as docstring_parse
 
+import cyclopts.utils
 from cyclopts.exceptions import DocstringError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter
@@ -24,18 +25,17 @@ def _list_index(lst: List, key: Callable) -> int:
     raise ValueError
 
 
-def _has_unparsed_parameters(f: Callable, *args) -> bool:
-    signature = inspect.signature(f)
-    for iparam in signature.parameters.values():
+def _has_unparsed_parameters(func_signature: inspect.Signature, *args) -> bool:
+    for iparam in func_signature.parameters.values():
+        cparam: Parameter
         _, cparam = get_hint_parameter(iparam, *args)
-
         if not cparam.parse:
             return True
     return False
 
 
 def _resolve_groups(
-    f: Callable,
+    func_signature: inspect.Signature,
     app_parameter: Optional[Parameter],
     group_arguments: Group,
     group_parameters: Group,
@@ -47,9 +47,7 @@ def _resolve_groups(
     resolved_groups = []
     iparam_to_groups = ParameterDict()
 
-    signature = inspect.signature(f)
-
-    for iparam in signature.parameters.values():
+    for iparam in func_signature.parameters.values():
         _, cparam = get_hint_parameter(iparam, app_parameter)
 
         if not cparam.parse:
@@ -96,11 +94,11 @@ def _resolve_groups(
     return resolved_groups, iparam_to_groups
 
 
-def _resolve_docstring(f) -> ParameterDict:
-    signature = inspect.signature(f)
-    f_docstring = docstring_parse(f.__doc__)
-
+def _resolve_docstring(f: Callable, signature: inspect.Signature) -> ParameterDict:
     iparam_to_docstring_cparam = ParameterDict()
+    if f.__doc__ is None:
+        return iparam_to_docstring_cparam
+    f_docstring = docstring_parse(f.__doc__)
 
     for dparam in f_docstring.params:
         try:
@@ -156,17 +154,19 @@ class ResolvedCommand:
             group_parameters = Group.create_default_parameters()
 
         self.command = f
-        signature = inspect.signature(f)
+        signature = cyclopts.utils.signature(f)
         self.name_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
 
         # Get:
         # 1. Fully resolved and created Groups.
         # 2. A mapping of inspect.Parameter to those Group objects.
-        self.groups, self.iparam_to_groups = _resolve_groups(f, app_parameter, group_arguments, group_parameters)
+        self.groups, self.iparam_to_groups = _resolve_groups(
+            signature, app_parameter, group_arguments, group_parameters
+        )
 
         # Fully Resolve each Cyclopts Parameter
         self.iparam_to_cparam = ParameterDict()
-        iparam_to_docstring_cparam = _resolve_docstring(f) if parse_docstring else ParameterDict()
+        iparam_to_docstring_cparam = _resolve_docstring(f, signature) if parse_docstring else ParameterDict()
         empty_help_string_parameter = Parameter(help="")
         for iparam, groups in self.iparam_to_groups.items():
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
@@ -188,7 +188,7 @@ class ResolvedCommand:
             )[1]
             self.iparam_to_cparam[iparam] = cparam
 
-        self.bind = signature.bind_partial if _has_unparsed_parameters(f, app_parameter) else signature.bind
+        self.bind = signature.bind_partial if _has_unparsed_parameters(signature, app_parameter) else signature.bind
 
         # Create a convenient group-to-iparam structure
         self.groups_iparams = [
