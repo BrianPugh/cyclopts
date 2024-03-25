@@ -3,6 +3,11 @@
 ==============
 Optional Lists
 ==============
+
+.. note::
+   This issue has been addressed in `Typer v0.10.0`_.
+
+
 Typer does not handle optional lists particularly well.
 In Typer, if a list argument is not provided via the CLI, an empty list is passed to the command by default.
 While this might be acceptable in some scenarios, it can be unexpected and differs semantically from the default value.
@@ -57,3 +62,4 @@ This feature is configurable via :attr:`.Parameter.negative_iterable`.
    # My favorite numbers are: []
 
 .. _setting mutable defaults is strongly discouraged: https://docs.python-guide.org/writing/gotchas/#mutable-default-arguments
+.. _Typer v0.10.0: https://github.com/tiangolo/typer/releases/tag/0.10.0
