@@ -276,6 +276,7 @@ While `Literal`_ is the recommended way of providing the user options, another m
 For a user provided token, a **case-insensitive name** lookup is performed.
 If an enum name contains an underscore, the CLI parameter **may** instead contain a hyphen, ``-``.
 Leading/Trailing underscores will be stripped.
+TODO: refer to ``name_transform``.
 
 If coming from Typer_, **Cyclopts Enum handling is reversed compared to Typer**.
 Typer attempts to match the token to an Enum **value**; Cyclopts attempts to match the token to an Enum **name**.

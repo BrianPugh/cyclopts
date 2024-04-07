@@ -132,7 +132,10 @@ def test_coerce_enum():
         PROD = auto()
         _PROD_OLD = auto()
 
+    # tests case-insensitivity
     assert SoftwareEnvironment.STAGING == convert(SoftwareEnvironment, "staging")
+
+    # tests underscore/hyphen support
     assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, "prod_old")
     assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, "prod-old")
 
