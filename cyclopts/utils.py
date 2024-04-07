@@ -171,3 +171,21 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
         return ()
 
     return to_tuple_converter(value)
+
+
+def default_name_transform(s: str) -> str:
+    """Converts a python identifier into a CLI token.
+
+    TODO: ADD INTENDED USE-CASE.
+
+    Parameters
+    ----------
+    s: str
+        Input python identifier string.
+
+    Returns
+    -------
+    str
+        Transformed name.
+    """
+    return s.lower().replace("_", "-").strip("-")
