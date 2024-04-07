@@ -16,6 +16,7 @@ __all__ = [
     "UnusedCliTokensError",
     "ValidationError",
     "convert",
+    "default_name_transform",
     "types",
     "validators",
 ]
@@ -36,5 +37,6 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
+from cyclopts.utils import default_name_transform
 
 from . import types, validators

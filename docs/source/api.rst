@@ -480,6 +480,7 @@ API
 
 .. autofunction:: cyclopts.convert
 
+.. autofunction:: cyclopts.default_name_transform
 
 .. _API Validators:
 

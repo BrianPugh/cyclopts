@@ -120,7 +120,7 @@ def _convert_tuple(type_: Type[Any], *args: str, converter: Optional[Callable] =
     return out
 
 
-def _convert(type_, element, converter=None):
+def _convert(type_, element, converter=None, name_transform=None):
     pconvert = partial(_convert, converter=converter)
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
