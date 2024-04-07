@@ -176,6 +176,12 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
 def default_name_transform(s: str) -> str:
     """Converts a python identifier into a CLI token.
 
+    Performs the following operations (in order):
+
+    1. ``lower`` the string.
+    2. Replace ``_`` with ``-``.
+    3. Strip any leading/trailing ``_`` or ``-``.
+
     TODO: ADD INTENDED USE-CASE.
 
     Parameters
