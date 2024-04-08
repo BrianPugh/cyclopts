@@ -263,7 +263,7 @@ def convert(
     type_: Type,
     *args: str,
     converter: Optional[Callable[[Type, str], Any]] = None,
-    name_transform: Callable[[str], str] = default_name_transform,
+    name_transform: Optional[Callable[[str], str]] = None,
 ):
     """Coerce variables into a specified type.
 
@@ -295,7 +295,7 @@ def convert(
         This allows to use the :func:`convert` function to handle the the difficult task
         of traversing lists/tuples/unions/etc, while leaving the final conversion logic to
         the caller.
-    name_transform: Callable
+    name_transform: Optional[Callable[[str], str]]
         Currently only used for ``Enum`` type hints.
         A function that transforms enum names and CLI values into a normalized format.
 
@@ -308,13 +308,16 @@ def convert(
 
         where the returned value is the name to be used on the CLI.
 
-        Defaults to ``cyclopts.default_name_transform``.
+        If ``None``, defaults to ``cyclopts.default_name_transform``.
 
     Returns
     -------
     Any
         Coerced version of input ``*args``.
     """
+    if name_transform is None:
+        name_transform = default_name_transform
+
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
     type_ = resolve(type_)
