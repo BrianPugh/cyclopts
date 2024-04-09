@@ -818,6 +818,34 @@ def test_help_print_function(app, console):
     assert actual == expected
 
 
+def test_help_print_parameter_required(app, console):
+    @app.command(help="Cmd help string.")
+    def cmd(
+        foo: Annotated[str, Parameter(required=False, help="Docstring for foo.")],
+        *,
+        bar: Annotated[str, Parameter(required=True, help="Docstring for bar.")],
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app cmd [ARGS] [OPTIONS]
+
+        Cmd help string.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │    FOO,--foo  Docstring for foo.                                   │
+        │ *  --bar      Docstring for bar. [required]                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_print_function_defaults(app, console):
     @app.command(help="Cmd help string.")
     def cmd(

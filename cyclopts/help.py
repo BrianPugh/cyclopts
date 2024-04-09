@@ -249,8 +249,8 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
             env_vars = " ".join(cparam.env_var)
             help_components.append(rf"[dim]\[env var: {env_vars}][/dim]")
 
-        if not cparam.required and (
-            cparam.show_default or (cparam.show_default is None and iparam.default is not None)
+        if cparam.show_default or (
+            cparam.show_default is None and iparam.default not in {None, inspect.Parameter.empty}
         ):
             default = ""
             if isclass(type_) and issubclass(type_, Enum):
