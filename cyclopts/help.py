@@ -1,8 +1,8 @@
 import inspect
 from enum import Enum
-from functools import lru_cache
+from functools import lru_cache, partial
 from inspect import isclass
-from typing import TYPE_CHECKING, List, Literal, Tuple, Type, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Callable, List, Literal, Tuple, Type, Union, get_args, get_origin
 
 import docstring_parser
 from attrs import define, field, frozen
@@ -190,20 +190,21 @@ def format_doc(root_app, app: "App", format: str = "restructuredtext"):
         raise ValueError(f'Unknown help_format "{format}"')
 
 
-def _get_choices(type_: Type) -> str:
+def _get_choices(type_: Type, name_transform: Callable[[str], str]) -> str:
+    get_choices = partial(_get_choices, name_transform=name_transform)
     choices: str = ""
     _origin = get_origin(type_)
     if isclass(type_) and issubclass(type_, Enum):
-        choices = ",".join(x.name.lower().replace("_", "-") for x in type_)
+        choices = ",".join(name_transform(x.name) for x in type_)
     elif _origin is Union:
-        inner_choices = [_get_choices(inner) for inner in get_args(type_)]
+        inner_choices = [get_choices(inner) for inner in get_args(type_)]
         choices = ",".join(x for x in inner_choices if x)
     elif _origin is Literal:
         choices = ",".join(str(x) for x in get_args(type_))
     elif _origin in (list, set, tuple):
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
-            choices = _get_choices(args[0])
+            choices = get_choices(args[0])
     return choices
 
 
@@ -218,6 +219,7 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
 
     for iparam, cparam in icparams:
         assert cparam.name is not None
+        assert cparam.name_transform is not None
         type_ = get_hint_parameter(iparam)[0]
         options = list(cparam.name)
         options.extend(cparam.get_negatives(type_, *options))
@@ -241,7 +243,7 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
             help_components.append(cparam.help)
 
         if cparam.show_choices:
-            choices = _get_choices(type_)
+            choices = _get_choices(type_, cparam.name_transform)
             if choices:
                 help_components.append(rf"[dim]\[choices: {choices}][/dim]")
 
@@ -254,7 +256,7 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
         ):
             default = ""
             if isclass(type_) and issubclass(type_, Enum):
-                default = iparam.default.name.lower().replace("_", "-")
+                default = cparam.name_transform(iparam.default.name)
             else:
                 default = iparam.default
 

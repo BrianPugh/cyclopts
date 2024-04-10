@@ -169,23 +169,26 @@ class ResolvedCommand:
         iparam_to_docstring_cparam = _resolve_docstring(f, signature) if parse_docstring else ParameterDict()
         empty_help_string_parameter = Parameter(help="")
         for iparam, groups in self.iparam_to_groups.items():
-            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
-                # Name is only used for help-string
-                names = [iparam.name.upper()]
-            else:
-                names = ["--" + iparam.name.replace("_", "-")]
-
-            default_name_parameter = Parameter(name=names)
-
             cparam = get_hint_parameter(
                 iparam,
                 empty_help_string_parameter,
                 app_parameter,
                 *(x.default_parameter for x in groups),
                 iparam_to_docstring_cparam.get(iparam),
-                default_name_parameter,
                 Parameter(required=iparam.default is iparam.empty),
             )[1]
+
+            # Resolve name now that ``name_transform`` has been resolved.
+            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                # Name is only used for help-string
+                names = [iparam.name.upper()]
+            else:
+                # cparam.name_transform cannot be None due to:
+                #     attrs.converters.default_if_none(default_name_transform)
+                assert cparam.name_transform is not None
+                names = ["--" + cparam.name_transform(iparam.name)]
+
+            cparam = Parameter.combine(Parameter(name=names), cparam)
             self.iparam_to_cparam[iparam] = cparam
 
         self.bind = signature.bind_partial if _has_unparsed_parameters(signature, app_parameter) else signature.bind

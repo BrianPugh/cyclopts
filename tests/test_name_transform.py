@@ -1,6 +1,15 @@
+import sys
+from enum import Enum, auto
+from textwrap import dedent
+
 import pytest
 
-from cyclopts import App, default_name_transform
+from cyclopts import App, Parameter, default_name_transform
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated  # pragma: no cover
+else:
+    from typing import Annotated  # pragma: no cover
 
 
 @pytest.mark.parametrize(
@@ -74,11 +83,105 @@ def test_subapp_name_transform_custom_inherited(app):
     assert "my-custom-name-transform" in subapp
 
 
-@pytest.mark.skip(reason="TODO")
-def test_parameter_name_transform_default(app):
-    pass
+def test_parameter_name_transform_default(app, assert_parse_args):
+    @app.default
+    def foo(*, b_a_r: int):
+        pass
+
+    assert_parse_args(foo, "--b-a-r 5", b_a_r=5)
 
 
-@pytest.mark.skip(reason="TODO")
-def test_parameter_name_transform_custom(app):
-    pass
+def test_parameter_name_transform_custom(app, assert_parse_args):
+    app.default_parameter = Parameter(name_transform=lambda s: s)
+
+    @app.default
+    def foo(*, b_a_r: int):
+        pass
+
+    assert_parse_args(foo, "--b_a_r 5", b_a_r=5)
+
+
+def test_parameter_name_transform_custom_name_override(app, assert_parse_args):
+    app.default_parameter = Parameter(name_transform=lambda s: s)
+
+    @app.default
+    def foo(*, b_a_r: Annotated[int, Parameter(name="--buzz")]):
+        pass
+
+    assert_parse_args(foo, "--buzz 5", b_a_r=5)
+
+
+def test_parameter_name_transform_custom_enum(app, assert_parse_args):
+    """name_transform should also be applied to enum options."""
+    app.default_parameter = Parameter(name_transform=lambda s: s)
+
+    class SoftwareEnvironment(Enum):
+        DEV = auto()
+        STAGING = auto()
+        PROD = auto()
+        _PROD_OLD = auto()
+
+    @app.default
+    def foo(*, b_a_r: SoftwareEnvironment = SoftwareEnvironment.STAGING):
+        pass
+
+    assert_parse_args(foo, "--b_a_r PROD", b_a_r=SoftwareEnvironment.PROD)
+
+
+def test_parameter_name_transform_help(app, console):
+    app.default_parameter = Parameter(name_transform=lambda s: s)
+
+    @app.default
+    def foo(*, b_a_r: int):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: foo COMMAND [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --b_a_r  [required]                                             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_parameter_name_transform_help_enum(app, console):
+    """name_transform should also be applied to enum options on help page."""
+    app.default_parameter = Parameter(name_transform=lambda s: s)
+
+    class CompSciProblem(Enum):
+        FIZZ = "bleep bloop blop"
+        BUZZ = "blop bleep bloop"
+
+    @app.command
+    def cmd(
+        foo: Annotated[CompSciProblem, Parameter(help="Docstring for foo.")] = CompSciProblem.FIZZ,
+        bar: Annotated[CompSciProblem, Parameter(help="Docstring for bar.")] = CompSciProblem.BUZZ,
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: test_name_transform cmd [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO,--foo  Docstring for foo. [choices: FIZZ,BUZZ] [default: FIZZ] │
+        │ BAR,--bar  Docstring for bar. [choices: FIZZ,BUZZ] [default: BUZZ] │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
