@@ -171,3 +171,27 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
         return ()
 
     return to_tuple_converter(value)
+
+
+def default_name_transform(s: str) -> str:
+    """Converts a python identifier into a CLI token.
+
+    Performs the following operations (in order):
+
+    1. Convert the string to all lowercase.
+    2. Replace ``_`` with ``-``.
+    3. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 2).
+
+    Intended to be used with :attr:`App.name_transform` and :attr:`Parameter.name_transform`.
+
+    Parameters
+    ----------
+    s: str
+        Input python identifier string.
+
+    Returns
+    -------
+    str
+        Transformed name.
+    """
+    return s.lower().replace("_", "-").strip("-")

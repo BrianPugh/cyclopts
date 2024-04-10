@@ -63,6 +63,22 @@ Prior to Python 3.9, :obj:`~typing.Annotated` has to be imported from ``typing_e
 :class:`.Parameter` gives complete control on how Cyclopts processes the annotated parameter.
 See the API page for all configurable options.
 
+------
+Naming
+------
+Like :ref:`command names <Command Changing Name>`, commandline parameters are derived from their python function argument counterparts.
+This automatic command name transform can be configured by :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`. Note that the resulting string is **before** the standard ``--`` is prepended.
+
+To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app, add the following to your :class:`~cyclopts.App` configuration:
+
+.. code-block:: python
+
+   app = App(
+       default_parameter=Parameter(name_transform=my_custom_name_transform),
+   )
+
+Manually set names via :attr:`Parameter.name <cyclopts.Parameter.name>` are not subject to :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`.
+
 ----
 Help
 ----

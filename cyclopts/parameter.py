@@ -1,4 +1,5 @@
 import inspect
+from functools import partial
 from typing import Any, Callable, Iterable, Optional, Tuple, Type, Union, cast, get_args, get_origin
 
 import attrs
@@ -13,7 +14,7 @@ from cyclopts._convert import (
     resolve_optional,
 )
 from cyclopts.group import Group
-from cyclopts.utils import optional_to_tuple_converter, record_init, to_tuple_converter
+from cyclopts.utils import default_name_transform, optional_to_tuple_converter, record_init, to_tuple_converter
 
 
 def _double_hyphen_validator(instance, attribute, values):
@@ -48,7 +49,7 @@ class Parameter:
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Callable = field(default=None, converter=attrs.converters.default_if_none(convert))
+    _converter: Callable = field(default=None, alias="converter")
 
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
@@ -98,12 +99,22 @@ class Parameter:
 
     allow_leading_hyphen: bool = field(default=False)
 
+    name_transform: Optional[Callable[[str], str]] = field(
+        default=None,
+        converter=attrs.converters.default_if_none(default_name_transform),
+        kw_only=True,
+    )
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
     @property
     def show(self):
         return self._show if self._show is not None else self.parse
+
+    @property
+    def converter(self):
+        return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
     def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:
         type_ = get_origin(type_) or type_

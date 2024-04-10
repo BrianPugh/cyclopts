@@ -27,7 +27,7 @@ else:
 
 
 from cyclopts.exceptions import CoercionError
-from cyclopts.utils import is_union
+from cyclopts.utils import default_name_transform, is_union
 
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
@@ -83,7 +83,13 @@ _converters = {
 }
 
 
-def _convert_tuple(type_: Type[Any], *args: str, converter: Optional[Callable] = None) -> Tuple:
+def _convert_tuple(
+    type_: Type[Any],
+    *args: str,
+    converter: Optional[Callable[[Type, str], Any]],
+    name_transform: Callable[[str], str],
+) -> Tuple:
+    convert = partial(_convert, converter=converter, name_transform=name_transform)
     inner_types = tuple(x for x in get_args(type_) if x is not ...)
     inner_token_count, consume_all = token_count(type_)
     if consume_all:
@@ -101,11 +107,10 @@ def _convert_tuple(type_: Type[Any], *args: str, converter: Optional[Callable] =
             raise ValueError("A tuple must have 0 or 1 inner-types.")
 
         if inner_token_count == 1:
-            out = tuple(_convert(inner_type, x, converter=converter) for x in args)
+            out = tuple(convert(inner_type, x) for x in args)
         else:
             out = tuple(
-                _convert(inner_type, args[i : i + inner_token_count], converter=converter)
-                for i in range(0, len(args), inner_token_count)
+                convert(inner_type, args[i : i + inner_token_count]) for i in range(0, len(args), inner_token_count)
             )
         return out
     else:
@@ -116,27 +121,41 @@ def _convert_tuple(type_: Type[Any], *args: str, converter: Optional[Callable] =
         it = iter(args)
         batched = [[next(it) for _ in range(size)] for size in args_per_convert]
         batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
-        out = tuple(_convert(inner_type, arg, converter=converter) for inner_type, arg in zip(inner_types, batched))
+        out = tuple(convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
     return out
 
 
-def _convert(type_, element, converter=None):
-    pconvert = partial(_convert, converter=converter)
+def _convert(
+    type_,
+    element,
+    *,
+    converter: Optional[Callable[[Type, str], Any]],
+    name_transform: Callable[[str], str],
+):
+    """Inner recursive conversion function for public ``convert``.
+
+    Parameters
+    ----------
+    converter: Callable
+    name_transform: Callable
+    """
+    convert = partial(_convert, converter=converter, name_transform=name_transform)
+    convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
-        return pconvert(_implicit_iterable_type_mapping[type_], element)
+        return convert(_implicit_iterable_type_mapping[type_], element)
 
     if origin_type is collections.abc.Iterable:
         assert len(inner_types) == 1
-        return pconvert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
+        return convert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
     elif is_union(origin_type):
         for t in inner_types:
             if t is NoneType:
                 continue
             try:
-                return pconvert(t, element)
+                return convert(t, element)
             except Exception:
                 pass
         else:
@@ -144,7 +163,7 @@ def _convert(type_, element, converter=None):
     elif origin_type is Literal:
         for choice in get_args(type_):
             try:
-                res = pconvert(type(choice), (element))
+                res = convert(type(choice), (element))
             except Exception:
                 continue
             if res == choice:
@@ -157,18 +176,18 @@ def _convert(type_, element, converter=None):
             gen = zip(*[iter(element)] * count)
         else:
             gen = element
-        return origin_type(pconvert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+        return origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
         if isinstance(element, str):
             # E.g. Tuple[str] (Annotation: tuple containing a single string)
-            return _convert_tuple(type_, element, converter=converter)
+            return convert_tuple(type_, element, converter=converter)
         else:
-            return _convert_tuple(type_, *element, converter=converter)
+            return convert_tuple(type_, *element, converter=converter)
     elif isclass(type_) and issubclass(type_, Enum):
         if converter is None:
-            element_lower = element.lower().replace("-", "_")
+            element_transformed = name_transform(element)
             for member in type_:
-                if member.name.lower().strip("_") == element_lower:
+                if name_transform(member.name) == element_transformed:
                     return member
             raise CoercionError(input_value=element, target_type=type_)
         else:
@@ -240,7 +259,12 @@ def resolve_annotated(type_: Type) -> Type:
     return type_
 
 
-def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
+def convert(
+    type_: Type,
+    *args: str,
+    converter: Optional[Callable[[Type, str], Any]] = None,
+    name_transform: Optional[Callable[[str], str]] = None,
+):
     """Coerce variables into a specified type.
 
     Internally used to coercing string CLI tokens into python builtin types.
@@ -259,8 +283,7 @@ def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
         A type hint/annotation to coerce ``*args`` into.
     `*args`: str
         String tokens to coerce.
-    converter: Optional[Callable]
-
+    converter: Optional[Callable[[Type, str], Any]]
         An optional function to convert tokens to the inner-most types.
         The converter should have signature:
 
@@ -272,12 +295,31 @@ def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
         This allows to use the :func:`convert` function to handle the the difficult task
         of traversing lists/tuples/unions/etc, while leaving the final conversion logic to
         the caller.
+    name_transform: Optional[Callable[[str], str]]
+        Currently only used for ``Enum`` type hints.
+        A function that transforms enum names and CLI values into a normalized format.
+
+        The function should have signature:
+
+        .. code-block:: python
+
+            def name_transform(s: str) -> str:
+                ...
+
+        where the returned value is the name to be used on the CLI.
+
+        If ``None``, defaults to ``cyclopts.default_name_transform``.
 
     Returns
     -------
     Any
         Coerced version of input ``*args``.
     """
+    if name_transform is None:
+        name_transform = default_name_transform
+
+    convert = partial(_convert, converter=converter, name_transform=name_transform)
+    convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
     type_ = resolve(type_)
 
     if type_ is Any:
@@ -288,13 +330,13 @@ def convert(type_: Type, *args: str, converter: Optional[Callable] = None):
     origin_type = get_origin_and_validate(type_)
 
     if origin_type is tuple:
-        return _convert_tuple(type_, *args, converter=converter)
+        return convert_tuple(type_, *args)
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return _convert(type_, args, converter=converter)
+        return convert(type_, args)
     elif len(args) == 1:
-        return _convert(type_, args[0], converter=converter)
+        return convert(type_, args[0])
     else:
-        return [_convert(type_, item, converter=converter) for item in args]
+        return [convert(type_, item) for item in args]
 
 
 def token_count(type_: Union[Type[Any], inspect.Parameter]) -> Tuple[int, bool]:

@@ -273,11 +273,12 @@ Enum
 ****
 While `Literal`_ is the recommended way of providing the user options, another method is using :class:`~enum.Enum`.
 
-For a user provided token, a **case-insensitive name** lookup is performed.
+:attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets applied to all :class:`~enum.Enum` names, as well as the CLI provided token.
+By default,this means that a **case-insensitive name** lookup is performed.
 If an enum name contains an underscore, the CLI parameter **may** instead contain a hyphen, ``-``.
 Leading/Trailing underscores will be stripped.
 
-If coming from Typer_, **Cyclopts Enum handling is reversed compared to Typer**.
+If coming from Typer_, **Cyclopts Enum handling is the reverse of Typer**.
 Typer attempts to match the token to an Enum **value**; Cyclopts attempts to match the token to an Enum **name**.
 
 

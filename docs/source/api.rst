@@ -161,6 +161,22 @@ API
 
       The raised error message will be presented to the user with python-variables prepended with "--" remapped to their CLI counterparts.
 
+   .. attribute:: name_transform
+      :type: Optional[Callable[[str], str]]
+      :value: None
+
+      A function that converts function names to their CLI command counterparts.
+
+      The function must have signature:
+
+      .. code-block:: python
+
+         def name_transform(s: str) -> str:
+             ...
+
+      If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+      If a subapp, inherits from first non-:obj:`None` parent.
+
 .. autoclass:: cyclopts.Parameter
 
    Cyclopts configuration for individual function parameters.
@@ -303,6 +319,21 @@ API
       Fallback to environment variable(s) if CLI value not provided.
       If multiple environment variables are given, the left-most environment variable with a set value will be used.
       If no environment variable is set, Cyclopts will fallback to the function-signature default.
+
+   .. attribute:: name_transform
+       :type: Optional[Callable[[str], str]]
+       :value: None
+
+       A function that converts python parameter names to their CLI command counterparts.
+
+       The function must have signature:
+
+       .. code-block:: python
+
+          def name_transform(s: str) -> str:
+              ...
+
+       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
 
    .. automethod:: combine
 
@@ -480,6 +511,7 @@ API
 
 .. autofunction:: cyclopts.convert
 
+.. autofunction:: cyclopts.default_name_transform
 
 .. _API Validators:
 
