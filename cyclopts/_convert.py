@@ -185,9 +185,9 @@ def _convert(
             return convert_tuple(type_, *element, converter=converter)
     elif isclass(type_) and issubclass(type_, Enum):
         if converter is None:
-            element_lower = name_transform(element)
+            element_transformed = name_transform(element)
             for member in type_:
-                if name_transform(member.name) == element_lower:
+                if name_transform(member.name) == element_transformed:
                     return member
             raise CoercionError(input_value=element, target_type=type_)
         else:
