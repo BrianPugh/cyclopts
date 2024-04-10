@@ -55,15 +55,11 @@ from cyclopts.help import (
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.resolve import ResolvedCommand
-from cyclopts.utils import optional_to_tuple_converter, to_list_converter, to_tuple_converter
+from cyclopts.utils import default_name_transform, optional_to_tuple_converter, to_list_converter, to_tuple_converter
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
     import readline  # Not available on windows
-
-
-def _format_name(name: str):
-    return name.lower().replace("_", "-").strip("-")
 
 
 class _CannotDeriveCallingModuleNameError(Exception):
@@ -224,6 +220,12 @@ class App:
     converter: Optional[Callable] = field(default=None, kw_only=True)
     validator: List[Callable] = field(default=None, converter=to_list_converter, kw_only=True)
 
+    _name_transform: Optional[Callable[[str], str]] = field(
+        default=None,
+        alias="name_transform",
+        kw_only=True,
+    )
+
     ######################
     # Private Attributes #
     ######################
@@ -307,7 +309,7 @@ class App:
                 name = _get_root_module_name()
             return (name,)
         else:
-            return (_format_name(self.default_command.__name__),)
+            return (self.name_transform(self.default_command.__name__),)
 
     @property
     def help(self) -> str:
@@ -327,6 +329,14 @@ class App:
     @help.setter
     def help(self, value):
         self._help = value
+
+    @property
+    def name_transform(self):
+        return self._name_transform if self._name_transform else default_name_transform
+
+    @name_transform.setter
+    def name_transform(self, value):
+        self._name_transform = value
 
     def version_print(self) -> None:
         """Print the application version."""
@@ -457,6 +467,9 @@ class App:
                 kwargs["group_arguments"] = copy(self.group_arguments)
             app = App(default_command=obj, **kwargs)
             # app.name is handled below
+
+        if app._name_transform is None:
+            app.name_transform = self.name_transform
 
         if name is None:
             name = app.name
