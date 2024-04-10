@@ -161,6 +161,22 @@ API
 
       The raised error message will be presented to the user with python-variables prepended with "--" remapped to their CLI counterparts.
 
+   .. attribute:: name_transform
+      :type: Optional[Callable[[str], str]]
+      :value: None
+
+      A function that converts function names to their CLI command counterparts.
+
+      The function must have signature:
+
+      .. code-block:: python
+
+         def name_transform(s: str) -> str:
+             ...
+
+      If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+      If a subapp, inherits from first non-:obj:`None` parent.
+
 .. autoclass:: cyclopts.Parameter
 
    Cyclopts configuration for individual function parameters.
