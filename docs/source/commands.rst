@@ -11,7 +11,6 @@ There are 2 function-registering decorators:
    This was previously demonstrated in :ref:`Getting Started`.
 
    A sub-app **cannot** be registered with :meth:`@app.default <cyclopts.App.default>`.
-
    The default :meth:`app.default <cyclopts.App.default>` handler runs :meth:`app.help_print <cyclopts.App.help_print>`.
 
 2. :meth:`@app.command <cyclopts.App.command>` - Registers a function or :class:`.App` as a command.
@@ -92,17 +91,23 @@ The :meth:`@app.command <cyclopts.App.command>` method can also register another
 The subcommand may have it's own registered ``default`` action.
 Cyclopts's command structure is fully recursive.
 
-.. _Changing Name:
+.. _Command Changing Name:
 
 -------------
 Changing Name
 -------------
 By default, a command is registered to the function name with underscores replaced with hyphens.
 Any leading or trailing underscore/hyphens will also be stripped.
-For example, ``def _foo_bar()`` will become the command ``foo-bar``.
+For example, the function ``_foo_bar()`` will become the command ``foo-bar``.
+This automatic command name transform can be configured by :attr:`App.name_transform <cyclopts.App.name_transform>`.
+For example, to make CLI command names be identical to their python function name counterparts, we can configure :class:`~cyclopts.App` as follows:
 
-The name can be manually changed in the :meth:`@app.command <cyclopts.App.command>` decorator.
-Manually set names are not subject to this name conversion.
+.. code-block:: python
+
+   app = App(name_transform=lambda s: s)
+
+Alternatively, the name can be manually changed in the :meth:`@app.command <cyclopts.App.command>` decorator.
+Manually set names are not subject to :attr:`App.name_transform <cyclopts.App.name_transform>`.
 
 .. code-block:: python
 

@@ -178,11 +178,11 @@ def default_name_transform(s: str) -> str:
 
     Performs the following operations (in order):
 
-    1. ``lower`` the string.
+    1. Convert the string to all lowercase.
     2. Replace ``_`` with ``-``.
-    3. Strip any leading/trailing ``_`` or ``-``.
+    3. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 2).
 
-    TODO: ADD INTENDED USE-CASE.
+    Intended to be used with :attr:`App.name_transform` and :attr:`Parameter.name_transform`.
 
     Parameters
     ----------

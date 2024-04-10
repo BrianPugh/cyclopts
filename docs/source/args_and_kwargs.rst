@@ -57,7 +57,7 @@ A variable number of keyword arguments consume all remaining CLI tokens starting
 Individual values are converted to the annotated type.
 As with normal python ``**kwargs``, the keywords are limited to python identifiers.
 Most prominently, no spaces allowed.
-Keyword name-conversion is the :ref:`same as commands <Changing Name>`.
+Keyword name-conversion is the :ref:`same as commands <Command Changing Name>`.
 
 .. code-block:: python
 
