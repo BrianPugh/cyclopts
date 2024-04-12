@@ -1449,3 +1449,34 @@ def test_help_markdown(app, console):
     actual = [x.strip() for x in actual.split("\n")]
 
     assert actual == expected
+
+
+def test_help_consistent_formatting(app, console):
+    """Checks to make sure short-descriptions and full-descriptions
+    are rendered using the same formatter.
+
+    https://github.com/BrianPugh/cyclopts/issues/113
+    """
+    app.help_format = "markdown"
+
+    @app.command
+    def cmd():
+        """[bold]Short description[/bold]."""
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual_help = capture.get()
+
+    # Hack to extract out the short_description from the help-page
+    actual_help = next(x for x in actual_help.split("\n") if "Short description" in x)
+    actual_help = actual_help[5:-1].strip()
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    # Hack to extract out the short_description from the help-page
+    actual_cmd_help = capture.get()
+    actual_cmd_help = next(x for x in actual_cmd_help.split("\n") if "Short description" in x)
+
+    assert actual_help == actual_cmd_help
