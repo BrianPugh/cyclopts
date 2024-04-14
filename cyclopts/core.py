@@ -39,6 +39,7 @@ from cyclopts.help import (
     format_command_entries,
     format_doc,
     format_usage,
+    resolve_help_format,
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -204,9 +205,16 @@ class App:
         alias="help_flags",
         kw_only=True,
     )
-    help_format: Union[None, Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]] = field(
-        default=None, kw_only=True
-    )
+    help_format: Optional[
+        Literal[
+            "markdown",
+            "md",
+            "plaintext",
+            "restructuredtext",
+            "rst",
+            "rich",
+        ]
+    ] = field(default=None, kw_only=True)
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
@@ -817,11 +825,7 @@ class App:
             console.print(executing_app.usage + "\n")
 
         # Print the App/Command's Doc String.
-        # Resolve help_format; None fallsback to parent; non-None overwrites parent.
-        help_format = "restructuredtext"
-        for app in apps:
-            if app.help_format is not None:
-                help_format = app.help_format
+        help_format = resolve_help_format(apps)
         console.print(format_doc(self, executing_app, help_format))
 
         for help_panel in self._assemble_help_panels(tokens):
@@ -852,6 +856,8 @@ class App:
     ) -> List[HelpPanel]:
         _, apps, _ = self.parse_commands(tokens)
 
+        help_format = resolve_help_format(apps)
+
         panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
@@ -876,7 +882,7 @@ class App:
                     else:
                         command_panel.description = group.help
 
-                command_panel.entries.extend(format_command_entries(elements))
+                command_panel.entries.extend(format_command_entries(elements, help_format))
 
         # Handle Arguments/Parameters
         for subapp in walk_metas(apps[-1]):
@@ -896,7 +902,7 @@ class App:
                     _, existing_panel = panels[group.name]
                 except KeyError:
                     existing_panel = None
-                new_panel = create_parameter_help_panel(group, iparams, cparams)
+                new_panel = create_parameter_help_panel(group, iparams, cparams, help_format)
 
                 if existing_panel:
                     # An imperfect merging process

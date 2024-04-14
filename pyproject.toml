@@ -177,6 +177,7 @@ convention = "numpy"
     "D106",
     "D107",
     "D205",
+    "D404",
     "S102",  # use of "exec"
     "S106",  # possible hardcoded password.
     "PGH001",  # use of "eval"
