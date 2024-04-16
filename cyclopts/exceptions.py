@@ -1,19 +1,16 @@
-import difflib
 import inspect
 import re
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
 
 from attrs import define, field
-from rich import box
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
 import cyclopts.utils
 from cyclopts.group import Group
 from cyclopts.utils import ParameterDict
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
     from cyclopts.core import App
 
 
@@ -98,7 +95,7 @@ class CycloptsError(Exception):
     The Cyclopts application itself.
     """
 
-    console: Optional[Console] = field(default=None, kw_only=True)
+    console: Optional["Console"] = field(default=None, kw_only=True)
     """
     Rich console to display runtime errors.
     """
@@ -221,6 +218,8 @@ class InvalidCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
 
     def __str__(self):
+        import difflib
+
         assert self.unused_tokens
         token = self.unused_tokens[0]
         response = super().__str__() + f'Unable to interpret valid command from "{token}".'
@@ -304,6 +303,10 @@ class RepeatArgumentError(CycloptsError):
 
 
 def format_cyclopts_error(e: Any):
+    from rich import box
+    from rich.panel import Panel
+    from rich.text import Text
+
     panel = Panel(
         Text(str(e), "default"),
         title="Error",
