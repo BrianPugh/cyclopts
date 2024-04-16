@@ -1,5 +1,3 @@
-import asyncio
-import importlib
 import inspect
 import os
 import sys
@@ -21,16 +19,8 @@ except ImportError:
     PydanticValidationError = None
 
 
-import attrs
 from attrs import define, field
 from rich.console import Console
-
-if sys.version_info < (3, 10):  # pragma: no cover
-    from importlib_metadata import PackageNotFoundError
-    from importlib_metadata import version as importlib_metadata_version
-else:  # pragma: no cover
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as importlib_metadata_version
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
@@ -90,6 +80,15 @@ def _default_version(default="0.0.0") -> str:
     version: str
         ``default`` if it cannot determine version.
     """
+    import importlib
+
+    if sys.version_info < (3, 10):  # pragma: no cover
+        from importlib_metadata import PackageNotFoundError
+        from importlib_metadata import version as importlib_metadata_version
+    else:  # pragma: no cover
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as importlib_metadata_version
+
     try:
         root_module_name = _get_root_module_name()
     except _CannotDeriveCallingModuleNameError:  # pragma: no cover
@@ -724,6 +723,8 @@ class App:
         )
         try:
             if inspect.iscoroutinefunction(command):
+                import asyncio
+
                 return asyncio.run(command(*bound.args, **bound.kwargs))
             else:
                 return command(*bound.args, **bound.kwargs)
