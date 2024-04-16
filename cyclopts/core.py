@@ -15,11 +15,6 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
-try:
-    from pydantic import ValidationError as PydanticValidationError
-except ImportError:
-    PydanticValidationError = None
-
 
 from attrs import define, field
 from rich.console import Console
@@ -744,6 +739,11 @@ class App:
             else:
                 return command(*bound.args, **bound.kwargs)
         except Exception as e:
+            try:
+                from pydantic import ValidationError as PydanticValidationError
+            except ImportError:
+                PydanticValidationError = None  # noqa: N806
+
             if PydanticValidationError is not None and isinstance(e, PydanticValidationError):
                 if print_error:
                     console = self._resolve_console(tokens, console)
