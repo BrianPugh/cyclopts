@@ -6,7 +6,7 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
 
 import cyclopts.utils
 
@@ -17,7 +17,6 @@ else:
 
 
 from attrs import define, field
-from rich.console import Console
 
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
@@ -45,6 +44,9 @@ from cyclopts.utils import default_name_transform, optional_to_tuple_converter, 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
     import readline  # Not available on windows
+
+if TYPE_CHECKING:
+    from rich.console import Console
 
 
 class _CannotDeriveCallingModuleNameError(Exception):
@@ -178,7 +180,7 @@ class App:
 
     show: bool = field(default=True, kw_only=True)
 
-    console: Optional[Console] = field(default=None, kw_only=True)
+    console: Optional["Console"] = field(default=None, kw_only=True)
 
     # This can ONLY ever be a Tuple[str, ...]
     _help_flags: Union[str, Iterable[str]] = field(
@@ -510,7 +512,7 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
-        console: Optional[Console] = None,
+        console: Optional["Console"] = None,
     ) -> Tuple[Callable, inspect.BoundArguments, List[str]]:
         """Interpret arguments into a function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
@@ -624,7 +626,7 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
-        console: Optional[Console] = None,
+        console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
         verbose: bool = False,
@@ -692,7 +694,7 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
-        console: Optional[Console] = None,
+        console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
         verbose: bool = False,
@@ -753,20 +755,24 @@ class App:
                     sys.exit(1)
             raise
 
-    def _resolve_console(self, tokens: Union[None, str, Iterable[str]], console: Optional[Console] = None) -> Console:
+    def _resolve_console(
+        self, tokens: Union[None, str, Iterable[str]], console: Optional["Console"] = None
+    ) -> "Console":
         if console is not None:
             return console
         _, apps, _ = self.parse_commands(tokens)
         for app in reversed(apps):
             if app.console:
                 return app.console
+        from rich.console import Console
+
         return Console()
 
     def help_print(
         self,
         tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
         *,
-        console: Annotated[Optional[Console], Parameter(parse=False)] = None,
+        console: Annotated[Optional["Console"], Parameter(parse=False)] = None,
     ) -> None:
         """Print the help page.
 

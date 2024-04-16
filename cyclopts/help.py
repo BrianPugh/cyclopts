@@ -6,10 +6,6 @@ from typing import TYPE_CHECKING, Callable, List, Literal, Tuple, Type, Union, g
 
 import docstring_parser
 from attrs import define, field, frozen
-from rich import box, console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
 
 import cyclopts.utils
 from cyclopts.group import Group
@@ -63,13 +59,20 @@ class HelpPanel:
     def __rich__(self):
         if not self.entries:
             return _silent
+        from rich.box import ROUNDED
+        from rich.console import Group as RichGroup
+        from rich.table import Table
+        from rich.text import Text
+
         table = Table.grid(padding=(0, 1))
         text = Text(end="")
         if self.description:
             text.append(self.description + "\n\n")
+        from rich.panel import Panel
+
         panel = Panel(
-            console.Group(text, table),
-            box=box.ROUNDED,
+            RichGroup(text, table),
+            box=ROUNDED,
             expand=True,
             title_align="left",
             title=self.title,
@@ -133,6 +136,8 @@ def format_usage(
     app,
     command_chain: List[str],
 ):
+    from rich.text import Text
+
     usage = []
     usage.append("Usage:")
     usage.append(app.name[0])
@@ -157,6 +162,9 @@ def format_usage(
 
 
 def format_doc(root_app, app: "App", format: str = "restructuredtext"):
+    from rich.console import Group as RichGroup
+    from rich.text import Text
+
     from cyclopts.core import App  # noqa: F811
 
     raw_doc_string = app.help
@@ -181,7 +189,7 @@ def format_doc(root_app, app: "App", format: str = "restructuredtext"):
     elif format in ("markdown", "md"):
         from rich.markdown import Markdown
 
-        return console.Group(Markdown("".join(x[0] for x in components)), Text(""))
+        return RichGroup(Markdown("".join(x[0] for x in components)), Text(""))
     elif format in ("restructuredtext", "rst"):
         from rich_rst import RestructuredText
 
