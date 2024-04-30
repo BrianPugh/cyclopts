@@ -189,7 +189,9 @@ class App:
         alias="help_flags",
         kw_only=True,
     )
-    help_format: Union[None, Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]] = None
+    help_format: Union[None, Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]] = field(
+        default=None, kw_only=True
+    )
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
