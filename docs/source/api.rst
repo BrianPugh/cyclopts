@@ -177,6 +177,23 @@ API
       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
       If a subapp, inherits from first non-:obj:`None` parent.
 
+   .. attribute:: bound_args_transform
+      :type: Union[None, Callable, Iterable[Callable]]
+      :value: None
+
+      A function or list of functions that are consecutively applied to the :ref:`inspect.BoundArguments`.
+      These function(s) are called before any additional conversion and validation.
+      Each function must have signature:
+
+      .. code-block:: python
+
+         def bound_args_transform(commands: Tuple[str, ...], bound: inspect.BoundArguments) -> Any:
+             ...
+
+      The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
+      See :ref:`cyclopts.bound_args_transforms`.
+
+
 .. autoclass:: cyclopts.Parameter
 
    Cyclopts configuration for individual function parameters.

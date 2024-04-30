@@ -1,6 +1,6 @@
 import inspect
 import re
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple, Type
 
 from attrs import define, field
 
@@ -85,7 +85,7 @@ class CycloptsError(Exception):
     Dictionary mapping function parameters to possible CLI tokens.
     """
 
-    command_chain: Optional[List[str]] = None
+    command_chain: Optional[Iterable[str]] = None
     """
     List of command that lead to ``target``.
     """

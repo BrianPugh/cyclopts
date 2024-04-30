@@ -185,6 +185,13 @@ class App:
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
+    # This can ONLY ever be a Tuple[Callable, ...]
+    bound_args_transform: Union[None, Callable, Iterable[Callable]] = field(
+        default=None,
+        converter=to_tuple_converter,
+        kw_only=True,
+    )
+
     version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
@@ -563,12 +570,19 @@ class App:
         meta_parent = self
 
         command_chain, apps, unused_tokens = self.parse_commands(tokens)
+        command_chain = tuple(command_chain)
         command_app = apps[-1]
 
         try:
             parent_app = apps[-2]
         except IndexError:
             parent_app = None
+
+        bound_args_transform: Tuple[Callable, ...] = ()
+        for app in reversed(apps):
+            if app.bound_args_transform:
+                bound_args_transform = app.bound_args_transform  # pyright: ignore[reportGeneralTypeIssues]
+                break
 
         # Special flags (help/version) get intercepted by the root app.
         # Special flags are allows to be **anywhere** in the token stream.
@@ -612,6 +626,8 @@ class App:
 
                     bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
                     try:
+                        for transform in bound_args_transform:
+                            transform(command_chain, bound)
                         if command_app.converter:
                             bound.arguments = command_app.converter(**bound.arguments)
                         for command_group in command_groups:
