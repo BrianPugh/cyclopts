@@ -4,13 +4,6 @@ from typing import Any, Optional
 
 import pytest
 
-from cyclopts.group import Group
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
 from cyclopts import Parameter
 from cyclopts.exceptions import (
     CoercionError,
@@ -19,6 +12,12 @@ from cyclopts.exceptions import (
     RepeatArgumentError,
     UnusedCliTokensError,
 )
+from cyclopts.group import Group
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 
 @pytest.mark.parametrize(
@@ -212,13 +211,13 @@ def test_bind_no_hint_no_default(app, cmd_str, annotated, assert_parse_args):
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Any, Parameter(help="help for a")]):  # pyright: ignore[reportGeneralTypeIssues]
+        def foo(a: Annotated[Any, Parameter(help="help for a")]):  # pyright: ignore[reportRedeclaration]
             pass
 
     else:
 
         @app.command
-        def foo(a):  # pyright: ignore[reportGeneralTypeIssues]
+        def foo(a):  # pyright: ignore[reportRedeclaration]
             pass
 
     assert_parse_args(foo, cmd_str, "1")
@@ -238,13 +237,13 @@ def test_bind_no_hint_none_default(app, cmd_str, annotated, assert_parse_args):
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Any, Parameter(help="help for a")] = None):  # pyright: ignore[reportGeneralTypeIssues]
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = None):  # pyright: ignore[reportRedeclaration]
             pass
 
     else:
 
         @app.command
-        def foo(a=None):  # pyright: ignore[reportGeneralTypeIssues]
+        def foo(a=None):  # pyright: ignore[reportRedeclaration]
             pass
 
     assert_parse_args(foo, cmd_str, "1")
@@ -264,13 +263,13 @@ def test_bind_no_hint_typed_default(app, cmd_str, annotated, assert_parse_args):
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Any, Parameter(help="help for a")] = 5):  # pyright: ignore[reportGeneralTypeIssues]
+        def foo(a: Annotated[Any, Parameter(help="help for a")] = 5):  # pyright: ignore[reportRedeclaration]
             pass
 
     else:
 
         @app.command
-        def foo(a=5):  # pyright: ignore[reportGeneralTypeIssues]
+        def foo(a=5):  # pyright: ignore[reportRedeclaration]
             pass
 
     assert_parse_args(foo, cmd_str, 1)

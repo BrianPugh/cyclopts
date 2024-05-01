@@ -2,7 +2,7 @@ from typing import Optional, Type, Union, get_args, get_origin
 
 from attrs import frozen
 
-Numeric = Union[int, float, complex]
+Numeric = Union[int, float]
 
 
 @frozen(kw_only=True)
@@ -28,14 +28,14 @@ class Number:
         if not isinstance(value, get_args(Numeric)):
             raise TypeError
 
-        if self.lt is not None and value >= self.lt:  # pyright: ignore[reportGeneralTypeIssues]
+        if self.lt is not None and value >= self.lt:
             raise ValueError(f"Must be < {self.lt}")
 
-        if self.lte is not None and value > self.lte:  # pyright: ignore[reportGeneralTypeIssues]
+        if self.lte is not None and value > self.lte:
             raise ValueError(f"Must be <= {self.lte}")
 
-        if self.gt is not None and value <= self.gt:  # pyright: ignore[reportGeneralTypeIssues]
+        if self.gt is not None and value <= self.gt:
             raise ValueError(f"Must be > {self.gt}")
 
-        if self.gte is not None and value < self.gte:  # pyright: ignore[reportGeneralTypeIssues]
+        if self.gte is not None and value < self.gte:
             raise ValueError(f"Must be >= {self.gte}")

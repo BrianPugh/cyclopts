@@ -198,7 +198,7 @@ class CoercionError(CycloptsError):
 
         if self.msg is not None:
             if self.parameter:
-                return f"{parameter_cli_name}: " + self.msg  # pyright: ignore[reportUnboundVariable]
+                return f"{parameter_cli_name}: " + self.msg  # pyright: ignore[reportPossiblyUnboundVariable]
             else:
                 return self.msg
 
@@ -209,7 +209,7 @@ class CoercionError(CycloptsError):
             response += f" to {target_type}"
 
         if self.parameter:
-            response += f' for "{parameter_cli_name}"'  # pyright: ignore[reportUnboundVariable]
+            response += f' for "{parameter_cli_name}"'  # pyright: ignore[reportPossiblyUnboundVariable]
 
         return super().__str__() + response + "."
 

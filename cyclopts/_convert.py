@@ -20,14 +20,14 @@ from typing import (
     get_origin,
 )
 
+from cyclopts.exceptions import CoercionError
+from cyclopts.utils import default_name_transform, is_union
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated  # pragma: no cover
 else:
     from typing import Annotated  # pragma: no cover
 
-
-from cyclopts.exceptions import CoercionError
-from cyclopts.utils import default_name_transform, is_union
 
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
@@ -217,7 +217,7 @@ def get_origin_and_validate(type_: Type):
     return origin_type
 
 
-def resolve(type_: Type) -> Type:
+def resolve(type_: Any) -> Type:
     """Perform all simplifying resolutions."""
     if type_ is inspect.Parameter.empty:
         return str
@@ -230,7 +230,7 @@ def resolve(type_: Type) -> Type:
     return type_
 
 
-def resolve_optional(type_: Type) -> Type:
+def resolve_optional(type_: Any) -> Type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.
@@ -253,14 +253,14 @@ def resolve_optional(type_: Type) -> Type:
     return type_
 
 
-def resolve_annotated(type_: Type) -> Type:
+def resolve_annotated(type_: Any) -> Type:
     if type(type_) is AnnotatedType:
         type_ = get_args(type_)[0]
     return type_
 
 
 def convert(
-    type_: Type,
+    type_: Any,
     *args: str,
     converter: Optional[Callable[[Type, str], Any]] = None,
     name_transform: Optional[Callable[[str], str]] = None,
@@ -339,7 +339,7 @@ def convert(
         return [convert(type_, item) for item in args]
 
 
-def token_count(type_: Union[Type[Any], inspect.Parameter]) -> Tuple[int, bool]:
+def token_count(type_: Any) -> Tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters

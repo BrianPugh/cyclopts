@@ -8,7 +8,7 @@ from cyclopts import validators
 def test_path_type(tmp_path):
     validator = validators.Path()
     with pytest.raises(TypeError):
-        validator(Path, "this is a string.")  # pyright: ignore[reportGeneralTypeIssues]
+        validator(Path, "this is a string.")  # pyright: ignore[reportArgumentType]
 
 
 def test_path_exists(tmp_path):

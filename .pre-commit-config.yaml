@@ -1,13 +1,13 @@
 exclude: ^(poetry.lock|.idea/)
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.1.11"
+    rev: "v0.4.2"
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
 
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 24.4.2
     hooks:
       - id: black
         args:
@@ -28,7 +28,7 @@ repos:
           - "--line-length=120"
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v4.6.0
     hooks:
       - id: check-added-large-files
       - id: check-ast
@@ -65,11 +65,11 @@ repos:
       - id: codespell
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.17.0
+    rev: v1.21.0
     hooks:
       - id: typos
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.345
+    rev: v1.1.360
     hooks:
       - id: pyright

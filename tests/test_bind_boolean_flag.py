@@ -2,12 +2,18 @@ import sys
 
 import pytest
 
+from cyclopts import (
+    CycloptsError,
+    Group,
+    Parameter,
+    UnknownOptionError,
+    ValidationError,
+)
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
-
-from cyclopts import CycloptsError, Group, Parameter, UnknownOptionError, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -97,7 +103,7 @@ def test_boolean_flag_app_parameter_default_nested_annotated_override(app, asser
     my_int = Annotated[int, Parameter(converter=my_converter)]
 
     @app.default
-    def foo(*, foo: Annotated[my_int, Parameter(name="--bar")] = True):  # pyright: ignore[reportGeneralTypeIssues]
+    def foo(*, foo: Annotated[my_int, Parameter(name="--bar")] = True):  # pyright: ignore[reportInvalidTypeForm]
         pass
 
     assert_parse_args(foo, "--bar=10", foo=5)
