@@ -163,7 +163,7 @@ def _is_short(s):
 
 def format_usage(
     app,
-    command_chain: List[str],
+    command_chain: Iterable[str],
 ):
     from rich.text import Text
 

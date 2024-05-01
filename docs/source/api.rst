@@ -187,7 +187,19 @@ API
 
       .. code-block:: python
 
-         def bound_args_transform(commands: Tuple[str, ...], bound: inspect.BoundArguments) -> Any:
+         def bound_args_transform(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: inspect.BoundArguments) -> Any:
+             """Modifies ``bound`` with some injected values.
+
+             Parameters
+             ----------
+             apps: Tuple[App, ...]
+                The application hierarchy that led to the current command function.
+                The current command is the last app of this tuple.
+             commands: Tuple[str, ...]
+                The CLI strings that led to the current command function.
+             bound: inspect.BoundArguments
+                The bound arguments (before App and Group converters/validators) from the CLI.
+             """
              ...
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
