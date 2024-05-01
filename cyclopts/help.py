@@ -275,6 +275,14 @@ def create_parameter_help_panel(
 
     iparams, cparams = (list(x) for x in zip(*icparams))
 
+    def help_append(text, style=""):
+        if help_components:
+            text = " " + text
+        if style:
+            help_components.append((text, style))
+        else:
+            help_components.append(text)
+
     for iparam, cparam in icparams:
         assert cparam.name is not None
         assert cparam.name_transform is not None
@@ -296,15 +304,6 @@ def create_parameter_help_panel(
                 long_options.append(option)
 
         help_components = []
-
-        def help_append(text, style=""):
-            nonlocal help_components
-            if help_components:
-                text = " " + text
-            if style:
-                help_components.append((text, style))
-            else:
-                help_components.append(text)
 
         if cparam.help:
             help_append(cparam.help)
