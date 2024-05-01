@@ -1,6 +1,17 @@
 import inspect
 from functools import partial
-from typing import Any, Callable, Iterable, Optional, Tuple, Type, Union, cast, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 import attrs
 from attrs import field, frozen
@@ -14,7 +25,12 @@ from cyclopts._convert import (
     resolve_optional,
 )
 from cyclopts.group import Group
-from cyclopts.utils import default_name_transform, optional_to_tuple_converter, record_init, to_tuple_converter
+from cyclopts.utils import (
+    default_name_transform,
+    optional_to_tuple_converter,
+    record_init,
+    to_tuple_converter,
+)
 
 
 def _double_hyphen_validator(instance, attribute, values):
@@ -145,7 +161,7 @@ class Parameter:
         content = ", ".join(
             [
                 f"{a.alias}={getattr(self, a.name)!r}"
-                for a in self.__attrs_attrs__  # pyright: ignore[reportGeneralTypeIssues]
+                for a in self.__attrs_attrs__  # pyright: ignore[reportAttributeAccessIssue]
                 if a.alias in self._provided_args
             ]
         )
@@ -165,7 +181,7 @@ class Parameter:
         for parameter in parameters:
             if parameter is None:
                 continue
-            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
+            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportAttributeAccessIssue]
                 if a.init and a.alias in parameter._provided_args:
                     kwargs[a.alias] = getattr(parameter, a.name)
 
@@ -179,7 +195,7 @@ class Parameter:
         values will be recorded and override all upstream parameter values.
         """
         return cls(
-            **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportGeneralTypeIssues]
+            **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportAttributeAccessIssue]
         )
 
 
@@ -199,9 +215,7 @@ def validate_command(f: Callable):
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
 
 
-def get_hint_parameter(
-    type_: Union[Type, inspect.Parameter], *default_parameters: Optional[Parameter]
-) -> Tuple[Type, Parameter]:
+def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.

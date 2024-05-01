@@ -6,7 +6,7 @@ from cyclopts.validators import Number
 def test_validator_number_type():
     validator = Number()
     with pytest.raises(TypeError):
-        validator(int, "this is a string.")  # pyright: ignore[reportGeneralTypeIssues]
+        validator(int, "this is a string.")  # pyright: ignore[reportArgumentType]
 
 
 def test_validator_number_lt():
@@ -52,4 +52,4 @@ def test_validator_number_gte():
 def test_validator_number_typeerror():
     validator = Number(gte=5)
     with pytest.raises(TypeError):
-        validator(str, "foo")  # pyright: ignore[reportGeneralTypeIssues]
+        validator(str, "foo")  # pyright: ignore[reportArgumentType]

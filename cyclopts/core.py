@@ -6,18 +6,22 @@ from contextlib import suppress
 from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, Iterator, List, Literal, Optional, Tuple, Union
-
-import cyclopts.utils
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from attrs import define, field
 
+import cyclopts.utils
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
@@ -39,7 +43,18 @@ from cyclopts.help import (
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.resolve import ResolvedCommand
-from cyclopts.utils import default_name_transform, optional_to_tuple_converter, to_list_converter, to_tuple_converter
+from cyclopts.utils import (
+    default_name_transform,
+    optional_to_tuple_converter,
+    to_list_converter,
+    to_tuple_converter,
+)
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
+
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -300,7 +315,7 @@ class App:
     def name(self) -> Tuple[str, ...]:
         """Application name(s). Dynamically derived if not previously set."""
         if self._name:
-            return self._name  # pyright: ignore[reportGeneralTypeIssues]
+            return self._name  # pyright: ignore[reportReturnType]
         elif self.default_command is None:
             name = Path(sys.argv[0]).name
             if name == "__main__.py":
@@ -602,7 +617,7 @@ class App:
                     except (AssertionError, ValueError, TypeError) as e:
                         raise ValidationError(
                             value=e.args[0] if e.args else "",
-                            group=command_group,  # pyright: ignore[reportUnboundVariable]
+                            group=command_group,  # pyright: ignore[reportPossiblyUnboundVariable]
                         ) from e
 
                 else:
@@ -980,7 +995,7 @@ class App:
     def __repr__(self):
         """Only shows non-default values."""
         non_defaults = {}
-        for a in self.__attrs_attrs__:  # pyright: ignore[reportGeneralTypeIssues]
+        for a in self.__attrs_attrs__:  # pyright: ignore[reportAttributeAccessIssue]
             if not a.init:
                 continue
             v = getattr(self, a.name)
