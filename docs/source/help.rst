@@ -146,7 +146,11 @@ Most noteworthy, is no additional text reflow is performed; newlines are present
 ^^^^
 Rich
 ^^^^
-Same as :ref:`PlainText`, but also supports `Rich Markup`_.
+Displays text as `Rich Markup`_.
+
+.. note::
+
+      Newlines are interpreted literally.
 
 .. code-block:: python
 
