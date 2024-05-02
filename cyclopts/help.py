@@ -2,7 +2,18 @@ import inspect
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
-from typing import TYPE_CHECKING, Callable, List, Literal, Tuple, Type, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Iterable,
+    List,
+    Literal,
+    Tuple,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+)
 
 import docstring_parser
 from attrs import define, field, frozen
@@ -35,16 +46,22 @@ def docstring_parse(doc: str):
 @frozen
 class HelpEntry:
     name: str
-    short: str = ""
-    description: "RenderableType" = ""
+    short: str
+    description: "RenderableType"
     required: bool = False
+
+
+def _text_factory():
+    from rich.text import Text
+
+    return Text()
 
 
 @define
 class HelpPanel:
     format: Literal["command", "parameter"]
     title: str
-    description: "RenderableType" = ""
+    description: "RenderableType" = field(factory=_text_factory)
     entries: List[HelpEntry] = field(factory=list)
 
     def remove_duplicates(self):
@@ -64,18 +81,26 @@ class HelpPanel:
             return _silent
         from rich.box import ROUNDED
         from rich.console import Group as RichGroup
+        from rich.console import NewLine
         from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
 
         table = Table.grid(padding=(0, 1))
         if isinstance(self.description, str):
-            panel_description = Text(self.description, end="")
+            panel_description = Text(self.description)
         else:
             panel_description = self.description
 
-        if panel_description.plain:
-            panel_description.append("\n\n")
+        if isinstance(panel_description, Text):
+            panel_description.end = ""
+
+            if panel_description.plain:
+                panel_description = RichGroup(panel_description, NewLine(2))
+        else:
+            # Should be either a RST or Markdown object
+            if panel_description.markup:  # pyright: ignore[reportAttributeAccessIssue]
+                panel_description = RichGroup(panel_description, NewLine(1))
 
         panel = Panel(
             RichGroup(panel_description, table),
@@ -192,7 +217,7 @@ def format_doc(root_app, app: "App", format: str = "restructuredtext"):
     return RichGroup(_format(*components, format=format), NewLine())
 
 
-def _format(*components: Union[str, Tuple[str, str]], format: str = "restructuredtext"):
+def _format(*components: Union[str, Tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
     format = format.lower()
 
     if format == "plaintext":
@@ -267,7 +292,7 @@ def create_parameter_help_panel(
     cparams: List[Parameter],
     format: str,
 ) -> HelpPanel:
-    help_panel = HelpPanel(format="parameter", title=group.name, description=group.help)
+    help_panel = HelpPanel(format="parameter", title=group.name, description=_format(group.help, format=format))
     icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
 
     if not icparams:
@@ -344,7 +369,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: List["App"], format: str) -> List:
+def format_command_entries(apps: Iterable["App"], format: str) -> List:
     entries = []
     for app in apps:
         short_names, long_names = [], []
@@ -360,7 +385,7 @@ def format_command_entries(apps: List["App"], format: str) -> List:
     return entries
 
 
-def resolve_help_format(app_chain: List["App"]) -> str:
+def resolve_help_format(app_chain: Iterable["App"]) -> str:
     # Resolve help_format; None fallsback to parent; non-None overwrites parent.
     help_format = "restructuredtext"
     for app in app_chain:

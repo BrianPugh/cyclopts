@@ -828,7 +828,7 @@ class App:
         help_format = resolve_help_format(apps)
         console.print(format_doc(self, executing_app, help_format))
 
-        for help_panel in self._assemble_help_panels(tokens):
+        for help_panel in self._assemble_help_panels(tokens, help_format):
             console.print(help_panel)
 
     def _resolve_command(
@@ -852,8 +852,12 @@ class App:
 
     def _assemble_help_panels(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: Union[None, str, Iterable[str]],
+        help_format,
     ) -> List[HelpPanel]:
+        from rich.console import Group as RichGroup
+        from rich.console import NewLine
+
         _, apps, _ = self.parse_commands(tokens)
 
         help_format = resolve_help_format(apps)
@@ -877,12 +881,16 @@ class App:
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
-                    if command_panel.description:
-                        command_panel.description += "\n" + group.help
-                    else:
-                        command_panel.description = group.help
+                    import cyclopts.help
 
-                command_panel.entries.extend(format_command_entries(elements, help_format))
+                    group_help = cyclopts.help._format(group.help, format=help_format)
+
+                    if command_panel.description:
+                        command_panel.description = RichGroup(command_panel.description, NewLine(), group_help)
+                    else:
+                        command_panel.description = group_help
+
+                command_panel.entries.extend(format_command_entries(elements, format=help_format))
 
         # Handle Arguments/Parameters
         for subapp in walk_metas(apps[-1]):
@@ -910,7 +918,9 @@ class App:
                     existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
                     if new_panel.description:
                         if existing_panel.description:
-                            existing_panel.description += "\n" + new_panel.description
+                            existing_panel.description = RichGroup(
+                                existing_panel.description, NewLine(), new_panel.description
+                            )
                         else:
                             existing_panel.description = new_panel.description
                 else:
