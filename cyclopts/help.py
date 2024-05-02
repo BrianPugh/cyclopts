@@ -87,10 +87,7 @@ class HelpPanel:
         from rich.text import Text
 
         table = Table.grid(padding=(0, 1))
-        if isinstance(self.description, str):
-            panel_description = Text(self.description)
-        else:
-            panel_description = self.description
+        panel_description = self.description
 
         if isinstance(panel_description, Text):
             panel_description.end = ""
