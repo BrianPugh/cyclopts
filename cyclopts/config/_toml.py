@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict
 
-from cyclopts.bound_args_transforms._common import ConfigFromFile
+from cyclopts.config._common import ConfigFromFile
 
 
 class Toml(ConfigFromFile):

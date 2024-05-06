@@ -1,12 +1,12 @@
 from pathlib import Path
 from typing import Any, Dict
 
-from cyclopts.bound_args_transforms._common import ConfigFromFile
+from cyclopts.config._common import ConfigFromFile
 
 
-class Json(ConfigFromFile):
+class Yaml(ConfigFromFile):
     def _load_config(self, path: Path) -> Dict[str, Any]:
-        import json
+        from yaml import safe_load
 
         with path.open() as f:
-            return json.load(f)
+            return safe_load(f)

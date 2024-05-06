@@ -186,7 +186,7 @@ class App:
     default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    bound_args_transform: Union[None, Callable, Iterable[Callable]] = field(
+    config: Union[None, Callable, Iterable[Callable]] = field(
         default=None,
         converter=to_tuple_converter,
         kw_only=True,
@@ -584,10 +584,10 @@ class App:
         except IndexError:
             parent_app = None
 
-        bound_args_transform: Tuple[Callable, ...] = ()
+        config: Tuple[Callable, ...] = ()
         for app in reversed(apps):
-            if app.bound_args_transform:
-                bound_args_transform = app.bound_args_transform  # pyright: ignore[reportAssignmentType]
+            if app.config:
+                config = app.config  # pyright: ignore[reportAssignmentType]
                 break
 
         # Special flags (help/version) get intercepted by the root app.
@@ -626,7 +626,7 @@ class App:
 
                     bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
                     try:
-                        for transform in bound_args_transform:
+                        for transform in config:
                             transform(apps, command_chain, bound)
                         if command_app.converter:
                             bound.arguments = command_app.converter(**bound.arguments)

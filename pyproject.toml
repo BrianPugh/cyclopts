@@ -187,7 +187,7 @@ convention = "numpy"
 "docs/*.py" = [
     "F811",  # redefinition
 ]
-"cyclopts/bound_args_transforms/*.py" = [
+"cyclopts/config/*.py" = [
     "PTH123",  # `open()` should be replaced by `Path.open()`. Pyright doesn't understand that it must be a Path.
 ]
 

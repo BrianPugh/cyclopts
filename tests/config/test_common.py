@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import pytest
 
-from cyclopts.bound_args_transforms._common import ConfigFromFile
+from cyclopts.config._common import ConfigFromFile
 
 
 class Dummy(ConfigFromFile):
@@ -60,14 +60,14 @@ def apps():
     return [{"function1": None}]
 
 
-def test_bound_args_transform_common_root_keys_empty(apps, config, bound):
+def test_config_common_root_keys_empty(apps, config, bound):
     config.path.touch()
     config(apps, (), bound)
     expected = inspect.signature(function1).bind_partial(key1="cli1", key2="foo2")
     assert expected == bound
 
 
-def test_bound_args_transform_common_root_keys_populated(apps, config_root_keys, bound):
+def test_config_common_root_keys_populated(apps, config_root_keys, bound):
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
     config_root_keys(apps, (), bound)
@@ -75,7 +75,7 @@ def test_bound_args_transform_common_root_keys_populated(apps, config_root_keys,
     assert expected == bound
 
 
-def test_bound_args_transform_common_must_exist_false(config, mocker):
+def test_config_common_must_exist_false(config, mocker):
     """If ``must_exist==False``, then the specified file is allowed to not exist.
 
     If the file does not exist, then have an empty config.
@@ -87,7 +87,7 @@ def test_bound_args_transform_common_must_exist_false(config, mocker):
     spy_load_config.assert_not_called()
 
 
-def test_bound_args_transform_common_must_exist_true(config):
+def test_config_common_must_exist_true(config):
     """If ``must_exist==True``, then the specified file must exist."""
     config.must_exist = True
     with pytest.raises(FileNotFoundError):
@@ -95,7 +95,7 @@ def test_bound_args_transform_common_must_exist_true(config):
 
 
 @pytest.mark.parametrize("must_exist", [True, False])
-def test_bound_args_transform_common_search_parents_true_exists(tmp_path, must_exist, config, mocker):
+def test_config_common_search_parents_true_exists(tmp_path, must_exist, config, mocker):
     """Tests finding an existing parent."""
     spy_load_config = mocker.spy(config, "_load_config")
 
@@ -110,7 +110,7 @@ def test_bound_args_transform_common_search_parents_true_exists(tmp_path, must_e
     spy_load_config.assert_called_once_with(original_path)
 
 
-def test_bound_args_transform_common_must_exist_true_search_parents_true_missing(tmp_path, config, mocker):
+def test_config_common_must_exist_true_search_parents_true_missing(tmp_path, config, mocker):
     """Tests finding a missing parent."""
     spy_load_config = mocker.spy(config, "_load_config")
 
@@ -124,7 +124,7 @@ def test_bound_args_transform_common_must_exist_true_search_parents_true_missing
     spy_load_config.assert_not_called()
 
 
-def test_bound_args_transform_common_must_exist_false_search_parents_true_missing(tmp_path, config, mocker):
+def test_config_common_must_exist_false_search_parents_true_missing(tmp_path, config, mocker):
     """Tests finding a missing parent."""
     spy_load_config = mocker.spy(config, "_load_config")
 

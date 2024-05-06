@@ -1,9 +1,9 @@
 from textwrap import dedent
 
-from cyclopts.bound_args_transforms._toml import Toml
+from cyclopts.config._toml import Toml
 
 
-def test_bound_args_transform_toml(tmp_path):
+def test_config_toml(tmp_path):
     fn = tmp_path / "test.toml"
     fn.write_text(
         dedent(

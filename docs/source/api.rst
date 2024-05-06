@@ -177,7 +177,7 @@ API
       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
       If a subapp, inherits from first non-:obj:`None` parent.
 
-   .. attribute:: bound_args_transform
+   .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
@@ -187,7 +187,7 @@ API
 
       .. code-block:: python
 
-         def bound_args_transform(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: inspect.BoundArguments) -> Any:
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: inspect.BoundArguments) -> Any:
              """Modifies ``bound`` with some injected values.
 
              Parameters
@@ -203,7 +203,7 @@ API
              ...
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
-      See :ref:`cyclopts.bound_args_transforms`.
+      See :ref:`cyclopts.configs`.
 
 
 .. autoclass:: cyclopts.Parameter

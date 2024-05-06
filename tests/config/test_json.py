@@ -1,9 +1,9 @@
 from textwrap import dedent
 
-from cyclopts.bound_args_transforms._json import Json
+from cyclopts.config._json import Json
 
 
-def test_bound_args_transform_json(tmp_path):
+def test_config_json(tmp_path):
     fn = tmp_path / "test.yaml"
     fn.write_text(
         dedent(

@@ -1,9 +1,9 @@
 from textwrap import dedent
 
-from cyclopts.bound_args_transforms._yaml import Yaml
+from cyclopts.config._yaml import Yaml
 
 
-def test_bound_args_transform_yaml(tmp_path):
+def test_config_yaml(tmp_path):
     fn = tmp_path / "test.yaml"
     fn.write_text(
         dedent(
