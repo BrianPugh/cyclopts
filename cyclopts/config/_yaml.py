@@ -6,7 +6,7 @@ from cyclopts.config._common import ConfigFromFile
 
 class Yaml(ConfigFromFile):
     def _load_config(self, path: Path) -> Dict[str, Any]:
-        from yaml import safe_load
+        from yaml import safe_load  # pyright: ignore[reportMissingModuleSource]
 
         with path.open() as f:
             return safe_load(f)

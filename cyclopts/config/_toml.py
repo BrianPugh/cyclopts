@@ -7,12 +7,11 @@ from cyclopts.config._common import ConfigFromFile
 class Toml(ConfigFromFile):
     def _load_config(self, path: Path) -> Dict[str, Any]:
         try:
-            import tomllib
-
-            with path.open("rb") as f:
-                return tomllib.load(f)
+            # Attempt to use builtin >=python3.11
+            import tomllib  # pyright: ignore[reportMissingImports]
         except ImportError:
-            import toml  # pyright: ignore[reportMissingModuleSource]
+            # Fallback to most popular pypi toml package.
+            import tomli as tomllib  # pyright: ignore[reportMissingModuleSource]
 
-            with path.open() as f:
-                return toml.load(f)
+        with path.open("rb") as f:
+            return tomllib.load(f)
