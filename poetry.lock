@@ -1323,13 +1323,13 @@ jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
 name = "rich-rst"
-version = "1.2.0"
+version = "1.3.1"
 description = "A beautiful reStructuredText renderer for rich"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "rich-rst-1.2.0.tar.gz", hash = "sha256:12e3962fd2ed99f5361beab8abb35b87b1d2a8d3a14cb705bc70d2eb2fa81ddd"},
-    {file = "rich_rst-1.2.0-py3-none-any.whl", hash = "sha256:49903d68fc7019d672145397719970c23ebcd7617c664bc26004607e83e4db6d"},
+    {file = "rich_rst-1.3.1-py3-none-any.whl", hash = "sha256:498a74e3896507ab04492d326e794c3ef76e7cda078703aa592d1853d91098c1"},
+    {file = "rich_rst-1.3.1.tar.gz", hash = "sha256:fad46e3ba42785ea8c1785e2ceaa56e0ffa32dbe5410dec432f37e4107c4f383"},
 ]
 
 [package.dependencies]
@@ -1789,4 +1789,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "a9d8cf783a432fbf4884dff937b19c82572a5afb333e7588d85440ff8d7e2136"
+content-hash = "caaf256ce644ff0bb1aaf8b1bdace63e91fbeeca4d04932761461278efea56cc"
