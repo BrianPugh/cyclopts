@@ -39,6 +39,7 @@ from cyclopts.help import (
     format_command_entries,
     format_doc,
     format_usage,
+    resolve_help_format,
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -204,9 +205,16 @@ class App:
         alias="help_flags",
         kw_only=True,
     )
-    help_format: Union[None, Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]] = field(
-        default=None, kw_only=True
-    )
+    help_format: Optional[
+        Literal[
+            "markdown",
+            "md",
+            "plaintext",
+            "restructuredtext",
+            "rst",
+            "rich",
+        ]
+    ] = field(default=None, kw_only=True)
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
@@ -817,14 +825,10 @@ class App:
             console.print(executing_app.usage + "\n")
 
         # Print the App/Command's Doc String.
-        # Resolve help_format; None fallsback to parent; non-None overwrites parent.
-        help_format = "restructuredtext"
-        for app in apps:
-            if app.help_format is not None:
-                help_format = app.help_format
+        help_format = resolve_help_format(apps)
         console.print(format_doc(self, executing_app, help_format))
 
-        for help_panel in self._assemble_help_panels(tokens):
+        for help_panel in self._assemble_help_panels(tokens, help_format):
             console.print(help_panel)
 
     def _resolve_command(
@@ -848,9 +852,15 @@ class App:
 
     def _assemble_help_panels(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: Union[None, str, Iterable[str]],
+        help_format,
     ) -> List[HelpPanel]:
+        from rich.console import Group as RichGroup
+        from rich.console import NewLine
+
         _, apps, _ = self.parse_commands(tokens)
+
+        help_format = resolve_help_format(apps)
 
         panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
@@ -871,12 +881,16 @@ class App:
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
-                    if command_panel.description:
-                        command_panel.description += "\n" + group.help
-                    else:
-                        command_panel.description = group.help
+                    import cyclopts.help
 
-                command_panel.entries.extend(format_command_entries(elements))
+                    group_help = cyclopts.help._format(group.help, format=help_format)
+
+                    if command_panel.description:
+                        command_panel.description = RichGroup(command_panel.description, NewLine(), group_help)
+                    else:
+                        command_panel.description = group_help
+
+                command_panel.entries.extend(format_command_entries(elements, format=help_format))
 
         # Handle Arguments/Parameters
         for subapp in walk_metas(apps[-1]):
@@ -896,7 +910,7 @@ class App:
                     _, existing_panel = panels[group.name]
                 except KeyError:
                     existing_panel = None
-                new_panel = create_parameter_help_panel(group, iparams, cparams)
+                new_panel = create_parameter_help_panel(group, iparams, cparams, help_format)
 
                 if existing_panel:
                     # An imperfect merging process
@@ -904,7 +918,9 @@ class App:
                     existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
                     if new_panel.description:
                         if existing_panel.description:
-                            existing_panel.description += "\n" + new_panel.description
+                            existing_panel.description = RichGroup(
+                                existing_panel.description, NewLine(), new_panel.description
+                            )
                         else:
                             existing_panel.description = new_panel.description
                 else:

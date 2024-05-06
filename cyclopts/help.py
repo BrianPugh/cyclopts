@@ -2,7 +2,18 @@ import inspect
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
-from typing import TYPE_CHECKING, Callable, List, Literal, Tuple, Type, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Iterable,
+    List,
+    Literal,
+    Tuple,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+)
 
 import docstring_parser
 from attrs import define, field, frozen
@@ -12,6 +23,8 @@ from cyclopts.group import Group
 from cyclopts.parameter import Parameter, get_hint_parameter
 
 if TYPE_CHECKING:
+    from rich.console import RenderableType
+
     from cyclopts.core import App
 
 
@@ -33,23 +46,30 @@ def docstring_parse(doc: str):
 @frozen
 class HelpEntry:
     name: str
-    short: str = ""
-    description: str = ""
+    short: str
+    description: "RenderableType"
     required: bool = False
+
+
+def _text_factory():
+    from rich.text import Text
+
+    return Text()
 
 
 @define
 class HelpPanel:
     format: Literal["command", "parameter"]
     title: str
-    description: str = ""
+    description: "RenderableType" = field(factory=_text_factory)
     entries: List[HelpEntry] = field(factory=list)
 
     def remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            if item not in seen:
-                seen.add(item)
+            hashable = (item.name, item.short)
+            if hashable not in seen:
+                seen.add(hashable)
                 out.append(item)
         self.entries = out
 
@@ -61,17 +81,26 @@ class HelpPanel:
             return _silent
         from rich.box import ROUNDED
         from rich.console import Group as RichGroup
+        from rich.console import NewLine
+        from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
 
         table = Table.grid(padding=(0, 1))
-        text = Text(end="")
-        if self.description:
-            text.append(self.description + "\n\n")
-        from rich.panel import Panel
+        panel_description = self.description
+
+        if isinstance(panel_description, Text):
+            panel_description.end = ""
+
+            if panel_description.plain:
+                panel_description = RichGroup(panel_description, NewLine(2))
+        else:
+            # Should be either a RST or Markdown object
+            if panel_description.markup:  # pyright: ignore[reportAttributeAccessIssue]
+                panel_description = RichGroup(panel_description, NewLine(1))
 
         panel = Panel(
-            RichGroup(text, table),
+            RichGroup(panel_description, table),
             box=ROUNDED,
             expand=True,
             title_align="left",
@@ -163,9 +192,8 @@ def format_usage(
 
 def format_doc(root_app, app: "App", format: str = "restructuredtext"):
     from rich.console import Group as RichGroup
+    from rich.console import NewLine
     from rich.text import Text
-
-    from cyclopts.core import App  # noqa: F811
 
     raw_doc_string = app.help
 
@@ -174,26 +202,65 @@ def format_doc(root_app, app: "App", format: str = "restructuredtext"):
 
     parsed = docstring_parse(raw_doc_string)
 
-    components: List[Tuple[str, str]] = []
+    components: List[Union[str, Tuple[str, str]]] = []
     if parsed.short_description:
-        components.append((parsed.short_description + "\n", "default"))
+        components.append(parsed.short_description + "\n")
 
     if parsed.long_description:
         if parsed.short_description:
-            components.append(("\n", "default"))
+            components.append("\n")
         components.append((parsed.long_description + "\n", "info"))
 
+    return RichGroup(_format(*components, format=format), NewLine())
+
+
+def _format(*components: Union[str, Tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
     format = format.lower()
+
     if format == "plaintext":
-        return Text.assemble(*components)
+        from rich.text import Text
+
+        aggregate = []
+        for component in components:
+            if isinstance(component, str):
+                aggregate.append(component)
+            else:
+                aggregate.append(component[0])
+        return Text.assemble("".join(aggregate).rstrip())
     elif format in ("markdown", "md"):
         from rich.markdown import Markdown
 
-        return RichGroup(Markdown("".join(x[0] for x in components)), Text(""))
+        aggregate = []
+        for component in components:
+            if isinstance(component, str):
+                aggregate.append(component)
+            else:
+                # Ignore style for now :(
+                aggregate.append(component[0])
+
+        return Markdown("".join(aggregate))
     elif format in ("restructuredtext", "rst"):
         from rich_rst import RestructuredText
 
-        return RestructuredText("".join(x[0] for x in components))
+        aggregate = []
+        for component in components:
+            if isinstance(component, str):
+                aggregate.append(component)
+            else:
+                # Ignore style for now :(
+                aggregate.append(component[0])
+        return RestructuredText("".join(aggregate))
+    elif format == "rich":
+        from rich.text import Text
+
+        def walk_components():
+            for component in components:
+                if isinstance(component, str):
+                    yield Text.from_markup(component.rstrip())
+                else:
+                    yield Text.from_markup(component[0].rstrip(), style=component[1])
+
+        return Text().join(walk_components())
     else:
         raise ValueError(f'Unknown help_format "{format}"')
 
@@ -216,14 +283,27 @@ def _get_choices(type_: Type, name_transform: Callable[[str], str]) -> str:
     return choices
 
 
-def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter]) -> HelpPanel:
-    help_panel = HelpPanel(format="parameter", title=group.name, description=group.help)
+def create_parameter_help_panel(
+    group: "Group",
+    iparams,
+    cparams: List[Parameter],
+    format: str,
+) -> HelpPanel:
+    help_panel = HelpPanel(format="parameter", title=group.name, description=_format(group.help, format=format))
     icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
 
     if not icparams:
         return help_panel
 
     iparams, cparams = (list(x) for x in zip(*icparams))
+
+    def help_append(text, style=""):
+        if help_components:
+            text = " " + text
+        if style:
+            help_components.append((text, style))
+        else:
+            help_components.append(text)
 
     for iparam, cparam in icparams:
         assert cparam.name is not None
@@ -248,16 +328,16 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
         help_components = []
 
         if cparam.help:
-            help_components.append(cparam.help)
+            help_append(cparam.help)
 
         if cparam.show_choices:
             choices = _get_choices(type_, cparam.name_transform)
             if choices:
-                help_components.append(rf"[dim]\[choices: {choices}][/dim]")
+                help_append(rf"[choices: {choices}]", "dim")
 
         if cparam.show_env_var and cparam.env_var:
             env_vars = " ".join(cparam.env_var)
-            help_components.append(rf"[dim]\[env var: {env_vars}][/dim]")
+            help_append(rf"[env var: {env_vars}]", "dim")
 
         if cparam.show_default or (
             cparam.show_default is None and iparam.default not in {None, inspect.Parameter.empty}
@@ -268,16 +348,16 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
             else:
                 default = iparam.default
 
-            help_components.append(rf"[dim]\[default: {default}][/dim]")
+            help_append(rf"[default: {default}]", "dim")
 
         if cparam.required:
-            help_components.append(r"[red][dim]\[required][/dim][/red]")
+            help_append(r"[required]", "dim red")
 
         # populate row
         help_panel.entries.append(
             HelpEntry(
                 name=",".join(long_options),
-                description=" ".join(help_components),
+                description=_format(*help_components, format=format),
                 short=",".join(short_options),
                 required=bool(cparam.required),
             )
@@ -286,17 +366,26 @@ def create_parameter_help_panel(group: "Group", iparams, cparams: List[Parameter
     return help_panel
 
 
-def format_command_entries(elements) -> List:
+def format_command_entries(apps: Iterable["App"], format: str) -> List:
     entries = []
-    for element in elements:
+    for app in apps:
         short_names, long_names = [], []
-        for name in element.name:
+        for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
         entry = HelpEntry(
             name=",".join(long_names),
             short=",".join(short_names),
-            description=docstring_parse(element.help).short_description or "",
+            description=_format(docstring_parse(app.help).short_description or "", format=format),
         )
         if entry not in entries:
             entries.append(entry)
     return entries
+
+
+def resolve_help_format(app_chain: Iterable["App"]) -> str:
+    # Resolve help_format; None fallsback to parent; non-None overwrites parent.
+    help_format = "restructuredtext"
+    for app in app_chain:
+        if app.help_format is not None:
+            help_format = app.help_format
+    return help_format

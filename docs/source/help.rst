@@ -143,6 +143,19 @@ Do not perform any additional parsing, display supplied text as-is.
 
 Most noteworthy, is no additional text reflow is performed; newlines are presented as-is.
 
+^^^^
+Rich
+^^^^
+Displays text as `Rich Markup`_.
+
+.. note::
+
+      Newlines are interpreted literally.
+
+.. code-block:: python
+
+   app = App(help_format="rich")
+
 ^^^^^^^^^^^^^^^^
 ReStructuredText
 ^^^^^^^^^^^^^^^^
@@ -247,3 +260,4 @@ To disable the help-page entirely, set ``help_flags`` to an empty string or iter
 
 .. _PEP-0257: https://peps.python.org/pep-0257/
 .. _PEP-0287: https://peps.python.org/pep-0287/
+.. _Rich Markup: https://rich.readthedocs.io/en/stable/markup.html

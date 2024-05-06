@@ -157,7 +157,7 @@ def test_format_commands_docstring(app, console):
         """
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["foo"],)))
+    panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
 
@@ -185,7 +185,7 @@ def test_format_commands_docstring_long_only(app, console):
         """  # noqa: D404
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["foo"],)))
+    panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
 
@@ -209,7 +209,7 @@ def test_format_commands_no_show(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app,)))
+    panel.entries.extend(format_command_entries((app,), format="restructuredtext"))
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -238,7 +238,7 @@ def test_format_commands_explicit_help(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["foo"],)))
+    panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
 
@@ -260,7 +260,7 @@ def test_format_commands_explicit_name(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["bar"],)))
+    panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
 
@@ -289,7 +289,7 @@ def capture_format_group_parameters(console, default_function_groups):
         with console.capture() as capture:
             group, iparams = command.groups_iparams[0]
             cparams = [command.iparam_to_cparam[x] for x in iparams]
-            console.print(create_parameter_help_panel(group, iparams, cparams))
+            console.print(create_parameter_help_panel(group, iparams, cparams, "restructuredtext"))
 
         return capture.get()
 
@@ -1399,24 +1399,28 @@ def test_help_print_commands_plus_meta_short(app, console):
     assert actual == expected
 
 
-def test_help_markdown(app, console):
-    markdown = dedent(
+def test_help_restructuredtext(app, console):
+    description = dedent(
         """\
-    This is a long sentence that
-    is spread across
-    three lines.
+        This is a long sentence that
+        is spread across
+        three lines.
 
-    This is a new paragraph.
-    This is another sentence of that paragraph.
-    [This is a hyperlink.](https://cyclopts.readthedocs.io)
+        This is a new paragraph.
+        This is another sentence of that paragraph.
+        `This is a hyperlink. <https://cyclopts.readthedocs.io>`_
 
-    The following are bulletpoints:
+        The following are bulletpoints:
 
-    * bulletpoint 1
-    * bulletpoint 2
-    """
+        * bulletpoint 1
+        * bulletpoint 2
+        """
     )
-    app = App(help=markdown, help_format="markdown")
+    app = App(help=description, help_format="rst")
+
+    @app.command
+    def foo(bar):
+        """This is **bold**."""
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -1438,6 +1442,7 @@ def test_help_markdown(app, console):
          • bulletpoint 2
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo        This is bold.                                           │
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
@@ -1445,7 +1450,200 @@ def test_help_markdown(app, console):
     )
 
     # Rich sticks a bunch of trailing spaces on lines.
-    expected = [x.strip() for x in expected.split("\n")]
-    actual = [x.strip() for x in actual.split("\n")]
+    expected = "\n".join(x.strip() for x in expected.split("\n"))
+    actual = "\n".join(x.strip() for x in actual.split("\n"))
 
     assert actual == expected
+
+
+def test_help_markdown(app, console):
+    description = dedent(
+        """\
+        This is a long sentence that
+        is spread across
+        three lines.
+
+        This is a new paragraph.
+        This is another sentence of that paragraph.
+        [This is a hyperlink.](https://cyclopts.readthedocs.io)
+
+        The following are bulletpoints:
+
+        * bulletpoint 1
+        * bulletpoint 2
+        """
+    )
+    app = App(help=description, help_format="markdown")
+
+    @app.command
+    def foo(bar):
+        """This is **bold**."""
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_help COMMAND
+
+        This is a long sentence that is spread across three lines.
+
+        This is a new paragraph. This is another sentence of that paragraph.
+        This is a hyperlink.
+
+        The following are bulletpoints:
+
+         • bulletpoint 1
+         • bulletpoint 2
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo        This is bold.                                           │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    # Rich sticks a bunch of trailing spaces on lines.
+    expected = "\n".join(x.strip() for x in expected.split("\n"))
+    actual = "\n".join(x.strip() for x in actual.split("\n"))
+
+    assert actual == expected
+
+
+def test_help_rich(app, console):
+    """Newlines actually get interpreted with rich."""
+    description = dedent(
+        """\
+        This is a long sentence that
+        is spread across
+        three lines.
+
+        This is a new paragraph.
+        This is another sentence of that paragraph.
+        [red]This text is red.[/red]
+        """
+    )
+    app = App(help=description, help_format="rich")
+
+    @app.command
+    def foo(bar):
+        """This is [italic]italic[/italic]."""
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_help COMMAND
+
+        This is a long sentence that
+        is spread across
+        three lines.
+
+        This is a new paragraph.
+        This is another sentence of that paragraph.
+        This text is red.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo        This is italic.                                         │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_help_plaintext(app, console):
+    """Tests that plaintext documents don't get interpreted otherwise."""
+    description = dedent(
+        """\
+        This is a long sentence that
+        is spread across
+        three lines.
+
+        This is a new paragraph.
+        This is another sentence of that paragraph.
+        [red]This text is red.[/red]
+
+        These are bulletpoints:
+
+        * point 1
+        * point 2
+        """
+    )
+    app = App(help=description, help_format="plaintext")
+
+    @app.command
+    def foo(bar):
+        """This is [italic]italic[/italic]."""
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_help COMMAND
+
+        This is a long sentence that
+        is spread across
+        three lines.
+
+        This is a new paragraph.
+        This is another sentence of that paragraph.
+        [red]This text is red.[/red]
+
+        These are bulletpoints:
+
+        * point 1
+        * point 2
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo        This is [italic]italic[/italic].                        │
+        │ --help,-h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_help_consistent_formatting(app, console):
+    """Checks to make sure short-descriptions and full-descriptions
+    are rendered using the same formatter.
+
+    https://github.com/BrianPugh/cyclopts/issues/113
+    """
+    app.help_format = "markdown"
+
+    @app.command
+    def cmd():
+        """[bold]Short description[/bold]."""
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual_help = capture.get()
+
+    # Hack to extract out the short_description from the help-page
+    actual_help = next(x for x in actual_help.split("\n") if "Short description" in x)
+    actual_help = actual_help[5:-1].strip()
+
+    with console.capture() as capture:
+        app.help_print(["cmd"], console=console)
+
+    # Hack to extract out the short_description from the help-page
+    actual_cmd_help = capture.get()
+    actual_cmd_help = next(x for x in actual_cmd_help.split("\n") if "Short description" in x)
+    actual_cmd_help = actual_cmd_help.strip()
+
+    assert actual_help == actual_cmd_help
