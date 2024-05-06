@@ -587,7 +587,7 @@ class App:
         bound_args_transform: Tuple[Callable, ...] = ()
         for app in reversed(apps):
             if app.bound_args_transform:
-                bound_args_transform = app.bound_args_transform  # pyright: ignore[reportGeneralTypeIssues]
+                bound_args_transform = app.bound_args_transform  # pyright: ignore[reportAssignmentType]
                 break
 
         # Special flags (help/version) get intercepted by the root app.
