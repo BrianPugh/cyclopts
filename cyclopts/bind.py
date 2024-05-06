@@ -4,7 +4,7 @@ import os
 import shlex
 import sys
 from contextlib import suppress
-from typing import Iterable, List, Tuple, Union
+from typing import Callable, Iterable, List, Tuple, Union
 
 from cyclopts._convert import token_count
 from cyclopts.exceptions import (
@@ -41,7 +41,7 @@ def _cli_kw_to_f_kw(cli_key: str):
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
     cli2kw = command.cli2parameter
 
-    kwargs_iparam = next((x for x in command.iparam_to_cparam.keys() if x.kind == x.VAR_KEYWORD), None)
+    kwargs_iparam = next((x for x in command.iparams if x.kind == x.VAR_KEYWORD), None)
 
     if kwargs_iparam:
         mapping[kwargs_iparam] = {}
@@ -240,8 +240,11 @@ def _parse_env(command: ResolvedCommand, mapping):
                 break
 
 
-def _is_required(parameter: inspect.Parameter) -> bool:
-    return parameter.default is parameter.empty
+def _is_required(iparam: inspect.Parameter) -> bool:
+    return iparam.default is iparam.empty and iparam.kind not in (
+        iparam.VAR_KEYWORD,
+        iparam.VAR_POSITIONAL,
+    )
 
 
 def _bind(
@@ -262,11 +265,9 @@ def _bind(
         try:
             f_pos.append(mapping[p])
         except KeyError:
-            if _is_required(p):
-                raise MissingArgumentError(parameter=p, tokens_so_far=[]) from None
             use_pos = False
 
-    for iparam in command.iparam_to_cparam.keys():
+    for iparam in command.iparams:
         if use_pos and iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
             f_pos_append(iparam)
         elif use_pos and iparam.kind is iparam.VAR_POSITIONAL:  # ``*args``
@@ -275,11 +276,8 @@ def _bind(
         elif iparam.kind is iparam.VAR_KEYWORD:
             f_kwargs.update(mapping.get(iparam, {}))
         else:
-            try:
+            with suppress(KeyError):
                 f_kwargs[iparam.name] = mapping[iparam]
-            except KeyError:
-                if _is_required(iparam):
-                    raise MissingArgumentError(parameter=iparam, tokens_so_far=[]) from None
 
     bound = command.bind(*f_pos, **f_kwargs)
     return bound
@@ -329,6 +327,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
 def create_bound_arguments(
     command: ResolvedCommand,
     tokens: List[str],
+    configs: Iterable[Callable],
 ) -> Tuple[inspect.BoundArguments, List[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -362,6 +361,9 @@ def create_bound_arguments(
         coerced = _convert(command, mapping)
         bound = _bind(command, coerced)
 
+        for config in configs:
+            config(bound)
+
         # Apply group converters
         for group, iparams in command.groups_iparams:
             if not group.converter:
@@ -372,7 +374,7 @@ def create_bound_arguments(
                 try:
                     bound.arguments[name] = converted[name]
                 except KeyError:
-                    del bound.arguments[name]
+                    bound.arguments.pop(name, None)
 
         # Apply group validators
         try:
@@ -385,6 +387,10 @@ def create_bound_arguments(
             raise ValidationError(
                 value=e.args[0] if e.args else "", group=group  # pyright: ignore[reportPossiblyUnboundVariable]
             ) from e
+
+        for iparam in command.iparams:
+            if _is_required(iparam) and iparam.name not in bound.arguments:
+                raise MissingArgumentError(parameter=iparam)
 
     except CycloptsError as e:
         e.target = command.command

@@ -589,6 +589,7 @@ class App:
             if app.config:
                 config = app.config  # pyright: ignore[reportAssignmentType]
                 break
+        config = tuple(partial(x, apps, command_chain) for x in config)
 
         # Special flags (help/version) get intercepted by the root app.
         # Special flags are allows to be **anywhere** in the token stream.
@@ -624,10 +625,8 @@ class App:
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
 
-                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
+                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens, config)
                     try:
-                        for transform in config:
-                            transform(apps, command_chain, bound)
                         if command_app.converter:
                             bound.arguments = command_app.converter(**bound.arguments)
                         for command_group in command_groups:

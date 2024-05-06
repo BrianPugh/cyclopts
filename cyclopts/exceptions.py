@@ -1,6 +1,16 @@
 import inspect
 import re
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+)
 
 from attrs import define, field
 
@@ -250,7 +260,7 @@ class MissingArgumentError(CycloptsError):
     The parameter that failed to parse.
     """
 
-    tokens_so_far: List[str]
+    tokens_so_far: List[str] = field(factory=list)
     """
     The tokens that were parsed so far for this Parameter.
     """

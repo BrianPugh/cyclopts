@@ -191,7 +191,7 @@ class ResolvedCommand:
             cparam = Parameter.combine(Parameter(name=names), cparam)
             self.iparam_to_cparam[iparam] = cparam
 
-        self.bind = signature.bind_partial if _has_unparsed_parameters(signature, app_parameter) else signature.bind
+        self.bind = signature.bind_partial
 
         # Create a convenient group-to-iparam structure
         self.groups_iparams = [
@@ -201,6 +201,10 @@ class ResolvedCommand:
             )
             for group in self.groups
         ]
+
+    @property
+    def iparams(self):
+        return self.iparam_to_cparam.keys()
 
     @cached_property
     def cli2parameter(self) -> Dict[str, Tuple[inspect.Parameter, Any]]:
