@@ -181,7 +181,7 @@ API
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
-      A function or list of functions that are consecutively applied to the :ref:`inspect.BoundArguments`.
+      A function or list of functions that are consecutively applied to the :class:`inspect.BoundArguments`.
       These function(s) are called before any additional conversion and validation.
       Each function must have signature:
 
@@ -203,7 +203,7 @@ API
              ...
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
-      See :ref:`cyclopts.configs`.
+      See :ref:`cyclopts.config <API Config>`.
 
 
 .. autoclass:: cyclopts.Parameter
@@ -628,6 +628,100 @@ Annotated types for checking common int/float value constraints.
 .. autodata:: cyclopts.types.NegativeInt
 
 .. autodata:: cyclopts.types.NonPositiveInt
+
+.. _API Config:
+
+------
+Config
+------
+Cyclopts has builtin configuration classes to be used with :attr:`App.config <cyclopts.App.config>` for loading user-defined defaults in many common scenarios.
+
+.. autoclass:: cyclopts.config.Toml
+
+   .. attribute:: path
+      :type: Union[str, Path]
+
+      Path to the TOML configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      Keys that lead to your application's configuration.
+      For example, if referencing a ``pyproject.toml``, it is common
+      to store all of your projects configuration under:
+
+      .. code-block:: toml
+
+         [tool.myproject]
+
+      So, your Cyclopts :class:`~cyclopts.App` should be configured as:
+
+      .. code-block:: python
+
+         app = cyclopts.App(config=cyclopts.config.Toml("pyproject.toml", root_keys=("tool", "myproject")))
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: False
+
+      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: False
+
+      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Toml.path` is found.
+
+.. autoclass:: cyclopts.config.Yaml
+
+   .. attribute:: path
+      :type: Union[str, Path]
+
+      Path to the YAML configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      Keys that lead to your application's configuration in the YAML file.
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: False
+
+      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: False
+
+      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Yaml.path` is found.
+
+.. autoclass:: cyclopts.config.Json
+
+   .. attribute:: path
+      :type: Union[str, Path]
+
+      Path to the JSON configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      Keys that lead to your application's configuration in the YAML file.
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: False
+
+      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: False
+
+      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Json.path` is found.
 
 ----------
 Exceptions

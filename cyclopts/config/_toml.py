@@ -11,7 +11,7 @@ class Toml(ConfigFromFile):
             import tomllib  # pyright: ignore[reportMissingImports]
         except ImportError:
             # Fallback to most popular pypi toml package.
-            import tomli as tomllib  # pyright: ignore[reportMissingModuleSource]
+            import tomli as tomllib  # pyright: ignore[reportMissingImports]
 
         with path.open("rb") as f:
             return tomllib.load(f)
