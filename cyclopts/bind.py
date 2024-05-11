@@ -39,8 +39,6 @@ def _cli_kw_to_f_kw(cli_key: str):
 
 
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
-    cli2kw = command.cli2parameter
-
     kwargs_iparam = next((x for x in command.iparams if x.kind == x.VAR_KEYWORD), None)
 
     if kwargs_iparam:
@@ -71,7 +69,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             cli_key = token
 
         try:
-            iparam, implicit_value = cli2kw[cli_key]
+            iparam, implicit_value = command.cli2parameter[cli_key]
         except KeyError:
             if kwargs_iparam:
                 iparam = kwargs_iparam
@@ -135,11 +133,9 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
 
 
 def _is_option_like(token: str) -> bool:
-    try:
+    with suppress(ValueError):
         complex(token)
         return False
-    except ValueError:
-        pass
 
     if token.startswith("-"):
         return True
@@ -361,8 +357,28 @@ def create_bound_arguments(
         coerced = _convert(command, mapping)
         bound = _bind(command, coerced)
 
+        # Remap `bound` back to CLI values for config parsing.
+        bound_kwargs = {}
+        for name, (iparam, implicit_value) in command.cli2parameter.items():
+            if not name.startswith("--"):
+                continue
+            if implicit_value is not None and not implicit_value:
+                # Skip negative-flags
+                continue
+            name = name[2:]  # Strip off the leading "--"
+            with suppress(KeyError):
+                bound_kwargs[name] = bound.arguments[iparam.name]
+
         for config in configs:
-            config(bound)
+            config(bound_kwargs)
+
+        # Rebind them to ``bound``
+        try:
+            for cli_name, value in bound_kwargs.items():
+                iparam, _ = command.cli2parameter["--" + cli_name]
+                bound.arguments[iparam.name] = value
+        except KeyError as e:
+            raise UnknownOptionError(token=e.args[0]) from None
 
         # Apply group converters
         for group, iparams in command.groups_iparams:

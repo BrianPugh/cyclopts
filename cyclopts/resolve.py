@@ -121,7 +121,9 @@ class ResolvedCommand:
     groups_iparams: List[Tuple[Group, List[inspect.Parameter]]]
     iparam_to_groups: ParameterDict
     iparam_to_cparam: ParameterDict
-    name_to_iparam: Dict[str, inspect.Parameter]
+
+    pyname_to_iparam: Dict[str, inspect.Parameter]
+    # Plain python identifier string to inspect.Parameter
 
     def __init__(
         self,
@@ -155,7 +157,7 @@ class ResolvedCommand:
 
         self.command = f
         signature = cyclopts.utils.signature(f)
-        self.name_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
+        self.pyname_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
 
         # Get:
         # 1. Fully resolved and created Groups.
@@ -178,7 +180,7 @@ class ResolvedCommand:
                 Parameter(required=iparam.default is iparam.empty),
             )[1]
 
-            # Resolve name now that ``name_transform`` has been resolved.
+            # Resolve ``name`` now that ``name_transform`` has been resolved.
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
                 # Name is only used for help-string
                 names = [iparam.name.upper()]

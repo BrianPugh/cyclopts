@@ -181,14 +181,14 @@ API
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
-      A function or list of functions that are consecutively applied to the :class:`inspect.BoundArguments`.
+      A function or list of functions that are consecutively applied to keyword arguments.
       These function(s) are called before any additional conversion and validation.
       Each function must have signature:
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: inspect.BoundArguments) -> Any:
-             """Modifies ``bound`` with some injected values.
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: Dict[str, Any]) -> Any:
+             """Modifies ``bound`` inplace with some injected values.
 
              Parameters
              ----------
@@ -197,8 +197,9 @@ API
                 The current command is the last app of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
-             bound: inspect.BoundArguments
+             bound: Dict[str, Any]
                 The bound arguments (before App and Group converters/validators) from the CLI.
+                Keys are CLI keyword options **WITHOUT** the leading ``--``.
              """
              ...
 

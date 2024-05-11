@@ -55,7 +55,7 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: BoundArguments):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Any]):
         config = self.config
         with suppress(KeyError):
             for key in self.root_keys:
@@ -64,4 +64,4 @@ class ConfigFromFile(ABC):
                 config = config[key]
             for key, value in config.items():
                 if key not in apps[-1]:
-                    bound.arguments.setdefault(key, value)
+                    bound.setdefault(key, value)

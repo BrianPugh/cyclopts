@@ -1,9 +1,11 @@
 import sys
+from pathlib import Path
 from textwrap import dedent
 from typing import Literal
 
 import pytest
 
+import cyclopts
 from cyclopts import App, Group, Parameter, validators
 
 if sys.version_info < (3, 9):
@@ -11,8 +13,13 @@ if sys.version_info < (3, 9):
 else:
     from typing import Annotated
 
+config_file = Path(__file__).parent / "config.toml"
 
-app = App(name="burgery", help="Welcome to Cyclopts Burgery!")
+app = App(
+    name="burgery",
+    help="Welcome to Cyclopts Burgery!",
+    config=cyclopts.config.Toml(config_file),
+)
 app.command(create := App(name="create"))
 
 
@@ -22,11 +29,12 @@ def burger(
     quantity: Annotated[int, Parameter(validator=validators.Number(gt=0))] = 1,
     /,
     *,
-    lettuce: Annotated[bool, Parameter(group="Toppings")] = True,
+    lettuce: Annotated[bool, Parameter(name="--iceberg", group="Toppings")] = True,
     tomato: Annotated[bool, Parameter(group="Toppings")] = True,
     onion: Annotated[bool, Parameter(group="Toppings")] = True,
     mustard: Annotated[bool, Parameter(group="Condiments")] = True,
     ketchup: Annotated[bool, Parameter(group="Condiments")] = True,
+    mayo: Annotated[bool, Parameter(group="Condiments")] = True,
 ):
     """Create a burger.
 
@@ -54,6 +62,7 @@ def burger(
         "onion": onion,
         "ketchup": ketchup,
         "mustard": mustard,
+        "mayo": mayo,
     }
 
 
@@ -75,9 +84,10 @@ def test_create_burger_help(console):
         ╭─ Condiments ───────────────────────────────────────────────────────╮
         │ --mustard,--no-mustard  Add mustard. [default: True]               │
         │ --ketchup,--no-ketchup  Add ketchup. [default: True]               │
+        │ --mayo,--no-mayo        [default: True]                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Toppings ─────────────────────────────────────────────────────────╮
-        │ --lettuce,--no-lettuce  Add lettuce. [default: True]               │
+        │ --iceberg,--no-iceberg  Add lettuce. [default: True]               │
         │ --tomato,--no-tomato    Add tomato. [default: True]                │
         │ --onion,--no-onion      Add onion. [default: True]                 │
         ╰────────────────────────────────────────────────────────────────────╯
@@ -87,7 +97,7 @@ def test_create_burger_help(console):
 
 
 def test_create_burger():
-    actual = app("create burger classic --lettuce --no-onion --no-ketchup")
+    actual = app("create burger classic --iceberg --no-onion --no-ketchup")
     assert actual == {
         "variety": "classic",
         "quantity": 1,
@@ -96,6 +106,7 @@ def test_create_burger():
         "onion": False,
         "ketchup": False,
         "mustard": True,
+        "mayo": False,  # Set from config file.
     }
 
 
