@@ -4,7 +4,7 @@ import os
 import shlex
 import sys
 from contextlib import suppress
-from typing import Callable, Iterable, List, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Tuple, Union
 
 from cyclopts._convert import token_count
 from cyclopts.exceptions import (
@@ -211,7 +211,7 @@ def _parse_pos(
     return tokens
 
 
-def _parse_env(command: ResolvedCommand, mapping):
+def _parse_env(command: ResolvedCommand, mapping: ParameterDict):
     """Populate argument defaults from environment variables.
 
     In cyclopts, arguments are parsed with the following priority:
@@ -320,6 +320,46 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
     return coerced
 
 
+def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
+    # Remap `bound` back to CLI values for config parsing.
+    bound_kwargs: Dict[str, list] = {}
+    for name, (iparam, implicit_value) in command.cli2parameter.items():
+        if not name.startswith("--"):
+            continue
+        if implicit_value is not None and not implicit_value:
+            # Skip negative-flags; in agreement with logic "Only accept values to the positive flag."
+            continue
+        name = name[2:]  # Strip off the leading "--"
+        with suppress(KeyError):
+            bound_kwargs[name] = mapping[iparam]
+
+    for config in configs:
+        config(bound_kwargs)
+
+        # If there is an error at this stage, it is a developer-error of the config object
+        bound_kwargs_update = {}
+        for k, values in bound_kwargs.items():
+            if not isinstance(k, str):
+                raise TypeError(f"{config.func!r} produced non-str key {k!r}")
+            if not isinstance(values, list):
+                bound_kwargs_update[k] = values = [values]
+            if len(values) > 1:
+                # They all must be strings, or reinterpret as a list-of-list
+                for value in values:
+                    if not isinstance(value, str):
+                        bound_kwargs_update[k] = values = [values]
+                        break
+        bound_kwargs.update(bound_kwargs_update)
+
+    # Rebind updated values to ``mapping``
+    try:
+        for cli_name, value in bound_kwargs.items():
+            iparam, _ = command.cli2parameter["--" + cli_name]
+            mapping[iparam] = value
+    except KeyError as e:
+        raise UnknownOptionError(token=e.args[0]) from None
+
+
 def create_bound_arguments(
     command: ResolvedCommand,
     tokens: List[str],
@@ -341,7 +381,10 @@ def create_bound_arguments(
     unused_tokens: List[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
-    # Note: mapping is updated inplace
+    # Note: ``mapping`` is updated inplace
+    # ``mapping`` maps inspect.Parameter to python-identifier-name to list of tokens/values.
+    #    * Each token is USUALLY a string and needs further casting/interpretation.
+    #    * However, if it's NOT a string, the value should be used as-is.
     mapping = ParameterDict()  # Each value should be a list
     unused_tokens = []
 
@@ -352,33 +395,11 @@ def create_bound_arguments(
         unused_tokens = _parse_kw_and_flags(command, tokens, mapping)
         unused_tokens = _parse_pos(command, unused_tokens, mapping)
         _parse_env(command, mapping)
+        _parse_configs(command, mapping, configs)
 
         # For each parameter, convert the list of string tokens.
         coerced = _convert(command, mapping)
         bound = _bind(command, coerced)
-
-        # Remap `bound` back to CLI values for config parsing.
-        bound_kwargs = {}
-        for name, (iparam, implicit_value) in command.cli2parameter.items():
-            if not name.startswith("--"):
-                continue
-            if implicit_value is not None and not implicit_value:
-                # Skip negative-flags
-                continue
-            name = name[2:]  # Strip off the leading "--"
-            with suppress(KeyError):
-                bound_kwargs[name] = bound.arguments[iparam.name]
-
-        for config in configs:
-            config(bound_kwargs)
-
-        # Rebind them to ``bound``
-        try:
-            for cli_name, value in bound_kwargs.items():
-                iparam, _ = command.cli2parameter["--" + cli_name]
-                bound.arguments[iparam.name] = value
-        except KeyError as e:
-            raise UnknownOptionError(token=e.args[0]) from None
 
         # Apply group converters
         for group, iparams in command.groups_iparams:
