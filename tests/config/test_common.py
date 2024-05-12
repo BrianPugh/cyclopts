@@ -51,7 +51,7 @@ def config_root_keys(tmp_path):
 
 @pytest.fixture
 def bound():
-    return {"key1": "cli1"}
+    return {"key1": ["cli1"]}
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def apps():
 def test_config_common_root_keys_empty(apps, config, bound):
     config.path.touch()
     config(apps, (), bound)
-    expected = {"key1": "cli1", "key2": "foo2"}
+    expected = {"key1": ["cli1"], "key2": ["foo2"]}
     assert expected == bound
 
 
@@ -71,7 +71,7 @@ def test_config_common_root_keys_populated(apps, config_root_keys, bound):
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
     config_root_keys(apps, (), bound)
-    expected = {"key1": "cli1", "key2": "foo2"}
+    expected = {"key1": ["cli1"], "key2": ["foo2"]}
     assert expected == bound
 
 

@@ -187,7 +187,7 @@ API
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: Dict[str, Any]) -> Any:
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: Dict[str, List[str]]) -> Any:
              """Modifies ``bound`` inplace with some injected values.
 
              Parameters
@@ -198,7 +198,7 @@ API
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              bound: Dict[str, Any]
-                The bound arguments (before App and Group converters/validators) from the CLI.
+                The bound tokens (before App and Group converters/validators) from the CLI.
                 Keys are CLI keyword options **WITHOUT** the leading ``--``.
              """
              ...

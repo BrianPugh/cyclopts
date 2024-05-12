@@ -340,15 +340,15 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
         bound_kwargs_update = {}
         for k, values in bound_kwargs.items():
             if not isinstance(k, str):
-                raise TypeError(f"{config.func!r} produced non-str key {k!r}")
+                raise TypeError(f"{config.func!r} produced non-str key {k!r}.")
             if not isinstance(values, list):
-                bound_kwargs_update[k] = values = [values]
+                raise TypeError(f"{config.func!r} produced non-list value for key {k!r}.")
             if len(values) > 1:
                 # They all must be strings, or reinterpret as a list-of-list
                 for value in values:
                     if not isinstance(value, str):
-                        bound_kwargs_update[k] = values = [values]
-                        break
+                        raise TypeError(f"{config.func!r} produced non-str element value for key {k!r}.")
+
         bound_kwargs.update(bound_kwargs_update)
 
     # Rebind updated values to ``mapping``

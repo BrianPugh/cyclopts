@@ -233,6 +233,7 @@ class ResolvedCommand:
             for name in cparam.name:
                 mapping[name] = (iparam, True if hint is bool else None)
             for name in cparam.get_negatives(hint, *cparam.name):
+                # Creates empty versions of iterables.
                 mapping[name] = (iparam, (get_origin(hint) or hint)())
 
         return mapping
