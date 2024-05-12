@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import pytest
 
-from cyclopts.config._common import ConfigFromFile
+from cyclopts.config._common import UNSET, ConfigFromFile
 
 
 class Dummy(ConfigFromFile):
@@ -51,7 +51,7 @@ def config_root_keys(tmp_path):
 
 @pytest.fixture
 def bound():
-    return {"key1": ["cli1"]}
+    return {"key1": ["cli1"], "key2": UNSET}
 
 
 @pytest.fixture

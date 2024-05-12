@@ -31,8 +31,11 @@ __all__ = [
     "DocstringError",
     "InvalidCommandError",
     "MissingArgumentError",
+    "RepeatArgumentError",
+    "UnknownOptionError",
     "UnusedCliTokensError",
     "ValidationError",
+    "format_cyclopts_error",
 ]
 
 

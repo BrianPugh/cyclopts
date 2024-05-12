@@ -2,16 +2,23 @@ import errno
 import os
 from abc import ABC, abstractmethod
 from contextlib import suppress
-from inspect import BoundArguments
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from attrs import define, field
 
-from cyclopts.utils import to_tuple_converter
+from cyclopts.exceptions import UnknownOptionError
+from cyclopts.utils import Sentinel, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.core import App
+
+
+class UNSET(Sentinel):
+    """Sentinel object for an UNSET parameter.
+
+    Used with :attr:`cyclopts.App.config`.
+    """
 
 
 @define
@@ -20,6 +27,7 @@ class ConfigFromFile(ABC):
     root_keys: Iterable[str] = field(default=(), converter=to_tuple_converter)
     must_exist: bool = field(default=False, kw_only=True)
     search_parents: bool = field(default=False, kw_only=True)
+    allow_unknown: bool = field(default=False, kw_only=True)
 
     _config: Optional[Dict[str, Any]] = field(default=None, init=False, repr=False)
 
@@ -55,15 +63,28 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, List[str]]):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[type[UNSET], List[str]]]):
         config = self.config
-        with suppress(KeyError):
+        try:
             for key in self.root_keys:
                 config = config[key]
             for key in commands:
                 config = config[key]
-            for key, value in config.items():
-                if key not in apps[-1]:
-                    if not isinstance(value, list):
-                        value = [value]
-                    bound.setdefault(key, [str(x) for x in value])
+        except KeyError:
+            return
+
+        if not self.allow_unknown:
+            remaining_config_keys = set(config)
+            remaining_config_keys -= set(apps[-1])
+            remaining_config_keys -= set(bound)
+            if remaining_config_keys:
+                raise UnknownOptionError(token=sorted(remaining_config_keys)[0])
+
+        for key in bound:
+            if bound[key] is not UNSET:
+                continue
+            with suppress(KeyError):
+                new_value = config[key]
+                if not isinstance(new_value, list):
+                    new_value = [new_value]
+                bound[key] = [str(x) for x in new_value]

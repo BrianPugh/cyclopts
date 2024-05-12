@@ -7,6 +7,7 @@ from contextlib import suppress
 from typing import Callable, Dict, Iterable, List, Tuple, Union
 
 from cyclopts._convert import token_count
+from cyclopts.config import UNSET
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
@@ -322,25 +323,29 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
 
 def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     # Remap `bound` back to CLI values for config parsing.
-    bound_kwargs: Dict[str, list] = {}
+    bound_kwargs: Dict[str, Union[type[UNSET], list]] = {}
     for name, (iparam, implicit_value) in command.cli2parameter.items():
         if not name.startswith("--"):
             continue
         if implicit_value is not None and not implicit_value:
             # Skip negative-flags; in agreement with logic "Only accept values to the positive flag."
             continue
+        # TODO: how to handle "--empty-"?
         name = name[2:]  # Strip off the leading "--"
-        with suppress(KeyError):
+        try:
             bound_kwargs[name] = mapping[iparam]
+        except KeyError:
+            bound_kwargs[name] = UNSET
 
     for config in configs:
         config(bound_kwargs)
 
         # If there is an error at this stage, it is a developer-error of the config object
-        bound_kwargs_update = {}
         for k, values in bound_kwargs.items():
             if not isinstance(k, str):
                 raise TypeError(f"{config.func!r} produced non-str key {k!r}.")
+            if values is UNSET:
+                continue
             if not isinstance(values, list):
                 raise TypeError(f"{config.func!r} produced non-list value for key {k!r}.")
             if len(values) > 1:
@@ -349,13 +354,15 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
                     if not isinstance(value, str):
                         raise TypeError(f"{config.func!r} produced non-str element value for key {k!r}.")
 
-        bound_kwargs.update(bound_kwargs_update)
-
     # Rebind updated values to ``mapping``
     try:
         for cli_name, value in bound_kwargs.items():
             iparam, _ = command.cli2parameter["--" + cli_name]
-            mapping[iparam] = value
+            if value is UNSET:
+                with suppress(KeyError):
+                    del mapping[iparam]
+            else:
+                mapping[iparam] = value
     except KeyError as e:
         raise UnknownOptionError(token=e.args[0]) from None
 

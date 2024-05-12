@@ -2,7 +2,18 @@ import functools
 import inspect
 import sys
 from collections.abc import MutableMapping
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 _union_types = set()
 _union_types.add(Union)
@@ -19,6 +30,18 @@ else:
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f)
 # fmt: on
+
+
+class SentinelMeta(type):
+    def __repr__(cls) -> str:
+        return f"<{cls.__name__}>"
+
+    def __bool__(cls) -> Literal[False]:
+        return False
+
+
+class Sentinel(metaclass=SentinelMeta):
+    pass
 
 
 def record_init(target: str):
@@ -47,14 +70,6 @@ def is_iterable(obj) -> bool:
 
 def is_union(type_: Optional[Type]) -> bool:
     return type_ in _union_types
-
-
-class Sentinel:
-    def __init__(self, name):
-        self.name = name
-
-    def __repr__(self):
-        return self.name
 
 
 class ParameterDict(MutableMapping):
@@ -117,12 +132,17 @@ class ParameterDict(MutableMapping):
 
 def resolve_callables(t, *args, **kwargs):
     """Recursively resolves callable elements in a tuple."""
+    if isinstance(t, type(Sentinel)):
+        return t
+
     if callable(t):
         return t(*args, **kwargs)
 
     resolved = []
     for element in t:
-        if callable(element):
+        if isinstance(element, type(Sentinel)):
+            resolved.append(element)
+        elif callable(element):
             resolved.append(element(*args, **kwargs))
         elif is_iterable(element):
             resolved.append(resolve_callables(element, *args, **kwargs))

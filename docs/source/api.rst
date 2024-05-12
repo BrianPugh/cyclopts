@@ -187,7 +187,7 @@ API
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: Dict[str, List[str]]) -> Any:
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: Dict[str, Union[type[UNSET], List[str]]]) -> Any:
              """Modifies ``bound`` inplace with some injected values.
 
              Parameters
@@ -197,8 +197,9 @@ API
                 The current command is the last app of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
-             bound: Dict[str, Any]
-                The bound tokens (before App and Group converters/validators) from the CLI.
+             bound: Dict[str, Union[type[UNSET], List[str]]]
+                The bound string tokens (before App and Group converters/validators) from the CLI.
+                If the value is the sentinel value :obj:`cyclopts.config.UNSET`, it means no tokens have been parsed for that parameter yet.
                 Keys are CLI keyword options **WITHOUT** the leading ``--``.
              """
              ...
@@ -674,6 +675,12 @@ Cyclopts has builtin configuration classes to be used with :attr:`App.config <cy
 
       Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Toml.path` is found.
 
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: False
+
+      Allow unknown keywords configuration values.
+
 .. autoclass:: cyclopts.config.Yaml
 
    .. attribute:: path
@@ -699,6 +706,13 @@ Cyclopts has builtin configuration classes to be used with :attr:`App.config <cy
 
       Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Yaml.path` is found.
 
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: False
+
+      Allow unknown keywords configuration values.
+
+
 .. autoclass:: cyclopts.config.Json
 
    .. attribute:: path
@@ -723,6 +737,12 @@ Cyclopts has builtin configuration classes to be used with :attr:`App.config <cy
       :value: False
 
       Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Json.path` is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: False
+
+      Allow unknown keywords configuration values.
 
 ----------
 Exceptions
