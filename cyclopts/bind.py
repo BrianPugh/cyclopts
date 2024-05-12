@@ -290,7 +290,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
         for parameter_token in parameter_tokens:
             if not isinstance(parameter_token, str):
                 # A token would be non-string if it's the implied-value (from a flag).
-                coerced[iparam] = parameter_tokens[0]
+                coerced[iparam] = parameter_token
                 break
         else:
             try:
