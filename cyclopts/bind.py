@@ -4,7 +4,7 @@ import os
 import shlex
 import sys
 from contextlib import suppress
-from typing import Callable, Dict, Iterable, List, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Tuple, Type, Union
 
 from cyclopts._convert import token_count
 from cyclopts.config import UNSET
@@ -323,7 +323,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
 
 def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     # Remap `bound` back to CLI values for config parsing.
-    bound_kwargs: Dict[str, Union[type[UNSET], list]] = {}
+    bound_kwargs: Dict[str, Union[Type[UNSET], list]] = {}
     for name, (iparam, implicit_value) in command.cli2parameter.items():
         if not name.startswith("--"):
             continue

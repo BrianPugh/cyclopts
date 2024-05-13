@@ -3,7 +3,17 @@ import os
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 from attrs import define, field
 
@@ -63,7 +73,7 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[type[UNSET], List[str]]]):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[Type[UNSET], List[str]]]):
         config = self.config
         try:
             for key in self.root_keys:
