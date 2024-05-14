@@ -6,7 +6,7 @@ import sys
 from contextlib import suppress
 from typing import Callable, Dict, Iterable, List, Tuple, Type, Union
 
-from cyclopts._convert import token_count
+from cyclopts._convert import _bool, token_count
 from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
@@ -86,10 +86,17 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             # A flag was parsed
             if cli_values:
                 # A value was parsed from "--key=value", and the ``value`` is in ``cli_values``.
-                if implicit_value:  # Only accept values to the positive flag
-                    pass
+                # Immediately convert to actual boolean datatype.
+                if _bool(cli_values[-1]):
+                    # --negative-flag=true or --empty-flag=true
+                    cli_values[-1] = implicit_value
                 else:
-                    raise CycloptsError(msg=f'Cannot assign value to negative flag "{cli_key}".')
+                    # --negative-flag=false or --empty-flag=false
+                    if implicit_value in (True, False):  # This is a boolean "--no-" flag.
+                        cli_values[-1] = not implicit_value
+                    else:  # This is an iterable "--empty-"
+                        # Just skip it, it doesn't mean anything.
+                        continue
             else:
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False

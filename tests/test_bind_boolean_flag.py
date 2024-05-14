@@ -33,24 +33,6 @@ def test_boolean_flag_default(app, cmd_str, expected, assert_parse_args):
     assert_parse_args(foo, cmd_str, expected)
 
 
-@pytest.mark.parametrize(
-    "cmd_str",
-    [
-        "--no-my-flag=True",
-        "--no-my-flag=False",
-    ],
-)
-def test_boolean_flag_negative_assignment_not_allowed(app, cmd_str, assert_parse_args):
-    @app.default
-    def foo(my_flag: bool = True):
-        pass
-
-    with pytest.raises(CycloptsError) as e:
-        app.parse_args(cmd_str, exit_on_error=False, print_error=True)
-
-    assert str(e.value) == 'Cannot assign value to negative flag "--no-my-flag".'
-
-
 def test_boolean_flag_app_parameter_default(app, assert_parse_args):
     app.default_parameter = Parameter(negative="")
 
@@ -66,7 +48,7 @@ def test_boolean_flag_app_parameter_default(app, assert_parse_args):
     assert str(e.value) == 'Unknown option: "--no-my-flag".'
 
 
-def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args):
+def test_boolean_flag_app_parameter_negative(app, assert_parse_args):
     @app.default
     def foo(my_flag: Annotated[bool, Parameter("", negative="--no-my-flag")] = True):
         pass
@@ -76,11 +58,8 @@ def test_boolean_flag_app_parameter_default_negative_only(app, assert_parse_args
     with pytest.raises(UnknownOptionError):
         app.parse_args("--my-flag", exit_on_error=False, print_error=True)
 
-    with pytest.raises(CycloptsError):
-        app.parse_args("--no-my-flag=True", exit_on_error=False, print_error=True)
-
-    with pytest.raises(CycloptsError):
-        app.parse_args("--no-my-flag=False", exit_on_error=False, print_error=True)
+    assert_parse_args(foo, "--no-my-flag=True", False)
+    assert_parse_args(foo, "--no-my-flag=False", True)
 
 
 def test_boolean_flag_app_parameter_default_annotated_override(app, assert_parse_args):
