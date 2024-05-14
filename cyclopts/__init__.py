@@ -18,11 +18,13 @@ __all__ = [
     "config",
     "convert",
     "default_name_transform",
+    "env_var_split",
     "types",
     "validators",
 ]
 
 from cyclopts._convert import convert
+from cyclopts._env_var import env_var_split
 from cyclopts.core import App
 from cyclopts.exceptions import (
     CoercionError,

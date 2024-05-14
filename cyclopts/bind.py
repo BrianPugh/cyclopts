@@ -7,7 +7,7 @@ from contextlib import suppress
 from typing import Callable, Dict, Iterable, List, Tuple, Type, Union
 
 from cyclopts._convert import token_count
-from cyclopts.config import UNSET
+from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
@@ -232,8 +232,7 @@ def _parse_env(command: ResolvedCommand, mapping: ParameterDict):
             except KeyError:
                 pass
             else:
-                mapping.setdefault(iparam, [])
-                mapping[iparam].append(env_var_value)
+                mapping[iparam] = cparam.env_var_split(iparam.annotation, env_var_value)
                 break
 
 
@@ -323,7 +322,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
 
 def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     # Remap `bound` back to CLI values for config parsing.
-    bound_kwargs: Dict[str, Union[Type[UNSET], list]] = {}
+    bound_kwargs: Dict[str, Union[Unset, list]] = {}
     for name, (iparam, implicit_value) in command.cli2parameter.items():
         if not name.startswith("--"):
             continue
@@ -335,7 +334,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
         try:
             bound_kwargs[name] = mapping[iparam]
         except KeyError:
-            bound_kwargs[name] = UNSET
+            bound_kwargs[name] = Unset(iparam.annotation)
 
     for config in configs:
         config(bound_kwargs)
@@ -344,7 +343,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
         for k, values in bound_kwargs.items():
             if not isinstance(k, str):
                 raise TypeError(f"{config.func!r} produced non-str key {k!r}.")
-            if values is UNSET:
+            if isinstance(values, Unset):
                 continue
             if not isinstance(values, list):
                 raise TypeError(f"{config.func!r} produced non-list value for key {k!r}.")
@@ -358,7 +357,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     try:
         for cli_name, value in bound_kwargs.items():
             iparam, _ = command.cli2parameter["--" + cli_name]
-            if value is UNSET:
+            if isinstance(value, Unset):
                 with suppress(KeyError):
                     del mapping[iparam]
             else:

@@ -24,11 +24,19 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
-class UNSET(Sentinel):
-    """Sentinel object for an UNSET parameter.
+@define
+class Unset:
+    """Placeholder object for an unset parameter.
 
     Used with :attr:`cyclopts.App.config`.
+
+    Parameters
+    ----------
+    type_: Any
+        The type annotation for the unset parameter.
     """
+
+    type_: Any
 
 
 @define
@@ -73,7 +81,7 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[Type[UNSET], List[str]]]):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[Unset, List[str]]]):
         config = self.config
         try:
             for key in self.root_keys:
@@ -91,7 +99,7 @@ class ConfigFromFile(ABC):
                 raise UnknownOptionError(token=sorted(remaining_config_keys)[0])
 
         for key in bound:
-            if bound[key] is not UNSET:
+            if not isinstance(bound[key], Unset):
                 continue
             with suppress(KeyError):
                 new_value = config[key]

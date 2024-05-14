@@ -16,6 +16,7 @@ from typing import (
 import attrs
 from attrs import field, frozen
 
+import cyclopts._env_var
 import cyclopts.utils
 from cyclopts._convert import (
     AnnotatedType,
@@ -98,6 +99,8 @@ class Parameter:
         default=None,
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
     )
+
+    env_var_split: Callable = cyclopts._env_var.env_var_split
 
     negative_bool: Tuple[str, ...] = field(
         default=None,
