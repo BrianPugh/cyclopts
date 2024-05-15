@@ -17,7 +17,10 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    TypeVar
 )
+
+T = TypeVar('T', bound=Callable)
 
 from attrs import define, field
 
@@ -446,10 +449,10 @@ class App:
 
     def command(
         self,
-        obj: Optional[Callable] = None,
+        obj: Optional[T] = None,
         name: Union[None, str, Iterable[str]] = None,
         **kwargs,
-    ) -> Callable:
+    ) -> T:
         """Decorator to register a function as a CLI command.
 
         Parameters
@@ -510,11 +513,11 @@ class App:
 
     def default(
         self,
-        obj: Optional[Callable] = None,
+        obj: Optional[T] = None,
         *,
         converter=None,
         validator=None,
-    ):
+    ) -> T:
         """Decorator to register a function as the default action handler."""
         if obj is None:  # Called ``@app.default_command(...)``
             return partial(self.default, converter=converter, validator=validator)
