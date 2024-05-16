@@ -16,6 +16,7 @@ from typing import (
     Literal,
     Optional,
     Tuple,
+    TypeVar,
     Union,
 )
 
@@ -50,6 +51,9 @@ from cyclopts.utils import (
     to_list_converter,
     to_tuple_converter,
 )
+
+T = TypeVar("T", bound=Callable)
+
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -446,10 +450,10 @@ class App:
 
     def command(
         self,
-        obj: Optional[Callable] = None,
+        obj: Optional[T] = None,
         name: Union[None, str, Iterable[str]] = None,
         **kwargs,
-    ) -> Callable:
+    ) -> T:
         """Decorator to register a function as a CLI command.
 
         Parameters
@@ -466,7 +470,7 @@ class App:
             Any argument that :class:`App` can take.
         """
         if obj is None:  # Called ``@app.command(...)``
-            return partial(self.command, name=name, **kwargs)
+            return partial(self.command, name=name, **kwargs)  # pyright: ignore[reportReturnType]
 
         if isinstance(obj, App):
             app = obj
@@ -506,18 +510,18 @@ class App:
 
         app._parents.append(self)
 
-        return obj
+        return obj  # pyright: ignore[reportReturnType]
 
     def default(
         self,
-        obj: Optional[Callable] = None,
+        obj: Optional[T] = None,
         *,
         converter=None,
         validator=None,
-    ):
+    ) -> T:
         """Decorator to register a function as the default action handler."""
         if obj is None:  # Called ``@app.default_command(...)``
-            return partial(self.default, converter=converter, validator=validator)
+            return partial(self.default, converter=converter, validator=validator)  # pyright: ignore[reportReturnType]
 
         if isinstance(obj, App):  # Registering a sub-App
             raise TypeError("Cannot register a sub-App to default.")
