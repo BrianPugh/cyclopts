@@ -51,7 +51,10 @@ def config_root_keys(tmp_path):
 
 @pytest.fixture
 def bound():
-    return {"key1": ["cli1"], "key2": Unset(str)}
+    return {
+        "key1": ["cli1"],
+        "key2": Unset(inspect.Parameter("FAKE_NAME", inspect.Parameter.POSITIONAL_OR_KEYWORD)),
+    }
 
 
 @pytest.fixture

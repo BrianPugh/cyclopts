@@ -32,4 +32,4 @@ class Env:
             except KeyError:
                 pass
             else:
-                bound[key] = self.split(value.type_, env_value)
+                bound[key] = self.split(value.iparam.annotation, env_value)

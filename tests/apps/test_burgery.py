@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 from textwrap import dedent
-from typing import Literal
+from typing import List, Literal, Optional
 
 import pytest
 
@@ -35,6 +35,7 @@ def burger(
     mustard: Annotated[bool, Parameter(group="Condiments")] = True,
     ketchup: Annotated[bool, Parameter(group="Condiments")] = True,
     mayo: Annotated[bool, Parameter(group="Condiments")] = True,
+    custom: Annotated[Optional[List[str]], Parameter(group="Condiments")] = None,
 ):
     """Create a burger.
 
@@ -54,16 +55,7 @@ def burger(
     ketchup: bool
         Add ketchup.
     """
-    return {
-        "variety": variety,
-        "quantity": quantity,
-        "lettuce": lettuce,
-        "tomato": tomato,
-        "onion": onion,
-        "ketchup": ketchup,
-        "mustard": mustard,
-        "mayo": mayo,
-    }
+    return locals()
 
 
 def test_create_burger_help(console):
@@ -82,9 +74,10 @@ def test_create_burger_help(console):
         │    QUANTITY  [default: 1]                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Condiments ───────────────────────────────────────────────────────╮
-        │ --mustard,--no-mustard  Add mustard. [default: True]               │
-        │ --ketchup,--no-ketchup  Add ketchup. [default: True]               │
-        │ --mayo,--no-mayo        [default: True]                            │
+        │ --mustard,--no-mustard   Add mustard. [default: True]              │
+        │ --ketchup,--no-ketchup   Add ketchup. [default: True]              │
+        │ --mayo,--no-mayo         [default: True]                           │
+        │ --custom,--empty-custom                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Toppings ─────────────────────────────────────────────────────────╮
         │ --iceberg,--no-iceberg  Add lettuce. [default: True]               │
@@ -96,8 +89,14 @@ def test_create_burger_help(console):
     assert actual == expected
 
 
-def test_create_burger():
-    actual = app("create burger classic --iceberg --no-onion --no-ketchup")
+def test_create_burger_1():
+    """Tests generic functionality.
+
+    Detailed:
+        * that config-file overrides (mayo, custom) work.
+        * typical boolean flags work.
+    """
+    actual = app("create burger classic --iceberg --no-onion --no-ketchup --custom sriracha --custom egg")
     assert actual == {
         "variety": "classic",
         "quantity": 1,
@@ -107,8 +106,41 @@ def test_create_burger():
         "ketchup": False,
         "mustard": True,
         "mayo": False,  # Set from config file.
+        "custom": ["sriracha", "egg"],
+    }
+
+
+def test_create_burger_2():
+    """Tests that the list from the toml file correctly populates."""
+    actual = app("create burger classic")
+    assert actual == {
+        "variety": "classic",
+        "quantity": 1,
+        "lettuce": True,
+        "tomato": True,
+        "onion": True,
+        "ketchup": True,
+        "mustard": True,
+        "mayo": False,  # Set from config file.
+        "custom": ["sweet-chili", "house-sauce"],  # Set from config file.
+    }
+
+
+def test_create_burger_3():
+    """Tests the --empty- config override."""
+    actual = app("create burger classic --empty-custom")
+    assert actual == {
+        "variety": "classic",
+        "quantity": 1,
+        "lettuce": True,
+        "tomato": True,
+        "onion": True,
+        "ketchup": True,
+        "mustard": True,
+        "mayo": False,  # Set from config file.
+        "custom": [],
     }
 
 
 if __name__ == "__main__":
-    test_create_burger()
+    test_create_burger_1()

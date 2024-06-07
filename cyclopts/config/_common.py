@@ -1,24 +1,15 @@
 import errno
+import inspect
 import os
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from attrs import define, field
 
 from cyclopts.exceptions import UnknownOptionError
-from cyclopts.utils import Sentinel, to_tuple_converter
+from cyclopts.utils import to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -34,9 +25,20 @@ class Unset:
     ----------
     type_: Any
         The type annotation for the unset parameter.
+    related: List[str]
+        List of CLI names that map to the same :class:`inspect.Parameter`.
     """
 
-    type_: Any
+    iparam: inspect.Parameter
+    related: List[str] = field(factory=list)
+
+    def related_set(self, bound: Dict[str, Union["Unset", List[str]]]) -> List[str]:
+        out = []
+        for name in self.related:
+            with suppress(KeyError):
+                if not isinstance(bound[name], Unset):
+                    out.append(name)
+        return out
 
 
 @define
@@ -99,8 +101,13 @@ class ConfigFromFile(ABC):
                 raise UnknownOptionError(token=sorted(remaining_config_keys)[0])
 
         for key in bound:
-            if not isinstance(bound[key], Unset):
+            value = bound[key]
+
+            # If a value is already parsed for this option, then skip
+            # attempting to parse it from config file.
+            if not isinstance(value, Unset) or value.related_set(bound):
                 continue
+
             with suppress(KeyError):
                 new_value = config[key]
                 if not isinstance(new_value, list):

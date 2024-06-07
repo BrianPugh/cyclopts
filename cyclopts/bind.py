@@ -328,26 +328,28 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
 
 
 def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
-    # Remap `bound` back to CLI values for config parsing.
-    bound_kwargs: Dict[str, Union[Unset, list]] = {}
+    # Remap `mapping` back to CLI values for config parsing.
+    cli_kwargs: Dict[str, Union[Unset, list]] = {}
     for name, (iparam, implicit_value) in command.cli2parameter.items():
         if not name.startswith("--"):
             continue
-        if implicit_value is not None and not implicit_value:
-            # Skip negative-flags; in agreement with logic "Only accept values to the positive flag."
-            continue
-        # TODO: how to handle "--empty-"?
         name = name[2:]  # Strip off the leading "--"
-        try:
-            bound_kwargs[name] = mapping[iparam]
-        except KeyError:
-            bound_kwargs[name] = Unset(iparam.annotation)
+
+        if implicit_value is None or implicit_value:
+            # Only associate value with positive flag/parameter.
+            try:
+                cli_kwargs[name] = mapping[iparam]
+            except KeyError:
+                cli_kwargs[name] = Unset(iparam, [x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")])
+        else:
+            continue
 
     for config in configs:
-        config(bound_kwargs)
+        config(cli_kwargs)
 
+        # Validate that ``config`` produced reasonable modifications.
         # If there is an error at this stage, it is a developer-error of the config object
-        for k, values in bound_kwargs.items():
+        for k, values in cli_kwargs.items():
             if not isinstance(k, str):
                 raise TypeError(f"{config.func!r} produced non-str key {k!r}.")
             if isinstance(values, Unset):
@@ -362,11 +364,13 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
 
     # Rebind updated values to ``mapping``
     try:
-        for cli_name, value in bound_kwargs.items():
+        for cli_name, value in cli_kwargs.items():
             iparam, _ = command.cli2parameter["--" + cli_name]
             if isinstance(value, Unset):
-                with suppress(KeyError):
-                    del mapping[iparam]
+                if not value.related_set(cli_kwargs):
+                    # No other "aliases" have provided values, safe to delete.
+                    with suppress(KeyError):
+                        del mapping[iparam]
             else:
                 mapping[iparam] = value
     except KeyError as e:

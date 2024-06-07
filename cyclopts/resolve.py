@@ -240,6 +240,7 @@ class ResolvedCommand:
 
     @cached_property
     def parameter2cli(self) -> ParameterDict:
+        """Creates a dictinoary mapping :class:`inspect.Parameter` to a list of CLI names."""
         c2p = self.cli2parameter
         p2c = ParameterDict()
 
