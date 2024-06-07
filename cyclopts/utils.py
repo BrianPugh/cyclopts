@@ -129,6 +129,10 @@ class ParameterDict(MutableMapping):
         except KeyError:
             return default
 
+    def clear(self):
+        self.store.clear()
+        self.reverse_mapping.clear()
+
 
 def resolve_callables(t, *args, **kwargs):
     """Recursively resolves callable elements in a tuple."""

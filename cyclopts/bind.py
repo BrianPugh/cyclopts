@@ -347,6 +347,15 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     for config in configs:
         config(cli_kwargs)
 
+        # Repopulate deleted keys with ``Unset``
+        for name, (iparam, _) in command.cli2parameter.items():
+            if not name.startswith("--"):
+                continue
+            name = name[2:]  # Strip off the leading "--"
+
+            if name not in cli_kwargs:
+                cli_kwargs[name] = Unset(iparam, [x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")])
+
         # Validate that ``config`` produced reasonable modifications.
         # If there is an error at this stage, it is a developer-error of the config object
         for k, values in cli_kwargs.items():
@@ -363,16 +372,23 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
                         raise TypeError(f"{config.func!r} produced non-str element value for key {k!r}.")
 
     # Rebind updated values to ``mapping``
+    set_iparams = set()
     try:
         for cli_name, value in cli_kwargs.items():
             iparam, _ = command.cli2parameter["--" + cli_name]
             if isinstance(value, Unset):
                 if not value.related_set(cli_kwargs):
                     # No other "aliases" have provided values, safe to delete.
+                    # This can occur if a config Unsets/deletes a value.
                     with suppress(KeyError):
                         del mapping[iparam]
+            elif id(iparam) in set_iparams and value != mapping[iparam]:
+                # Intended to detect if a config sets different
+                # values to different aliases of the same parameter.
+                raise RepeatArgumentError(parameter=iparam)
             else:
                 mapping[iparam] = value
+                set_iparams.add(id(iparam))
     except KeyError as e:
         raise UnknownOptionError(token=e.args[0]) from None
 
