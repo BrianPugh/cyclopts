@@ -9,6 +9,7 @@ from cyclopts import (
     UnknownOptionError,
     ValidationError,
 )
+from cyclopts.exceptions import CoercionError
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -60,6 +61,9 @@ def test_boolean_flag_app_parameter_negative(app, assert_parse_args):
 
     assert_parse_args(foo, "--no-my-flag=True", False)
     assert_parse_args(foo, "--no-my-flag=False", True)
+
+    with pytest.raises(CoercionError):
+        app("--no-my-flag=", exit_on_error=False)
 
 
 def test_boolean_flag_app_parameter_default_annotated_override(app, assert_parse_args):
