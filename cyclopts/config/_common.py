@@ -55,7 +55,15 @@ class ConfigFromFile(ABC):
     def _load_config(self, path: Path) -> Dict[str, Any]:
         """Load the config dictionary from path.
 
-        The ``path`` is guaranteed to exist.
+        Parameters
+        ----------
+        path: Path
+            Path to the file. Guaranteed to exist.
+
+        Returns
+        -------
+        dict
+            Loaded configuration.
         """
         raise NotImplementedError
 

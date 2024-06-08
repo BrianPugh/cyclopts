@@ -1,4 +1,5 @@
 __all__ = [
+    "ConfigFromFile",
     "Env",
     "Json",
     "Toml",
@@ -6,7 +7,7 @@ __all__ = [
     "Unset",
 ]
 
-from cyclopts.config._common import Unset
+from cyclopts.config._common import ConfigFromFile, Unset
 from cyclopts.config._env import Env
 from cyclopts.config._json import Json
 from cyclopts.config._toml import Toml
