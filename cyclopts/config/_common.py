@@ -45,12 +45,7 @@ class Unset:
         Set[str]
             CLI keys that map to the same ``inspect.Parameter`` that have parsed token(s).
         """
-        out = set()
-        for name in self.related:
-            with suppress(KeyError):
-                if not isinstance(mapping[name], Unset):
-                    out.add(name)
-        return out
+        return {x for x in self.related.intersection(mapping) if not isinstance(mapping[x], Unset)}
 
 
 @define
