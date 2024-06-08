@@ -26,7 +26,7 @@ class Env:
         for key, value in bound.items():
             if not isinstance(value, Unset):
                 continue
-            env_key = (prefix + key).upper()
+            env_key = (prefix + key.replace("-", "_")).upper()
             try:
                 env_value = os.environ[env_key]
             except KeyError:

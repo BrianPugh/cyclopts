@@ -13,10 +13,10 @@ def test_config_env_default(app):
     )
 
     @app.command
-    def foo(bar: int):
-        assert bar == 100
+    def foo(bar_baz: int):
+        assert bar_baz == 100
 
-    os.environ["CYCLOPTS_TEST_APP_FOO_BAR"] = "100"
+    os.environ["CYCLOPTS_TEST_APP_FOO_BAR_BAZ"] = "100"
 
     app("foo")
 
