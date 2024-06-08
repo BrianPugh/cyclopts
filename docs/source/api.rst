@@ -93,7 +93,8 @@ API
       :type: Parameter
       :value: None
 
-      Default :class:`Parameter` configuration.
+      Default :class:`Parameter` configuration. Unspecified values of command-annotated :class:`Parameter` will inherit these values.
+      See :ref:`Parameter Resolution Order<Parameter Resolution Order>` for more details.
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
@@ -197,8 +198,8 @@ API
                 The current command is the last app of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
-             bound: Dict[str, Union[Unset, List[str]]]
-                The bound string tokens (before App and Group converters/validators) from the CLI.
+             mapping: Dict[str, Union[Unset, List[str]]]
+                The CLI string tokens (before App and Group converters/validators).
                 If the value is a :obj:`cyclopts.config.Unset`, it means no tokens have been parsed for that parameter yet.
                 Keys are CLI keyword options **WITHOUT** the leading ``--``.
              """
@@ -553,8 +554,6 @@ API
          │ --buzz value "bob" needs to be uppercase.               │
          ╰─────────────────────────────────────────────────────────╯
 
-.. autoclass:: cyclopts.config.Unset
-
 .. autofunction:: cyclopts.convert
 
 .. autofunction:: cyclopts.default_name_transform
@@ -654,6 +653,13 @@ Annotated types for checking common int/float value constraints.
 Config
 ------
 Cyclopts has builtin configuration classes to be used with :attr:`App.config <cyclopts.App.config>` for loading user-defined defaults in many common scenarios.
+All Cyclopts builtins index into the configuration file with the following rules:
+
+1. Apply ``root_keys`` (if provided) to enter the project's configuration namespace.
+
+2. Apply the command name(s) to enter the current command's configuration namespace.
+
+3. Apply each key/value pair if CLI arguments have **not** been provided for that parameter.
 
 .. autoclass:: cyclopts.config.Toml
 
@@ -787,6 +793,9 @@ Cyclopts has builtin configuration classes to be used with :attr:`App.config <cy
       :value: cyclopts.env_var_split
 
       Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
+
+.. autoclass:: cyclopts.config.Unset
+   :members: related_set
 
 ----------
 Exceptions

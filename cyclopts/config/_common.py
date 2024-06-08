@@ -17,23 +17,24 @@ if TYPE_CHECKING:
 
 @define
 class Unset:
-    """Placeholder object for an unset parameter.
+    """Placeholder object for a parameter that does not yet have any associated string tokens.
 
-    Used with :attr:`cyclopts.App.config`.
+    Used with :attr:`App.config <cyclopts.App.config>`.
 
     Parameters
     ----------
     iparam: inspect.Parameter
-        The corresponding ``inspect.Parameter`` for the unset variable.
-    related: Set[str]
-        CLI names that map to the same :class:`inspect.Parameter`.
+        The corresponding :class:`inspect.Parameter` for the unset variable.
+    related: set[str]
+        Other CLI names that map to the same :class:`inspect.Parameter`.
+        These may be aliases, or things like negative flags.
     """
 
     iparam: inspect.Parameter
     related: Set[str] = field(factory=set)
 
     def related_set(self, mapping: Dict[str, Union["Unset", List[str]]]) -> Set[str]:
-        """Other CLI keys that map to the same ``inspect.Parameter`` that have parsed token(s).
+        """Other CLI keys that map to the same :class:`inspect.Parameter` that have parsed token(s).
 
         Parameters
         ----------
@@ -42,8 +43,8 @@ class Unset:
 
         Returns
         -------
-        Set[str]
-            CLI keys that map to the same ``inspect.Parameter`` that have parsed token(s).
+        set[str]
+            CLI keys that map to the same :class:`inspect.Parameter` that have parsed token(s).
         """
         return {x for x in self.related.intersection(mapping) if not isinstance(mapping[x], Unset)}
 
