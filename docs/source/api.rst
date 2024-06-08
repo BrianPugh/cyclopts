@@ -775,7 +775,38 @@ All Cyclopts builtins index into the configuration file with the following rules
 
 .. autoclass:: cyclopts.config.Env
 
-   Automatically read configuration from environment variables.
+   Automatically derive environment variable names to read configurations from.
+
+   For example, consider the following app:
+
+   .. code-block:: python
+
+      import cyclopts
+
+      app = cyclopts.App(config=cyclopts.config.Env("MY_SCRIPT_"))
+
+
+      @app.command
+      def my_command(foo, bar):
+          print(f"{foo=} {bar=}")
+
+
+      app()
+
+   If values for ``foo`` and ``bar`` are not supplied by the command line, the app will check
+   the environment variables ``MY_SCRIPT_MY_COMMAND_FOO`` and ``MY_SCRIPT_MY_COMMAND_BAR``, respectively:
+
+   .. code-block:: console
+
+      $ python my_script.py my-command 1 2
+      foo=1 bar=2
+
+      $ export MY_SCRIPT_MY_COMMAND_FOO=100
+      $ python my_script.py my-command --bar=2
+      foo=100 bar=2
+      $ python my_script.py my-command 1 2
+      foo=1 bar=2
+
 
    .. attribute:: prefix
       :type: str
