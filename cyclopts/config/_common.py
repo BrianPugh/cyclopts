@@ -4,7 +4,7 @@ import os
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from attrs import define, field
 
@@ -23,21 +23,33 @@ class Unset:
 
     Parameters
     ----------
-    type_: Any
-        The type annotation for the unset parameter.
-    related: List[str]
-        List of CLI names that map to the same :class:`inspect.Parameter`.
+    iparam: inspect.Parameter
+        The corresponding ``inspect.Parameter`` for the unset variable.
+    related: Set[str]
+        CLI names that map to the same :class:`inspect.Parameter`.
     """
 
     iparam: inspect.Parameter
-    related: List[str] = field(factory=list)
+    related: Set[str] = field(factory=set)
 
-    def related_set(self, bound: Dict[str, Union["Unset", List[str]]]) -> List[str]:
-        out = []
+    def related_set(self, mapping: Dict[str, Union["Unset", List[str]]]) -> Set[str]:
+        """Other CLI keys that map to the same ``inspect.Parameter`` that have parsed token(s).
+
+        Parameters
+        ----------
+        mapping: dict
+            All associated cli_name to tokens.
+
+        Returns
+        -------
+        Set[str]
+            CLI keys that map to the same ``inspect.Parameter`` that have parsed token(s).
+        """
+        out = set()
         for name in self.related:
             with suppress(KeyError):
-                if not isinstance(bound[name], Unset):
-                    out.append(name)
+                if not isinstance(mapping[name], Unset):
+                    out.add(name)
         return out
 
 
@@ -91,7 +103,7 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[Unset, List[str]]]):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
         config = self.config
         try:
             for key in self.root_keys:
@@ -104,20 +116,20 @@ class ConfigFromFile(ABC):
         if not self.allow_unknown:
             remaining_config_keys = set(config)
             remaining_config_keys -= set(apps[-1])
-            remaining_config_keys -= set(bound)
+            remaining_config_keys -= set(mapping)
             if remaining_config_keys:
                 raise UnknownOptionError(token=sorted(remaining_config_keys)[0])
 
-        for key in bound:
-            value = bound[key]
+        for key in mapping:
+            value = mapping[key]
 
             # If a value is already parsed for this option, then skip
             # attempting to parse it from config file.
-            if not isinstance(value, Unset) or value.related_set(bound):
+            if not isinstance(value, Unset) or value.related_set(mapping):
                 continue
 
             with suppress(KeyError):
                 new_value = config[key]
                 if not isinstance(new_value, list):
                     new_value = [new_value]
-                bound[key] = [str(x) for x in new_value]
+                mapping[key] = [str(x) for x in new_value]

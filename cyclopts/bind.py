@@ -340,7 +340,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
             try:
                 cli_kwargs[name] = mapping[iparam]
             except KeyError:
-                cli_kwargs[name] = Unset(iparam, [x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")])
+                cli_kwargs[name] = Unset(iparam, {x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")})
         else:
             continue
 
@@ -354,7 +354,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
             name = name[2:]  # Strip off the leading "--"
 
             if name not in cli_kwargs:
-                cli_kwargs[name] = Unset(iparam, [x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")])
+                cli_kwargs[name] = Unset(iparam, {x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")})
 
         # Validate that ``config`` produced reasonable modifications.
         # If there is an error at this stage, it is a developer-error of the config object
