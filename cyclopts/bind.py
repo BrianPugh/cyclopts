@@ -141,14 +141,14 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
 
 
 def _is_option_like(token: str) -> bool:
+    """Checks if a token looks like an option.
+
+    Namely, negative numbers are not options, but a token like ``--foo`` is.
+    """
     with suppress(ValueError):
         complex(token)
         return False
-
-    if token.startswith("-"):
-        return True
-
-    return False
+    return token.startswith("-")
 
 
 def _validate_is_not_option_like(token):
@@ -244,6 +244,7 @@ def _parse_env(command: ResolvedCommand, mapping: ParameterDict):
 
 
 def _is_required(iparam: inspect.Parameter) -> bool:
+    """A token must be provided for the given :class:``inspect.Parameter``."""
     return iparam.default is iparam.empty and iparam.kind not in (
         iparam.VAR_KEYWORD,
         iparam.VAR_POSITIONAL,
@@ -257,7 +258,7 @@ def _bind(
     """Bind the mapping to the function signature.
 
     Better than directly using ``signature.bind`` because this can handle
-    intermingled keywords.
+    intermingled positional and keyword arguments.
     """
     f_pos, f_kwargs = [], {}
     use_pos = True
@@ -327,70 +328,71 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
     return coerced
 
 
-def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
-    # Remap `mapping` back to CLI values for config parsing.
-    cli_kwargs: Dict[str, Union[Unset, list]] = {}
+def _walk_name_iparam_implicit_value(command: ResolvedCommand):
     for name, (iparam, implicit_value) in command.cli2parameter.items():
         if not name.startswith("--"):
             continue
         name = name[2:]  # Strip off the leading "--"
+        yield name, iparam, implicit_value
 
-        if implicit_value is None or implicit_value:
-            # Only associate value with positive flag/parameter.
-            try:
-                cli_kwargs[name] = mapping[iparam]
-            except KeyError:
-                cli_kwargs[name] = Unset(iparam, {x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")})
-        else:
-            continue
 
-    for config in configs:
-        config(cli_kwargs)
+def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
+    """Iteratively apply each ``config`` callable to the token mapping."""
+    # Remap `mapping` back to CLI values for config parsing.
+    cli_kwargs: Dict[str, Union[Unset, list]] = {}
+    for cli_name, iparam, implicit_value in _walk_name_iparam_implicit_value(command):
+        # Assign existing tokens to the "positive" flag/keyword if it exists.
+        # Otherwise, assign it to the "negative" flag/keyword.
+        cparam = command.iparam_to_cparam[iparam]
+        if implicit_value is None or cparam.name == ("",) or implicit_value:
+            with suppress(KeyError):
+                cli_kwargs[cli_name] = mapping[iparam]
 
+    def repopulate_unset():
         # Repopulate deleted keys with ``Unset``
-        for name, (iparam, _) in command.cli2parameter.items():
-            if not name.startswith("--"):
-                continue
-            name = name[2:]  # Strip off the leading "--"
-
+        for name, iparam, _ in _walk_name_iparam_implicit_value(command):
             if name not in cli_kwargs:
                 cli_kwargs[name] = Unset(iparam, {x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")})
 
+    repopulate_unset()
+
+    for config in configs:
+        config(cli_kwargs)
+        repopulate_unset()
+
         # Validate that ``config`` produced reasonable modifications.
         # If there is an error at this stage, it is a developer-error of the config object
-        for k, values in cli_kwargs.items():
-            if not isinstance(k, str):
-                raise TypeError(f"{config.func!r} produced non-str key {k!r}.")
+        for cli_name, values in cli_kwargs.items():
+            if not isinstance(cli_name, str):
+                raise TypeError(f"{config.func!r} produced non-str key {cli_name!r}.")
             if isinstance(values, Unset):
                 continue
             if not isinstance(values, list):
-                raise TypeError(f"{config.func!r} produced non-list value for key {k!r}.")
+                raise TypeError(f"{config.func!r} produced non-list value for key {cli_name!r}.")
+            if "--" + cli_name not in command.cli2parameter:
+                raise ValueError(f"{config.func!r} produced unknown key {cli_name!r}.")
             if len(values) > 1:
                 # They all must be strings, or reinterpret as a list-of-list
                 for value in values:
                     if not isinstance(value, str):
-                        raise TypeError(f"{config.func!r} produced non-str element value for key {k!r}.")
+                        raise TypeError(f"{config.func!r} produced non-str element value for key {cli_name!r}.")
 
     # Rebind updated values to ``mapping``
     set_iparams = set()
-    try:
-        for cli_name, value in cli_kwargs.items():
-            iparam, _ = command.cli2parameter["--" + cli_name]
-            if isinstance(value, Unset):
-                if not value.related_set(cli_kwargs):
-                    # No other "aliases" have provided values, safe to delete.
-                    # This can occur if a config Unsets/deletes a value.
-                    with suppress(KeyError):
-                        del mapping[iparam]
-            elif id(iparam) in set_iparams and value != mapping[iparam]:
-                # Intended to detect if a config sets different
-                # values to different aliases of the same parameter.
-                raise RepeatArgumentError(parameter=iparam)
-            else:
-                mapping[iparam] = value
-                set_iparams.add(id(iparam))
-    except KeyError as e:
-        raise UnknownOptionError(token=e.args[0]) from None
+    for cli_name, value in cli_kwargs.items():
+        iparam, _ = command.cli2parameter["--" + cli_name]
+        if isinstance(value, Unset):
+            if not value.related_set(cli_kwargs):
+                # No other "aliases" have provided values, safe to delete.
+                # This can occur if a config Unsets/deletes a value.
+                mapping.pop(iparam, None)
+        elif id(iparam) in set_iparams and value != mapping[iparam]:
+            # Intended to detect if a config sets different
+            # values to different aliases of the same parameter.
+            raise RepeatArgumentError(parameter=iparam)
+        else:
+            mapping[iparam] = value
+            set_iparams.add(id(iparam))
 
 
 def create_bound_arguments(
@@ -414,11 +416,12 @@ def create_bound_arguments(
     unused_tokens: List[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
-    # Note: ``mapping`` is updated inplace
-    # ``mapping`` maps inspect.Parameter to python-identifier-name to list of tokens/values.
+    # ``mapping`` maps inspect.Parameter to list of tokens/values.
     #    * Each token is USUALLY a string and needs further casting/interpretation.
     #    * However, if it's NOT a string, the value should be used as-is.
-    mapping = ParameterDict()  # Each value should be a list
+    #        * This is used for implicit-value keyword tokens like "--flag" and "--empty-iterable"
+    # ``mapping`` is updated inplace throughout this function.
+    mapping = ParameterDict()
     unused_tokens = []
 
     validate_command(command.command)
