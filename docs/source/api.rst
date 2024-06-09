@@ -188,8 +188,8 @@ API
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]) -> Any:
-             """Modifies ``mapping`` inplace with some injected values.
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
+             """Modifies given mapping inplace with some injected values.
 
              Parameters
              ----------
@@ -199,14 +199,14 @@ API
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              mapping: Dict[str, Union[Unset, List[str]]]
-                The CLI string tokens (before App and Group converters/validators).
-                If the value is a :obj:`cyclopts.config.Unset`, it means no tokens have been parsed for that parameter yet.
-                Keys are CLI keyword options **WITHOUT** the leading ``--``.
+                A dictionary mapping CLI keyword names to their tokens (before App and Group converters/validators have been invoked).
+                For example, if the user specifies --my-var=foo, then this dictionary will be {"my-var": ["foo"]}.
+                If the value is an cyclopts.config.Unset object, then no tokens have been parsed for that parameter yet.
+                Deleting keys from this dictionary will unset their value.
              """
-             ...
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
-      See :ref:`cyclopts.config <API Config>`.
+      See :ref:`cyclopts.config <API Config>` for useful builtins.
 
 
 .. autoclass:: cyclopts.Parameter

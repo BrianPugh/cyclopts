@@ -351,7 +351,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     def repopulate_unset():
         # Repopulate deleted keys with ``Unset``
         for name, iparam, _ in _walk_name_iparam_implicit_value(command):
-            if name not in cli_kwargs:
+            if name not in cli_kwargs or not cli_kwargs[name]:
                 cli_kwargs[name] = Unset(iparam, {x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")})
 
     repopulate_unset()
