@@ -16,15 +16,15 @@ class Env:
     command: bool = field(default=True, kw_only=True)
     split: Callable = field(default=env_var_split, kw_only=True)
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], bound: Dict[str, Union[Unset, List[str]]]):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
         components = [self.prefix]
         if self.command and commands:
             components.append("_".join(commands))
             components.append("_")
         prefix = "".join(components).upper()
 
-        for key, value in bound.items():
-            if not isinstance(value, Unset):
+        for key, value in mapping.items():
+            if not isinstance(value, Unset) or value.related_set(mapping):
                 continue
             env_key = (prefix + key).upper().replace("-", "_")
             try:
@@ -32,4 +32,4 @@ class Env:
             except KeyError:
                 pass
             else:
-                bound[key] = self.split(value.iparam.annotation, env_value)
+                mapping[key] = self.split(value.iparam.annotation, env_value)
