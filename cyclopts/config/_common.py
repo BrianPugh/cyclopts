@@ -3,6 +3,7 @@ import inspect
 import os
 from abc import ABC, abstractmethod
 from contextlib import suppress
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
@@ -102,25 +103,15 @@ class ConfigFromFile(ABC):
     def __call__(self, apps: List["App"], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
         config = self.config
         try:
-            for key in self.root_keys:
-                config = config[key]
-            for key in commands:
+            for key in chain(self.root_keys, commands):
                 config = config[key]
         except KeyError:
             return
 
-        if not self.allow_unknown:
-            remaining_config_keys = set(config)
-            remaining_config_keys -= set(apps[-1])
-            remaining_config_keys -= set(mapping)
-            if remaining_config_keys:
-                raise UnknownOptionError(token=sorted(remaining_config_keys)[0])
+        if not self.allow_unknown and (remaining_keys := set(config) - set(apps[-1]) - set(mapping)):
+            raise UnknownOptionError(token=sorted(remaining_keys)[0])
 
-        for key in mapping:
-            value = mapping[key]
-
-            # If a value is already parsed for this option, then skip
-            # attempting to parse it from config file.
+        for key, value in mapping.items():
             if not isinstance(value, Unset) or value.related_set(mapping):
                 continue
 
