@@ -188,14 +188,14 @@ API
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], bound: Dict[str, Union[Unset, List[str]]]) -> Any:
-             """Modifies ``bound`` inplace with some injected values.
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]) -> Any:
+             """Modifies ``mapping`` inplace with some injected values.
 
              Parameters
              ----------
              apps: Tuple[App, ...]
                 The application hierarchy that led to the current command function.
-                The current command is the last app of this tuple.
+                The current command app is the last element of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              mapping: Dict[str, Union[Unset, List[str]]]
