@@ -1,14 +1,22 @@
 import itertools
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
 
 from attrs import define, field
 
-from cyclopts.utils import Sentinel, is_iterable
+from cyclopts.utils import Sentinel, is_iterable, resolve_callables, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
-
-from cyclopts.utils import resolve_callables, to_tuple_converter
 
 
 def _group_default_parameter_must_be_none(instance, attribute, value: Optional["Parameter"]):
@@ -23,7 +31,8 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
 _sort_key_counter = itertools.count()
 
 
-NO_USER_SORT_KEY = Sentinel("NO_USER_SORT_KEY")
+class NO_USER_SORT_KEY(Sentinel):  # noqa: N801
+    pass
 
 
 @define

@@ -15,13 +15,16 @@ __all__ = [
     "UnknownOptionError",
     "UnusedCliTokensError",
     "ValidationError",
+    "config",
     "convert",
     "default_name_transform",
+    "env_var_split",
     "types",
     "validators",
 ]
 
 from cyclopts._convert import convert
+from cyclopts._env_var import env_var_split
 from cyclopts.core import App
 from cyclopts.exceptions import (
     CoercionError,
@@ -39,4 +42,4 @@ from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.utils import default_name_transform
 
-from . import types, validators
+from . import config, types, validators

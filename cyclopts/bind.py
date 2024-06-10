@@ -4,9 +4,10 @@ import os
 import shlex
 import sys
 from contextlib import suppress
-from typing import Iterable, List, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Tuple, Type, Union
 
-from cyclopts._convert import token_count
+from cyclopts._convert import _bool, token_count
+from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
@@ -39,9 +40,7 @@ def _cli_kw_to_f_kw(cli_key: str):
 
 
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
-    cli2kw = command.cli2parameter
-
-    kwargs_iparam = next((x for x in command.iparam_to_cparam.keys() if x.kind == x.VAR_KEYWORD), None)
+    kwargs_iparam = next((x for x in command.iparams if x.kind == x.VAR_KEYWORD), None)
 
     if kwargs_iparam:
         mapping[kwargs_iparam] = {}
@@ -71,7 +70,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             cli_key = token
 
         try:
-            iparam, implicit_value = cli2kw[cli_key]
+            iparam, implicit_value = command.cli2parameter[cli_key]
         except KeyError:
             if kwargs_iparam:
                 iparam = kwargs_iparam
@@ -87,10 +86,17 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             # A flag was parsed
             if cli_values:
                 # A value was parsed from "--key=value", and the ``value`` is in ``cli_values``.
-                if implicit_value:  # Only accept values to the positive flag
-                    pass
+                # Immediately convert to actual boolean datatype.
+                if _bool(cli_values[-1]):
+                    # --negative-flag=true or --empty-flag=true
+                    cli_values[-1] = implicit_value
                 else:
-                    raise CycloptsError(msg=f'Cannot assign value to negative flag "{cli_key}".')
+                    # --negative-flag=false or --empty-flag=false
+                    if implicit_value in (True, False):  # This is a boolean "--no-" flag.
+                        cli_values[-1] = not implicit_value
+                    else:  # This is an iterable "--empty-"
+                        # Just skip it, it doesn't mean anything.
+                        continue
             else:
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False
@@ -135,16 +141,14 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
 
 
 def _is_option_like(token: str) -> bool:
-    try:
+    """Checks if a token looks like an option.
+
+    Namely, negative numbers are not options, but a token like ``--foo`` is.
+    """
+    with suppress(ValueError):
         complex(token)
         return False
-    except ValueError:
-        pass
-
-    if token.startswith("-"):
-        return True
-
-    return False
+    return token.startswith("-")
 
 
 def _validate_is_not_option_like(token):
@@ -215,7 +219,7 @@ def _parse_pos(
     return tokens
 
 
-def _parse_env(command: ResolvedCommand, mapping):
+def _parse_env(command: ResolvedCommand, mapping: ParameterDict):
     """Populate argument defaults from environment variables.
 
     In cyclopts, arguments are parsed with the following priority:
@@ -235,13 +239,16 @@ def _parse_env(command: ResolvedCommand, mapping):
             except KeyError:
                 pass
             else:
-                mapping.setdefault(iparam, [])
-                mapping[iparam].append(env_var_value)
+                mapping[iparam] = cparam.env_var_split(iparam.annotation, env_var_value)
                 break
 
 
-def _is_required(parameter: inspect.Parameter) -> bool:
-    return parameter.default is parameter.empty
+def _is_required(iparam: inspect.Parameter) -> bool:
+    """A token must be provided for the given :class:``inspect.Parameter``."""
+    return iparam.default is iparam.empty and iparam.kind not in (
+        iparam.VAR_KEYWORD,
+        iparam.VAR_POSITIONAL,
+    )
 
 
 def _bind(
@@ -251,7 +258,7 @@ def _bind(
     """Bind the mapping to the function signature.
 
     Better than directly using ``signature.bind`` because this can handle
-    intermingled keywords.
+    intermingled positional and keyword arguments.
     """
     f_pos, f_kwargs = [], {}
     use_pos = True
@@ -262,11 +269,9 @@ def _bind(
         try:
             f_pos.append(mapping[p])
         except KeyError:
-            if _is_required(p):
-                raise MissingArgumentError(parameter=p, tokens_so_far=[]) from None
             use_pos = False
 
-    for iparam in command.iparam_to_cparam.keys():
+    for iparam in command.iparams:
         if use_pos and iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
             f_pos_append(iparam)
         elif use_pos and iparam.kind is iparam.VAR_POSITIONAL:  # ``*args``
@@ -275,11 +280,8 @@ def _bind(
         elif iparam.kind is iparam.VAR_KEYWORD:
             f_kwargs.update(mapping.get(iparam, {}))
         else:
-            try:
+            with suppress(KeyError):
                 f_kwargs[iparam.name] = mapping[iparam]
-            except KeyError:
-                if _is_required(iparam):
-                    raise MissingArgumentError(parameter=iparam, tokens_so_far=[]) from None
 
     bound = command.bind(*f_pos, **f_kwargs)
     return bound
@@ -296,7 +298,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
         for parameter_token in parameter_tokens:
             if not isinstance(parameter_token, str):
                 # A token would be non-string if it's the implied-value (from a flag).
-                coerced[iparam] = parameter_tokens[0]
+                coerced[iparam] = parameter_token
                 break
         else:
             try:
@@ -326,9 +328,77 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
     return coerced
 
 
+def _walk_name_iparam_implicit_value(command: ResolvedCommand):
+    for name, (iparam, implicit_value) in command.cli2parameter.items():
+        if not name.startswith("--"):
+            continue
+        name = name[2:]  # Strip off the leading "--"
+        yield name, iparam, implicit_value
+
+
+def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
+    """Iteratively apply each ``config`` callable to the token mapping."""
+    # Remap `mapping` back to CLI values for config parsing.
+    cli_kwargs: Dict[str, Union[Unset, list]] = {}
+    for cli_name, iparam, implicit_value in _walk_name_iparam_implicit_value(command):
+        # Assign existing tokens to the "positive" flag/keyword if it exists.
+        # Otherwise, assign it to the "negative" flag/keyword.
+        cparam = command.iparam_to_cparam[iparam]
+        if implicit_value is None or cparam.name == ("",) or implicit_value:
+            with suppress(KeyError):
+                cli_kwargs[cli_name] = mapping[iparam]
+
+    def repopulate_unset():
+        # Repopulate deleted keys with ``Unset``
+        for name, iparam, _ in _walk_name_iparam_implicit_value(command):
+            if name not in cli_kwargs or not cli_kwargs[name]:
+                cli_kwargs[name] = Unset(iparam, {x[2:] for x in command.parameter2cli[iparam] if x.startswith("--")})
+
+    repopulate_unset()
+
+    for config in configs:
+        config(cli_kwargs)
+        repopulate_unset()
+
+        # Validate that ``config`` produced reasonable modifications.
+        # If there is an error at this stage, it is a developer-error of the config object
+        for cli_name, values in cli_kwargs.items():
+            if not isinstance(cli_name, str):
+                raise TypeError(f"{config.func!r} produced non-str key {cli_name!r}.")
+            if isinstance(values, Unset):
+                continue
+            if not isinstance(values, list):
+                raise TypeError(f"{config.func!r} produced non-list value for key {cli_name!r}.")
+            if "--" + cli_name not in command.cli2parameter:
+                raise ValueError(f"{config.func!r} produced unknown key {cli_name!r}.")
+            if len(values) > 1:
+                # They all must be strings, or reinterpret as a list-of-list
+                for value in values:
+                    if not isinstance(value, str):
+                        raise TypeError(f"{config.func!r} produced non-str element value for key {cli_name!r}.")
+
+    # Rebind updated values to ``mapping``
+    set_iparams = set()
+    for cli_name, value in cli_kwargs.items():
+        iparam, _ = command.cli2parameter["--" + cli_name]
+        if isinstance(value, Unset):
+            if not value.related_set(cli_kwargs):
+                # No other "aliases" have provided values, safe to delete.
+                # This can occur if a config Unsets/deletes a value.
+                mapping.pop(iparam, None)
+        elif id(iparam) in set_iparams and value != mapping[iparam]:
+            # Intended to detect if a config sets different
+            # values to different aliases of the same parameter.
+            raise RepeatArgumentError(parameter=iparam)
+        else:
+            mapping[iparam] = value
+            set_iparams.add(id(iparam))
+
+
 def create_bound_arguments(
     command: ResolvedCommand,
     tokens: List[str],
+    configs: Iterable[Callable],
 ) -> Tuple[inspect.BoundArguments, List[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -346,8 +416,12 @@ def create_bound_arguments(
     unused_tokens: List[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
-    # Note: mapping is updated inplace
-    mapping = ParameterDict()  # Each value should be a list
+    # ``mapping`` maps inspect.Parameter to list of tokens/values.
+    #    * Each token is USUALLY a string and needs further casting/interpretation.
+    #    * However, if it's NOT a string, the value should be used as-is.
+    #        * This is used for implicit-value keyword tokens like "--flag" and "--empty-iterable"
+    # ``mapping`` is updated inplace throughout this function.
+    mapping = ParameterDict()
     unused_tokens = []
 
     validate_command(command.command)
@@ -357,6 +431,7 @@ def create_bound_arguments(
         unused_tokens = _parse_kw_and_flags(command, tokens, mapping)
         unused_tokens = _parse_pos(command, unused_tokens, mapping)
         _parse_env(command, mapping)
+        _parse_configs(command, mapping, configs)
 
         # For each parameter, convert the list of string tokens.
         coerced = _convert(command, mapping)
@@ -372,7 +447,7 @@ def create_bound_arguments(
                 try:
                     bound.arguments[name] = converted[name]
                 except KeyError:
-                    del bound.arguments[name]
+                    bound.arguments.pop(name, None)
 
         # Apply group validators
         try:
@@ -385,6 +460,10 @@ def create_bound_arguments(
             raise ValidationError(
                 value=e.args[0] if e.args else "", group=group  # pyright: ignore[reportPossiblyUnboundVariable]
             ) from e
+
+        for iparam in command.iparams:
+            if _is_required(iparam) and iparam.name not in bound.arguments:
+                raise MissingArgumentError(parameter=iparam)
 
     except CycloptsError as e:
         e.target = command.command

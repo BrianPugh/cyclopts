@@ -93,7 +93,8 @@ API
       :type: Parameter
       :value: None
 
-      Default :class:`Parameter` configuration.
+      Default :class:`Parameter` configuration. Unspecified values of command-annotated :class:`Parameter` will inherit these values.
+      See :ref:`Parameter Resolution Order<Parameter Resolution Order>` for more details.
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
@@ -176,6 +177,37 @@ API
 
       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
       If a subapp, inherits from first non-:obj:`None` parent.
+
+   .. attribute:: config
+      :type: Union[None, Callable, Iterable[Callable]]
+      :value: None
+
+      A function or list of functions that are consecutively applied to keyword arguments.
+      These function(s) are called before any additional conversion and validation.
+      Each function must have signature:
+
+      .. code-block:: python
+
+         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
+             """Modifies given mapping inplace with some injected values.
+
+             Parameters
+             ----------
+             apps: Tuple[App, ...]
+                The application hierarchy that led to the current command function.
+                The current command app is the last element of this tuple.
+             commands: Tuple[str, ...]
+                The CLI strings that led to the current command function.
+             mapping: Dict[str, Union[Unset, List[str]]]
+                A dictionary mapping CLI keyword names to their tokens (before App and Group converters/validators have been invoked).
+                For example, if the user specifies --my-var=foo, then this dictionary will be {"my-var": ["foo"]}.
+                If the value is an cyclopts.config.Unset object, then no tokens have been parsed for that parameter yet.
+                Deleting keys from this dictionary will unset their value.
+             """
+
+      The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
+      See :ref:`cyclopts.config <API Config>` for useful builtins.
+
 
 .. autoclass:: cyclopts.Parameter
 
@@ -319,6 +351,20 @@ API
       Fallback to environment variable(s) if CLI value not provided.
       If multiple environment variables are given, the left-most environment variable with a set value will be used.
       If no environment variable is set, Cyclopts will fallback to the function-signature default.
+
+   .. attribute:: env_var_split
+      :type: Callable
+      :value: cyclopts.env_var_split
+
+      Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
+      The function must have signature:
+
+      .. code-block:: python
+
+         def env_var_split(type_: type, val: str) -> List[str]:
+             ...
+
+      where ``type_`` is the associated parameter type-hint, and ``val`` is the environment value.
 
    .. attribute:: name_transform
        :type: Optional[Callable[[str], str]]
@@ -508,10 +554,11 @@ API
          │ --buzz value "bob" needs to be uppercase.               │
          ╰─────────────────────────────────────────────────────────╯
 
-
 .. autofunction:: cyclopts.convert
 
 .. autofunction:: cyclopts.default_name_transform
+
+.. autofunction:: cyclopts.env_var_split
 
 .. _API Validators:
 
@@ -599,6 +646,187 @@ Annotated types for checking common int/float value constraints.
 .. autodata:: cyclopts.types.NegativeInt
 
 .. autodata:: cyclopts.types.NonPositiveInt
+
+.. _API Config:
+
+------
+Config
+------
+Cyclopts has builtin configuration classes to be used with :attr:`App.config <cyclopts.App.config>` for loading user-defined defaults in many common scenarios.
+All Cyclopts builtins index into the configuration file with the following rules:
+
+1. Apply ``root_keys`` (if provided) to enter the project's configuration namespace.
+
+2. Apply the command name(s) to enter the current command's configuration namespace.
+
+3. Apply each key/value pair if CLI arguments have **not** been provided for that parameter.
+
+.. autoclass:: cyclopts.config.Toml
+
+   Automatically read configuration from Toml file.
+
+   .. attribute:: path
+      :type: Union[str, Path]
+
+      Path to the TOML configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      Keys that lead to your application's configuration.
+      For example, if referencing a ``pyproject.toml``, it is common
+      to store all of your projects configuration under:
+
+      .. code-block:: toml
+
+         [tool.myproject]
+
+      So, your Cyclopts :class:`~cyclopts.App` should be configured as:
+
+      .. code-block:: python
+
+         app = cyclopts.App(config=cyclopts.config.Toml("pyproject.toml", root_keys=("tool", "myproject")))
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: False
+
+      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: False
+
+      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Toml.path` is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: False
+
+      Allow unknown keywords configuration values.
+
+.. autoclass:: cyclopts.config.Yaml
+
+   Automatically read configuration from Yaml file.
+
+   .. attribute:: path
+      :type: Union[str, Path]
+
+      Path to the YAML configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      Keys that lead to your application's configuration in the YAML file.
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: False
+
+      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: False
+
+      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Yaml.path` is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: False
+
+      Allow unknown keywords configuration values.
+
+
+.. autoclass:: cyclopts.config.Json
+
+   Automatically read configuration from Json file.
+
+   .. attribute:: path
+      :type: Union[str, Path]
+
+      Path to the JSON configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      Keys that lead to your application's configuration in the YAML file.
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: False
+
+      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: False
+
+      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Json.path` is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: False
+
+      Allow unknown keywords configuration values.
+
+.. autoclass:: cyclopts.config.Env
+
+   Automatically derive environment variable names to read configurations from.
+
+   For example, consider the following app:
+
+   .. code-block:: python
+
+      import cyclopts
+
+      app = cyclopts.App(config=cyclopts.config.Env("MY_SCRIPT_"))
+
+
+      @app.command
+      def my_command(foo, bar):
+          print(f"{foo=} {bar=}")
+
+
+      app()
+
+   If values for ``foo`` and ``bar`` are not supplied by the command line, the app will check
+   the environment variables ``MY_SCRIPT_MY_COMMAND_FOO`` and ``MY_SCRIPT_MY_COMMAND_BAR``, respectively:
+
+   .. code-block:: console
+
+      $ python my_script.py my-command 1 2
+      foo=1 bar=2
+
+      $ export MY_SCRIPT_MY_COMMAND_FOO=100
+      $ python my_script.py my-command --bar=2
+      foo=100 bar=2
+      $ python my_script.py my-command 1 2
+      foo=1 bar=2
+
+
+   .. attribute:: prefix
+      :type: str
+      :value: ""
+
+      String to prepend to all autogenerated environment variable names.
+      Typically ends in ``_``, and is something like ``MY_APP_``.
+
+   .. attribute:: command
+      :type: bool
+      :value: True
+
+   .. attribute:: split
+      :type: Callable
+      :value: cyclopts.env_var_split
+
+      Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
+
+.. autoclass:: cyclopts.config.Unset
+   :members: related_set
 
 ----------
 Exceptions

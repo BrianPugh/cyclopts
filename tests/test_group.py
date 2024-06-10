@@ -15,10 +15,6 @@ else:
     from typing import Annotated
 
 
-class SentinelError(Exception):
-    pass
-
-
 def upper(type_, *args: str):
     return args[0].upper()
 

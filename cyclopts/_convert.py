@@ -52,6 +52,7 @@ def _bool(s: str) -> bool:
     elif s in {"yes", "y", "1", "true", "t"}:
         return True
     else:
+        # Cyclopts is a little bit conservative when coercing strings into boolean.
         raise CoercionError(target_type=bool, input_value=s)
 
 

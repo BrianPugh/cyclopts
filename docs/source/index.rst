@@ -34,6 +34,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    :caption: Advanced Usage
 
    args_and_kwargs.rst
+   config_file.rst
    packaging.rst
    app_calling.rst
    meta_app.rst

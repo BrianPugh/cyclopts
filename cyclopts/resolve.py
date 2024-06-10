@@ -121,7 +121,9 @@ class ResolvedCommand:
     groups_iparams: List[Tuple[Group, List[inspect.Parameter]]]
     iparam_to_groups: ParameterDict
     iparam_to_cparam: ParameterDict
-    name_to_iparam: Dict[str, inspect.Parameter]
+
+    pyname_to_iparam: Dict[str, inspect.Parameter]
+    # Plain python identifier string to inspect.Parameter
 
     def __init__(
         self,
@@ -155,7 +157,7 @@ class ResolvedCommand:
 
         self.command = f
         signature = cyclopts.utils.signature(f)
-        self.name_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
+        self.pyname_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
 
         # Get:
         # 1. Fully resolved and created Groups.
@@ -178,7 +180,7 @@ class ResolvedCommand:
                 Parameter(required=iparam.default is iparam.empty),
             )[1]
 
-            # Resolve name now that ``name_transform`` has been resolved.
+            # Resolve ``name`` now that ``name_transform`` has been resolved.
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
                 # Name is only used for help-string
                 names = [iparam.name.upper()]
@@ -191,7 +193,7 @@ class ResolvedCommand:
             cparam = Parameter.combine(Parameter(name=names), cparam)
             self.iparam_to_cparam[iparam] = cparam
 
-        self.bind = signature.bind_partial if _has_unparsed_parameters(signature, app_parameter) else signature.bind
+        self.bind = signature.bind_partial
 
         # Create a convenient group-to-iparam structure
         self.groups_iparams = [
@@ -201,6 +203,10 @@ class ResolvedCommand:
             )
             for group in self.groups
         ]
+
+    @property
+    def iparams(self):
+        return self.iparam_to_cparam.keys()
 
     @cached_property
     def cli2parameter(self) -> Dict[str, Tuple[inspect.Parameter, Any]]:
@@ -227,12 +233,14 @@ class ResolvedCommand:
             for name in cparam.name:
                 mapping[name] = (iparam, True if hint is bool else None)
             for name in cparam.get_negatives(hint, *cparam.name):
+                # Creates empty versions of iterables.
                 mapping[name] = (iparam, (get_origin(hint) or hint)())
 
         return mapping
 
     @cached_property
     def parameter2cli(self) -> ParameterDict:
+        """Creates a dictinoary mapping :class:`inspect.Parameter` to a list of CLI names."""
         c2p = self.cli2parameter
         p2c = ParameterDict()
 

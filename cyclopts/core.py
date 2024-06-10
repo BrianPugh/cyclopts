@@ -189,6 +189,13 @@ class App:
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
+    # This can ONLY ever be a Tuple[Callable, ...]
+    config: Union[None, Callable, Iterable[Callable]] = field(
+        default=None,
+        converter=to_tuple_converter,
+        kw_only=True,
+    )
+
     version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
@@ -409,7 +416,14 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
-    def parse_commands(self, tokens: Union[None, str, Iterable[str]] = None):
+    def parse_commands(
+        self,
+        tokens: Union[
+            None,
+            str,
+            Iterable[str],
+        ] = None,
+    ) -> Tuple[Tuple[str, ...], Tuple["App", ...], List[str]]:
         """Extract out the command tokens from a command.
 
         Parameters
@@ -446,7 +460,7 @@ class App:
             command_chain.append(token)
             command_mapping = _combined_meta_command_mapping(app)
 
-        return command_chain, apps, unused_tokens
+        return tuple(command_chain), tuple(apps), unused_tokens
 
     def command(
         self,
@@ -574,6 +588,13 @@ class App:
         except IndexError:
             parent_app = None
 
+        config: Tuple[Callable, ...] = ()
+        for app in reversed(apps):
+            if app.config:
+                config = app.config  # pyright: ignore[reportAssignmentType]
+                break
+        config = tuple(partial(x, apps, command_chain) for x in config)
+
         # Special flags (help/version) get intercepted by the root app.
         # Special flags are allows to be **anywhere** in the token stream.
 
@@ -604,17 +625,11 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    resolved_command = self._resolve_command(
-                        tokens,
-                        parse_docstring=False,
-                    )
+                    resolved_command = self._resolve_command(tokens, parse_docstring=False)
                     # We want the resolved group that ``app`` belongs to.
-                    if parent_app is None:
-                        command_groups = []
-                    else:
-                        command_groups = _get_command_groups(parent_app, command_app)
+                    command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
 
-                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens)
+                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens, config)
                     try:
                         if command_app.converter:
                             bound.arguments = command_app.converter(**bound.arguments)

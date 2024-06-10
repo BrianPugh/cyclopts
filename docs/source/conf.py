@@ -15,10 +15,10 @@ import git
 from sphinx.application import Sphinx
 from sphinx.ext.autodoc import Options
 
+from cyclopts import __version__
+
 sys.path.insert(0, str(Path("../..").absolute()))
 
-
-from cyclopts import __version__
 
 git_repo = git.Repo(".", search_parent_directories=True)  # type: ignore[reportPrivateImportUsage]
 git_commit = git_repo.head.commit
