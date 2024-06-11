@@ -216,6 +216,7 @@ sections=["tool.poetry.dependencies"]
 exclude-deps =[
   "importlib-metadata",
   "typing-extensions",
+  "docstring-parser",  # Not detected due to deferred import.
   "rich-rst",  # Not detected due to deferred import.
   "rich",  # Not detected due to deferred import.
   "tomli",  # Not detected due to optional feature.

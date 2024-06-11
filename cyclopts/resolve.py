@@ -8,8 +8,6 @@ import inspect
 from functools import cached_property
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast, get_origin
 
-from docstring_parser import parse as docstring_parse
-
 import cyclopts.utils
 from cyclopts.exceptions import DocstringError
 from cyclopts.group import Group
@@ -95,6 +93,8 @@ def _resolve_groups(
 
 
 def _resolve_docstring(f: Callable, signature: inspect.Signature) -> ParameterDict:
+    from docstring_parser import parse as docstring_parse
+
     iparam_to_docstring_cparam = ParameterDict()
     if f.__doc__ is None:
         return iparam_to_docstring_cparam

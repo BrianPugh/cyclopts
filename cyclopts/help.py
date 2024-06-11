@@ -15,7 +15,6 @@ from typing import (
     get_origin,
 )
 
-import docstring_parser
 from attrs import define, field, frozen
 
 import cyclopts.utils
@@ -31,6 +30,8 @@ if TYPE_CHECKING:
 @lru_cache(maxsize=16)
 def docstring_parse(doc: str):
     """Addon to :func:`docstring_parser.parse` that double checks the `short_description`."""
+    import docstring_parser
+
     res = docstring_parser.parse(doc)
     cleaned_doc = inspect.cleandoc(doc)
     short = cleaned_doc.split("\n\n")[0]
