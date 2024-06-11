@@ -113,7 +113,7 @@ ignore = ["docs/", ]
 
 [tool.ruff]
 target-version = 'py38'
-line-length = 120  # Must agree with Black
+line-length = 120
 exclude = [
     "migrations",
     "__pycache__",
@@ -125,6 +125,9 @@ exclude = [
     ".venv",
 ]
 
+[tool.ruff.format]
+docstring-code-format = true
+
 [tool.ruff.lint]
 select = [
     "B",  # flake8-bugbear
@@ -133,7 +136,6 @@ select = [
     "E",  # Error
     "F",  # pyflakes
     "I",  # isort
-    "ISC", # flake8-implicit-str-concat
     "N",  # pep8-naming
     "PGH",  # pygrep-hooks
     "PTH", # flake8-use-pathlib

@@ -54,7 +54,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             skip_next_iterations -= 1
             continue
 
-        if not token.startswith("-"):
+        if not _is_option_like(token):
             unused_tokens.append(token)
             continue
 
@@ -458,7 +458,8 @@ def create_bound_arguments(
         except (AssertionError, ValueError, TypeError) as e:
             # group will always be set from the above for loop if an exception occurs.
             raise ValidationError(
-                value=e.args[0] if e.args else "", group=group  # pyright: ignore[reportPossiblyUnboundVariable]
+                value=e.args[0] if e.args else "",
+                group=group,  # pyright: ignore[reportPossiblyUnboundVariable]
             ) from e
 
         for iparam in command.iparams:
