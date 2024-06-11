@@ -54,7 +54,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             skip_next_iterations -= 1
             continue
 
-        if not token.startswith("-"):
+        if not _is_option_like(token):
             unused_tokens.append(token)
             continue
 
