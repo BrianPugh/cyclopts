@@ -291,7 +291,7 @@ def convert(
         .. code-block:: python
 
             def converter(type_: type, value: str) -> Any:
-                ...
+                "Perform conversion of string token."
 
         This allows to use the :func:`convert` function to handle the the difficult task
         of traversing lists/tuples/unions/etc, while leaving the final conversion logic to
@@ -305,7 +305,7 @@ def convert(
         .. code-block:: python
 
             def name_transform(s: str) -> str:
-                ...
+                "Perform name transform."
 
         where the returned value is the name to be used on the CLI.
 

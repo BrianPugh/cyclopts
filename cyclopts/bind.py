@@ -458,7 +458,8 @@ def create_bound_arguments(
         except (AssertionError, ValueError, TypeError) as e:
             # group will always be set from the above for loop if an exception occurs.
             raise ValidationError(
-                value=e.args[0] if e.args else "", group=group  # pyright: ignore[reportPossiblyUnboundVariable]
+                value=e.args[0] if e.args else "",
+                group=group,  # pyright: ignore[reportPossiblyUnboundVariable]
             ) from e
 
         for iparam in command.iparams:

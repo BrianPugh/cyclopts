@@ -29,7 +29,7 @@ def _create_or_append(
 
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     """Extract Group/App association from all commands of ``app``."""
-    group_mapping: List[Tuple[Group, List["App"]]] = [
+    group_mapping: List[Tuple[Group, List[App]]] = [
         (app.group_commands, []),
     ]
 
