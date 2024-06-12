@@ -2,12 +2,23 @@ import inspect
 import sys
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    TypedDict,
+    Union,
+)
 
 import pytest
 
 from cyclopts import CoercionError
-from cyclopts._convert import convert, resolve, token_count
+from cyclopts._convert import convert, is_typed_dict, resolve, token_count
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -271,3 +282,35 @@ def test_resolve_annotated():
 def test_resolve_empty():
     res = resolve(inspect.Parameter.empty)
     assert res == str
+
+
+class ExampleTypedDict(TypedDict):
+    foo: str
+    bar: int
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        ExampleTypedDict,
+        Optional[ExampleTypedDict],
+        Annotated[ExampleTypedDict, "foo"],
+        # A union including a Typed Dict is allowed.
+        Union[ExampleTypedDict, str, int],
+    ],
+)
+def test_is_typed_dict_true(hint):
+    assert is_typed_dict(hint)
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        list,
+        dict,
+        Dict,
+        Dict[str, int],
+    ],
+)
+def test_is_typed_dict_false(hint):
+    assert not is_typed_dict(hint)

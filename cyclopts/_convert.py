@@ -37,6 +37,9 @@ else:
 if TYPE_CHECKING:
     from cyclopts.parameter import Parameter
 
+_IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
+
+
 # from types import NoneType is available >=3.10
 NoneType = type(None)
 AnnotatedType = type(Annotated[int, 0])
@@ -252,6 +255,39 @@ def resolve_annotated(type_: Any) -> Type:
     if type(type_) is AnnotatedType:
         type_ = get_args(type_)[0]
     return type_
+
+
+def is_typed_dict(hint) -> bool:
+    """Determine if a type annotation is a TypedDict.
+
+    This is surprisingly hard! Modified from Beartype's implementation:
+
+        https://github.com/beartype/beartype/blob/main/beartype/_util/hint/pep/proposal/utilpep589.py
+    """
+    hint = resolve(hint)
+    if is_union(get_origin(hint)):
+        return any(is_typed_dict(x) for x in get_args(hint))
+
+    if not (isinstance(hint, type) and issubclass(hint, dict)):
+        return False
+
+    return (
+        # This "dict" subclass defines these "TypedDict" attributes *AND*...
+        hasattr(hint, "__annotations__")
+        and hasattr(hint, "__total__")
+        and
+        # Either...
+        (
+            # The active Python interpreter targets exactly Python 3.8 and
+            # thus fails to unconditionally define the remaining attributes
+            # *OR*...
+            _IS_PYTHON_3_8
+            or
+            # The active Python interpreter targets any other Python version
+            # and thus unconditionally defines the remaining attributes.
+            (hasattr(hint, "__required_keys__") and hasattr(hint, "__optional_keys__"))
+        )
+    )
 
 
 def convert(
