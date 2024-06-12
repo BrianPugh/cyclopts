@@ -212,20 +212,6 @@ def _convert(
             raise CoercionError(input_value=element, target_type=type_) from None
 
 
-_unsupported_target_types = {dict}
-
-
-def get_origin_and_validate(type_: Type):
-    origin_type = get_origin(type_)
-    if origin_type is None:
-        if type_ in _unsupported_target_types:
-            raise TypeError(f"Unsupported Type: {type_}")
-    else:
-        if origin_type in _unsupported_target_types:
-            raise TypeError(f"Unsupported Type: {type_}")
-    return origin_type
-
-
 def resolve(type_: Any) -> Type:
     """Perform all simplifying resolutions."""
     if type_ is inspect.Parameter.empty:
@@ -336,7 +322,7 @@ def convert(
 
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
-    origin_type = get_origin_and_validate(type_)
+    origin_type = get_origin(type_)
 
     if origin_type is tuple:
         return convert_tuple(type_, *args)
@@ -369,7 +355,7 @@ def token_count(type_: Any) -> Tuple[int, bool]:
     annotation = get_hint_parameter(type_)[0]
 
     annotation = resolve(annotation)
-    origin_type = get_origin_and_validate(annotation)
+    origin_type = get_origin(annotation)
 
     if (origin_type or annotation) is tuple:
         args = get_args(annotation)

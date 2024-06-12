@@ -18,13 +18,7 @@ from attrs import field, frozen
 
 import cyclopts._env_var
 import cyclopts.utils
-from cyclopts._convert import (
-    AnnotatedType,
-    convert,
-    get_origin_and_validate,
-    resolve,
-    resolve_optional,
-)
+from cyclopts._convert import AnnotatedType, convert, resolve, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
@@ -212,7 +206,7 @@ def validate_command(f: Callable):
     """
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
-        get_origin_and_validate(iparam.annotation)
+        get_origin(iparam.annotation)
         type_, cparam = get_hint_parameter(iparam)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
