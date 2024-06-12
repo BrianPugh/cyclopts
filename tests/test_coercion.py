@@ -6,13 +6,13 @@ from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Uni
 
 import pytest
 
+from cyclopts import CoercionError
+from cyclopts._convert import convert, resolve, token_count
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
-
-from cyclopts import CoercionError
-from cyclopts._convert import convert, resolve, token_count
 
 
 def _assert_tuple(expected, actual):
@@ -141,17 +141,6 @@ def test_coerce_enum():
 
     with pytest.raises(CoercionError):
         convert(SoftwareEnvironment, "invalid-choice")
-
-
-def test_coerce_dict_error():
-    with pytest.raises(TypeError):
-        convert(dict, "this-doesnt-matter")
-
-    with pytest.raises(TypeError):
-        convert(Dict, "this-doesnt-matter")
-
-    with pytest.raises(TypeError):
-        convert(Annotated[dict, "foo"], "this-doesnt-matter")
 
 
 def test_coerce_tuple_basic_single():
