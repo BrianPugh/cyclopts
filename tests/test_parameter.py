@@ -4,13 +4,18 @@ from typing import List, Optional, Set
 
 import pytest
 
+from cyclopts import Parameter
+from cyclopts.parameter import get_hint_parameter
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
 
-from cyclopts import Parameter
-from cyclopts.parameter import get_hint_parameter
+
+def test_parameter_invalid_name():
+    with pytest.raises(ValueError):
+        Parameter(name="foo.bar.baz")
 
 
 def test_parameter_get_negatives_bool_default():
