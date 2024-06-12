@@ -69,12 +69,15 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
         else:
             cli_key = token
 
+        cli_keys = cli_key.split(".")
+        del cli_key
+
         try:
-            iparam, implicit_value = command.cli2parameter[cli_key]
+            iparam, implicit_value = command.cli2parameter[cli_keys[0]]
         except KeyError:
             if kwargs_iparam:
                 iparam = kwargs_iparam
-                kwargs_key = _cli_kw_to_f_kw(cli_key)
+                kwargs_key = _cli_kw_to_f_kw(cli_keys[0])
                 implicit_value = None
             else:
                 unused_tokens.append(token)

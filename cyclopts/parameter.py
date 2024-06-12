@@ -29,12 +29,15 @@ from cyclopts.utils import (
 
 
 def _double_hyphen_validator(instance, attribute, values):
-    if not values:
-        return
-
     for value in values:
         if value is not None and not value.startswith("--"):
             raise ValueError(f'{attribute.alias} value must start with "--".')
+
+
+def _name_validator(instance, attribute, values):
+    for value in values:
+        if "." in value:
+            raise ValueError
 
 
 def _negative_converter(default: Tuple[str, ...]):
@@ -58,6 +61,7 @@ class Parameter:
     name: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
+        validator=_name_validator,
     )
 
     _converter: Callable = field(default=None, alias="converter")
