@@ -314,3 +314,15 @@ def test_is_typed_dict_true(hint):
 )
 def test_is_typed_dict_false(hint):
     assert not is_typed_dict(hint)
+
+
+@pytest.mark.skip(reason="not implemented")
+def test_dict_token_count(
+    hint,
+):
+    pass
+
+
+@pytest.mark.skip(reason="not implemented")
+def test_typed_dict_token_count():
+    pass
