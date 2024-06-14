@@ -4,9 +4,19 @@ import os
 import shlex
 import sys
 from contextlib import suppress
-from typing import Callable, Dict, Iterable, List, Tuple, Type, Union
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Tuple,
+    Type,
+    Union,
+    get_args,
+    get_origin,
+)
 
-from cyclopts._convert import _bool, token_count
+from cyclopts._convert import _bool, resolve, token_count
 from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
@@ -39,6 +49,34 @@ def _cli_kw_to_f_kw(cli_key: str):
     return cli_key
 
 
+def _get_type_from_keys(hint, cli_keys):
+    """If ``hint`` is dict-like, apply cli_keys and fetch the appropriate annotation."""
+    resolved_hint = resolve(hint)
+    origin = get_origin(resolved_hint) or resolved_hint
+
+    if isinstance(origin, type) and issubclass(origin, dict):
+        args = get_args(resolved_hint)
+        if not args:
+            # bare ``dict`` or ``Dict`` annotation
+            return str
+        args = tuple(resolve(x) for x in args)
+
+        # args[0] gets checked first because it's a programmer error.
+        if args[0] != str:
+            raise ValueError("Dictionary keys must be strings.")
+
+        if not cli_keys:
+            raise UnknownOptionError(token="")  # populated in _parse_kw_and_flags
+
+        # TODO: handle TypedDict here
+        return _get_type_from_keys(args[1], cli_keys[1:])
+
+    if cli_keys:
+        raise UnknownOptionError(token="")  # populated in _parse_kw_and_flags
+
+    return hint
+
+
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
     kwargs_iparam = next((x for x in command.iparams if x.kind == x.VAR_KEYWORD), None)
 
@@ -63,14 +101,13 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
         consume_count = 0
 
         if "=" in token:
-            cli_key, cli_value = token.split("=", 1)
+            cli_option, cli_value = token.split("=", 1)
             cli_values.append(cli_value)
             consume_count -= 1
         else:
-            cli_key = token
+            cli_option = token
 
-        cli_keys = cli_key.split(".")
-        del cli_key
+        cli_keys = cli_option.split(".")
 
         try:
             iparam, implicit_value = command.cli2parameter[cli_keys[0]]
@@ -104,7 +141,13 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False
         else:
-            tokens_per_element, consume_all = token_count(iparam)
+            try:
+                type_ = _get_type_from_keys(iparam.annotation, cli_keys[1:])
+            except UnknownOptionError as e:
+                e.token = cli_option
+                raise
+
+            tokens_per_element, consume_all = token_count(type_)
 
             with suppress(IndexError):
                 if consume_all:
