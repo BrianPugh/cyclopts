@@ -23,8 +23,8 @@ If you would like your CLI application to be able to upgrade itself, you can add
        """Update mypackage to latest stable version."""
        old_version = mypackage.__version__
        subprocess.check_output([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
-       subprocess.check_output([sys.executable, "-m", "pip", "install", "--upgrade", "gnwmanager"])
-       res = subprocess.run([sys.executable, "-m", "gnwmanager", "--version"], stdout=subprocess.PIPE, check=True)
+       subprocess.check_output([sys.executable, "-m", "pip", "install", "--upgrade", "mypackage"])
+       res = subprocess.run([sys.executable, "-m", "mypackage", "--version"], stdout=subprocess.PIPE, check=True)
        new_version = res.stdout.decode().strip()
        if old_version == new_version:
            print(f"mypackage up-to-date (v{new_version}).")
