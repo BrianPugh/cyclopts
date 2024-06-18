@@ -189,10 +189,11 @@ class App:
     default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
-    # This can ONLY ever be a Tuple[Callable, ...]
-    config: Union[None, Callable, Iterable[Callable]] = field(
+    # This can ONLY ever be None or Tuple[Callable, ...]
+    _config: Union[None, Callable, Iterable[Callable]] = field(
         default=None,
-        converter=to_tuple_converter,
+        alias="config",
+        converter=optional_to_tuple_converter,
         kw_only=True,
     )
 
@@ -342,6 +343,17 @@ class App:
             return (name,)
         else:
             return (self.name_transform(self.default_command.__name__),)
+
+    @property
+    def config(self) -> Tuple[str, ...]:
+        if self._config is None and self._meta_parent is not None:
+            return self._meta_parent.config
+        else:
+            return self._config or ()  # pyright: ignore[reportReturnType]
+
+    @config.setter
+    def config(self, value):
+        self._config = value
 
     @property
     def help(self) -> str:
