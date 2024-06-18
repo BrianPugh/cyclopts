@@ -2,12 +2,12 @@ import sys
 
 import pytest
 
+from cyclopts import Parameter
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
-
-from cyclopts import Parameter
 
 
 @pytest.mark.parametrize(
@@ -31,3 +31,8 @@ def test_meta_basic(app, cmd_str):
         app(tokens)
 
     app.meta(cmd_str)
+
+
+def test_meta_app_config_inheritance(app):
+    app.config = ("foo", "bar")
+    assert app.meta.config == ("foo", "bar")
