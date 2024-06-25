@@ -39,6 +39,7 @@ from cyclopts.help import (
     create_parameter_help_panel,
     format_command_entries,
     format_doc,
+    format_str,
     format_usage,
     resolve_help_format,
 )
@@ -197,7 +198,7 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable] = field(factory=_default_version, kw_only=True)
+    version: Union[None, str, Callable[..., str]] = field(factory=_default_version, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -382,9 +383,29 @@ class App:
     def name_transform(self, value):
         self._name_transform = value
 
-    def version_print(self) -> None:
-        """Print the application version."""
-        print(self.version() if callable(self.version) else self.version)
+    def version_print(
+        self,
+        console: Optional["Console"] = None,
+    ) -> None:
+        """Print the application version.
+
+        Parameters
+        ----------
+        console: rich.console.Console
+            Console to print version string to.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
+
+        """
+        console = self._resolve_console(None, console)
+        help_format = resolve_help_format(None)
+
+        version_raw = self.version() if callable(self.version) else self.version
+
+        if version_raw is None:
+            version_raw = "0.0.0"
+
+        version_formatted = format_str(version_raw, format=help_format)
+        console.print(version_formatted)
 
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.
@@ -430,11 +451,7 @@ class App:
 
     def parse_commands(
         self,
-        tokens: Union[
-            None,
-            str,
-            Iterable[str],
-        ] = None,
+        tokens: Union[None, str, Iterable[str]] = None,
     ) -> Tuple[Tuple[str, ...], Tuple["App", ...], List[str]]:
         """Extract out the command tokens from a command.
 
@@ -576,6 +593,9 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
+        console: rich.console.Console
+            Console to print help and runtime Cyclopts errors.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
 
         Returns
         -------
@@ -912,9 +932,7 @@ class App:
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
-                    import cyclopts.help
-
-                    group_help = cyclopts.help._format(group.help, format=help_format)
+                    group_help = format_str(group.help, format=help_format)
 
                     if command_panel.description:
                         command_panel.description = RichGroup(command_panel.description, NewLine(), group_help)
