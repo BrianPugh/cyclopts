@@ -8,6 +8,7 @@ from typing import (
     Iterable,
     List,
     Literal,
+    Optional,
     Tuple,
     Type,
     Union,
@@ -212,10 +213,10 @@ def format_doc(root_app, app: "App", format: str = "restructuredtext"):
             components.append("\n")
         components.append((parsed.long_description + "\n", "info"))
 
-    return RichGroup(_format(*components, format=format), NewLine())
+    return RichGroup(format_str(*components, format=format), NewLine())
 
 
-def _format(*components: Union[str, Tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
+def format_str(*components: Union[str, Tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
     format = format.lower()
 
     if format == "plaintext":
@@ -290,7 +291,7 @@ def create_parameter_help_panel(
     cparams: List[Parameter],
     format: str,
 ) -> HelpPanel:
-    help_panel = HelpPanel(format="parameter", title=group.name, description=_format(group.help, format=format))
+    help_panel = HelpPanel(format="parameter", title=group.name, description=format_str(group.help, format=format))
     icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
 
     if not icparams:
@@ -358,7 +359,7 @@ def create_parameter_help_panel(
         help_panel.entries.append(
             HelpEntry(
                 name=",".join(long_options),
-                description=_format(*help_components, format=format),
+                description=format_str(*help_components, format=format),
                 short=",".join(short_options),
                 required=bool(cparam.required),
             )
@@ -376,16 +377,18 @@ def format_command_entries(apps: Iterable["App"], format: str) -> List:
         entry = HelpEntry(
             name=",".join(long_names),
             short=",".join(short_names),
-            description=_format(docstring_parse(app.help).short_description or "", format=format),
+            description=format_str(docstring_parse(app.help).short_description or "", format=format),
         )
         if entry not in entries:
             entries.append(entry)
     return entries
 
 
-def resolve_help_format(app_chain: Iterable["App"]) -> str:
+def resolve_help_format(app_chain: Optional[Iterable["App"]]) -> str:
     # Resolve help_format; None fallsback to parent; non-None overwrites parent.
     help_format = "restructuredtext"
+    if app_chain is None:
+        return help_format
     for app in app_chain:
         if app.help_format is not None:
             help_format = app.help_format
