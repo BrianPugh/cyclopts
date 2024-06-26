@@ -397,7 +397,7 @@ class App:
 
         """
         console = self._resolve_console(None, console)
-        help_format = resolve_help_format(None)
+        help_format = resolve_help_format([self])
 
         version_raw = self.version() if callable(self.version) else self.version
 
