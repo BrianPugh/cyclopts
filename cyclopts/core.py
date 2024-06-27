@@ -42,6 +42,7 @@ from cyclopts.help import (
     format_str,
     format_usage,
     resolve_help_format,
+    resolve_version_format,
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -229,6 +230,17 @@ class App:
         ]
     ] = field(default=None, kw_only=True)
 
+    version_format: Optional[
+        Literal[
+            "markdown",
+            "md",
+            "plaintext",
+            "restructuredtext",
+            "rst",
+            "rich",
+        ]
+    ] = field(default=None, kw_only=True)
+
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
     group: Union[Group, str, Tuple[Union[Group, str], ...]] = field(
@@ -397,7 +409,7 @@ class App:
 
         """
         console = self._resolve_console(None, console)
-        help_format = resolve_help_format([self])
+        help_format = resolve_version_format([self])
 
         version_raw = self.version() if callable(self.version) else self.version
 

@@ -46,6 +46,13 @@ API
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
 
+   .. attribute:: version_format
+      :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
+      :value: None
+
+      The markup language of the version string; used in :meth:`version_print`.
+      If :obj:`None`, fallback to resolved :attr:`~.App.help_format`.
+
    .. attribute:: usage
       :type: Optional[str]
       :value: None
