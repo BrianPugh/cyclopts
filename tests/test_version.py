@@ -40,7 +40,21 @@ def test_version_print_custom_callable(app, console):
 
 
 def test_version_print_help_format_fallback(app, console):
-    app.version = "[red]foo[/foo]"
+    """If no explicit version_format is provided, we should fallback to help_format."""
+    app.help_format = "rich"
+    app.version = "[red]foo[/red]"
+
+    with console.capture() as capture:
+        app.version_print(console)
+
+    assert "foo\n" == capture.get()
+
+
+def test_version_print_help_format_override(app, console):
+    """If version_format is provided, help_format should not be used for version."""
+    app.help_format = "plain"
+    app.version_format = "rich"
+    app.version = "[red]foo[/red]"
 
     with console.capture() as capture:
         app.version_print(console)
