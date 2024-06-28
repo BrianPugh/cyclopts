@@ -5,11 +5,6 @@ from typing import List, Literal, Optional, Set, Tuple, Union
 
 import pytest
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
 from cyclopts import App, Group, Parameter
 from cyclopts.help import (
     HelpPanel,
@@ -18,6 +13,11 @@ from cyclopts.help import (
     format_usage,
 )
 from cyclopts.resolve import ResolvedCommand
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated
+else:
+    from typing import Annotated
 
 
 @pytest.fixture
