@@ -51,7 +51,8 @@ API
       :value: None
 
       The markup language of the version string; used in :meth:`version_print`.
-      If :obj:`None`, fallback to resolved :attr:`~.App.help_format`.
+      If :obj:`None`, fallback to parenting :attr:`~.App.version_format`.
+      If no :attr:`~.App.version_format` is defined, falls back to resolved :attr:`~.App.help_format`.
 
    .. attribute:: usage
       :type: Optional[str]

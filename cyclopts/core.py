@@ -409,14 +409,14 @@ class App:
 
         """
         console = self._resolve_console(None, console)
-        help_format = resolve_version_format([self])
+        version_format = resolve_version_format([self])
 
         version_raw = self.version() if callable(self.version) else self.version
 
         if version_raw is None:
             version_raw = "0.0.0"
 
-        version_formatted = format_str(version_raw, format=help_format)
+        version_formatted = format_str(version_raw, format=version_format)
         console.print(version_formatted)
 
     def __getitem__(self, key: str) -> "App":

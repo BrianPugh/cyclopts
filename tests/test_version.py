@@ -37,3 +37,12 @@ def test_version_print_custom_callable(app, console):
         app.version_print(console)
 
     assert "foo\n" == capture.get()
+
+
+def test_version_print_help_format_fallback(app, console):
+    app.version = "[red]foo[/foo]"
+
+    with console.capture() as capture:
+        app.version_print(console)
+
+    assert "foo\n" == capture.get()
