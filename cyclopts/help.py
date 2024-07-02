@@ -1,4 +1,5 @@
 import inspect
+import sys
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
@@ -26,6 +27,11 @@ if TYPE_CHECKING:
     from rich.console import RenderableType
 
     from cyclopts.core import App
+
+if sys.version_info >= (3, 12):
+    from typing import TypeAliasType
+else:
+    TypeAliasType = None
 
 
 @lru_cache(maxsize=16)
@@ -282,6 +288,8 @@ def _get_choices(type_: Type, name_transform: Callable[[str], str]) -> str:
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices = get_choices(args[0])
+    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
+        choices = get_choices(type_.__value__)
     return choices
 
 
