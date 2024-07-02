@@ -23,6 +23,11 @@ from typing import (
 from cyclopts.exceptions import CoercionError
 from cyclopts.utils import default_name_transform, is_union
 
+if sys.version_info >= (3, 12):
+    from typing import TypeAliasType
+else:
+    TypeAliasType = None
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated  # pragma: no cover
 else:
@@ -151,6 +156,8 @@ def _convert(
     if origin_type is collections.abc.Iterable:
         assert len(inner_types) == 1
         return convert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
+    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
+        return convert(type_.__value__, element)
     elif is_union(origin_type):
         for t in inner_types:
             if t is NoneType:
@@ -162,6 +169,7 @@ def _convert(
         else:
             raise CoercionError(input_value=element, target_type=type_)
     elif origin_type is Literal:
+        # Try coercing the token into each allowed Literal value (left-to-right).
         for choice in get_args(type_):
             try:
                 res = convert(type(choice), (element))
