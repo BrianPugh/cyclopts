@@ -11,8 +11,6 @@ repos:
     rev: v4.6.0
     hooks:
       - id: check-added-large-files
-      - id: check-ast
-      - id: check-builtin-literals
       - id: check-case-conflict
       - id: check-shebang-scripts-are-executable
       - id: check-merge-conflict
@@ -21,6 +19,7 @@ repos:
       - id: check-xml
       - id: check-yaml
       - id: debug-statements
+        exclude: '^tests/test_py3.*\.py$'
       - id: destroyed-symlinks
       - id: detect-private-key
       - id: end-of-file-fixer
@@ -39,10 +38,10 @@ repos:
 
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.6
-    additional_dependencies:
-      - tomli
     hooks:
       - id: codespell
+        additional_dependencies:
+          - tomli
 
   - repo: https://github.com/crate-ci/typos
     rev: v1.21.0

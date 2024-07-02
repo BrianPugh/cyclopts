@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,12 @@ from rich.console import Console
 import cyclopts
 import cyclopts.utils
 from cyclopts import App, Group, Parameter
+
+
+def pytest_ignore_collect(collection_path):
+    for minor in range(8, 20):
+        if sys.version_info < (3, minor) and collection_path.stem.startswith(f"test_py3{minor}_"):
+            return True
 
 
 @pytest.fixture
