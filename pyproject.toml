@@ -106,7 +106,7 @@ omit = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-ignore = ["docs/", ]
+ignore = ["docs/", "tests/test_py3*.py"]
 
 [tool.ruff]
 target-version = 'py38'
