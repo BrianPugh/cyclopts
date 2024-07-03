@@ -279,7 +279,7 @@ def _get_choices(type_: Type, name_transform: Callable[[str], str]) -> str:
     _origin = get_origin(type_)
     if isclass(type_) and issubclass(type_, Enum):
         choices = ",".join(name_transform(x.name) for x in type_)
-    elif _origin is Union:
+    elif cyclopts.utils.is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
         choices = ",".join(x for x in inner_choices if x)
     elif _origin is Literal:
