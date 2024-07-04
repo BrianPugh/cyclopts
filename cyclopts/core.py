@@ -18,6 +18,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    overload,
 )
 
 from attrs import define, field
@@ -247,17 +248,20 @@ class App:
         default=None, converter=to_tuple_converter, kw_only=True
     )
 
-    group_arguments: Group = field(
+    # This can ONLY ever be a Group
+    group_arguments: Union[Group, str, None] = field(
         default=None,
         converter=GroupConverter(Group.create_default_arguments()),
         kw_only=True,
     )
-    group_parameters: Group = field(
+    # This can ONLY ever be a Group
+    group_parameters: Union[Group, str, None] = field(
         default=None,
         converter=GroupConverter(Group.create_default_parameters()),
         kw_only=True,
     )
-    group_commands: Group = field(
+    # This can ONLY ever be a Group
+    group_commands: Union[Group, str, None] = field(
         default=None,
         converter=GroupConverter(Group.create_default_commands()),
         kw_only=True,
@@ -503,12 +507,38 @@ class App:
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
+    # This overload is used in code like:
+    #
+    # @app.command
+    # def my_command(foo: str):
+    #   ...
+    @overload
+    def command(
+        self,
+        obj: T,
+        name: Union[None, str, Iterable[str]] = None,
+        **kwargs: object,
+    ) -> T: ...
+
+    # This overload is used in code like:
+    #
+    # @app.command(name="bar")
+    # def my_command(foo: str):
+    #   ...
+    @overload
+    def command(
+        self,
+        obj: None = None,
+        name: Union[None, str, Iterable[str]] = None,
+        **kwargs: object,
+    ) -> Callable[[T], T]: ...
+
     def command(
         self,
         obj: Optional[T] = None,
         name: Union[None, str, Iterable[str]] = None,
-        **kwargs,
-    ) -> T:
+        **kwargs: object,
+    ) -> Union[T, Callable[[T], T]]:
         """Decorator to register a function as a CLI command.
 
         Parameters
@@ -545,7 +575,7 @@ class App:
                 kwargs["group_parameters"] = copy(self.group_parameters)
             if "group_arguments" not in kwargs:
                 kwargs["group_arguments"] = copy(self.group_arguments)
-            app = App(default_command=obj, **kwargs)
+            app = App(default_command=obj, **kwargs)  # pyright: ignore
             # app.name is handled below
 
         if app._name_transform is None:
@@ -554,7 +584,7 @@ class App:
         if name is None:
             name = app.name
         else:
-            app._name = name
+            app._name = name  # pyright: ignore[reportAttributeAccessIssue]
 
         for n in to_tuple_converter(name):
             if n in self:
@@ -903,6 +933,9 @@ class App:
 
         if not apps[-1].default_command:
             raise InvalidCommandError
+
+        assert isinstance(apps[-1].group_arguments, Group)
+        assert isinstance(apps[-1].group_parameters, Group)
 
         resolved_command = ResolvedCommand(
             apps[-1].default_command,

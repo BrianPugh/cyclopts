@@ -6,17 +6,17 @@ from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Uni
 
 import pytest
 
+from cyclopts import CoercionError
+from cyclopts._convert import convert, resolve, token_count
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
 
-from cyclopts import CoercionError
-from cyclopts._convert import convert, resolve, token_count
-
 
 def _assert_tuple(expected, actual):
-    assert type(actual) == tuple
+    assert type(actual) is tuple
     assert len(expected) == len(actual)
     for e, a in zip(expected, actual):
         assert type(e) == type(a)
@@ -281,4 +281,4 @@ def test_resolve_annotated():
 
 def test_resolve_empty():
     res = resolve(inspect.Parameter.empty)
-    assert res == str
+    assert res is str
