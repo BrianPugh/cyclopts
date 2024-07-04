@@ -538,7 +538,7 @@ class App:
         obj: Optional[T] = None,
         name: Union[None, str, Iterable[str]] = None,
         **kwargs: object,
-    ) -> T | Callable[[T], T]:
+    ) -> Union[T, Callable[[T], T]]:
         """Decorator to register a function as a CLI command.
 
         Parameters
