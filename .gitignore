@@ -250,3 +250,6 @@ poetry.toml
 
 # line-profiler
 *.lprof
+
+# Misc dev
+/*.py
