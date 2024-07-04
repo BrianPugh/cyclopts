@@ -18,7 +18,7 @@ from typing import (
 import pytest
 
 from cyclopts import CoercionError
-from cyclopts._convert import convert, is_typed_dict, resolve, token_count
+from cyclopts._convert import accepts_keys, convert, is_typed_dict, resolve, token_count
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -326,3 +326,37 @@ def test_dict_token_count(
 @pytest.mark.skip(reason="not implemented")
 def test_typed_dict_token_count():
     pass
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        int,
+        list,
+        List[float],
+        str,
+        Union[int, str],
+    ],
+)
+def test_accepts_keys_false(hint):
+    assert accepts_keys(hint) is False
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        dict,
+        Dict,
+        Dict[str, int],
+        ExampleTypedDict,
+        Optional[ExampleTypedDict],
+        Annotated[ExampleTypedDict, "foo"],
+        # A union including a Typed Dict is allowed.
+        Union[ExampleTypedDict, str, int],
+        Union[dict, str, int],
+        Union[Dict, str, int],
+        Union[Dict[str, int], str, int],
+    ],
+)
+def test_accepts_keys_true(hint):
+    assert accepts_keys(hint) is True

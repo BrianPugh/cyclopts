@@ -290,6 +290,14 @@ def is_typed_dict(hint) -> bool:
     )
 
 
+def accepts_keys(hint) -> bool:
+    hint = resolve(hint)
+    origin = get_origin(hint)
+    if is_union(origin):
+        return any(accepts_keys(x) for x in get_args(hint))
+    return dict in (hint, origin) or is_typed_dict(hint)
+
+
 def convert(
     type_: Any,
     *args: str,
