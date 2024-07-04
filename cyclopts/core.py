@@ -18,6 +18,7 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    overload,
 )
 
 from attrs import define, field
@@ -503,12 +504,39 @@ class App:
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
+    # This overload is used in code like:
+    #
+    # @app.command
+    # def my_command(foo: str):
+    #   ...
+    @overload
+    def command(
+        self,
+        obj: T,
+        name: Union[None, str, Iterable[str]] = None,
+        **kwargs: object,
+    ) -> T: ...
+
+
+    # This overload is used in code like:
+    #
+    # @app.command(name="bar")
+    # def my_command(foo: str):
+    #   ...
+    @overload
+    def command(
+        self,
+        obj: None = None,
+        name: Union[None, str, Iterable[str]] = None,
+        **kwargs: object,
+    ) -> Callable[[T], T]: ...
+
     def command(
         self,
         obj: Optional[T] = None,
         name: Union[None, str, Iterable[str]] = None,
-        **kwargs,
-    ) -> T:
+        **kwargs: object,
+    ) -> T | Callable[[T], T]:
         """Decorator to register a function as a CLI command.
 
         Parameters
