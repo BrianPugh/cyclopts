@@ -31,6 +31,7 @@ __all__ = [
     "DocstringError",
     "InvalidCommandError",
     "MissingArgumentError",
+    "MixedArgumentError",
     "RepeatArgumentError",
     "UnknownOptionError",
     "UnusedCliTokensError",
@@ -313,6 +314,21 @@ class RepeatArgumentError(CycloptsError):
         assert self.parameter2cli is not None
         parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
         return super().__str__() + f"Parameter {parameter_cli_name} specified multiple times."
+
+
+@define(kw_only=True)
+class MixedArgumentError(CycloptsError):
+    """Cannot supply keywords and non-keywords to the same argument."""
+
+    parameter: inspect.Parameter
+    """
+    The parameter that was supplied with keyword and non-keyword arguments.
+    """
+
+    def __str__(self):
+        assert self.parameter2cli is not None
+        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
+        return super().__str__() + f"Cannot supply keyword & non-keyword arguments to {parameter_cli_name}."
 
 
 def format_cyclopts_error(e: Any):
