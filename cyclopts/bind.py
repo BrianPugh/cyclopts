@@ -16,12 +16,13 @@ from typing import (
     get_origin,
 )
 
-from cyclopts._convert import _bool, resolve, token_count
+from cyclopts._convert import _bool, accepts_keys, resolve, token_count
 from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
     MissingArgumentError,
+    MixedArgumentError,
     RepeatArgumentError,
     UnknownOptionError,
     ValidationError,
@@ -41,12 +42,65 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
-def _cli_kw_to_f_kw(cli_key: str):
+def _cli_kws_to_f_kws(cli_keys: List[str]) -> List[str]:
     """Only used for converting unknown CLI key/value keys for ``**kwargs``."""
-    assert cli_key.startswith("--")
-    cli_key = cli_key[2:]  # strip off leading "--"
-    cli_key = cli_key.replace("-", "_")
-    return cli_key
+    out = []
+    for cli_key in cli_keys:
+        assert cli_key.startswith("--")
+        cli_key = cli_key[2:]  # strip off leading "--"
+        cli_key = cli_key.replace("-", "_")
+        out.append(cli_key)
+    return out
+
+
+def _check_repeat_arg(
+    mapping: Dict,
+    iparam: inspect.Parameter,
+    keys: List[str],
+) -> bool:
+    """Checks if iparam/keys agrees with previously supplied CLI arguments.
+
+    Returns
+    -------
+    bool
+        True if this specific iparam/key combo has been supplied before.
+    """
+    if iparam.kind is iparam.VAR_KEYWORD:
+        assert keys
+        d = mapping.get(iparam, {})
+    else:
+        if not keys:
+            return iparam in mapping
+        d = mapping.get(iparam, {} if keys else [])
+
+    for key in keys[:-1]:
+        if isinstance(d, list):
+            raise MixedArgumentError(parameter=iparam)
+        d = d.get(key, {})
+
+    return keys[-1] in d
+
+
+def _get_mapping_values(
+    mapping: Dict,
+    iparam: inspect.Parameter,
+    keys: List[str],
+) -> List:
+    if iparam.kind is iparam.VAR_KEYWORD:
+        assert keys
+        d = mapping.setdefault(iparam, {})
+    else:
+        d = mapping.setdefault(iparam, {} if keys else [])
+
+    for i, key in enumerate(keys):
+        if isinstance(d, list):
+            raise MixedArgumentError(parameter=iparam)
+        is_last = i == len(keys) - 1
+
+        d = d.setdefault(key, [] if is_last else {})
+    if not isinstance(d, list):
+        raise MixedArgumentError(parameter=iparam)
+    return d
 
 
 def _get_type_from_keys(hint, cli_keys):
@@ -97,7 +151,6 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             continue
 
         cli_values = []
-        kwargs_key = None
         consume_count = 0
 
         if "=" in token:
@@ -109,18 +162,22 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
 
         cli_keys = cli_option.split(".")
 
+        # Determine the iparam
         try:
             iparam, implicit_value = command.cli2parameter[cli_keys[0]]
+            cli_keys = cli_keys[1:]
         except KeyError:
             if kwargs_iparam:
                 iparam = kwargs_iparam
-                kwargs_key = _cli_kw_to_f_kw(cli_keys[0])
+                cli_keys = _cli_kws_to_f_kws(cli_keys)
                 implicit_value = None
             else:
                 unused_tokens.append(token)
                 continue
 
         cparam = command.iparam_to_cparam[iparam]
+
+        is_repeated = _check_repeat_arg(mapping, iparam, cli_keys)
 
         if implicit_value is not None:
             # A flag was parsed
@@ -142,12 +199,15 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             tokens_per_element, consume_all = 0, False
         else:
             try:
-                type_ = _get_type_from_keys(iparam.annotation, cli_keys[1:])
+                type_ = _get_type_from_keys(iparam.annotation, cli_keys[1:] if iparam is kwargs_iparam else cli_keys)
             except UnknownOptionError as e:
                 e.token = cli_option
                 raise
 
             tokens_per_element, consume_all = token_count(type_)
+
+            if is_repeated and not consume_all:
+                raise RepeatArgumentError(parameter=iparam)
 
             with suppress(IndexError):
                 if consume_all:
@@ -170,19 +230,9 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                 raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values)
 
         # Update mapping
-        if iparam is kwargs_iparam:
-            assert kwargs_key is not None
-            if kwargs_key in mapping[iparam] and not consume_all:
-                raise RepeatArgumentError(parameter=iparam)
-            mapping[iparam].setdefault(kwargs_key, [])
-            mapping[iparam][kwargs_key].extend(cli_values)
-        else:
-            if iparam in mapping and not consume_all:
-                raise RepeatArgumentError(parameter=iparam)
+        existing_cli_values = _get_mapping_values(mapping, iparam, cli_keys)
 
-            mapping.setdefault(iparam, [])
-            mapping[iparam].extend(cli_values)
-
+        existing_cli_values.extend(cli_values)
     return unused_tokens
 
 
