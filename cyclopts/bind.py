@@ -16,7 +16,7 @@ from typing import (
     get_origin,
 )
 
-from cyclopts._convert import _bool, accepts_keys, resolve, token_count
+from cyclopts._convert import _bool, _DictHint, accepts_keys, resolve, token_count
 from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
@@ -103,34 +103,6 @@ def _get_mapping_values(
     return d
 
 
-def _get_type_from_keys(hint, cli_keys):
-    """If ``hint`` is dict-like, apply cli_keys and fetch the appropriate annotation."""
-    resolved_hint = resolve(hint)
-    origin = get_origin(resolved_hint) or resolved_hint
-
-    if isinstance(origin, type) and issubclass(origin, dict):
-        args = get_args(resolved_hint)
-        if not args:
-            # bare ``dict`` or ``Dict`` annotation
-            return str
-        args = tuple(resolve(x) for x in args)
-
-        # args[0] gets checked first because it's a programmer error.
-        if args[0] != str:
-            raise ValueError("Dictionary keys must be strings.")
-
-        if not cli_keys:
-            raise UnknownOptionError(token="")  # populated in _parse_kw_and_flags
-
-        # TODO: handle TypedDict here
-        return _get_type_from_keys(args[1], cli_keys[1:])
-
-    if cli_keys:
-        raise UnknownOptionError(token="")  # populated in _parse_kw_and_flags
-
-    return hint
-
-
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
     kwargs_iparam = next((x for x in command.iparams if x.kind == x.VAR_KEYWORD), None)
 
@@ -200,11 +172,12 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                 cli_values.append(implicit_value)
             tokens_per_element, consume_all = 0, False
         else:
+            type_ = iparam.annotation
             try:
-                type_ = _get_type_from_keys(iparam.annotation, cli_keys[1:] if iparam is kwargs_iparam else cli_keys)
-            except UnknownOptionError as e:
-                e.token = cli_option
-                raise
+                for cli_key in cli_keys[1:] if iparam is kwargs_iparam else cli_keys:
+                    type_ = _DictHint(iparam.annotation)[cli_key]
+            except KeyError:
+                raise UnknownOptionError(token=token) from None
 
             tokens_per_element, consume_all = token_count(type_)
 
