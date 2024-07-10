@@ -80,7 +80,7 @@ def test_boolean_flag_app_parameter_default_annotated_override(app, assert_parse
 def test_boolean_flag_app_parameter_default_nested_annotated_override(app, assert_parse_args):
     app.default_parameter = Parameter(negative="")
 
-    def my_converter(type_, *values):
+    def my_converter(type_, tokens):
         return 5
 
     my_int = Annotated[int, Parameter(converter=my_converter)]

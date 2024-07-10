@@ -12,6 +12,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Type,
@@ -300,7 +301,7 @@ def accepts_keys(hint) -> bool:
 
 def convert(
     type_: Any,
-    *args: str,
+    tokens: Sequence[str],
     converter: Optional[Callable[[Type, str], Any]] = None,
     name_transform: Optional[Callable[[str], str]] = None,
 ):
@@ -310,17 +311,17 @@ def convert(
     Externally, may be useful in a custom converter.
     See Cyclopt's automatic coercion rules :doc:`/rules`.
 
-    If ``type_`` **is not** iterable, then each element of ``*args`` will be converted independently.
+    If ``type_`` **is not** iterable, then each element of ``tokens`` will be converted independently.
     If there is more than one element, then the return type will be a ``Tuple[type_, ...]``.
     If there is a single element, then the return type will be ``type_``.
 
-    If ``type_`` **is** iterable, then all elements of ``*args`` will be collated.
+    If ``type_`` **is** iterable, then all elements of ``tokens`` will be collated.
 
     Parameters
     ----------
     type_: Type
         A type hint/annotation to coerce ``*args`` into.
-    `*args`: str
+    tokens: Sequence[str]
         String tokens to coerce.
     converter: Optional[Callable[[Type, str], Any]]
         An optional function to convert tokens to the inner-most types.
@@ -369,13 +370,13 @@ def convert(
     origin_type = get_origin(type_)
 
     if origin_type is tuple:
-        return convert_tuple(type_, *args)
+        return convert_tuple(type_, *tokens)
     elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return convert(type_, args)
-    elif len(args) == 1:
-        return convert(type_, args[0])
+        return convert(type_, tokens)
+    elif len(tokens) == 1:
+        return convert(type_, tokens[0])
     else:
-        return [convert(type_, item) for item in args]
+        return [convert(type_, item) for item in tokens]
 
 
 def token_count(type_: Any) -> Tuple[int, bool]:

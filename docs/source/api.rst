@@ -238,8 +238,24 @@ API
 
       .. code-block:: python
 
-          def converter(type_, *args) -> Any:
+          def converter(type_, tokens) -> Any:
               pass
+
+      Where ``type_`` is the parameter's type hint, and ``tokens`` is either:
+      * A ``List[str]`` of CLI tokens.
+      * A ``Dict`` of CLI tokens if keys are specified in the CLI. E.g.
+
+        .. code-block:: bash
+
+           python my-script.py --foo.key1=val1
+
+        would be parsed into:
+
+        .. code-block:: python
+
+           tokens = {
+              "key1": ["val1"],
+           }
 
       If not provided, defaults to Cyclopts's internal coercion engine.
 

@@ -401,18 +401,18 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
                 if iparam.kind == iparam.VAR_KEYWORD:
                     coerced[iparam] = {}
                     for key, values in parameter_tokens.items():
-                        val = cparam.converter(type_, *values)
+                        val = cparam.converter(type_, values)
                         for validator in cparam.validator:
                             validator(type_, val)
                         coerced[iparam][key] = val
                 elif iparam.kind == iparam.VAR_POSITIONAL:
-                    val = cparam.converter(List[type_], *parameter_tokens)
+                    val = cparam.converter(List[type_], parameter_tokens)
                     for validator in cparam.validator:
                         for v in val:
                             validator(type_, v)
                     coerced[iparam] = val
                 else:
-                    val = cparam.converter(type_, *parameter_tokens)
+                    val = cparam.converter(type_, parameter_tokens)
                     for validator in cparam.validator:
                         validator(type_, val)
                     coerced[iparam] = val

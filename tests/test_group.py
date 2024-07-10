@@ -1,5 +1,6 @@
 import itertools
 import sys
+from typing import List
 from unittest.mock import Mock
 
 import pytest
@@ -15,8 +16,8 @@ else:
     from typing import Annotated
 
 
-def upper(type_, *args: str):
-    return args[0].upper()
+def upper(type_, tokens: List[str]):
+    return tokens[0].upper()
 
 
 def test_group_str_method():

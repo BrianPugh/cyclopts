@@ -4,12 +4,12 @@ from typing import Any, Union
 import pytest
 from attrs import frozen
 
+from cyclopts import Parameter, convert
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
-
-from cyclopts import Parameter, convert
 
 
 @frozen
@@ -41,9 +41,9 @@ def test_custom_type_one_token_implicit_convert(app):
 
 
 def test_custom_type_one_token_explicit_convert(app):
-    def converter(type_, *args):
-        assert len(args) == 1
-        return type_(int(args[0]))
+    def converter(type_, tokens):
+        assert len(tokens) == 1
+        return type_(int(tokens[0]))
 
     @app.default
     def default(value: Annotated[OneToken, Parameter(converter=converter)]):

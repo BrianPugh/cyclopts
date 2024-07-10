@@ -4,12 +4,12 @@ from unittest.mock import Mock
 
 import pytest
 
+from cyclopts import Parameter, ValidationError
+
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
 else:
     from typing import Annotated
-
-from cyclopts import Parameter, ValidationError
 
 
 @pytest.fixture
@@ -18,8 +18,8 @@ def validator():
 
 
 def test_custom_converter(app, assert_parse_args):
-    def custom_converter(type_, *args):
-        return 2 * int(args[0])
+    def custom_converter(type_, tokens):
+        return 2 * int(tokens[0])
 
     @app.default
     def foo(age: Annotated[int, Parameter(converter=custom_converter)]):
@@ -82,8 +82,8 @@ def test_custom_converter_and_validator(app, assert_parse_args, validator):
         if not (0 < value < 150):
             raise ValueError("An unreasonable age was entered.")
 
-    def custom_converter(type_, *args):
-        return 2 * int(args[0])
+    def custom_converter(type_, tokens):
+        return 2 * int(tokens[0])
 
     @app.default
     def foo(age: Annotated[int, Parameter(converter=custom_converter, validator=validator)]):

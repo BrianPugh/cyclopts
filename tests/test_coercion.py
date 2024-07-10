@@ -94,46 +94,46 @@ def test_token_count_iterable():
 
 
 def test_coerce_bool():
-    assert True is convert(bool, "true")
-    assert False is convert(bool, "false")
+    assert True is convert(bool, ["true"])
+    assert False is convert(bool, ["false"])
 
 
 def test_coerce_error():
     with pytest.raises(CoercionError):
-        convert(bool, "foo")
+        convert(bool, ["foo"])
 
 
 def test_coerce_int():
-    assert 123 == convert(int, "123")
+    assert 123 == convert(int, ["123"])
 
 
 def test_coerce_annotated_int():
-    assert [123, 456] == convert(Annotated[int, "foo"], "123", "456")
-    assert [123, 456] == convert(Annotated[List[int], "foo"], "123", "456")
+    assert [123, 456] == convert(Annotated[int, "foo"], ["123", "456"])
+    assert [123, 456] == convert(Annotated[List[int], "foo"], ["123", "456"])
 
 
 def test_coerce_optional_annotated_int():
-    assert [123, 456] == convert(Optional[Annotated[int, "foo"]], "123", "456")
-    assert [123, 456] == convert(Optional[Annotated[List[int], "foo"]], "123", "456")
+    assert [123, 456] == convert(Optional[Annotated[int, "foo"]], ["123", "456"])
+    assert [123, 456] == convert(Optional[Annotated[List[int], "foo"]], ["123", "456"])
 
 
 def test_coerce_annotated_union_str_secondary_choice():
-    assert 123 == convert(Union[None, int, str], "123")
-    assert "foo" == convert(Union[None, int, str], "foo")
+    assert 123 == convert(Union[None, int, str], ["123"])
+    assert "foo" == convert(Union[None, int, str], ["foo"])
 
     with pytest.raises(CoercionError):
-        convert(Union[None, int, float], "invalid-choice")
+        convert(Union[None, int, float], ["invalid-choice"])
 
 
 def test_coerce_annotated_nested_union_str_secondary_choice():
-    assert 123 == convert(Union[None, Union[int, str]], "123")
-    assert "foo" == convert(Union[None, Union[int, str]], "foo")
+    assert 123 == convert(Union[None, Union[int, str]], ["123"])
+    assert "foo" == convert(Union[None, Union[int, str]], ["foo"])
 
 
 def test_coerce_annotated_union_int():
-    assert 123 == convert(Annotated[Union[None, int, float], "foo"], "123")
-    assert [123, 456] == convert(Annotated[int, "foo"], "123", "456")
-    assert [123, 456] == convert(Annotated[Union[None, int, float], "foo"], "123", "456")
+    assert 123 == convert(Annotated[Union[None, int, float], "foo"], ["123"])
+    assert [123, 456] == convert(Annotated[int, "foo"], ["123", "456"])
+    assert [123, 456] == convert(Annotated[Union[None, int, float], "foo"], ["123", "456"])
 
 
 def test_coerce_enum():
@@ -144,80 +144,80 @@ def test_coerce_enum():
         _PROD_OLD = auto()
 
     # tests case-insensitivity
-    assert SoftwareEnvironment.STAGING == convert(SoftwareEnvironment, "staging")
+    assert SoftwareEnvironment.STAGING == convert(SoftwareEnvironment, ["staging"])
 
     # tests underscore/hyphen support
-    assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, "prod_old")
-    assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, "prod-old")
+    assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, ["prod_old"])
+    assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, ["prod-old"])
 
     with pytest.raises(CoercionError):
-        convert(SoftwareEnvironment, "invalid-choice")
+        convert(SoftwareEnvironment, ["invalid-choice"])
 
 
 def test_coerce_tuple_basic_single():
-    _assert_tuple((1,), convert(Tuple[int], "1"))
+    _assert_tuple((1,), convert(Tuple[int], ["1"]))
 
 
 def test_coerce_tuple_str_single():
-    _assert_tuple(("foo",), convert(Tuple[str], "foo"))
+    _assert_tuple(("foo",), convert(Tuple[str], ["foo"]))
 
 
 def test_coerce_tuple_basic_double():
-    _assert_tuple((1, 2.0), convert(Tuple[int, Union[None, float, int]], "1", "2"))
+    _assert_tuple((1, 2.0), convert(Tuple[int, Union[None, float, int]], ["1", "2"]))
 
 
 def test_coerce_tuple_typing_no_inner_types():
-    _assert_tuple(("1", "2"), convert(Tuple, "1", "2"))
+    _assert_tuple(("1", "2"), convert(Tuple, ["1", "2"]))
 
 
 def test_coerce_tuple_builtin_no_inner_types():
-    _assert_tuple(("1", "2"), convert(tuple, "1", "2"))
+    _assert_tuple(("1", "2"), convert(tuple, ["1", "2"]))
 
 
 def test_coerce_tuple_nested():
     _assert_tuple(
         (1, (2.0, "foo")),
-        convert(Tuple[int, Tuple[float, Union[None, str, int]]], "1", "2", "foo"),
+        convert(Tuple[int, Tuple[float, Union[None, str, int]]], ["1", "2", "foo"]),
     )
 
 
 def test_coerce_tuple_len_mismatch_underflow():
     with pytest.raises(CoercionError):
-        convert(Tuple[int, int], "1")
+        convert(Tuple[int, int], ["1"])
 
 
 def test_coerce_tuple_len_mismatch_overflow():
     with pytest.raises(CoercionError):
-        convert(Tuple[int, int], "1", "2", "3")
+        convert(Tuple[int, int], ["1", "2", "3"])
 
 
 @pytest.mark.skipif(sys.version_info < (3, 11), reason="Typing")
 def test_coerce_tuple_ellipsis_too_many_inner_types():
     with pytest.raises(ValueError):  # This is a ValueError because it happens prior to runtime.
         # Only 1 inner type annotation allowed
-        convert(Tuple[int, int, ...], "1", "2")  # pyright: ignore
+        convert(Tuple[int, int, ...], ["1", "2"])  # pyright: ignore
 
 
 def test_coerce_tuple_ellipsis_non_divisible():
     with pytest.raises(CoercionError):
-        convert(Tuple[Tuple[int, int], ...], "1", "2", "3")
+        convert(Tuple[Tuple[int, int], ...], ["1", "2", "3"])
 
 
 def test_coerce_list():
-    assert [123, 456] == convert(int, "123", "456")
-    assert [123, 456] == convert(List[int], "123", "456")
-    assert [123] == convert(List[int], "123")
+    assert [123, 456] == convert(int, ["123", "456"])
+    assert [123, 456] == convert(List[int], ["123", "456"])
+    assert [123] == convert(List[int], ["123"])
 
 
 def test_coerce_list_of_tuple_str_single_1():
-    res = convert(List[Tuple[str]], "foo")
+    res = convert(List[Tuple[str]], ["foo"])
     assert isinstance(res, list)
     assert len(res) == 1
     _assert_tuple(("foo",), res[0])
 
 
 def test_coerce_list_of_tuple_str_single_2():
-    res = convert(List[Tuple[str]], "foo", "bar")
+    res = convert(List[Tuple[str]], ["foo", "bar"])
     assert isinstance(res, list)
     assert len(res) == 2
     _assert_tuple(("foo",), res[0])
@@ -226,51 +226,51 @@ def test_coerce_list_of_tuple_str_single_2():
 
 def test_coerce_bare_list():
     # Implicit element type: str
-    assert ["123", "456"] == convert(list, "123", "456")
+    assert ["123", "456"] == convert(list, ["123", "456"])
 
 
 def test_coerce_iterable():
-    assert [123, 456] == convert(Iterable[int], "123", "456")
-    assert [123] == convert(Iterable[int], "123")
+    assert [123, 456] == convert(Iterable[int], ["123", "456"])
+    assert [123] == convert(Iterable[int], ["123"])
 
 
 def test_coerce_set():
-    assert {"123", "456"} == convert(Set[str], "123", "456")
-    assert {123, 456} == convert(Set[Union[int, str]], "123", "456")
+    assert {"123", "456"} == convert(Set[str], ["123", "456"])
+    assert {123, 456} == convert(Set[Union[int, str]], ["123", "456"])
 
 
 def test_coerce_literal():
-    assert "foo" == convert(Literal["foo", "bar", 3], "foo")
-    assert "bar" == convert(Literal["foo", "bar", 3], "bar")
-    assert 3 == convert(Literal["foo", "bar", 3], "3")
+    assert "foo" == convert(Literal["foo", "bar", 3], ["foo"])
+    assert "bar" == convert(Literal["foo", "bar", 3], ["bar"])
+    assert 3 == convert(Literal["foo", "bar", 3], ["3"])
 
     with pytest.raises(CoercionError):
-        convert(Literal["foo", "bar", 3], "invalid-choice")
+        convert(Literal["foo", "bar", 3], ["invalid-choice"])
 
 
 def test_coerce_path():
-    assert Path("foo") == convert(Path, "foo")
+    assert Path("foo") == convert(Path, ["foo"])
 
 
 def test_coerce_any():
-    assert "foo" == convert(Any, "foo")
+    assert "foo" == convert(Any, ["foo"])
 
 
 def test_coerce_bytes():
-    assert b"foo" == convert(bytes, "foo")
-    assert [b"foo", b"bar"] == convert(bytes, "foo", "bar")
+    assert b"foo" == convert(bytes, ["foo"])
+    assert [b"foo", b"bar"] == convert(bytes, ["foo", "bar"])
 
 
 def test_coerce_bytearray():
-    res = convert(bytearray, "foo")
+    res = convert(bytearray, ["foo"])
     assert isinstance(res, bytearray)
     assert bytearray(b"foo") == res
 
-    assert [bytearray(b"foo"), bytearray(b"bar")] == convert(bytearray, "foo", "bar")
+    assert [bytearray(b"foo"), bytearray(b"bar")] == convert(bytearray, ["foo", "bar"])
 
 
 def test_coerce_empty():
-    assert "foo" == convert(inspect.Parameter.empty, "foo")
+    assert "foo" == convert(inspect.Parameter.empty, ["foo"])
 
 
 def test_resolve_annotated():
