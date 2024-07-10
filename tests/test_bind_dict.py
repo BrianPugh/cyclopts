@@ -1,3 +1,4 @@
+import sys
 from typing import Dict, List, Optional, Tuple
 
 import pytest
@@ -5,10 +6,34 @@ import pytest
 from cyclopts.exceptions import MissingArgumentError
 
 
-@pytest.mark.skip(reason="TODO")
-def test_unannotated_typing_dict(app, assert_parse_args):
+@pytest.mark.parametrize(
+    "type_",
+    [
+        Dict[str, str],
+        dict,
+        Dict,
+    ],
+)
+def test_bind_dict_str_to_str(app, assert_parse_args, type_):
     @app.command
-    def foo(d: Dict):
+    def foo(d: type_):
         pass
 
     assert_parse_args(foo, "foo --d.key1='val1' --d.key2='val2'", d={"key1": "val1", "key2": "val2"})
+
+
+def test_bind_dict_str_to_int_typing(app, assert_parse_args):
+    @app.command
+    def foo(d: Dict[str, int]):
+        pass
+
+    assert_parse_args(foo, "foo --d.key1=7 --d.key2=42", d={"key1": 7, "key2": 42})
+
+
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Native Typing")
+def test_bind_dict_str_to_int_builtin(app, assert_parse_args):
+    @app.command
+    def foo(d: dict[str, int]):
+        pass
+
+    assert_parse_args(foo, "foo --d.key1=7 --d.key2=42", d={"key1": 7, "key2": 42})

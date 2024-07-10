@@ -1,6 +1,7 @@
 import collections.abc
 import inspect
 import sys
+from contextlib import suppress
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -30,7 +31,7 @@ else:
     TypeAliasType = None
 
 if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
+    from typing_extensions import Annotated, TypedDict  # pragma: no cover
 else:
     from typing import Annotated  # pragma: no cover
 
@@ -49,9 +50,12 @@ _implicit_iterable_type_mapping: Dict[Type, Type] = {
     list: List[str],
     set: Set[str],
     tuple: Tuple[str, ...],
+    dict: Dict[str, str],
 }
 
 _iterable_types = {list, set}
+
+NestedCliArgs = Dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
 
 def _bool(s: str) -> bool:
@@ -296,12 +300,14 @@ def accepts_keys(hint) -> bool:
     origin = get_origin(hint)
     if is_union(origin):
         return any(accepts_keys(x) for x in get_args(hint))
-    return dict in (hint, origin) or is_typed_dict(hint)
+    return (
+        dict in (hint, origin) or is_typed_dict(hint) or hasattr(hint, "__pydantic_core_schema__")
+    )  # checking for a pydantic hint without importing pydantic yet (slow).
 
 
 def convert(
     type_: Any,
-    tokens: Sequence[str],
+    tokens: Union[Sequence[str], NestedCliArgs],
     converter: Optional[Callable[[Type, str], Any]] = None,
     name_transform: Optional[Callable[[str], str]] = None,
 ):
@@ -321,8 +327,10 @@ def convert(
     ----------
     type_: Type
         A type hint/annotation to coerce ``*args`` into.
-    tokens: Sequence[str]
+    tokens: Union[Sequence[str], NestedCliArgs]
         String tokens to coerce.
+        Generally, either a list of strings, or a dictionary of list of strings (recursive).
+        Each leaf in the dictionary tree should be a list of strings.
     converter: Optional[Callable[[Type, str], Any]]
         An optional function to convert tokens to the inner-most types.
         The converter should have signature:
@@ -358,7 +366,8 @@ def convert(
     if name_transform is None:
         name_transform = default_name_transform
 
-    convert = partial(_convert, converter=converter, name_transform=name_transform)
+    convert_pub = partial(convert, converter=converter, name_transform=name_transform)
+    convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
     type_ = resolve(type_)
 
@@ -368,15 +377,65 @@ def convert(
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
     origin_type = get_origin(type_)
+    maybe_origin_type = origin_type or type_
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)
-    elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return convert(type_, tokens)
-    elif len(tokens) == 1:
-        return convert(type_, tokens[0])
+    elif maybe_origin_type in _iterable_types or origin_type is collections.abc.Iterable:
+        return convert_priv(type_, tokens)
+    elif accepts_keys(type_):
+        if not isinstance(tokens, dict):
+            raise ValueError  # Programming error
+        dict_hint = _DictHint(type_)
+        return _converters.get(maybe_origin_type, maybe_origin_type)(
+            **{k: convert_pub(dict_hint[k], v) for k, v in tokens.items()}
+        )
+    elif isinstance(tokens, dict):
+        raise ValueError  # Programming error
     else:
-        return [convert(type_, item) for item in tokens]
+        if len(tokens) == 1:
+            return convert_priv(type_, tokens[0])
+        else:
+            return [convert_priv(type_, item) for item in tokens]
+
+
+class _DictHint:
+    """Maps parameter names to their type hint."""
+
+    def __init__(self, hint):
+        hint = resolve(hint)
+        origin = get_origin(hint)
+
+        self._default = None
+        self._lookup = {}
+
+        if dict in (hint, origin):
+            # Normal Dictionary
+            key_type, val_type = str, str
+            args = get_args(hint)
+            with suppress(IndexError):
+                key_type = args[0]
+                val_type = args[1]
+            if key_type is not str:
+                raise TypeError('Dictionary type annotations must have "str" keys.')
+            self._default = val_type
+        elif is_typed_dict(hint):
+            # TypedDict
+            raise NotImplementedError
+        elif hasattr(hint, "__pydantic_core_schema__"):
+            # Pydantic
+            raise NotImplementedError
+        else:
+            # TODO: handle generic objects?
+            raise TypeError(f"Unknown type hint {hint!r}.")
+
+    def __getitem__(self, key: str):
+        try:
+            return self._lookup[key]
+        except KeyError:
+            if self._default is None:
+                raise CoercionError from None
+            return self._default
 
 
 def token_count(type_: Any) -> Tuple[int, bool]:
