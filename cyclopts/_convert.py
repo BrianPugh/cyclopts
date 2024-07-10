@@ -406,6 +406,7 @@ class _DictHint:
         hint = resolve(hint)
         origin = get_origin(hint)
 
+        self.hint = hint
         self._default = None
         self._lookup = {}
 
@@ -420,8 +421,7 @@ class _DictHint:
                 raise TypeError('Dictionary type annotations must have "str" keys.')
             self._default = val_type
         elif is_typed_dict(hint):
-            # TypedDict
-            raise NotImplementedError
+            self._lookup.update(hint.__annotations__)
         elif hasattr(hint, "__pydantic_core_schema__"):
             # Pydantic
             raise NotImplementedError
@@ -434,7 +434,7 @@ class _DictHint:
             return self._lookup[key]
         except KeyError:
             if self._default is None:
-                raise CoercionError from None
+                raise
             return self._default
 
 
