@@ -174,6 +174,8 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             else:
                 unused_tokens.append(token)
                 continue
+        # Generally, keys in dictionary/objects aren't allowed to have dashes.
+        cli_keys = [cli_key.replace("-", "_") for cli_key in cli_keys]
 
         cparam = command.iparam_to_cparam[iparam]
 

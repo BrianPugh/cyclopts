@@ -19,7 +19,7 @@ def test_bind_dict_str_to_str(app, assert_parse_args, type_):
     def foo(d: type_):
         pass
 
-    assert_parse_args(foo, "foo --d.key1='val1' --d.key2='val2'", d={"key1": "val1", "key2": "val2"})
+    assert_parse_args(foo, "foo --d.key_1='val1' --d.key-2='val2'", d={"key_1": "val1", "key_2": "val2"})
 
 
 def test_bind_dict_str_to_int_typing(app, assert_parse_args):
