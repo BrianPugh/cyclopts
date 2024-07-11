@@ -103,6 +103,10 @@ _converters = {
 }
 
 
+def _identity_converter(type_, element):
+    return element
+
+
 def _convert_tuple(
     type_: Type[Any],
     *args: str,
@@ -316,6 +320,10 @@ def _validate_typed_dict(typed_dict, data: dict, key_chain=None):
             _validate_typed_dict(hint, data[field_name], key_chain + (field_name,))
 
 
+def is_pydantic(hint) -> bool:
+    return hasattr(hint, "__pydantic_core_schema__")
+
+
 def is_typed_dict(hint) -> bool:
     """Determine if a type annotation is a TypedDict.
 
@@ -355,7 +363,7 @@ def accepts_keys(hint) -> bool:
     if is_union(origin):
         return any(accepts_keys(x) for x in get_args(hint))
     return (
-        dict in (hint, origin) or is_typed_dict(hint) or hasattr(hint, "__pydantic_core_schema__")
+        dict in (hint, origin) or is_typed_dict(hint) or is_pydantic(hint)
     )  # checking for a pydantic hint without importing pydantic yet (slow).
 
 
@@ -420,7 +428,6 @@ def convert(
     if name_transform is None:
         name_transform = default_name_transform
 
-    convert_pub = partial(convert, converter=converter, name_transform=name_transform)
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
     type_ = resolve(type_)
@@ -440,8 +447,15 @@ def convert(
     elif accepts_keys(type_):
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
+        # TODO: maybe skip converting if pydantic, and elect to flatten.
+        if is_pydantic(type_) and converter is None:
+            # Let pydantic handle the coercion of str->whatever.
+            # Cyclopts will just structure the data into dict/list/str.
+            converter = _identity_converter
         dict_hint = _DictHint(type_)
-        dict_converted = {k: convert_pub(dict_hint[k], v) for k, v in tokens.items()}
+        dict_converted = {
+            k: convert(dict_hint[k], v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
+        }
         if is_typed_dict(type_):
             # Other classes that accept keys perform their own validation/dont need validation.
             _validate_typed_dict(type_, dict_converted)
@@ -464,7 +478,7 @@ class _DictHint:
 
         self.hint = hint
         self._default = None
-        self._lookup = {}
+        self._lookup = {}  # maps field names to their type.
 
         if dict in (hint, origin):
             # Normal Dictionary
@@ -478,9 +492,9 @@ class _DictHint:
             self._default = val_type
         elif is_typed_dict(hint):
             self._lookup.update(hint.__annotations__)
-        elif hasattr(hint, "__pydantic_core_schema__"):
+        elif is_pydantic(hint):
             # Pydantic
-            raise NotImplementedError
+            self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
         else:
             # TODO: handle generic objects?
             raise TypeError(f"Unknown type hint {hint!r}.")

@@ -175,7 +175,7 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
             type_ = iparam.annotation
             try:
                 for cli_key in cli_keys[1:] if iparam is kwargs_iparam else cli_keys:
-                    type_ = _DictHint(iparam.annotation)[cli_key]
+                    type_ = _DictHint(type_)[cli_key]
             except KeyError:
                 raise UnknownOptionError(token=token) from None
 

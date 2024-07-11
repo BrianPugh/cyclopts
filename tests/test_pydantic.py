@@ -1,7 +1,8 @@
+from datetime import datetime
 from textwrap import dedent
 
 import pytest
-from pydantic import PositiveInt, validate_call
+from pydantic import BaseModel, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 
 
@@ -34,3 +35,32 @@ def test_pydantic_error_msg(app, console):
     )
 
     assert actual.startswith(expected_prefix)
+
+
+# from https://docs.pydantic.dev/latest/#pydantic-examples
+class User(BaseModel):
+    id: int
+    name: str = "John Doe"
+    signup_ts: datetime | None
+    tastes: dict[str, PositiveInt]
+
+
+def test_bind_pydantic_basemodel(app, assert_parse_args):
+    @app.command
+    def foo(user: User):
+        pass
+
+    external_data = {
+        "id": 123,
+        "signup_ts": "2019-06-01 12:22",
+        "tastes": {
+            "wine": 9,
+            b"cheese": 7,
+            "cabbage": "1",
+        },
+    }
+    assert_parse_args(
+        foo,
+        'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1',
+        User(**external_data),
+    )
