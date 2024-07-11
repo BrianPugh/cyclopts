@@ -1,10 +1,6 @@
 import sys
-from typing import Any, Union
 
-import pytest
-from attrs import frozen
-
-from cyclopts import Parameter, convert
+from cyclopts import Parameter
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -12,20 +8,12 @@ else:
     from typing import Annotated
 
 
-@frozen
 class OneToken:
-    value: Any
+    def __init__(self, value):
+        self.value = value
 
-
-@frozen
-class TwoToken:
-    value1: Any
-    value2: Any
-
-
-class AllToken:
-    def __init__(self, *args):
-        self.args = args
+    def __eq__(self, other):
+        return self.value == other.value
 
 
 def test_custom_type_one_token_implicit_convert(app):
