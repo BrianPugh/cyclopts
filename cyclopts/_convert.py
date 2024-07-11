@@ -13,6 +13,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Required,
     Sequence,
     Set,
     Tuple,
@@ -26,9 +27,14 @@ from cyclopts.exceptions import CoercionError, MissingArgumentError
 from cyclopts.utils import default_name_transform, is_union
 
 if sys.version_info >= (3, 12):
-    from typing import TypeAliasType
+    from typing import TypeAliasType  # pragma: no cover
 else:
-    TypeAliasType = None
+    TypeAliasType = None  # pragma: no cover
+
+if sys.version_info < (3, 11):
+    from typing_extensions import NotRequired, Required  # pragma: no cover
+else:
+    from typing import NotRequired, Required  # pragma: no cover
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated, TypedDict  # pragma: no cover
@@ -230,6 +236,7 @@ def resolve(type_: Any) -> Type:
         type_prev = type_
         type_ = resolve_annotated(type_)
         type_ = resolve_optional(type_)
+        type_ = resolve_required(type_)
     return type_
 
 
@@ -258,6 +265,12 @@ def resolve_optional(type_: Any) -> Type:
 
 def resolve_annotated(type_: Any) -> Type:
     if type(type_) is AnnotatedType:
+        type_ = get_args(type_)[0]
+    return type_
+
+
+def resolve_required(type_: Any) -> Type:
+    if get_origin(type_) in (Required, NotRequired):
         type_ = get_args(type_)[0]
     return type_
 
