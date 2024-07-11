@@ -1,7 +1,7 @@
 exclude: ^(poetry.lock|.idea/)
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.4.8"
+    rev: "v0.5.0"
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -32,23 +32,23 @@ repos:
         exclude: \.(html|svg)$
 
   - repo: https://github.com/fredrikaverpil/creosote.git
-    rev: v3.0.0
+    rev: v3.0.2
     hooks:
       - id: creosote
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.2.6
+    rev: v2.3.0
     hooks:
       - id: codespell
         additional_dependencies:
           - tomli
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.21.0
+    rev: v1.22.9
     hooks:
       - id: typos
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.361
+    rev: v1.1.370
     hooks:
       - id: pyright

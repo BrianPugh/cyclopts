@@ -100,13 +100,15 @@ class Parameter:
 
     env_var_split: Callable = cyclopts._env_var.env_var_split
 
-    negative_bool: Tuple[str, ...] = field(
+    # This can ONLY ever be a Tuple[str, ...]
+    negative_bool: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=_negative_converter(("--no-",)),
         validator=_double_hyphen_validator,
     )
 
-    negative_iterable: Tuple[str, ...] = field(
+    # This can ONLY ever be a Tuple[str, ...]
+    negative_iterable: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=_negative_converter(("--empty-",)),
         validator=_double_hyphen_validator,
@@ -152,7 +154,7 @@ class Parameter:
                 raise ValueError("All parameters should have started with '-' or '--'.")
 
             negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
-
+            assert isinstance(negative_prefixes, tuple)
             for negative_prefix in negative_prefixes:
                 out.append(f"{negative_prefix}{name}")
         return tuple(out)

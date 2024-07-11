@@ -27,7 +27,7 @@ else:
 
 
 def _assert_tuple(expected, actual):
-    assert type(actual) == tuple
+    assert type(actual) is tuple
     assert len(expected) == len(actual)
     for e, a in zip(expected, actual):
         assert type(e) == type(a)
@@ -281,7 +281,7 @@ def test_resolve_annotated():
 
 def test_resolve_empty():
     res = resolve(inspect.Parameter.empty)
-    assert res == str
+    assert res is str
 
 
 class ExampleTypedDict(TypedDict):

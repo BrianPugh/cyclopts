@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Tuple, Union
 
+from cyclopts.group import Group
+
 if TYPE_CHECKING:
     from cyclopts.core import App
-
-from cyclopts.group import Group
 
 
 def _create_or_append(
@@ -29,6 +29,7 @@ def _create_or_append(
 
 def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     """Extract Group/App association from all commands of ``app``."""
+    assert isinstance(app.group_commands, Group)
     group_mapping: List[Tuple[Group, List[App]]] = [
         (app.group_commands, []),
     ]
