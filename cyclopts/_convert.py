@@ -324,6 +324,10 @@ def is_pydantic(hint) -> bool:
     return hasattr(hint, "__pydantic_core_schema__")
 
 
+def is_dataclass(hint) -> bool:
+    return hasattr(hint, "__dataclass_fields__")
+
+
 def is_typed_dict(hint) -> bool:
     """Determine if a type annotation is a TypedDict.
 
@@ -358,13 +362,14 @@ def is_typed_dict(hint) -> bool:
 
 
 def accepts_keys(hint) -> bool:
-    hint = resolve(hint)
     origin = get_origin(hint)
     if is_union(origin):
         return any(accepts_keys(x) for x in get_args(hint))
-    return (
-        dict in (hint, origin) or is_typed_dict(hint) or is_pydantic(hint)
-    )  # checking for a pydantic hint without importing pydantic yet (slow).
+    try:
+        _DictHint(hint)
+    except ValueError:
+        return False
+    return True
 
 
 def convert(
@@ -461,7 +466,7 @@ def convert(
             _validate_typed_dict(type_, dict_converted)
         return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
     elif isinstance(tokens, dict):
-        raise ValueError  # Programming error
+        raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])
@@ -481,7 +486,6 @@ class _DictHint:
         self._lookup = {}  # maps field names to their type.
 
         if dict in (hint, origin):
-            # Normal Dictionary
             key_type, val_type = str, str
             args = get_args(hint)
             with suppress(IndexError):
@@ -492,12 +496,12 @@ class _DictHint:
             self._default = val_type
         elif is_typed_dict(hint):
             self._lookup.update(hint.__annotations__)
+        elif is_dataclass(hint):
+            self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
         elif is_pydantic(hint):
-            # Pydantic
             self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
         else:
-            # TODO: handle generic objects?
-            raise TypeError(f"Unknown type hint {hint!r}.")
+            raise ValueError(f"Unknown type hint {hint!r}.")
 
     def __getitem__(self, key: str):
         try:
