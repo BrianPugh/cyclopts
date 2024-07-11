@@ -328,6 +328,10 @@ def is_dataclass(hint) -> bool:
     return hasattr(hint, "__dataclass_fields__")
 
 
+def is_namedtuple(hint) -> bool:
+    return isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
+
+
 def is_attrs(hint) -> bool:
     return hasattr(hint, "__attrs_attrs__")
 
@@ -502,9 +506,11 @@ class _DictHint:
             self._lookup.update(hint.__annotations__)
         elif is_dataclass(hint):
             self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
+        elif is_namedtuple(hint):
+            # collections.namedtuple does not have type hints, assume "str" for everything.
+            self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
         elif is_attrs(hint):
             self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
-
         elif is_pydantic(hint):
             self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
         else:
