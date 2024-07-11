@@ -391,7 +391,7 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
                     for validator in cparam.validator:
                         validator(type_, val)
                     coerced[iparam] = val
-            except CoercionError as e:
+            except (CoercionError, MissingArgumentError) as e:
                 e.parameter = iparam
                 raise
             except (AssertionError, ValueError, TypeError) as e:

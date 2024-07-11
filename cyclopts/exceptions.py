@@ -259,7 +259,7 @@ class UnusedCliTokensError(CycloptsError):
 class MissingArgumentError(CycloptsError):
     """A parameter had insufficient tokens to be populated."""
 
-    parameter: inspect.Parameter
+    parameter: Optional[inspect.Parameter] = None
     """
     The parameter that failed to parse.
     """
@@ -269,31 +269,41 @@ class MissingArgumentError(CycloptsError):
     The tokens that were parsed so far for this Parameter.
     """
 
+    missing_keys: List[str] = field(factory=list)
+
     def __str__(self):
         from cyclopts._convert import token_count
 
-        count, _ = token_count(self.parameter)
-        if count == 0:
-            required_string = "flag required"
-            only_got_string = ""
-        elif count == 1:
-            required_string = "requires an argument"
-            only_got_string = ""
-        else:
-            required_string = f"requires {count} arguments"
-            received_count = len(self.tokens_so_far) % count
-            only_got_string = f" Only got {received_count}." if received_count else ""
-
         assert self.parameter2cli is not None
+        assert self.parameter is not None
         parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
 
         strings = []
-        if self.command_chain:
-            strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{parameter_cli_name}" {required_string}.{only_got_string}'
-            )
+        if self.missing_keys:
+            missing_cli_keys = [f"{parameter_cli_name}.{missing_key}" for missing_key in sorted(self.missing_keys)]
+            if len(missing_cli_keys) == 1:
+                strings.append(f"Missing argument for key {next(iter(missing_cli_keys))}.")
+            else:
+                strings.append(f"Missing argument for keys {missing_cli_keys}.")
         else:
-            strings.append(f'Parameter "{parameter_cli_name}" {required_string}.{only_got_string}')
+            count, _ = token_count(self.parameter)
+            if count == 0:
+                required_string = "flag required"
+                only_got_string = ""
+            elif count == 1:
+                required_string = "requires an argument"
+                only_got_string = ""
+            else:
+                required_string = f"requires {count} arguments"
+                received_count = len(self.tokens_so_far) % count
+                only_got_string = f" Only got {received_count}." if received_count else ""
+
+            if self.command_chain:
+                strings.append(
+                    f'Command "{" ".join(self.command_chain)}" parameter "{parameter_cli_name}" {required_string}.{only_got_string}'
+                )
+            else:
+                strings.append(f'Parameter "{parameter_cli_name}" {required_string}.{only_got_string}')
 
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")

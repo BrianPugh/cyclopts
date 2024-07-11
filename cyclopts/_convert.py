@@ -22,7 +22,7 @@ from typing import (
     get_origin,
 )
 
-from cyclopts.exceptions import CoercionError
+from cyclopts.exceptions import CoercionError, MissingArgumentError
 from cyclopts.utils import default_name_transform, is_union
 
 if sys.version_info >= (3, 12):
@@ -262,6 +262,47 @@ def resolve_annotated(type_: Any) -> Type:
     return type_
 
 
+def _validate_typed_dict(typed_dict, data: dict, key_chain=None):
+    """Not a complete validator; only recursively checks TypedDicts.
+
+    Checks:
+        1. Are there any extra keys.
+        2. Are all required keys present.
+
+    Things that this doesn't check (these are enforced by other parts of Cyclopts):
+        1. If the values are the correct type
+    """
+    if key_chain is None:
+        key_chain = ()
+    data_keys = set(data)
+    extra_keys = data_keys - set(typed_dict.__annotations__)
+
+    if extra_keys:
+        if len(extra_keys) == 1:
+            raise CoercionError(msg=f"{typed_dict} does not accept key {next(iter(extra_keys))}.")
+        else:
+            raise CoercionError(msg=f"{typed_dict} does not accept keys {extra_keys}.")
+
+    # First, check for extra keys.
+    if sys.version_info < (3, 9):
+        # Can only check __total__ or not
+        if typed_dict.__total__:
+            missing_keys = set(typed_dict.__annotations__) - data_keys
+        else:
+            missing_keys = set()
+    else:
+        missing_keys = typed_dict.__required_keys__ - data_keys
+    if missing_keys:
+        prefix = ".".join(key_chain)
+        if prefix:
+            prefix += "."
+        raise MissingArgumentError(missing_keys=[prefix + x for x in missing_keys])
+
+    for field_name, hint in typed_dict.__annotations__.items():
+        if is_typed_dict(hint):
+            _validate_typed_dict(hint, data[field_name], key_chain + (field_name,))
+
+
 def is_typed_dict(hint) -> bool:
     """Determine if a type annotation is a TypedDict.
 
@@ -387,9 +428,11 @@ def convert(
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
         dict_hint = _DictHint(type_)
-        return _converters.get(maybe_origin_type, maybe_origin_type)(
-            **{k: convert_pub(dict_hint[k], v) for k, v in tokens.items()}
-        )
+        dict_converted = {k: convert_pub(dict_hint[k], v) for k, v in tokens.items()}
+        if is_typed_dict(type_):
+            # Other classes that accept keys perform their own validation/dont need validation.
+            _validate_typed_dict(type_, dict_converted)
+        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
     elif isinstance(tokens, dict):
         raise ValueError  # Programming error
     else:

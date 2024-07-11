@@ -9,9 +9,12 @@ TODO/Notes:
 """
 
 import sys
+from textwrap import dedent
 from typing import List, TypedDict
 
 import pytest
+
+from cyclopts.exceptions import MissingArgumentError
 
 
 class MyDict(TypedDict):
@@ -36,6 +39,31 @@ def test_bind_typed_dict(app, assert_parse_args):
             "my_list_int": [1, 2],
         },
     )
+
+
+def test_bind_typed_dict_missing_arg(app, console):
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(
+            "foo --d.my_int=5 --d.my_str=bar",
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Missing argument for keys ['--d.my_list', '--d.my_list_int'].      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
 
 
 @pytest.mark.skipif(sys.version_info < (3, 11) or True, reason="Not Implemented")
