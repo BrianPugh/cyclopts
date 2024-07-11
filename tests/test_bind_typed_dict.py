@@ -16,6 +16,11 @@ import pytest
 
 from cyclopts.exceptions import MissingArgumentError
 
+if sys.version_info < (3, 11):
+    from typing_extensions import NotRequired, Required
+else:
+    from typing import NotRequired, Required
+
 
 class MyDict(TypedDict):
     my_int: int
@@ -66,11 +71,37 @@ def test_bind_typed_dict_missing_arg(app, console):
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11) or True, reason="Not Implemented")
-def test_bind_typed_dict_not_required():
-    raise NotImplementedError
+def test_bind_typed_dict_total_false(app, assert_parse_args):
+    class MyDict(TypedDict, total=False):
+        my_int: int
+        my_str: str
+
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    assert_parse_args(foo, "foo --d.my_str=bar", d={"my_str": "bar"})
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11) or True, reason="Not Implemented")
-def test_bind_typed_dict_required():
-    raise NotImplementedError
+def test_bind_typed_dict_not_required(app, assert_parse_args):
+    class MyDict(TypedDict):
+        my_int: int
+        my_str: NotRequired[str]
+
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    assert_parse_args(foo, "foo --d.my_int=5", d={"my_int": 5})
+
+
+def test_bind_typed_dict_required(app, assert_parse_args):
+    class MyDict(TypedDict, total=False):
+        my_int: Required[int]
+        my_str: str
+
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    assert_parse_args(foo, "foo --d.my_int=5", d={"my_int": 5})
