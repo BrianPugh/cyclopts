@@ -460,7 +460,6 @@ def convert(
     elif accepts_keys(type_):
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
-        # TODO: maybe skip converting if pydantic, and elect to flatten.
         if is_pydantic(type_) and converter is None:
             # Let pydantic handle the coercion of str->whatever.
             # Cyclopts will just structure the data into dict/list/str.

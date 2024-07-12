@@ -1,3 +1,4 @@
+import inspect
 import sys
 
 import pytest
@@ -23,7 +24,8 @@ def test_resolve_docstring():
         pass
 
     res = ResolvedCommand(foo)
-    cparam = res.iparam_to_cparam[res.pyname_to_iparam["bar"]]
+    iparam = inspect.signature(foo).parameters["bar"]
+    cparam = res.iparam_to_cparam[iparam]
     assert cparam.help == "Bar Docstring."
 
 
@@ -38,7 +40,8 @@ def test_resolve_docstring_parameter_priority():
         pass
 
     res = ResolvedCommand(foo)
-    cparam = res.iparam_to_cparam[res.pyname_to_iparam["bar"]]
+    iparam = inspect.signature(foo).parameters["bar"]
+    cparam = res.iparam_to_cparam[iparam]
     assert cparam.help == "This has priority."
 
 

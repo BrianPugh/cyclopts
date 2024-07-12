@@ -122,9 +122,6 @@ class ResolvedCommand:
     iparam_to_groups: ParameterDict
     iparam_to_cparam: ParameterDict
 
-    pyname_to_iparam: Dict[str, inspect.Parameter]
-    # Plain python identifier string to inspect.Parameter
-
     def __init__(
         self,
         f,
@@ -157,7 +154,6 @@ class ResolvedCommand:
 
         self.command = f
         signature = cyclopts.utils.signature(f)
-        self.pyname_to_iparam = cast(Dict[str, inspect.Parameter], signature.parameters)
 
         # Get:
         # 1. Fully resolved and created Groups.
