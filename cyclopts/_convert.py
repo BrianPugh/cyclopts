@@ -316,7 +316,7 @@ def _validate_typed_dict(typed_dict, data: dict, key_chain=None):
         raise MissingArgumentError(missing_keys=[prefix + x for x in missing_keys])
 
     for field_name, hint in typed_dict.__annotations__.items():
-        if is_typed_dict(hint):
+        if is_typeddict(hint):
             _validate_typed_dict(hint, data[field_name], key_chain + (field_name,))
 
 
@@ -336,7 +336,7 @@ def is_attrs(hint) -> bool:
     return hasattr(hint, "__attrs_attrs__")
 
 
-def is_typed_dict(hint) -> bool:
+def is_typeddict(hint) -> bool:
     """Determine if a type annotation is a TypedDict.
 
     This is surprisingly hard! Modified from Beartype's implementation:
@@ -345,7 +345,7 @@ def is_typed_dict(hint) -> bool:
     """
     hint = resolve(hint)
     if is_union(get_origin(hint)):
-        return any(is_typed_dict(x) for x in get_args(hint))
+        return any(is_typeddict(x) for x in get_args(hint))
 
     if not (isinstance(hint, type) and issubclass(hint, dict)):
         return False
@@ -468,7 +468,7 @@ def convert(
         dict_converted = {
             k: convert(dict_hint[k], v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
         }
-        if is_typed_dict(type_):
+        if is_typeddict(type_):
             # Other classes that accept keys perform their own validation/dont need validation.
             _validate_typed_dict(type_, dict_converted)
         return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
@@ -501,7 +501,7 @@ class _DictHint:
             if key_type is not str:
                 raise TypeError('Dictionary type annotations must have "str" keys.')
             self._default = val_type
-        elif is_typed_dict(hint):
+        elif is_typeddict(hint):
             self._lookup.update(hint.__annotations__)
         elif is_dataclass(hint):
             self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})

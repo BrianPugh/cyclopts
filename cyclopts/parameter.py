@@ -58,6 +58,7 @@ class Parameter:
     # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
 
     # This can ONLY ever be a Tuple[str, ...]
+    # Usually starts with "--" or "-"
     name: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),

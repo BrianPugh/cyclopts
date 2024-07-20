@@ -18,7 +18,7 @@ from typing import (
 import pytest
 
 from cyclopts import CoercionError
-from cyclopts._convert import accepts_keys, convert, is_typed_dict, resolve, token_count
+from cyclopts._convert import accepts_keys, convert, is_typeddict, resolve, token_count
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated
@@ -300,7 +300,7 @@ class ExampleTypedDict(TypedDict):
     ],
 )
 def test_is_typed_dict_true(hint):
-    assert is_typed_dict(hint)
+    assert is_typeddict(hint)
 
 
 @pytest.mark.parametrize(
@@ -313,7 +313,7 @@ def test_is_typed_dict_true(hint):
     ],
 )
 def test_is_typed_dict_false(hint):
-    assert not is_typed_dict(hint)
+    assert not is_typeddict(hint)
 
 
 @pytest.mark.parametrize(
