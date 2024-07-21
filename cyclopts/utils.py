@@ -13,6 +13,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    get_origin,
 )
 
 _union_types = set()
@@ -69,7 +70,7 @@ def is_iterable(obj) -> bool:
 
 
 def is_union(type_: Optional[Type]) -> bool:
-    return type_ in _union_types
+    return type_ in _union_types or get_origin(type_) in _union_types
 
 
 class ParameterDict(MutableMapping):
