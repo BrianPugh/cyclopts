@@ -1,3 +1,4 @@
+import inspect
 import itertools
 from typing import (
     TYPE_CHECKING,
@@ -9,6 +10,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    get_args,
 )
 
 from attrs import define, field
@@ -166,3 +168,22 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
     out_groups, out_attributes = zip(*[x[1] for x in combined])
 
     return list(out_groups), list(out_attributes)
+
+
+def find_all_parameters(func: Callable) -> List["Parameter"]:
+    """Used to find all the groups prior to true resolving."""
+    from cyclopts.parameter import Parameter
+
+    out = []
+
+    def inner(type_):
+        for arg in get_args(type_):
+            if isinstance(arg, Parameter):
+                out.append(arg)
+            else:
+                inner(arg)
+
+    for iparam in inspect.signature(func).parameters.values():
+        inner(iparam.annotation)
+
+    return out

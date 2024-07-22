@@ -171,7 +171,7 @@ def _convert(
     if type_ in _implicit_iterable_type_mapping:
         return convert(_implicit_iterable_type_mapping[type_], element)
 
-    if origin_type is collections.abc.Iterable:
+    if origin_type in (collections.abc.Iterable, collections.abc.Sequence):
         assert len(inner_types) == 1
         return convert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):

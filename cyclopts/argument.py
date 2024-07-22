@@ -1,7 +1,18 @@
 import inspect
 from contextlib import suppress
+from enum import Enum
 from functools import cached_property, partial
-from typing import Any, List, Optional, Tuple, get_args, get_origin
+from typing import (
+    Any,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    get_args,
+    get_origin,
+)
 
 from attr import setters
 from attrs import define, field, frozen
@@ -111,7 +122,7 @@ class Argument:
 
     # The type for this leaf; may be different from ``iparam.annotation``
     # because this could be a subkey of iparam.
-    # This hint must be unannotated.
+    # This hint MUST be unannotated.
     hint: Any
 
     # **Python** Keys into iparam that lead to this leaf.
@@ -126,10 +137,15 @@ class Argument:
     _lookup: dict = field(factory=dict, init=False)
 
     def __attrs_post_init__(self):
+        # By definition, self.hint is Not AnnotatedType
         hints = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         for hint in hints:
+            # This could be annotated...
             origin = get_origin(hint)
-            if dict in (hint, origin):
+            # TODO: need to resolve Annotation and handle cyclopts.Parameters
+            hint_origin = {hint, origin}
+
+            if self.cparam.accepts_keys in (None, True) and dict in hint_origin:
                 self.accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
@@ -138,23 +154,27 @@ class Argument:
                     val_type = args[1]
                 if key_type is not str:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
-                self._default = val_type
-            elif is_typeddict(hint):
-                self.accepts_keywords = True
-                self._lookup.update(hint.__annotations__)
-            elif is_dataclass(hint):
-                self.accepts_keywords = True
-                self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
-            elif is_namedtuple(hint):
-                # collections.namedtuple does not have type hints, assume "str" for everything.
-                self.accepts_keywords = True
-                self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
-            elif is_attrs(hint):
-                self.accepts_keywords = True
-                self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
-            elif is_pydantic(hint):
-                self.accepts_keywords = True
-                self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
+                    self._default = val_type
+                """
+                elif is_typeddict(hint):
+                    self.accepts_keywords = True
+                    self._lookup.update(hint.__annotations__)
+
+                if self.cparam.accepts_keys is True:
+                    if is_dataclass(hint):
+                        self.accepts_keywords = True
+                        self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
+                    elif is_namedtuple(hint):
+                        # collections.namedtuple does not have type hints, assume "str" for everything.
+                        self.accepts_keywords = True
+                        self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
+                    elif is_attrs(hint):
+                        self.accepts_keywords = True
+                        self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
+                    elif is_pydantic(hint):
+                        self.accepts_keywords = True
+                        self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
+                """
 
     @cached_property
     def accepts_arbitrary_keywords(self):
@@ -264,7 +284,7 @@ class ArgumentCollection(list):
         keys: Tuple[str, ...],
         *default_parameters,
     ):
-        # Does NOT perform group resolution.
+        # Does NOT perform group resolution; assumes that's handled in default_parameters.
 
         assert hint is not NoneType
         hint = resolve_optional(hint)
@@ -275,9 +295,11 @@ class ArgumentCollection(list):
         else:
             cyclopts_parameters = []
 
-        cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
-        candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint)
         out = cls()
+        cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
+        if not cparam.parse:
+            return out
+        candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint)
         if candidate_argument.accepts_arbitrary_keywords:
             out.append(candidate_argument)
         if candidate_argument.accepts_keywords:
@@ -291,7 +313,7 @@ class ArgumentCollection(list):
     def from_iparam(cls, iparam: inspect.Parameter, *default_parameters: Optional[Parameter]):
         # The responsibility of this function is to extract out the root type
         # and annotation. The rest of the functionality goes into _from_type.
-        # Does NOT perform group resolution.
+        # Does NOT perform group resolution; assumes that's handled in default_parameters.
         hint = iparam.annotation
 
         if hint is inspect.Parameter.empty:
@@ -302,7 +324,7 @@ class ArgumentCollection(list):
 
     @classmethod
     def from_callable(cls, func, *default_parameters: Optional[Parameter]):
-        # Does NOT perform group resolution.
+        # Does NOT perform group resolution; assumes that's handled in default_parameters.
         out = cls()
         for iparam in inspect.signature(func).parameters.values():
             out.extend(cls.from_iparam(iparam, *default_parameters))

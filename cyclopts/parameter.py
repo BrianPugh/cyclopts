@@ -4,6 +4,7 @@ from typing import (
     Any,
     Callable,
     Iterable,
+    List,
     Optional,
     Tuple,
     Type,
@@ -124,6 +125,9 @@ class Parameter:
         converter=attrs.converters.default_if_none(default_name_transform),
         kw_only=True,
     )
+
+    # Should not get inherited
+    accepts_keys: Optional[bool] = field(default=None)
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)

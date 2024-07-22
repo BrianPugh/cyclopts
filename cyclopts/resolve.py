@@ -32,6 +32,22 @@ def _has_unparsed_parameters(func_signature: inspect.Signature, *args) -> bool:
     return False
 
 
+def _resolve_groups_3(
+    func_signature: inspect.Signature,
+    app_parameter: Optional[Parameter],
+    group_arguments: Group,
+    group_parameters: Group,
+) -> List[Tuple[Group, List[inspect.Parameter]]]:
+    """
+    Goal: Create list of groups, would be cool to get all Arguments with them.
+    I don't think its worth populating the children of each group... yet ()
+    """
+    out = []
+    # TODO: we need get_hint_parameter to return a dictionary
+    raise NotImplementedError
+    return out
+
+
 def _resolve_groups(
     func_signature: inspect.Signature,
     app_parameter: Optional[Parameter],
