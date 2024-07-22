@@ -139,13 +139,18 @@ class Argument:
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
         hints = get_args(self.hint) if is_union(self.hint) else (self.hint,)
+
+        if self.cparam.accepts_keys is False:
+            return
+
         for hint in hints:
             # This could be annotated...
             origin = get_origin(hint)
             # TODO: need to resolve Annotation and handle cyclopts.Parameters
             hint_origin = {hint, origin}
 
-            if self.cparam.accepts_keys in (None, True) and dict in hint_origin:
+            # Classes that ALWAYS takes keywords (accepts_keys=None)
+            if dict in hint_origin:
                 self.accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
@@ -154,27 +159,38 @@ class Argument:
                     val_type = args[1]
                 if key_type is not str:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
-                    self._default = val_type
-                """
-                elif is_typeddict(hint):
-                    self.accepts_keywords = True
-                    self._lookup.update(hint.__annotations__)
+                self._default = val_type
+            elif is_typeddict(hint):
+                self.accepts_keywords = True
+                self._lookup.update(hint.__annotations__)
 
-                if self.cparam.accepts_keys is True:
-                    if is_dataclass(hint):
-                        self.accepts_keywords = True
-                        self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
-                    elif is_namedtuple(hint):
-                        # collections.namedtuple does not have type hints, assume "str" for everything.
-                        self.accepts_keywords = True
-                        self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
-                    elif is_attrs(hint):
-                        self.accepts_keywords = True
-                        self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
-                    elif is_pydantic(hint):
-                        self.accepts_keywords = True
-                        self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
-                """
+            if self.cparam.accepts_keys is None:
+                continue
+
+            # Classes that MAY take keywords (accepts_keys=True)
+            if is_dataclass(hint):
+                self.accepts_keywords = True
+                self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
+            elif is_namedtuple(hint):
+                # collections.namedtuple does not have type hints, assume "str" for everything.
+                self.accepts_keywords = True
+                self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
+            elif is_attrs(hint):
+                self.accepts_keywords = True
+                self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
+            elif is_pydantic(hint):
+                self.accepts_keywords = True
+                self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
+            else:
+                self.accepts_keywords = True
+                for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
+                    if i == 0 and iparam.name == "self":
+                        continue
+                    if iparam.kind is iparam.VAR_KEYWORD:
+                        self._default = iparam.annotation
+                    else:
+                        self._lookup[iparam.name] = iparam.annotation
+                raise NotImplementedError
 
     @cached_property
     def accepts_arbitrary_keywords(self):
