@@ -1,20 +1,8 @@
 import inspect
 from contextlib import suppress
-from enum import Enum
-from functools import cached_property, partial
-from typing import (
-    Any,
-    Iterable,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Tuple,
-    get_args,
-    get_origin,
-)
+from functools import cached_property
+from typing import Any, Callable, Dict, List, Optional, Tuple, get_args, get_origin
 
-from attr import setters
 from attrs import define, field, frozen
 
 from cyclopts._convert import (
@@ -28,12 +16,16 @@ from cyclopts._convert import (
     resolve,
     resolve_optional,
 )
+from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import Sentinel, is_union
 
 
 class NOT_CONVERTED(Sentinel):  # noqa: N801
     pass
+
+
+_PARAMETER_EMPTY_HELP = Parameter(help="")
 
 
 def _accepts_keywords(hint) -> bool:
@@ -54,7 +46,7 @@ def _accepts_keywords(hint) -> bool:
 @frozen
 class Token:
     """
-    This class should be purely a dataclass containing factual book-keeping for a user input.
+    Purely a dataclass containing factual book-keeping for a user input.
     """
 
     # Value like "--foo" or `--foo.bar.baz` that indicated token; ``None`` when positional.
@@ -114,11 +106,11 @@ class Argument:
 
     # Multiple ``Argument`` may be associated with a single iparam.
     # However, each ``Argument`` must have a unique iparam/keys combo
-    iparam: inspect.Parameter
+    iparam: inspect.Parameter = field(default=None)
 
     # Fully resolved Parameter
     # Resolved parameter should have a fully resolved Parameter.name
-    cparam: "Parameter"
+    cparam: "Parameter" = field(default=None)
 
     # The type for this leaf; may be different from ``iparam.annotation``
     # because this could be a subkey of iparam.
@@ -130,7 +122,7 @@ class Argument:
     # For example, a cparam.name=="--foo.bar.baz" could be aliased to "--fizz".
     # "keys" may be an empty tuple.
     # This should be populated based on type-hints, not ``Parameter.name``
-    keys: Tuple[str, ...]
+    keys: Tuple[str, ...] = field(default=())
 
     accepts_keywords: bool = field(default=False, init=False)
     _default: Any = field(default=None, init=False)
@@ -138,7 +130,8 @@ class Argument:
 
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
-        hints = get_args(self.hint) if is_union(self.hint) else (self.hint,)
+        hint = resolve(self.hint)
+        hints = get_args(hint) if is_union(hint) else (hint,)
 
         if self.cparam.accepts_keys is False:
             return
@@ -146,7 +139,7 @@ class Argument:
         for hint in hints:
             # This could be annotated...
             origin = get_origin(hint)
-            # TODO: need to resolve Annotation and handle cyclopts.Parameters
+            # TODO: need to resolve Annotation and handle cyclopts.Parameters; or do we?
             hint_origin = {hint, origin}
 
             # Classes that ALWAYS takes keywords (accepts_keys=None)
@@ -190,7 +183,6 @@ class Argument:
                         self._default = iparam.annotation
                     else:
                         self._lookup[iparam.name] = iparam.annotation
-                raise NotImplementedError
 
     @cached_property
     def accepts_arbitrary_keywords(self):
@@ -206,7 +198,8 @@ class Argument:
             return self._default
 
     def match(self, token: str) -> Tuple[str, ...]:
-        """
+        """Find the matching Argument for a token keyword identifier.
+
         Parameter
         ---------
         token: str
@@ -299,49 +292,216 @@ class ArgumentCollection(list):
         hint,
         keys: Tuple[str, ...],
         *default_parameters,
+        group_lookup: Dict[str, Group],
+        group_arguments: Group,
+        group_parameters: Group,
+        parse_docstring: bool = True,
     ):
-        # Does NOT perform group resolution; assumes that's handled in default_parameters.
-
         assert hint is not NoneType
+        out = cls()
         hint = resolve_optional(hint)
         if type(hint) is AnnotatedType:
             annotations = hint.__metadata__  # pyright: ignore
             hint = get_args(hint)[0]
-            cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+            cyclopts_parameters_no_group = [x for x in annotations if isinstance(x, Parameter)]
         else:
-            cyclopts_parameters = []
+            cyclopts_parameters_no_group = []
 
-        out = cls()
-        cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
-        if not cparam.parse:
+        if group_lookup:
+            cyclopts_parameters = []
+            for cparam in cyclopts_parameters_no_group:
+                for group in cparam.group:  # pyright:ignore
+                    if isinstance(group, str):
+                        group = group_lookup[group]
+                    cyclopts_parameters.append(group.default_parameter)
+                cyclopts_parameters.append(cparam)
+        else:
+            cyclopts_parameters = cyclopts_parameters_no_group
+
+        upstream_parameter = Parameter.combine(*default_parameters)
+        immediate_parameter = Parameter.combine(*cyclopts_parameters)
+
+        if not immediate_parameter.parse:
             return out
+
+        cparam = Parameter.combine(upstream_parameter, immediate_parameter)
+
+        # Derive default parameter name (if necessary).
+        if keys:
+            cparam = Parameter.combine(
+                cparam,
+                Parameter(
+                    name=_resolve_parameter_name(
+                        upstream_parameter.name,  # pyright: ignore
+                        immediate_parameter.name or tuple(cparam.name_transform(k) for k in keys[-1:]),  # pyright: ignore
+                    )
+                ),
+            )
+        elif not cparam.name:
+            # This is directly on iparam; derive default name from it.
+            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                # Name is only used for help-string
+                cparam = Parameter.combine(cparam, Parameter(name=[iparam.name.upper()]))
+            else:
+                # cparam.name_transform cannot be None due to:
+                #     attrs.converters.default_if_none(default_name_transform)
+                assert cparam.name_transform is not None
+                cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
+
         candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint)
         if candidate_argument.accepts_arbitrary_keywords:
             out.append(candidate_argument)
         if candidate_argument.accepts_keywords:
+            docstring_lookup = {}
+            if parse_docstring:
+                docstring_lookup = _extract_docstring_help(candidate_argument.hint)
+
             for field_name, field_hint in candidate_argument._lookup.items():
-                out.extend(cls._from_type(iparam, field_hint, keys + (field_name,), cparam))
+                out.extend(
+                    cls._from_type(
+                        iparam,
+                        field_hint,
+                        keys + (field_name,),
+                        docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
+                        cparam,
+                        group_lookup=group_lookup,
+                        group_arguments=group_arguments,
+                        group_parameters=group_parameters,
+                        parse_docstring=parse_docstring,
+                    )
+                )
         else:
             out.append(candidate_argument)
         return out
 
     @classmethod
-    def from_iparam(cls, iparam: inspect.Parameter, *default_parameters: Optional[Parameter]):
+    def from_iparam(
+        cls,
+        iparam: inspect.Parameter,
+        *default_parameters: Optional[Parameter],
+        group_lookup: Optional[Dict[str, Group]] = None,
+        group_arguments: Optional[Group] = None,
+        group_parameters: Optional[Group] = None,
+    ):
         # The responsibility of this function is to extract out the root type
         # and annotation. The rest of the functionality goes into _from_type.
-        # Does NOT perform group resolution; assumes that's handled in default_parameters.
+        if group_lookup is None:
+            group_lookup = {}
+        if group_arguments is None:
+            group_arguments = Group.create_default_arguments()
+        if group_parameters is None:
+            group_parameters = Group.create_default_parameters()
+
         hint = iparam.annotation
 
         if hint is inspect.Parameter.empty:
             hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
 
         hint = resolve_optional(hint)
-        return cls._from_type(iparam, hint, (), *default_parameters)
+        return cls._from_type(
+            iparam,
+            hint,
+            (),
+            *default_parameters,
+            _PARAMETER_EMPTY_HELP,
+            Parameter(required=iparam.default is iparam.empty),
+            group_lookup=group_lookup,
+            group_arguments=group_arguments,
+            group_parameters=group_parameters,
+        )
 
     @classmethod
-    def from_callable(cls, func, *default_parameters: Optional[Parameter]):
-        # Does NOT perform group resolution; assumes that's handled in default_parameters.
+    def from_callable(
+        cls,
+        func: Callable,
+        *default_parameters: Optional[Parameter],
+        group_lookup: Optional[Dict[str, Group]] = None,
+        group_arguments: Optional[Group] = None,
+        group_parameters: Optional[Group] = None,
+        parse_docstring: bool = True,
+    ):
+        import cyclopts.utils
+
+        if group_lookup is None:
+            group_lookup = {group.name: group for group in _resolve_groups_3(func)}
+
+        docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
+
         out = cls()
-        for iparam in inspect.signature(func).parameters.values():
-            out.extend(cls.from_iparam(iparam, *default_parameters))
+        for iparam in cyclopts.utils.signature(func).parameters.values():
+            out.extend(
+                cls.from_iparam(
+                    iparam,
+                    _PARAMETER_EMPTY_HELP,
+                    *default_parameters,
+                    docstring_lookup.get(iparam.name),
+                    group_lookup=group_lookup,
+                    group_arguments=group_arguments,
+                    group_parameters=group_parameters,
+                )
+            )
         return out
+
+
+def _resolve_groups_3(func: Callable) -> List[Group]:
+    resolved_groups = []
+
+    def add_if_new(group):
+        try:
+            next(x for x in resolved_groups if x.name == group)
+        except StopIteration:
+            resolved_groups.append(Group(group))
+
+    for argument in ArgumentCollection.from_callable(func, group_lookup={}, parse_docstring=False):
+        for group in argument.cparam.group:  # pyright: ignore
+            if isinstance(group, str):
+                add_if_new(group)
+            elif isinstance(group, Group):
+                # Ensure a different, but same-named group doesn't already exist
+                if any(group is not x and x.name == group.name for x in resolved_groups):
+                    raise ValueError("Cannot register 2 distinct Group objects with same name.")
+
+                if group.default_parameter is not None and group.default_parameter.group:
+                    # This shouldn't be possible due to ``Group`` internal checks.
+                    raise ValueError("Group.default_parameter cannot have a specified group.")  # pragma: no cover
+                add_if_new(group)
+            else:
+                raise TypeError
+    return resolved_groups
+
+
+def _extract_docstring_help(f: Callable) -> Dict[str, Parameter]:
+    from docstring_parser import parse as docstring_parse
+
+    return {dparam.arg_name: Parameter(help=dparam.description) for dparam in docstring_parse(f.__doc__ or "").params}
+
+
+def _resolve_parameter_name(*argss: Tuple[str, ...]) -> Tuple[str, ...]:
+    """
+    args will only ever be >1 if parsing a subkey.
+    """
+    if len(argss) == 0:
+        return ()
+    elif len(argss) == 1:
+        return argss[0]
+
+    # Combine the first 2, and do a recursive call.
+    out = []
+    for a1 in argss[0]:
+        if a1.endswith("*"):
+            a1 = a1[:-1]
+        elif not a1.startswith("-"):
+            continue
+
+        if not a1:
+            a1 = "--"
+        elif not a1.endswith("."):
+            a1 += "."
+
+        for a2 in argss[1]:
+            if a2.startswith("-"):
+                out.append(a2)
+            else:
+                out.append(a1 + a2)
+
+    return _resolve_parameter_name(tuple(out), *argss[2:])

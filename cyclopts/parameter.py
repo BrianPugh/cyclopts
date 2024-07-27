@@ -35,12 +35,6 @@ def _double_hyphen_validator(instance, attribute, values):
             raise ValueError(f'{attribute.alias} value must start with "--".')
 
 
-def _name_validator(instance, attribute, values):
-    for value in values:
-        if "." in value:
-            raise ValueError
-
-
 def _negative_converter(default: Tuple[str, ...]):
     def converter(value) -> Tuple[str, ...]:
         if value is None:
@@ -63,7 +57,6 @@ class Parameter:
     name: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
-        validator=_name_validator,
     )
 
     _converter: Callable = field(default=None, alias="converter")
@@ -133,7 +126,7 @@ class Parameter:
     _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
 
     @property
-    def show(self):
+    def show(self) -> bool:
         return self._show if self._show is not None else self.parse
 
     @property

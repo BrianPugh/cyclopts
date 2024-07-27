@@ -13,11 +13,6 @@ else:
     from typing import Annotated
 
 
-def test_parameter_invalid_name():
-    with pytest.raises(ValueError):
-        Parameter(name="foo.bar.baz")
-
-
 def test_parameter_get_negatives_bool_default():
     p = Parameter()
     assert ("--no-foo", "--no-bar") == p.get_negatives(bool, "--foo", "--bar")

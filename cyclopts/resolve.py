@@ -6,7 +6,7 @@ All downstream functions should consume data "as is" without fallbacks.
 
 import inspect
 from functools import cached_property
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast, get_origin
+from typing import Any, Callable, Dict, List, Optional, Tuple, get_origin
 
 import cyclopts.utils
 from cyclopts.exceptions import DocstringError
@@ -21,31 +21,6 @@ def _list_index(lst: List, key: Callable) -> int:
         if key(element):
             return i
     raise ValueError
-
-
-def _has_unparsed_parameters(func_signature: inspect.Signature, *args) -> bool:
-    for iparam in func_signature.parameters.values():
-        cparam: Parameter
-        _, cparam = get_hint_parameter(iparam, *args)
-        if not cparam.parse:
-            return True
-    return False
-
-
-def _resolve_groups_3(
-    func_signature: inspect.Signature,
-    app_parameter: Optional[Parameter],
-    group_arguments: Group,
-    group_parameters: Group,
-) -> List[Tuple[Group, List[inspect.Parameter]]]:
-    """
-    Goal: Create list of groups, would be cool to get all Arguments with them.
-    I don't think its worth populating the children of each group... yet ()
-    """
-    out = []
-    # TODO: we need get_hint_parameter to return a dictionary
-    raise NotImplementedError
-    return out
 
 
 def _resolve_groups(
