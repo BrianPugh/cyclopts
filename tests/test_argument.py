@@ -156,7 +156,113 @@ def test_argument_collection_typeddict():
     assert collection[2].accepts_keywords is False
 
 
-def test_argument_collection_typeddict_flatten():
+def test_argument_collection_typeddict_nested():
+    class Inner(TypedDict):
+        fizz: float
+        buzz: Annotated[complex, Parameter(name="bazz")]
+
+    class ExampleTypedDict(TypedDict):
+        foo: Inner
+        bar: int
+
+    def foo(a: ExampleTypedDict, b: int):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 4
+
+    assert collection[0].iparam == iparams["a"]
+    assert collection[0].cparam.name == ("--a.foo.fizz",)
+    assert collection[0].hint is float
+    assert collection[0].keys == ("foo", "fizz")
+    assert collection[0].accepts_keywords is False
+
+    assert collection[1].iparam == iparams["a"]
+    assert collection[1].cparam.name == ("--a.foo.bazz",)
+    assert collection[1].hint is complex
+    assert collection[1].keys == ("foo", "buzz")
+    assert collection[1].accepts_keywords is False
+
+    assert collection[2].iparam == iparams["a"]
+    assert collection[2].cparam.name == ("--a.bar",)
+    assert collection[2].hint is int
+    assert collection[2].keys == ("bar",)
+    assert collection[2].accepts_keywords is False
+
+    assert collection[3].iparam == iparams["b"]
+    assert collection[3].cparam.name == ("--b",)
+    assert collection[3].hint is int
+    assert collection[3].keys == ()
+    assert collection[3].accepts_keywords is False
+
+
+def test_argument_collection_typeddict_annotated_keys_name_change():
+    class ExampleTypedDict(TypedDict):
+        foo: Annotated[str, Parameter(name="fizz")]
+        bar: Annotated[int, Parameter(name="buzz")]
+
+    def foo(a: ExampleTypedDict, b: int):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 3
+
+    assert collection[0].iparam == iparams["a"]
+    assert collection[0].cparam.name == ("--a.fizz",)
+    assert collection[0].hint is str
+    assert collection[0].keys == ("foo",)
+    assert collection[0].accepts_keywords is False
+
+    assert collection[1].iparam == iparams["a"]
+    assert collection[1].cparam.name == ("--a.buzz",)
+    assert collection[1].hint is int
+    assert collection[1].keys == ("bar",)
+    assert collection[1].accepts_keywords is False
+
+    assert collection[2].iparam == iparams["b"]
+    assert collection[2].cparam.name == ("--b",)
+    assert collection[2].hint is int
+    assert collection[2].keys == ()
+    assert collection[2].accepts_keywords is False
+
+
+def test_argument_collection_typeddict_annotated_keys_name_override():
+    class ExampleTypedDict(TypedDict):
+        foo: Annotated[str, Parameter(name="--fizz")]
+        bar: Annotated[int, Parameter(name="--buzz")]
+
+    def foo(a: ExampleTypedDict, b: int):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 3
+
+    assert collection[0].iparam == iparams["a"]
+    assert collection[0].cparam.name == ("--fizz",)
+    assert collection[0].hint is str
+    assert collection[0].keys == ("foo",)
+    assert collection[0].accepts_keywords is False
+
+    assert collection[1].iparam == iparams["a"]
+    assert collection[1].cparam.name == ("--buzz",)
+    assert collection[1].hint is int
+    assert collection[1].keys == ("bar",)
+    assert collection[1].accepts_keywords is False
+
+    assert collection[2].iparam == iparams["b"]
+    assert collection[2].cparam.name == ("--b",)
+    assert collection[2].hint is int
+    assert collection[2].keys == ()
+    assert collection[2].accepts_keywords is False
+
+
+def test_argument_collection_typeddict_flatten_root():
     class ExampleTypedDict(TypedDict):
         foo: str
         bar: int
