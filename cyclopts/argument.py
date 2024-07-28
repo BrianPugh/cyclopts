@@ -446,16 +446,13 @@ class ArgumentCollection(list):
 def _resolve_groups_3(func: Callable) -> List[Group]:
     resolved_groups = []
 
-    def add_if_new(group):
-        try:
-            next(x for x in resolved_groups if x.name == group)
-        except StopIteration:
-            resolved_groups.append(Group(group))
-
     for argument in ArgumentCollection.from_callable(func, group_lookup={}, parse_docstring=False):
         for group in argument.cparam.group:  # pyright: ignore
             if isinstance(group, str):
-                add_if_new(group)
+                try:
+                    next(x for x in resolved_groups if x.name == group)
+                except StopIteration:
+                    resolved_groups.append(Group(group))
             elif isinstance(group, Group):
                 # Ensure a different, but same-named group doesn't already exist
                 if any(group is not x and x.name == group.name for x in resolved_groups):
@@ -464,7 +461,11 @@ def _resolve_groups_3(func: Callable) -> List[Group]:
                 if group.default_parameter is not None and group.default_parameter.group:
                     # This shouldn't be possible due to ``Group`` internal checks.
                     raise ValueError("Group.default_parameter cannot have a specified group.")  # pragma: no cover
-                add_if_new(group)
+
+                try:
+                    next(x for x in resolved_groups if x.name == group.name)
+                except StopIteration:
+                    resolved_groups.append(group)
             else:
                 raise TypeError
     return resolved_groups
