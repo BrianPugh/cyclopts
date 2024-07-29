@@ -128,11 +128,15 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
         else:
             cli_option = token
 
-        argument, leftover_keys, implicit_value = argument_collection.match(cli_option)
+        try:
+            argument, leftover_keys, implicit_value = argument_collection.match(cli_option)
+        except ValueError:
+            unused_tokens.append(token)
+            continue
 
         if implicit_value is not None:
             # A flag was parsed
-            argument.append(Token(cli_option, (cli_values[-1],) if cli_values else (), "cli"))
+            argument.append(Token(cli_option, cli_values[-1] if cli_values else "", "cli"))
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
@@ -157,7 +161,8 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
                 # TODO: fix exceptions to have the Argument
                 raise MissingArgumentError(tokens_so_far=cli_values)
 
-            argument.append(Token(cli_option, tuple(cli_values), "cli"))
+            for index, cli_value in enumerate(cli_values):
+                argument.append(Token(cli_option, cli_value, "cli", index=index))
 
     return unused_tokens
 
@@ -288,20 +293,30 @@ def _validate_is_not_option_like(token):
 
 def _parse_pos_3(
     argument_collection: ArgumentCollection,
-    tokens: Iterable[str],
+    tokens: List[str],
 ) -> List[str]:
-    try:
-        for i in itertools.count():
+    for i in itertools.count():
+        try:
             argument, _, _ = argument_collection.match(i)
-            if argument.tokens:
-                continue
-            tokens_per_element, consume_all = argument.token_count()
-            if consume_all:
-                raise NotImplementedError
-            breakpoint()
-    except ValueError:
-        pass
-    raise NotImplementedError
+        except ValueError:
+            break
+        tokens_per_element, consume_all = argument.token_count()
+        tokens_per_element = max(1, tokens_per_element)
+        new_tokens = []
+        while tokens:
+            if len(tokens) < tokens_per_element:
+                raise MissingArgumentError(parameter=argument.iparam, tokens_so_far=tokens)
+
+            for index, token in enumerate(tokens[:tokens_per_element]):
+                if not argument.cparam.allow_leading_hyphen:
+                    _validate_is_not_option_like(token)
+                new_tokens.append(Token(None, token, "cli", index=index))
+            tokens = tokens[tokens_per_element:]
+            if not consume_all:
+                break
+        argument.tokens[:0] = new_tokens  # Prepend the new tokens to the argument.
+
+    return tokens
 
 
 def _parse_pos(
@@ -554,7 +569,7 @@ def create_bound_arguments(
     try:
         # Build up a mapping of inspect.Parameter->List[str]
         unused_tokens = _parse_kw_and_flags_3(argument_collection, tokens)
-        unused_tokens = _parse_pos_3(argument_collection, tokens)
+        unused_tokens = _parse_pos_3(argument_collection, unused_tokens)
         breakpoint()
         raise NotImplementedError
     except CycloptsError as e:

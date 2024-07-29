@@ -69,12 +69,14 @@ class Token:
     # **This should be pretty unadulterated from the user's input.**
     keyword: Optional[str]
 
-    # Empty tuple when a flag. The parsed token value (unadulterated)
-    tokens: Tuple[str, ...]
+    # Empty string when a flag. The parsed token value (unadulterated)
+    token: str
 
     # Where the token came from; used for --help purposes.
     # Cyclopts specially uses "cli" for cli-parsed tokens.
     source: str
+
+    index: int = 0
 
 
 @define(kw_only=True)
@@ -197,12 +199,12 @@ class Argument:
                     else:
                         self._lookup[iparam.name] = iparam.annotation
 
-    @cached_property
+    @property
     def accepts_arbitrary_keywords(self) -> bool:
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
-    @cached_property
+    @property
     def accepts_multiple_arguments(self) -> bool:
         return self.token_count()[1]
 
@@ -215,7 +217,8 @@ class Argument:
             return self._default
 
     def match(self, term: Union[str, int]) -> Tuple[Tuple[str, ...], Any]:
-        """
+        """Match a name search-term, or a positional integer index.
+
         Returns
         -------
         Tuple[str, ...]
@@ -318,7 +321,9 @@ class Argument:
         if keys:
             raise NotImplementedError
         else:
-            return token_count(self.hint)
+            tokens_per_element, consume_all = token_count(self.hint)
+            consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL
+            return tokens_per_element, consume_all
 
 
 class ArgumentCollection(list):
