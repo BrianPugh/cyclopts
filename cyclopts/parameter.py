@@ -133,7 +133,7 @@ class Parameter:
     def converter(self):
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
-    def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:
+    def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:  # TODO: use self.name
         type_ = get_origin(type_) or type_
 
         if self.negative is not None:

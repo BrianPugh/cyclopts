@@ -24,6 +24,7 @@ from typing import (
 from attrs import define, field
 
 import cyclopts.utils
+from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
@@ -700,10 +701,17 @@ class App:
                 if command_app.default_command:
                     command = command_app.default_command
                     resolved_command = self._resolve_command(tokens, parse_docstring=False)
+                    argument_collection = self._resolve_argument_collection(tokens, parse_docstring=False)
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
 
-                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens, config)
+                    # bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens, config)
+                    bound, unused_tokens = create_bound_arguments(
+                        command_app.default_command,
+                        argument_collection,
+                        unused_tokens,
+                        config,
+                    )
                     try:
                         if command_app.converter:
                             bound.arguments = command_app.converter(**bound.arguments)
@@ -731,6 +739,7 @@ class App:
                         bound = cyclopts.utils.signature(command).bind(tokens=tokens, console=console)
                         unused_tokens = []
             except CycloptsError as e:
+                e.target = command_app.default_command
                 e.app = command_app
                 if command_chain:
                     e.command_chain = command_chain
@@ -923,6 +932,27 @@ class App:
 
         for help_panel in self._assemble_help_panels(tokens, help_format):
             console.print(help_panel)
+
+    def _resolve_argument_collection(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        parse_docstring: bool = True,
+    ) -> ArgumentCollection:
+        _, apps, _ = self.parse_commands(tokens)
+
+        if not apps[-1].default_command:
+            raise InvalidCommandError
+
+        assert isinstance(apps[-1].group_arguments, Group)
+        assert isinstance(apps[-1].group_parameters, Group)
+
+        return ArgumentCollection.from_callable(
+            apps[-1].default_command,
+            resolve_default_parameter_from_apps(apps),
+            group_arguments=apps[-1].group_arguments,
+            group_parameters=apps[-1].group_parameters,
+            parse_docstring=parse_docstring,
+        )
 
     def _resolve_command(
         self,

@@ -16,7 +16,9 @@ from typing import (
     get_origin,
 )
 
+import cyclopts.utils
 from cyclopts._convert import _bool, _DictHint, accepts_keys, resolve, token_count
+from cyclopts.argument import ArgumentCollection, Token
 from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
@@ -101,6 +103,63 @@ def _get_mapping_values(
     if not isinstance(d, list):
         raise MixedArgumentError(parameter=iparam)
     return d
+
+
+def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
+    unused_tokens = []
+    skip_next_iterations = 0
+    for i, token in enumerate(tokens):
+        # If the previous argument was a keyword, then this is its value
+        if skip_next_iterations > 0:
+            skip_next_iterations -= 1
+            continue
+
+        if not _is_option_like(token):
+            unused_tokens.append(token)
+            continue
+
+        cli_values: List[str] = []
+        consume_count = 0
+
+        if "=" in token:
+            cli_option, cli_value = token.split("=", 1)
+            cli_values.append(cli_value)
+            consume_count -= 1
+        else:
+            cli_option = token
+
+        argument, leftover_keys, implicit_value = argument_collection.match(cli_option)
+
+        if implicit_value is not None:
+            # A flag was parsed
+            argument.append(Token(cli_option, (cli_values[-1],) if cli_values else (), "cli"))
+        else:
+            tokens_per_element, consume_all = argument.token_count(leftover_keys)
+
+            with suppress(IndexError):
+                if consume_all:
+                    for j in itertools.count():
+                        token = tokens[i + 1 + j]
+                        if not argument.cparam.allow_leading_hyphen and _is_option_like(token):
+                            break
+                        cli_values.append(token)
+                        skip_next_iterations += 1
+                else:
+                    consume_count += tokens_per_element
+                    for j in range(consume_count):
+                        token = tokens[i + 1 + j]
+                        if not argument.cparam.allow_leading_hyphen:
+                            _validate_is_not_option_like(token)
+                        cli_values.append(token)
+                        skip_next_iterations += 1
+
+            if not cli_values or len(cli_values) % tokens_per_element:
+                # TODO: fix exceptions to have the Argument
+                raise MissingArgumentError(tokens_so_far=cli_values)
+
+            argument.append(Token(cli_option, tuple(cli_values), "cli"))
+
+    return unused_tokens
 
 
 def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
@@ -225,6 +284,24 @@ def _is_option_like(token: str) -> bool:
 def _validate_is_not_option_like(token):
     if _is_option_like(token):
         raise UnknownOptionError(token=token)
+
+
+def _parse_pos_3(
+    argument_collection: ArgumentCollection,
+    tokens: Iterable[str],
+) -> List[str]:
+    try:
+        for i in itertools.count():
+            argument, _, _ = argument_collection.match(i)
+            if argument.tokens:
+                continue
+            tokens_per_element, consume_all = argument.token_count()
+            if consume_all:
+                raise NotImplementedError
+            breakpoint()
+    except ValueError:
+        pass
+    raise NotImplementedError
 
 
 def _parse_pos(
@@ -467,6 +544,30 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
 
 
 def create_bound_arguments(
+    func: Callable,
+    argument_collection: ArgumentCollection,
+    tokens: List[str],
+    configs: Iterable[Callable],
+) -> Tuple[inspect.BoundArguments, List[str]]:
+    unused_tokens = []
+
+    try:
+        # Build up a mapping of inspect.Parameter->List[str]
+        unused_tokens = _parse_kw_and_flags_3(argument_collection, tokens)
+        unused_tokens = _parse_pos_3(argument_collection, tokens)
+        breakpoint()
+        raise NotImplementedError
+    except CycloptsError as e:
+        e.root_input_tokens = tokens
+        # e.cli2parameter = command.cli2parameter
+        # e.parameter2cli = command.parameter2cli
+        e.unused_tokens = unused_tokens
+        raise
+
+    return bound, unused_tokens
+
+
+def create_bound_arguments_old(
     command: ResolvedCommand,
     tokens: List[str],
     configs: Iterable[Callable],

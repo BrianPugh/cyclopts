@@ -1,7 +1,18 @@
 import inspect
 from contextlib import suppress
 from functools import cached_property
-from typing import Any, Callable, Dict, List, Optional, Tuple, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    get_args,
+    get_origin,
+)
 
 from attrs import define, field, frozen
 
@@ -15,7 +26,9 @@ from cyclopts._convert import (
     is_typeddict,
     resolve,
     resolve_optional,
+    token_count,
 )
+from cyclopts.exceptions import RepeatArgumentError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import Sentinel, is_union
@@ -29,6 +42,7 @@ _PARAMETER_EMPTY_HELP = Parameter(help="")
 
 
 def _accepts_keywords(hint) -> bool:
+    # TODO: revisit this; do we want "magical" behavior?
     # MUST agree with ArgumentCollection._from_type
     origin = get_origin(hint)
     if is_union(origin):
@@ -55,16 +69,12 @@ class Token:
     # **This should be pretty unadulterated from the user's input.**
     keyword: Optional[str]
 
-    # ``None`` when a flag. The parsed token value (unadulterated)
-    token: Optional[str]
+    # Empty tuple when a flag. The parsed token value (unadulterated)
+    tokens: Tuple[str, ...]
 
     # Where the token came from; used for --help purposes.
     # Cyclopts specially uses "cli" for cli-parsed tokens.
     source: str
-
-    # When multiple tokens are given for a single keyword (tuple).
-    # If ``keyword`` is ``None`` (positional), then this is the position index.
-    index: int = 0
 
 
 @define(kw_only=True)
@@ -116,6 +126,9 @@ class Argument:
     # because this could be a subkey of iparam.
     # This hint MUST be unannotated.
     hint: Any
+
+    # If supplied as a positional argument, the index of it.
+    index: Optional[int] = field(default=None)
 
     # **Python** Keys into iparam that lead to this leaf.
     # Note: that self.cparam.name and self.keys can naively disagree!
@@ -185,9 +198,13 @@ class Argument:
                         self._lookup[iparam.name] = iparam.annotation
 
     @cached_property
-    def accepts_arbitrary_keywords(self):
+    def accepts_arbitrary_keywords(self) -> bool:
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
+
+    @cached_property
+    def accepts_multiple_arguments(self) -> bool:
+        return self.token_count()[1]
 
     def type_hint_for_key(self, key: str):
         try:
@@ -197,7 +214,20 @@ class Argument:
                 raise
             return self._default
 
-    def match(self, token: str) -> Tuple[str, ...]:
+    def match(self, term: Union[str, int]) -> Tuple[Tuple[str, ...], Any]:
+        """
+        Returns
+        -------
+        Tuple[str, ...]
+            Leftover keys after matching to this argument.
+            Used if this argument accepts_arbitrary_keywords.
+            Otherwise, should be the same as argument.keys
+        Any
+            Implicit value.
+        """
+        return self._match_index(term) if isinstance(term, int) else self._match_name(term)
+
+    def _match_name(self, token: str) -> Tuple[Tuple[str, ...], Any]:
         """Find the matching Argument for a token keyword identifier.
 
         Parameter
@@ -213,12 +243,17 @@ class Argument:
         Returns
         -------
         Tuple[str, ...]
-            Keys into this Argument
+            Leftover keys after matching to this argument.
+            Used if this argument accepts_arbitrary_keywords.
+            Otherwise, should be the same as argument.keys
+        Any
+            Implicit value.
         """
         assert self.cparam.name
         for name in self.cparam.name:
             if name.startswith(token):
                 trailing = token[len(token) :]
+                implicit_value = True if self.hint is bool else None
                 if trailing:
                     if trailing[0] == ".":
                         trailing = token[1:]
@@ -226,10 +261,24 @@ class Argument:
                     # Otherwise, it's not an actual match.
                 else:
                     # exact match
-                    return ()
+                    return (), implicit_value
         else:
             # No matches found.
-            raise ValueError
+            for name in self.cparam.get_negatives(self.hint, *self.cparam.name):
+                if name.startswith(token):
+                    trailing = token[len(token) :]
+                    implicit_value = (get_origin(self.hint) or self.hint)()
+                    if trailing:
+                        if trailing[0] == ".":
+                            trailing = token[1:]
+                            break
+                        # Otherwise, it's not an actual match.
+                    else:
+                        # exact match
+                        return (), implicit_value
+            else:
+                # No matches found.
+                raise ValueError
 
         # trailing is period-delimited subkeys like ``bar.baz``
 
@@ -238,9 +287,21 @@ class Argument:
             raise ValueError
 
         # TODO: apply cparam.name_transform to keys here?
-        return tuple(trailing.split("."))
+        return tuple(trailing.split(".")), implicit_value
+
+    def _match_index(self, index: int) -> Tuple[Tuple[str, ...], Any]:
+        if self.index is None or self.iparam in (self.iparam.KEYWORD_ONLY, self.iparam.VAR_KEYWORD):
+            raise ValueError
+        elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
+            if index < self.index:
+                raise ValueError
+        elif index != self.index:
+            raise ValueError
+        return (), None
 
     def append(self, token: Token):
+        if self.tokens and not self.accepts_multiple_arguments:
+            raise RepeatArgumentError(parameter=self.iparam)
         self.tokens.append(token)
 
     def convert(self):
@@ -253,37 +314,48 @@ class Argument:
         # TODO
         raise NotImplementedError
 
-    def token_count(self) -> int:
-        # TODO
-        raise NotImplementedError
+    def token_count(self, keys: Tuple[str, ...] = ()):
+        if keys:
+            raise NotImplementedError
+        else:
+            return token_count(self.hint)
 
 
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
 
-    def match(self, token: str) -> Tuple[Argument, Tuple[str, ...]]:
+    def match(self, term: Union[str, int]) -> Tuple[Argument, Tuple[str, ...], Any]:
         """Maps keyword CLI arguments to their :class:`Argument`.
 
         Parameters
         ----------
         token: str
-            Something like "--foo" or "-f" or "--foo.bar.baz".
+            Something like "--foo" or "-f" or "--foo.bar.baz" or an integer index.
         """
         # TODO: it MIGHT be unnecessary to search entire list for best match.
-        best_match_argument, best_match_keys = None, None
+        best_match_argument, best_match_keys, best_implicit_value = None, None, None
         for argument in self:
             try:
-                match_keys = argument.match(token)
+                match_keys, implicit_value = argument.match(term)
             except ValueError:
                 continue
             if best_match_keys is None or len(match_keys) < len(best_match_keys):
                 best_match_keys = match_keys
                 best_match_argument = argument
+                best_implicit_value = implicit_value
 
         if best_match_argument is None or best_match_keys is None:
-            raise ValueError(f"No Argument matches {token!r}")
+            raise ValueError(f"No Argument matches {term!r}")
 
-        return best_match_argument, best_match_keys
+        return best_match_argument, best_match_keys, best_implicit_value
+
+    def populated(self, iparam: Optional[inspect.Parameter] = None) -> Iterator[Argument]:
+        for argument in self:
+            if not argument.tokens:
+                continue
+            if argument.iparam != iparam:
+                continue
+            yield argument
 
     @classmethod
     def _from_type(
@@ -296,6 +368,7 @@ class ArgumentCollection(list):
         group_arguments: Group,
         group_parameters: Group,
         parse_docstring: bool = True,
+        positional_index: Optional[int] = None,
     ):
         assert hint is not NoneType
         out = cls()
@@ -348,7 +421,7 @@ class ArgumentCollection(list):
                 assert cparam.name_transform is not None
                 cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
 
-        candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint)
+        candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
         if candidate_argument.accepts_arbitrary_keywords:
             out.append(candidate_argument)
         if candidate_argument.accepts_keywords:
@@ -368,6 +441,8 @@ class ArgumentCollection(list):
                         group_arguments=group_arguments,
                         group_parameters=group_parameters,
                         parse_docstring=parse_docstring,
+                        # Purposely DONT pass along posiitonal_index.
+                        # We don't want to populate subkeys with positional arguments.
                     )
                 )
         else:
@@ -382,6 +457,7 @@ class ArgumentCollection(list):
         group_lookup: Optional[Dict[str, Group]] = None,
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
+        positional_index: Optional[int] = None,
     ):
         # The responsibility of this function is to extract out the root type
         # and annotation. The rest of the functionality goes into _from_type.
@@ -408,6 +484,7 @@ class ArgumentCollection(list):
             group_lookup=group_lookup,
             group_arguments=group_arguments,
             group_parameters=group_parameters,
+            positional_index=positional_index,
         )
 
     @classmethod
@@ -428,7 +505,7 @@ class ArgumentCollection(list):
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
 
         out = cls()
-        for iparam in cyclopts.utils.signature(func).parameters.values():
+        for i, iparam in enumerate(cyclopts.utils.signature(func).parameters.values()):
             out.extend(
                 cls.from_iparam(
                     iparam,
@@ -438,6 +515,7 @@ class ArgumentCollection(list):
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
+                    positional_index=i,
                 )
             )
         return out
