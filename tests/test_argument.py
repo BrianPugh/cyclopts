@@ -1,6 +1,6 @@
 import inspect
 import sys
-from typing import Dict, Optional, TypedDict
+from typing import Dict, Optional, Tuple, TypedDict
 
 import pytest
 
@@ -292,6 +292,62 @@ def test_argument_collection_typeddict_flatten_root():
     assert collection[2].hint is int
     assert collection[2].keys == ()
     assert collection[2].accepts_keywords is False
+
+
+def test_argument_collection_var_positional():
+    def foo(a: int, *b: float):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 2
+
+    assert collection[0].iparam == iparams["a"]
+    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].hint is int
+    assert collection[0].keys == ()
+    assert collection[0].accepts_keywords is False
+
+    assert collection[1].iparam == iparams["b"]
+    assert collection[1].cparam.name == ("B",)
+    assert collection[1].hint is Tuple[float, ...]
+    assert collection[1].keys == ()
+    assert collection[1].accepts_keywords is False
+
+
+def test_argument_collection_var_keyword():
+    def foo(a: int, **b: float):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 2
+
+    assert collection[0].iparam == iparams["a"]
+    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].hint is int
+    assert collection[0].keys == ()
+    assert collection[0].accepts_keywords is False
+
+    assert collection[1].iparam == iparams["b"]
+    assert collection[1].cparam.name == ("--[KEYWORD]",)
+    assert collection[1].hint is Dict[str, float]
+    assert collection[1].keys == ()
+    assert collection[1].accepts_keywords is True
+
+
+def test_argument_collection_var_keyword_match():
+    def foo(a: int, **b: float):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    argument, keys, _ = collection.match("--fizz")
+    assert keys == ("fizz",)
+    assert argument.iparam == iparams["b"]
 
 
 @pytest.mark.parametrize(

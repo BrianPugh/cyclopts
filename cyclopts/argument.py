@@ -252,6 +252,10 @@ class Argument:
         Any
             Implicit value.
         """
+        if self.iparam.kind is self.iparam.VAR_KEYWORD:
+            # TODO: apply cparam.name_transform to keys here?
+            return tuple(token.lstrip("-").split(".")), None
+
         assert self.cparam.name
         for name in self.cparam.name:
             if name.startswith(token):
@@ -266,7 +270,7 @@ class Argument:
                     # exact match
                     return (), implicit_value
         else:
-            # No matches found.
+            # No positive-name matches found.
             for name in self.cparam.get_negatives(self.hint, *self.cparam.name):
                 if name.startswith(token):
                     trailing = token[len(token) :]
@@ -280,7 +284,7 @@ class Argument:
                         # exact match
                         return (), implicit_value
             else:
-                # No matches found.
+                # No negative-name matches found.
                 raise ValueError
 
         # trailing is period-delimited subkeys like ``bar.baz``
@@ -336,8 +340,16 @@ class ArgumentCollection(list):
         ----------
         token: str
             Something like "--foo" or "-f" or "--foo.bar.baz" or an integer index.
+
+        Returns
+        -------
+        Argument
+            Matched :class:`Argument`.
+        Tuple[str, ...]
+            Python keys into Argument. Non-empty iff Argument accepts keys.
+        Any
+            Implicit value (if a flag). :obj:`None` otherwise.
         """
-        # TODO: it MIGHT be unnecessary to search entire list for best match.
         best_match_argument, best_match_keys, best_implicit_value = None, None, None
         for argument in self:
             try:
@@ -348,6 +360,8 @@ class ArgumentCollection(list):
                 best_match_keys = match_keys
                 best_match_argument = argument
                 best_implicit_value = implicit_value
+            if not match_keys:  # Perfect match
+                break
 
         if best_match_argument is None or best_match_keys is None:
             raise ValueError(f"No Argument matches {term!r}")
@@ -385,6 +399,12 @@ class ArgumentCollection(list):
         else:
             cyclopts_parameters_no_group = []
 
+        if not keys:
+            if iparam.kind is iparam.VAR_KEYWORD:
+                hint = Dict[str, hint]
+            elif iparam.kind is iparam.VAR_POSITIONAL:
+                hint = Tuple[hint, ...]
+
         if group_lookup:
             cyclopts_parameters = []
             for cparam in cyclopts_parameters_no_group:
@@ -419,7 +439,13 @@ class ArgumentCollection(list):
             # This is directly on iparam; derive default name from it.
             if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
                 # Name is only used for help-string
-                cparam = Parameter.combine(cparam, Parameter(name=[iparam.name.upper()]))
+                cparam = Parameter.combine(cparam, Parameter(name=(iparam.name.upper(),)))
+            elif iparam.kind is iparam.VAR_KEYWORD:
+                if cparam.name:
+                    # TODO: Probably something like `--existing.[KEYWORD]`
+                    breakpoint()
+                else:
+                    cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
             else:
                 # cparam.name_transform cannot be None due to:
                 #     attrs.converters.default_if_none(default_name_transform)
@@ -479,6 +505,7 @@ class ArgumentCollection(list):
             hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
 
         hint = resolve_optional(hint)
+
         return cls._from_type(
             iparam,
             hint,
