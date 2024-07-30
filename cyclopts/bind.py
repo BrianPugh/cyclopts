@@ -514,6 +514,12 @@ def _walk_name_iparam_implicit_value(command: ResolvedCommand):
         yield name, iparam, implicit_value
 
 
+def _parse_configs_3(argument_collection: ArgumentCollection, configs):
+    for config in configs:
+        config(argument_collection)
+        # TODO: validate argument_collection after every config?
+
+
 def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
     """Iteratively apply each ``config`` callable to the token mapping."""
     # Remap `mapping` back to CLI values for config parsing.
@@ -586,6 +592,7 @@ def create_bound_arguments(
         unused_tokens = _parse_kw_and_flags_3(argument_collection, tokens)
         unused_tokens = _parse_pos_3(argument_collection, unused_tokens)
         _parse_env_3(argument_collection)
+        _parse_configs_3(argument_collection, configs)
         breakpoint()
         raise NotImplementedError
     except CycloptsError as e:

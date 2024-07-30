@@ -1,18 +1,20 @@
 import errno
 import inspect
+import itertools
 import os
 from abc import ABC, abstractmethod
-from contextlib import suppress
 from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from attrs import define, field
 
+from cyclopts.argument import Token
 from cyclopts.exceptions import UnknownOptionError
 from cyclopts.utils import to_tuple_converter
 
 if TYPE_CHECKING:
+    from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
 
 
@@ -100,7 +102,7 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
+    def __call__(self, apps: List["App"], commands: Tuple[str, ...], arguments: "ArgumentCollection"):
         config = self.config
         try:
             for key in chain(self.root_keys, commands):
@@ -108,15 +110,32 @@ class ConfigFromFile(ABC):
         except KeyError:
             return
 
-        if not self.allow_unknown and (remaining_keys := set(config) - set(apps[-1]) - set(mapping)):
+        argument_names = {name[2:] for name in arguments.names if name.startswith("--")}
+        if not self.allow_unknown and (remaining_keys := set(config) - set(apps[-1]) - argument_names):
             raise UnknownOptionError(token=sorted(remaining_keys)[0])
 
-        for key, value in mapping.items():
-            if not isinstance(value, Unset) or value.related_set(mapping):
+        for argument in arguments:
+            if argument.tokens:
                 continue
+            for name in argument.names:
+                if not name.startswith("--"):
+                    continue
+                name_tokens = name[2:].split(".")
+                lookup = config
 
-            with suppress(KeyError):
-                new_value = config[key]
-                if not isinstance(new_value, list):
-                    new_value = [new_value]
-                mapping[key] = [str(x) for x in new_value]
+                try:
+                    for name_token in name_tokens:
+                        lookup = lookup[name_token]
+                except KeyError:
+                    continue
+
+                if isinstance(lookup, dict):
+                    raise NotImplementedError  # TODO
+                elif not isinstance(lookup, list):
+                    lookup = [lookup]
+                lookup = [str(x) for x in lookup]
+
+                complete_keyword = "".join(f"[{k}]" for k in itertools.chain(self.root_keys, name_tokens))
+
+                for i, value in enumerate(lookup):
+                    argument.append(Token(complete_keyword, value, source=str(self.path), index=i))

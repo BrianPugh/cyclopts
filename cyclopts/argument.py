@@ -1,4 +1,5 @@
 import inspect
+import itertools
 from contextlib import suppress
 from functools import cached_property
 from typing import (
@@ -271,7 +272,7 @@ class Argument:
                     return (), implicit_value
         else:
             # No positive-name matches found.
-            for name in self.cparam.get_negatives(self.hint, *self.cparam.name):
+            for name in self.cparam.get_negatives(self.hint):
                 if name.startswith(token):
                     trailing = token[len(token) :]
                     implicit_value = (get_origin(self.hint) or self.hint)()
@@ -329,6 +330,14 @@ class Argument:
             consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL
             return tokens_per_element, consume_all
 
+    @property
+    def negatives(self):
+        return self.cparam.get_negatives(self.hint)
+
+    @property
+    def names(self):
+        return itertools.chain(self.cparam.name, self.negatives)
+
 
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
@@ -375,6 +384,10 @@ class ArgumentCollection(list):
             if argument.iparam != iparam:
                 continue
             yield argument
+
+    @property
+    def names(self):
+        return (name for argument in self for name in argument.names)
 
     @classmethod
     def _from_type(
