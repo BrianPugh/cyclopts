@@ -136,7 +136,7 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
 
         if implicit_value is not None:
             # A flag was parsed
-            argument.append(Token(cli_option, cli_values[-1] if cli_values else "", "cli"))
+            argument.append(Token(cli_option, cli_values[-1] if cli_values else "", source="cli"))
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
@@ -162,7 +162,7 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
                 raise MissingArgumentError(tokens_so_far=cli_values)
 
             for index, cli_value in enumerate(cli_values):
-                argument.append(Token(cli_option, cli_value, "cli", index=index))
+                argument.append(Token(cli_option, cli_value, source="cli", index=index))
 
     return unused_tokens
 
@@ -382,6 +382,21 @@ def _parse_pos(
     return tokens
 
 
+def _parse_env_3(argument_collection):
+    for argument in argument_collection:
+        if argument.tokens:
+            # Don't check environment variables for parameters that already have values from CLI.
+            continue
+        for env_var_name in argument.cparam.env_var:
+            try:
+                env_var_value = os.environ[env_var_name]
+            except KeyError:
+                pass
+            else:
+                argument.tokens.append(Token(env_var_name, env_var_value, source="env"))
+                break
+
+
 def _parse_env(command: ResolvedCommand, mapping: ParameterDict):
     """Populate argument defaults from environment variables.
 
@@ -570,6 +585,7 @@ def create_bound_arguments(
         # Build up a mapping of inspect.Parameter->List[str]
         unused_tokens = _parse_kw_and_flags_3(argument_collection, tokens)
         unused_tokens = _parse_pos_3(argument_collection, unused_tokens)
+        _parse_env_3(argument_collection)
         breakpoint()
         raise NotImplementedError
     except CycloptsError as e:
