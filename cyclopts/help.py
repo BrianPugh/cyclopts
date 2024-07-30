@@ -320,7 +320,7 @@ def create_parameter_help_panel(
         assert cparam.name_transform is not None
         type_ = get_hint_parameter(iparam)[0]
         options = list(cparam.name)
-        options.extend(cparam.get_negatives(type_, *options))
+        options.extend(cparam.get_negatives(type_))
 
         # Add an all-uppercase name if it's an argument
         if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):

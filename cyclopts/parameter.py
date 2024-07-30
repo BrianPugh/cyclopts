@@ -133,8 +133,12 @@ class Parameter:
     def converter(self):
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
-    def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:  # TODO: use self.name
+    def get_negatives(self, type_, names: Optional[Iterable[str]] = None) -> Tuple[str, ...]:  # TODO: use self.name
         type_ = get_origin(type_) or type_
+
+        if names is None:
+            assert isinstance(self.name, tuple)
+            names = self.name
 
         if self.negative is not None:
             return self.negative  # pyright: ignore
