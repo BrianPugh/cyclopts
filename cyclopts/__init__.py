@@ -3,6 +3,9 @@ __version__ = "0.0.0"
 
 __all__ = [
     "App",
+    "Argument",
+    "ArgumentCollection",
+    "Token",
     "CoercionError",
     "CommandCollisionError",
     "CycloptsError",
@@ -26,6 +29,7 @@ __all__ = [
 
 from cyclopts._convert import convert
 from cyclopts._env_var import env_var_split
+from cyclopts.argument import Argument, ArgumentCollection, Token
 from cyclopts.core import App
 from cyclopts.exceptions import (
     CoercionError,
