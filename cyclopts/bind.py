@@ -315,6 +315,8 @@ def _parse_pos_3(
             if not consume_all:
                 break
         argument.tokens[:0] = new_tokens  # Prepend the new tokens to the argument.
+        if not tokens:
+            break
 
     return tokens
 
@@ -579,7 +581,7 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
             set_iparams.add(id(iparam))
 
 
-def create_bound_arguments(
+def create_bound_arguments_3(
     func: Callable,
     argument_collection: ArgumentCollection,
     tokens: List[str],
@@ -593,8 +595,8 @@ def create_bound_arguments(
         unused_tokens = _parse_pos_3(argument_collection, unused_tokens)
         _parse_env_3(argument_collection)
         _parse_configs_3(argument_collection, configs)
-        breakpoint()
-        raise NotImplementedError
+        bound = None
+        # TODO: the rest
     except CycloptsError as e:
         e.root_input_tokens = tokens
         # e.cli2parameter = command.cli2parameter
@@ -605,7 +607,7 @@ def create_bound_arguments(
     return bound, unused_tokens
 
 
-def create_bound_arguments_old(
+def create_bound_arguments(
     command: ResolvedCommand,
     tokens: List[str],
     configs: Iterable[Callable],
@@ -641,7 +643,7 @@ def create_bound_arguments_old(
         unused_tokens = _parse_kw_and_flags(command, tokens, mapping)
         unused_tokens = _parse_pos(command, unused_tokens, mapping)
         _parse_env(command, mapping)
-        _parse_configs(command, mapping, configs)
+        # _parse_configs(command, mapping, configs)
 
         # For each parameter, convert the list of string tokens.
         coerced = _convert(command, mapping)

@@ -1,10 +1,10 @@
-import inspect
 from pathlib import Path
 from typing import Any, Dict
 
 import pytest
 
-from cyclopts.config._common import ConfigFromFile, Unset
+from cyclopts.argument import ArgumentCollection, Token
+from cyclopts.config._common import ConfigFromFile
 
 
 class Dummy(ConfigFromFile):
@@ -50,11 +50,13 @@ def config_root_keys(tmp_path):
 
 
 @pytest.fixture
-def bound():
-    return {
-        "key1": ["cli1"],
-        "key2": Unset(inspect.Parameter("FAKE_NAME", inspect.Parameter.POSITIONAL_OR_KEYWORD)),
-    }
+def argument_collection():
+    def foo(key1, key2):
+        pass
+
+    out = ArgumentCollection.from_callable(foo)
+    out[0].append(Token("--key1", "cli1", source="cli"))
+    return out
 
 
 @pytest.fixture
@@ -63,19 +65,19 @@ def apps():
     return [{"function1": None}]
 
 
-def test_config_common_root_keys_empty(apps, config, bound):
+def test_config_common_root_keys_empty(apps, config, argument_collection):
     config.path.touch()
-    config(apps, (), bound)
-    expected = {"key1": ["cli1"], "key2": ["foo2"]}
-    assert expected == bound
+    config(apps, (), argument_collection)
+    assert argument_collection[0].tokens == [Token("--key1", "cli1", source="cli")]
+    assert argument_collection[1].tokens == [Token("[key2]", "foo2", source=str(config.path))]
 
 
-def test_config_common_root_keys_populated(apps, config_root_keys, bound):
+def test_config_common_root_keys_populated(apps, config_root_keys, argument_collection):
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
-    config_root_keys(apps, (), bound)
-    expected = {"key1": ["cli1"], "key2": ["foo2"]}
-    assert expected == bound
+    config_root_keys(apps, (), argument_collection)
+    assert argument_collection[0].tokens == [Token("--key1", "cli1", source="cli")]
+    assert argument_collection[1].tokens == [Token("[tool][cyclopts][key2]", "foo2", source=str(config_root_keys.path))]
 
 
 def test_config_common_must_exist_false(config, mocker):

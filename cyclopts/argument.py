@@ -68,10 +68,10 @@ class Token:
     # Could also be something like "tool.project.foo" if `source=="config"`
     # or could be `TOOL_PROJECT_FOO` if coming from an `source=="env"`
     # **This should be pretty unadulterated from the user's input.**
-    keyword: Optional[str]
+    keyword: Optional[str]  # TODO: rename to "key"
 
     # Empty string when a flag. The parsed token value (unadulterated)
-    token: str
+    token: str  # TODO: rename to "value"
 
     # Where the token came from; used for --help purposes.
     # Cyclopts specially uses "cli" for cli-parsed tokens.
@@ -311,6 +311,10 @@ class Argument:
         if self.tokens and not self.accepts_multiple_arguments:
             raise RepeatArgumentError(parameter=self.iparam)
         self.tokens.append(token)
+
+    def values(self):
+        for token in self.tokens:
+            yield token.token
 
     def convert(self):
         # TODO
