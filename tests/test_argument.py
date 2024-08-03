@@ -1,12 +1,13 @@
 import inspect
 import sys
-from typing import Dict, Optional, Tuple, TypedDict
+from typing import Dict, List, Optional, Tuple, TypedDict
 
 import pytest
 
 from cyclopts.argument import (
     Argument,
     ArgumentCollection,
+    Token,
     _resolve_groups_3,
     _resolve_parameter_name,
 )
@@ -385,3 +386,30 @@ def test_resolve_groups_3():
 
     actual = _resolve_groups_3(build)
     assert actual == [Group("Flags"), Group("Other Flags"), Group("Inside Typed Dict")]
+
+
+def test_argument_convert():
+    argument = Argument(
+        hint=List[int],
+        tokens=[
+            Token("doesn't matter", "42", source="test"),
+            Token("doesn't matter", "70", source="test"),
+        ],
+    )
+    assert argument.convert() == [42, 70]
+
+
+def test_argument_convert_cparam_provided():
+    def my_converter(type_, tokens):
+        return f"my_converter_{tokens[0]}"
+
+    argument = Argument(
+        hint=str,
+        tokens=[
+            Token("doesn't matter", "my_value", source="test"),
+        ],
+        cparam=Parameter(
+            converter=my_converter,
+        ),
+    )
+    assert argument.convert() == "my_converter_my_value"

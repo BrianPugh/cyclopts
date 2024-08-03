@@ -518,6 +518,7 @@ def _walk_name_iparam_implicit_value(command: ResolvedCommand):
 
 def _parse_configs_3(argument_collection: ArgumentCollection, configs):
     for config in configs:
+        # Each ``config`` is a partial that already has apps and commands provided.
         config(argument_collection)
         # TODO: validate argument_collection after every config?
 
@@ -588,6 +589,8 @@ def create_bound_arguments_3(
     configs: Iterable[Callable],
 ) -> Tuple[inspect.BoundArguments, List[str]]:
     unused_tokens = []
+
+    validate_command(func)  # TODO: is this the appropriate location?
 
     try:
         # Build up a mapping of inspect.Parameter->List[str]

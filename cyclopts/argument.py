@@ -15,6 +15,7 @@ from typing import (
     get_origin,
 )
 
+from attr.converters import default_if_none
 from attrs import define, field, frozen
 
 from cyclopts._convert import (
@@ -123,14 +124,14 @@ class Argument:
 
     # Fully resolved Parameter
     # Resolved parameter should have a fully resolved Parameter.name
-    cparam: "Parameter" = field(default=None)
+    cparam: Parameter = field(factory=Parameter)
 
     # The type for this leaf; may be different from ``iparam.annotation``
     # because this could be a subkey of iparam.
     # This hint MUST be unannotated.
     hint: Any
 
-    # If supplied as a positional argument, the index of it.
+    # Associated positional index for iparam.
     index: Optional[int] = field(default=None)
 
     # **Python** Keys into iparam that lead to this leaf.
@@ -312,15 +313,12 @@ class Argument:
             raise RepeatArgumentError(parameter=self.iparam)
         self.tokens.append(token)
 
-    def values(self):
+    def values(self) -> Iterator[str]:
         for token in self.tokens:
             yield token.token
 
     def convert(self):
-        # TODO
-        # Converts all the tokens into a final output.
-        # should use the self.cparam.converter
-        raise NotImplementedError
+        return self.cparam.converter(self.hint, tuple(self.values()))
 
     def validate(self, value):
         # TODO
@@ -339,8 +337,9 @@ class Argument:
         return self.cparam.get_negatives(self.hint)
 
     @property
-    def names(self):
-        return itertools.chain(self.cparam.name, self.negatives)
+    def names(self) -> Tuple[str, ...]:
+        assert isinstance(self.cparam.name, tuple)
+        return tuple(itertools.chain(self.cparam.name, self.negatives))
 
 
 class ArgumentCollection(list):
