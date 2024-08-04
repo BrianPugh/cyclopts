@@ -30,7 +30,7 @@ from cyclopts._convert import (
     resolve_optional,
     token_count,
 )
-from cyclopts.exceptions import RepeatArgumentError
+from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import Sentinel, is_union
@@ -69,16 +69,20 @@ class Token:
     # Could also be something like "tool.project.foo" if `source=="config"`
     # or could be `TOOL_PROJECT_FOO` if coming from an `source=="env"`
     # **This should be pretty unadulterated from the user's input.**
+    # Used ONLY for error message purposes.
     keyword: Optional[str]  # TODO: rename to "key"
 
     # Empty string when a flag. The parsed token value (unadulterated)
-    token: str  # TODO: rename to "value"
+    value: str
 
-    # Where the token came from; used for --help purposes.
+    # Where the token came from; used for error message purposes.
     # Cyclopts specially uses "cli" for cli-parsed tokens.
     source: str
 
-    index: int = 0
+    index: int = field(default=0, kw_only=True)
+
+    # Only used for Arguments that take arbitrary keys.
+    keys: Tuple[str, ...] = field(default=(), kw_only=True)
 
 
 @define(kw_only=True)
@@ -142,6 +146,7 @@ class Argument:
     keys: Tuple[str, ...] = field(default=())
 
     accepts_keywords: bool = field(default=False, init=False)
+
     _default: Any = field(default=None, init=False)
     _lookup: dict = field(factory=dict, init=False)
 
@@ -206,10 +211,6 @@ class Argument:
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
-    @property
-    def accepts_multiple_arguments(self) -> bool:
-        return self.token_count()[1]
-
     def type_hint_for_key(self, key: str):
         try:
             return self._lookup[key]
@@ -226,7 +227,6 @@ class Argument:
         Tuple[str, ...]
             Leftover keys after matching to this argument.
             Used if this argument accepts_arbitrary_keywords.
-            Otherwise, should be the same as argument.keys
         Any
             Implicit value.
         """
@@ -250,7 +250,6 @@ class Argument:
         Tuple[str, ...]
             Leftover keys after matching to this argument.
             Used if this argument accepts_arbitrary_keywords.
-            Otherwise, should be the same as argument.keys
         Any
             Implicit value.
         """
@@ -260,12 +259,12 @@ class Argument:
 
         assert self.cparam.name
         for name in self.cparam.name:
-            if name.startswith(token):
-                trailing = token[len(token) :]
+            if token.startswith(name):
+                trailing = token[len(name) :]
                 implicit_value = True if self.hint is bool else None
                 if trailing:
                     if trailing[0] == ".":
-                        trailing = token[1:]
+                        trailing = trailing[1:]
                         break
                     # Otherwise, it's not an actual match.
                 else:
@@ -274,12 +273,12 @@ class Argument:
         else:
             # No positive-name matches found.
             for name in self.cparam.get_negatives(self.hint):
-                if name.startswith(token):
-                    trailing = token[len(token) :]
+                if token.startswith(name):
+                    trailing = token[len(name) :]
                     implicit_value = (get_origin(self.hint) or self.hint)()
                     if trailing:
                         if trailing[0] == ".":
-                            trailing = token[1:]
+                            trailing = trailing[1:]
                             break
                         # Otherwise, it's not an actual match.
                     else:
@@ -309,28 +308,59 @@ class Argument:
         return (), None
 
     def append(self, token: Token):
-        if self.tokens and not self.accepts_multiple_arguments:
+        if any(x.keys == token.keys for x in self.tokens) and not self.token_count(token.keys)[1]:
             raise RepeatArgumentError(parameter=self.iparam)
+        if self.tokens:
+            if bool(token.keys) ^ any(x.keys for x in self.tokens):
+                raise MixedArgumentError(parameter=self.iparam)
         self.tokens.append(token)
 
     def values(self) -> Iterator[str]:
         for token in self.tokens:
-            yield token.token
+            yield token.value
 
     def convert(self):
-        return self.cparam.converter(self.hint, tuple(self.values()))
+        positional, keyword = [], {}
+        for token in self.tokens:
+            if token.keys:
+                lookup = keyword
+                for key in token.keys[:-1]:
+                    lookup = lookup.setdefault(key, {})
+                lookup.setdefault(token.keys[-1], []).append(token.value)
+            else:
+                positional.append(token.value)
+
+            if positional and keyword:
+                # This should never happen due to checks in ``Argument.append``
+                raise MixedArgumentError(parameter=self.iparam)
+
+        if positional:
+            return self.cparam.converter(self.hint, tuple(positional))
+        elif keyword:
+            return self.cparam.converter(self.hint, keyword)
+        else:
+            raise NotImplementedError
 
     def validate(self, value):
-        # TODO
-        raise NotImplementedError
+        assert isinstance(self.cparam.validator, tuple)
+        for validator in self.cparam.validator:
+            validator(self.hint, value)
+
+    def convert_and_validate(self):
+        val = self.convert()
+        self.validate(val)
+        return val
 
     def token_count(self, keys: Tuple[str, ...] = ()):
-        if keys:
-            raise NotImplementedError
+        if len(keys) > 1:
+            hint = self._default
+        elif len(keys) == 1:
+            hint = self.type_hint_for_key(keys[0])
         else:
-            tokens_per_element, consume_all = token_count(self.hint)
-            consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL
-            return tokens_per_element, consume_all
+            hint = self.hint
+        tokens_per_element, consume_all = token_count(hint)
+        consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL  # TODO: is this necessary?
+        return tokens_per_element, consume_all
 
     @property
     def negatives(self):
@@ -407,6 +437,13 @@ class ArgumentCollection(list):
     ):
         assert hint is not NoneType
         out = cls()
+
+        if not keys:  # root hint annotation
+            if iparam.kind is iparam.VAR_KEYWORD:
+                hint = Dict[str, hint]
+            elif iparam.kind is iparam.VAR_POSITIONAL:
+                hint = Tuple[hint, ...]
+
         hint = resolve_optional(hint)
         if type(hint) is AnnotatedType:
             annotations = hint.__metadata__  # pyright: ignore
@@ -414,12 +451,6 @@ class ArgumentCollection(list):
             cyclopts_parameters_no_group = [x for x in annotations if isinstance(x, Parameter)]
         else:
             cyclopts_parameters_no_group = []
-
-        if not keys:
-            if iparam.kind is iparam.VAR_KEYWORD:
-                hint = Dict[str, hint]
-            elif iparam.kind is iparam.VAR_POSITIONAL:
-                hint = Tuple[hint, ...]
 
         if group_lookup:
             cyclopts_parameters = []
@@ -567,6 +598,13 @@ class ArgumentCollection(list):
                 )
             )
         return out
+
+    @property
+    def var_keyword(self) -> Optional[Argument]:
+        for argument in self:
+            if argument.iparam.kind == argument.iparam.VAR_KEYWORD:
+                return argument
+        return None
 
 
 def _resolve_groups_3(func: Callable) -> List[Group]:

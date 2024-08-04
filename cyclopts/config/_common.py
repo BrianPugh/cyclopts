@@ -111,12 +111,17 @@ class ConfigFromFile(ABC):
             return
 
         argument_names = {name[2:] for name in arguments.names if name.startswith("--")}
-        if not self.allow_unknown and (remaining_keys := set(config) - set(apps[-1]) - argument_names):
+        if (
+            not arguments.var_keyword
+            and not self.allow_unknown
+            and (remaining_keys := set(config) - set(apps[-1]) - argument_names)
+        ):
             raise UnknownOptionError(token=sorted(remaining_keys)[0])
 
         for argument in arguments:
             if argument.tokens:
                 continue
+            # TODO: this direction doesn't work with VAR_KEYWORD
             for name in argument.names:
                 if not name.startswith("--"):
                     continue

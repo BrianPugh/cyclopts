@@ -162,7 +162,7 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
                 raise MissingArgumentError(tokens_so_far=cli_values)
 
             for index, cli_value in enumerate(cli_values):
-                argument.append(Token(cli_option, cli_value, source="cli", index=index))
+                argument.append(Token(cli_option, cli_value, source="cli", index=index, keys=leftover_keys))
 
     return unused_tokens
 

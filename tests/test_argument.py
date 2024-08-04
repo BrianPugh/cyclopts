@@ -399,6 +399,42 @@ def test_argument_convert():
     assert argument.convert() == [42, 70]
 
 
+def test_argument_convert_dict():
+    def foo(bar: Dict[str, int]):
+        pass
+
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 1
+    argument = collection[0]
+
+    # Sanity check the match method
+    assert argument.match("--bar.buzz") == (("buzz",), None)
+
+    argument.append(Token("--bar.fizz", "7", source="test", keys=("fizz",)))
+    argument.append(Token("--bar.buzz", "12", source="test", keys=("buzz",)))
+
+    assert argument.convert() == {"fizz": 7, "buzz": 12}
+
+
+def test_argument_convert_var_keyword():
+    def foo(**kwargs: int):
+        pass
+
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 1
+    argument = collection[0]
+
+    # Sanity check the match method
+    assert argument.match("--fizz") == (("fizz",), None)
+
+    argument.append(Token("--fizz", "7", source="test", keys=("fizz",)))
+    argument.append(Token("--buzz", "12", source="test", keys=("buzz",)))
+
+    assert argument.convert() == {"fizz": 7, "buzz": 12}
+
+
 def test_argument_convert_cparam_provided():
     def my_converter(type_, tokens):
         return f"my_converter_{tokens[0]}"
