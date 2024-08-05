@@ -136,7 +136,16 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
 
         if implicit_value is not None:
             # A flag was parsed
-            argument.append(Token(cli_option, cli_values[-1] if cli_values else "", source="cli"))
+            if cli_values:
+                if _bool(cli_values[-1]):  # --positive-flag=true or --negative-flag=true or --empty-flag=true
+                    argument.append(Token(cli_option, "", source="cli", implicit_value=implicit_value))
+                else:  # --positive-flag=false or --negative-flag=false or --empty-flag=false
+                    if isinstance(implicit_value, bool):
+                        argument.append(Token(cli_option, "", source="cli", implicit_value=not implicit_value))
+                    else:
+                        continue
+            else:
+                argument.append(Token(cli_option, "", source="cli", implicit_value=implicit_value))
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 

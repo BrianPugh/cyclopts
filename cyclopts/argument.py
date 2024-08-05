@@ -35,11 +35,6 @@ from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import ParameterDict, Sentinel, is_union
 
-
-class NOT_CONVERTED(Sentinel):  # noqa: N801
-    pass
-
-
 _PARAMETER_EMPTY_HELP = Parameter(help="")
 
 
@@ -73,6 +68,7 @@ class Token:
     keyword: Optional[str]  # TODO: rename to "key"
 
     # Empty string when a flag. The parsed token value (unadulterated)
+    # See ``Token.implicit_value``
     value: str
 
     # Where the token came from; used for error message purposes.
@@ -83,6 +79,8 @@ class Token:
 
     # Only used for Arguments that take arbitrary keys.
     keys: Tuple[str, ...] = field(default=(), kw_only=True)
+
+    implicit_value: Any = field(default=None, kw_only=True)
 
 
 @define(kw_only=True)
@@ -346,6 +344,10 @@ class Argument:
     def convert(self):
         positional, keyword = [], {}
         for token in self.tokens:
+            if token.implicit_value is not None:
+                assert len(self.tokens) == 1
+                return token.implicit_value
+
             if token.keys:
                 lookup = keyword
                 for key in token.keys[:-1]:
