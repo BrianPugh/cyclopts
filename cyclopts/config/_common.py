@@ -155,7 +155,7 @@ class ConfigFromFile(ABC):
                     else:
                         raise UnknownOptionError(token=complete_keyword) from None
 
-                if argument.tokens:
+                if any(x.source != str(self.path) for x in argument.tokens):
                     continue
 
                 if not isinstance(value, list):

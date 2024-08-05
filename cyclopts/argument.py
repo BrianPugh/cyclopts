@@ -219,7 +219,13 @@ class Argument:
                 raise
             return self._default
 
-    def match(self, term: Union[str, int]) -> Tuple[Tuple[str, ...], Any]:
+    def match(
+        self,
+        term: Union[str, int],
+        *,
+        transform: Optional[Callable[[str], str]] = None,
+        delimiter: str = ".",
+    ) -> Tuple[Tuple[str, ...], Any]:
         """Match a name search-term, or a positional integer index.
 
         Returns
@@ -230,15 +236,28 @@ class Argument:
         Any
             Implicit value.
         """
-        return self._match_index(term) if isinstance(term, int) else self._match_name(term)
+        return (
+            self._match_index(term)
+            if isinstance(term, int)
+            else self._match_name(term, transform=transform, delimiter=delimiter)
+        )
 
-    def _match_name(self, token: str) -> Tuple[Tuple[str, ...], Any]:
+    def _match_name(
+        self,
+        term: str,
+        *,
+        transform: Optional[Callable[[str], str]] = None,
+        delimiter: str = ".",
+    ) -> Tuple[Tuple[str, ...], Any]:
         """Find the matching Argument for a token keyword identifier.
 
         Parameter
         ---------
-        token: str
+        term: str
             Something like "--foo"
+        transform: Callable
+            Function that converts the cyclopts Parameter name(s) into
+            something that should be compared against ``term``.
 
         Raises
         ------
@@ -255,15 +274,17 @@ class Argument:
         """
         if self.iparam.kind is self.iparam.VAR_KEYWORD:
             # TODO: apply cparam.name_transform to keys here?
-            return tuple(token.lstrip("-").split(".")), None
+            return tuple(term.lstrip("-").split(delimiter)), None
 
         assert self.cparam.name
         for name in self.cparam.name:
-            if token.startswith(name):
-                trailing = token[len(name) :]
+            if transform:
+                name = transform(name)
+            if term.startswith(name):
+                trailing = term[len(name) :]
                 implicit_value = True if self.hint is bool else None
                 if trailing:
-                    if trailing[0] == ".":
+                    if trailing[0] == delimiter:
                         trailing = trailing[1:]
                         break
                     # Otherwise, it's not an actual match.
@@ -273,11 +294,13 @@ class Argument:
         else:
             # No positive-name matches found.
             for name in self.cparam.get_negatives(self.hint):
-                if token.startswith(name):
-                    trailing = token[len(name) :]
+                if transform:
+                    name = transform(name)
+                if term.startswith(name):
+                    trailing = term[len(name) :]
                     implicit_value = (get_origin(self.hint) or self.hint)()
                     if trailing:
-                        if trailing[0] == ".":
+                        if trailing[0] == delimiter:
                             trailing = trailing[1:]
                             break
                         # Otherwise, it's not an actual match.
@@ -288,14 +311,12 @@ class Argument:
                 # No negative-name matches found.
                 raise ValueError
 
-        # trailing is period-delimited subkeys like ``bar.baz``
-
         if not self.accepts_arbitrary_keywords:
             # Still not an actual match.
             raise ValueError
 
         # TODO: apply cparam.name_transform to keys here?
-        return tuple(trailing.split(".")), implicit_value
+        return tuple(trailing.split(delimiter)), implicit_value
 
     def _match_index(self, index: int) -> Tuple[Tuple[str, ...], Any]:
         if self.index is None or self.iparam in (self.iparam.KEYWORD_ONLY, self.iparam.VAR_KEYWORD):
@@ -374,11 +395,20 @@ class Argument:
         assert isinstance(self.cparam.name, tuple)
         return tuple(itertools.chain(self.cparam.name, self.negatives))
 
+    def env_var_split(self, value: str, delimiter: Optional[str] = None) -> List[str]:
+        return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
+
 
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
 
-    def match(self, term: Union[str, int]) -> Tuple[Argument, Tuple[str, ...], Any]:
+    def match(
+        self,
+        term: Union[str, int],
+        *,
+        transform: Optional[Callable[[str], str]] = None,
+        delimiter: str = ".",
+    ) -> Tuple[Argument, Tuple[str, ...], Any]:
         """Maps keyword CLI arguments to their :class:`Argument`.
 
         Parameters
@@ -398,7 +428,7 @@ class ArgumentCollection(list):
         best_match_argument, best_match_keys, best_implicit_value = None, None, None
         for argument in self:
             try:
-                match_keys, implicit_value = argument.match(term)
+                match_keys, implicit_value = argument.match(term, transform=transform, delimiter=delimiter)
             except ValueError:
                 continue
             if best_match_keys is None or len(match_keys) < len(best_match_keys):
