@@ -33,7 +33,7 @@ from cyclopts._convert import (
 from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
-from cyclopts.utils import Sentinel, is_union
+from cyclopts.utils import ParameterDict, Sentinel, is_union
 
 
 class NOT_CONVERTED(Sentinel):  # noqa: N801
@@ -450,6 +450,18 @@ class ArgumentCollection(list):
             if argument.iparam != iparam:
                 continue
             yield argument
+
+    def convert(self) -> ParameterDict:
+        out = ParameterDict()
+        for argument in self:
+            if not argument.tokens:
+                continue
+            node = out
+            keys_to_leaf = (argument.iparam,) + argument.keys
+            for key in keys_to_leaf[:-1]:
+                node = node.setdefault(key, {})
+            node[keys_to_leaf[-1]] = argument.convert_and_validate()
+        return out
 
     @property
     def names(self):

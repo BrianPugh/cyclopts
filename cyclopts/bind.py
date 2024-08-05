@@ -300,6 +300,8 @@ def _parse_pos_3(
             argument, _, _ = argument_collection.match(i)
         except ValueError:
             break
+        if argument.tokens:
+            continue
         tokens_per_element, consume_all = argument.token_count()
         tokens_per_element = max(1, tokens_per_element)
         new_tokens = []
@@ -467,6 +469,43 @@ def _bind(
     return bound
 
 
+def _bind_3(
+    func: Callable,
+    mapping: ParameterDict,
+):
+    """Bind the mapping to the function signature.
+
+    Better than directly using ``signature.bind`` because this can handle
+    intermingled positional and keyword arguments.
+    """
+    f_pos, f_kwargs = [], {}
+    use_pos = True
+
+    def f_pos_append(p):
+        nonlocal use_pos
+        assert use_pos
+        try:
+            f_pos.append(mapping[p])
+        except KeyError:
+            use_pos = False
+
+    signature = cyclopts.utils.signature(func)
+    for iparam in signature.parameters.values():
+        if use_pos and iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
+            f_pos_append(iparam)
+        elif use_pos and iparam.kind is iparam.VAR_POSITIONAL:  # ``*args``
+            f_pos.extend(mapping.get(iparam, []))
+            use_pos = False
+        elif iparam.kind is iparam.VAR_KEYWORD:
+            f_kwargs.update(mapping.get(iparam, {}))
+        else:
+            with suppress(KeyError):
+                f_kwargs[iparam.name] = mapping[iparam]
+
+    bound = signature.bind_partial(*f_pos, **f_kwargs)
+    return bound
+
+
 def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
     coerced = ParameterDict()
     for iparam, parameter_tokens in mapping.items():
@@ -598,8 +637,8 @@ def create_bound_arguments_3(
         unused_tokens = _parse_pos_3(argument_collection, unused_tokens)
         _parse_env_3(argument_collection)
         _parse_configs_3(argument_collection, configs)
-        bound = None
-        # TODO: the rest
+        iparam_to_value = argument_collection.convert()
+        bound = _bind_3(func, iparam_to_value)
     except CycloptsError as e:
         e.root_input_tokens = tokens
         # e.cli2parameter = command.cli2parameter
