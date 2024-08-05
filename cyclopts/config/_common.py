@@ -5,7 +5,18 @@ import os
 from abc import ABC, abstractmethod
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 from attrs import define, field
 
@@ -50,6 +61,24 @@ class Unset:
             CLI keys that map to the same :class:`inspect.Parameter` that have parsed token(s).
         """
         return {x for x in self.related.intersection(mapping) if not isinstance(mapping[x], Unset)}
+
+
+def _walk_leaves(
+    d,
+    parent_keys: Optional[Tuple[str, ...]] = None,
+) -> Iterator[Tuple[Tuple[str, ...], Any]]:
+    if parent_keys is None:
+        parent_keys = ()
+
+    if isinstance(d, dict):
+        for key, value in d.items():
+            current_keys = parent_keys + (key,)
+            if isinstance(value, dict):
+                yield from _walk_leaves(value, current_keys)
+            else:
+                yield current_keys, value
+    else:
+        yield (), d
 
 
 @define
@@ -103,44 +132,35 @@ class ConfigFromFile(ABC):
         return self._config
 
     def __call__(self, apps: List["App"], commands: Tuple[str, ...], arguments: "ArgumentCollection"):
-        config = self.config
+        config: Dict[str, Any] = self.config
         try:
             for key in chain(self.root_keys, commands):
                 config = config[key]
         except KeyError:
             return
 
-        argument_names = {name[2:] for name in arguments.names if name.startswith("--")}
-        if (
-            not arguments.var_keyword
-            and not self.allow_unknown
-            and (remaining_keys := set(config) - set(apps[-1]) - argument_names)
-        ):
-            raise UnknownOptionError(token=sorted(remaining_keys)[0])
-
-        for argument in arguments:
-            if argument.tokens:
+        for option_key, option_value in config.items():
+            if option_key in apps[-1]:  # Check if it's a command.
                 continue
-            # TODO: this direction doesn't work with VAR_KEYWORD
-            for name in argument.names:
-                if not name.startswith("--"):
-                    continue
-                name_tokens = name[2:].split(".")
-                lookup = config
+
+            for subkeys, value in _walk_leaves(option_value):
+                cli_option_name = "--" + ".".join(chain((option_key,), subkeys))
+                complete_keyword = "".join(f"[{k}]" for k in itertools.chain(self.root_keys, (option_key,), subkeys))
 
                 try:
-                    for name_token in name_tokens:
-                        lookup = lookup[name_token]
-                except KeyError:
+                    argument, remaining_keys, _ = arguments.match(cli_option_name)
+                except ValueError:
+                    if self.allow_unknown:
+                        continue
+                    else:
+                        raise UnknownOptionError(token=complete_keyword) from None
+
+                if argument.tokens:
                     continue
 
-                if isinstance(lookup, dict):
-                    raise NotImplementedError  # TODO
-                elif not isinstance(lookup, list):
-                    lookup = [lookup]
-                lookup = [str(x) for x in lookup]
+                if not isinstance(value, list):
+                    value = (value,)
+                value = tuple(str(x) for x in value)
 
-                complete_keyword = "".join(f"[{k}]" for k in itertools.chain(self.root_keys, name_tokens))
-
-                for i, value in enumerate(lookup):
-                    argument.append(Token(complete_keyword, value, source=str(self.path), index=i))
+                for i, v in enumerate(value):
+                    argument.append(Token(complete_keyword, v, source=str(self.path), index=i, keys=remaining_keys))

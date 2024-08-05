@@ -147,8 +147,8 @@ class Argument:
 
     accepts_keywords: bool = field(default=False, init=False)
 
-    _default: Any = field(default=None, init=False)
-    _lookup: dict = field(factory=dict, init=False)
+    _default: Any = field(default=None, init=False, repr=False)
+    _lookup: dict = field(factory=dict, init=False, repr=False)
 
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
@@ -308,7 +308,10 @@ class Argument:
         return (), None
 
     def append(self, token: Token):
-        if any(x.keys == token.keys for x in self.tokens) and not self.token_count(token.keys)[1]:
+        if (
+            any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
+            and not self.token_count(token.keys)[1]
+        ):
             raise RepeatArgumentError(parameter=self.iparam)
         if self.tokens:
             if bool(token.keys) ^ any(x.keys for x in self.tokens):
