@@ -169,6 +169,8 @@ class Argument:
             return
 
         for hint in hints:
+            # accepts_keys is either ``None`` or ``True`` here
+
             # This could be annotated...
             origin = get_origin(hint)
             # TODO: need to resolve Annotation and handle cyclopts.Parameters; or do we?
@@ -190,19 +192,7 @@ class Argument:
                 self._internal_validator = _validate_typed_dict
                 self._accepts_keywords = True
                 self._lookup.update(hint.__annotations__)
-            elif self.cparam.accepts_keys is None:
-                # Typical builtin hint
-                self._assignable = True
-                continue
-
-            if self.cparam.accepts_keys is None:
-                continue
-            # Only explicit ``self.cparam.accepts_keys == True`` from here on
-
-            # Classes that MAY take keywords (accepts_keys=True)
-            # They must be explicitly specified ``accepts_keys=True`` because otherwise
-            # providing a single positional argument is what we want.
-            if is_dataclass(hint):
+            elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._accepts_keywords = True
                 self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
             elif is_namedtuple(hint):
@@ -215,15 +205,26 @@ class Argument:
             elif is_pydantic(hint):
                 self._accepts_keywords = True
                 self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
-            else:
-                self._accepts_keywords = True
-                for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
-                    if i == 0 and iparam.name == "self":
-                        continue
-                    if iparam.kind is iparam.VAR_KEYWORD:
-                        self._default = iparam.annotation
-                    else:
-                        self._lookup[iparam.name] = iparam.annotation
+            elif self.cparam.accepts_keys is None:
+                # Typical builtin hint
+                self._assignable = True
+                continue
+
+            if self.cparam.accepts_keys is None:
+                continue
+            # Only explicit ``self.cparam.accepts_keys == True`` from here on
+
+            # Classes that MAY take keywords (accepts_keys=True)
+            # They must be explicitly specified ``accepts_keys=True`` because otherwise
+            # providing a single positional argument is what we want.
+            self._accepts_keywords = True
+            for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
+                if i == 0 and iparam.name == "self":
+                    continue
+                if iparam.kind is iparam.VAR_KEYWORD:
+                    self._default = iparam.annotation
+                else:
+                    self._lookup[iparam.name] = iparam.annotation
 
     @property
     def accepts_arbitrary_keywords(self) -> bool:

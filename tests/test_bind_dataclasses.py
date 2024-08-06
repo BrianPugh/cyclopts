@@ -18,7 +18,7 @@ class User:
 
 def test_bind_dataclass(app, assert_parse_args):
     @app.command
-    def foo(some_number: int, user: Annotated[User, Parameter(accepts_keys=True)]):
+    def foo(some_number: int, user: User):
         pass
 
     external_data = {
