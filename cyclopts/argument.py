@@ -595,7 +595,7 @@ class ArgumentCollection(list):
 
         hint = iparam.annotation
 
-        if hint is inspect.Parameter.empty:
+        if hint is inspect.Parameter.empty or resolve(hint) is Any:
             hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
 
         hint = resolve_optional(hint)
