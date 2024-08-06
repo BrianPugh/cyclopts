@@ -640,6 +640,8 @@ def create_bound_arguments_3(
 
     validate_command(func)  # TODO: is this the appropriate location?
 
+    signature = cyclopts.utils.signature(func)
+
     try:
         # Build up a mapping of inspect.Parameter->List[str]
         unused_tokens = _parse_kw_and_flags_3(argument_collection, tokens)
@@ -648,6 +650,11 @@ def create_bound_arguments_3(
         _parse_configs_3(argument_collection, configs)
         iparam_to_value = argument_collection.convert()
         bound = _bind_3(func, iparam_to_value)
+
+        for iparam in signature.parameters.values():
+            if _is_required(iparam) and iparam.name not in bound.arguments:
+                raise MissingArgumentError(parameter=iparam)
+
     except CycloptsError as e:
         e.root_input_tokens = tokens
         # e.cli2parameter = command.cli2parameter
