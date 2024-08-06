@@ -1,7 +1,6 @@
 import inspect
 import itertools
 from contextlib import suppress
-from functools import cached_property
 from typing import (
     Any,
     Callable,
@@ -15,7 +14,6 @@ from typing import (
     get_origin,
 )
 
-from attr.converters import default_if_none
 from attrs import define, field, frozen
 
 from cyclopts._convert import (
@@ -33,25 +31,20 @@ from cyclopts._convert import (
 from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
-from cyclopts.utils import ParameterDict, Sentinel, is_union
+from cyclopts.utils import ParameterDict, is_union
 
 _PARAMETER_EMPTY_HELP = Parameter(help="")
 
-
-def _accepts_keywords(hint) -> bool:
-    # TODO: revisit this; do we want "magical" behavior?
-    # MUST agree with ArgumentCollection._from_type
-    origin = get_origin(hint)
-    if is_union(origin):
-        return any(_accepts_keywords(x) for x in get_args(hint))
-    return (
-        dict in (hint, origin)
-        or is_typeddict(hint)
-        or is_dataclass(hint)
-        or is_namedtuple(hint)
-        or is_attrs(hint)
-        or is_pydantic(hint)
-    )
+# parameter subkeys should not inherit these parameter values from their parent.
+_PARAMETER_SUBKEY_BLOCKER = Parameter(
+    name=None,
+    converter=None,
+    validator=None,
+    negative=None,
+    help=None,
+    required=None,
+    accepts_keys=None,
+)
 
 
 def _iparam_get_hint(iparam):
@@ -503,6 +496,8 @@ class ArgumentCollection(list):
             elif iparam.kind is iparam.VAR_POSITIONAL:
                 hint = Tuple[hint, ...]
 
+        if hint is inspect.Parameter.empty:
+            breakpoint()
         hint = resolve_optional(hint)
         if type(hint) is AnnotatedType:
             annotations = hint.__metadata__  # pyright: ignore
@@ -528,15 +523,12 @@ class ArgumentCollection(list):
         if not immediate_parameter.parse:
             return out
 
-        # Don't inherit accepts_keys
-        cparam = Parameter.combine(
-            upstream_parameter,
-            Parameter(accepts_keys=None),
-            immediate_parameter,
-        )
-
-        # Derive default parameter name (if necessary).
         if keys:
+            cparam = Parameter.combine(
+                upstream_parameter,
+                _PARAMETER_SUBKEY_BLOCKER,
+                immediate_parameter,
+            )
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
@@ -546,22 +538,27 @@ class ArgumentCollection(list):
                     )
                 ),
             )
-        elif not cparam.name:
-            # This is directly on iparam; derive default name from it.
-            if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
-                # Name is only used for help-string
-                cparam = Parameter.combine(cparam, Parameter(name=(iparam.name.upper(),)))
-            elif iparam.kind is iparam.VAR_KEYWORD:
-                if cparam.name:
-                    # TODO: Probably something like `--existing.[KEYWORD]`
-                    breakpoint()
+        else:
+            cparam = Parameter.combine(
+                upstream_parameter,
+                immediate_parameter,
+            )
+            if not cparam.name:
+                # This is directly on iparam; derive default name from it.
+                if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                    # Name is only used for help-string
+                    cparam = Parameter.combine(cparam, Parameter(name=(iparam.name.upper(),)))
+                elif iparam.kind is iparam.VAR_KEYWORD:
+                    if cparam.name:
+                        # TODO: Probably something like `--existing.[KEYWORD]`
+                        breakpoint()
+                    else:
+                        cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:
-                    cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
-            else:
-                # cparam.name_transform cannot be None due to:
-                #     attrs.converters.default_if_none(default_name_transform)
-                assert cparam.name_transform is not None
-                cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
+                    # cparam.name_transform cannot be None due to:
+                    #     attrs.converters.default_if_none(default_name_transform)
+                    assert cparam.name_transform is not None
+                    cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
 
         candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
         if candidate_argument.accepts_arbitrary_keywords:
@@ -581,7 +578,6 @@ class ArgumentCollection(list):
                         keys + (field_name,),
                         docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
                         cparam,
-                        # TODO: should we not inherit converter here?
                         group_lookup=group_lookup,
                         group_arguments=group_arguments,
                         group_parameters=group_parameters,
