@@ -1,4 +1,12 @@
+import sys
 from dataclasses import dataclass, field
+
+from cyclopts import Parameter
+
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated, TypedDict  # pragma: no cover
+else:
+    from typing import Annotated  # pragma: no cover
 
 
 @dataclass
@@ -10,7 +18,7 @@ class User:
 
 def test_bind_dataclass(app, assert_parse_args):
     @app.command
-    def foo(user: User):
+    def foo(user: Annotated[User, Parameter(accepts_keys=True)]):
         pass
 
     external_data = {

@@ -54,6 +54,14 @@ def _accepts_keywords(hint) -> bool:
     )
 
 
+def _iparam_get_hint(iparam):
+    hint = iparam.annotation
+    if hint is inspect.Parameter.empty or resolve(hint) is Any:
+        hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
+    hint = resolve_optional(hint)
+    return hint
+
+
 @frozen
 class Token:
     """
@@ -143,7 +151,7 @@ class Argument:
     # This should be populated based on type-hints, not ``Parameter.name``
     keys: Tuple[str, ...] = field(default=())
 
-    accepts_keywords: bool = field(default=False, init=False)
+    _accepts_keywords: bool = field(default=False, init=False, repr=False)
 
     _default: Any = field(default=None, init=False, repr=False)
     _lookup: dict = field(factory=dict, init=False, repr=False)
@@ -153,7 +161,7 @@ class Argument:
         hint = resolve(self.hint)
         hints = get_args(hint) if is_union(hint) else (hint,)
 
-        if self.cparam.accepts_keys is False:
+        if self.cparam.accepts_keys is False:  # ``None`` means to infer.
             return
 
         for hint in hints:
@@ -164,7 +172,7 @@ class Argument:
 
             # Classes that ALWAYS takes keywords (accepts_keys=None)
             if dict in hint_origin:
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
                 with suppress(IndexError):
@@ -174,28 +182,31 @@ class Argument:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
                 self._default = val_type
             elif is_typeddict(hint):
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 self._lookup.update(hint.__annotations__)
 
             if self.cparam.accepts_keys is None:
                 continue
+            # Only explicit ``self.cparam.accepts_keys == True`` from here on
 
             # Classes that MAY take keywords (accepts_keys=True)
+            # They must be explicitly specified ``accepts_keys=True`` because otherwise
+            # providing a single positional argument is what we want.
             if is_dataclass(hint):
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
             elif is_attrs(hint):
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
             elif is_pydantic(hint):
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
             else:
-                self.accepts_keywords = True
+                self._accepts_keywords = True
                 for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
                     if i == 0 and iparam.name == "self":
                         continue
@@ -463,6 +474,7 @@ class ArgumentCollection(list):
             for key in keys_to_leaf[:-1]:
                 node = node.setdefault(key, {})
             node[keys_to_leaf[-1]] = argument.convert_and_validate()
+
         return out
 
     @property
@@ -516,7 +528,12 @@ class ArgumentCollection(list):
         if not immediate_parameter.parse:
             return out
 
-        cparam = Parameter.combine(upstream_parameter, immediate_parameter)
+        # Don't inherit accepts_keys
+        cparam = Parameter.combine(
+            upstream_parameter,
+            Parameter(accepts_keys=None),
+            immediate_parameter,
+        )
 
         # Derive default parameter name (if necessary).
         if keys:
@@ -548,8 +565,10 @@ class ArgumentCollection(list):
 
         candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
         if candidate_argument.accepts_arbitrary_keywords:
+            # Argument that accepts keywords that's also a leaf.
             out.append(candidate_argument)
-        if candidate_argument.accepts_keywords:
+        if candidate_argument._accepts_keywords:
+            # Argument that accepts keywords that's NOT a leaf.
             docstring_lookup = {}
             if parse_docstring:
                 docstring_lookup = _extract_docstring_help(candidate_argument.hint)
@@ -562,15 +581,17 @@ class ArgumentCollection(list):
                         keys + (field_name,),
                         docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
                         cparam,
+                        # TODO: should we not inherit converter here?
                         group_lookup=group_lookup,
                         group_arguments=group_arguments,
                         group_parameters=group_parameters,
                         parse_docstring=parse_docstring,
-                        # Purposely DONT pass along posiitonal_index.
+                        # Purposely DONT pass along positional_index.
                         # We don't want to populate subkeys with positional arguments.
                     )
                 )
         else:
+            # Typical argument.
             out.append(candidate_argument)
         return out
 
@@ -593,12 +614,7 @@ class ArgumentCollection(list):
         if group_parameters is None:
             group_parameters = Group.create_default_parameters()
 
-        hint = iparam.annotation
-
-        if hint is inspect.Parameter.empty or resolve(hint) is Any:
-            hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
-
-        hint = resolve_optional(hint)
+        hint = _iparam_get_hint(iparam)
 
         return cls._from_type(
             iparam,
