@@ -29,7 +29,7 @@ from cyclopts._convert import (
     resolve_optional,
     token_count,
 )
-from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError
+from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError, ValidationError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import ParameterDict, is_union
@@ -414,9 +414,13 @@ class Argument:
     def validate(self, value):
         if self._internal_validator:
             self._internal_validator(self.hint, value)
+
         assert isinstance(self.cparam.validator, tuple)
-        for validator in self.cparam.validator:
-            validator(self.hint, value)
+        try:
+            for validator in self.cparam.validator:
+                validator(self.hint, value)
+        except (AssertionError, ValueError, TypeError) as e:
+            raise ValidationError(value=e.args[0] if e.args else "", parameter=self.iparam) from e
 
     def convert_and_validate(self):
         val = self.convert()

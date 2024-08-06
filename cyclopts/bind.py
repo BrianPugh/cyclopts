@@ -646,6 +646,10 @@ def create_bound_arguments_3(
         unused_tokens = _parse_pos_3(argument_collection, unused_tokens)
         _parse_env_3(argument_collection)
         _parse_configs_3(argument_collection, configs)
+
+        # TODO: apply group converters
+        # TODO: apply group validators
+
         iparam_to_value = argument_collection.convert()
         bound = _bind_3(func, iparam_to_value)
 
