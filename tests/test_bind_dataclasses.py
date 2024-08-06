@@ -18,11 +18,12 @@ class User:
 
 def test_bind_dataclass(app, assert_parse_args):
     @app.command
-    def foo(user: Annotated[User, Parameter(accepts_keys=True)]):
+    def foo(some_number: int, user: Annotated[User, Parameter(accepts_keys=True)]):
         pass
 
     external_data = {
         "id": 123,
+        # "name" is purposely missing.
         "tastes": {
             "wine": 9,
             "cheese": 7,
@@ -31,6 +32,7 @@ def test_bind_dataclass(app, assert_parse_args):
     }
     assert_parse_args(
         foo,
-        "foo --user.id=123 --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1",
+        "foo 100 --user.id=123 --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1",
+        100,
         User(**external_data),
     )

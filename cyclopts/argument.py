@@ -149,12 +149,19 @@ class Argument:
     _default: Any = field(default=None, init=False, repr=False)
     _lookup: dict = field(factory=dict, init=False, repr=False)
 
+    # Can assign values directly to this argument
+    # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
+    _assignable: bool = field(default=False, init=False, repr=False)
+    _children: List["Argument"] = field(factory=list, init=False, repr=False)
+    _marked: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
+
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
         hint = resolve(self.hint)
         hints = get_args(hint) if is_union(hint) else (hint,)
 
         if self.cparam.accepts_keys is False:  # ``None`` means to infer.
+            self._assignable = True
             return
 
         for hint in hints:
@@ -165,6 +172,7 @@ class Argument:
 
             # Classes that ALWAYS takes keywords (accepts_keys=None)
             if dict in hint_origin:
+                self._assignable = True
                 self._accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
@@ -177,6 +185,10 @@ class Argument:
             elif is_typeddict(hint):
                 self._accepts_keywords = True
                 self._lookup.update(hint.__annotations__)
+            elif self.cparam.accepts_keys is None:
+                # Typical builtin hint
+                self._assignable = True
+                continue
 
             if self.cparam.accepts_keys is None:
                 continue
@@ -210,6 +222,8 @@ class Argument:
 
     @property
     def accepts_arbitrary_keywords(self) -> bool:
+        if not self._assignable:
+            return False
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
@@ -238,6 +252,8 @@ class Argument:
         Any
             Implicit value.
         """
+        if not self._assignable:
+            raise ValueError
         return (
             self._match_index(term)
             if isinstance(term, int)
@@ -331,6 +347,8 @@ class Argument:
         return (), None
 
     def append(self, token: Token):
+        if not self._assignable:
+            raise ValueError
         if (
             any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
             and not self.token_count(token.keys)[1]
@@ -345,7 +363,22 @@ class Argument:
         for token in self.tokens:
             yield token.value
 
+    @property
+    def _n_branch_tokens(self) -> int:
+        return len(self.tokens) + sum(child._n_branch_tokens for child in self._children)
+
     def convert(self):
+        self._marked = True
+        if not self._assignable:  # A dictionary-like structure.
+            out = {}
+            for child in self._children:
+                assert len(child.keys) == (len(self.keys) + 1)
+                if child._n_branch_tokens:
+                    out[child.keys[-1]] = child.convert_and_validate()
+                else:
+                    child._marked = True
+            return self.hint(**out)
+
         positional, keyword = [], {}
         for token in self.tokens:
             if token.implicit_value is not None:
@@ -457,16 +490,31 @@ class ArgumentCollection(list):
                 continue
             yield argument
 
+    def _set_marks(self, val: bool):
+        for argument in self:
+            argument._marked = val
+
     def convert(self) -> ParameterDict:
         out = ParameterDict()
+        self._set_marks(False)
+
+        # Convert all root nodes first.
         for argument in self:
-            if not argument.tokens:
+            if argument._marked or argument._assignable or argument.keys:
                 continue
-            node = out
-            keys_to_leaf = (argument.iparam,) + argument.keys
-            for key in keys_to_leaf[:-1]:
-                node = node.setdefault(key, {})
-            node[keys_to_leaf[-1]] = argument.convert_and_validate()
+            if argument._n_branch_tokens:
+                out[argument.iparam] = argument.convert_and_validate()
+            else:
+                argument._marked = True
+
+        # Then convert all others.
+        for argument in self:
+            if argument._marked:
+                continue
+            if argument.tokens:
+                out[argument.iparam] = argument.convert_and_validate()
+            else:
+                argument._marked = True
 
         return out
 
@@ -561,34 +609,28 @@ class ArgumentCollection(list):
                     cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
 
         candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
-        if candidate_argument.accepts_arbitrary_keywords:
-            # Argument that accepts keywords that's also a leaf.
-            out.append(candidate_argument)
+        out.append(candidate_argument)
         if candidate_argument._accepts_keywords:
-            # Argument that accepts keywords that's NOT a leaf.
             docstring_lookup = {}
             if parse_docstring:
                 docstring_lookup = _extract_docstring_help(candidate_argument.hint)
 
             for field_name, field_hint in candidate_argument._lookup.items():
-                out.extend(
-                    cls._from_type(
-                        iparam,
-                        field_hint,
-                        keys + (field_name,),
-                        docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
-                        cparam,
-                        group_lookup=group_lookup,
-                        group_arguments=group_arguments,
-                        group_parameters=group_parameters,
-                        parse_docstring=parse_docstring,
-                        # Purposely DONT pass along positional_index.
-                        # We don't want to populate subkeys with positional arguments.
-                    )
+                subkey_argument = cls._from_type(
+                    iparam,
+                    field_hint,
+                    keys + (field_name,),
+                    docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
+                    cparam,
+                    group_lookup=group_lookup,
+                    group_arguments=group_arguments,
+                    group_parameters=group_parameters,
+                    parse_docstring=parse_docstring,
+                    # Purposely DONT pass along positional_index.
+                    # We don't want to populate subkeys with positional arguments.
                 )
-        else:
-            # Typical argument.
-            out.append(candidate_argument)
+                candidate_argument._children.extend(subkey_argument)
+                out.extend(subkey_argument)
         return out
 
     @classmethod
