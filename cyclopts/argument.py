@@ -445,6 +445,10 @@ class Argument:
     def env_var_split(self, value: str, delimiter: Optional[str] = None) -> List[str]:
         return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
 
+    @property
+    def show(self) -> bool:
+        return self._assignable and self.cparam.show
+
 
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
