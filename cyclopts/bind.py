@@ -309,9 +309,11 @@ def _parse_pos_3(
             argument, _, _ = argument_collection.match(i)
         except ValueError:
             break
-        if argument.tokens:
-            continue
         tokens_per_element, consume_all = argument.token_count()
+
+        if not consume_all and argument.tokens:
+            continue
+
         tokens_per_element = max(1, tokens_per_element)
         new_tokens = []
         while tokens:
