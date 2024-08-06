@@ -653,6 +653,13 @@ class ArgumentCollection(list):
                 return argument
         return None
 
+    @property
+    def iparams(self):
+        out = ParameterDict()  # Repurposing ParameterDict as a Set.
+        for argument in self:
+            out[argument.iparam] = None
+        return out.keys()
+
 
 def _resolve_groups_3(func: Callable) -> List[Group]:
     resolved_groups = []
