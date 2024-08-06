@@ -420,7 +420,11 @@ class Argument:
             for validator in self.cparam.validator:
                 validator(self.hint, value)
         except (AssertionError, ValueError, TypeError) as e:
-            raise ValidationError(value=e.args[0] if e.args else "", parameter=self.iparam) from e
+            if len(self.tokens) == 1 and not self._children:
+                # If there's only one token, we can be more helpful.
+                raise ValidationError(value=e.args[0] if e.args else "", token=self.tokens[0]) from e
+            else:
+                raise ValidationError(value=e.args[0] if e.args else "", argument=self) from e
 
     def convert_and_validate(self):
         val = self.convert()

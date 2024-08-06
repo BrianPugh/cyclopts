@@ -553,8 +553,9 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
             except (CoercionError, MissingArgumentError) as e:
                 e.parameter = iparam
                 raise
-            except (AssertionError, ValueError, TypeError) as e:
-                raise ValidationError(value=e.args[0] if e.args else "", parameter=iparam) from e
+            except (AssertionError, ValueError, TypeError):
+                raise ValueError  # TODO: this whole function is getting deleted.
+                # raise ValidationError(value=e.args[0] if e.args else "", parameter=iparam) from e
     return coerced
 
 

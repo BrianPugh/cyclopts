@@ -21,6 +21,7 @@ from cyclopts.utils import ParameterDict
 if TYPE_CHECKING:
     from rich.console import Console
 
+    from cyclopts.argument import Argument, Token
     from cyclopts.core import App
 
 
@@ -153,24 +154,23 @@ class ValidationError(CycloptsError):
     value: str
     """Parenting Assertion/Value/Type Error message."""
 
-    parameter: Optional[inspect.Parameter] = None
-    """Parameter who's ``validator`` function failed."""
-
+    # One of the following caused a failure
+    argument: Optional["Argument"] = None
+    token: Optional["Token"] = None
     group: Optional[Group] = None
-    """Group who's ``validator`` function failed."""
+
+    def __attrs_post_init__(self):
+        # Make sure only 1 is set.
+        assert (bool(self.argument) + bool(self.token) + bool(self.group)) == 1
 
     def __str__(self):
-        # Either parameter or group must be set (but not both!)
-        assert bool(self.parameter) is not bool(self.group)
-
-        if self.parameter:
-            assert self.parameter2cli is not None
-            # TODO: The displayed ``parameter_cli_name`` may not match the actual offending
-            # cli --option token provided (i.e. aliases).
-            # It would be much nicer to directly get the offending raw cli --option token.
-            parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-            return super().__str__() + f'Invalid value for "{parameter_cli_name}". {self.value}'
+        if self.argument:
+            breakpoint()
+            raise NotImplementedError
+        elif self.token:
+            return super().__str__() + f"Invalid value for {self.token.keyword}. {self.value}"
         elif self.group:
+            breakpoint()
             # TODO: it would be much nicer to directly get the offending raw cli --option token(s).
             # However, this information is not available to the validator, so it's a bit hopeless.
             self.value = self._find_and_replace(self.value)
