@@ -39,7 +39,7 @@ _PARAMETER_EMPTY_HELP = Parameter(help="")
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
     name=None,
-    converter=None,
+    converter=None,  # pyright: ignore
     validator=None,
     negative=None,
     help=None,
@@ -462,6 +462,10 @@ class Argument:
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
 
+    def __init__(self, *args, groups: Optional[List[Group]] = None):
+        super().__init__(*args)
+        self.groups = [] if groups is None else groups
+
     def match(
         self,
         term: Union[str, int],
@@ -555,9 +559,10 @@ class ArgumentCollection(list):
         group_parameters: Group,
         parse_docstring: bool = True,
         positional_index: Optional[int] = None,
+        _resolve_groups: bool = True,
     ):
         assert hint is not NoneType
-        out = cls()
+        out = cls(groups=list(group_lookup.values()))
 
         if not keys:  # root hint annotation
             if iparam.kind is iparam.VAR_KEYWORD:
@@ -575,14 +580,17 @@ class ArgumentCollection(list):
         else:
             cyclopts_parameters_no_group = []
 
-        if group_lookup:
+        if _resolve_groups:
             cyclopts_parameters = []
             for cparam in cyclopts_parameters_no_group:
+                resolved_groups = []
                 for group in cparam.group:  # pyright:ignore
                     if isinstance(group, str):
                         group = group_lookup[group]
+                    resolved_groups.append(group)
                     cyclopts_parameters.append(group.default_parameter)
                 cyclopts_parameters.append(cparam)
+                cyclopts_parameters.append(Parameter(group=resolved_groups))
         else:
             cyclopts_parameters = cyclopts_parameters_no_group
 
@@ -649,6 +657,7 @@ class ArgumentCollection(list):
                     parse_docstring=parse_docstring,
                     # Purposely DONT pass along positional_index.
                     # We don't want to populate subkeys with positional arguments.
+                    _resolve_groups=_resolve_groups,
                 )
                 if subkey_argument:
                     argument._children.append(subkey_argument[0])
@@ -664,6 +673,7 @@ class ArgumentCollection(list):
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
         positional_index: Optional[int] = None,
+        _resolve_groups: bool = True,
     ):
         # The responsibility of this function is to extract out the root type
         # and annotation. The rest of the functionality goes into _from_type.
@@ -673,6 +683,8 @@ class ArgumentCollection(list):
             group_arguments = Group.create_default_arguments()
         if group_parameters is None:
             group_parameters = Group.create_default_parameters()
+        group_lookup[group_arguments.name] = group_arguments
+        group_lookup[group_parameters.name] = group_parameters
 
         hint = _iparam_get_hint(iparam)
 
@@ -687,6 +699,7 @@ class ArgumentCollection(list):
             group_arguments=group_arguments,
             group_parameters=group_parameters,
             positional_index=positional_index,
+            _resolve_groups=_resolve_groups,
         )
 
     @classmethod
@@ -698,15 +711,29 @@ class ArgumentCollection(list):
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
         parse_docstring: bool = True,
+        _resolve_groups: bool = True,
     ):
         import cyclopts.utils
 
-        if group_lookup is None:
-            group_lookup = {group.name: group for group in _resolve_groups_3(func)}
+        if group_arguments is None:
+            group_arguments = Group.create_default_arguments()
+        if group_parameters is None:
+            group_parameters = Group.create_default_parameters()
+
+        if _resolve_groups:
+            group_lookup = {
+                group.name: group
+                for group in _resolve_groups_3(
+                    func,
+                    *default_parameters,
+                    group_arguments=group_arguments,
+                    group_parameters=group_parameters,
+                )
+            }
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
 
-        out = cls()
+        out = cls(groups=list(group_lookup.values()) if group_lookup else None)
         for i, iparam in enumerate(cyclopts.utils.signature(func).parameters.values()):
             out.extend(
                 cls.from_iparam(
@@ -718,6 +745,7 @@ class ArgumentCollection(list):
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
                     positional_index=i,
+                    _resolve_groups=_resolve_groups,
                 )
             )
         return out
@@ -737,31 +765,54 @@ class ArgumentCollection(list):
         return out.keys()
 
 
-def _resolve_groups_3(func: Callable) -> List[Group]:
+def _resolve_groups_3(
+    func: Callable,
+    *default_parameters: Optional[Parameter],
+    group_arguments: Optional[Group] = None,
+    group_parameters: Optional[Group] = None,
+) -> List[Group]:
+    argument_collection = ArgumentCollection.from_callable(
+        func,
+        *default_parameters,
+        group_arguments=group_arguments,
+        group_parameters=group_parameters,
+        parse_docstring=False,
+        _resolve_groups=False,
+    )
+
     resolved_groups = []
+    if group_arguments is not None:
+        resolved_groups.append(group_arguments)
+    if group_parameters is not None:
+        resolved_groups.append(group_parameters)
 
-    for argument in ArgumentCollection.from_callable(func, group_lookup={}, parse_docstring=False):
+    for argument in argument_collection:
         for group in argument.cparam.group:  # pyright: ignore
-            if isinstance(group, str):
-                try:
-                    next(x for x in resolved_groups if x.name == group)
-                except StopIteration:
-                    resolved_groups.append(Group(group))
-            elif isinstance(group, Group):
-                # Ensure a different, but same-named group doesn't already exist
-                if any(group is not x and x.name == group.name for x in resolved_groups):
-                    raise ValueError("Cannot register 2 distinct Group objects with same name.")
+            if not isinstance(group, Group):
+                continue
 
-                if group.default_parameter is not None and group.default_parameter.group:
-                    # This shouldn't be possible due to ``Group`` internal checks.
-                    raise ValueError("Group.default_parameter cannot have a specified group.")  # pragma: no cover
+            # Ensure a different, but same-named group doesn't already exist
+            if any(group is not x and x.name == group.name for x in resolved_groups):
+                raise ValueError("Cannot register 2 distinct Group objects with same name.")
 
-                try:
-                    next(x for x in resolved_groups if x.name == group.name)
-                except StopIteration:
-                    resolved_groups.append(group)
-            else:
-                raise TypeError
+            if group.default_parameter is not None and group.default_parameter.group:
+                # This shouldn't be possible due to ``Group`` internal checks.
+                raise ValueError("Group.default_parameter cannot have a specified group.")  # pragma: no cover
+
+            try:
+                next(x for x in resolved_groups if x.name == group.name)
+            except StopIteration:
+                resolved_groups.append(group)
+
+    for argument in argument_collection:
+        for group in argument.cparam.group:  # pyright: ignore
+            if not isinstance(group, str):
+                continue
+            try:
+                next(x for x in resolved_groups if x.name == group)
+            except StopIteration:
+                resolved_groups.append(Group(group))
+
     return resolved_groups
 
 
