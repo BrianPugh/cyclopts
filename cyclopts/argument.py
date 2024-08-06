@@ -621,14 +621,14 @@ class ArgumentCollection(list):
                     assert cparam.name_transform is not None
                     cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
 
-        candidate_argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
-        out.append(candidate_argument)
-        if candidate_argument._accepts_keywords:
+        argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
+        out.append(argument)
+        if argument._accepts_keywords:
             docstring_lookup = {}
             if parse_docstring:
-                docstring_lookup = _extract_docstring_help(candidate_argument.hint)
+                docstring_lookup = _extract_docstring_help(argument.hint)
 
-            for field_name, field_hint in candidate_argument._lookup.items():
+            for field_name, field_hint in argument._lookup.items():
                 subkey_argument = cls._from_type(
                     iparam,
                     field_hint,
@@ -642,8 +642,9 @@ class ArgumentCollection(list):
                     # Purposely DONT pass along positional_index.
                     # We don't want to populate subkeys with positional arguments.
                 )
-                candidate_argument._children.extend(subkey_argument)
-                out.extend(subkey_argument)
+                if subkey_argument:
+                    argument._children.append(subkey_argument[0])
+                    out.extend(subkey_argument)
         return out
 
     @classmethod
