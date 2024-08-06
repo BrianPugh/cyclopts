@@ -19,6 +19,7 @@ from attrs import define, field, frozen
 from cyclopts._convert import (
     AnnotatedType,
     NoneType,
+    _validate_typed_dict,
     is_attrs,
     is_dataclass,
     is_namedtuple,
@@ -155,6 +156,9 @@ class Argument:
     _children: List["Argument"] = field(factory=list, init=False, repr=False)
     _marked: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
 
+    # Validator to be called based on builtin type support.
+    _internal_validator: Optional[Callable] = field(default=None, init=False, repr=False)
+
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
         hint = resolve(self.hint)
@@ -183,6 +187,7 @@ class Argument:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
                 self._default = val_type
             elif is_typeddict(hint):
+                self._internal_validator = _validate_typed_dict
                 self._accepts_keywords = True
                 self._lookup.update(hint.__annotations__)
             elif self.cparam.accepts_keys is None:
@@ -369,42 +374,45 @@ class Argument:
 
     def convert(self):
         self._marked = True
-        if not self._assignable:  # A dictionary-like structure.
-            out = {}
+        if self._assignable:
+            positional, keyword = [], {}
+            for token in self.tokens:
+                if token.implicit_value is not None:
+                    assert len(self.tokens) == 1
+                    return token.implicit_value
+
+                if token.keys:
+                    lookup = keyword
+                    for key in token.keys[:-1]:
+                        lookup = lookup.setdefault(key, {})
+                    lookup.setdefault(token.keys[-1], []).append(token.value)
+                else:
+                    positional.append(token.value)
+
+                if positional and keyword:
+                    # This should never happen due to checks in ``Argument.append``
+                    raise MixedArgumentError(parameter=self.iparam)
+
+            if positional:
+                out = self.cparam.converter(self.hint, tuple(positional))
+            elif keyword:
+                out = self.cparam.converter(self.hint, keyword)
+            else:
+                raise NotImplementedError
+        else:  # A dictionary-like structure.
+            data = {}
             for child in self._children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child._n_branch_tokens:
-                    out[child.keys[-1]] = child.convert_and_validate()
+                    data[child.keys[-1]] = child.convert_and_validate()
                 else:
                     child._marked = True
-            return self.hint(**out)
-
-        positional, keyword = [], {}
-        for token in self.tokens:
-            if token.implicit_value is not None:
-                assert len(self.tokens) == 1
-                return token.implicit_value
-
-            if token.keys:
-                lookup = keyword
-                for key in token.keys[:-1]:
-                    lookup = lookup.setdefault(key, {})
-                lookup.setdefault(token.keys[-1], []).append(token.value)
-            else:
-                positional.append(token.value)
-
-            if positional and keyword:
-                # This should never happen due to checks in ``Argument.append``
-                raise MixedArgumentError(parameter=self.iparam)
-
-        if positional:
-            return self.cparam.converter(self.hint, tuple(positional))
-        elif keyword:
-            return self.cparam.converter(self.hint, keyword)
-        else:
-            raise NotImplementedError
+            out = self.hint(**data)
+        return out
 
     def validate(self, value):
+        if self._internal_validator:
+            self._internal_validator(self.hint, value)
         assert isinstance(self.cparam.validator, tuple)
         for validator in self.cparam.validator:
             validator(self.hint, value)

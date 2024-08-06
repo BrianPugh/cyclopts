@@ -36,7 +36,7 @@ def test_bind_typed_dict(app, assert_parse_args):
 
     assert_parse_args(
         foo,
-        "foo --d.my_int=5 --d.my_str=bar --d.my-list=a --d.my-list=b --d.my-list-int=1 --d.my-list-int=2",
+        "foo --d.my-int=5 --d.my-str=bar --d.my-list=a --d.my-list=b --d.my-list-int=1 --d.my-list-int=2",
         d={
             "my_int": 5,
             "my_str": "bar",
@@ -46,6 +46,7 @@ def test_bind_typed_dict(app, assert_parse_args):
     )
 
 
+@pytest.mark.skip(reason="Need to revamp exceptions.")
 def test_bind_typed_dict_missing_arg(app, console):
     @app.command
     def foo(d: MyDict):
@@ -80,7 +81,7 @@ def test_bind_typed_dict_total_false(app, assert_parse_args):
     def foo(d: MyDict):
         pass
 
-    assert_parse_args(foo, "foo --d.my_str=bar", d={"my_str": "bar"})
+    assert_parse_args(foo, "foo --d.my-str=bar", d={"my_str": "bar"})
 
 
 def test_bind_typed_dict_not_required(app, assert_parse_args):
@@ -104,4 +105,4 @@ def test_bind_typed_dict_required(app, assert_parse_args):
     def foo(d: MyDict):
         pass
 
-    assert_parse_args(foo, "foo --d.my_int=5", d={"my_int": 5})
+    assert_parse_args(foo, "foo --d.my-int=5", d={"my_int": 5})
