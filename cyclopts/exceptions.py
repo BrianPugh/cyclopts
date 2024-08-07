@@ -257,6 +257,39 @@ class UnusedCliTokensError(CycloptsError):
 
 @define(kw_only=True)
 class MissingArgumentError(CycloptsError):
+    argument: "Argument"
+
+    tokens_so_far: List[str] = field(factory=list)
+
+    def __str__(self):
+        strings = []
+        count, _ = self.argument.token_count()
+        if count == 0:
+            required_string = "flag required"
+            only_got_string = ""
+        elif count == 1:
+            required_string = "requires an argument"
+            only_got_string = ""
+        else:
+            required_string = f"requires {count} arguments"
+            received_count = len(self.tokens_so_far) % count
+            only_got_string = f" Only got {received_count}." if received_count else ""
+
+        if self.command_chain:
+            strings.append(
+                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.names[0]}" {required_string}.{only_got_string}'
+            )
+        else:
+            strings.append(f'Parameter "{self.argument.names[0]}" {required_string}.{only_got_string}')
+
+        if self.verbose:
+            strings.append(f" Parsed: {self.tokens_so_far}.")
+
+        return super().__str__() + " ".join(strings)
+
+
+@define(kw_only=True)
+class MissingArgumentErrorOld(CycloptsError):
     """A parameter had insufficient tokens to be populated."""
 
     parameter: Optional[inspect.Parameter] = None

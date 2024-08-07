@@ -167,8 +167,7 @@ def _parse_kw_and_flags_3(argument_collection: ArgumentCollection, tokens):
                         skip_next_iterations += 1
 
             if not cli_values or len(cli_values) % tokens_per_element:
-                # TODO: fix exceptions to have the Argument
-                raise MissingArgumentError(tokens_so_far=cli_values)
+                raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
 
             for index, cli_value in enumerate(cli_values):
                 argument.append(Token(cli_option, cli_value, source="cli", index=index, keys=leftover_keys))
@@ -275,7 +274,8 @@ def _parse_kw_and_flags(command: ResolvedCommand, tokens, mapping):
                         skip_next_iterations += 1
 
             if not cli_values or len(cli_values) % tokens_per_element:
-                raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values)
+                raise ValueError  # TODO: this function is gonna be deleted.
+                # raise MissingArgumentError(parameter=iparam, tokens_so_far=cli_values)
 
         # Update mapping
         existing_cli_values = _get_mapping_values(mapping, iparam, cli_keys)
@@ -318,7 +318,7 @@ def _parse_pos_3(
         new_tokens = []
         while tokens:
             if len(tokens) < tokens_per_element:
-                raise MissingArgumentError(parameter=argument.iparam, tokens_so_far=tokens)
+                raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
 
             for index, token in enumerate(tokens[:tokens_per_element]):
                 if not argument.cparam.allow_leading_hyphen:
@@ -383,7 +383,8 @@ def _parse_pos(
         tokens_per_element = max(1, tokens_per_element)
 
         if len(tokens) < tokens_per_element:
-            raise MissingArgumentError(parameter=iparam, tokens_so_far=tokens)
+            raise ValueError  # TODO: this function is gonna be deleted.
+            # raise MissingArgumentError(parameter=iparam, tokens_so_far=tokens)
 
         mapping.setdefault(iparam, [])
         for token in tokens[:tokens_per_element]:
@@ -550,8 +551,8 @@ def _convert(command: ResolvedCommand, mapping: ParameterDict) -> ParameterDict:
                     for validator in cparam.validator:
                         validator(type_, val)
                     coerced[iparam] = val
-            except (CoercionError, MissingArgumentError) as e:
-                e.parameter = iparam
+            except (CoercionError, MissingArgumentError):
+                # e.parameter = iparam  # TODO: this function is going to be deleted.
                 raise
             except (AssertionError, ValueError, TypeError):
                 raise ValueError  # TODO: this whole function is getting deleted.
@@ -656,9 +657,14 @@ def create_bound_arguments_3(
         iparam_to_value = argument_collection.convert()
         bound = _bind_3(func, iparam_to_value)
 
-        for iparam in argument_collection.iparams:
-            if _is_required(iparam) and iparam.name not in bound.arguments:
-                raise MissingArgumentError(parameter=iparam)
+        missing_iparam = ParameterDict()
+        for argument in argument_collection:
+            if not _is_required(argument.iparam):
+                continue
+            missing_iparam.setdefault(argument.iparam, True)
+            missing_iparam[argument.iparam] &= not bool(argument._n_branch_tokens)
+            if missing_iparam[argument.iparam] and argument.keys == ():
+                raise MissingArgumentError(argument=argument)
 
     except CycloptsError as e:
         e.root_input_tokens = tokens
@@ -739,7 +745,8 @@ def create_bound_arguments(
 
         for iparam in command.iparams:
             if _is_required(iparam) and iparam.name not in bound.arguments:
-                raise MissingArgumentError(parameter=iparam)
+                raise ValueError  # TODO: this function is getting deleted soon.
+                # raise MissingArgumentError(parameter=iparam)
 
     except CycloptsError as e:
         e.target = command.command

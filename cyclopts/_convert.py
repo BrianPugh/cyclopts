@@ -311,7 +311,9 @@ def _validate_typed_dict(typed_dict, data: dict, _key_chain: Tuple[str, ...] = (
         prefix = ".".join(_key_chain)
         if prefix:
             prefix += "."
-        raise MissingArgumentError(missing_keys=[prefix + x for x in missing_keys])
+        raise ValueError  # TODO: MissingArgumentError
+        # TODO: this should have a specific Argument.
+        # raise MissingArgumentError(missing_keys=[prefix + x for x in missing_keys])
 
     for field_name, hint in typed_dict.__annotations__.items():
         if is_typeddict(hint):
