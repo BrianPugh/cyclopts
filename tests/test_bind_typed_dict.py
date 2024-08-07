@@ -93,7 +93,7 @@ def test_bind_typed_dict_not_required(app, assert_parse_args):
     def foo(d: MyDict):
         pass
 
-    assert_parse_args(foo, "foo --d.my_int=5", d={"my_int": 5})
+    assert_parse_args(foo, "foo --d.my-int=5", d={"my_int": 5})
 
 
 def test_bind_typed_dict_required(app, assert_parse_args):

@@ -657,13 +657,10 @@ def create_bound_arguments_3(
         iparam_to_value = argument_collection.convert()
         bound = _bind_3(func, iparam_to_value)
 
-        missing_iparam = ParameterDict()
         for argument in argument_collection:
-            if not _is_required(argument.iparam):
+            if not _is_required(argument.iparam) or argument.keys:
                 continue
-            missing_iparam.setdefault(argument.iparam, True)
-            missing_iparam[argument.iparam] &= not bool(argument._n_branch_tokens)
-            if missing_iparam[argument.iparam] and argument.keys == ():
+            if not bool(argument._n_branch_tokens):
                 raise MissingArgumentError(argument=argument)
 
     except CycloptsError as e:
