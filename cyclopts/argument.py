@@ -32,7 +32,7 @@ from cyclopts._convert import (
 from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError, ValidationError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
-from cyclopts.utils import ParameterDict, is_union
+from cyclopts.utils import ParameterDict, Sentinel, is_union
 
 _PARAMETER_EMPTY_HELP = Parameter(help="")
 
@@ -118,6 +118,9 @@ class Argument:
 
     """
 
+    class UNSET(Sentinel):
+        pass
+
     # List of tokens parsed from various sources
     # If tokens is empty, then no tokens have been parsed for this argument.
     tokens: List[Token] = field(factory=list)
@@ -145,6 +148,9 @@ class Argument:
     # This should be populated based on type-hints, not ``Parameter.name``
     keys: Tuple[str, ...] = field(default=())
 
+    # Converted value; may be stale.
+    _value: Any = field(default=UNSET, init=False)
+
     _accepts_keywords: bool = field(default=False, init=False, repr=False)
 
     _default: Any = field(default=None, init=False, repr=False)
@@ -154,10 +160,30 @@ class Argument:
     # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
     _assignable: bool = field(default=False, init=False, repr=False)
     _children: List["Argument"] = field(factory=list, init=False, repr=False)
-    _marked: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
+    _marked_converted: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
+    _mark_converted_override: bool = field(default=False, init=False, repr=False)
 
     # Validator to be called based on builtin type support.
     _internal_validator: Optional[Callable] = field(default=None, init=False, repr=False)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, val):
+        if self._marked:
+            self._mark_converted_override = True
+        self._marked = True
+        self._value = val
+
+    @property
+    def _marked(self):
+        return self._marked_converted | self._mark_converted_override
+
+    @_marked.setter
+    def _marked(self, value: bool):
+        self._marked_converted = value
 
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
@@ -373,8 +399,7 @@ class Argument:
     def _n_branch_tokens(self) -> int:
         return len(self.tokens) + sum(child._n_branch_tokens for child in self._children)
 
-    def convert(self):
-        self._marked = True
+    def _convert(self):
         if self._assignable:
             positional, keyword = [], {}
             for token in self.tokens:
@@ -398,18 +423,21 @@ class Argument:
                 out = self.cparam.converter(self.hint, tuple(positional))
             elif keyword:
                 out = self.cparam.converter(self.hint, keyword)
-            else:
-                raise NotImplementedError
+            else:  # no tokens
+                return self.UNSET
         else:  # A dictionary-like structure.
             data = {}
             for child in self._children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child._n_branch_tokens:
                     data[child.keys[-1]] = child.convert_and_validate()
-                else:
-                    child._marked = True
             out = self.hint(**data)
         return out
+
+    def convert(self):
+        if not self._marked:
+            self.value = self._convert()
+        return self.value
 
     def validate(self, value):
         if self._internal_validator:
@@ -428,7 +456,8 @@ class Argument:
 
     def convert_and_validate(self):
         val = self.convert()
-        self.validate(val)
+        if val is not None:
+            self.validate(val)
         return val
 
     def token_count(self, keys: Tuple[str, ...] = ()):
@@ -445,6 +474,10 @@ class Argument:
     @property
     def negatives(self):
         return self.cparam.get_negatives(self.hint)
+
+    @property
+    def name(self) -> str:
+        return self.names[0]
 
     @property
     def names(self) -> Tuple[str, ...]:
@@ -519,29 +552,12 @@ class ArgumentCollection(list):
         for argument in self:
             argument._marked = val
 
-    def convert(self) -> ParameterDict:
-        out = ParameterDict()
+    def convert(self):
         self._set_marks(False)
-
-        # Convert all root nodes first.
-        for argument in self:
-            if argument._marked or argument._assignable or argument.keys:
-                continue
-            if argument._n_branch_tokens:
-                out[argument.iparam] = argument.convert_and_validate()
-            else:
-                argument._marked = True
-
-        # Then convert all others.
-        for argument in self:
+        for argument in sorted(self, key=lambda x: x.keys):
             if argument._marked:
                 continue
-            if argument.tokens:
-                out[argument.iparam] = argument.convert_and_validate()
-            else:
-                argument._marked = True
-
-        return out
+            argument.convert_and_validate()
 
     @property
     def names(self):
@@ -763,6 +779,23 @@ class ArgumentCollection(list):
         for argument in self:
             out[argument.iparam] = None
         return out.keys()
+
+    @property
+    def root_arguments(self):
+        for argument in self:
+            if not argument.keys:
+                yield argument
+
+    def iparam_to_value(self) -> ParameterDict:
+        """Mapping iparam to converted values.
+
+        Assumes that ``self.convert`` has already been called.
+        """
+        out = ParameterDict()
+        for argument in self.root_arguments:
+            if argument.value is not argument.UNSET:
+                out[argument.iparam] = argument.value
+        return out
 
 
 def _resolve_groups_3(

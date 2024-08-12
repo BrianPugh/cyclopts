@@ -36,8 +36,9 @@ def test_group_show_property():
 
 
 def test_group_parameter_converter(app, assert_parse_args):
-    def converter(**kwargs):
-        return {k: v.upper() for k, v in kwargs.items()}
+    def converter(arguments):
+        for argument in arguments:
+            argument.value = argument.value.upper()
 
     food_group = Group("Food", converter=converter)
 
@@ -52,10 +53,9 @@ def test_group_parameter_converter(app, assert_parse_args):
 
 
 def test_group_parameter_converter_delete_arg(app, assert_parse_args):
-    def converter(**kwargs):
-        # This doesn't have a "cone" key in the response, meaning it should not be
-        # in the resulting bound arguments.
-        return {k: v.upper() for k, v in kwargs.items() if k != "cone"}
+    def converter(arguments):
+        for argument in arguments:
+            argument.value = argument.UNSET if argument.name == "--cone" else argument.value.upper()
 
     food_group = Group("Food", converter=converter)
 

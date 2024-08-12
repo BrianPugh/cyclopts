@@ -508,20 +508,16 @@ API
    .. attribute:: converter
       :type: Optional[Callable]
 
-      A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+      A function that takes in an :class:`cyclopts.ArgumentCollection` and updates their value(s) in-place.
 
       .. code-block:: python
 
-          def converter(**kwargs) -> Dict[str, Any]:
-              """Return an updated dictionary."""
+          def converter(argument_collection: ArgumentCollection):
+              """Updates argument values in-place."""
+              for argument in argument_collection:
+                 argument.value = ...  # set to argument.UNSET to unbind
 
-      The **python variable names will be used**, which may differ from their CLI names.
-      If a variable isn't populated from the CLI or environment variable, it will not be provided to the converter.
-      I.e. defaults from the function signature are **not** applied prior.
-
-      The returned dictionary will be used for subsequent execution.
-      Removing variables from the returned dictionary will unbind them.
-      When used with :meth:`@app.command <cyclopts.App.command>`, all function arguments are provided.
+      TODO: reference ArgumentCollection documentation here.
 
    .. attribute:: validator
       :type: Optional[Callable]

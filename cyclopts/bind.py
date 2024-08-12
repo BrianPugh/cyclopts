@@ -5,6 +5,7 @@ import shlex
 import sys
 from contextlib import suppress
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     Iterable,
@@ -18,7 +19,7 @@ from typing import (
 
 import cyclopts.utils
 from cyclopts._convert import _bool, _DictHint, accepts_keys, resolve, token_count
-from cyclopts.argument import ArgumentCollection, Token
+from cyclopts.argument import Argument, ArgumentCollection, Token
 from cyclopts.config import Unset
 from cyclopts.exceptions import (
     CoercionError,
@@ -33,6 +34,9 @@ from cyclopts.parameter import get_hint_parameter, validate_command
 from cyclopts.resolve import ResolvedCommand
 from cyclopts.utils import ParameterDict
 
+if TYPE_CHECKING:
+    from cyclopts.group import Group
+
 
 def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     if tokens is None:
@@ -42,6 +46,24 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     else:
         tokens = list(tokens)
     return tokens
+
+
+def _common_root_keys(argument_collection) -> Tuple[str, ...]:
+    if not argument_collection:
+        return ()
+    common = argument_collection[0].keys
+    for argument in argument_collection[1:]:
+        if not argument.keys:
+            return ()
+        for i, (common_key, argument_key) in enumerate(zip(common, argument.keys)):
+            if common_key != argument_key:
+                if i == 0:
+                    return ()
+
+                common = argument.keys[:i]
+                break
+        common = common[: len(argument.keys)]
+    return common
 
 
 def _cli_kws_to_f_kws(cli_keys: List[str]) -> List[str]:
@@ -634,6 +656,28 @@ def _parse_configs(command: ResolvedCommand, mapping: ParameterDict, configs):
             set_iparams.add(id(iparam))
 
 
+def _sort_group_converters(argument_collection) -> List[Tuple["Group", List[Argument]]]:
+    """Sort groups into "deepest common-root-keys first" order.
+
+    This is imperfect, but probably works sufficiently well for practical use-cases.
+    """
+    out = {}
+    # Sort alphabetically by group-name to enfroce some determinism.
+    for i, group in enumerate(sorted(argument_collection.groups, key=lambda x: x.name)):
+        if group.converter is None:
+            continue
+        group_arguments = [x for x in argument_collection if group in x.cparam.group and x._n_branch_tokens]
+        if not group_arguments:
+            continue
+        common_root_keys = _common_root_keys(group_arguments)
+        # Add i to key so that we don't get collisions.
+        out[(common_root_keys, i)] = (
+            group,
+            [x for x in group_arguments if x.keys[: len(common_root_keys)] == common_root_keys],
+        )
+    return [ga for _, ga in sorted(out.items(), reverse=True)]
+
+
 def create_bound_arguments_3(
     func: Callable,
     argument_collection: ArgumentCollection,
@@ -651,11 +695,15 @@ def create_bound_arguments_3(
         _parse_env_3(argument_collection)
         _parse_configs_3(argument_collection, configs)
 
-        # TODO: apply group converters
-        # TODO: apply group validators
+        argument_collection.convert()
+        for group, group_arguments in _sort_group_converters(argument_collection):
+            assert group.converter is not None
+            group.converter(group_arguments)
+            # A downstream Argument may have been overrode, so we have to reconvert the tree.
+            argument_collection.convert()
 
-        iparam_to_value = argument_collection.convert()
-        bound = _bind_3(func, iparam_to_value)
+        # TODO: apply group validators
+        bound = _bind_3(func, argument_collection.iparam_to_value())
 
         for argument in argument_collection:
             if not _is_required(argument.iparam) or argument.keys:
@@ -665,8 +713,6 @@ def create_bound_arguments_3(
 
     except CycloptsError as e:
         e.root_input_tokens = tokens
-        # e.cli2parameter = command.cli2parameter
-        # e.parameter2cli = command.parameter2cli
         e.unused_tokens = unused_tokens
         raise
 
