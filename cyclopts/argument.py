@@ -420,13 +420,13 @@ class Argument:
                     raise MixedArgumentError(parameter=self.iparam)
 
             if positional:
-                if self.iparam.kind is self.iparam.VAR_POSITIONAL:
+                if self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
                     # Apply converter to individual values
                     out = tuple(self.cparam.converter(get_args(self.hint)[0], (value,)) for value in positional)
                 else:
                     out = self.cparam.converter(self.hint, tuple(positional))
             elif keyword:
-                if self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
+                if self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
                     # Apply converter to individual values
                     out = {key: self.cparam.converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
                 else:
@@ -454,12 +454,12 @@ class Argument:
         assert isinstance(self.cparam.validator, tuple)
 
         try:
-            if not self.keys and self.iparam.kind is self.iparam.VAR_KEYWORD:
+            if not self.keys and self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.cparam.validator:
                     for val in value.values():
                         validator(hint, val)
-            elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
+            elif self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.cparam.validator:
                     for val in value:
