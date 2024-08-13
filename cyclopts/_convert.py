@@ -457,13 +457,9 @@ def convert(
         return convert_tuple(type_, *tokens)
     elif maybe_origin_type in _iterable_types or origin_type is collections.abc.Iterable:
         return convert_priv(type_, tokens)
-    elif accepts_keys(type_):
+    elif maybe_origin_type is dict:
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
-        if is_pydantic(type_) and converter is None:
-            # Let pydantic handle the coercion of str->whatever.
-            # Cyclopts will just structure the data into dict/list/str.
-            converter = _identity_converter
         try:
             value_type = get_args(type_)[1]
         except IndexError:
