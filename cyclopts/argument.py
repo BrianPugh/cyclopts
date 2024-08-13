@@ -420,9 +420,17 @@ class Argument:
                     raise MixedArgumentError(parameter=self.iparam)
 
             if positional:
-                out = self.cparam.converter(self.hint, tuple(positional))
+                if self.iparam.kind is self.iparam.VAR_POSITIONAL:
+                    # Apply converter to individual values
+                    out = tuple(self.cparam.converter(get_args(self.hint)[0], (value,)) for value in positional)
+                else:
+                    out = self.cparam.converter(self.hint, tuple(positional))
             elif keyword:
-                out = self.cparam.converter(self.hint, keyword)
+                if self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
+                    # Apply converter to individual values
+                    out = {key: self.cparam.converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
+                else:
+                    out = self.cparam.converter(self.hint, keyword)
             else:  # no tokens
                 return self.UNSET
         else:  # A dictionary-like structure.
@@ -444,9 +452,21 @@ class Argument:
             self._internal_validator(self.hint, value)
 
         assert isinstance(self.cparam.validator, tuple)
+
         try:
-            for validator in self.cparam.validator:
-                validator(self.hint, value)
+            if not self.keys and self.iparam.kind is self.iparam.VAR_KEYWORD:
+                hint = get_args(self.hint)[1]
+                for validator in self.cparam.validator:
+                    for val in value.values():
+                        validator(hint, val)
+            elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
+                hint = get_args(self.hint)[0]
+                for validator in self.cparam.validator:
+                    for val in value:
+                        validator(hint, val)
+            else:
+                for validator in self.cparam.validator:
+                    validator(self.hint, value)
         except (AssertionError, ValueError, TypeError) as e:
             if len(self.tokens) == 1 and not self._children:
                 # If there's only one token, we can be more helpful.
@@ -580,21 +600,19 @@ class ArgumentCollection(list):
         assert hint is not NoneType
         out = cls(groups=list(group_lookup.values()))
 
+        cyclopts_parameters_no_group = []
+
+        hint = resolve_optional(hint)
+        if type(hint) is AnnotatedType:
+            annotations = hint.__metadata__  # pyright: ignore
+            hint = get_args(hint)[0]
+            cyclopts_parameters_no_group.extend(x for x in annotations if isinstance(x, Parameter))
+
         if not keys:  # root hint annotation
             if iparam.kind is iparam.VAR_KEYWORD:
                 hint = Dict[str, hint]
             elif iparam.kind is iparam.VAR_POSITIONAL:
                 hint = Tuple[hint, ...]
-
-        if hint is inspect.Parameter.empty:
-            breakpoint()
-        hint = resolve_optional(hint)
-        if type(hint) is AnnotatedType:
-            annotations = hint.__metadata__  # pyright: ignore
-            hint = get_args(hint)[0]
-            cyclopts_parameters_no_group = [x for x in annotations if isinstance(x, Parameter)]
-        else:
-            cyclopts_parameters_no_group = []
 
         if _resolve_groups:
             cyclopts_parameters = []
