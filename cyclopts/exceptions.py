@@ -348,15 +348,10 @@ class MissingArgumentErrorOld(CycloptsError):
 class RepeatArgumentError(CycloptsError):
     """The same parameter has erroneously been specified multiple times."""
 
-    parameter: inspect.Parameter
-    """
-    The repeated parameter.
-    """
+    token: "Token"
 
     def __str__(self):
-        assert self.parameter2cli is not None
-        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-        return super().__str__() + f"Parameter {parameter_cli_name} specified multiple times."
+        return super().__str__() + f"Parameter {self.token.keyword} specified multiple times."
 
 
 @define(kw_only=True)
