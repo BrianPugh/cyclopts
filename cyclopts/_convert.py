@@ -464,9 +464,12 @@ def convert(
             # Let pydantic handle the coercion of str->whatever.
             # Cyclopts will just structure the data into dict/list/str.
             converter = _identity_converter
-        dict_hint = _DictHint(type_)
+        try:
+            value_type = get_args(type_)[1]
+        except IndexError:
+            value_type = str
         dict_converted = {
-            k: convert(dict_hint[k], v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
+            k: convert(value_type, v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
         }
         if is_typeddict(type_):
             # Other classes that accept keys perform their own validation/dont need validation.
