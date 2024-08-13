@@ -25,11 +25,7 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.argument import ArgumentCollection
-from cyclopts.bind import (
-    create_bound_arguments,
-    create_bound_arguments_3,
-    normalize_tokens,
-)
+from cyclopts.bind import create_bound_arguments, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
@@ -704,13 +700,11 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    resolved_command = self._resolve_command(tokens, parse_docstring=False)
                     argument_collection = self._resolve_argument_collection(tokens, parse_docstring=False)
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
 
-                    # bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens, config)
-                    bound, unused_tokens = create_bound_arguments_3(
+                    bound, unused_tokens = create_bound_arguments(
                         command_app.default_command,
                         argument_collection,
                         unused_tokens,
