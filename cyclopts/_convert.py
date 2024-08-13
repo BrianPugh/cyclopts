@@ -1,7 +1,6 @@
 import collections.abc
 import inspect
 import sys
-from contextlib import suppress
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -23,7 +22,7 @@ from typing import (
     get_origin,
 )
 
-from cyclopts.exceptions import CoercionError, MissingArgumentError
+from cyclopts.exceptions import CoercionError
 from cyclopts.utils import default_name_transform, is_union
 
 if sys.version_info >= (3, 12):
@@ -467,49 +466,6 @@ def convert(
             return convert_priv(type_, tokens[0])
         else:
             return [convert_priv(type_, item) for item in tokens]
-
-
-class _DictHint:
-    """Maps parameter names to their type hint."""
-
-    def __init__(self, hint):
-        hint = resolve(hint)
-        origin = get_origin(hint)
-
-        self.hint = hint
-        self._default = None
-        self._lookup = {}  # maps field names to their type.
-
-        if dict in (hint, origin):
-            key_type, val_type = str, str
-            args = get_args(hint)
-            with suppress(IndexError):
-                key_type = args[0]
-                val_type = args[1]
-            if key_type is not str:
-                raise TypeError('Dictionary type annotations must have "str" keys.')
-            self._default = val_type
-        elif is_typeddict(hint):
-            self._lookup.update(hint.__annotations__)
-        elif is_dataclass(hint):
-            self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
-        elif is_namedtuple(hint):
-            # collections.namedtuple does not have type hints, assume "str" for everything.
-            self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
-        elif is_attrs(hint):
-            self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
-        elif is_pydantic(hint):
-            self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
-        else:
-            raise ValueError(f"Unknown type hint {hint!r}.")
-
-    def __getitem__(self, key: str):
-        try:
-            return self._lookup[key]
-        except KeyError:
-            if self._default is None:
-                raise
-            return self._default
 
 
 def token_count(type_: Any) -> Tuple[int, bool]:
