@@ -170,10 +170,6 @@ class ValidationError(CycloptsError):
         elif self.token:
             return super().__str__() + f"Invalid value for {self.token.keyword}. {self.value}"
         elif self.group:
-            breakpoint()
-            # TODO: it would be much nicer to directly get the offending raw cli --option token(s).
-            # However, this information is not available to the validator, so it's a bit hopeless.
-            self.value = self._find_and_replace(self.value)
             return super().__str__() + f'Invalid values for group "{self.group}". {self.value}'
         else:
             raise NotImplementedError
