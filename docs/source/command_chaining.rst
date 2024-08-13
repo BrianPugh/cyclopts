@@ -12,10 +12,11 @@ In this example, we will use a special delimiter token (e.g. ``"AND"``) to separ
 
 .. code-block:: python
 
-   import cyclopts
    import itertools
+   from cyclopts import App, Parameter
+   from typing import Annotated
 
-   app = cyclopts.App()
+   app = App()
 
 
    @app.command
@@ -29,7 +30,7 @@ In this example, we will use a special delimiter token (e.g. ``"AND"``) to separ
 
 
    @app.meta.default
-   def main(*tokens):
+   def main(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
        # tokens is ``["foo", "123", "AND", "foo", "456", "AND", "bar", "--flag"]``
        delimiter = "AND"
 
