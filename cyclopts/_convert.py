@@ -369,17 +369,6 @@ def is_typeddict(hint) -> bool:
     )
 
 
-def accepts_keys(hint) -> bool:
-    origin = get_origin(hint)
-    if is_union(origin):
-        return any(accepts_keys(x) for x in get_args(hint))
-    try:
-        _DictHint(hint)
-    except ValueError:
-        return False
-    return True
-
-
 def convert(
     type_: Any,
     tokens: Union[Sequence[str], NestedCliArgs],
@@ -470,7 +459,7 @@ def convert(
         if is_typeddict(type_):
             # Other classes that accept keys perform their own validation/dont need validation.
             _validate_typed_dict(type_, dict_converted)
-        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
+        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)  # pyright: ignore
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
     else:
