@@ -136,7 +136,7 @@ class Argument:
     # The type for this leaf; may be different from ``iparam.annotation``
     # because this could be a subkey of iparam.
     # This hint MUST be unannotated.
-    hint: Any
+    hint: Any = str
 
     # Associated positional index for iparam.
     index: Optional[int] = field(default=None)
@@ -149,7 +149,7 @@ class Argument:
     keys: Tuple[str, ...] = field(default=())
 
     # Converted value; may be stale.
-    _value: Any = field(default=UNSET, init=False)
+    _value: Any = field(alias="value", default=UNSET)
 
     _accepts_keywords: bool = field(default=False, init=False, repr=False)
 
