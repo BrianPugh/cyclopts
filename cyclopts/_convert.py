@@ -100,10 +100,6 @@ _converters = {
 }
 
 
-def _identity_converter(type_, element):
-    return element
-
-
 def _convert_tuple(
     type_: Type[Any],
     *args: str,

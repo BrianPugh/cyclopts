@@ -2,6 +2,7 @@ import inspect
 import itertools
 import sys
 from contextlib import suppress
+from functools import partial
 from inspect import isclass
 from typing import (
     Any,
@@ -21,11 +22,17 @@ from attrs import define, field, frozen
 from cyclopts._convert import (
     AnnotatedType,
     NoneType,
+    convert,
     resolve,
     resolve_optional,
     token_count,
 )
-from cyclopts.exceptions import CoercionError, MixedArgumentError, RepeatArgumentError, ValidationError
+from cyclopts.exceptions import (
+    CoercionError,
+    MixedArgumentError,
+    RepeatArgumentError,
+    ValidationError,
+)
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import ParameterDict, Sentinel, is_union
@@ -143,6 +150,10 @@ def is_typeddict(hint) -> bool:
     )
 
 
+def _identity_converter(type_, element):
+    return element
+
+
 @frozen
 class Token:
     """
@@ -252,6 +263,7 @@ class Argument:
 
     # Validator to be called based on builtin type support.
     _internal_validator: Optional[Callable] = field(default=None, init=False, repr=False)
+    _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
 
     @property
     def value(self):
@@ -486,7 +498,9 @@ class Argument:
     def _n_branch_tokens(self) -> int:
         return len(self.tokens) + sum(child._n_branch_tokens for child in self._children)
 
-    def _convert(self):
+    def _convert(self, converter=None):
+        if converter is None:
+            converter = self.cparam.converter
         if self._assignable:
             positional, keyword = [], {}
             for token in self.tokens:
@@ -509,29 +523,31 @@ class Argument:
             if positional:
                 if self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
                     # Apply converter to individual values
-                    out = tuple(self.cparam.converter(get_args(self.hint)[0], (value,)) for value in positional)
+                    out = tuple(converter(get_args(self.hint)[0], (value,)) for value in positional)
                 else:
-                    out = self.cparam.converter(self.hint, tuple(positional))
+                    out = converter(self.hint, tuple(positional))
             elif keyword:
                 if self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
                     # Apply converter to individual values
-                    out = {key: self.cparam.converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
+                    out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
                 else:
-                    out = self.cparam.converter(self.hint, keyword)
+                    out = converter(self.hint, keyword)
             else:  # no tokens
                 return self.UNSET
         else:  # A dictionary-like structure.
             data = {}
+            if is_pydantic(self.hint):
+                converter = partial(convert, converter=_identity_converter, name_transform=self.cparam.name_transform)
             for child in self._children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child._n_branch_tokens:
-                    data[child.keys[-1]] = child.convert_and_validate()
+                    data[child.keys[-1]] = child.convert_and_validate(converter=converter)
             out = self.hint(**data)
         return out
 
-    def convert(self):
+    def convert(self, converter=None):
         if not self._marked:
-            self.value = self._convert()
+            self.value = self._convert(converter=converter)
         return self.value
 
     def validate(self, value):
@@ -561,8 +577,8 @@ class Argument:
             else:
                 raise ValidationError(value=e.args[0] if e.args else "", argument=self) from e
 
-    def convert_and_validate(self):
-        val = self.convert()
+    def convert_and_validate(self, converter=None):
+        val = self.convert(converter=converter)
         if val is not None:
             self.validate(val)
         return val
