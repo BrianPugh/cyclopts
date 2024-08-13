@@ -579,7 +579,7 @@ class Argument:
 
     def convert_and_validate(self, converter=None):
         val = self.convert(converter=converter)
-        if val is not None:
+        if val is not self.UNSET:
             self.validate(val)
         return val
 
