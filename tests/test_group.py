@@ -158,7 +158,11 @@ def test_group_validator(app):
 
     app.parse_args("--rock-salt --peppercorn --ketchup")
 
-    validator.assert_called_once_with(salt=True, pepper=True)
+    validator.assert_called_once()
+    provided_arguments = validator.call_args_list[0][0][0]
+    assert len(provided_arguments) == 2
+    assert provided_arguments[0].name == "--rock-salt"
+    assert provided_arguments[1].name == "--peppercorn"
 
 
 def test_group_sort_key_property():

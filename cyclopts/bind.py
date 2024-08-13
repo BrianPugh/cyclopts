@@ -237,7 +237,7 @@ def _parse_configs(argument_collection: ArgumentCollection, configs):
         # TODO: validate argument_collection after every config?
 
 
-def _sort_group_converters(argument_collection) -> List[Tuple["Group", List[Argument]]]:
+def _sort_group(argument_collection) -> List[Tuple["Group", List[Argument]]]:
     """Sort groups into "deepest common-root-keys first" order.
 
     This is imperfect, but probably works sufficiently well for practical use-cases.
@@ -245,8 +245,6 @@ def _sort_group_converters(argument_collection) -> List[Tuple["Group", List[Argu
     out = {}
     # Sort alphabetically by group-name to enfroce some determinism.
     for i, group in enumerate(sorted(argument_collection.groups, key=lambda x: x.name)):
-        if group.converter is None:
-            continue
         group_arguments = [x for x in argument_collection if group in x.cparam.group and x._n_branch_tokens]
         if not group_arguments:
             continue
@@ -296,8 +294,10 @@ def create_bound_arguments(
         _parse_configs(argument_collection, configs)
 
         argument_collection.convert()
-        groups_with_arguments = _sort_group_converters(argument_collection)
+        groups_with_arguments = _sort_group(argument_collection)
         for group, group_arguments in groups_with_arguments:
+            if group.converter is None:
+                continue
             group.converter(group_arguments)  # pyright: ignore[reportOptionalCall]
             # A downstream Argument may have been overrode, so we have to reconvert the tree.
             argument_collection.convert()
