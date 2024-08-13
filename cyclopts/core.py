@@ -8,12 +8,14 @@ from functools import partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Iterable,
     Iterator,
     List,
     Literal,
+    Mapping,
     Optional,
     Tuple,
     TypeVar,
@@ -268,8 +270,8 @@ class App:
         kw_only=True,
     )
 
-    converter: Optional[Callable] = field(default=None, kw_only=True)
-    validator: List[Callable] = field(default=None, converter=to_list_converter, kw_only=True)
+    converter: Optional[Callable[..., Mapping[str, Any]]] = field(default=None, kw_only=True)
+    validator: List[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
 
     _name_transform: Optional[Callable[[str], str]] = field(
         default=None,
@@ -598,13 +600,41 @@ class App:
 
         return obj  # pyright: ignore[reportReturnType]
 
+    # This overload is used in code like:
+    #
+    # @app.default
+    # def my_command(foo: str):
+    #   ...
+    @overload
+    def default(
+        self,
+        obj: T,
+        *,
+        converter: Optional[Callable[..., Mapping[str, Any]]] = None,
+        validator: Optional[Callable[..., Any]] = None,
+    ) -> T: ...
+
+    # This overload is used in code like:
+    #
+    # @app.default()
+    # def my_command(foo: str):
+    #   ...
+    @overload
+    def default(
+        self,
+        obj: None = None,
+        *,
+        converter: Optional[Callable[..., Mapping[str, Any]]] = None,
+        validator: Optional[Callable[..., Any]] = None,
+    ) -> Callable[[T], T]: ...
+
     def default(
         self,
         obj: Optional[T] = None,
         *,
-        converter=None,
-        validator=None,
-    ) -> T:
+        converter: Optional[Callable[..., Mapping[str, Any]]] = None,
+        validator: Optional[Callable[..., Any]] = None,
+    ) -> Union[T, Callable[[T], T]]:
         """Decorator to register a function as the default action handler."""
         if obj is None:  # Called ``@app.default_command(...)``
             return partial(self.default, converter=converter, validator=validator)  # pyright: ignore[reportReturnType]
@@ -620,7 +650,7 @@ class App:
         if converter:
             self.converter = converter
         if validator:
-            self.validator = validator
+            self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
     def parse_known_args(
@@ -712,7 +742,7 @@ class App:
                     )
                     try:
                         if command_app.converter:
-                            bound.arguments = command_app.converter(**bound.arguments)
+                            bound.arguments = command_app.converter(**bound.arguments)  # pyright: ignore[reportAttributeAccessIssue]
                         for command_group in command_groups:
                             if command_group.converter:
                                 bound.arguments = command_group.converter(**bound.arguments)
