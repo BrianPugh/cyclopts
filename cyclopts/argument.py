@@ -1,6 +1,8 @@
 import inspect
 import itertools
+import sys
 from contextlib import suppress
+from inspect import isclass
 from typing import (
     Any,
     Callable,
@@ -19,21 +21,16 @@ from attrs import define, field, frozen
 from cyclopts._convert import (
     AnnotatedType,
     NoneType,
-    _validate_typed_dict,
-    is_attrs,
-    is_dataclass,
-    is_namedtuple,
-    is_pydantic,
-    is_typeddict,
     resolve,
     resolve_optional,
     token_count,
 )
-from cyclopts.exceptions import MixedArgumentError, RepeatArgumentError, ValidationError
+from cyclopts.exceptions import CoercionError, MixedArgumentError, RepeatArgumentError, ValidationError
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import ParameterDict, Sentinel, is_union
 
+_IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
 _PARAMETER_EMPTY_HELP = Parameter(help="")
 
 # parameter subkeys should not inherit these parameter values from their parent.
@@ -54,6 +51,96 @@ def _iparam_get_hint(iparam):
         hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
     hint = resolve_optional(hint)
     return hint
+
+
+def _validate_typed_dict(typed_dict, data: dict, _key_chain: Tuple[str, ...] = ()):
+    """Not a complete validator; only recursively checks TypedDicts.
+
+    Checks:
+        1. Are there any extra keys.
+        2. Are all required keys present.
+
+    Things that this doesn't check (these are enforced by other parts of Cyclopts):
+        1. If the values are the correct type
+    """
+    data_keys = set(data)
+    extra_keys = data_keys - set(typed_dict.__annotations__)
+
+    if extra_keys:
+        if len(extra_keys) == 1:
+            raise CoercionError(msg=f"{typed_dict} does not accept key {next(iter(extra_keys))}.")
+        else:
+            raise CoercionError(msg=f"{typed_dict} does not accept keys {extra_keys}.")
+
+    # First, check for extra keys.
+    if sys.version_info < (3, 9):
+        # Can only check __total__ or not
+        if typed_dict.__total__:
+            missing_keys = set(typed_dict.__annotations__) - data_keys
+        else:
+            missing_keys = set()
+    else:
+        missing_keys = typed_dict.__required_keys__ - data_keys
+    if missing_keys:
+        prefix = ".".join(_key_chain)
+        if prefix:
+            prefix += "."
+        raise ValueError  # TODO: MissingArgumentError
+        # TODO: this should have a specific Argument.
+        # raise MissingArgumentError(missing_keys=[prefix + x for x in missing_keys])
+
+    for field_name, hint in typed_dict.__annotations__.items():
+        if is_typeddict(hint):
+            _validate_typed_dict(hint, data[field_name], _key_chain + (field_name,))
+
+
+def is_pydantic(hint) -> bool:
+    return hasattr(hint, "__pydantic_core_schema__")
+
+
+def is_dataclass(hint) -> bool:
+    return hasattr(hint, "__dataclass_fields__")
+
+
+def is_namedtuple(hint) -> bool:
+    return isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
+
+
+def is_attrs(hint) -> bool:
+    return hasattr(hint, "__attrs_attrs__")
+
+
+def is_typeddict(hint) -> bool:
+    """Determine if a type annotation is a TypedDict.
+
+    This is surprisingly hard! Modified from Beartype's implementation:
+
+        https://github.com/beartype/beartype/blob/main/beartype/_util/hint/pep/proposal/utilpep589.py
+    """
+    hint = resolve(hint)
+    if is_union(get_origin(hint)):
+        return any(is_typeddict(x) for x in get_args(hint))
+
+    if not (isinstance(hint, type) and issubclass(hint, dict)):
+        return False
+
+    return (
+        # This "dict" subclass defines these "TypedDict" attributes *AND*...
+        hasattr(hint, "__annotations__")
+        and hasattr(hint, "__total__")
+        and
+        # Either...
+        (
+            # The active Python interpreter targets exactly Python 3.8 and
+            # thus fails to unconditionally define the remaining attributes
+            # *OR*...
+            _IS_PYTHON_3_8
+            or
+            # The active Python interpreter targets any other Python version
+            # and thus unconditionally defines the remaining attributes.
+            (hasattr(hint, "__required_keys__") and hasattr(hint, "__optional_keys__"))
+        )
+    )
 
 
 @frozen

@@ -1,6 +1,6 @@
 import inspect
 import sys
-from typing import Dict, List, Optional, Tuple, TypedDict
+from typing import Dict, List, Optional, Tuple, TypedDict, Union
 
 import pytest
 
@@ -10,6 +10,7 @@ from cyclopts.argument import (
     Token,
     _resolve_groups_3,
     _resolve_parameter_name,
+    is_typeddict,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
@@ -505,3 +506,35 @@ def test_argument_convert_cparam_provided():
         ),
     )
     assert argument.convert() == "my_converter_my_value"
+
+
+class ExampleTypedDict(TypedDict):
+    foo: str
+    bar: int
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        ExampleTypedDict,
+        Optional[ExampleTypedDict],
+        Annotated[ExampleTypedDict, "foo"],
+        # A union including a Typed Dict is allowed.
+        Union[ExampleTypedDict, str, int],
+    ],
+)
+def test_is_typed_dict_true(hint):
+    assert is_typeddict(hint)
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        list,
+        dict,
+        Dict,
+        Dict[str, int],
+    ],
+)
+def test_is_typed_dict_false(hint):
+    assert not is_typeddict(hint)
