@@ -1,4 +1,3 @@
-import inspect
 import itertools
 from typing import (
     TYPE_CHECKING,
@@ -10,7 +9,6 @@ from typing import (
     Tuple,
     Union,
     cast,
-    get_args,
 )
 
 from attrs import define, field
@@ -118,6 +116,8 @@ class Group:
 
 @define
 class GroupConverter:
+    """Configurable attrs converter."""
+
     default_group: Group
 
     def __call__(self, input_value: Union[None, str, Group]) -> Group:
