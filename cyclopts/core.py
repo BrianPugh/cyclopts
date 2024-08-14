@@ -982,28 +982,6 @@ class App:
             parse_docstring=parse_docstring,
         )
 
-    def _resolve_command(
-        self,
-        tokens: Union[None, str, Iterable[str]] = None,
-        parse_docstring: bool = True,
-    ) -> ResolvedCommand:
-        _, apps, _ = self.parse_commands(tokens)
-
-        if not apps[-1].default_command:
-            raise InvalidCommandError
-
-        assert isinstance(apps[-1].group_arguments, Group)
-        assert isinstance(apps[-1].group_parameters, Group)
-
-        resolved_command = ResolvedCommand(
-            apps[-1].default_command,
-            resolve_default_parameter_from_apps(apps),
-            apps[-1].group_arguments,
-            apps[-1].group_parameters,
-            parse_docstring=parse_docstring,
-        )
-        return resolved_command
-
     def _assemble_help_panels(
         self,
         tokens: Union[None, str, Iterable[str]],
