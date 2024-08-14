@@ -38,6 +38,16 @@ def test_empty_help_panel_rich_silent(console):
     assert actual == ""
 
 
+def test_help_mutable_default(app):
+    """Ensures it doesn't crash; see issue #215."""
+
+    @app.default
+    def main(users: List[str] = ["a", "b"]) -> None:  # noqa: B006
+        print(users)
+
+    app(["--help"])
+
+
 def test_help_default_action(app, console):
     """No command should default to help."""
     with console.capture() as capture:

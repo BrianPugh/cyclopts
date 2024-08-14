@@ -350,7 +350,7 @@ def create_parameter_help_panel(
             help_append(rf"[env var: {env_vars}]", "dim")
 
         if cparam.show_default or (
-            cparam.show_default is None and iparam.default not in {None, inspect.Parameter.empty}
+            cparam.show_default is None and iparam.default is not None and iparam.default != iparam.empty
         ):
             default = ""
             if isclass(type_) and issubclass(type_, Enum):
