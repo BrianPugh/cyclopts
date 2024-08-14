@@ -233,8 +233,7 @@ class Argument:
 
     # The type for this leaf; may be different from ``iparam.annotation``
     # because this could be a subkey of iparam.
-    # This hint MUST be unannotated.
-    hint: Any = str
+    hint: Any = field(default=str, converter=resolve)
 
     # Associated positional index for iparam.
     index: Optional[int] = field(default=None)

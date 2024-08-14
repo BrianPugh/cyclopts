@@ -23,6 +23,7 @@ from cyclopts._convert import AnnotatedType, convert, resolve, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
+    is_union,
     optional_to_tuple_converter,
     record_init,
     to_tuple_converter,
@@ -134,6 +135,9 @@ class Parameter:
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
     def get_negatives(self, type_, names: Optional[Iterable[str]] = None) -> Tuple[str, ...]:  # TODO: use self.name
+        if is_union(type_):
+            type_ = next(x for x in get_args(type_) if x is not None)
+
         type_ = get_origin(type_) or type_
 
         if names is None:
