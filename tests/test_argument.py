@@ -8,7 +8,7 @@ from cyclopts.argument import (
     Argument,
     ArgumentCollection,
     Token,
-    _resolve_groups_3,
+    _resolve_groups_from_callable,
     _resolve_parameter_name,
     is_typeddict,
 )
@@ -426,7 +426,7 @@ def test_resolve_parameter_name(args, expected):
     assert _resolve_parameter_name(*args) == expected
 
 
-def test_resolve_groups_3():
+def test_resolve_groups_from_callable():
     class User(TypedDict):
         name: Annotated[str, Parameter(group="Inside Typed Dict")]
         age: Annotated[int, Parameter(group="Inside Typed Dict")]
@@ -441,7 +441,7 @@ def test_resolve_groups_3():
     ):
         pass
 
-    actual = _resolve_groups_3(build)
+    actual = _resolve_groups_from_callable(build)
     assert actual == [Group("Flags"), Group("Other Flags"), Group("Inside Typed Dict")]
 
 

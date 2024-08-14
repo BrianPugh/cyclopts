@@ -153,7 +153,7 @@ def _get_command_groups(parent_app, child_app):
     return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
 
 
-def resolve_default_parameter_from_apps(apps) -> Parameter:
+def _resolve_default_parameter_from_apps(apps) -> Parameter:
     """The default_parameter resolution depends on the parent-child path traversed."""
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
@@ -171,7 +171,7 @@ def resolve_default_parameter_from_apps(apps) -> Parameter:
     return Parameter.combine(*cparams)
 
 
-def walk_metas(app):
+def _walk_metas(app):
     # Iterates from deepest to shallowest meta-apps
     meta_list = [app]  # shallowest to deepest
     meta = app
@@ -976,7 +976,7 @@ class App:
 
         return ArgumentCollection.from_callable(
             apps[-1].default_command,
-            resolve_default_parameter_from_apps(apps),
+            _resolve_default_parameter_from_apps(apps),
             group_arguments=apps[-1].group_arguments,
             group_parameters=apps[-1].group_parameters,
             parse_docstring=parse_docstring,
@@ -997,7 +997,7 @@ class App:
         panels: Dict[str, Tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in walk_metas(apps[-1]):
+        for subapp in _walk_metas(apps[-1]):
             # Handle Commands
             for group, elements in groups_from_app(subapp):
                 if not group.show:
@@ -1023,12 +1023,12 @@ class App:
                 command_panel.entries.extend(format_command_entries(elements, format=help_format))
 
         # Handle Arguments/Parameters
-        for subapp in walk_metas(apps[-1]):
+        for subapp in _walk_metas(apps[-1]):
             if not subapp.default_command:
                 continue
             command = ResolvedCommand(
                 subapp.default_command,
-                resolve_default_parameter_from_apps(apps),
+                _resolve_default_parameter_from_apps(apps),
                 subapp.group_arguments,
                 subapp.group_parameters,
             )

@@ -165,7 +165,7 @@ class Token:
     # or could be `TOOL_PROJECT_FOO` if coming from an `source=="env"`
     # **This should be pretty unadulterated from the user's input.**
     # Used ONLY for error message purposes.
-    keyword: Optional[str]  # TODO: rename to "key"
+    keyword: Optional[str]
 
     # Empty string when a flag. The parsed token value (unadulterated)
     # See ``Token.implicit_value``
@@ -859,7 +859,7 @@ class ArgumentCollection(list):
         if _resolve_groups:
             group_lookup = {
                 group.name: group
-                for group in _resolve_groups_3(
+                for group in _resolve_groups_from_callable(
                     func,
                     *default_parameters,
                     group_arguments=group_arguments,
@@ -918,7 +918,7 @@ class ArgumentCollection(list):
         return out
 
 
-def _resolve_groups_3(
+def _resolve_groups_from_callable(
     func: Callable,
     *default_parameters: Optional[Parameter],
     group_arguments: Optional[Group] = None,
