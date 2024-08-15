@@ -730,7 +730,14 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    argument_collection = self._resolve_argument_collection(tokens, parse_docstring=False)
+                    argument_collection = ArgumentCollection.from_callable(
+                        command_app.default_command,  # pyright: ignore
+                        _resolve_default_parameter_from_apps(apps),
+                        group_arguments=command_app.group_arguments,  # pyright: ignore
+                        group_parameters=command_app.group_parameters,  # pyright: ignore
+                        parse_docstring=False,
+                    )
+
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
 
@@ -961,27 +968,6 @@ class App:
         for help_panel in self._assemble_help_panels(tokens, help_format):
             console.print(help_panel)
 
-    def _resolve_argument_collection(
-        self,
-        tokens: Union[None, str, Iterable[str]] = None,
-        parse_docstring: bool = True,
-    ) -> ArgumentCollection:
-        _, apps, _ = self.parse_commands(tokens)
-
-        if not apps[-1].default_command:
-            raise InvalidCommandError
-
-        assert isinstance(apps[-1].group_arguments, Group)
-        assert isinstance(apps[-1].group_parameters, Group)
-
-        return ArgumentCollection.from_callable(
-            apps[-1].default_command,
-            _resolve_default_parameter_from_apps(apps),
-            group_arguments=apps[-1].group_arguments,
-            group_parameters=apps[-1].group_parameters,
-            parse_docstring=parse_docstring,
-        )
-
     def _assemble_help_panels(
         self,
         tokens: Union[None, str, Iterable[str]],
@@ -1026,6 +1012,15 @@ class App:
         for subapp in _walk_metas(apps[-1]):
             if not subapp.default_command:
                 continue
+
+            argument_collection = ArgumentCollection.from_callable(
+                subapp.default_command,
+                _resolve_default_parameter_from_apps(apps),
+                group_arguments=apps[-1].group_arguments,  # pyright: ignore
+                group_parameters=apps[-1].group_parameters,  # pyright: ignore
+                parse_docstring=True,
+            )
+
             command = ResolvedCommand(
                 subapp.default_command,
                 _resolve_default_parameter_from_apps(apps),
