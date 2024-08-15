@@ -726,11 +726,19 @@ class ArgumentCollection(list):
                     resolved_groups.append(group)
                     cyclopts_parameters.append(group.default_parameter)
                 cyclopts_parameters.append(cparam)
-                cyclopts_parameters.append(Parameter(group=resolved_groups))
+                if resolved_groups:
+                    cyclopts_parameters.append(Parameter(group=resolved_groups))
         else:
             cyclopts_parameters = cyclopts_parameters_no_group
 
-        upstream_parameter = Parameter.combine(*default_parameters)
+        upstream_parameter = Parameter.combine(
+            (
+                Parameter(group=group_arguments)
+                if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL)
+                else Parameter(group=group_parameters)
+            ),
+            *default_parameters,
+        )
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
 
         if not immediate_parameter.parse:
@@ -916,6 +924,15 @@ class ArgumentCollection(list):
             if argument.value is not argument.UNSET:
                 out[argument.iparam] = argument.value
         return out
+
+    def filter_by(
+        self,
+        *,
+        group: Optional[Group] = None,
+    ) -> "ArgumentCollection":
+        if group is not None:
+            return type(self)([x for x in self if group in x.cparam.group])
+        raise NotImplementedError
 
 
 def _resolve_groups_from_callable(
