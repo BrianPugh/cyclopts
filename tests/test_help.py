@@ -6,6 +6,7 @@ from typing import List, Literal, Optional, Set, Tuple, Union
 import pytest
 
 from cyclopts import App, Group, Parameter
+from cyclopts.argument import ArgumentCollection
 from cyclopts.help import (
     HelpPanel,
     create_parameter_help_panel,
@@ -295,11 +296,16 @@ def test_help_empty(console):
 @pytest.fixture
 def capture_format_group_parameters(console, default_function_groups):
     def inner(cmd):
-        command = ResolvedCommand(cmd, *default_function_groups)
+        argument_collection = ArgumentCollection.from_callable(
+            cmd,
+            None,
+            parse_docstring=True,
+        )
+
         with console.capture() as capture:
-            group, iparams = command.groups_iparams[0]
-            cparams = [command.iparam_to_cparam[x] for x in iparams]
-            console.print(create_parameter_help_panel(group, iparams, cparams, "restructuredtext"))
+            group = argument_collection.groups[0]
+            group_argument_collection = argument_collection.filter_by(group=group)
+            console.print(create_parameter_help_panel(group, group_argument_collection, "restructuredtext"))
 
         return capture.get()
 

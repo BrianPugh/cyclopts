@@ -1018,26 +1018,23 @@ class App:
             argument_collection = ArgumentCollection.from_callable(
                 subapp.default_command,
                 _resolve_default_parameter_from_apps(apps),
-                group_arguments=apps[-1].group_arguments,  # pyright: ignore
-                group_parameters=apps[-1].group_parameters,  # pyright: ignore
+                group_arguments=subapp.group_arguments,  # pyright: ignore
+                group_parameters=subapp.group_parameters,  # pyright: ignore
                 parse_docstring=True,
             )
-
-            command = ResolvedCommand(
-                subapp.default_command,
-                _resolve_default_parameter_from_apps(apps),
-                subapp.group_arguments,
-                subapp.group_parameters,
-            )
-            for group, iparams in command.groups_iparams:
+            for group in argument_collection.groups:
                 if not group.show:
                     continue
-                cparams = [command.iparam_to_cparam[x] for x in iparams]
+                group_argument_collection = argument_collection.filter_by(group=group)
+                if not group_argument_collection:
+                    continue
+
                 try:
                     _, existing_panel = panels[group.name]
                 except KeyError:
                     existing_panel = None
-                new_panel = create_parameter_help_panel(group, iparams, cparams, help_format)
+
+                new_panel = create_parameter_help_panel(group, group_argument_collection, help_format)
 
                 if existing_panel:
                     # An imperfect merging process

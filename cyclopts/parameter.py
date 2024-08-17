@@ -235,7 +235,7 @@ def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> 
         annotation = type_.annotation
 
         if annotation is inspect.Parameter.empty or resolve(annotation) is Any:
-            if type_.default in (inspect.Parameter.empty, None):
+            if type_.default is inspect.Parameter.empty or type_.default is None:
                 annotation = str
             else:
                 return get_hint_parameter(type(type_.default), *default_parameters)

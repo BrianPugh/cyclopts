@@ -26,6 +26,7 @@ from cyclopts.parameter import Parameter, get_hint_parameter
 if TYPE_CHECKING:
     from rich.console import RenderableType
 
+    from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
 
 if sys.version_info >= (3, 12):
@@ -295,17 +296,10 @@ def _get_choices(type_: Type, name_transform: Callable[[str], str]) -> str:
 
 def create_parameter_help_panel(
     group: "Group",
-    iparams,
-    cparams: List[Parameter],
+    argument_collection: "ArgumentCollection",
     format: str,
 ) -> HelpPanel:
     help_panel = HelpPanel(format="parameter", title=group.name, description=format_str(group.help, format=format))
-    icparams = [(ip, cp) for ip, cp in zip(iparams, cparams) if cp.show]
-
-    if not icparams:
-        return help_panel
-
-    iparams, cparams = (list(x) for x in zip(*icparams))
 
     def help_append(text, style=""):
         if help_components:
@@ -315,15 +309,15 @@ def create_parameter_help_panel(
         else:
             help_components.append(text)
 
-    for iparam, cparam in icparams:
-        assert cparam.name is not None
-        assert cparam.name_transform is not None
-        type_ = get_hint_parameter(iparam)[0]
-        options = list(cparam.name)
-        options.extend(cparam.get_negatives(type_))
+    for argument in argument_collection:
+        if not argument.cparam.show:
+            continue
+
+        help_components = []
+        options = list(argument.names)
 
         # Add an all-uppercase name if it's an argument
-        if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
+        if argument.iparam.kind in (argument.iparam.POSITIONAL_ONLY, argument.iparam.POSITIONAL_OR_KEYWORD):
             arg_name = options[0].lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]
@@ -335,32 +329,33 @@ def create_parameter_help_panel(
             else:
                 long_options.append(option)
 
-        help_components = []
+        if argument.cparam.help:
+            help_append(argument.cparam.help)
 
-        if cparam.help:
-            help_append(cparam.help)
-
-        if cparam.show_choices:
-            choices = _get_choices(type_, cparam.name_transform)
+        if argument.cparam.show_choices:
+            choices = _get_choices(argument.hint, argument.cparam.name_transform)
             if choices:
                 help_append(rf"[choices: {choices}]", "dim")
 
-        if cparam.show_env_var and cparam.env_var:
-            env_vars = " ".join(cparam.env_var)
+        if argument.cparam.show_env_var and argument.cparam.env_var:
+            env_vars = " ".join(argument.cparam.env_var)
             help_append(rf"[env var: {env_vars}]", "dim")
 
-        if cparam.show_default or (
-            cparam.show_default is None and iparam.default is not None and iparam.default != iparam.empty
+        if argument.cparam.show_default or (
+            argument.cparam.show_default is None
+            and argument.iparam.default is not None
+            and argument.iparam.default != argument.iparam.empty
         ):
             default = ""
-            if isclass(type_) and issubclass(type_, Enum):
-                default = cparam.name_transform(iparam.default.name)
+            if isclass(argument.hint) and issubclass(argument.hint, Enum):
+                default = argument.cparam.name_transform(argument.iparam.default.name)
             else:
-                default = iparam.default
+                # TODO: this only works if ``not keys``
+                default = argument.iparam.default
 
             help_append(rf"[default: {default}]", "dim")
 
-        if cparam.required:
+        if argument.cparam.required:
             help_append(r"[required]", "dim red")
 
         # populate row
@@ -369,7 +364,7 @@ def create_parameter_help_panel(
                 name=",".join(long_options),
                 description=format_str(*help_components, format=format),
                 short=",".join(short_options),
-                required=bool(cparam.required),
+                required=bool(argument.cparam.required),
             )
         )
 

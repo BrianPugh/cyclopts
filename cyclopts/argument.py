@@ -55,7 +55,7 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
 def _iparam_get_hint(iparam):
     hint = iparam.annotation
     if hint is inspect.Parameter.empty or resolve(hint) is Any:
-        hint = str if iparam.default in (inspect.Parameter.empty, None) else type(iparam.default)
+        hint = str if iparam.default is inspect.Parameter.empty or iparam.default is None else type(iparam.default)
     hint = resolve_optional(hint)
     return hint
 
@@ -784,16 +784,16 @@ class ArgumentCollection(list):
         argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
         out.append(argument)
         if argument._accepts_keywords:
-            docstring_lookup = {}
             if parse_docstring:
-                docstring_lookup = _extract_docstring_help(argument.hint)
+                # TODO: need to get docstring of attributes?
+                # docstring_lookup = _extract_docstring_help(argument.hint)
+                pass
 
             for field_name, field_hint in argument._lookup.items():
                 subkey_argument = cls._from_type(
                     iparam,
                     field_hint,
                     keys + (field_name,),
-                    docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
                     cparam,
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
@@ -817,6 +817,7 @@ class ArgumentCollection(list):
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
         positional_index: Optional[int] = None,
+        parse_docstring: bool = True,
         _resolve_groups: bool = True,
     ):
         # The responsibility of this function is to extract out the root type
@@ -836,13 +837,14 @@ class ArgumentCollection(list):
             iparam,
             hint,
             (),
-            *default_parameters,
             _PARAMETER_EMPTY_HELP,
             Parameter(required=iparam.default is iparam.empty),
+            *default_parameters,
             group_lookup=group_lookup,
             group_arguments=group_arguments,
             group_parameters=group_parameters,
             positional_index=positional_index,
+            parse_docstring=parse_docstring,
             _resolve_groups=_resolve_groups,
         )
 
@@ -876,8 +878,7 @@ class ArgumentCollection(list):
             }
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
-
-        out = cls(groups=list(group_lookup.values()) if group_lookup else None)
+        out = cls()
         for i, iparam in enumerate(cyclopts.utils.signature(func).parameters.values()):
             out.extend(
                 cls.from_iparam(
@@ -889,9 +890,16 @@ class ArgumentCollection(list):
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
                     positional_index=i,
+                    parse_docstring=parse_docstring,
                     _resolve_groups=_resolve_groups,
                 )
             )
+
+        out.groups = []
+        for argument in out:
+            for group in argument.cparam.group:
+                if group not in out.groups:
+                    out.groups.append(group)
         return out
 
     @property
