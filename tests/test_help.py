@@ -13,7 +13,6 @@ from cyclopts.help import (
     format_command_entries,
     format_usage,
 )
-from cyclopts.resolve import ResolvedCommand
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated

@@ -50,7 +50,6 @@ from cyclopts.help import (
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
-from cyclopts.resolve import ResolvedCommand
 from cyclopts.utils import (
     default_name_transform,
     optional_to_tuple_converter,
