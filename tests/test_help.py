@@ -1348,8 +1348,10 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Arguments ────────────────────────────────────────────────╮
+        │ *  TOKENS  [required]                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  TOKENS          [required]                                      │
         │ *  --hostname  -n  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1388,8 +1390,10 @@ def test_help_print_commands_plus_meta_short(app, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  RDP,--rdp  RDP description. [required]                          │
         ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Arguments ────────────────────────────────────────────────╮
+        │ *  TOKENS  [required]                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  TOKENS          [required]                                      │
         │ *  --hostname  -n  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
