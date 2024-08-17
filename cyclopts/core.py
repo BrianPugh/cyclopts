@@ -331,6 +331,7 @@ class App:
                 name=self._version_flags,
                 help_flags=[],
                 version_flags=[],
+                version=self.version,
                 help="Display application version.",
             )
 
@@ -348,6 +349,7 @@ class App:
                 name=self._help_flags,
                 help_flags=[],
                 version_flags=[],
+                version=self.version,
                 help="Display this message and exit.",
             )
 
