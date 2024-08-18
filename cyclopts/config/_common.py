@@ -1,5 +1,4 @@
 import errno
-import inspect
 import itertools
 import os
 from abc import ABC, abstractmethod
@@ -13,7 +12,6 @@ from typing import (
     Iterator,
     List,
     Optional,
-    Set,
     Tuple,
     Union,
 )
@@ -27,40 +25,6 @@ from cyclopts.utils import to_tuple_converter
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
-
-
-@define
-class Unset:
-    """Placeholder object for a parameter that does not yet have any associated string tokens.
-
-    Used with :attr:`App.config <cyclopts.App.config>`.
-
-    Parameters
-    ----------
-    iparam: inspect.Parameter
-        The corresponding :class:`inspect.Parameter` for the unset variable.
-    related: set[str]
-        Other CLI names that map to the same :class:`inspect.Parameter`.
-        These may be aliases, or things like negative flags.
-    """
-
-    iparam: inspect.Parameter
-    related: Set[str] = field(factory=set)
-
-    def related_set(self, mapping: Dict[str, Union["Unset", List[str]]]) -> Set[str]:
-        """Other CLI keys that map to the same :class:`inspect.Parameter` that have parsed token(s).
-
-        Parameters
-        ----------
-        mapping: dict
-            All associated cli_name to tokens.
-
-        Returns
-        -------
-        set[str]
-            CLI keys that map to the same :class:`inspect.Parameter` that have parsed token(s).
-        """
-        return {x for x in self.related.intersection(mapping) if not isinstance(mapping[x], Unset)}
 
 
 def _walk_leaves(

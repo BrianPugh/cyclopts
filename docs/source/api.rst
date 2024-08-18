@@ -196,7 +196,7 @@ API
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
+         def config(apps: List["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
@@ -206,11 +206,8 @@ API
                 The current command app is the last element of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
-             mapping: Dict[str, Union[Unset, List[str]]]
-                A dictionary mapping CLI keyword names to their tokens (before App and Group converters/validators have been invoked).
-                For example, if the user specifies --my-var=foo, then this dictionary will be {"my-var": ["foo"]}.
-                If the value is an cyclopts.config.Unset object, then no tokens have been parsed for that parameter yet.
-                Deleting keys from this dictionary will unset their value.
+             arguments: ArgumentCollection
+                TODO
              """
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
@@ -844,9 +841,6 @@ All Cyclopts builtins index into the configuration file with the following rules
       :value: cyclopts.env_var_split
 
       Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
-
-.. autoclass:: cyclopts.config.Unset
-   :members: related_set
 
 ----------
 Exceptions

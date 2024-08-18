@@ -22,6 +22,7 @@ __all__ = [
     "ResolvedExistingDirectory",
     "ResolvedDirectory",
     "ResolvedFile",
+    "ResolvedPath",
     # Number
     "PositiveFloat",
     "NonNegativeFloat",

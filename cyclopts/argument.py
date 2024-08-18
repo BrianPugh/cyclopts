@@ -662,14 +662,6 @@ class ArgumentCollection(list):
 
         return best_match_argument, best_match_keys, best_implicit_value
 
-    def populated(self, iparam: Optional[inspect.Parameter] = None) -> Iterator[Argument]:
-        for argument in self:
-            if not argument.tokens:
-                continue
-            if argument.iparam != iparam:
-                continue
-            yield argument
-
     def _set_marks(self, val: bool):
         for argument in self:
             argument._marked = val
@@ -901,20 +893,6 @@ class ArgumentCollection(list):
                 if group not in out.groups:
                     out.groups.append(group)
         return out
-
-    @property
-    def var_keyword(self) -> Optional[Argument]:
-        for argument in self:
-            if argument.iparam.kind == argument.iparam.VAR_KEYWORD:
-                return argument
-        return None
-
-    @property
-    def iparams(self):
-        out = ParameterDict()  # Repurposing ParameterDict as a Set.
-        for argument in self:
-            out[argument.iparam] = None
-        return out.keys()
 
     @property
     def root_arguments(self):

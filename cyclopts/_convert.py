@@ -36,7 +36,7 @@ else:
     from typing import NotRequired, Required  # pragma: no cover
 
 if sys.version_info < (3, 9):
-    from typing_extensions import Annotated, TypedDict  # pragma: no cover
+    from typing_extensions import Annotated  # pragma: no cover
 else:
     from typing import Annotated  # pragma: no cover
 

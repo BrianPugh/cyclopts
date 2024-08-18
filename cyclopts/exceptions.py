@@ -90,11 +90,6 @@ class CycloptsError(Exception):
     The python function associated with the command being parsed.
     """
 
-    cli2parameter: Optional[Dict[str, Tuple[inspect.Parameter, Any]]] = None
-    """
-    Dictionary mapping CLI strings to python parameters.
-    """
-
     parameter2cli: Optional[ParameterDict] = None
     """
     Dictionary mapping function parameters to possible CLI tokens.
@@ -135,16 +130,6 @@ class CycloptsError(Exception):
             return "\n".join(strings) + "\n"
         else:
             return ""
-
-    def _find_and_replace(self, s: str) -> str:
-        """Replaces all instances of "--python-variable-name" with "--cli-variable-name"."""
-        if self.parameter2cli is None:
-            return s
-        for p, names in self.parameter2cli.items():
-            pattern = rf"--\b{re.escape(p.name)}\b(?=\W|$)"
-            replacement = names[0]
-            s = re.sub(pattern, replacement, s)
-        return s
 
 
 @define(kw_only=True)
