@@ -964,7 +964,7 @@ class App:
 
         # Print the App/Command's Doc String.
         help_format = resolve_help_format(apps)
-        console.print(format_doc(self, executing_app, help_format))
+        console.print(format_doc(executing_app, help_format))
 
         for help_panel in self._assemble_help_panels(tokens, help_format):
             console.print(help_panel)

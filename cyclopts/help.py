@@ -199,10 +199,9 @@ def format_usage(
     return Text(" ".join(usage) + "\n", style="bold")
 
 
-def format_doc(root_app, app: "App", format: str = "restructuredtext"):
+def format_doc(app: "App", format: str = "restructuredtext"):
     from rich.console import Group as RichGroup
     from rich.console import NewLine
-    from rich.text import Text
 
     raw_doc_string = app.help
 
