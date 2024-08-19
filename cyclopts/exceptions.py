@@ -185,46 +185,26 @@ class CoercionError(CycloptsError):
     Intended type to coerce into.
     """
 
-    parameter: Optional[inspect.Parameter] = None
-
     def __str__(self):
-        # Goal: figure out the exact token(s) that caused the coercion error.
-        # Usually an Argument will have a single token, but it's possible that it's a tuple.
-        # How do we get the
         assert self.argument is not None
-
-        # if self.argument.tokens[0].keyword is not None:
-        #    if self.argument.tokens[0].source:
-        #        if self.argument.tokens[0].source == "cli":
-        #            raise NotImplementedError
-        #        else:
-        #            raise NotImplementedError
-        #    else:
-        #        raise NotImplementedError
-        #    parameter_cli_name = self.argument.tokens[0].keyword
-        # else:
-        #    parameter_cli_name = ""
-
-        if self.parameter:
-            assert self.parameter2cli is not None
-            parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
+        assert self.token is not None
+        assert self.target_type is not None
 
         if self.msg is not None:
-            if self.parameter:
-                return f"{parameter_cli_name}: " + self.msg  # pyright: ignore[reportPossiblyUnboundVariable]
-            else:
+            if self.token.keyword is None:
                 return self.msg
+            else:
+                return f"{self.token.keyword}: {self.msg}"
 
-        response = f'Error converting value "{self.token}"'
+        if self.token.keyword is None:
+            msg = f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {self.target_type.__name__}.'
+        else:
+            msg = f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
 
-        if self.target_type is not None:
-            target_type = str(self.target_type).lstrip("typing.")  # lessens the verbosity a little bit.
-            response += f" to {target_type}"
+        if super_msg := super().__str__():
+            msg = f"{super_msg} {msg}"
 
-        if self.parameter:
-            response += f' for "{parameter_cli_name}"'  # pyright: ignore[reportPossiblyUnboundVariable]
-
-        return super().__str__() + response + "."
+        return msg
 
 
 class InvalidCommandError(CycloptsError):
@@ -259,6 +239,7 @@ class MissingArgumentError(CycloptsError):
     tokens_so_far: List[str] = field(factory=list)
 
     def __str__(self):
+        assert self.argument is not None
         strings = []
         count, _ = self.argument.token_count()
         if count == 0:

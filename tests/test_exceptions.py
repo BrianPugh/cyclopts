@@ -39,7 +39,7 @@ def test_exceptions_coercion_error(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Error converting value "fizz" to <class 'int'> for "--bar".        │
+        │ Invalid value for "--bar": unable to convert "fizz" into int.      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
