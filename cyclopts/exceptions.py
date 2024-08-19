@@ -191,13 +191,11 @@ class CoercionError(CycloptsError):
             else:
                 return f"{self.token.keyword}: {self.msg}"
 
+        msg = super().__str__()
         if self.token.keyword is None:
-            msg = f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {self.target_type.__name__}.'
+            msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {self.target_type.__name__}.'
         else:
-            msg = f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
-
-        if super_msg := super().__str__():
-            msg = f"{super_msg} {msg}"
+            msg += f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
 
         return msg
 

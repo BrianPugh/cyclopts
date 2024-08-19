@@ -70,7 +70,7 @@ def test_exceptions_coercion_error_verbose(app, console):
         """\
         │     foo(bar: int)                                                  │
         │ Root Input Tokens: ['foo', 'fizz']                                 │
-        │ Error converting value "fizz" to <class 'int'> for "--bar".        │
+        │ Invalid value for "--bar": unable to convert "fizz" into int.      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
