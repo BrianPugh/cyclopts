@@ -449,8 +449,8 @@ def test_argument_convert():
     argument = Argument(
         hint=List[int],
         tokens=[
-            Token("doesn't matter", "42", source="test"),
-            Token("doesn't matter", "70", source="test"),
+            Token(value="42", source="test"),
+            Token(value="70", source="test"),
         ],
     )
     assert argument.convert() == [42, 70]
@@ -468,8 +468,8 @@ def test_argument_convert_dict():
     # Sanity check the match method
     assert argument.match("--bar.buzz") == (("buzz",), None)
 
-    argument.append(Token("--bar.fizz", "7", source="test", keys=("fizz",)))
-    argument.append(Token("--bar.buzz", "12", source="test", keys=("buzz",)))
+    argument.append(Token(value="7", source="test", keys=("fizz",)))
+    argument.append(Token(value="12", source="test", keys=("buzz",)))
 
     assert argument.convert() == {"fizz": 7, "buzz": 12}
 
@@ -486,8 +486,8 @@ def test_argument_convert_var_keyword():
     # Sanity check the match method
     assert argument.match("--fizz") == (("fizz",), None)
 
-    argument.append(Token("--fizz", "7", source="test", keys=("fizz",)))
-    argument.append(Token("--buzz", "12", source="test", keys=("buzz",)))
+    argument.append(Token(value="7", source="test", keys=("fizz",)))
+    argument.append(Token(value="12", source="test", keys=("buzz",)))
 
     assert argument.convert() == {"fizz": 7, "buzz": 12}
 
@@ -498,9 +498,7 @@ def test_argument_convert_cparam_provided():
 
     argument = Argument(
         hint=str,
-        tokens=[
-            Token("doesn't matter", "my_value", source="test"),
-        ],
+        tokens=[Token(value="my_value", source="test")],
         cparam=Parameter(
             converter=my_converter,
         ),

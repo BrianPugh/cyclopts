@@ -83,14 +83,14 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
             # A flag was parsed
             if cli_values:
                 if _bool(cli_values[-1]):  # --positive-flag=true or --negative-flag=true or --empty-flag=true
-                    argument.append(Token(cli_option, "", source="cli", implicit_value=implicit_value))
+                    argument.append(Token(keyword=cli_option, source="cli", implicit_value=implicit_value))
                 else:  # --positive-flag=false or --negative-flag=false or --empty-flag=false
                     if isinstance(implicit_value, bool):
-                        argument.append(Token(cli_option, "", source="cli", implicit_value=not implicit_value))
+                        argument.append(Token(keyword=cli_option, source="cli", implicit_value=not implicit_value))
                     else:
                         continue
             else:
-                argument.append(Token(cli_option, "", source="cli", implicit_value=implicit_value))
+                argument.append(Token(keyword=cli_option, source="cli", implicit_value=implicit_value))
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
@@ -115,7 +115,9 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                 raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
 
             for index, cli_value in enumerate(cli_values):
-                argument.append(Token(cli_option, cli_value, source="cli", index=index, keys=leftover_keys))
+                argument.append(
+                    Token(keyword=cli_option, value=cli_value, source="cli", index=index, keys=leftover_keys)
+                )
 
     return unused_tokens
 
@@ -159,7 +161,7 @@ def _parse_pos(
             for index, token in enumerate(tokens[:tokens_per_element]):
                 if not argument.cparam.allow_leading_hyphen:
                     _validate_is_not_option_like(token)
-                new_tokens.append(Token(None, token, "cli", index=index))
+                new_tokens.append(Token(value=token, source="cli", index=index))
             tokens = tokens[tokens_per_element:]
             if not consume_all:
                 break
@@ -181,7 +183,7 @@ def _parse_env(argument_collection):
             except KeyError:
                 pass
             else:
-                argument.tokens.append(Token(env_var_name, env_var_value, source="env"))
+                argument.tokens.append(Token(keyword=env_var_name, value=env_var_value, source="env"))
                 break
 
 

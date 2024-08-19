@@ -36,4 +36,6 @@ class Env:
                 continue
             remaining_keys = tuple(x.lower() for x in remaining_keys)
             for i, value in enumerate(argument.env_var_split(os.environ[candidate_env_key])):
-                argument.append(Token(candidate_env_key, value, source="env", index=i, keys=remaining_keys))
+                argument.append(
+                    Token(keyword=candidate_env_key, value=value, source="env", index=i, keys=remaining_keys)
+                )

@@ -127,4 +127,6 @@ class ConfigFromFile(ABC):
                 value = tuple(str(x) for x in value)
 
                 for i, v in enumerate(value):
-                    argument.append(Token(complete_keyword, v, source=str(self.path), index=i, keys=remaining_keys))
+                    argument.append(
+                        Token(keyword=complete_keyword, value=v, source=str(self.path), index=i, keys=remaining_keys)
+                    )

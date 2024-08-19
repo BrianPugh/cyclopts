@@ -19,14 +19,7 @@ from typing import (
 
 from attrs import define, field, frozen
 
-from cyclopts._convert import (
-    AnnotatedType,
-    NoneType,
-    convert,
-    resolve,
-    resolve_optional,
-    token_count,
-)
+from cyclopts._convert import convert, resolve, resolve_optional, token_count
 from cyclopts.exceptions import (
     CoercionError,
     MixedArgumentError,
@@ -35,7 +28,7 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
-from cyclopts.utils import ParameterDict, Sentinel, is_union
+from cyclopts.utils import AnnotatedType, NoneType, ParameterDict, Sentinel, is_union
 
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
 _PARAMETER_EMPTY_HELP = Parameter(help="")
@@ -154,7 +147,7 @@ def _identity_converter(type_, element):
     return element
 
 
-@frozen
+@frozen(kw_only=True)
 class Token:
     """
     Purely a dataclass containing factual book-keeping for a user input.
@@ -165,15 +158,15 @@ class Token:
     # or could be `TOOL_PROJECT_FOO` if coming from an `source=="env"`
     # **This should be pretty unadulterated from the user's input.**
     # Used ONLY for error message purposes.
-    keyword: Optional[str]
+    keyword: Optional[str] = None
 
     # Empty string when a flag. The parsed token value (unadulterated)
     # See ``Token.implicit_value``
-    value: str
+    value: str = ""
 
     # Where the token came from; used for error message purposes.
     # Cyclopts specially uses "cli" for cli-parsed tokens.
-    source: str
+    source: str = ""
 
     index: int = field(default=0, kw_only=True)
 
@@ -546,7 +539,12 @@ class Argument:
 
     def convert(self, converter=None):
         if not self._marked:
-            self.value = self._convert(converter=converter)
+            try:
+                self.value = self._convert(converter=converter)
+            except CoercionError as e:
+                if e.argument is None:
+                    e.argument = self
+                raise
         return self.value
 
     def validate(self, value):

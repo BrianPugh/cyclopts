@@ -55,7 +55,7 @@ def argument_collection():
         pass
 
     out = ArgumentCollection.from_callable(foo)
-    out[0].append(Token("--key1", "cli1", source="cli"))
+    out[0].append(Token(keyword="--key1", value="cli1", source="cli"))
     return out
 
 
@@ -68,16 +68,18 @@ def apps():
 def test_config_common_root_keys_empty(apps, config, argument_collection):
     config.path.touch()
     config(apps, (), argument_collection)
-    assert argument_collection[0].tokens == [Token("--key1", "cli1", source="cli")]
-    assert argument_collection[1].tokens == [Token("[key2]", "foo2", source=str(config.path))]
+    assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
+    assert argument_collection[1].tokens == [Token(keyword="[key2]", value="foo2", source=str(config.path))]
 
 
 def test_config_common_root_keys_populated(apps, config_root_keys, argument_collection):
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
     config_root_keys(apps, (), argument_collection)
-    assert argument_collection[0].tokens == [Token("--key1", "cli1", source="cli")]
-    assert argument_collection[1].tokens == [Token("[tool][cyclopts][key2]", "foo2", source=str(config_root_keys.path))]
+    assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
+    assert argument_collection[1].tokens == [
+        Token(keyword="[tool][cyclopts][key2]", value="foo2", source=str(config_root_keys.path))
+    ]
 
 
 def test_config_common_must_exist_false(config, mocker):

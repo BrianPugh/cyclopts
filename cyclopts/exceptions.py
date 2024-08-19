@@ -95,6 +95,8 @@ class CycloptsError(Exception):
     Dictionary mapping function parameters to possible CLI tokens.
     """
 
+    argument: Optional["Argument"] = None
+
     command_chain: Optional[Iterable[str]] = None
     """
     List of command that lead to ``target``.
@@ -140,7 +142,6 @@ class ValidationError(CycloptsError):
     """Parenting Assertion/Value/Type Error message."""
 
     # One of the following caused a failure
-    argument: Optional["Argument"] = None
     token: Optional["Token"] = None
     group: Optional[Group] = None
 
@@ -174,9 +175,9 @@ class UnknownOptionError(CycloptsError):
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
 
-    input_value: str = ""
+    token: Optional["Token"] = None
     """
-    String input token that couldn't be coerced.
+    Input token that couldn't be coerced.
     """
 
     target_type: Optional[Type] = None
@@ -187,6 +188,23 @@ class CoercionError(CycloptsError):
     parameter: Optional[inspect.Parameter] = None
 
     def __str__(self):
+        # Goal: figure out the exact token(s) that caused the coercion error.
+        # Usually an Argument will have a single token, but it's possible that it's a tuple.
+        # How do we get the
+        assert self.argument is not None
+
+        # if self.argument.tokens[0].keyword is not None:
+        #    if self.argument.tokens[0].source:
+        #        if self.argument.tokens[0].source == "cli":
+        #            raise NotImplementedError
+        #        else:
+        #            raise NotImplementedError
+        #    else:
+        #        raise NotImplementedError
+        #    parameter_cli_name = self.argument.tokens[0].keyword
+        # else:
+        #    parameter_cli_name = ""
+
         if self.parameter:
             assert self.parameter2cli is not None
             parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
@@ -197,7 +215,7 @@ class CoercionError(CycloptsError):
             else:
                 return self.msg
 
-        response = f'Error converting value "{self.input_value}"'
+        response = f'Error converting value "{self.token}"'
 
         if self.target_type is not None:
             target_type = str(self.target_type).lstrip("typing.")  # lessens the verbosity a little bit.
@@ -238,8 +256,6 @@ class UnusedCliTokensError(CycloptsError):
 
 @define(kw_only=True)
 class MissingArgumentError(CycloptsError):
-    argument: "Argument"
-
     tokens_so_far: List[str] = field(factory=list)
 
     def __str__(self):

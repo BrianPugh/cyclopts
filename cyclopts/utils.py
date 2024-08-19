@@ -23,6 +23,11 @@ if sys.version_info >= (3, 10):
 
     _union_types.add(UnionType)
 
+if sys.version_info < (3, 9):
+    from typing_extensions import Annotated  # pragma: no cover
+else:
+    from typing import Annotated  # pragma: no cover
+
 # fmt: off
 if sys.version_info >= (3, 10):
     def signature(f: Any) -> inspect.Signature:
@@ -31,6 +36,10 @@ else:
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f)
 # fmt: on
+
+# from types import NoneType is available >=3.10
+NoneType = type(None)
+AnnotatedType = type(Annotated[int, 0])
 
 
 class SentinelMeta(type):
