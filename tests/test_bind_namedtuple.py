@@ -1,8 +1,6 @@
 from collections import namedtuple
 from typing import NamedTuple
 
-import pytest
-
 
 def test_bind_typing_named_tuple(app, assert_parse_args):
     class Employee(NamedTuple):

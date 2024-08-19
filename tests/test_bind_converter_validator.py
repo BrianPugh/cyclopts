@@ -1,4 +1,3 @@
-import inspect
 import sys
 from unittest.mock import Mock
 

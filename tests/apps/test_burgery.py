@@ -3,10 +3,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import List, Literal, Optional
 
-import pytest
-
 import cyclopts
-from cyclopts import App, Group, Parameter, validators
+from cyclopts import App, Parameter, validators
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated

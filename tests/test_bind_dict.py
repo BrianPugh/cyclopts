@@ -1,9 +1,7 @@
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 
 import pytest
-
-from cyclopts.exceptions import MissingArgumentError
 
 
 @pytest.mark.parametrize(
@@ -33,7 +31,7 @@ def test_bind_dict_str_to_int_typing(app, assert_parse_args):
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Native Typing")
 def test_bind_dict_str_to_int_builtin(app, assert_parse_args):
     @app.command
-    def foo(d: dict[str, int]):
+    def foo(d: Dict[str, int]):
         pass
 
     assert_parse_args(foo, "foo --d.key1=7 --d.key2=42", d={"key1": 7, "key2": 42})

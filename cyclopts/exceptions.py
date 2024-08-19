@@ -1,14 +1,11 @@
 import inspect
-import re
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Iterable,
     List,
     Optional,
-    Tuple,
     Type,
 )
 
@@ -16,7 +13,6 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.group import Group
-from cyclopts.utils import ParameterDict
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -149,8 +145,7 @@ class ValidationError(CycloptsError):
 
     def __str__(self):
         if self.argument:
-            breakpoint()
-            raise NotImplementedError
+            raise NotImplementedError  # TODO
         elif self.token:
             return super().__str__() + f"Invalid value for {self.token.keyword}. {self.value}"
         elif self.group:

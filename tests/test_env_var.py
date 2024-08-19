@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable, List, Optional, Tuple
 
 import pytest
 

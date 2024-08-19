@@ -4,7 +4,6 @@ from typing import (
     Any,
     Callable,
     Iterable,
-    List,
     Optional,
     Tuple,
     Type,

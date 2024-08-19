@@ -1,19 +1,12 @@
-import sys
 from dataclasses import dataclass, field
-
-from cyclopts import Parameter
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated, TypedDict  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
+from typing import Dict
 
 
 @dataclass
 class User:
     id: int
     name: str = "John Doe"
-    tastes: dict[str, int] = field(default_factory=dict)
+    tastes: Dict[str, int] = field(default_factory=dict)
 
 
 def test_bind_dataclass(app, assert_parse_args):

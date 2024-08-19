@@ -762,7 +762,7 @@ class ArgumentCollection(list):
                 elif iparam.kind is iparam.VAR_KEYWORD:
                     if cparam.name:
                         # TODO: Probably something like `--existing.[KEYWORD]`
-                        breakpoint()
+                        raise NotImplementedError
                     else:
                         cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:

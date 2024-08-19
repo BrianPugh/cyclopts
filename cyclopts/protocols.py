@@ -1,5 +1,5 @@
 import inspect
-from typing import Any, Callable, Protocol, Type
+from typing import Any, Callable, Protocol
 
 
 class Dispatcher(Protocol):

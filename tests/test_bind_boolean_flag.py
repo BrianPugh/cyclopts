@@ -3,11 +3,9 @@ import sys
 import pytest
 
 from cyclopts import (
-    CycloptsError,
     Group,
     Parameter,
     UnknownOptionError,
-    ValidationError,
 )
 from cyclopts.exceptions import CoercionError
 

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, List, Optional, get_args
+from typing import Any, Optional, get_args
 
 
 def _is_path(type_) -> bool:

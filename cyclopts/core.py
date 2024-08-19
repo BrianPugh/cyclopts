@@ -68,7 +68,8 @@ else:
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
-    import readline  # Not available on windows
+    # Not available on windows
+    import readline  # noqa: F401
 
 if TYPE_CHECKING:
     from rich.console import Console

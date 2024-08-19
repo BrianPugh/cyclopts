@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from cyclopts import MissingArgumentError, UnknownOptionError, ValidationError
+from cyclopts import MissingArgumentError, UnknownOptionError
 
 
 @pytest.mark.parametrize(

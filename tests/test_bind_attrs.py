@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Optional
 
 from attrs import define, field
 
@@ -13,7 +13,7 @@ class Outfit:
 class User:
     id: int
     name: str = "John Doe"
-    tastes: dict[str, int] = field(factory=dict)
+    tastes: Dict[str, int] = field(factory=dict)
     outfit: Optional[Outfit] = None
 
 

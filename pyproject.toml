@@ -157,7 +157,6 @@ ignore = [
     "D401",
     "E402",
     "E501",
-    "F401",
     "PGH003",  # Use specific rule codes when ignoring type issues
     "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
     "TRY300",  # Consider moving this statement to an `else` block

@@ -1,6 +1,6 @@
 from datetime import datetime
 from textwrap import dedent
-from typing import Optional
+from typing import Dict, Optional, Union
 
 import pytest
 from pydantic import BaseModel, PositiveInt, validate_call
@@ -47,8 +47,8 @@ class Outfit(BaseModel):
 class User(BaseModel):
     id: int
     name: str = "John Doe"
-    signup_ts: datetime | None
-    tastes: dict[str, PositiveInt]
+    signup_ts: Union[datetime, None]
+    tastes: Dict[str, PositiveInt]
     outfit: Optional[Outfit] = None
 
 

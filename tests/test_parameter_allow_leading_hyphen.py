@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from cyclopts.exceptions import UnknownOptionError, ValidationError
+from cyclopts.exceptions import UnknownOptionError
 
 if sys.version_info < (3, 9):
     from typing_extensions import Annotated

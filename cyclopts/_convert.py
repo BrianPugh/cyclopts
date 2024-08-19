@@ -12,7 +12,6 @@ from typing import (
     List,
     Literal,
     Optional,
-    Required,
     Sequence,
     Set,
     Tuple,
@@ -35,15 +34,8 @@ if sys.version_info < (3, 11):
 else:
     from typing import NotRequired, Required  # pragma: no cover
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
-
-
 if TYPE_CHECKING:
     from cyclopts.argument import Token
-    from cyclopts.parameter import Parameter
 
 
 _implicit_iterable_type_mapping: Dict[Type, Type] = {
