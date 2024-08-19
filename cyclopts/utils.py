@@ -2,6 +2,7 @@ import functools
 import inspect
 import sys
 from collections.abc import MutableMapping
+from types import GenericAlias
 from typing import (
     Any,
     Dict,
@@ -13,6 +14,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    get_args,
     get_origin,
 )
 
@@ -229,3 +231,22 @@ def default_name_transform(s: str):
         Transformed name.
     """
     return s.lower().replace("_", "-").strip("-")
+
+
+def get_hint_name(hint) -> str:
+    if isinstance(hint, str):
+        return hint
+    elif hint is Any:
+        return "Any"
+    elif isinstance(hint, GenericAlias):
+        return hint._name
+    elif hasattr(hint, "__name__"):
+        return hint.__name__
+    elif getattr(hint, "_name", None) is not None:
+        return hint._name
+    elif is_union(hint):
+        return "|".join(get_hint_name(arg) for arg in get_args(hint))
+    origin = get_origin(hint)
+    if origin is not None:
+        return f"{get_hint_name(origin)}[{', '.join(get_hint_name(arg) for arg in get_args(hint))}]"
+    return str(hint)

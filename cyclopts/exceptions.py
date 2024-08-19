@@ -1,13 +1,5 @@
 import inspect
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Optional,
-    Type,
-)
+from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Type
 
 from attrs import define, field
 
@@ -190,16 +182,17 @@ class CoercionError(CycloptsError):
                 return f"{self.token.keyword}: {self.msg}"
 
         msg = super().__str__()
+        target_type_name = cyclopts.utils.get_hint_name(self.target_type)
         if self.token.keyword is None:
             if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {self.target_type.__name__}.'
+                msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {target_type_name}.'
             else:
-                msg += f'Invalid value for "{self.argument.name}" from {self.token.source}: unable to convert "{self.token.value}" into {self.target_type.__name__}.'
+                msg += f'Invalid value for "{self.argument.name}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
         else:
             if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
+                msg += f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {target_type_name}.'
             else:
-                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
+                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert value "{self.token.value}" into {target_type_name}.'
 
         return msg
 
