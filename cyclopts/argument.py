@@ -8,6 +8,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    FrozenSet,
     Iterator,
     List,
     Optional,
@@ -15,11 +16,18 @@ from typing import (
     Union,
     get_args,
     get_origin,
+    get_type_hints,
 )
 
 from attrs import define, field, frozen
 
-from cyclopts._convert import convert, resolve, resolve_optional, token_count
+from cyclopts._convert import (
+    convert,
+    resolve,
+    resolve_annotated,
+    resolve_optional,
+    token_count,
+)
 from cyclopts.exceptions import (
     CoercionError,
     MixedArgumentError,
@@ -29,6 +37,11 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.utils import AnnotatedType, NoneType, ParameterDict, Sentinel, is_union
+
+if sys.version_info < (3, 11):
+    from typing_extensions import NotRequired, Required
+else:
+    from typing import NotRequired, Required
 
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
 _PARAMETER_EMPTY_HELP = Parameter(help="")
@@ -53,6 +66,24 @@ def _iparam_get_hint(iparam):
     return hint
 
 
+def _typed_dict_required_optional(typed_dict) -> Tuple[FrozenSet[str], FrozenSet[str]]:
+    """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in cp3.10."""
+    required, optional = set(), set()
+    for name, annotation in get_type_hints(typed_dict).items():
+        annotation = resolve_annotated(annotation)
+        origin = get_origin(annotation)
+        if origin is Required:
+            required.add(name)
+        elif origin is NotRequired:
+            optional.add(name)
+        elif typed_dict.__total__:
+            required.add(name)
+        else:
+            optional.add(name)
+
+    return frozenset(required), frozenset(optional)
+
+
 def _validate_typed_dict(typed_dict, data: dict, _key_chain: Tuple[str, ...] = ()):
     """Not a complete validator; only recursively checks TypedDicts.
 
@@ -73,14 +104,8 @@ def _validate_typed_dict(typed_dict, data: dict, _key_chain: Tuple[str, ...] = (
             raise CoercionError(msg=f"{typed_dict} does not accept keys {extra_keys}.")
 
     # First, check for extra keys.
-    if sys.version_info < (3, 9):
-        # Can only check __total__ or not
-        if typed_dict.__total__:
-            missing_keys = set(typed_dict.__annotations__) - data_keys
-        else:
-            missing_keys = set()
-    else:
-        missing_keys = typed_dict.__required_keys__ - data_keys
+    required_keys, _ = _typed_dict_required_optional(typed_dict)
+    missing_keys = required_keys - data_keys
     if missing_keys:
         prefix = ".".join(_key_chain)
         if prefix:
