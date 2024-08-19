@@ -4,12 +4,14 @@ import os
 import shlex
 import sys
 from contextlib import suppress
+from functools import partial
 from typing import TYPE_CHECKING, Callable, Iterable, List, Tuple, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
 from cyclopts.argument import Argument, ArgumentCollection, Token
 from cyclopts.exceptions import (
+    CoercionError,
     CycloptsError,
     MissingArgumentError,
     UnknownOptionError,
@@ -20,6 +22,8 @@ from cyclopts.utils import ParameterDict
 
 if TYPE_CHECKING:
     from cyclopts.group import Group
+
+CliToken = partial(Token, source="cli")
 
 
 def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
@@ -82,15 +86,23 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
         if implicit_value is not None:
             # A flag was parsed
             if cli_values:
-                if _bool(cli_values[-1]):  # --positive-flag=true or --negative-flag=true or --empty-flag=true
-                    argument.append(Token(keyword=cli_option, source="cli", implicit_value=implicit_value))
+                try:
+                    coerced_value = _bool(cli_values[-1])
+                except CoercionError as e:
+                    if e.token is None:
+                        e.token = CliToken(keyword=cli_option)
+                    if e.argument is None:
+                        e.argument = argument
+                    raise
+                if coerced_value:  # --positive-flag=true or --negative-flag=true or --empty-flag=true
+                    argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
                 else:  # --positive-flag=false or --negative-flag=false or --empty-flag=false
                     if isinstance(implicit_value, bool):
-                        argument.append(Token(keyword=cli_option, source="cli", implicit_value=not implicit_value))
+                        argument.append(CliToken(keyword=cli_option, implicit_value=not implicit_value))
                     else:
                         continue
             else:
-                argument.append(Token(keyword=cli_option, source="cli", implicit_value=implicit_value))
+                argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
@@ -115,9 +127,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                 raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
 
             for index, cli_value in enumerate(cli_values):
-                argument.append(
-                    Token(keyword=cli_option, value=cli_value, source="cli", index=index, keys=leftover_keys)
-                )
+                argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
 
     return unused_tokens
 
@@ -161,7 +171,7 @@ def _parse_pos(
             for index, token in enumerate(tokens[:tokens_per_element]):
                 if not argument.cparam.allow_leading_hyphen:
                     _validate_is_not_option_like(token)
-                new_tokens.append(Token(value=token, source="cli", index=index))
+                new_tokens.append(CliToken(value=token, index=index))
             tokens = tokens[tokens_per_element:]
             if not consume_all:
                 break
