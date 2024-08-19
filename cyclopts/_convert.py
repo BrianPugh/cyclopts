@@ -177,20 +177,32 @@ def _convert(
             except Exception:
                 pass
         else:
+            if isinstance(token, Sequence):
+                raise ValueError  # noqa: TRY004
             raise CoercionError(token=token, target_type=type_)
     elif origin_type is Literal:
         # Try coercing the token into each allowed Literal value (left-to-right).
+        last_coercion_error = None
         for choice in get_args(type_):
             try:
                 res = convert(type(choice), token)
+            except CoercionError as e:
+                last_coercion_error = e
+                continue
             except Exception:
                 continue
             if res == choice:
                 return res
         else:
-            raise CoercionError(token=token, target_type=type_)
+            if last_coercion_error:
+                last_coercion_error.target_type = type_
+                raise last_coercion_error
+            else:
+                raise CoercionError(token=token[0] if isinstance(token, Sequence) else token, target_type=type_)
     elif origin_type in _iterable_types:  # NOT including tuple
         count, _ = token_count(inner_types[0])
+        if not isinstance(token, Sequence):
+            raise ValueError
         if count > 1:
             gen = zip(*[iter(token)] * count)
         else:
@@ -205,6 +217,9 @@ def _convert(
         else:
             return convert_tuple(type_, *token, converter=converter)
     elif isclass(type_) and issubclass(type_, Enum):
+        if isinstance(token, Sequence):
+            raise ValueError
+
         if converter is None:
             element_transformed = name_transform(token.value)
             for member in type_:
@@ -212,9 +227,11 @@ def _convert(
                     return member
             raise CoercionError(token=token, target_type=type_)
         else:
-            return converter(type_, token)
+            return converter(type_, token.value)
     else:
         # The actual casting/converting of the underlying type is performed here.
+        if isinstance(token, Sequence):
+            raise ValueError
         try:
             if converter is None:
                 return _converters.get(type_, type_)(token.value)
@@ -361,9 +378,9 @@ def convert(
     maybe_origin_type = origin_type or type_
 
     if origin_type is tuple:
-        return convert_tuple(type_, *tokens)
+        return convert_tuple(type_, *tokens)  # pyright: ignore
     elif maybe_origin_type in _iterable_types or origin_type is collections.abc.Iterable:
-        return convert_priv(type_, tokens)
+        return convert_priv(type_, tokens)  # pyright: ignore
     elif maybe_origin_type is dict:
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
@@ -379,9 +396,9 @@ def convert(
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
     else:
         if len(tokens) == 1:
-            return convert_priv(type_, tokens[0])
+            return convert_priv(type_, tokens[0])  # pyright: ignore
         else:
-            return [convert_priv(type_, item) for item in tokens]
+            return [convert_priv(type_, item) for item in tokens]  # pyright:ignore
 
 
 def token_count(type_: Any) -> Tuple[int, bool]:
