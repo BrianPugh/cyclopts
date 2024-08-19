@@ -91,6 +91,9 @@ class CycloptsError(Exception):
     """
 
     argument: Optional["Argument"] = None
+    """
+    :class:`Argument` that was matched.
+    """
 
     command_chain: Optional[Iterable[str]] = None
     """
@@ -193,9 +196,15 @@ class CoercionError(CycloptsError):
 
         msg = super().__str__()
         if self.token.keyword is None:
-            msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {self.target_type.__name__}.'
+            if self.token.source == "" or self.token.source == "cli":
+                msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {self.target_type.__name__}.'
+            else:
+                msg += f'Invalid value for "{self.argument.name}" from {self.token.source}: unable to convert "{self.token.value}" into {self.target_type.__name__}.'
         else:
-            msg += f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
+            if self.token.source == "" or self.token.source == "cli":
+                msg += f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
+            else:
+                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert value "{self.token.value}" into {self.target_type.__name__}.'
 
         return msg
 
