@@ -340,6 +340,8 @@ class Argument:
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._accepts_keywords = True
+                if not hasattr(hint, "__annotations__"):
+                    raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
                 self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
             elif is_attrs(hint):
                 self._accepts_keywords = True
