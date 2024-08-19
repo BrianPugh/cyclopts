@@ -90,11 +90,6 @@ class CycloptsError(Exception):
     The python function associated with the command being parsed.
     """
 
-    parameter2cli: Optional[ParameterDict] = None
-    """
-    Dictionary mapping function parameters to possible CLI tokens.
-    """
-
     argument: Optional["Argument"] = None
 
     command_chain: Optional[Iterable[str]] = None
@@ -280,15 +275,10 @@ class RepeatArgumentError(CycloptsError):
 class MixedArgumentError(CycloptsError):
     """Cannot supply keywords and non-keywords to the same argument."""
 
-    parameter: inspect.Parameter
-    """
-    The parameter that was supplied with keyword and non-keyword arguments.
-    """
-
     def __str__(self):
-        assert self.parameter2cli is not None
-        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-        return super().__str__() + f"Cannot supply keyword & non-keyword arguments to {parameter_cli_name}."
+        assert self.argument is not None
+        display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
+        return super().__str__() + f'Cannot supply keyword & non-keyword arguments to "{display_name}".'
 
 
 def format_cyclopts_error(e: Any):

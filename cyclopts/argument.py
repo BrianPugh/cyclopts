@@ -479,7 +479,7 @@ class Argument:
             raise RepeatArgumentError(token=token)
         if self.tokens:
             if bool(token.keys) ^ any(x.keys for x in self.tokens):
-                raise MixedArgumentError(parameter=self.iparam)
+                raise MixedArgumentError(argument=self)
         self.tokens.append(token)
 
     def values(self) -> Iterator[str]:
@@ -510,7 +510,7 @@ class Argument:
 
                 if positional and keyword:
                     # This should never happen due to checks in ``Argument.append``
-                    raise MixedArgumentError(parameter=self.iparam)
+                    raise MixedArgumentError(argument=self)
 
             if positional:
                 if self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:

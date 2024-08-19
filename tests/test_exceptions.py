@@ -1,8 +1,9 @@
 from textwrap import dedent
+from typing import Union
 
 import pytest
 
-from cyclopts.exceptions import CoercionError, InvalidCommandError, MissingArgumentError
+from cyclopts.exceptions import CoercionError, InvalidCommandError, MissingArgumentError, MixedArgumentError
 
 
 def test_exceptions_missing_argument(app, console):
@@ -74,6 +75,26 @@ def test_exceptions_coercion_error_verbose(app, console):
         """
     )
     assert actual.endswith(expected)
+
+
+def test_exceptions_mixed_argument_error(app, console):
+    @app.default
+    def foo(bar: Union[int, dict]):
+        pass
+
+    with console.capture() as capture, pytest.raises(MixedArgumentError):
+        app("--bar 5 --bar.baz fizz", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Cannot supply keyword & non-keyword arguments to "--bar".          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
 
 def test_exceptions_unknown_command(app, console):
