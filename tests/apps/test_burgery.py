@@ -143,4 +143,4 @@ def test_create_burger_3():
 
 
 if __name__ == "__main__":
-    test_create_burger_1()
+    app()

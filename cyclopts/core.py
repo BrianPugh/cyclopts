@@ -5,6 +5,7 @@ import traceback
 from contextlib import suppress
 from copy import copy
 from functools import partial
+from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -291,8 +292,10 @@ class App:
 
     def __attrs_post_init__(self):
         # Trigger the setters
-        self.help_flags = self._help_flags
-        self.version_flags = self._version_flags
+        func = getattr(self.default_command, "__func__", None)
+        if func != type(self).version_print and func != type(self).help_print:
+            self.help_flags = self._help_flags
+            self.version_flags = self._version_flags
 
     ###########
     # Methods #
@@ -311,7 +314,7 @@ class App:
         for command in commands:
             with suppress(KeyError):
                 if default:
-                    if self[command].default == self.version_print:
+                    if self[command].default == default:
                         del self[command]
                 else:
                     del self[command]
@@ -324,14 +327,18 @@ class App:
     def version_flags(self, value):
         self._version_flags = value
         self._delete_commands(self._version_flags, default=self.version_print)
-        if self._version_flags:
+        func = getattr(self.default_command, "__func__", None)
+        if self._version_flags and func != type(self).version_print:
+            assert isinstance(self._version_flags, tuple)
             self.command(
-                self.version_print,
-                name=self._version_flags,
-                help_flags=[],
-                version_flags=[],
-                version=self.version,
-                help="Display application version.",
+                App(
+                    name=self._version_flags,
+                    default_command=self.version_print,
+                    help_flags=self.help_flags,
+                    version_flags=self.version_flags,
+                    version=self.version,
+                    help="Display application version.",
+                )
             )
 
     @property
@@ -342,14 +349,18 @@ class App:
     def help_flags(self, value):
         self._help_flags = value
         self._delete_commands(self._help_flags, default=self.help_print)
-        if self._help_flags:
+        func = getattr(self.default_command, "__func__", None)
+        if self._help_flags and func != type(self).help_print:
+            assert isinstance(self._help_flags, tuple)
             self.command(
-                self.help_print,
-                name=self._help_flags,
-                help_flags=[],
-                version_flags=[],
-                version=self.version,
-                help="Display this message and exit.",
+                App(
+                    name=self._help_flags,
+                    default_command=self.help_print,
+                    help_flags=self.help_flags,
+                    version_flags=self.version_flags,
+                    version=self.version,
+                    help="Display this message and exit.",
+                )
             )
 
     @property
@@ -460,8 +471,8 @@ class App:
     def meta(self) -> "App":
         if self._meta is None:
             self._meta = type(self)(
-                help_flags=copy(self.help_flags),
-                version_flags=copy(self.version_flags),
+                help_flags=self.help_flags,
+                version_flags=self.version_flags,
                 group_commands=copy(self.group_commands),
                 group_arguments=copy(self.group_arguments),
                 group_parameters=copy(self.group_parameters),
@@ -571,8 +582,10 @@ class App:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
         else:
             validate_command(obj)
-            kwargs.setdefault("help_flags", [])
-            kwargs.setdefault("version_flags", [])
+
+            kwargs.setdefault("help_flags", self.help_flags)
+            kwargs.setdefault("version_flags", self.version_flags)
+
             if "group_commands" not in kwargs:
                 kwargs["group_commands"] = copy(self.group_commands)
             if "group_parameters" not in kwargs:
@@ -580,7 +593,9 @@ class App:
             if "group_arguments" not in kwargs:
                 kwargs["group_arguments"] = copy(self.group_arguments)
             app = App(default_command=obj, **kwargs)  # pyright: ignore
-            # app.name is handled below
+
+            for flag in chain(kwargs["help_flags"], kwargs["version_flags"]):  # pyright: ignore
+                app[flag].show = False
 
         if app._name_transform is None:
             app.name_transform = self.name_transform
@@ -704,7 +719,7 @@ class App:
         # Special flags (help/version) get intercepted by the root app.
         # Special flags are allows to be **anywhere** in the token stream.
 
-        for help_flag in self.help_flags:
+        for help_flag in command_app.help_flags:
             try:
                 help_flag_index = tokens.index(help_flag)
                 break
@@ -720,7 +735,7 @@ class App:
                 command = meta_parent.help_print
             bound = cyclopts.utils.signature(command).bind(tokens, console=console)
             unused_tokens = []
-        elif any(flag in tokens for flag in self.version_flags):
+        elif any(flag in tokens for flag in command_app.version_flags):
             # Version
             command = self.version_print
             while meta_parent := meta_parent._meta_parent:
