@@ -203,7 +203,7 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str]] = field(factory=_default_version, kw_only=True)
+    version: Union[None, str, Callable[..., str]] = field(default=_default_version, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
