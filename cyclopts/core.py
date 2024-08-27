@@ -292,10 +292,8 @@ class App:
 
     def __attrs_post_init__(self):
         # Trigger the setters
-        func = getattr(self.default_command, "__func__", None)
-        if func != type(self).version_print and func != type(self).help_print:
-            self.help_flags = self._help_flags
-            self.version_flags = self._version_flags
+        self.help_flags = self._help_flags
+        self.version_flags = self._version_flags
 
     ###########
     # Methods #
@@ -327,18 +325,14 @@ class App:
     def version_flags(self, value):
         self._version_flags = value
         self._delete_commands(self._version_flags, default=self.version_print)
-        func = getattr(self.default_command, "__func__", None)
-        if self._version_flags and func != type(self).version_print:
-            assert isinstance(self._version_flags, tuple)
+        if self._version_flags:
             self.command(
-                App(
-                    name=self._version_flags,
-                    default_command=self.version_print,
-                    help_flags=self.help_flags,
-                    version_flags=self.version_flags,
-                    version=self.version,
-                    help="Display application version.",
-                )
+                self.version_print,
+                name=self._version_flags,
+                help_flags=[],
+                version_flags=[],
+                version=self.version,
+                help="Display application version.",
             )
 
     @property
@@ -349,18 +343,14 @@ class App:
     def help_flags(self, value):
         self._help_flags = value
         self._delete_commands(self._help_flags, default=self.help_print)
-        func = getattr(self.default_command, "__func__", None)
-        if self._help_flags and func != type(self).help_print:
-            assert isinstance(self._help_flags, tuple)
+        if self._help_flags:
             self.command(
-                App(
-                    name=self._help_flags,
-                    default_command=self.help_print,
-                    help_flags=self.help_flags,
-                    version_flags=self.version_flags,
-                    version=self.version,
-                    help="Display this message and exit.",
-                )
+                self.help_print,
+                name=self._help_flags,
+                help_flags=[],
+                version_flags=[],
+                version=self.version,
+                help="Display this message and exit.",
             )
 
     @property
@@ -703,6 +693,12 @@ class App:
 
         command_chain, apps, unused_tokens = self.parse_commands(tokens)
         command_app = apps[-1]
+
+        # We don't want the command_app to be the version/help handler.
+        with suppress(IndexError):
+            if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
+                apps = apps[:-1]
+                command_app = apps[-1]
 
         try:
             parent_app = apps[-2]
