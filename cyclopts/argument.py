@@ -57,7 +57,7 @@ def _iparam_get_hint(iparam):
 
 def _typed_dict_required_optional(typeddict) -> tuple[frozenset[str], frozenset[str]]:
     """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11."""
-    if sys.version_info > (3, 10):
+    if sys.version_info >= (3, 11):
         return typeddict.__required_keys__, typeddict.__optional_keys__
 
     required, optional = set(), set()
