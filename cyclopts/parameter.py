@@ -1,12 +1,10 @@
 import inspect
+from collections.abc import Iterable
 from functools import partial
 from typing import (
     Any,
     Callable,
-    Iterable,
     Optional,
-    Tuple,
-    Type,
     Union,
     cast,
     get_args,
@@ -35,8 +33,8 @@ def _double_hyphen_validator(instance, attribute, values):
             raise ValueError(f'{attribute.alias} value must start with "--".')
 
 
-def _negative_converter(default: Tuple[str, ...]):
-    def converter(value) -> Tuple[str, ...]:
+def _negative_converter(default: tuple[str, ...]):
+    def converter(value) -> tuple[str, ...]:
         if value is None:
             return default
         else:
@@ -56,7 +54,7 @@ class Parameter:
     # Usually starts with "--" or "-"
     name: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
     _converter: Callable = field(default=None, alias="converter")
@@ -64,7 +62,7 @@ class Parameter:
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
         default=(),
-        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
     )
 
     # This can ONLY ever be a Tuple[str, ...]
@@ -90,7 +88,7 @@ class Parameter:
     # This can ONLY ever be a Tuple[str, ...]
     env_var: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
     env_var_split: Callable = cyclopts._env_var.env_var_split
@@ -123,7 +121,7 @@ class Parameter:
     accepts_keys: Optional[bool] = field(default=None)
 
     # Populated by the record_attrs_init_args decorator.
-    _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
+    _provided_args: tuple[str] = field(default=(), init=False, eq=False)
 
     @property
     def show(self) -> bool:
@@ -133,7 +131,7 @@ class Parameter:
     def converter(self):
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
-    def get_negatives(self, type_, names: Optional[Iterable[str]] = None) -> Tuple[str, ...]:  # TODO: use self.name
+    def get_negatives(self, type_, names: Optional[Iterable[str]] = None) -> tuple[str, ...]:  # TODO: use self.name
         if is_union(type_):
             type_ = next(x for x in get_args(type_) if x is not None)
 
@@ -223,7 +221,7 @@ def validate_command(f: Callable):
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
 
 
-def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
+def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> tuple[type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.

@@ -1,18 +1,14 @@
 import inspect
 import itertools
 import sys
+from collections.abc import Iterator
 from contextlib import suppress
 from functools import partial
 from inspect import isclass
 from typing import (
     Any,
     Callable,
-    Dict,
-    FrozenSet,
-    Iterator,
-    List,
     Optional,
-    Tuple,
     Union,
     get_args,
     get_origin,
@@ -66,7 +62,7 @@ def _iparam_get_hint(iparam):
     return hint
 
 
-def _typed_dict_required_optional(typed_dict) -> Tuple[FrozenSet[str], FrozenSet[str]]:
+def _typed_dict_required_optional(typed_dict) -> tuple[frozenset[str], frozenset[str]]:
     """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in cp3.10."""
     required, optional = set(), set()
     for name, annotation in get_type_hints(typed_dict).items():
@@ -84,7 +80,7 @@ def _typed_dict_required_optional(typed_dict) -> Tuple[FrozenSet[str], FrozenSet
     return frozenset(required), frozenset(optional)
 
 
-def _validate_typed_dict(typed_dict, data: dict, _key_chain: Tuple[str, ...] = ()):
+def _validate_typed_dict(typed_dict, data: dict, _key_chain: tuple[str, ...] = ()):
     """Not a complete validator; only recursively checks TypedDicts.
 
     Checks:
@@ -196,7 +192,7 @@ class Token:
     index: int = field(default=0, kw_only=True)
 
     # Only used for Arguments that take arbitrary keys.
-    keys: Tuple[str, ...] = field(default=(), kw_only=True)
+    keys: tuple[str, ...] = field(default=(), kw_only=True)
 
     implicit_value: Any = field(default=None, kw_only=True)
 
@@ -239,7 +235,7 @@ class Argument:
 
     # List of tokens parsed from various sources
     # If tokens is empty, then no tokens have been parsed for this argument.
-    tokens: List[Token] = field(factory=list)
+    tokens: list[Token] = field(factory=list)
 
     # Multiple ``Argument`` may be associated with a single iparam.
     # However, each ``Argument`` must have a unique iparam/keys combo
@@ -261,7 +257,7 @@ class Argument:
     # For example, a cparam.name=="--foo.bar.baz" could be aliased to "--fizz".
     # "keys" may be an empty tuple.
     # This should be populated based on type-hints, not ``Parameter.name``
-    keys: Tuple[str, ...] = field(default=())
+    keys: tuple[str, ...] = field(default=())
 
     # Converted value; may be stale.
     _value: Any = field(alias="value", default=UNSET)
@@ -274,7 +270,7 @@ class Argument:
     # Can assign values directly to this argument
     # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
     _assignable: bool = field(default=False, init=False, repr=False)
-    _children: List["Argument"] = field(factory=list, init=False, repr=False)
+    _children: list["Argument"] = field(factory=list, init=False, repr=False)
     _marked_converted: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
     _mark_converted_override: bool = field(default=False, init=False, repr=False)
 
@@ -391,7 +387,7 @@ class Argument:
         *,
         transform: Optional[Callable[[str], str]] = None,
         delimiter: str = ".",
-    ) -> Tuple[Tuple[str, ...], Any]:
+    ) -> tuple[tuple[str, ...], Any]:
         """Match a name search-term, or a positional integer index.
 
         Returns
@@ -416,7 +412,7 @@ class Argument:
         *,
         transform: Optional[Callable[[str], str]] = None,
         delimiter: str = ".",
-    ) -> Tuple[Tuple[str, ...], Any]:
+    ) -> tuple[tuple[str, ...], Any]:
         """Find the matching Argument for a token keyword identifier.
 
         Parameter
@@ -486,7 +482,7 @@ class Argument:
         # TODO: apply cparam.name_transform to keys here?
         return tuple(trailing.split(delimiter)), implicit_value
 
-    def _match_index(self, index: int) -> Tuple[Tuple[str, ...], Any]:
+    def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
         if self.index is None or self.iparam in (self.iparam.KEYWORD_ONLY, self.iparam.VAR_KEYWORD):
             raise ValueError
         elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
@@ -607,7 +603,7 @@ class Argument:
             self.validate(val)
         return val
 
-    def token_count(self, keys: Tuple[str, ...] = ()):
+    def token_count(self, keys: tuple[str, ...] = ()):
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:
@@ -627,11 +623,11 @@ class Argument:
         return self.names[0]
 
     @property
-    def names(self) -> Tuple[str, ...]:
+    def names(self) -> tuple[str, ...]:
         assert isinstance(self.cparam.name, tuple)
         return tuple(itertools.chain(self.cparam.name, self.negatives))
 
-    def env_var_split(self, value: str, delimiter: Optional[str] = None) -> List[str]:
+    def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
         return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
 
     @property
@@ -642,7 +638,7 @@ class Argument:
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
 
-    def __init__(self, *args, groups: Optional[List[Group]] = None):
+    def __init__(self, *args, groups: Optional[list[Group]] = None):
         super().__init__(*args)
         self.groups = [] if groups is None else groups
 
@@ -652,7 +648,7 @@ class ArgumentCollection(list):
         *,
         transform: Optional[Callable[[str], str]] = None,
         delimiter: str = ".",
-    ) -> Tuple[Argument, Tuple[str, ...], Any]:
+    ) -> tuple[Argument, tuple[str, ...], Any]:
         """Maps keyword CLI arguments to their :class:`Argument`.
 
         Parameters
@@ -707,9 +703,9 @@ class ArgumentCollection(list):
         cls,
         iparam: inspect.Parameter,
         hint,
-        keys: Tuple[str, ...],
+        keys: tuple[str, ...],
         *default_parameters,
-        group_lookup: Dict[str, Group],
+        group_lookup: dict[str, Group],
         group_arguments: Group,
         group_parameters: Group,
         parse_docstring: bool = True,
@@ -729,9 +725,9 @@ class ArgumentCollection(list):
 
         if not keys:  # root hint annotation
             if iparam.kind is iparam.VAR_KEYWORD:
-                hint = Dict[str, hint]
+                hint = dict[str, hint]
             elif iparam.kind is iparam.VAR_POSITIONAL:
-                hint = Tuple[hint, ...]
+                hint = tuple[hint, ...]
 
         if _resolve_groups:
             cyclopts_parameters = []
@@ -830,7 +826,7 @@ class ArgumentCollection(list):
         cls,
         iparam: inspect.Parameter,
         *default_parameters: Optional[Parameter],
-        group_lookup: Optional[Dict[str, Group]] = None,
+        group_lookup: Optional[dict[str, Group]] = None,
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
         positional_index: Optional[int] = None,
@@ -870,7 +866,7 @@ class ArgumentCollection(list):
         cls,
         func: Callable,
         *default_parameters: Optional[Parameter],
-        group_lookup: Optional[Dict[str, Group]] = None,
+        group_lookup: Optional[dict[str, Group]] = None,
         group_arguments: Optional[Group] = None,
         group_parameters: Optional[Group] = None,
         parse_docstring: bool = True,
@@ -951,7 +947,7 @@ def _resolve_groups_from_callable(
     *default_parameters: Optional[Parameter],
     group_arguments: Optional[Group] = None,
     group_parameters: Optional[Group] = None,
-) -> List[Group]:
+) -> list[Group]:
     argument_collection = ArgumentCollection.from_callable(
         func,
         *default_parameters,
@@ -997,13 +993,13 @@ def _resolve_groups_from_callable(
     return resolved_groups
 
 
-def _extract_docstring_help(f: Callable) -> Dict[str, Parameter]:
+def _extract_docstring_help(f: Callable) -> dict[str, Parameter]:
     from docstring_parser import parse as docstring_parse
 
     return {dparam.arg_name: Parameter(help=dparam.description) for dparam in docstring_parse(f.__doc__ or "").params}
 
 
-def _resolve_parameter_name(*argss: Tuple[str, ...]) -> Tuple[str, ...]:
+def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
     """
     args will only ever be >1 if parsing a subkey.
     """

@@ -1,4 +1,3 @@
-import sys
 from typing import Dict
 
 import pytest
@@ -28,7 +27,6 @@ def test_bind_dict_str_to_int_typing(app, assert_parse_args):
     assert_parse_args(foo, "foo --d.key1=7 --d.key2=42", d={"key1": 7, "key2": 42})
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Native Typing")
 def test_bind_dict_str_to_int_builtin(app, assert_parse_args):
     @app.command
     def foo(d: Dict[str, int]):

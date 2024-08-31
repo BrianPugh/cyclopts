@@ -1,4 +1,4 @@
-import sys
+from typing import Annotated
 
 import pytest
 
@@ -6,11 +6,6 @@ from cyclopts import Argument, Group, Parameter, Token
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import ValidationError
 from cyclopts.validators import LimitedChoice
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
 
 
 @pytest.fixture

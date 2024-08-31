@@ -1,6 +1,5 @@
 import inspect
-import sys
-from typing import Dict, List, Optional, Tuple, TypedDict, Union
+from typing import Annotated, Dict, List, Optional, TypedDict, Union
 
 import pytest
 
@@ -14,11 +13,6 @@ from cyclopts.argument import (
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
 
 
 def test_argument_collection_no_annotation_no_default():
@@ -369,7 +363,7 @@ def test_argument_collection_var_positional():
 
     assert collection[1].iparam == iparams["b"]
     assert collection[1].cparam.name == ("B",)
-    assert collection[1].hint is Tuple[float, ...]
+    assert collection[1].hint == tuple[float, ...]
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
 
@@ -391,7 +385,7 @@ def test_argument_collection_var_keyword():
 
     assert collection[1].iparam == iparams["b"]
     assert collection[1].cparam.name == ("--[KEYWORD]",)
-    assert collection[1].hint is Dict[str, float]
+    assert collection[1].hint == dict[str, float]
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is True
 

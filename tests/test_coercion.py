@@ -2,17 +2,12 @@ import inspect
 import sys
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Iterable, List, Literal, Optional, Set, Tuple, Union
+from typing import Annotated, Any, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 import pytest
 
 from cyclopts import CoercionError
 from cyclopts._convert import convert, resolve, token_count
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 def _assert_tuple(expected, actual):
@@ -64,7 +59,6 @@ def test_token_count_list_generic():
     assert (1, True) == token_count(list)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Native Typing")
 def test_token_count_list_direct():
     assert (1, True) == token_count(list[int])  # pyright: ignore
 

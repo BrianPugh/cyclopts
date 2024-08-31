@@ -1,14 +1,9 @@
-import sys
 from pathlib import Path
+from typing import Annotated  # pragma: no cover
 
 from cyclopts import validators
 from cyclopts._convert import convert
 from cyclopts.parameter import Parameter
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
 
 __all__ = [
     # Path

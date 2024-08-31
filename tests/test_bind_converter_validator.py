@@ -1,14 +1,9 @@
-import sys
+from typing import Annotated
 from unittest.mock import Mock
 
 import pytest
 
 from cyclopts import Parameter, ValidationError
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 @pytest.fixture

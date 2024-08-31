@@ -1,6 +1,7 @@
 import collections.abc
 import inspect
 import sys
+from collections.abc import Sequence
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -8,14 +9,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    List,
     Literal,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
     get_args,
     get_origin,
@@ -38,16 +33,16 @@ if TYPE_CHECKING:
     from cyclopts.argument import Token
 
 
-_implicit_iterable_type_mapping: Dict[Type, Type] = {
-    list: List[str],
-    set: Set[str],
-    tuple: Tuple[str, ...],
-    dict: Dict[str, str],
+_implicit_iterable_type_mapping: dict[type, type] = {
+    list: list[str],
+    set: set[str],
+    tuple: tuple[str, ...],
+    dict: dict[str, str],
 }
 
 _iterable_types = {list, set}
 
-NestedCliArgs = Dict[str, Union[Sequence[str], "NestedCliArgs"]]
+NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
 
 def _bool(s: str) -> bool:
@@ -90,11 +85,11 @@ _converters = {
 
 
 def _convert_tuple(
-    type_: Type[Any],
+    type_: type[Any],
     *tokens: "Token",
-    converter: Optional[Callable[[Type, str], Any]],
+    converter: Optional[Callable[[type, str], Any]],
     name_transform: Callable[[str], str],
-) -> Tuple:
+) -> tuple:
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     inner_types = tuple(x for x in get_args(type_) if x is not ...)
     inner_token_count, consume_all = token_count(type_)
@@ -137,7 +132,7 @@ def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
     *,
-    converter: Optional[Callable[[Type, str], Any]],
+    converter: Optional[Callable[[type, str], Any]],
     name_transform: Callable[[str], str],
 ):
     """Inner recursive conversion function for public ``convert``.
@@ -157,7 +152,7 @@ def _convert(
 
     if origin_type in (collections.abc.Iterable, collections.abc.Sequence):
         assert len(inner_types) == 1
-        return convert(List[inner_types[0]], token)  # pyright: ignore[reportGeneralTypeIssues]
+        return convert(list[inner_types[0]], token)  # pyright: ignore[reportGeneralTypeIssues]
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return convert(type_.__value__, token)
     elif is_union(origin_type):
@@ -239,7 +234,7 @@ def _convert(
             raise CoercionError(token=token, target_type=type_) from None
 
 
-def resolve(type_: Any) -> Type:
+def resolve(type_: Any) -> type:
     """Perform all simplifying resolutions."""
     if type_ is inspect.Parameter.empty:
         return str
@@ -253,7 +248,7 @@ def resolve(type_: Any) -> Type:
     return type_
 
 
-def resolve_optional(type_: Any) -> Type:
+def resolve_optional(type_: Any) -> type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.
@@ -276,13 +271,13 @@ def resolve_optional(type_: Any) -> Type:
     return type_
 
 
-def resolve_annotated(type_: Any) -> Type:
+def resolve_annotated(type_: Any) -> type:
     if type(type_) is AnnotatedType:
         type_ = get_args(type_)[0]
     return type_
 
 
-def resolve_required(type_: Any) -> Type:
+def resolve_required(type_: Any) -> type:
     if get_origin(type_) in (Required, NotRequired):
         type_ = get_args(type_)[0]
     return type_
@@ -291,7 +286,7 @@ def resolve_required(type_: Any) -> Type:
 def convert(
     type_: Any,
     tokens: Union[Sequence[str], Sequence["Token"], NestedCliArgs],
-    converter: Optional[Callable[[Type, str], Any]] = None,
+    converter: Optional[Callable[[type, str], Any]] = None,
     name_transform: Optional[Callable[[str], str]] = None,
 ):
     """Coerce variables into a specified type.
@@ -393,7 +388,7 @@ def convert(
             return [convert_priv(type_, item) for item in tokens]  # pyright:ignore
 
 
-def token_count(type_: Any) -> Tuple[int, bool]:
+def token_count(type_: Any) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters

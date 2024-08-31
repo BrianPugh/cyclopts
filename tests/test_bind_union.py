@@ -1,16 +1,10 @@
-import sys
 from textwrap import dedent
-from typing import Union
+from typing import Annotated, Union
 
 import pytest
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 @pytest.mark.parametrize(

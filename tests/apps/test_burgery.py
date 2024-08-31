@@ -1,15 +1,9 @@
-import sys
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 
 import cyclopts
 from cyclopts import App, Parameter, validators
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 config_file = Path(__file__).parent / "config.toml"
 

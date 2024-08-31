@@ -1,15 +1,9 @@
-import sys
+from typing import Annotated
 
 import pytest
 
-from cyclopts.exceptions import UnknownOptionError
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
 from cyclopts import Parameter
+from cyclopts.exceptions import UnknownOptionError
 
 
 def test_allow_leading_hyphen_false(app):

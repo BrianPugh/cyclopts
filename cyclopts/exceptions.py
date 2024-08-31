@@ -1,5 +1,6 @@
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Iterable, List, Optional, Type
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from attrs import define, field
 
@@ -63,12 +64,12 @@ class CycloptsError(Exception):
     Defaults to ``False``.
     """
 
-    root_input_tokens: Optional[List[str]] = None
+    root_input_tokens: Optional[list[str]] = None
     """
     The parsed CLI tokens that were initially fed into the :class:`App`.
     """
 
-    unused_tokens: Optional[List[str]] = None
+    unused_tokens: Optional[list[str]] = None
     """
     Leftover tokens after parsing is complete.
     """
@@ -165,7 +166,7 @@ class CoercionError(CycloptsError):
     Input token that couldn't be coerced.
     """
 
-    target_type: Optional[Type] = None
+    target_type: Optional[type] = None
     """
     Intended type to coerce into.
     """
@@ -226,7 +227,7 @@ class UnusedCliTokensError(CycloptsError):
 
 @define(kw_only=True)
 class MissingArgumentError(CycloptsError):
-    tokens_so_far: List[str] = field(factory=list)
+    tokens_so_far: list[str] = field(factory=list)
 
     def __str__(self):
         assert self.argument is not None

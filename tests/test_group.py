@@ -1,6 +1,5 @@
 import itertools
-import sys
-from typing import List
+from typing import Annotated, List
 from unittest.mock import Mock
 
 import pytest
@@ -9,11 +8,6 @@ import cyclopts.group
 from cyclopts import App, Group, Parameter
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 def upper(type_, tokens: List[str]):

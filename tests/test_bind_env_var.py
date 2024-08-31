@@ -1,13 +1,8 @@
-import sys
+from typing import Annotated
 
 import pytest
 
 from cyclopts import MissingArgumentError, Parameter
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 def test_env_var_unset_use_signature_default(app, assert_parse_args, monkeypatch):

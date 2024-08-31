@@ -1,5 +1,5 @@
 import os
-from typing import TYPE_CHECKING, Callable, List, Tuple
+from typing import TYPE_CHECKING, Callable
 
 from attrs import define, field
 
@@ -16,7 +16,7 @@ class Env:
     command: bool = field(default=True, kw_only=True)
     split: Callable = field(default=env_var_split, kw_only=True)
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], arguments: "ArgumentCollection"):
+    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
         prefix = self.prefix
         if self.command and commands:
             prefix += "_".join(commands) + "_"

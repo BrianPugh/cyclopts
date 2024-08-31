@@ -1,12 +1,10 @@
 import itertools
+from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Iterable,
-    List,
     Optional,
-    Tuple,
     Union,
     cast,
 )
@@ -55,7 +53,7 @@ class Group:
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
         default=None,
-        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
         kw_only=True,
     )
 
@@ -131,7 +129,7 @@ class GroupConverter:
             raise TypeError
 
 
-def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group], List[Any]]:
+def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group], list[Any]]:
     """Sort groups for the help-page."""
     assert len(groups) == len(attributes)
     if not groups:
@@ -146,9 +144,9 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
         else:
             sort_key__group_attributes.append((group._sort_key, value))
 
-    sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
-    ordered_no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
-    no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
+    sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
+    ordered_no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
+    no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
 
     for sort_key, (group, attribute) in sort_key__group_attributes:
         value = (group, attribute)

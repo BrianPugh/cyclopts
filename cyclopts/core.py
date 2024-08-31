@@ -2,6 +2,7 @@ import inspect
 import os
 import sys
 import traceback
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import suppress
 from copy import copy
 from functools import partial
@@ -11,14 +12,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Literal,
-    Mapping,
     Optional,
-    Tuple,
     TypeVar,
     Union,
     overload,
@@ -61,11 +56,7 @@ from cyclopts.utils import (
 T = TypeVar("T", bound=Callable)
 
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
+from typing import Annotated
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -185,7 +176,7 @@ def _walk_metas(app):
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    _name: Union[None, str, Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
+    _name: Union[None, str, tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
     _help: Optional[str] = field(default=None, alias="help")
 
@@ -248,7 +239,7 @@ class App:
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    group: Union[Group, str, Tuple[Union[Group, str], ...]] = field(
+    group: Union[Group, str, tuple[Union[Group, str], ...]] = field(
         default=None, converter=to_tuple_converter, kw_only=True
     )
 
@@ -272,7 +263,7 @@ class App:
     )
 
     converter: Optional[Callable[..., Mapping[str, Any]]] = field(default=None, kw_only=True)
-    validator: List[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
+    validator: list[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
 
     _name_transform: Optional[Callable[[str], str]] = field(
         default=None,
@@ -284,9 +275,9 @@ class App:
     # Private Attributes #
     ######################
     # Maps CLI-name of a command to a function handle.
-    _commands: Dict[str, "App"] = field(init=False, factory=dict)
+    _commands: dict[str, "App"] = field(init=False, factory=dict)
 
-    _parents: List["App"] = field(init=False, factory=list)
+    _parents: list["App"] = field(init=False, factory=list)
 
     _meta: "App" = field(init=False, default=None)
     _meta_parent: "App" = field(init=False, default=None)
@@ -355,7 +346,7 @@ class App:
             )
 
     @property
-    def name(self) -> Tuple[str, ...]:
+    def name(self) -> tuple[str, ...]:
         """Application name(s). Dynamically derived if not previously set."""
         if self._name:
             return self._name  # pyright: ignore[reportReturnType]
@@ -368,7 +359,7 @@ class App:
             return (self.name_transform(self.default_command.__name__),)
 
     @property
-    def config(self) -> Tuple[str, ...]:
+    def config(self) -> tuple[str, ...]:
         if self._config is None and self._meta_parent is not None:
             return self._meta_parent.config
         else:
@@ -452,11 +443,9 @@ class App:
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over command & meta command names."""
-        for k in self._commands:
-            yield k
+        yield from self._commands
         if self._meta_parent:
-            for k in self._meta_parent:
-                yield k
+            yield from self._meta_parent
 
     @property
     def meta(self) -> "App":
@@ -474,7 +463,7 @@ class App:
     def parse_commands(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
-    ) -> Tuple[Tuple[str, ...], Tuple["App", ...], List[str]]:
+    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
         """Extract out the command tokens from a command.
 
         Parameters
@@ -665,7 +654,7 @@ class App:
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
-    ) -> Tuple[Callable, inspect.BoundArguments, List[str]]:
+    ) -> tuple[Callable, inspect.BoundArguments, list[str]]:
         """Interpret arguments into a function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
         Parameters
@@ -706,7 +695,7 @@ class App:
         except IndexError:
             parent_app = None
 
-        config: Tuple[Callable, ...] = ()
+        config: tuple[Callable, ...] = ()
         for app in reversed(apps):
             if app.config:
                 config = app.config  # pyright: ignore[reportAssignmentType]
@@ -805,7 +794,7 @@ class App:
         print_error: bool = True,
         exit_on_error: bool = True,
         verbose: bool = False,
-    ) -> Tuple[Callable, inspect.BoundArguments]:
+    ) -> tuple[Callable, inspect.BoundArguments]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
         Raises
@@ -985,7 +974,7 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> List[HelpPanel]:
+    ) -> list[HelpPanel]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -993,7 +982,7 @@ class App:
 
         help_format = resolve_help_format(apps)
 
-        panels: Dict[str, Tuple[Group, HelpPanel]] = {}
+        panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
         for subapp in _walk_metas(apps[-1]):

@@ -1,15 +1,10 @@
-import sys
 from enum import Enum, auto
 from textwrap import dedent
+from typing import Annotated
 
 import pytest
 
 from cyclopts import App, Parameter, default_name_transform
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
 
 
 @pytest.mark.parametrize(

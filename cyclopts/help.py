@@ -1,17 +1,14 @@
 import inspect
 import sys
+from collections.abc import Iterable
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Iterable,
-    List,
     Literal,
     Optional,
-    Tuple,
-    Type,
     Union,
     get_args,
     get_origin,
@@ -70,7 +67,7 @@ class HelpPanel:
     format: Literal["command", "parameter"]
     title: str
     description: "RenderableType" = field(factory=_text_factory)
-    entries: List[HelpEntry] = field(factory=list)
+    entries: list[HelpEntry] = field(factory=list)
 
     def remove_duplicates(self):
         seen, out = set(), []
@@ -209,7 +206,7 @@ def format_doc(app: "App", format: str = "restructuredtext"):
 
     parsed = docstring_parse(raw_doc_string)
 
-    components: List[Union[str, Tuple[str, str]]] = []
+    components: list[Union[str, tuple[str, str]]] = []
     if parsed.short_description:
         components.append(parsed.short_description + "\n")
 
@@ -221,7 +218,7 @@ def format_doc(app: "App", format: str = "restructuredtext"):
     return RichGroup(format_str(*components, format=format), NewLine())
 
 
-def format_str(*components: Union[str, Tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
+def format_str(*components: Union[str, tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
     format = format.lower()
 
     if format == "plaintext":
@@ -272,7 +269,7 @@ def format_str(*components: Union[str, Tuple[str, str]], format: str = "restruct
         raise ValueError(f'Unknown help_format "{format}"')
 
 
-def _get_choices(type_: Type, name_transform: Callable[[str], str]) -> str:
+def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
     get_choices = partial(_get_choices, name_transform=name_transform)
     choices: str = ""
     _origin = get_origin(type_)
@@ -369,7 +366,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> List:
+def format_command_entries(apps: Iterable["App"], format: str) -> list:
     entries = []
     for app in apps:
         short_names, long_names = [], []

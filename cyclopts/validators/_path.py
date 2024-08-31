@@ -1,5 +1,4 @@
 import pathlib
-from typing import Type
 
 from attrs import frozen
 
@@ -29,7 +28,7 @@ class Path:
         if not self.file_okay and not self.dir_okay:
             raise ValueError("file_okay and dir_okay cannot both be False.")
 
-    def __call__(self, type_: Type, path: pathlib.Path):
+    def __call__(self, type_: type, path: pathlib.Path):
         if not isinstance(path, pathlib.Path):
             raise TypeError
 

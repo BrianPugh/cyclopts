@@ -1,17 +1,11 @@
 import functools
 import inspect
 import sys
-from collections.abc import MutableMapping
+from collections.abc import Iterable, Iterator, MutableMapping
 from typing import (
     Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Literal,
     Optional,
-    Tuple,
-    Type,
     Union,
     get_args,
     get_origin,
@@ -24,10 +18,7 @@ if sys.version_info >= (3, 10):
 
     _union_types.add(UnionType)
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
+from typing import Annotated  # pragma: no cover
 
 # fmt: off
 if sys.version_info >= (3, 10):
@@ -79,14 +70,14 @@ def is_iterable(obj) -> bool:
     return isinstance(obj, Iterable) and not isinstance(obj, str)
 
 
-def is_union(type_: Optional[Type]) -> bool:
+def is_union(type_: Optional[type]) -> bool:
     return type_ in _union_types or get_origin(type_) in _union_types
 
 
 class ParameterDict(MutableMapping):
     """A dictionary implementation that can handle mutable ``inspect.Parameter`` as keys."""
 
-    def __init__(self, store: Optional[Dict[inspect.Parameter, Any]] = None):
+    def __init__(self, store: Optional[dict[inspect.Parameter, Any]] = None):
         self.store = {}
         self.reverse_mapping = {}
         if store is not None:
@@ -166,7 +157,7 @@ def resolve_callables(t, *args, **kwargs):
     return tuple(resolved)
 
 
-def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
+def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:
     """Convert a single element or an iterable of elements into a tuple.
 
     Intended to be used in an ``attrs.Field``. If :obj:`None` is provided, returns an empty tuple.
@@ -190,11 +181,11 @@ def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...
         return (value,)
 
 
-def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> List[Any]:
+def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> list[Any]:
     return list(to_tuple_converter(value))
 
 
-def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[Tuple[Any, ...]]:
+def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[tuple[Any, ...]]:
     """Convert a string or Iterable or None into an Iterable or None.
 
     Intended to be used in an ``attrs.Field``.
@@ -237,12 +228,12 @@ def get_hint_name(hint) -> str:
         return hint
     elif hint is Any:
         return "Any"
+    elif is_union(hint):
+        return "|".join(get_hint_name(arg) for arg in get_args(hint))
     elif hasattr(hint, "__name__"):
         return hint.__name__
     elif getattr(hint, "_name", None) is not None:
         return hint._name
-    elif is_union(hint):
-        return "|".join(get_hint_name(arg) for arg in get_args(hint))
     origin = get_origin(hint)
     if origin is not None:
         return f"{get_hint_name(origin)}[{', '.join(get_hint_name(arg) for arg in get_args(hint))}]"

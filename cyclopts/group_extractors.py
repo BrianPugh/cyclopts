@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from cyclopts.group import Group
 
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 def _create_or_append(
-    group_mapping: List[Tuple[Group, List[Any]]],
+    group_mapping: list[tuple[Group, list[Any]]],
     group: Union[str, Group],
     element: Any,
 ):
@@ -27,10 +27,10 @@ def _create_or_append(
         group_mapping.append((group, [element]))
 
 
-def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
+def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
     """Extract Group/App association from all commands of ``app``."""
     assert isinstance(app.group_commands, Group)
-    group_mapping: List[Tuple[Group, List[App]]] = [
+    group_mapping: list[tuple[Group, list[App]]] = [
         (app.group_commands, []),
     ]
 
@@ -69,7 +69,7 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     return group_mapping
 
 
-def inverse_groups_from_app(input_app: "App") -> List[Tuple["App", List[Group]]]:
+def inverse_groups_from_app(input_app: "App") -> list[tuple["App", list[Group]]]:
     out = []
     seen_apps = []
     for group, apps in groups_from_app(input_app):

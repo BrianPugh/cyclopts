@@ -1,4 +1,4 @@
-from typing import Optional, Type, Union, get_args, get_origin
+from typing import Optional, Union, get_args, get_origin
 
 from attrs import frozen
 
@@ -21,7 +21,7 @@ class Number:
     gte: Optional[Numeric] = None
     """Input value must be **greater than or equal** this value."""
 
-    def __call__(self, type_: Type, value: Numeric):
+    def __call__(self, type_: type, value: Numeric):
         origin = get_origin(type_) or type_
         if origin not in get_args(Numeric):
             raise TypeError

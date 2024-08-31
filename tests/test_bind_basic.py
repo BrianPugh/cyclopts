@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 import pytest
 
@@ -12,11 +12,6 @@ from cyclopts.exceptions import (
     UnusedCliTokensError,
 )
 from cyclopts.group import Group
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 @pytest.mark.parametrize(

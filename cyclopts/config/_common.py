@@ -2,17 +2,13 @@ import errno
 import itertools
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator
 from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Optional,
-    Tuple,
     Union,
 )
 
@@ -29,8 +25,8 @@ if TYPE_CHECKING:
 
 def _walk_leaves(
     d,
-    parent_keys: Optional[Tuple[str, ...]] = None,
-) -> Iterator[Tuple[Tuple[str, ...], Any]]:
+    parent_keys: Optional[tuple[str, ...]] = None,
+) -> Iterator[tuple[tuple[str, ...], Any]]:
     if parent_keys is None:
         parent_keys = ()
 
@@ -53,10 +49,10 @@ class ConfigFromFile(ABC):
     search_parents: bool = field(default=False, kw_only=True)
     allow_unknown: bool = field(default=False, kw_only=True)
 
-    _config: Optional[Dict[str, Any]] = field(default=None, init=False, repr=False)
+    _config: Optional[dict[str, Any]] = field(default=None, init=False, repr=False)
 
     @abstractmethod
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         """Load the config dictionary from path.
 
         Parameters
@@ -72,7 +68,7 @@ class ConfigFromFile(ABC):
         raise NotImplementedError
 
     @property
-    def config(self) -> Dict[str, Any]:
+    def config(self) -> dict[str, Any]:
         if self._config is not None:
             return self._config
 
@@ -95,8 +91,8 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
-    def __call__(self, apps: List["App"], commands: Tuple[str, ...], arguments: "ArgumentCollection"):
-        config: Dict[str, Any] = self.config
+    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
+        config: dict[str, Any] = self.config
         try:
             for key in chain(self.root_keys, commands):
                 config = config[key]

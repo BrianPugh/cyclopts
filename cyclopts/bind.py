@@ -3,9 +3,10 @@ import itertools
 import os
 import shlex
 import sys
+from collections.abc import Iterable
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Iterable, List, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
 CliToken = partial(Token, source="cli")
 
 
-def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
+def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> list[str]:
     if tokens is None:
         tokens = sys.argv[1:]  # Remove the executable
     elif isinstance(tokens, str):
@@ -36,7 +37,7 @@ def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> List[str]:
     return tokens
 
 
-def _common_root_keys(argument_collection) -> Tuple[str, ...]:
+def _common_root_keys(argument_collection) -> tuple[str, ...]:
     if not argument_collection:
         return ()
     common = argument_collection[0].keys
@@ -67,7 +68,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
             unused_tokens.append(token)
             continue
 
-        cli_values: List[str] = []
+        cli_values: list[str] = []
         consume_count = 0
 
         if "=" in token:
@@ -150,8 +151,8 @@ def _validate_is_not_option_like(token):
 
 def _parse_pos(
     argument_collection: ArgumentCollection,
-    tokens: List[str],
-) -> List[str]:
+    tokens: list[str],
+) -> list[str]:
     for i in itertools.count():
         try:
             argument, _, _ = argument_collection.match(i)
@@ -249,7 +250,7 @@ def _parse_configs(argument_collection: ArgumentCollection, configs):
         # TODO: validate argument_collection after every config?
 
 
-def _sort_group(argument_collection) -> List[Tuple["Group", List[Argument]]]:
+def _sort_group(argument_collection) -> list[tuple["Group", list[Argument]]]:
     """Sort groups into "deepest common-root-keys first" order.
 
     This is imperfect, but probably works sufficiently well for practical use-cases.
@@ -272,9 +273,9 @@ def _sort_group(argument_collection) -> List[Tuple["Group", List[Argument]]]:
 def create_bound_arguments(
     func: Callable,
     argument_collection: ArgumentCollection,
-    tokens: List[str],
+    tokens: list[str],
     configs: Iterable[Callable],
-) -> Tuple[inspect.BoundArguments, List[str]]:
+) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
     Parameters
