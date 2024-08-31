@@ -6,11 +6,12 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.group import Group
+from cyclopts.token import Token
 
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from cyclopts.argument import Argument, Token
+    from cyclopts.argument import Argument
     from cyclopts.core import App
 
 

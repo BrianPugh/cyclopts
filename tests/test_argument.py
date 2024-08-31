@@ -6,13 +6,13 @@ import pytest
 from cyclopts.argument import (
     Argument,
     ArgumentCollection,
-    Token,
     _resolve_groups_from_callable,
     _resolve_parameter_name,
     is_typeddict,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
+from cyclopts.token import Token
 
 
 def test_argument_collection_no_annotation_no_default():

@@ -7,7 +7,7 @@ from functools import partial
 from inspect import isclass
 from typing import Any, Callable, Optional, Union, get_args, get_origin, get_type_hints
 
-from attrs import define, field, frozen
+from attrs import define, field
 
 from cyclopts._convert import (
     convert,
@@ -24,6 +24,7 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
+from cyclopts.token import Token
 from cyclopts.utils import AnnotatedType, NoneType, ParameterDict, Sentinel, is_union
 
 if sys.version_info < (3, 11):
@@ -161,35 +162,6 @@ def is_typeddict(hint) -> bool:
 
 def _identity_converter(type_, element):
     return element
-
-
-@frozen(kw_only=True)
-class Token:
-    """
-    Purely a dataclass containing factual book-keeping for a user input.
-    """
-
-    # Value like "--foo" or `--foo.bar.baz` that indicated token; ``None`` when positional.
-    # Could also be something like "tool.project.foo" if `source=="config"`
-    # or could be `TOOL_PROJECT_FOO` if coming from an `source=="env"`
-    # **This should be pretty unadulterated from the user's input.**
-    # Used ONLY for error message purposes.
-    keyword: Optional[str] = None
-
-    # Empty string when a flag. The parsed token value (unadulterated)
-    # See ``Token.implicit_value``
-    value: str = ""
-
-    # Where the token came from; used for error message purposes.
-    # Cyclopts specially uses "cli" for cli-parsed tokens.
-    source: str = ""
-
-    index: int = field(default=0, kw_only=True)
-
-    # Only used for Arguments that take arbitrary keys.
-    keys: tuple[str, ...] = field(default=(), kw_only=True)
-
-    implicit_value: Any = field(default=None, kw_only=True)
 
 
 @define(kw_only=True)

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Callable, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
-from cyclopts.argument import Argument, ArgumentCollection, Token
+from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     CoercionError,
     CycloptsError,
@@ -19,6 +19,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.parameter import validate_command
+from cyclopts.token import Token
 from cyclopts.utils import ParameterDict
 
 if TYPE_CHECKING:
