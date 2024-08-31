@@ -5,15 +5,7 @@ from collections.abc import Iterator
 from contextlib import suppress
 from functools import partial
 from inspect import isclass
-from typing import (
-    Any,
-    Callable,
-    Optional,
-    Union,
-    get_args,
-    get_origin,
-    get_type_hints,
-)
+from typing import Any, Callable, Optional, Union, get_args, get_origin, get_type_hints
 
 from attrs import define, field, frozen
 
@@ -62,19 +54,22 @@ def _iparam_get_hint(iparam):
     return hint
 
 
-def _typed_dict_required_optional(typed_dict) -> tuple[frozenset[str], frozenset[str]]:
-    """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in cp3.10."""
+def _typed_dict_required_optional(typeddict) -> tuple[frozenset[str], frozenset[str]]:
+    """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11."""
+    if sys.version_info > (3, 10):
+        return typeddict.__required_keys__, typeddict.__optional_keys__
+
     required, optional = set(), set()
-    for name, annotation in get_type_hints(typed_dict).items():
+    for name, annotation in get_type_hints(typeddict).items():
         annotation = resolve_annotated(annotation)
         origin = get_origin(annotation)
         if origin is Required:
             required.add(name)
         elif origin is NotRequired:
             optional.add(name)
-        elif typed_dict.__total__:
+        elif typeddict.__total__:  # Fields are required by default.
             required.add(name)
-        else:
+        else:  # Fields are optional by default
             optional.add(name)
 
     return frozenset(required), frozenset(optional)
