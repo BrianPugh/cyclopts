@@ -2,7 +2,6 @@ import functools
 import inspect
 import sys
 from collections.abc import MutableMapping
-from types import GenericAlias
 from typing import (
     Any,
     Dict,
@@ -238,8 +237,6 @@ def get_hint_name(hint) -> str:
         return hint
     elif hint is Any:
         return "Any"
-    elif isinstance(hint, GenericAlias):
-        return hint._name
     elif hasattr(hint, "__name__"):
         return hint.__name__
     elif getattr(hint, "_name", None) is not None:
