@@ -17,11 +17,9 @@ from cyclopts.group import Group
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "foo 1 --b=2 3",
         "foo 1 2 3",
+        "foo 1 2 --c=3",
         "foo --a 1 --b 2 --c 3",
-        "foo --c 3 1 2",
-        "foo --c 3 --b=2 1",
         "foo --c 3 --b=2 --a 1",
     ],
 )
@@ -37,13 +35,13 @@ def test_basic_1(app, cmd_str, assert_parse_args):
     "cmd_str",
     [
         "foo 1 2 3 --d 10 --some-flag",
-        "foo --some-flag 1 --b=2 3 --d 10",
+        "foo --some-flag 1 --b=2 --c 3 --d 10",
         "foo 1 2 --some-flag 3 --d 10",
     ],
 )
 def test_basic_2(app, cmd_str, assert_parse_args):
     @app.command
-    def foo(a: int, b: int, c: int, d: int = 5, some_flag: bool = False):
+    def foo(a: int, b: int, c: int, d: int = 5, *, some_flag: bool = False):
         pass
 
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
