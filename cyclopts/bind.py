@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Callable, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
-from cyclopts.argument import Argument, ArgumentCollection
+from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -253,7 +253,7 @@ def _parse_configs(argument_collection: ArgumentCollection, configs):
         # TODO: validate argument_collection after every config?
 
 
-def _sort_group(argument_collection) -> list[tuple["Group", list[Argument]]]:
+def _sort_group(argument_collection) -> list[tuple["Group", ArgumentCollection]]:
     """Sort groups into "deepest common-root-keys first" order.
 
     This is imperfect, but probably works sufficiently well for practical use-cases.
@@ -261,15 +261,11 @@ def _sort_group(argument_collection) -> list[tuple["Group", list[Argument]]]:
     out = {}
     # Sort alphabetically by group-name to enfroce some determinism.
     for i, group in enumerate(sorted(argument_collection.groups, key=lambda x: x.name)):
-        group_arguments = [x for x in argument_collection if group in x.cparam.group and x._n_branch_tokens]
-        if not group_arguments:
+        if not (group_arguments := argument_collection.filter_by(group=group, has_tree_tokens=True)):
             continue
         common_root_keys = _common_root_keys(group_arguments)
         # Add i to key so that we don't get collisions.
-        out[(common_root_keys, i)] = (
-            group,
-            [x for x in group_arguments if x.keys[: len(common_root_keys)] == common_root_keys],
-        )
+        out[(common_root_keys, i)] = (group, group_arguments.filter_by(keys_prefix=common_root_keys))
     return [ga for _, ga in sorted(out.items(), reverse=True)]
 
 
@@ -329,7 +325,7 @@ def create_bound_arguments(
         for argument in argument_collection:
             if not _is_required(argument.iparam) or argument.keys:
                 continue
-            if not bool(argument._n_branch_tokens):
+            if not bool(argument.n_tree_tokens):
                 raise MissingArgumentError(argument=argument)
 
     except CycloptsError as e:

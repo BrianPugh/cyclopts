@@ -237,7 +237,7 @@ class Argument:
     # Can assign values directly to this argument
     # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
     _assignable: bool = field(default=False, init=False, repr=False)
-    _children: list["Argument"] = field(factory=list, init=False, repr=False)
+    children: list["Argument"] = field(factory=list, init=False, repr=False)
     _marked_converted: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
     _mark_converted_override: bool = field(default=False, init=False, repr=False)
 
@@ -477,8 +477,8 @@ class Argument:
             yield token.value
 
     @property
-    def _n_branch_tokens(self) -> int:
-        return len(self.tokens) + sum(child._n_branch_tokens for child in self._children)
+    def n_tree_tokens(self) -> int:
+        return len(self.tokens) + sum(child.n_tree_tokens for child in self.children)
 
     def _convert(self, converter=None):
         if converter is None:
@@ -520,9 +520,9 @@ class Argument:
             data = {}
             if is_pydantic(self.hint):
                 converter = partial(convert, converter=_identity_converter, name_transform=self.cparam.name_transform)
-            for child in self._children:
+            for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
-                if child._n_branch_tokens:
+                if child.n_tree_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
             out = self.hint(**data)
         return out
@@ -558,7 +558,7 @@ class Argument:
                 for validator in self.cparam.validator:
                     validator(self.hint, value)
         except (AssertionError, ValueError, TypeError) as e:
-            if len(self.tokens) == 1 and not self._children:
+            if len(self.tokens) == 1 and not self.children:
                 # If there's only one token, we can be more helpful.
                 raise ValidationError(value=e.args[0] if e.args else "", token=self.tokens[0]) from e
             else:
@@ -787,7 +787,7 @@ class ArgumentCollection(list):
                     _resolve_groups=_resolve_groups,
                 )
                 if subkey_argument:
-                    argument._children.append(subkey_argument[0])
+                    argument.children.append(subkey_argument[0])
                     out.extend(subkey_argument)
         return out
 
@@ -908,6 +908,8 @@ class ArgumentCollection(list):
         group: Optional[Group] = None,
         kind=None,
         has_tokens: Optional[bool] = None,
+        has_tree_tokens: Optional[bool] = None,
+        keys_prefix: Optional[tuple[str, ...]] = None,
     ) -> "ArgumentCollection":
         """Filter the ArgumentCollection by something.
 
@@ -920,16 +922,24 @@ class ArgumentCollection(list):
             The ``kind`` of ``inspect.Parameter``.
         has_tokens: Optional[bool]
             Has parsed tokens.
+        has_tree_tokens: Optional[bool]
+            Argument and/or it's children have parsed tokens.
         """
-        argument_collection = self.copy()
+        ac = self.copy()
+        cls = type(self)
+
         if group is not None:
-            argument_collection = type(self)([x for x in argument_collection if group in x.cparam.group])
+            ac = cls(x for x in ac if group in x.cparam.group)
         if kind is not None:
-            argument_collection = type(self)([x for x in argument_collection if x.iparam.kind == kind])
+            ac = cls(x for x in ac if x.iparam.kind == kind)
         if has_tokens is not None:
-            has_tokens = bool(has_tokens)
-            argument_collection = type(self)([x for x in argument_collection if not (bool(x.tokens) ^ has_tokens)])
-        return argument_collection
+            ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tokens)))
+        if has_tree_tokens is not None:
+            ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tree_tokens)))
+        if keys_prefix is not None:
+            ac = cls(x for x in ac if x.keys[: len(keys_prefix)] == keys_prefix)
+
+        return ac
 
 
 def _resolve_groups_from_callable(
