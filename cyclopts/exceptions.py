@@ -269,6 +269,20 @@ class RepeatArgumentError(CycloptsError):
 
 
 @define(kw_only=True)
+class ArgumentOrderError(CycloptsError):
+    """Cannot supply a POSITIONAL_OR_KEYWORD argument with a keyword, and then a later
+    POSITIONAL_OR_KEYWORD argument positionally.
+    """
+
+    def __str__(self):
+        # TODO
+        return super().__str__()
+        assert self.argument is not None
+        display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
+        return super().__str__() + "TODO."
+
+
+@define(kw_only=True)
 class MixedArgumentError(CycloptsError):
     """Cannot supply keywords and non-keywords to the same argument."""
 

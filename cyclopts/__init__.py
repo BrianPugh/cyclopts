@@ -5,6 +5,7 @@ __all__ = [
     "App",
     "Argument",
     "ArgumentCollection",
+    "ArgumentOrderError",
     "Token",
     "CoercionError",
     "CommandCollisionError",
@@ -32,6 +33,7 @@ from cyclopts._env_var import env_var_split
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App
 from cyclopts.exceptions import (
+    ArgumentOrderError,
     CoercionError,
     CommandCollisionError,
     CycloptsError,
