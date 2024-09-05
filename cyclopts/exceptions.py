@@ -270,16 +270,25 @@ class RepeatArgumentError(CycloptsError):
 
 @define(kw_only=True)
 class ArgumentOrderError(CycloptsError):
-    """Cannot supply a POSITIONAL_OR_KEYWORD argument with a keyword, and then a later
-    POSITIONAL_OR_KEYWORD argument positionally.
-    """
+    """Cannot supply a POSITIONAL_OR_KEYWORD argument with a keyword, and then a later POSITIONAL_OR_KEYWORD argument positionally."""
+
+    token: str
+    prior_positional_or_keyword_supplied_as_keyword_arguments: list["Argument"]
 
     def __str__(self):
-        # TODO
-        return super().__str__()
         assert self.argument is not None
-        display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
-        return super().__str__() + "TODO."
+        plural = len(self.prior_positional_or_keyword_supplied_as_keyword_arguments) > 1
+        display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name).lstrip("-")
+        prior_display_names = [
+            x.tokens[0].keyword for x in self.prior_positional_or_keyword_supplied_as_keyword_arguments
+        ]
+        if len(prior_display_names) == 1:
+            prior_display_names = prior_display_names[0]
+
+        return (
+            super().__str__()
+            + f"Cannot specify token {self.token!r} positionally for parameter {display_name!r} due to previously specified keyword{'s' if plural else ''} {prior_display_names!r}. {prior_display_names!r} must either be passed positionally, or {self.token!r} must be passed as a keyword to {self.argument.name!r}."
+        )
 
 
 @define(kw_only=True)

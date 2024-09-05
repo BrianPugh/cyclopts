@@ -162,8 +162,11 @@ def _parse_pos(
                 # Continue in case we hit a VAR_POSITIONAL argument.
                 continue
             if prior_positional_or_keyword_supplied_as_keyword_arguments:
-                # TODO: we should probably provide ``prior_positional_or_keyword_supplied_as_keyword_arguments`` to exception.
-                raise ArgumentOrderError(argument=argument)
+                raise ArgumentOrderError(
+                    argument=argument,
+                    prior_positional_or_keyword_supplied_as_keyword_arguments=prior_positional_or_keyword_supplied_as_keyword_arguments,
+                    token=tokens[0],
+                )
 
         tokens_per_element, consume_all = argument.token_count()
         tokens_per_element = max(1, tokens_per_element)

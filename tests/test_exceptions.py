@@ -3,7 +3,13 @@ from typing import Union
 
 import pytest
 
-from cyclopts.exceptions import CoercionError, InvalidCommandError, MissingArgumentError, MixedArgumentError
+from cyclopts.exceptions import (
+    ArgumentOrderError,
+    CoercionError,
+    InvalidCommandError,
+    MissingArgumentError,
+    MixedArgumentError,
+)
 
 
 def test_exceptions_missing_argument(app, console):
@@ -111,6 +117,53 @@ def test_exceptions_unknown_command(app, console):
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ Unable to interpret valid command from "bar".                      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_argument_order_error_singular(app, console):
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with console.capture() as capture, pytest.raises(ArgumentOrderError):
+        app("foo --b=5 1 2", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Cannot specify token '2' positionally for parameter 'c' due to     │
+        │ previously specified keyword '--b'. '--b' must either be passed    │
+        │ positionally, or '2' must be passed as a keyword to '--c'.         │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_argument_order_error_plural(app, console):
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with console.capture() as capture, pytest.raises(ArgumentOrderError):
+        app("foo --a=1 --b=5 3", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Cannot specify token '3' positionally for parameter 'c' due to     │
+        │ previously specified keywords ['--a', '--b']. ['--a', '--b'] must  │
+        │ either be passed positionally, or '3' must be passed as a keyword  │
+        │ to '--c'.                                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
