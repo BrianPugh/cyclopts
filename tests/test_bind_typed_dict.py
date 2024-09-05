@@ -158,6 +158,40 @@ def test_bind_typed_dict_missing_arg_renamed_hyphen(app, console):
     assert actual == expected
 
 
+def test_bind_typed_dict_missing_arg_nested(app, console):
+    class User(TypedDict):
+        name: str
+        age: int
+
+    class MyDict(TypedDict):
+        my_int: int
+        my_str: str
+        my_user: User
+
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(
+            "foo --d.my-int=5 --d.my-str=bar --d.my-user.age=30",
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--d.my-user.name" requires an argument.   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
 def test_bind_typed_dict_total_false(app, assert_parse_args):
     class MyDict(TypedDict, total=False):
         my_int: int

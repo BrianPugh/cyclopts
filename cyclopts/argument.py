@@ -102,7 +102,10 @@ def _validate_typed_dict(argument, data: dict, _key_chain: tuple[str, ...] = ())
     missing_keys = sorted(required_keys - data_keys)
     if missing_keys:
         # Report the first missing argument.
-        missing_argument = argument.children.filter_by(keys_prefix=(next(iter(missing_keys)),))[0]
+        missing_key = next(iter(missing_keys))
+        missing_argument = argument.children.filter_by(
+            keys_prefix=argument.keys + (missing_key,),
+        )[0]
         raise MissingArgumentError(argument=missing_argument)
 
     for field_name, hint in typed_dict.__annotations__.items():
