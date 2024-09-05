@@ -609,6 +609,9 @@ class ArgumentCollection(list):
         super().__init__(*args)
         self.groups = [] if groups is None else groups
 
+    def copy(self) -> "ArgumentCollection":
+        return type(self)(self)
+
     def match(
         self,
         term: Union[str, int],
@@ -903,10 +906,30 @@ class ArgumentCollection(list):
         self,
         *,
         group: Optional[Group] = None,
+        kind=None,
+        has_tokens: Optional[bool] = None,
     ) -> "ArgumentCollection":
+        """Filter the ArgumentCollection by something.
+
+        All non-``None`` arguments will be applied.
+
+        Parameter
+        ---------
+        group: Optional[Group]
+        kind: Optional[inspect._ParameterKind]
+            The ``kind`` of ``inspect.Parameter``.
+        has_tokens: Optional[bool]
+            Has parsed tokens.
+        """
+        argument_collection = self.copy()
         if group is not None:
-            return type(self)([x for x in self if group in x.cparam.group])
-        raise NotImplementedError
+            argument_collection = type(self)([x for x in argument_collection if group in x.cparam.group])
+        if kind is not None:
+            argument_collection = type(self)([x for x in argument_collection if x.iparam.kind == kind])
+        if has_tokens is not None:
+            has_tokens = bool(has_tokens)
+            argument_collection = type(self)([x for x in argument_collection if not (bool(x.tokens) ^ has_tokens)])
+        return argument_collection
 
 
 def _resolve_groups_from_callable(
