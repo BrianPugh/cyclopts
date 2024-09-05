@@ -304,10 +304,7 @@ def create_parameter_help_panel(
         else:
             help_components.append(text)
 
-    for argument in argument_collection:
-        if not argument.cparam.show:
-            continue
-
+    for argument in argument_collection.filter_by(show=True):
         help_components = []
         options = list(argument.names)
 

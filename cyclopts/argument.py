@@ -910,6 +910,8 @@ class ArgumentCollection(list):
         has_tokens: Optional[bool] = None,
         has_tree_tokens: Optional[bool] = None,
         keys_prefix: Optional[tuple[str, ...]] = None,
+        show: Optional[bool] = None,
+        value_set: Optional[bool] = None,
     ) -> "ArgumentCollection":
         """Filter the ArgumentCollection by something.
 
@@ -924,6 +926,10 @@ class ArgumentCollection(list):
             Has parsed tokens.
         has_tree_tokens: Optional[bool]
             Argument and/or it's children have parsed tokens.
+        show: Optional[bool]
+            The Argument is intended to be show on the help page.
+        value_set: Optional[bool]
+            The converted value is set.
         """
         ac = self.copy()
         cls = type(self)
@@ -938,6 +944,10 @@ class ArgumentCollection(list):
             ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tree_tokens)))
         if keys_prefix is not None:
             ac = cls(x for x in ac if x.keys[: len(keys_prefix)] == keys_prefix)
+        if show is not None:
+            ac = cls(x for x in ac if not (x.cparam.show ^ bool(show)))
+        if value_set is not None:
+            ac = cls(x for x in ac if ((x.value is x.UNSET) ^ bool(value_set)))
 
         return ac
 

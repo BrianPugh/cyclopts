@@ -21,7 +21,7 @@ class LimitedChoice:
             raise ValueError("max must be >=min.")
 
     def __call__(self, argument_collection):
-        argument_collection = [a for a in argument_collection if a.value is not a.UNSET]
+        argument_collection = argument_collection.filter_by(value_set=True)
         n_arguments = len(argument_collection)
 
         if self.min <= n_arguments <= self.max:
