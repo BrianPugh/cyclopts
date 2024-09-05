@@ -120,8 +120,8 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                     consume_count += tokens_per_element
                     for j in range(consume_count):
                         token = tokens[i + 1 + j]
-                        if not argument.cparam.allow_leading_hyphen:
-                            _validate_is_not_option_like(token)
+                        if not argument.cparam.allow_leading_hyphen and _is_option_like(token):
+                            raise UnknownOptionError(token=token)
                         cli_values.append(token)
                         skip_next_iterations += 1
 
@@ -145,11 +145,6 @@ def _is_option_like(token: str) -> bool:
     return token.startswith("-")
 
 
-def _validate_is_not_option_like(token):
-    if _is_option_like(token):
-        raise UnknownOptionError(token=token)
-
-
 def _parse_pos(
     argument_collection: ArgumentCollection,
     tokens: list[str],
@@ -171,8 +166,8 @@ def _parse_pos(
                 raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
 
             for index, token in enumerate(tokens[:tokens_per_element]):
-                if not argument.cparam.allow_leading_hyphen:
-                    _validate_is_not_option_like(token)
+                if not argument.cparam.allow_leading_hyphen and _is_option_like(token):
+                    raise UnknownOptionError(token=token)
                 new_tokens.append(CliToken(value=token, index=index))
             tokens = tokens[tokens_per_element:]
             if not consume_all:
