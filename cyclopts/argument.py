@@ -18,6 +18,7 @@ from cyclopts._convert import (
 )
 from cyclopts.exceptions import (
     CoercionError,
+    MissingArgumentError,
     MixedArgumentError,
     RepeatArgumentError,
     ValidationError,
@@ -76,7 +77,7 @@ def _typed_dict_required_optional(typeddict) -> tuple[frozenset[str], frozenset[
     return frozenset(required), frozenset(optional)
 
 
-def _validate_typed_dict(typed_dict, data: dict, _key_chain: tuple[str, ...] = ()):
+def _validate_typed_dict(argument, data: dict, _key_chain: tuple[str, ...] = ()):
     """Not a complete validator; only recursively checks TypedDicts.
 
     Checks:
@@ -86,6 +87,7 @@ def _validate_typed_dict(typed_dict, data: dict, _key_chain: tuple[str, ...] = (
     Things that this doesn't check (these are enforced by other parts of Cyclopts):
         1. If the values are the correct type
     """
+    typed_dict = argument.hint
     data_keys = set(data)
     extra_keys = data_keys - set(typed_dict.__annotations__)
 
@@ -97,14 +99,11 @@ def _validate_typed_dict(typed_dict, data: dict, _key_chain: tuple[str, ...] = (
 
     # First, check for extra keys.
     required_keys, _ = _typed_dict_required_optional(typed_dict)
-    missing_keys = required_keys - data_keys
+    missing_keys = sorted(required_keys - data_keys)
     if missing_keys:
-        prefix = ".".join(_key_chain)
-        if prefix:
-            prefix += "."
-        raise ValueError  # TODO: MissingArgumentError
-        # TODO: this should have a specific Argument.
-        # raise MissingArgumentError(missing_keys=[prefix + x for x in missing_keys])
+        # Report the first missing argument.
+        missing_argument = argument.children.filter_by(keys_prefix=(next(iter(missing_keys)),))[0]
+        raise MissingArgumentError(argument=missing_argument)
 
     for field_name, hint in typed_dict.__annotations__.items():
         if is_typeddict(hint):
@@ -164,444 +163,6 @@ def _identity_converter(type_, element):
     return element
 
 
-@define(kw_only=True)
-class Argument:
-    """Tracks the lifespan of a parsed argument.
-
-    An argument is defined as:
-
-        * the finest unit that can have a Parameter assigned to it.
-        * a leaf in the iparam/key tree.
-        * anything that would have its own entry in the --help page.
-        * If a type hint has a ``dict`` in it, it's a leaf.
-        * Individual tuple elements do NOT get their own Argument.
-
-    e.g.
-
-    ... code-block:: python
-
-        def foo(bar: Annotated[int, Parameter(help="bar's help")]):
-            ...
-
-    ... code-block:: python
-
-        from attrs import define
-
-        @define
-        class Foo:
-            bar: Annotated[int, Parameter(help="bar's help")]  # This gets an Argument
-            baz: Annotated[int, Parameter(help="baz's help")]  # This gets an Argument
-
-        def foo(fizz: Annotated[Foo, Parameter(help="bar's help")]):  # This gets an Argument
-            ...
-
-    """
-
-    class UNSET(Sentinel):
-        pass
-
-    # List of tokens parsed from various sources
-    # If tokens is empty, then no tokens have been parsed for this argument.
-    tokens: list[Token] = field(factory=list)
-
-    # Multiple ``Argument`` may be associated with a single iparam.
-    # However, each ``Argument`` must have a unique iparam/keys combo
-    iparam: inspect.Parameter = field(default=None)
-
-    # Fully resolved Parameter
-    # Resolved parameter should have a fully resolved Parameter.name
-    cparam: Parameter = field(factory=Parameter)
-
-    # The type for this leaf; may be different from ``iparam.annotation``
-    # because this could be a subkey of iparam.
-    hint: Any = field(default=str, converter=resolve)
-
-    # Associated positional index for iparam.
-    index: Optional[int] = field(default=None)
-
-    # **Python** Keys into iparam that lead to this leaf.
-    # Note: that self.cparam.name and self.keys can naively disagree!
-    # For example, a cparam.name=="--foo.bar.baz" could be aliased to "--fizz".
-    # "keys" may be an empty tuple.
-    # This should be populated based on type-hints, not ``Parameter.name``
-    keys: tuple[str, ...] = field(default=())
-
-    # Converted value; may be stale.
-    _value: Any = field(alias="value", default=UNSET)
-
-    _accepts_keywords: bool = field(default=False, init=False, repr=False)
-
-    _default: Any = field(default=None, init=False, repr=False)
-    _lookup: dict = field(factory=dict, init=False, repr=False)
-
-    # Can assign values directly to this argument
-    # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
-    _assignable: bool = field(default=False, init=False, repr=False)
-    children: list["Argument"] = field(factory=list, init=False, repr=False)
-    _marked_converted: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
-    _mark_converted_override: bool = field(default=False, init=False, repr=False)
-
-    # Validator to be called based on builtin type support.
-    _internal_validator: Optional[Callable] = field(default=None, init=False, repr=False)
-    _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
-
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, val):
-        if self._marked:
-            self._mark_converted_override = True
-        self._marked = True
-        self._value = val
-
-    @property
-    def _marked(self):
-        return self._marked_converted | self._mark_converted_override
-
-    @_marked.setter
-    def _marked(self, value: bool):
-        self._marked_converted = value
-
-    def __attrs_post_init__(self):
-        # By definition, self.hint is Not AnnotatedType
-        hint = resolve(self.hint)
-        hints = get_args(hint) if is_union(hint) else (hint,)
-
-        if self.cparam.accepts_keys is False:  # ``None`` means to infer.
-            self._assignable = True
-            return
-
-        for hint in hints:
-            # accepts_keys is either ``None`` or ``True`` here
-
-            # This could be annotated...
-            origin = get_origin(hint)
-            # TODO: need to resolve Annotation and handle cyclopts.Parameters; or do we?
-            hint_origin = {hint, origin}
-
-            # Classes that ALWAYS takes keywords (accepts_keys=None)
-            if dict in hint_origin:
-                self._assignable = True
-                self._accepts_keywords = True
-                key_type, val_type = str, str
-                args = get_args(hint)
-                with suppress(IndexError):
-                    key_type = args[0]
-                    val_type = args[1]
-                if key_type is not str:
-                    raise TypeError('Dictionary type annotations must have "str" keys.')
-                self._default = val_type
-            elif is_typeddict(hint):
-                self._internal_validator = _validate_typed_dict
-                self._accepts_keywords = True
-                self._lookup.update(hint.__annotations__)
-            elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
-                self._accepts_keywords = True
-                self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
-            elif is_namedtuple(hint):
-                # collections.namedtuple does not have type hints, assume "str" for everything.
-                self._accepts_keywords = True
-                if not hasattr(hint, "__annotations__"):
-                    raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
-            elif is_attrs(hint):
-                self._accepts_keywords = True
-                self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
-            elif is_pydantic(hint):
-                self._accepts_keywords = True
-                self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
-            elif self.cparam.accepts_keys is None:
-                # Typical builtin hint
-                self._assignable = True
-                continue
-
-            if self.cparam.accepts_keys is None:
-                continue
-            # Only explicit ``self.cparam.accepts_keys == True`` from here on
-
-            # Classes that MAY take keywords (accepts_keys=True)
-            # They must be explicitly specified ``accepts_keys=True`` because otherwise
-            # providing a single positional argument is what we want.
-            self._accepts_keywords = True
-            for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
-                if i == 0 and iparam.name == "self":
-                    continue
-                if iparam.kind is iparam.VAR_KEYWORD:
-                    self._default = iparam.annotation
-                else:
-                    self._lookup[iparam.name] = iparam.annotation
-
-    @property
-    def accepts_arbitrary_keywords(self) -> bool:
-        if not self._assignable:
-            return False
-        args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
-        return any(dict in (arg, get_origin(arg)) for arg in args)
-
-    def type_hint_for_key(self, key: str):
-        try:
-            return self._lookup[key]
-        except KeyError:
-            if self._default is None:
-                raise
-            return self._default
-
-    def match(
-        self,
-        term: Union[str, int],
-        *,
-        transform: Optional[Callable[[str], str]] = None,
-        delimiter: str = ".",
-    ) -> tuple[tuple[str, ...], Any]:
-        """Match a name search-term, or a positional integer index.
-
-        Returns
-        -------
-        Tuple[str, ...]
-            Leftover keys after matching to this argument.
-            Used if this argument accepts_arbitrary_keywords.
-        Any
-            Implicit value.
-        """
-        if not self._assignable:
-            raise ValueError
-        return (
-            self._match_index(term)
-            if isinstance(term, int)
-            else self._match_name(term, transform=transform, delimiter=delimiter)
-        )
-
-    def _match_name(
-        self,
-        term: str,
-        *,
-        transform: Optional[Callable[[str], str]] = None,
-        delimiter: str = ".",
-    ) -> tuple[tuple[str, ...], Any]:
-        """Find the matching Argument for a token keyword identifier.
-
-        Parameter
-        ---------
-        term: str
-            Something like "--foo"
-        transform: Callable
-            Function that converts the cyclopts Parameter name(s) into
-            something that should be compared against ``term``.
-
-        Raises
-        ------
-        ValueError
-            If no match found.
-
-        Returns
-        -------
-        Tuple[str, ...]
-            Leftover keys after matching to this argument.
-            Used if this argument accepts_arbitrary_keywords.
-        Any
-            Implicit value.
-        """
-        if self.iparam.kind is self.iparam.VAR_KEYWORD:
-            # TODO: apply cparam.name_transform to keys here?
-            return tuple(term.lstrip("-").split(delimiter)), None
-
-        assert self.cparam.name
-        for name in self.cparam.name:
-            if transform:
-                name = transform(name)
-            if term.startswith(name):
-                trailing = term[len(name) :]
-                implicit_value = True if self.hint is bool else None
-                if trailing:
-                    if trailing[0] == delimiter:
-                        trailing = trailing[1:]
-                        break
-                    # Otherwise, it's not an actual match.
-                else:
-                    # exact match
-                    return (), implicit_value
-        else:
-            # No positive-name matches found.
-            for name in self.cparam.get_negatives(self.hint):
-                if transform:
-                    name = transform(name)
-                if term.startswith(name):
-                    trailing = term[len(name) :]
-                    implicit_value = (get_origin(self.hint) or self.hint)()
-                    if trailing:
-                        if trailing[0] == delimiter:
-                            trailing = trailing[1:]
-                            break
-                        # Otherwise, it's not an actual match.
-                    else:
-                        # exact match
-                        return (), implicit_value
-            else:
-                # No negative-name matches found.
-                raise ValueError
-
-        if not self.accepts_arbitrary_keywords:
-            # Still not an actual match.
-            raise ValueError
-
-        # TODO: apply cparam.name_transform to keys here?
-        return tuple(trailing.split(delimiter)), implicit_value
-
-    def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
-        if self.index is None or self.iparam in (self.iparam.KEYWORD_ONLY, self.iparam.VAR_KEYWORD):
-            raise ValueError
-        elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
-            if index < self.index:
-                raise ValueError
-        elif index != self.index:
-            raise ValueError
-        return (), None
-
-    def append(self, token: Token):
-        if not self._assignable:
-            raise ValueError
-        if (
-            any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
-            and not self.token_count(token.keys)[1]
-        ):
-            raise RepeatArgumentError(token=token)
-        if self.tokens:
-            if bool(token.keys) ^ any(x.keys for x in self.tokens):
-                raise MixedArgumentError(argument=self)
-        self.tokens.append(token)
-
-    def values(self) -> Iterator[str]:
-        for token in self.tokens:
-            yield token.value
-
-    @property
-    def n_tree_tokens(self) -> int:
-        return len(self.tokens) + sum(child.n_tree_tokens for child in self.children)
-
-    def _convert(self, converter=None):
-        if converter is None:
-            converter = self.cparam.converter
-        if self._assignable:
-            positional, keyword = [], {}
-            for token in self.tokens:
-                if token.implicit_value is not None:
-                    assert len(self.tokens) == 1
-                    return token.implicit_value
-
-                if token.keys:
-                    lookup = keyword
-                    for key in token.keys[:-1]:
-                        lookup = lookup.setdefault(key, {})
-                    lookup.setdefault(token.keys[-1], []).append(token.value)
-                else:
-                    positional.append(token.value)
-
-                if positional and keyword:
-                    # This should never happen due to checks in ``Argument.append``
-                    raise MixedArgumentError(argument=self)
-
-            if positional:
-                if self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
-                    # Apply converter to individual values
-                    out = tuple(converter(get_args(self.hint)[0], (value,)) for value in positional)
-                else:
-                    out = converter(self.hint, tuple(positional))
-            elif keyword:
-                if self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
-                    # Apply converter to individual values
-                    out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
-                else:
-                    out = converter(self.hint, keyword)
-            else:  # no tokens
-                return self.UNSET
-        else:  # A dictionary-like structure.
-            data = {}
-            if is_pydantic(self.hint):
-                converter = partial(convert, converter=_identity_converter, name_transform=self.cparam.name_transform)
-            for child in self.children:
-                assert len(child.keys) == (len(self.keys) + 1)
-                if child.n_tree_tokens:
-                    data[child.keys[-1]] = child.convert_and_validate(converter=converter)
-            out = self.hint(**data)
-        return out
-
-    def convert(self, converter=None):
-        if not self._marked:
-            try:
-                self.value = self._convert(converter=converter)
-            except CoercionError as e:
-                if e.argument is None:
-                    e.argument = self
-                raise
-        return self.value
-
-    def validate(self, value):
-        if self._internal_validator:
-            self._internal_validator(self.hint, value)
-
-        assert isinstance(self.cparam.validator, tuple)
-
-        try:
-            if not self.keys and self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD:
-                hint = get_args(self.hint)[1]
-                for validator in self.cparam.validator:
-                    for val in value.values():
-                        validator(hint, val)
-            elif self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
-                hint = get_args(self.hint)[0]
-                for validator in self.cparam.validator:
-                    for val in value:
-                        validator(hint, val)
-            else:
-                for validator in self.cparam.validator:
-                    validator(self.hint, value)
-        except (AssertionError, ValueError, TypeError) as e:
-            if len(self.tokens) == 1 and not self.children:
-                # If there's only one token, we can be more helpful.
-                raise ValidationError(value=e.args[0] if e.args else "", token=self.tokens[0]) from e
-            else:
-                raise ValidationError(value=e.args[0] if e.args else "", argument=self) from e
-
-    def convert_and_validate(self, converter=None):
-        val = self.convert(converter=converter)
-        if val is not self.UNSET:
-            self.validate(val)
-        return val
-
-    def token_count(self, keys: tuple[str, ...] = ()):
-        if len(keys) > 1:
-            hint = self._default
-        elif len(keys) == 1:
-            hint = self.type_hint_for_key(keys[0])
-        else:
-            hint = self.hint
-        tokens_per_element, consume_all = token_count(hint)
-        consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL  # TODO: is this necessary?
-        return tokens_per_element, consume_all
-
-    @property
-    def negatives(self):
-        return self.cparam.get_negatives(self.hint)
-
-    @property
-    def name(self) -> str:
-        return self.names[0]
-
-    @property
-    def names(self) -> tuple[str, ...]:
-        assert isinstance(self.cparam.name, tuple)
-        return tuple(itertools.chain(self.cparam.name, self.negatives))
-
-    def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
-        return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
-
-    @property
-    def show(self) -> bool:
-        return self._assignable and self.cparam.show
-
-
 class ArgumentCollection(list):
     """Provides easy lookups/pattern matching."""
 
@@ -618,7 +179,7 @@ class ArgumentCollection(list):
         *,
         transform: Optional[Callable[[str], str]] = None,
         delimiter: str = ".",
-    ) -> tuple[Argument, tuple[str, ...], Any]:
+    ) -> tuple["Argument", tuple[str, ...], Any]:
         """Maps keyword CLI arguments to their :class:`Argument`.
 
         Parameters
@@ -950,6 +511,445 @@ class ArgumentCollection(list):
             ac = cls(x for x in ac if ((x.value is x.UNSET) ^ bool(value_set)))
 
         return ac
+
+
+@define(kw_only=True)
+class Argument:
+    """Tracks the lifespan of a parsed argument.
+
+    An argument is defined as:
+
+        * the finest unit that can have a Parameter assigned to it.
+        * a leaf in the iparam/key tree.
+        * anything that would have its own entry in the --help page.
+        * If a type hint has a ``dict`` in it, it's a leaf.
+        * Individual tuple elements do NOT get their own Argument.
+
+    e.g.
+
+    ... code-block:: python
+
+        def foo(bar: Annotated[int, Parameter(help="bar's help")]):
+            ...
+
+    ... code-block:: python
+
+        from attrs import define
+
+        @define
+        class Foo:
+            bar: Annotated[int, Parameter(help="bar's help")]  # This gets an Argument
+            baz: Annotated[int, Parameter(help="baz's help")]  # This gets an Argument
+
+        def foo(fizz: Annotated[Foo, Parameter(help="bar's help")]):  # This gets an Argument
+            ...
+
+    """
+
+    class UNSET(Sentinel):
+        pass
+
+    # List of tokens parsed from various sources
+    # If tokens is empty, then no tokens have been parsed for this argument.
+    tokens: list[Token] = field(factory=list)
+
+    # Multiple ``Argument`` may be associated with a single iparam.
+    # However, each ``Argument`` must have a unique iparam/keys combo
+    iparam: inspect.Parameter = field(default=None)
+
+    # Fully resolved Parameter
+    # Resolved parameter should have a fully resolved Parameter.name
+    cparam: Parameter = field(factory=Parameter)
+
+    # The type for this leaf; may be different from ``iparam.annotation``
+    # because this could be a subkey of iparam.
+    hint: Any = field(default=str, converter=resolve)
+
+    # Associated positional index for iparam.
+    index: Optional[int] = field(default=None)
+
+    # **Python** Keys into iparam that lead to this leaf.
+    # Note: that self.cparam.name and self.keys can naively disagree!
+    # For example, a cparam.name=="--foo.bar.baz" could be aliased to "--fizz".
+    # "keys" may be an empty tuple.
+    # This should be populated based on type-hints, not ``Parameter.name``
+    keys: tuple[str, ...] = field(default=())
+
+    # Converted value; may be stale.
+    _value: Any = field(alias="value", default=UNSET)
+
+    _accepts_keywords: bool = field(default=False, init=False, repr=False)
+
+    _default: Any = field(default=None, init=False, repr=False)
+    _lookup: dict = field(factory=dict, init=False, repr=False)
+
+    # Can assign values directly to this argument
+    # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
+    _assignable: bool = field(default=False, init=False, repr=False)
+    children: "ArgumentCollection" = field(factory=ArgumentCollection, init=False, repr=False)
+    _marked_converted: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
+    _mark_converted_override: bool = field(default=False, init=False, repr=False)
+
+    # Validator to be called based on builtin type support.
+    _internal_validator: Optional[Callable] = field(default=None, init=False, repr=False)
+
+    _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, val):
+        if self._marked:
+            self._mark_converted_override = True
+        self._marked = True
+        self._value = val
+
+    @property
+    def _marked(self):
+        return self._marked_converted | self._mark_converted_override
+
+    @_marked.setter
+    def _marked(self, value: bool):
+        self._marked_converted = value
+
+    def __attrs_post_init__(self):
+        # By definition, self.hint is Not AnnotatedType
+        hint = resolve(self.hint)
+        hints = get_args(hint) if is_union(hint) else (hint,)
+
+        if self.cparam.accepts_keys is False:  # ``None`` means to infer.
+            self._assignable = True
+            return
+
+        for hint in hints:
+            # accepts_keys is either ``None`` or ``True`` here
+
+            # This could be annotated...
+            origin = get_origin(hint)
+            # TODO: need to resolve Annotation and handle cyclopts.Parameters; or do we?
+            hint_origin = {hint, origin}
+
+            # Classes that ALWAYS takes keywords (accepts_keys=None)
+            if dict in hint_origin:
+                self._assignable = True
+                self._accepts_keywords = True
+                key_type, val_type = str, str
+                args = get_args(hint)
+                with suppress(IndexError):
+                    key_type = args[0]
+                    val_type = args[1]
+                if key_type is not str:
+                    raise TypeError('Dictionary type annotations must have "str" keys.')
+                self._default = val_type
+            elif is_typeddict(hint):
+                self._internal_validator = _validate_typed_dict
+                self._accepts_keywords = True
+                self._lookup.update(hint.__annotations__)
+            elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
+                self._accepts_keywords = True
+                self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
+            elif is_namedtuple(hint):
+                # collections.namedtuple does not have type hints, assume "str" for everything.
+                self._accepts_keywords = True
+                if not hasattr(hint, "__annotations__"):
+                    raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
+                self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
+            elif is_attrs(hint):
+                self._accepts_keywords = True
+                self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
+            elif is_pydantic(hint):
+                self._accepts_keywords = True
+                self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
+            elif self.cparam.accepts_keys is None:
+                # Typical builtin hint
+                self._assignable = True
+                continue
+
+            if self.cparam.accepts_keys is None:
+                continue
+            # Only explicit ``self.cparam.accepts_keys == True`` from here on
+
+            # Classes that MAY take keywords (accepts_keys=True)
+            # They must be explicitly specified ``accepts_keys=True`` because otherwise
+            # providing a single positional argument is what we want.
+            self._accepts_keywords = True
+            for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
+                if i == 0 and iparam.name == "self":
+                    continue
+                if iparam.kind is iparam.VAR_KEYWORD:
+                    self._default = iparam.annotation
+                else:
+                    self._lookup[iparam.name] = iparam.annotation
+
+    @property
+    def accepts_arbitrary_keywords(self) -> bool:
+        if not self._assignable:
+            return False
+        args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
+        return any(dict in (arg, get_origin(arg)) for arg in args)
+
+    def type_hint_for_key(self, key: str):
+        try:
+            return self._lookup[key]
+        except KeyError:
+            if self._default is None:
+                raise
+            return self._default
+
+    def match(
+        self,
+        term: Union[str, int],
+        *,
+        transform: Optional[Callable[[str], str]] = None,
+        delimiter: str = ".",
+    ) -> tuple[tuple[str, ...], Any]:
+        """Match a name search-term, or a positional integer index.
+
+        Returns
+        -------
+        Tuple[str, ...]
+            Leftover keys after matching to this argument.
+            Used if this argument accepts_arbitrary_keywords.
+        Any
+            Implicit value.
+        """
+        if not self._assignable:
+            raise ValueError
+        return (
+            self._match_index(term)
+            if isinstance(term, int)
+            else self._match_name(term, transform=transform, delimiter=delimiter)
+        )
+
+    def _match_name(
+        self,
+        term: str,
+        *,
+        transform: Optional[Callable[[str], str]] = None,
+        delimiter: str = ".",
+    ) -> tuple[tuple[str, ...], Any]:
+        """Check how well this argument matches a token keyword identifier.
+
+        Parameter
+        ---------
+        term: str
+            Something like "--foo"
+        transform: Callable
+            Function that converts the cyclopts Parameter name(s) into
+            something that should be compared against ``term``.
+
+        Raises
+        ------
+        ValueError
+            If no match found.
+
+        Returns
+        -------
+        Tuple[str, ...]
+            Leftover keys after matching to this argument.
+            Used if this argument accepts_arbitrary_keywords.
+        Any
+            Implicit value.
+        """
+        if self.iparam.kind is self.iparam.VAR_KEYWORD:
+            # TODO: apply cparam.name_transform to keys here?
+            return tuple(term.lstrip("-").split(delimiter)), None
+
+        assert self.cparam.name
+        for name in self.cparam.name:
+            if transform:
+                name = transform(name)
+            if term.startswith(name):
+                trailing = term[len(name) :]
+                implicit_value = True if self.hint is bool else None
+                if trailing:
+                    if trailing[0] == delimiter:
+                        trailing = trailing[1:]
+                        break
+                    # Otherwise, it's not an actual match.
+                else:
+                    # exact match
+                    return (), implicit_value
+        else:
+            # No positive-name matches found.
+            for name in self.cparam.get_negatives(self.hint):
+                if transform:
+                    name = transform(name)
+                if term.startswith(name):
+                    trailing = term[len(name) :]
+                    implicit_value = (get_origin(self.hint) or self.hint)()
+                    if trailing:
+                        if trailing[0] == delimiter:
+                            trailing = trailing[1:]
+                            break
+                        # Otherwise, it's not an actual match.
+                    else:
+                        # exact match
+                        return (), implicit_value
+            else:
+                # No negative-name matches found.
+                raise ValueError
+
+        if not self.accepts_arbitrary_keywords:
+            # Still not an actual match.
+            raise ValueError
+
+        # TODO: apply cparam.name_transform to keys here?
+        return tuple(trailing.split(delimiter)), implicit_value
+
+    def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
+        if self.index is None or self.iparam in (self.iparam.KEYWORD_ONLY, self.iparam.VAR_KEYWORD):
+            raise ValueError
+        elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
+            if index < self.index:
+                raise ValueError
+        elif index != self.index:
+            raise ValueError
+        return (), None
+
+    def append(self, token: Token):
+        if not self._assignable:
+            raise ValueError
+        if (
+            any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
+            and not self.token_count(token.keys)[1]
+        ):
+            raise RepeatArgumentError(token=token)
+        if self.tokens:
+            if bool(token.keys) ^ any(x.keys for x in self.tokens):
+                raise MixedArgumentError(argument=self)
+        self.tokens.append(token)
+
+    def values(self) -> Iterator[str]:
+        for token in self.tokens:
+            yield token.value
+
+    @property
+    def n_tree_tokens(self) -> int:
+        return len(self.tokens) + sum(child.n_tree_tokens for child in self.children)
+
+    def _convert(self, converter=None):
+        if converter is None:
+            converter = self.cparam.converter
+        if self._assignable:
+            positional, keyword = [], {}
+            for token in self.tokens:
+                if token.implicit_value is not None:
+                    assert len(self.tokens) == 1
+                    return token.implicit_value
+
+                if token.keys:
+                    lookup = keyword
+                    for key in token.keys[:-1]:
+                        lookup = lookup.setdefault(key, {})
+                    lookup.setdefault(token.keys[-1], []).append(token.value)
+                else:
+                    positional.append(token.value)
+
+                if positional and keyword:
+                    # This should never happen due to checks in ``Argument.append``
+                    raise MixedArgumentError(argument=self)
+
+            if positional:
+                if self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
+                    # Apply converter to individual values
+                    out = tuple(converter(get_args(self.hint)[0], (value,)) for value in positional)
+                else:
+                    out = converter(self.hint, tuple(positional))
+            elif keyword:
+                if self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
+                    # Apply converter to individual values
+                    out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
+                else:
+                    out = converter(self.hint, keyword)
+            else:  # no tokens
+                return self.UNSET
+        else:  # A dictionary-like structure.
+            data = {}
+            if is_pydantic(self.hint):
+                converter = partial(convert, converter=_identity_converter, name_transform=self.cparam.name_transform)
+            for child in self.children:
+                assert len(child.keys) == (len(self.keys) + 1)
+                if child.n_tree_tokens:
+                    data[child.keys[-1]] = child.convert_and_validate(converter=converter)
+            out = self.hint(**data)
+        return out
+
+    def convert(self, converter=None):
+        if not self._marked:
+            try:
+                self.value = self._convert(converter=converter)
+            except CoercionError as e:
+                if e.argument is None:
+                    e.argument = self
+                raise
+        return self.value
+
+    def validate(self, value):
+        if self._internal_validator:
+            self._internal_validator(self, value)
+
+        assert isinstance(self.cparam.validator, tuple)
+
+        try:
+            if not self.keys and self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD:
+                hint = get_args(self.hint)[1]
+                for validator in self.cparam.validator:
+                    for val in value.values():
+                        validator(hint, val)
+            elif self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
+                hint = get_args(self.hint)[0]
+                for validator in self.cparam.validator:
+                    for val in value:
+                        validator(hint, val)
+            else:
+                for validator in self.cparam.validator:
+                    validator(self.hint, value)
+        except (AssertionError, ValueError, TypeError) as e:
+            if len(self.tokens) == 1 and not self.children:
+                # If there's only one token, we can be more helpful.
+                raise ValidationError(value=e.args[0] if e.args else "", token=self.tokens[0]) from e
+            else:
+                raise ValidationError(value=e.args[0] if e.args else "", argument=self) from e
+
+    def convert_and_validate(self, converter=None):
+        val = self.convert(converter=converter)
+        if val is not self.UNSET:
+            self.validate(val)
+        return val
+
+    def token_count(self, keys: tuple[str, ...] = ()):
+        if len(keys) > 1:
+            hint = self._default
+        elif len(keys) == 1:
+            hint = self.type_hint_for_key(keys[0])
+        else:
+            hint = self.hint
+        tokens_per_element, consume_all = token_count(hint)
+        consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL  # TODO: is this necessary?
+        return tokens_per_element, consume_all
+
+    @property
+    def negatives(self):
+        return self.cparam.get_negatives(self.hint)
+
+    @property
+    def name(self) -> str:
+        return self.names[0]
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        assert isinstance(self.cparam.name, tuple)
+        return tuple(itertools.chain(self.cparam.name, self.negatives))
+
+    def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
+        return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
+
+    @property
+    def show(self) -> bool:
+        return self._assignable and self.cparam.show
 
 
 def _resolve_groups_from_callable(

@@ -46,7 +46,6 @@ def test_bind_typed_dict(app, assert_parse_args):
     )
 
 
-@pytest.mark.skip(reason="Need to revamp exceptions.")
 def test_bind_typed_dict_missing_arg(app, console):
     @app.command
     def foo(d: MyDict):
@@ -54,7 +53,7 @@ def test_bind_typed_dict_missing_arg(app, console):
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
-            "foo --d.my_int=5 --d.my_str=bar",
+            "foo --d.my-int=5 --d.my-str=bar",
             console=console,
             exit_on_error=False,
         )
@@ -64,7 +63,7 @@ def test_bind_typed_dict_missing_arg(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Missing argument for keys ['--d.my_list', '--d.my_list_int'].      │
+        │ Command "foo" parameter "--d.my-list" requires an argument.        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
