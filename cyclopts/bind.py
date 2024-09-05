@@ -213,11 +213,7 @@ def _bind(
     func: Callable,
     mapping: ParameterDict,
 ):
-    """Bind the mapping to the function signature.
-
-    Better than directly using ``signature.bind`` because this can handle
-    intermingled positional and keyword arguments.
-    """
+    """Bind the mapping to the function signature."""
     f_pos, f_kwargs = [], {}
     use_pos = True
 
@@ -233,7 +229,7 @@ def _bind(
     for iparam in signature.parameters.values():
         if use_pos and iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
             f_pos_append(iparam)
-        elif use_pos and iparam.kind is iparam.VAR_POSITIONAL:  # ``*args``
+        elif use_pos and iparam.kind is iparam.VAR_POSITIONAL:
             f_pos.extend(mapping.get(iparam, []))
             use_pos = False
         elif iparam.kind is iparam.VAR_KEYWORD:
