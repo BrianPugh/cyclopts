@@ -10,11 +10,11 @@ TODO/Notes:
 
 import sys
 from textwrap import dedent
-from typing import List, TypedDict
+from typing import Annotated, List, TypedDict
 
 import pytest
 
-from cyclopts.exceptions import MissingArgumentError
+from cyclopts import MissingArgumentError, Parameter
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired, Required
@@ -46,7 +46,7 @@ def test_bind_typed_dict(app, assert_parse_args):
     )
 
 
-def test_bind_typed_dict_missing_arg(app, console):
+def test_bind_typed_dict_missing_arg_basic(app, console):
     @app.command
     def foo(d: MyDict):
         pass
@@ -64,6 +64,93 @@ def test_bind_typed_dict_missing_arg(app, console):
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ Command "foo" parameter "--d.my-list" requires an argument.        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_bind_typed_dict_missing_arg_star(app, console):
+    @app.command
+    def foo(d: Annotated[MyDict, Parameter(name="*")]):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(
+            "foo --d.my-int=5 --d.my-str=bar",
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--my-int" requires an argument.           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_bind_typed_dict_missing_arg_renamed_no_hyphen(app, console):
+    class MyDict(TypedDict):
+        my_int: int
+        my_str: str
+        my_list: Annotated[list, Parameter(name="your-list")]
+        my_list_int: List[int]
+
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(
+            "foo --d.my-int=5 --d.my-str=bar",
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--d.your-list" requires an argument.      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_bind_typed_dict_missing_arg_renamed_hyphen(app, console):
+    class MyDict(TypedDict):
+        my_int: int
+        my_str: str
+        my_list: Annotated[list, Parameter(name="--your-list")]
+        my_list_int: List[int]
+
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(
+            "foo --d.my-int=5 --d.my-str=bar",
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--your-list" requires an argument.        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
