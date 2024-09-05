@@ -12,6 +12,7 @@ import cyclopts.utils
 from cyclopts._convert import _bool
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
+    ArgumentOrderError,
     CoercionError,
     CycloptsError,
     MissingArgumentError,
@@ -149,16 +150,22 @@ def _parse_pos(
     argument_collection: ArgumentCollection,
     tokens: list[str],
 ) -> list[str]:
+    prior_positional_or_keyword_supplied_as_keyword_arguments = []
     for i in itertools.count():
         try:
             argument, _, _ = argument_collection.match(i)
         except ValueError:
             break
+        if argument.iparam.kind is argument.iparam.POSITIONAL_OR_KEYWORD:
+            if argument.tokens and argument.tokens[0].keyword is not None:
+                prior_positional_or_keyword_supplied_as_keyword_arguments.append(argument)
+                # Continue in case we hit a VAR_POSITIONAL argument.
+                continue
+            if prior_positional_or_keyword_supplied_as_keyword_arguments:
+                # TODO: we should probably provide ``prior_positional_or_keyword_supplied_as_keyword_arguments`` to exception.
+                raise ArgumentOrderError(argument=argument)
+
         tokens_per_element, consume_all = argument.token_count()
-
-        if not consume_all and argument.tokens:
-            continue
-
         tokens_per_element = max(1, tokens_per_element)
         new_tokens = []
         while tokens:

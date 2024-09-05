@@ -5,6 +5,7 @@ import pytest
 
 from cyclopts import Parameter
 from cyclopts.exceptions import (
+    ArgumentOrderError,
     CoercionError,
     InvalidCommandError,
     MissingArgumentError,
@@ -45,6 +46,15 @@ def test_basic_2(app, cmd_str, assert_parse_args):
         pass
 
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
+
+
+def test_out_of_order_mixed_positional_or_keyword(app, assert_parse_args):
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with pytest.raises(ArgumentOrderError):
+        app.parse_args("foo --b=5 1 2", print_error=False, exit_on_error=False)
 
 
 def test_command_rename(app, assert_parse_args):
