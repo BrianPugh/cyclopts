@@ -319,14 +319,14 @@ def create_bound_arguments(
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(value=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
 
-        bound = _bind(func, argument_collection.iparam_to_value())
-
         for argument in argument_collection:
-            if not _is_required(argument.iparam) or argument.keys:
+            # TODO: this doesn't check if all required subkeys were provided.
+            if not _is_required(argument.iparam) or argument.keys or not argument._assignable:
                 continue
             if not bool(argument.n_tree_tokens):
                 raise MissingArgumentError(argument=argument)
 
+        bound = _bind(func, argument_collection.iparam_to_value())
     except CycloptsError as e:
         e.root_input_tokens = tokens
         e.unused_tokens = unused_tokens

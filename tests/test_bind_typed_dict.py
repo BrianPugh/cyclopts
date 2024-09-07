@@ -71,14 +71,14 @@ def test_bind_typed_dict_missing_arg_basic(app, console):
     assert actual == expected
 
 
-def test_bind_typed_dict_missing_arg_star(app, console):
+def test_bind_typed_dict_missing_arg_flatten(app, console):
     @app.command
     def foo(d: Annotated[MyDict, Parameter(name="*")]):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
-            "foo --d.my-int=5 --d.my-str=bar",
+            "foo",
             console=console,
             exit_on_error=False,
         )

@@ -2,7 +2,10 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Annotated, Dict
 
+import pytest
+
 from cyclopts import Parameter
+from cyclopts.exceptions import MissingArgumentError
 
 
 @dataclass
@@ -73,7 +76,6 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         car: Car
             Car specifications.
         """
-        pass
 
     assert_parse_args(
         build,
@@ -88,11 +90,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
     )
 
     with console.capture() as capture:
-        app(
-            "build --help",
-            console=console,
-            exit_on_error=False,
-        )
+        app("build --help", console=console)
 
     actual = capture.get()
     print(actual)
@@ -118,3 +116,45 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
     )
 
     assert actual == expected
+
+
+def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
+    """The ``engine`` parameter itself is optional, but if specified it has 2 required fields."""
+
+    @dataclass
+    class Engine:
+        cylinders: int
+        hp: float
+
+    @dataclass
+    class Car:
+        name: str
+        mileage: float
+        engine: Annotated[Engine, Parameter(name="*", group="Engine")] = Engine(8, 500)
+
+    @app.command
+    def build(*, license_plate: str, car: Car):
+        pass
+
+    # Specifying a complete engine works.
+    assert_parse_args(
+        build,
+        "build --car.name=ford --car.mileage=500 --car.cylinders=4 --car.hp=200 --license-plate=ABCDEFG",
+        car=Car(name="ford", mileage=500, engine=Engine(cylinders=4, hp=200)),
+        license_plate="ABCDEFG",
+    )
+
+    # Specifying NO engine works.
+    assert_parse_args(
+        build,
+        "build --car.name=ford --car.mileage=500 --license-plate=ABCDEFG",
+        car=Car(name="ford", mileage=500),
+        license_plate="ABCDEFG",
+    )
+
+    # Partially defining an engine does NOT work.
+    with pytest.raises(MissingArgumentError):
+        app.parse_args(
+            "build --car.name=ford --car.mileage=500 --car.hp=200 --license-plate=ABCDEFG",
+            exit_on_error=False,
+        )

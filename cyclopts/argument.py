@@ -548,7 +548,10 @@ class Argument:
     """
 
     class UNSET(Sentinel):
-        pass
+        """No data was provided to derive a python value from.
+
+        Or, :meth:`Argument.convert` has not yet been called.
+        """
 
     # List of tokens parsed from various sources
     # If tokens is empty, then no tokens have been parsed for this argument.
@@ -609,6 +612,7 @@ class Argument:
 
     @property
     def _marked(self):
+        """If ``True``, then this node in the tree has already been converted and ``value`` has been populated."""
         return self._marked_converted | self._mark_converted_override
 
     @_marked.setter
@@ -870,12 +874,13 @@ class Argument:
         else:  # A dictionary-like structure.
             data = {}
             if is_pydantic(self.hint):
+                # Don't convert any subkeys, let pydantic handle them.
                 converter = partial(convert, converter=_identity_converter, name_transform=self.cparam.name_transform)
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child.n_tree_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
-            out = self.hint(**data)
+            out = self.hint(**data) if data else self.UNSET
         return out
 
     def convert(self, converter=None):
