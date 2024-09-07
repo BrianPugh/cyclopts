@@ -42,7 +42,7 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     converter=None,  # pyright: ignore
     validator=None,
     negative=None,
-    help=None,
+    # Do NOT include help here; handled elsewhere due to docstring parsing.
     required=None,
     accepts_keys=None,
 )
@@ -331,10 +331,7 @@ class ArgumentCollection(list):
         argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
         out.append(argument)
         if argument._accepts_keywords:
-            if parse_docstring:
-                # TODO: need to get docstring of attributes?
-                # docstring_lookup = _extract_docstring_help(argument.hint)
-                pass
+            docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
 
             for field_name, field_hint in argument._lookup.items():
                 subkey_argument = cls._from_type(
@@ -342,6 +339,7 @@ class ArgumentCollection(list):
                     field_hint,
                     keys + (field_name,),
                     cparam,
+                    docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
@@ -1007,9 +1005,13 @@ def _resolve_groups_from_callable(
 
 
 def _extract_docstring_help(f: Callable) -> dict[str, Parameter]:
-    from docstring_parser import parse as docstring_parse
+    from docstring_parser import parse_from_object
 
-    return {dparam.arg_name: Parameter(help=dparam.description) for dparam in docstring_parse(f.__doc__ or "").params}
+    try:
+        return {dparam.arg_name: Parameter(help=dparam.description) for dparam in parse_from_object(f).params}
+    except TypeError:
+        # Type hints like ``dict[str, str]`` trigger this.
+        return {}
 
 
 def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
