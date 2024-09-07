@@ -56,7 +56,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         mileage: float
         "How many miles the car has driven."
 
-        engine: Annotated[Engine, Parameter(name="*")]
+        engine: Annotated[Engine, Parameter(name="*", group="Engine")]
         "The kind of engine the car is using."
 
         wheel: Wheel
@@ -99,7 +99,21 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
 
     expected = dedent(
         """\
-        TODO
+        Usage: test_bind_dataclasses build [OPTIONS]
+
+        Build a car.
+
+        ╭─ Engine ───────────────────────────────────────────────────────────╮
+        │ --car.cylinders  Number of cylinders the engine has.               │
+        │ --car.hp         Amount of horsepower the engine can generate.     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --license-plate       License plate identifier to give to car.  │
+        │                          [required]                                │
+        │    --car.name            The name/model of the car.                │
+        │    --car.mileage         How many miles the car has driven.        │
+        │    --car.wheel.diameter  Diameter of wheel in inches.              │
+        ╰────────────────────────────────────────────────────────────────────╯
         """
     )
 
