@@ -108,10 +108,6 @@ def _validate_typed_dict(argument, data: dict, _key_chain: tuple[str, ...] = ())
         )[0]
         raise MissingArgumentError(argument=missing_argument)
 
-    for field_name, hint in typed_dict.__annotations__.items():
-        if is_typeddict(hint):
-            _validate_typed_dict(hint, data[field_name], _key_chain + (field_name,))
-
 
 def is_pydantic(hint) -> bool:
     return hasattr(hint, "__pydantic_core_schema__")
