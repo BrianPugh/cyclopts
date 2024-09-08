@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from contextlib import suppress
 from functools import partial
 from inspect import isclass
-from typing import Any, Callable, Optional, Union, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from attrs import define, field
 
@@ -43,7 +43,6 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     validator=None,
     negative=None,
     # Do NOT include help here; handled elsewhere due to docstring parsing.
-    required=None,
     accepts_keys=None,
 )
 
@@ -56,40 +55,66 @@ def _iparam_get_hint(iparam):
     return hint
 
 
-def _typed_dict_required_optional(typeddict) -> tuple[frozenset[str], frozenset[str]]:
-    """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11."""
+def _typed_dict_required_optional(typeddict) -> tuple[dict[str, Any], dict[str, Any]]:
+    # Don't use get_type_hints because it resolves Annotated automatically.
+    type_hints = typeddict.__annotations__
     if sys.version_info >= (3, 11):
-        return typeddict.__required_keys__, typeddict.__optional_keys__
+        required = {k: type_hints[k] for k in typeddict.__required_keys__}
+        optional = {k: type_hints[k] for k in typeddict.__optional_keys__}
+    else:
+        """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11."""
+        required, optional = {}, {}
+        for name, annotation in type_hints.items():
+            origin = get_origin(resolve_annotated(annotation))
+            if origin is Required:
+                required[name] = annotation
+            elif origin is NotRequired:
+                optional[name] = annotation
+            elif typeddict.__total__:  # Fields are required by default.
+                required[name] = annotation
+            else:  # Fields are optional by default
+                optional[name] = annotation
 
-    required, optional = set(), set()
-    for name, annotation in get_type_hints(typeddict).items():
-        annotation = resolve_annotated(annotation)
-        origin = get_origin(annotation)
-        if origin is Required:
-            required.add(name)
-        elif origin is NotRequired:
-            optional.add(name)
-        elif typeddict.__total__:  # Fields are required by default.
-            required.add(name)
-        else:  # Fields are optional by default
-            optional.add(name)
-
-    return frozenset(required), frozenset(optional)
+    return required, optional
 
 
-def _validate_init(argument: "Argument", data: dict):
-    signature = inspect.signature(argument.hint.__init__)
-
-    required, optional = set(), set()
+def _func_required_optional(f) -> tuple[dict[str, Any], dict[str, Any]]:
+    signature = inspect.signature(f)
+    required, optional = {}, {}
     for name, iparam in signature.parameters.items():
         if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
             continue
         if iparam.default == iparam.empty:
-            required.add(name)
+            required[name] = iparam.annotation
         else:
-            optional.add(name)
+            optional[name] = iparam.annotation
+    return required, optional
 
-    missing_keys = required - set(data)
+
+def _pydantic_required_optional(model) -> tuple[dict[str, Any], dict[str, Any]]:
+    required, optional = {}, {}
+    for k, v in model.model_fields.items():
+        if v.is_required():
+            required[k] = v.annotation
+        else:
+            optional[k] = v.annotation
+    return required, optional
+
+
+def _validate_init(argument: "Argument", data: dict):
+    required, optional = _func_required_optional(argument.hint.__init__)
+    missing_keys = set(required) - set(data)
+    if missing_keys:
+        missing_key = next(iter(missing_keys))
+        missing_argument = argument.children.filter_by(
+            keys_prefix=argument.keys + (missing_key,),
+        )[0]
+        raise MissingArgumentError(argument=missing_argument)
+
+
+def _validate_pydantic(argument: "Argument", data: dict):
+    required, optional = _pydantic_required_optional(argument.hint)
+    missing_keys = set(required) - set(data)
     if missing_keys:
         missing_key = next(iter(missing_keys))
         missing_argument = argument.children.filter_by(
@@ -121,7 +146,7 @@ def _validate_typed_dict(argument: "Argument", data: dict):
 
     # First, check for extra keys.
     required_keys, _ = _typed_dict_required_optional(typed_dict)
-    missing_keys = sorted(required_keys - data_keys)
+    missing_keys = sorted(set(required_keys) - data_keys)
     if missing_keys:
         # Report the first missing argument.
         missing_key = next(iter(missing_keys))
@@ -351,14 +376,14 @@ class ArgumentCollection(list):
         if argument._accepts_keywords:
             docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
 
-            for field_name, field_hint in argument._lookup.items():
+            for field_name, (field_hint, field_required) in argument._lookup.items():
                 subkey_argument = cls._from_type(
                     iparam,
                     field_hint,
                     keys + (field_name,),
                     cparam,
+                    Parameter(required=cparam.required & field_required),
                     docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
-                    # TODO: required here and remove it from _PARAMETER_SUBKEY_BLOCKER?
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
@@ -674,26 +699,38 @@ class Argument:
             elif is_typeddict(hint):
                 self._internal_validator = _validate_typed_dict
                 self._accepts_keywords = True
-                self._lookup.update(hint.__annotations__)
+                lookup_required, lookup_optional = _typed_dict_required_optional(hint)
+                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._internal_validator = _validate_init
                 self._accepts_keywords = True
-                self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
+                lookup_required, lookup_optional = _func_required_optional(hint.__init__)
+                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._internal_validator = _validate_init
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
+                self._lookup.update(
+                    {name: (hint.__annotations__.get(name, str), name in hint._field_defaults) for name in hint._fields}
+                )
             elif is_attrs(hint):
                 self._internal_validator = _validate_init
                 self._accepts_keywords = True
-                self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
+                lookup_required, lookup_optional = _func_required_optional(hint.__init__)
+                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_pydantic(hint):
-                self._internal_validator = _validate_init
+                self._internal_validator = _validate_pydantic
                 self._accepts_keywords = True
-                self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
+                # pydantic's __init__ signature doesn't accurately reflect its requirements.
+                # so we cannot use _func_required_optional(...)
+                lookup_required, lookup_optional = _pydantic_required_optional(hint)
+                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True
@@ -714,7 +751,12 @@ class Argument:
                 if iparam.kind is iparam.VAR_KEYWORD:
                     self._default = iparam.annotation
                 else:
-                    self._lookup[iparam.name] = iparam.annotation
+                    self._lookup[iparam.name] = (
+                        iparam.annotation,
+                        iparam.default is iparam.empty
+                        and iparam.kind != iparam.VAR_KEYWORD
+                        and iparam.kind != iparam.VAR_POSITIONAL,
+                    )
 
     @property
     def accepts_arbitrary_keywords(self) -> bool:

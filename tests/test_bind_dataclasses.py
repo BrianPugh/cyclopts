@@ -51,6 +51,9 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         hp: float
         "Amount of horsepower the engine can generate."
 
+        diesel: bool = False
+        "If this engine consumes diesel, instead of gasoline."
+
     @dataclass
     class Car:
         name: str
@@ -64,6 +67,9 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
 
         wheel: Wheel
         "The kind of wheels the car is using."
+
+        n_axles: int = 2
+        "Number of axles the car has."
 
     @app.command
     def build(*, license_plate: str, car: Car):
@@ -102,15 +108,21 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         Build a car.
 
         ╭─ Engine ───────────────────────────────────────────────────────────╮
-        │ --car.cylinders  Number of cylinders the engine has.               │
-        │ --car.hp         Amount of horsepower the engine can generate.     │
+        │ *  --car.cylinders               Number of cylinders the engine    │
+        │                                  has. [required]                   │
+        │ *  --car.hp                      Amount of horsepower the engine   │
+        │                                  can generate. [required]          │
+        │    --car.diesel,--no-car.diesel  If this engine consumes diesel,   │
+        │                                  instead of gasoline.              │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --license-plate       License plate identifier to give to car.  │
         │                          [required]                                │
-        │    --car.name            The name/model of the car.                │
-        │    --car.mileage         How many miles the car has driven.        │
-        │    --car.wheel.diameter  Diameter of wheel in inches.              │
+        │ *  --car.name            The name/model of the car. [required]     │
+        │ *  --car.mileage         How many miles the car has driven.        │
+        │                          [required]                                │
+        │ *  --car.wheel.diameter  Diameter of wheel in inches. [required]   │
+        │    --car.n-axles         Number of axles the car has.              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
