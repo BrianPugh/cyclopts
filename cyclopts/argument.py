@@ -358,6 +358,7 @@ class ArgumentCollection(list):
                     keys + (field_name,),
                     cparam,
                     docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
+                    # TODO: required here and remove it from _PARAMETER_SUBKEY_BLOCKER?
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
@@ -401,7 +402,11 @@ class ArgumentCollection(list):
             hint,
             (),
             _PARAMETER_EMPTY_HELP,
-            Parameter(required=iparam.default is iparam.empty),
+            Parameter(
+                required=iparam.default is iparam.empty
+                and iparam.kind != iparam.VAR_KEYWORD
+                and iparam.kind != iparam.VAR_POSITIONAL
+            ),
             *default_parameters,
             group_lookup=group_lookup,
             group_arguments=group_arguments,
@@ -892,6 +897,8 @@ class Argument:
                     out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
                 else:
                     out = converter(self.hint, keyword)
+            elif self.cparam.required:
+                raise MissingArgumentError(argument=self)
             else:  # no tokens
                 return self.UNSET
         else:  # A dictionary-like structure.
@@ -903,12 +910,17 @@ class Argument:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child.n_tree_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
+
+            if self._internal_validator and (self.cparam.required or data):
+                self._internal_validator(self, data)
+
             if data:
-                if self._internal_validator:
-                    self._internal_validator(self, data)
                 out = self.hint(**data)
+            elif self.cparam.required:
+                raise MissingArgumentError(argument=self)
             else:
                 out = self.UNSET
+
         return out
 
     def convert(self, converter=None):
