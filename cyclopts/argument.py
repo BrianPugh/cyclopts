@@ -77,7 +77,7 @@ def _typed_dict_required_optional(typeddict) -> tuple[frozenset[str], frozenset[
     return frozenset(required), frozenset(optional)
 
 
-def _validate_typed_dict(argument, data: dict, _key_chain: tuple[str, ...] = ()):
+def _validate_typed_dict(argument: "Argument", data: dict):
     """Not a complete validator; only recursively checks TypedDicts.
 
     Checks:
