@@ -124,7 +124,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     @dataclass
     class Engine:
         cylinders: int
-        hp: float
+        hp: float = 100
 
     @dataclass
     class Car:
@@ -153,8 +153,21 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     )
 
     # Partially defining an engine does NOT work.
-    with pytest.raises(MissingArgumentError):
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
         app.parse_args(
             "build --car.name=ford --car.mileage=500 --car.hp=200 --license-plate=ABCDEFG",
+            console=console,
             exit_on_error=False,
         )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "build" parameter "--car.cylinders" requires an argument.  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected

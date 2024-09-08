@@ -77,6 +77,27 @@ def _typed_dict_required_optional(typeddict) -> tuple[frozenset[str], frozenset[
     return frozenset(required), frozenset(optional)
 
 
+def _validate_init(argument: "Argument", data: dict):
+    signature = inspect.signature(argument.hint.__init__)
+
+    required, optional = set(), set()
+    for name, iparam in signature.parameters.items():
+        if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
+            continue
+        if iparam.default == iparam.empty:
+            required.add(name)
+        else:
+            optional.add(name)
+
+    missing_keys = required - set(data)
+    if missing_keys:
+        missing_key = next(iter(missing_keys))
+        missing_argument = argument.children.filter_by(
+            keys_prefix=argument.keys + (missing_key,),
+        )[0]
+        raise MissingArgumentError(argument=missing_argument)
+
+
 def _validate_typed_dict(argument: "Argument", data: dict):
     """Not a complete validator; only recursively checks TypedDicts.
 
@@ -92,6 +113,7 @@ def _validate_typed_dict(argument: "Argument", data: dict):
     extra_keys = data_keys - set(typed_dict.__annotations__)
 
     if extra_keys:
+        # TODO: is it possible to get here? or is it caught at an earlier stage?
         if len(extra_keys) == 1:
             raise CoercionError(msg=f"{typed_dict} does not accept key {next(iter(extra_keys))}.")
         else:
@@ -649,18 +671,22 @@ class Argument:
                 self._accepts_keywords = True
                 self._lookup.update(hint.__annotations__)
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
+                self._internal_validator = _validate_init
                 self._accepts_keywords = True
                 self._lookup.update({k: v.type for k, v in hint.__dataclass_fields__.items()})
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
+                self._internal_validator = _validate_init
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
                 self._lookup.update({field: hint.__annotations__.get(field, str) for field in hint._fields})
             elif is_attrs(hint):
+                self._internal_validator = _validate_init
                 self._accepts_keywords = True
                 self._lookup.update({a.alias: a.type for a in hint.__attrs_attrs__})
             elif is_pydantic(hint):
+                self._internal_validator = _validate_init
                 self._accepts_keywords = True
                 self._lookup.update({k: v.annotation for k, v in hint.model_fields.items()})
             elif self.cparam.accepts_keys is None:
@@ -676,6 +702,7 @@ class Argument:
             # They must be explicitly specified ``accepts_keys=True`` because otherwise
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
+            self._internal_validator = _validate_init
             for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
@@ -876,7 +903,12 @@ class Argument:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child.n_tree_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
-            out = self.hint(**data) if data else self.UNSET
+            if data:
+                if self._internal_validator:
+                    self._internal_validator(self, data)
+                out = self.hint(**data)
+            else:
+                out = self.UNSET
         return out
 
     def convert(self, converter=None):
@@ -890,9 +922,6 @@ class Argument:
         return self.value
 
     def validate(self, value):
-        if self._internal_validator:
-            self._internal_validator(self, value)
-
         assert isinstance(self.cparam.validator, tuple)
 
         try:
