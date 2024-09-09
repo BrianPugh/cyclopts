@@ -50,7 +50,7 @@ pre_commit = ">=2.16.0"
 pytest = ">=7.1.2"
 pytest-cov = ">=3.0.0"
 pytest-mock = ">=3.7.0"
-pydantic = "^2.7.0"
+pydantic = "^2.9.0"
 toml = "^0.10.2"
 pyyaml = ">=6.0.1"
 
