@@ -1,13 +1,3 @@
-"""TypedDict.
-
-TODO/Notes:
-    * total=False/True (>=3.8)
-        * MyDict.__total__
-    * MyDict.__required_keys__ frozenset  (>= 3.9)
-    * MyDict.__optional_keys__ frozenset  (>= 3.9)
-    * Required/NotRequired (>= 3.11)
-"""
-
 import sys
 from textwrap import dedent
 from typing import Annotated, List, TypedDict
