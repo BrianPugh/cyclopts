@@ -15,7 +15,7 @@ from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
 
-TestCase = namedtuple("TestCase", ["args", "expected"])
+Case = namedtuple("TestCase", ["args", "expected"])
 
 
 def test_argument_collection_no_annotation_no_default():
@@ -430,15 +430,15 @@ def test_argument_collection_var_keyword_match():
 @pytest.mark.parametrize(
     "args, expected",
     [
-        TestCase(args=(("--foo",),), expected=("--foo",)),
-        TestCase(args=(("--foo", "--bar"),), expected=("--foo", "--bar")),
-        TestCase(args=(("--foo",), ("--bar",)), expected=("--bar",)),
-        TestCase(args=(("--foo",), ("baz",)), expected=("--foo.baz",)),
-        TestCase(args=(("--foo",), ("--bar", "baz")), expected=("--bar", "--foo.baz")),
-        TestCase(args=(("--foo", "--bar"), ("baz",)), expected=("--foo.baz", "--bar.baz")),
-        TestCase(args=(("*",), ("bar",)), expected=("--bar",)),
-        TestCase(args=(("--foo", "*"), ("bar",)), expected=("--foo.bar", "--bar")),
-        TestCase(args=(("--foo",), ("*",), ("bar",)), expected=("--foo.bar",)),
+        Case(args=(("--foo",),), expected=("--foo",)),
+        Case(args=(("--foo", "--bar"),), expected=("--foo", "--bar")),
+        Case(args=(("--foo",), ("--bar",)), expected=("--bar",)),
+        Case(args=(("--foo",), ("baz",)), expected=("--foo.baz",)),
+        Case(args=(("--foo",), ("--bar", "baz")), expected=("--bar", "--foo.baz")),
+        Case(args=(("--foo", "--bar"), ("baz",)), expected=("--foo.baz", "--bar.baz")),
+        Case(args=(("*",), ("bar",)), expected=("--bar",)),
+        Case(args=(("--foo", "*"), ("bar",)), expected=("--foo.bar", "--bar")),
+        Case(args=(("--foo",), ("*",), ("bar",)), expected=("--foo.bar",)),
     ],
 )
 def test_resolve_parameter_name(args, expected):

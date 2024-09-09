@@ -2,6 +2,7 @@ import collections.abc
 import inspect
 import sys
 from collections.abc import Sequence
+from contextlib import suppress
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -82,6 +83,18 @@ _converters = {
     bytes: _bytes,
     bytearray: _bytearray,
 }
+
+
+def _first_argument_type(hint):
+    try:
+        signature = inspect.signature(hint.__init__)
+    except AttributeError:
+        raise ValueError from None
+    for iparam in signature.parameters.values():
+        if iparam.name == "self":
+            continue
+        return str if iparam.annotation is iparam.empty else iparam.annotation
+    raise ValueError
 
 
 def _convert_tuple(
@@ -221,7 +234,13 @@ def _convert(
             raise ValueError
         try:
             if converter is None:
-                return _converters.get(type_, type_)(token.value)
+                inner_value = token.value
+                with suppress(ValueError):
+                    first_argument_type = _first_argument_type(type_)
+                    if first_argument_type is not str:
+                        # Prevents infinite recursion
+                        inner_value = convert(first_argument_type, token)
+                return _converters.get(type_, type_)(inner_value)
             else:
                 return converter(type_, token.value)
         except CoercionError as e:
