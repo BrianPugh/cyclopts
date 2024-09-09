@@ -967,7 +967,6 @@ class Argument:
         else:
             hint = self.hint
         tokens_per_element, consume_all = token_count(hint)
-        consume_all |= self.iparam.kind is self.iparam.VAR_POSITIONAL  # TODO: is this necessary?
         return tokens_per_element, consume_all
 
     @property
