@@ -140,12 +140,13 @@ class ValidationError(CycloptsError):
         if self.argument:
             if len(self.argument.tokens) == 1 and not self.argument.children:
                 token = self.argument.tokens[0]
+                provided_by = "" if token.source == "cli" else f" provided by {token.source}"
                 if token.keyword is None:
                     # Provided positionally
                     positional_name = self.argument.name.lstrip("-").upper()
-                    message = f'Invalid value "{token.value}" for {positional_name}.'
+                    message = f'Invalid value "{token.value}" for {positional_name}{provided_by}.'
                 else:
-                    message = f"Invalid value {self.argument.value!r} for {token.keyword}."
+                    message = f'Invalid value "{self.argument.value}" for {token.keyword}{provided_by}.'
             else:
                 message = "TODO"
         elif self.group:

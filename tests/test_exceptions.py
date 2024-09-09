@@ -1,17 +1,24 @@
 from textwrap import dedent
-from typing import Annotated, Union
+from typing import Union
 
 import pytest
 
 from cyclopts import (
+    Argument,
     ArgumentOrderError,
     CoercionError,
     InvalidCommandError,
     MissingArgumentError,
     MixedArgumentError,
     Parameter,
+    Token,
     ValidationError,
 )
+
+
+def positive_validator(type_, value):
+    if value <= 0:
+        raise ValueError("Value must be positive.")
 
 
 def test_exceptions_missing_argument(app, console):
@@ -36,58 +43,63 @@ def test_exceptions_missing_argument(app, console):
 
 
 def test_exceptions_validation_error_cli_single_positional(app, console):
-    def validator(type_, value):
-        if value <= 0:
-            raise ValueError("Value must be positive.")
-
-    @app.command
-    def foo(bar: Annotated[int, Parameter(validator=validator)]):
-        pass
-
-    with console.capture() as capture, pytest.raises(ValidationError):
-        app("foo -2", console=console, exit_on_error=False)
-
-    actual = capture.get()
+    argument = Argument(
+        hint=int,
+        cparam=Parameter(name=("--bar",), validator=positive_validator),
+        tokens=[
+            Token(keyword=None, value="-2", source="cli"),
+        ],
+    )
+    with pytest.raises(ValidationError) as e:
+        argument.convert_and_validate()
 
     expected = dedent(
-        """\
-        ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value "-2" for BAR. Value must be positive.                │
-        ╰────────────────────────────────────────────────────────────────────╯
         """
-    )
-
-    assert actual == expected
+        ValidationError
+        Invalid value "-2" for BAR. Value must be positive.
+        """
+    ).strip()
+    assert str(e.value) == expected
 
 
 def test_exceptions_validation_error_cli_single_keyword(app, console):
-    def validator(type_, value):
-        if value <= 0:
-            raise ValueError("Value must be positive.")
-
-    @app.command
-    def foo(bar: Annotated[int, Parameter(validator=validator)]):
-        pass
-
-    with console.capture() as capture, pytest.raises(ValidationError):
-        app("foo --bar -2", console=console, exit_on_error=False)
-
-    actual = capture.get()
+    argument = Argument(
+        hint=int,
+        cparam=Parameter(name=("--bar",), validator=positive_validator),
+        tokens=[
+            Token(keyword="--bar", value="-2", source="cli"),
+        ],
+    )
+    with pytest.raises(ValidationError) as e:
+        argument.convert_and_validate()
 
     expected = dedent(
-        """\
-        ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value -2 for --bar. Value must be positive.                │
-        ╰────────────────────────────────────────────────────────────────────╯
         """
-    )
-
-    assert actual == expected
+        ValidationError
+        Invalid value "-2" for --bar. Value must be positive.
+        """
+    ).strip()
+    assert str(e.value) == expected
 
 
 def test_exceptions_validation_error_non_cli_single_keyword(app, console):
-    # TODO
-    pass
+    argument = Argument(
+        hint=int,
+        cparam=Parameter(name=("--bar",), validator=positive_validator),
+        tokens=[
+            Token(value="-2", source="test"),
+        ],
+    )
+    with pytest.raises(ValidationError) as e:
+        argument.convert_and_validate()
+
+    expected = dedent(
+        """
+        ValidationError
+        Invalid value "-2" for BAR provided by test. Value must be positive.
+        """
+    ).strip()
+    assert str(e.value) == expected
 
 
 def test_exceptions_validation_error_cli_multi_positional(app, console):
