@@ -1,14 +1,16 @@
 from textwrap import dedent
-from typing import Union
+from typing import Annotated, Union
 
 import pytest
 
-from cyclopts.exceptions import (
+from cyclopts import (
     ArgumentOrderError,
     CoercionError,
     InvalidCommandError,
     MissingArgumentError,
     MixedArgumentError,
+    Parameter,
+    ValidationError,
 )
 
 
@@ -31,6 +33,71 @@ def test_exceptions_missing_argument(app, console):
     )
 
     assert actual == expected
+
+
+def test_exceptions_validation_error_cli_single_positional(app, console):
+    def validator(type_, value):
+        if value <= 0:
+            raise ValueError("Value must be positive.")
+
+    @app.command
+    def foo(bar: Annotated[int, Parameter(validator=validator)]):
+        pass
+
+    with console.capture() as capture, pytest.raises(ValidationError):
+        app("foo -2", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Invalid value "-2" for BAR. Value must be positive.                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_validation_error_cli_single_keyword(app, console):
+    def validator(type_, value):
+        if value <= 0:
+            raise ValueError("Value must be positive.")
+
+    @app.command
+    def foo(bar: Annotated[int, Parameter(validator=validator)]):
+        pass
+
+    with console.capture() as capture, pytest.raises(ValidationError):
+        app("foo --bar -2", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Invalid value -2 for --bar. Value must be positive.                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_validation_error_non_cli_single_keyword(app, console):
+    # TODO
+    pass
+
+
+def test_exceptions_validation_error_cli_multi_positional(app, console):
+    # TODO
+    pass
+
+
+def test_exceptions_validation_error_cli_multi_keyword(app, console):
+    # TODO
+    pass
 
 
 def test_exceptions_coercion_error(app, console):

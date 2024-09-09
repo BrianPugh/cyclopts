@@ -129,23 +129,30 @@ class ValidationError(CycloptsError):
     value: str
     """Parenting Assertion/Value/Type Error message."""
 
-    # One of the following caused a failure
-    token: Optional["Token"] = None
     group: Optional[Group] = None
+    """If a group validator caused the exception."""
 
     def __attrs_post_init__(self):
         # Make sure only 1 is set.
-        assert (bool(self.argument) + bool(self.token) + bool(self.group)) == 1
+        assert (bool(self.argument) + bool(self.group)) == 1
 
     def __str__(self):
         if self.argument:
-            raise NotImplementedError  # TODO
-        elif self.token:
-            return super().__str__() + f"Invalid value for {self.token.keyword}. {self.value}"
+            if len(self.argument.tokens) == 1 and not self.argument.children:
+                token = self.argument.tokens[0]
+                if token.keyword is None:
+                    # Provided positionally
+                    positional_name = self.argument.name.lstrip("-").upper()
+                    message = f'Invalid value "{token.value}" for {positional_name}.'
+                else:
+                    message = f"Invalid value {self.argument.value!r} for {token.keyword}."
+            else:
+                message = "TODO"
         elif self.group:
-            return super().__str__() + f'Invalid values for group "{self.group}". {self.value}'
+            message = f'Invalid values for group "{self.group}".'
         else:
             raise NotImplementedError
+        return f"{super().__str__()}{message} {self.value}"
 
 
 @define(kw_only=True)
