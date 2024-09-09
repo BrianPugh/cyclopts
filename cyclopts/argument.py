@@ -96,19 +96,12 @@ def _pydantic_required_optional(model) -> tuple[dict[str, Any], dict[str, Any]]:
     return required, optional
 
 
-def _missing_keys_generic_class(argument: "Argument", data: dict):
-    required, optional = _generic_class_required_optional(argument.hint)
-    return set(required) - set(data)
+def _missing_keys_factory(get_required_optional: Callable[[Any], tuple[dict[str, Any], dict[str, Any]]]):
+    def inner(argument: "Argument", data: dict) -> set[str]:
+        required, _ = get_required_optional(argument.hint)
+        return set(required) - set(data)
 
-
-def _missing_keys_pydantic(argument: "Argument", data: dict):
-    required, optional = _pydantic_required_optional(argument.hint)
-    return set(required) - set(data)
-
-
-def _missing_keys_typed_dict(argument: "Argument", data: dict):
-    required_keys, _ = _typed_dict_required_optional(argument.hint)
-    return sorted(set(required_keys) - set(data))
+    return inner
 
 
 def is_pydantic(hint) -> bool:
@@ -652,20 +645,20 @@ class Argument:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
                 self._default = val_type
             elif is_typeddict(hint):
-                self._missing_keys_checker = _missing_keys_typed_dict
+                self._missing_keys_checker = _missing_keys_factory(_typed_dict_required_optional)
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _typed_dict_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
-                self._missing_keys_checker = _missing_keys_generic_class
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _generic_class_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
-                self._missing_keys_checker = _missing_keys_generic_class
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
@@ -673,13 +666,13 @@ class Argument:
                     {name: (hint.__annotations__.get(name, str), name in hint._field_defaults) for name in hint._fields}
                 )
             elif is_attrs(hint):
-                self._missing_keys_checker = _missing_keys_generic_class
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _generic_class_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_pydantic(hint):
-                self._missing_keys_checker = _missing_keys_pydantic
+                self._missing_keys_checker = _missing_keys_factory(_pydantic_required_optional)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
@@ -699,7 +692,7 @@ class Argument:
             # They must be explicitly specified ``accepts_keys=True`` because otherwise
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
-            self._missing_keys_checker = _missing_keys_generic_class
+            self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
             for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
@@ -911,7 +904,7 @@ class Argument:
             if self._missing_keys_checker and (self.cparam.required or data):
                 if missing_keys := self._missing_keys_checker(self, data):
                     # Report the first missing argument.
-                    missing_key = next(iter(missing_keys))
+                    missing_key = sorted(missing_keys)[0]
                     missing_argument = self.children.filter_by(
                         keys_prefix=self.keys + (missing_key,),
                     )[0]
