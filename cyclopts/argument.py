@@ -73,8 +73,8 @@ def _typed_dict_required_optional(typeddict) -> tuple[dict[str, Any], dict[str, 
     return required, optional
 
 
-def _func_required_optional(f) -> tuple[dict[str, Any], dict[str, Any]]:
-    signature = inspect.signature(f)
+def _generic_class_required_optional(f) -> tuple[dict[str, Any], dict[str, Any]]:
+    signature = inspect.signature(f.__init__)
     required, optional = {}, {}
     for name, iparam in signature.parameters.items():
         if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
@@ -96,59 +96,19 @@ def _pydantic_required_optional(model) -> tuple[dict[str, Any], dict[str, Any]]:
     return required, optional
 
 
-def _validate_init(argument: "Argument", data: dict):
-    required, optional = _func_required_optional(argument.hint.__init__)
-    missing_keys = set(required) - set(data)
-    if missing_keys:
-        missing_key = next(iter(missing_keys))
-        missing_argument = argument.children.filter_by(
-            keys_prefix=argument.keys + (missing_key,),
-        )[0]
-        raise MissingArgumentError(argument=missing_argument)
+def _missing_keys_generic_class(argument: "Argument", data: dict):
+    required, optional = _generic_class_required_optional(argument.hint)
+    return set(required) - set(data)
 
 
-def _validate_pydantic(argument: "Argument", data: dict):
+def _missing_keys_pydantic(argument: "Argument", data: dict):
     required, optional = _pydantic_required_optional(argument.hint)
-    missing_keys = set(required) - set(data)
-    if missing_keys:
-        missing_key = next(iter(missing_keys))
-        missing_argument = argument.children.filter_by(
-            keys_prefix=argument.keys + (missing_key,),
-        )[0]
-        raise MissingArgumentError(argument=missing_argument)
+    return set(required) - set(data)
 
 
-def _validate_typed_dict(argument: "Argument", data: dict):
-    """Not a complete validator; only recursively checks TypedDicts.
-
-    Checks:
-        1. Are there any extra keys.
-        2. Are all required keys present.
-
-    Things that this doesn't check (these are enforced by other parts of Cyclopts):
-        1. If the values are the correct type
-    """
-    typed_dict = argument.hint
-    data_keys = set(data)
-    extra_keys = data_keys - set(typed_dict.__annotations__)
-
-    if extra_keys:
-        # TODO: is it possible to get here? or is it caught at an earlier stage?
-        if len(extra_keys) == 1:
-            raise CoercionError(msg=f"{typed_dict} does not accept key {next(iter(extra_keys))}.")
-        else:
-            raise CoercionError(msg=f"{typed_dict} does not accept keys {extra_keys}.")
-
-    # First, check for extra keys.
-    required_keys, _ = _typed_dict_required_optional(typed_dict)
-    missing_keys = sorted(set(required_keys) - data_keys)
-    if missing_keys:
-        # Report the first missing argument.
-        missing_key = next(iter(missing_keys))
-        missing_argument = argument.children.filter_by(
-            keys_prefix=argument.keys + (missing_key,),
-        )[0]
-        raise MissingArgumentError(argument=missing_argument)
+def _missing_keys_typed_dict(argument: "Argument", data: dict):
+    required_keys, _ = _typed_dict_required_optional(argument.hint)
+    return sorted(set(required_keys) - set(data))
 
 
 def is_pydantic(hint) -> bool:
@@ -638,7 +598,7 @@ class Argument:
     _mark_converted_override: bool = field(default=False, init=False, repr=False)
 
     # Validator to be called based on builtin type support.
-    _internal_validator: Optional[Callable] = field(default=None, init=False, repr=False)
+    _missing_keys_checker: Optional[Callable] = field(default=None, init=False, repr=False)
 
     _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
 
@@ -692,20 +652,20 @@ class Argument:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
                 self._default = val_type
             elif is_typeddict(hint):
-                self._internal_validator = _validate_typed_dict
+                self._missing_keys_checker = _missing_keys_typed_dict
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _typed_dict_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
-                self._internal_validator = _validate_init
+                self._missing_keys_checker = _missing_keys_generic_class
                 self._accepts_keywords = True
-                lookup_required, lookup_optional = _func_required_optional(hint.__init__)
+                lookup_required, lookup_optional = _generic_class_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
-                self._internal_validator = _validate_init
+                self._missing_keys_checker = _missing_keys_generic_class
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
@@ -713,16 +673,16 @@ class Argument:
                     {name: (hint.__annotations__.get(name, str), name in hint._field_defaults) for name in hint._fields}
                 )
             elif is_attrs(hint):
-                self._internal_validator = _validate_init
+                self._missing_keys_checker = _missing_keys_generic_class
                 self._accepts_keywords = True
-                lookup_required, lookup_optional = _func_required_optional(hint.__init__)
+                lookup_required, lookup_optional = _generic_class_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
             elif is_pydantic(hint):
-                self._internal_validator = _validate_pydantic
+                self._missing_keys_checker = _missing_keys_pydantic
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
-                # so we cannot use _func_required_optional(...)
+                # so we cannot use _generic_class_required_optional(...)
                 lookup_required, lookup_optional = _pydantic_required_optional(hint)
                 self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
                 self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
@@ -739,7 +699,7 @@ class Argument:
             # They must be explicitly specified ``accepts_keys=True`` because otherwise
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
-            self._internal_validator = _validate_init
+            self._missing_keys_checker = _missing_keys_generic_class
             for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
@@ -948,8 +908,14 @@ class Argument:
                 if child.n_tree_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
 
-            if self._internal_validator and (self.cparam.required or data):
-                self._internal_validator(self, data)
+            if self._missing_keys_checker and (self.cparam.required or data):
+                if missing_keys := self._missing_keys_checker(self, data):
+                    # Report the first missing argument.
+                    missing_key = next(iter(missing_keys))
+                    missing_argument = self.children.filter_by(
+                        keys_prefix=self.keys + (missing_key,),
+                    )[0]
+                    raise MissingArgumentError(argument=missing_argument)
 
             if data:
                 out = self.hint(**data)
