@@ -288,6 +288,7 @@ class ArgumentCollection(list):
                 _PARAMETER_SUBKEY_BLOCKER,
                 immediate_parameter,
             )
+            # TODO: if cparam.name?
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
@@ -308,11 +309,7 @@ class ArgumentCollection(list):
                     # Name is only used for help-string
                     cparam = Parameter.combine(cparam, Parameter(name=(iparam.name.upper(),)))
                 elif iparam.kind is iparam.VAR_KEYWORD:
-                    if cparam.name:
-                        # TODO: Probably something like `--existing.[KEYWORD]`
-                        raise NotImplementedError
-                    else:
-                        cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
+                    cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:
                     # cparam.name_transform cannot be None due to:
                     #     attrs.converters.default_if_none(default_name_transform)
@@ -1052,8 +1049,17 @@ def _extract_docstring_help(f: Callable) -> dict[str, Parameter]:
 
 
 def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
-    """
-    args will only ever be >1 if parsing a subkey.
+    """Resolve parameter names by combining and formatting multiple tuples of strings.
+
+    Parameters
+    ----------
+    *argss
+        Each tuple represents a group of parameter name components.
+
+    Returns
+    -------
+    tuple[str, ...]
+        A tuple of resolved parameter names.
     """
     if len(argss) == 0:
         return ()

@@ -1,4 +1,5 @@
 import inspect
+from collections import namedtuple
 from typing import Annotated, Dict, List, Optional, TypedDict, Union
 
 import pytest
@@ -13,6 +14,8 @@ from cyclopts.argument import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
+
+TestCase = namedtuple("TestCase", ["args", "expected"])
 
 
 def test_argument_collection_no_annotation_no_default():
@@ -390,6 +393,28 @@ def test_argument_collection_var_keyword():
     assert collection[1]._accepts_keywords is True
 
 
+def test_argument_collection_var_keyword_named():
+    def foo(a: int, **b: Annotated[float, Parameter(name=("--foo", "--bar"))]):
+        pass
+
+    iparams = inspect.signature(foo).parameters
+    collection = ArgumentCollection.from_callable(foo)
+
+    assert len(collection) == 2
+
+    assert collection[0].iparam == iparams["a"]
+    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].hint is int
+    assert collection[0].keys == ()
+    assert collection[0]._accepts_keywords is False
+
+    assert collection[1].iparam == iparams["b"]
+    assert collection[1].cparam.name == ("--foo", "--bar")
+    assert collection[1].hint == dict[str, float]
+    assert collection[1].keys == ()
+    assert collection[1]._accepts_keywords is True
+
+
 def test_argument_collection_var_keyword_match():
     def foo(a: int, **b: float):
         pass
@@ -405,15 +430,15 @@ def test_argument_collection_var_keyword_match():
 @pytest.mark.parametrize(
     "args, expected",
     [
-        ((("--foo",),), ("--foo",)),
-        ((("--foo", "--bar"),), ("--foo", "--bar")),
-        ((("--foo",), ("--bar",)), ("--bar",)),
-        ((("--foo",), ("baz",)), ("--foo.baz",)),
-        ((("--foo",), ("--bar", "baz")), ("--bar", "--foo.baz")),
-        ((("--foo", "--bar"), ("baz",)), ("--foo.baz", "--bar.baz")),
-        ((("*",), ("bar",)), ("--bar",)),
-        ((("--foo", "*"), ("bar",)), ("--foo.bar", "--bar")),
-        ((("--foo",), ("*",), ("bar",)), ("--foo.bar",)),
+        TestCase(args=(("--foo",),), expected=("--foo",)),
+        TestCase(args=(("--foo", "--bar"),), expected=("--foo", "--bar")),
+        TestCase(args=(("--foo",), ("--bar",)), expected=("--bar",)),
+        TestCase(args=(("--foo",), ("baz",)), expected=("--foo.baz",)),
+        TestCase(args=(("--foo",), ("--bar", "baz")), expected=("--bar", "--foo.baz")),
+        TestCase(args=(("--foo", "--bar"), ("baz",)), expected=("--foo.baz", "--bar.baz")),
+        TestCase(args=(("*",), ("bar",)), expected=("--bar",)),
+        TestCase(args=(("--foo", "*"), ("bar",)), expected=("--foo.bar", "--bar")),
+        TestCase(args=(("--foo",), ("*",), ("bar",)), expected=("--foo.bar",)),
     ],
 )
 def test_resolve_parameter_name(args, expected):
