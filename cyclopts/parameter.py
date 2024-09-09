@@ -1,15 +1,7 @@
 import inspect
 from collections.abc import Iterable
 from functools import partial
-from typing import (
-    Any,
-    Callable,
-    Optional,
-    Union,
-    cast,
-    get_args,
-    get_origin,
-)
+from typing import Any, Callable, Optional, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
@@ -131,15 +123,11 @@ class Parameter:
     def converter(self):
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
-    def get_negatives(self, type_, names: Optional[Iterable[str]] = None) -> tuple[str, ...]:  # TODO: use self.name
+    def get_negatives(self, type_) -> tuple[str, ...]:
         if is_union(type_):
             type_ = next(x for x in get_args(type_) if x is not None)
 
         type_ = get_origin(type_) or type_
-
-        if names is None:
-            assert isinstance(self.name, tuple)
-            names = self.name
 
         if self.negative is not None:
             return self.negative  # pyright: ignore
@@ -147,7 +135,8 @@ class Parameter:
             return ()
 
         out = []
-        for name in names:
+        assert isinstance(self.name, tuple)
+        for name in self.name:
             if name.startswith("--"):
                 name = name[2:]
             elif name.startswith("-"):
