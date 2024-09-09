@@ -50,16 +50,12 @@ def env_var_split(
     list[str]
         List of individual tokens.
     """
-    from cyclopts._convert import token_count
-    from cyclopts.parameter import get_hint_parameter
+    from cyclopts._convert import resolve, token_count
 
+    type_ = resolve(type_)
     count, consume_all = token_count(type_)
-    type_ = get_hint_parameter(type_)[0]
 
     if count > 1 or consume_all:
-        if _is_path(type_):
-            return val.split(os.pathsep)
-        else:
-            return val.split(delimiter)
+        return val.split(os.pathsep) if _is_path(type_) else val.split(delimiter)
     else:
         return [val]
