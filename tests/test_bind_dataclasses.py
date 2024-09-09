@@ -48,7 +48,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         cylinders: int
         "Number of cylinders the engine has."
 
-        hp: float
+        hp: Annotated[float, Parameter(name=("horsepower", "p"))]
         "Amount of horsepower the engine can generate."
 
         diesel: bool = False
@@ -85,7 +85,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
 
     assert_parse_args(
         build,
-        "build --car.name=ford --car.mileage=500 --car.cylinders=4 --car.hp=200 --car.wheel.diameter=18 --license-plate=ABCDEFG",
+        "build --car.name=ford --car.mileage=500 --car.cylinders=4 --car.p=200 --car.wheel.diameter=18 --license-plate=ABCDEFG",
         car=Car(
             name="ford",
             mileage=500,
@@ -110,7 +110,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         ╭─ Engine ───────────────────────────────────────────────────────────╮
         │ *  --car.cylinders               Number of cylinders the engine    │
         │                                  has. [required]                   │
-        │ *  --car.hp                      Amount of horsepower the engine   │
+        │ *  --car.horsepower,--car.p      Amount of horsepower the engine   │
         │                                  can generate. [required]          │
         │    --car.diesel,--no-car.diesel  If this engine consumes diesel,   │
         │                                  instead of gasoline.              │
