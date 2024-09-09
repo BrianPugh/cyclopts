@@ -4,7 +4,7 @@ from typing import Annotated, List, Optional, Set
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.parameter import get_hint_parameter
+from cyclopts.parameter import _get_hint_parameter
 
 
 def test_parameter_get_negatives_bool_default():
@@ -74,7 +74,7 @@ def test_get_hint_parameter_basic():
         help="Display this message and exit.",
     )
 
-    type_, cparam = get_hint_parameter(Annotated[bool, expected_cparam], Parameter())
+    type_, cparam = _get_hint_parameter(Annotated[bool, expected_cparam], Parameter())
     assert type_ is bool
     assert cparam == expected_cparam
 
@@ -87,25 +87,25 @@ def test_get_hint_parameter_optional_annotated():
         help="Display this message and exit.",
     )
 
-    type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]], Parameter())
+    type_, cparam = _get_hint_parameter(Optional[Annotated[bool, expected_cparam]], Parameter())
     assert type_ is bool
     assert cparam == expected_cparam
 
 
 def test_get_hint_parameter_empty_iparam_1():
     p = inspect.Parameter("foo", inspect.Parameter.POSITIONAL_ONLY)
-    type_, _ = get_hint_parameter(p, Parameter())
+    type_, _ = _get_hint_parameter(p, Parameter())
     assert type_ is str
 
 
 def test_get_hint_parameter_empty_iparam_2():
-    type_, _ = get_hint_parameter(inspect.Parameter.empty, Parameter())
+    type_, _ = _get_hint_parameter(inspect.Parameter.empty, Parameter())
     assert type_ is str
 
 
 def test_get_hint_parameter_empty_iparam_w_default():
     p = inspect.Parameter("foo", inspect.Parameter.POSITIONAL_ONLY, default=5)
-    type_, _ = get_hint_parameter(p, Parameter())
+    type_, _ = _get_hint_parameter(p, Parameter())
     assert type_ is int
 
 

@@ -404,11 +404,7 @@ def token_count(type_: Any) -> tuple[int, bool]:
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    from cyclopts.parameter import get_hint_parameter
-
-    annotation = get_hint_parameter(type_)[0]
-
-    annotation = resolve(annotation)
+    annotation = resolve(type_)
     origin_type = get_origin(annotation)
 
     if (origin_type or annotation) is tuple:

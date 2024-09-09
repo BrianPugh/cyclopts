@@ -205,12 +205,12 @@ def validate_command(f: Callable):
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
         get_origin(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam)
+        type_, cparam = _get_hint_parameter(iparam)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
 
 
-def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> tuple[type, Parameter]:
+def _get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> tuple[type, Parameter]:
     """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
 
     If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
@@ -224,7 +224,7 @@ def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> 
             if type_.default is inspect.Parameter.empty or type_.default is None:
                 annotation = str
             else:
-                return get_hint_parameter(type(type_.default), *default_parameters)
+                return _get_hint_parameter(type(type_.default), *default_parameters)
     else:
         annotation = type_
 
