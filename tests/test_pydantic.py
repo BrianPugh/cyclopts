@@ -6,6 +6,8 @@ import pytest
 from pydantic import BaseModel, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 
+from cyclopts import MissingArgumentError
+
 
 def test_pydantic_error_msg(app, console):
     @app.command
@@ -75,3 +77,30 @@ def test_bind_pydantic_basemodel(app, assert_parse_args):
         'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap',
         User(**external_data),
     )
+
+
+def test_bind_pydantic_basemodel_missing_arg(app, assert_parse_args, console):
+    """Partially defining an Outfit should raise a MissingArgumentError."""
+
+    @app.command
+    def foo(user: User):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app.parse_args(
+            'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt',
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--user.outfit.head" requires an argument. │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
