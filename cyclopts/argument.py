@@ -56,24 +56,19 @@ def _iparam_get_hint(iparam):
 
 
 def _typed_dict_required_optional(typeddict) -> tuple[dict[str, Any], dict[str, Any]]:
+    # The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11.
+    required, optional = {}, {}
     # Don't use get_type_hints because it resolves Annotated automatically.
-    type_hints = typeddict.__annotations__
-    if sys.version_info >= (3, 11):
-        required = {k: type_hints[k] for k in typeddict.__required_keys__}
-        optional = {k: type_hints[k] for k in typeddict.__optional_keys__}
-    else:
-        """The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11."""
-        required, optional = {}, {}
-        for name, annotation in type_hints.items():
-            origin = get_origin(resolve_annotated(annotation))
-            if origin is Required:
-                required[name] = annotation
-            elif origin is NotRequired:
-                optional[name] = annotation
-            elif typeddict.__total__:  # Fields are required by default.
-                required[name] = annotation
-            else:  # Fields are optional by default
-                optional[name] = annotation
+    for name, annotation in typeddict.__annotations__.items():
+        origin = get_origin(resolve_annotated(annotation))
+        if origin is Required:
+            required[name] = annotation
+        elif origin is NotRequired:
+            optional[name] = annotation
+        elif typeddict.__total__:  # Fields are REQUIRED by default.
+            required[name] = annotation
+        else:  # Fields are OPTIONAL by default
+            optional[name] = annotation
 
     return required, optional
 

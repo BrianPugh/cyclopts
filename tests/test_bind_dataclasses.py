@@ -142,7 +142,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     class Car:
         name: str
         mileage: float
-        engine: Annotated[Engine, Parameter(name="*", group="Engine")] = Engine(8, 500)
+        engine: Annotated[Engine, Parameter(name="*", group="Engine")] = field(default_factory=lambda: Engine(8, 500))
 
     @app.command
     def build(*, license_plate: str, car: Car):
