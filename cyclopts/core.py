@@ -10,6 +10,7 @@ from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     Literal,
@@ -23,11 +24,12 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.argument import ArgumentCollection
-from cyclopts.bind import create_bound_arguments, normalize_tokens
+from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
     InvalidCommandError,
+    UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
     format_cyclopts_error,
@@ -55,8 +57,6 @@ from cyclopts.utils import (
 
 T = TypeVar("T", bound=Callable)
 
-
-from typing import Annotated
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -835,6 +835,10 @@ class App:
         try:
             command, bound, unused_tokens = self.parse_known_args(tokens, console=console)
             if unused_tokens:
+                for token in unused_tokens:
+                    if is_option_like(token):
+                        token = token.split("=")[0]
+                        raise UnknownOptionError(token=token)
                 raise UnusedCliTokensError(
                     target=command,
                     unused_tokens=unused_tokens,

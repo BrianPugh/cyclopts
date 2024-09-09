@@ -15,6 +15,7 @@ from typing import Annotated, List, TypedDict
 import pytest
 
 from cyclopts import MissingArgumentError, Parameter
+from cyclopts.exceptions import UnknownOptionError
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired, Required
@@ -226,3 +227,28 @@ def test_bind_typed_dict_required(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "foo --d.my-int=5", d={"my_int": 5})
+
+
+def test_bind_typed_dict_extra_field(app, console):
+    @app.command
+    def foo(d: MyDict):
+        pass
+
+    with console.capture() as capture, pytest.raises(UnknownOptionError):
+        app.parse_args(
+            "foo --d.my-int=5 --d.my-str=bar --d.my-list=a --d.my-list=b --d.my-list-int=1 --d.my-list-int=2 --d.extra-key=10",
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown option: "--d.extra-key".                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected

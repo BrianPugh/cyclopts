@@ -66,7 +66,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
             skip_next_iterations -= 1
             continue
 
-        if not _is_option_like(token):
+        if not is_option_like(token):
             unused_tokens.append(token)
             continue
 
@@ -113,7 +113,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                 if consume_all:
                     for j in itertools.count():
                         token = tokens[i + 1 + j]
-                        if not argument.cparam.allow_leading_hyphen and _is_option_like(token):
+                        if not argument.cparam.allow_leading_hyphen and is_option_like(token):
                             break
                         cli_values.append(token)
                         skip_next_iterations += 1
@@ -121,7 +121,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                     consume_count += tokens_per_element
                     for j in range(consume_count):
                         token = tokens[i + 1 + j]
-                        if not argument.cparam.allow_leading_hyphen and _is_option_like(token):
+                        if not argument.cparam.allow_leading_hyphen and is_option_like(token):
                             raise UnknownOptionError(token=token)
                         cli_values.append(token)
                         skip_next_iterations += 1
@@ -135,7 +135,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
     return unused_tokens
 
 
-def _is_option_like(token: str) -> bool:
+def is_option_like(token: str) -> bool:
     """Checks if a token looks like an option.
 
     Namely, negative numbers are not options, but a token like ``--foo`` is.
@@ -176,7 +176,7 @@ def _parse_pos(
                 raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
 
             for index, token in enumerate(tokens[:tokens_per_element]):
-                if not argument.cparam.allow_leading_hyphen and _is_option_like(token):
+                if not argument.cparam.allow_leading_hyphen and is_option_like(token):
                     raise UnknownOptionError(token=token)
                 new_tokens.append(CliToken(value=token, index=index))
             tokens = tokens[tokens_per_element:]
