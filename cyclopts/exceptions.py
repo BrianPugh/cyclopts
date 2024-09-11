@@ -126,7 +126,7 @@ class CycloptsError(Exception):
 class ValidationError(CycloptsError):
     """Validator function raised an exception."""
 
-    value: str
+    value: str = ""
     """Parenting Assertion/Value/Type Error message."""
 
     group: Optional[Group] = None
@@ -138,22 +138,20 @@ class ValidationError(CycloptsError):
 
     def __str__(self):
         if self.argument:
-            if len(self.argument.tokens) == 1 and not self.argument.children:
-                token = self.argument.tokens[0]
-                provided_by = "" if token.source == "cli" else f" provided by {token.source}"
-                if token.keyword is None:
-                    # Provided positionally
-                    positional_name = self.argument.name.lstrip("-").upper()
-                    message = f'Invalid value "{token.value}" for {positional_name}{provided_by}.'
-                else:
-                    message = f'Invalid value "{self.argument.value}" for {token.keyword}{provided_by}.'
-            else:
-                message = "TODO"
+            assert self.argument is not None
+            token = self.argument.tokens[0]
+            provided_by = "" if not token.source or token.source == "cli" else f' provided by "{token.source}"'
+            name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
+            message = f'Invalid value "{self.argument.value}" for "{name}"{provided_by}.'
         elif self.group:
             message = f'Invalid values for group "{self.group}".'
         else:
             raise NotImplementedError
-        return f"{super().__str__()}{message} {self.value}"
+
+        if self.value:
+            return f"{super().__str__()}{message} {self.value}"
+        else:
+            return f"{super().__str__()}{message}"
 
 
 @define(kw_only=True)

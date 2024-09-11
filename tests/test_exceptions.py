@@ -18,7 +18,14 @@ from cyclopts import (
 
 def positive_validator(type_, value):
     if value <= 0:
+        # Seeing if we can translate a ValueError into a ValidationError as helpfully as possible.
         raise ValueError("Value must be positive.")
+
+
+def multi_positive_validator(type_, values):
+    for value in values:
+        if value <= 0:
+            raise ValueError("Value must be positive.")
 
 
 def test_exceptions_missing_argument(app, console):
@@ -56,7 +63,7 @@ def test_exceptions_validation_error_cli_single_positional(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "-2" for BAR. Value must be positive.
+        Invalid value "-2" for "BAR". Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -76,7 +83,7 @@ def test_exceptions_validation_error_cli_single_keyword(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "-2" for --bar. Value must be positive.
+        Invalid value "-2" for "--bar". Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -96,20 +103,52 @@ def test_exceptions_validation_error_non_cli_single_keyword(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "-2" for BAR provided by test. Value must be positive.
+        Invalid value "-2" for "BAR" provided by "test". Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
 
 
 def test_exceptions_validation_error_cli_multi_positional(app, console):
-    # TODO
-    pass
+    argument = Argument(
+        hint=tuple[int, int],
+        cparam=Parameter(name=("--bar",), validator=multi_positive_validator),
+        tokens=[
+            Token(keyword=None, value="100", source="cli"),
+            Token(keyword=None, value="-2", source="cli"),
+        ],
+    )
+    with pytest.raises(ValidationError) as e:
+        argument.convert_and_validate()
+
+    expected = dedent(
+        """
+        ValidationError
+        Invalid value "(100, -2)" for "BAR". Value must be positive.
+        """
+    ).strip()
+    assert str(e.value) == expected
 
 
 def test_exceptions_validation_error_cli_multi_keyword(app, console):
-    # TODO
-    pass
+    argument = Argument(
+        hint=tuple[int, int],
+        cparam=Parameter(name=("--bar",), validator=multi_positive_validator),
+        tokens=[
+            Token(keyword="--bar", value="100", source="cli"),
+            Token(keyword="--bar", value="-2", source="cli"),
+        ],
+    )
+    with pytest.raises(ValidationError) as e:
+        argument.convert_and_validate()
+
+    expected = dedent(
+        """
+        ValidationError
+        Invalid value "(100, -2)" for "--bar". Value must be positive.
+        """
+    ).strip()
+    assert str(e.value) == expected
 
 
 def test_exceptions_coercion_error(app, console):
