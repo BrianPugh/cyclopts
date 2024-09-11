@@ -85,7 +85,7 @@ def _generic_class_field_info(f) -> dict[str, _FieldInfo]:
     for name, iparam in signature.parameters.items():
         if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
             continue
-        kw_only = iparam.kind in (iparam.KEYWORD_ONLY, iparam.POSITIONAL_OR_KEYWORD)
+        kw_only = iparam.kind == iparam.KEYWORD_ONLY
         required = iparam.default == iparam.empty
         out[name] = _FieldInfo(iparam.annotation, required, kw_only=kw_only)
     return out
@@ -94,7 +94,7 @@ def _generic_class_field_info(f) -> dict[str, _FieldInfo]:
 def _pydantic_field_info(model) -> dict[str, _FieldInfo]:
     out = {}
     for k, v in model.model_fields.items():
-        out[k] = _FieldInfo(v.annotation, v.is_required())  # TODO: kw_only
+        out[k] = _FieldInfo(v.annotation, v.is_required(), kw_only=v.kw_only)
     return out
 
 
@@ -331,6 +331,9 @@ class ArgumentCollection(list):
         if argument._accepts_keywords:
             docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
             for field_name, field_info in argument._lookup.items():
+                if field_info.kw_only:
+                    positional_index = None
+
                 subkey_argument_collection = cls._from_type(
                     iparam,
                     field_info.hint,
@@ -677,10 +680,9 @@ class Argument:
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                # TODO: need to populate kw_only from defaults
                 self._lookup.update(
                     {
-                        name: _FieldInfo(hint.__annotations__.get(name, str), name in hint._field_defaults)
+                        name: _FieldInfo(hint.__annotations__.get(name, str), name in hint._field_defaults, False)
                         for name in hint._fields
                     }
                 )
