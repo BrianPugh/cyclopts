@@ -207,3 +207,21 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str):
         print(f"{config=}")
 
     assert_parse_args(my_default_command, cmd_str, Config(a=100, b=200))
+
+
+def test_bind_dataclass_positionally_with_keyword_only_exception(app, assert_parse_args):
+    @dataclass
+    class Config:
+        a: int = 1
+        """Docstring for a."""
+
+        b: Annotated[int, Parameter(name="bar")] = 2
+        """This is the docstring for python parameter "b"."""
+
+        c: int = field(kw_only=True)
+
+    @app.default
+    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+        print(f"{config=}")
+
+    app.parse_args("100 200 300")

@@ -50,6 +50,7 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
 class _FieldInfo(NamedTuple):
     hint: Any
     required: bool
+    kw_only: bool = True
 
 
 def _iparam_get_hint(iparam):
@@ -60,50 +61,47 @@ def _iparam_get_hint(iparam):
     return hint
 
 
-def _typed_dict_required_optional(typeddict) -> tuple[dict[str, Any], dict[str, Any]]:
+def _typed_dict_field_info(typeddict) -> dict[str, _FieldInfo]:
     # The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11.
-    required, optional = {}, {}
+    out = {}
     # Don't use get_type_hints because it resolves Annotated automatically.
     for name, annotation in typeddict.__annotations__.items():
         origin = get_origin(resolve_annotated(annotation))
         if origin is Required:
-            required[name] = annotation
+            required = True
         elif origin is NotRequired:
-            optional[name] = annotation
+            required = False
         elif typeddict.__total__:  # Fields are REQUIRED by default.
-            required[name] = annotation
+            required = True
         else:  # Fields are OPTIONAL by default
-            optional[name] = annotation
+            required = False
+        out[name] = _FieldInfo(annotation, required)
+    return out
 
-    return required, optional
 
-
-def _generic_class_required_optional(f) -> tuple[dict[str, Any], dict[str, Any]]:
+def _generic_class_field_info(f) -> dict[str, _FieldInfo]:
     signature = inspect.signature(f.__init__)
-    required, optional = {}, {}
+    out = {}
     for name, iparam in signature.parameters.items():
         if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
             continue
-        if iparam.default == iparam.empty:
-            required[name] = iparam.annotation
-        else:
-            optional[name] = iparam.annotation
-    return required, optional
+        kw_only = iparam.kind in (iparam.KEYWORD_ONLY, iparam.POSITIONAL_OR_KEYWORD)
+        required = iparam.default == iparam.empty
+        out[name] = _FieldInfo(iparam.annotation, required, kw_only=kw_only)
+    return out
 
 
-def _pydantic_required_optional(model) -> tuple[dict[str, Any], dict[str, Any]]:
-    required, optional = {}, {}
+def _pydantic_field_info(model) -> dict[str, _FieldInfo]:
+    out = {}
     for k, v in model.model_fields.items():
-        if v.is_required():
-            required[k] = v.annotation
-        else:
-            optional[k] = v.annotation
-    return required, optional
+        out[k] = _FieldInfo(v.annotation, v.is_required())  # TODO: kw_only
+    return out
 
 
-def _missing_keys_factory(get_required_optional: Callable[[Any], tuple[dict[str, Any], dict[str, Any]]]):
+def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, _FieldInfo]]):
     def inner(argument: "Argument", data: dict) -> set[str]:
-        required, _ = get_required_optional(argument.hint)
+        field_info = get_field_info(argument.hint)
+        required = {k for k, v in field_info.items() if v.required}
         return set(required) - set(data)
 
     return inner
@@ -666,23 +664,20 @@ class Argument:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
                 self._default = val_type
             elif is_typeddict(hint):
-                self._missing_keys_checker = _missing_keys_factory(_typed_dict_required_optional)
+                self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_info)
                 self._accepts_keywords = True
-                lookup_required, lookup_optional = _typed_dict_required_optional(hint)
-                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
+                self._lookup.update(_typed_dict_field_info(hint))
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                lookup_required, lookup_optional = _generic_class_required_optional(hint)
-                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
+                self._lookup.update(_generic_class_field_info(hint))
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
+                # TODO: need to populate kw_only from defaults
                 self._lookup.update(
                     {
                         name: _FieldInfo(hint.__annotations__.get(name, str), name in hint._field_defaults)
@@ -690,19 +685,15 @@ class Argument:
                     }
                 )
             elif is_attrs(hint):
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                lookup_required, lookup_optional = _generic_class_required_optional(hint)
-                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
+                self._lookup.update(_generic_class_field_info(hint))
             elif is_pydantic(hint):
-                self._missing_keys_checker = _missing_keys_factory(_pydantic_required_optional)
+                self._missing_keys_checker = _missing_keys_factory(_pydantic_field_info)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
-                lookup_required, lookup_optional = _pydantic_required_optional(hint)
-                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
+                self._lookup.update(_pydantic_field_info(hint))
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True
@@ -716,7 +707,7 @@ class Argument:
             # They must be explicitly specified ``accepts_keys=True`` because otherwise
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
-            self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
+            self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
             for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
