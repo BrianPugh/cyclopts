@@ -151,6 +151,8 @@ def _parse_pos(
     tokens: list[str],
 ) -> list[str]:
     prior_positional_or_keyword_supplied_as_keyword_arguments = []
+    if not tokens:
+        return []
     for i in itertools.count():
         try:
             argument, _, _ = argument_collection.match(i)

@@ -316,13 +316,19 @@ class ArgumentCollection(list):
                     assert cparam.name_transform is not None
                     cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
 
-        argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint, index=positional_index)
+        if iparam.kind in (iparam.KEYWORD_ONLY, iparam.VAR_KEYWORD):
+            positional_index = None
+
+        argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint)
+        if argument._assignable and positional_index is not None:
+            argument.index = positional_index
+            positional_index += 1
+
         out.append(argument)
         if argument._accepts_keywords:
             docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
-
             for field_name, (field_hint, field_required) in argument._lookup.items():
-                subkey_argument = cls._from_type(
+                subkey_argument_collection = cls._from_type(
                     iparam,
                     field_hint,
                     keys + (field_name,),
@@ -333,13 +339,18 @@ class ArgumentCollection(list):
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
                     parse_docstring=parse_docstring,
-                    # Purposely DONT pass along positional_index.
-                    # We don't want to populate subkeys with positional arguments.
+                    positional_index=positional_index,
                     _resolve_groups=_resolve_groups,
                 )
-                if subkey_argument:
-                    argument.children.append(subkey_argument[0])
-                    out.extend(subkey_argument)
+                if subkey_argument_collection:
+                    argument.children.append(subkey_argument_collection[0])
+                    out.extend(subkey_argument_collection)
+
+                    if positional_index is not None:
+                        positional_index = subkey_argument_collection._max_index
+                        if positional_index is not None:
+                            positional_index += 1
+
         return out
 
     @classmethod
@@ -417,21 +428,25 @@ class ArgumentCollection(list):
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
         out = cls()
-        for i, iparam in enumerate(cyclopts.utils.signature(func).parameters.values()):
-            out.extend(
-                cls.from_iparam(
-                    iparam,
-                    _PARAMETER_EMPTY_HELP,
-                    *default_parameters,
-                    docstring_lookup.get(iparam.name),
-                    group_lookup=group_lookup,
-                    group_arguments=group_arguments,
-                    group_parameters=group_parameters,
-                    positional_index=i,
-                    parse_docstring=parse_docstring,
-                    _resolve_groups=_resolve_groups,
-                )
+        positional_index = 0
+        for iparam in cyclopts.utils.signature(func).parameters.values():
+            iparam_argument_collection = cls.from_iparam(
+                iparam,
+                _PARAMETER_EMPTY_HELP,
+                *default_parameters,
+                docstring_lookup.get(iparam.name),
+                group_lookup=group_lookup,
+                group_arguments=group_arguments,
+                group_parameters=group_parameters,
+                positional_index=positional_index,
+                parse_docstring=parse_docstring,
+                _resolve_groups=_resolve_groups,
             )
+            if positional_index is not None:
+                positional_index = iparam_argument_collection._max_index
+                if positional_index is not None:
+                    positional_index += 1
+            out.extend(iparam_argument_collection)
 
         out.groups = []
         for argument in out:
@@ -445,6 +460,10 @@ class ArgumentCollection(list):
         for argument in self:
             if not argument.keys:
                 yield argument
+
+    @property
+    def _max_index(self) -> Optional[int]:
+        return max((x.index for x in self if x.index is not None), default=None)
 
     def iparam_to_value(self) -> ParameterDict:
         """Mapping iparam to converted values.
