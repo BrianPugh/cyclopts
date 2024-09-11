@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from contextlib import suppress
 from functools import partial
 from inspect import isclass
-from typing import Any, Callable, Optional, Union, get_args, get_origin
+from typing import Any, Callable, NamedTuple, Optional, Union, get_args, get_origin
 
 from attrs import define, field
 
@@ -45,6 +45,11 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     # Do NOT include help here; handled elsewhere due to docstring parsing.
     accepts_keys=None,
 )
+
+
+class _FieldInfo(NamedTuple):
+    hint: Any
+    required: bool
 
 
 def _iparam_get_hint(iparam):
@@ -327,13 +332,13 @@ class ArgumentCollection(list):
         out.append(argument)
         if argument._accepts_keywords:
             docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
-            for field_name, (field_hint, field_required) in argument._lookup.items():
+            for field_name, field_info in argument._lookup.items():
                 subkey_argument_collection = cls._from_type(
                     iparam,
-                    field_hint,
+                    field_info.hint,
                     keys + (field_name,),
                     cparam,
-                    Parameter(required=cparam.required & field_required),
+                    Parameter(required=bool(cparam.required) & field_info.required),
                     docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
@@ -597,7 +602,7 @@ class Argument:
     _accepts_keywords: bool = field(default=False, init=False, repr=False)
 
     _default: Any = field(default=None, init=False, repr=False)
-    _lookup: dict = field(factory=dict, init=False, repr=False)
+    _lookup: dict[str, _FieldInfo] = field(factory=dict, init=False, repr=False)
 
     # Can assign values directly to this argument
     # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
@@ -664,14 +669,14 @@ class Argument:
                 self._missing_keys_checker = _missing_keys_factory(_typed_dict_required_optional)
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _typed_dict_required_optional(hint)
-                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
+                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _generic_class_required_optional(hint)
-                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
+                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
@@ -679,22 +684,25 @@ class Argument:
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
                 self._lookup.update(
-                    {name: (hint.__annotations__.get(name, str), name in hint._field_defaults) for name in hint._fields}
+                    {
+                        name: _FieldInfo(hint.__annotations__.get(name, str), name in hint._field_defaults)
+                        for name in hint._fields
+                    }
                 )
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_required_optional)
                 self._accepts_keywords = True
                 lookup_required, lookup_optional = _generic_class_required_optional(hint)
-                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
+                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
             elif is_pydantic(hint):
                 self._missing_keys_checker = _missing_keys_factory(_pydantic_required_optional)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
                 lookup_required, lookup_optional = _pydantic_required_optional(hint)
-                self._lookup.update({k: (v, True) for k, v in lookup_required.items()})
-                self._lookup.update({k: (v, False) for k, v in lookup_optional.items()})
+                self._lookup.update({k: _FieldInfo(v, True) for k, v in lookup_required.items()})
+                self._lookup.update({k: _FieldInfo(v, False) for k, v in lookup_optional.items()})
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True
@@ -715,7 +723,7 @@ class Argument:
                 if iparam.kind is iparam.VAR_KEYWORD:
                     self._default = iparam.annotation
                 else:
-                    self._lookup[iparam.name] = (
+                    self._lookup[iparam.name] = _FieldInfo(
                         iparam.annotation,
                         iparam.default is iparam.empty
                         and iparam.kind != iparam.VAR_KEYWORD
@@ -731,7 +739,7 @@ class Argument:
 
     def type_hint_for_key(self, key: str):
         try:
-            return self._lookup[key]
+            return self._lookup[key].hint
         except KeyError:
             if self._default is None:
                 raise
