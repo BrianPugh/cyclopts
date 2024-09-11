@@ -183,3 +183,27 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     )
 
     assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "100 200",
+        "--a 100 --bar 200",
+        "--bar 200 100",
+    ],
+)
+def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str):
+    @dataclass
+    class Config:
+        a: int = 1
+        """Docstring for a."""
+
+        b: Annotated[int, Parameter(name="bar")] = 2
+        """This is the docstring for python parameter "b"."""
+
+    @app.default
+    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+        print(f"{config=}")
+
+    assert_parse_args(my_default_command, cmd_str, Config(a=100, b=200))
