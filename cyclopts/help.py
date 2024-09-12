@@ -1,6 +1,7 @@
 import inspect
 import sys
 from collections.abc import Iterable
+from contextlib import suppress
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
@@ -113,8 +114,8 @@ class HelpPanel:
         )
 
         if self.format == "command":
-            table.add_column(justify="left", style="cyan")
-            table.add_column(justify="left")
+            table.add_column("Commands", justify="left", style="cyan")
+            table.add_column("Description", justify="left")
 
             for entry in self.entries:
                 name = entry.name
@@ -126,23 +127,24 @@ class HelpPanel:
             has_required = any(entry.required for entry in self.entries)
 
             if has_required:
-                table.add_column(justify="left", width=1, style="red bold")  # For asterisk
-            table.add_column(justify="left", no_wrap=True, style="cyan")  # For option names
+                table.add_column("Asterisk", justify="left", width=1, style="red bold")
+            table.add_column("Options", justify="left", no_wrap=True, style="cyan")
             if has_short:
-                table.add_column(justify="left", no_wrap=True, style="green")  # For short options
-            table.add_column(justify="left")  # For main help text.
+                table.add_column("Short", justify="left", no_wrap=True, style="green")
+            table.add_column("Description", justify="left")
 
+            lookup = {col.header: i for i, col in enumerate(table.columns)}
             for entry in self.entries:
-                row = []
-                if has_required:
-                    if entry.required:
-                        row.append("*")
-                    else:
-                        row.append("")
-                row.append(entry.name + " ")
-                if has_short:
-                    row.append(entry.short + " ")
-                row.append(entry.description)
+                row = [""] * len(table.columns)
+
+                def add(key, value):
+                    with suppress(KeyError):
+                        row[lookup[key]] = value  # noqa: B023
+
+                add("Asterisk", "*" if entry.required else "")
+                add("Options", entry.name + " ")
+                add("Short", entry.short + " ")
+                add("Description", entry.description)
                 table.add_row(*row)
         else:
             raise NotImplementedError
