@@ -139,7 +139,7 @@ def test_parameter_name_transform_help(app, console):
         Usage: foo COMMAND [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -174,8 +174,10 @@ def test_parameter_name_transform_help_enum(app, console):
         Usage: test_name_transform cmd [ARGS] [OPTIONS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: FIZZ,BUZZ] [default: FIZZ] │
-        │ BAR,--bar  Docstring for bar. [choices: FIZZ,BUZZ] [default: BUZZ] │
+        │ FOO --foo  Docstring for foo. [choices: FIZZ, BUZZ] [default:      │
+        │            FIZZ]                                                   │
+        │ BAR --bar  Docstring for bar. [choices: FIZZ, BUZZ] [default:      │
+        │            BUZZ]                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

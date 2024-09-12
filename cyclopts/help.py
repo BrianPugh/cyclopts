@@ -132,6 +132,7 @@ class HelpPanel:
                 name = entry.name
                 if entry.short:
                     name += " " + entry.short
+                name = "\n".join(wrap(name, commands_width))
                 table.add_row(name, entry.description)
         elif self.format == "parameter":
             options_width = ceil(console.width * 0.35)

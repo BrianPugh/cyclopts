@@ -61,20 +61,20 @@ def test_create_burger_help(console):
         Create a burger.
 
         ╭─ Arguments ────────────────────────────────────────────────────────╮
-        │ *  VARIETY   Type of burger to create [choices: classic,double]    │
+        │ *  VARIETY   Type of burger to create [choices: classic, double]   │
         │              [required]                                            │
         │    QUANTITY  [default: 1]                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Condiments ───────────────────────────────────────────────────────╮
-        │ --mustard,--no-mustard   Add mustard. [default: True]              │
-        │ --ketchup,--no-ketchup   Add ketchup. [default: True]              │
-        │ --mayo,--no-mayo         [default: True]                           │
-        │ --custom,--empty-custom                                            │
+        │ --mustard --no-mustard   Add mustard. [default: True]              │
+        │ --ketchup --no-ketchup   Add ketchup. [default: True]              │
+        │ --mayo --no-mayo         [default: True]                           │
+        │ --custom --empty-custom                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Toppings ─────────────────────────────────────────────────────────╮
-        │ --iceberg,--no-iceberg  Add lettuce. [default: True]               │
-        │ --tomato,--no-tomato    Add tomato. [default: True]                │
-        │ --onion,--no-onion      Add onion. [default: True]                 │
+        │ --iceberg --no-iceberg  Add lettuce. [default: True]               │
+        │ --tomato --no-tomato    Add tomato. [default: True]                │
+        │ --onion --no-onion      Add onion. [default: True]                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
