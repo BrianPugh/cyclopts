@@ -19,10 +19,10 @@ from cyclopts.utils import (
 )
 
 
-def _double_hyphen_validator(instance, attribute, values):
+def _not_hyphen_validator(instance, attribute, values):
     for value in values:
-        if value is not None and not value.startswith("--"):
-            raise ValueError(f'{attribute.alias} value must start with "--".')
+        if value is not None and value.startswith("-"):
+            raise ValueError(f'{attribute.alias} value must NOT start with "-".')
 
 
 def _negative_converter(default: tuple[str, ...]):
@@ -88,15 +88,15 @@ class Parameter:
     # This can ONLY ever be a Tuple[str, ...]
     negative_bool: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=_negative_converter(("--no-",)),
-        validator=_double_hyphen_validator,
+        converter=_negative_converter(("no-",)),
+        validator=_not_hyphen_validator,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
     negative_iterable: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=_negative_converter(("--empty-",)),
-        validator=_double_hyphen_validator,
+        converter=_negative_converter(("empty-",)),
+        validator=_not_hyphen_validator,
     )
 
     required: Optional[bool] = field(default=None)
@@ -144,11 +144,15 @@ class Parameter:
                 continue
             else:
                 raise ValueError("All parameters should have started with '-' or '--'.")
+            name_components = name.split(".")
 
             negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
+            name_prefix = ".".join(name_components[:-1])
+            if name_prefix:
+                name_prefix += "."
             assert isinstance(negative_prefixes, tuple)
             for negative_prefix in negative_prefixes:
-                out.append(f"{negative_prefix}{name}")
+                out.append(f"--{name_prefix}{negative_prefix}{name_components[-1]}")
         return tuple(out)
 
     def __repr__(self):

@@ -86,7 +86,7 @@ def test_boolean_flag_app_parameter_default_nested_annotated_override(app, asser
 
 
 def test_boolean_flag_group_default_parameter_resolution_1(app, assert_parse_args):
-    food_group = Group("Food", default_parameter=Parameter(negative_bool="--group-"))
+    food_group = Group("Food", default_parameter=Parameter(negative_bool="group-"))
 
     @app.default
     def foo(flag: Annotated[bool, Parameter(group=food_group)]):

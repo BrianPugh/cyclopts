@@ -813,7 +813,7 @@ class Argument:
                     return (), implicit_value
         else:
             # No positive-name matches found.
-            for name in self.cparam.get_negatives(self.hint):
+            for name in self.negatives:
                 if transform:
                     name = transform(name)
                 if term.startswith(name):
