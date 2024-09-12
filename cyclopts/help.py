@@ -102,7 +102,7 @@ class HelpPanel:
             tabsize=4,
         )
         # (top, right, bottom, left)
-        table = Table.grid(padding=(0, 2, 0, 0), expand=True, pad_edge=False)
+        table = Table.grid(padding=(0, 2, 0, 0), pad_edge=False)
         panel_description = self.description
 
         if isinstance(panel_description, Text):
