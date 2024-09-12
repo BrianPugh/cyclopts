@@ -92,7 +92,8 @@ class HelpPanel:
         from rich.table import Table
         from rich.text import Text
 
-        table = Table.grid(padding=(0, 1))
+        # (top, right, bottom, left)
+        table = Table.grid(padding=(0, 2, 0, 0))
         panel_description = self.description
 
         if isinstance(panel_description, Text):
@@ -121,7 +122,7 @@ class HelpPanel:
                 name = entry.name
                 if entry.short:
                     name += "," + entry.short
-                table.add_row(name + " ", entry.description)
+                table.add_row(name, entry.description)
         elif self.format == "parameter":
             has_short = any(entry.short for entry in self.entries)
             has_required = any(entry.required for entry in self.entries)
@@ -142,8 +143,8 @@ class HelpPanel:
                         row[lookup[key]] = value  # noqa: B023
 
                 add("Asterisk", "*" if entry.required else "")
-                add("Options", entry.name + " ")
-                add("Short", entry.short + " ")
+                add("Options", entry.name)
+                add("Short", entry.short)
                 add("Description", entry.description)
                 table.add_row(*row)
         else:
