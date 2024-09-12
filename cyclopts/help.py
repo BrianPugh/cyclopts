@@ -1,10 +1,10 @@
 import inspect
 import sys
 from collections.abc import Iterable
-from contextlib import suppress
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
+from math import ceil
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -21,7 +21,7 @@ import cyclopts.utils
 from cyclopts.group import Group
 
 if TYPE_CHECKING:
-    from rich.console import RenderableType
+    from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
@@ -82,9 +82,12 @@ class HelpPanel:
     def sort(self):
         self.entries.sort(key=lambda x: (x.name.startswith("-"), x.name))
 
-    def __rich__(self):
+    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
         if not self.entries:
             return _silent
+
+        import textwrap
+
         from rich.box import ROUNDED
         from rich.console import Group as RichGroup
         from rich.console import NewLine
@@ -92,8 +95,14 @@ class HelpPanel:
         from rich.table import Table
         from rich.text import Text
 
+        wrap = partial(
+            textwrap.wrap,
+            subsequent_indent="  ",
+            break_on_hyphens=False,
+            tabsize=4,
+        )
         # (top, right, bottom, left)
-        table = Table.grid(padding=(0, 2, 0, 0))
+        table = Table.grid(padding=(0, 2, 0, 0), expand=True, pad_edge=False)
         panel_description = self.description
 
         if isinstance(panel_description, Text):
@@ -115,48 +124,57 @@ class HelpPanel:
         )
 
         if self.format == "command":
-            table.add_column("Commands", justify="left", style="cyan")
+            commands_width = ceil(console.width * 0.35)
+            table.add_column("Commands", justify="left", max_width=commands_width, style="cyan")
             table.add_column("Description", justify="left")
 
             for entry in self.entries:
                 name = entry.name
                 if entry.short:
-                    name += "," + entry.short
+                    name += " " + entry.short
                 table.add_row(name, entry.description)
         elif self.format == "parameter":
+            options_width = ceil(console.width * 0.35)
+            short_width = ceil(console.width * 0.1)
+
             has_short = any(entry.short for entry in self.entries)
             has_required = any(entry.required for entry in self.entries)
 
             if has_required:
                 table.add_column("Asterisk", justify="left", width=1, style="red bold")
-            table.add_column("Options", justify="left", no_wrap=True, style="cyan")
+            table.add_column("Options", justify="left", overflow="fold", max_width=options_width, style="cyan")
             if has_short:
-                table.add_column("Short", justify="left", no_wrap=True, style="green")
-            table.add_column("Description", justify="left")
+                table.add_column("Short", justify="left", overflow="fold", max_width=short_width, style="green")
+            table.add_column("Description", justify="left", overflow="fold")
 
-            lookup = {col.header: i for i, col in enumerate(table.columns)}
+            lookup = {col.header: (i, col.max_width) for i, col in enumerate(table.columns)}
             for entry in self.entries:
                 row = [""] * len(table.columns)
 
-                def add(key, value):
-                    with suppress(KeyError):
-                        row[lookup[key]] = value  # noqa: B023
+                def add(key, value, custom_wrap=False):
+                    try:
+                        index, max_width = lookup[key]
+                    except KeyError:
+                        return
+                    if custom_wrap and max_width:
+                        value = "\n".join(wrap(value, max_width))
+                    row[index] = value  # noqa: B023
 
                 add("Asterisk", "*" if entry.required else "")
-                add("Options", entry.name)
+                add("Options", entry.name, custom_wrap=True)
                 add("Short", entry.short)
                 add("Description", entry.description)
                 table.add_row(*row)
         else:
             raise NotImplementedError
 
-        return panel
+        yield panel
 
 
 class SilentRich:
     """Dummy object that causes nothing to be printed."""
 
-    def __rich_console__(self, console, options):
+    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
         # This generator yields nothing, so ``rich`` will print nothing for this object.
         if False:
             yield
@@ -277,12 +295,12 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
     choices: str = ""
     _origin = get_origin(type_)
     if isclass(type_) and issubclass(type_, Enum):
-        choices = ",".join(name_transform(x.name) for x in type_)
+        choices = ", ".join(name_transform(x.name) for x in type_)
     elif cyclopts.utils.is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
-        choices = ",".join(x for x in inner_choices if x)
+        choices = ", ".join(x for x in inner_choices if x)
     elif _origin is Literal:
-        choices = ",".join(str(x) for x in get_args(type_))
+        choices = ", ".join(str(x) for x in get_args(type_))
     elif _origin in (list, set, tuple):
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
@@ -335,7 +353,7 @@ def create_parameter_help_panel(
                 help_append(rf"[choices: {choices}]", "dim")
 
         if argument.cparam.show_env_var and argument.cparam.env_var:
-            env_vars = " ".join(argument.cparam.env_var)
+            env_vars = ", ".join(argument.cparam.env_var)
             help_append(rf"[env var: {env_vars}]", "dim")
 
         if argument.cparam.show_default or (
@@ -358,9 +376,9 @@ def create_parameter_help_panel(
         # populate row
         help_panel.entries.append(
             HelpEntry(
-                name=",".join(long_options),
+                name=" ".join(long_options),
                 description=format_str(*help_components, format=format),
-                short=",".join(short_options),
+                short=" ".join(short_options),
                 required=bool(argument.cparam.required),
             )
         )
@@ -375,8 +393,8 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list:
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
         entry = HelpEntry(
-            name=",".join(long_names),
-            short=",".join(short_names),
+            name="\n".join(long_names),
+            short=" ".join(short_names),
             description=format_str(docstring_parse(app.help).short_description or "", format=format),
         )
         if entry not in entries:
