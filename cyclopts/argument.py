@@ -291,13 +291,12 @@ class ArgumentCollection(list):
                 _PARAMETER_SUBKEY_BLOCKER,
                 immediate_parameter,
             )
-            # TODO: if cparam.name?
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
                     name=_resolve_parameter_name(
                         upstream_parameter.name,  # pyright: ignore
-                        immediate_parameter.name or tuple(cparam.name_transform(k) for k in keys[-1:]),  # pyright: ignore
+                        immediate_parameter.name or (cparam.name_transform(keys[-1]),),  # pyright: ignore
                     )
                 ),
             )
