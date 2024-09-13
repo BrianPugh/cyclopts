@@ -27,7 +27,7 @@ class Env:
             try:
                 argument, remaining_keys, _ = arguments.match(
                     candidate_env_key[len(prefix) :],
-                    transform=lambda s: s.upper().replace("-", "_").lstrip("_"),
+                    transform=lambda s: s.upper().replace("-", "_").replace(".", "_").lstrip("_"),
                     delimiter="_",
                 )
             except ValueError:
