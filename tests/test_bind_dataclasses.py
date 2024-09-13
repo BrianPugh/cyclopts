@@ -5,7 +5,7 @@ from typing import Annotated, Dict
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.exceptions import MissingArgumentError, UnusedCliTokensError
+from cyclopts.exceptions import ArgumentOrderError, MissingArgumentError, UnusedCliTokensError
 
 
 @dataclass
@@ -221,11 +221,18 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app,
         c: int = field(kw_only=True)
 
     @app.default
-    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+    def my_default_command(foo, config: Annotated[Config, Parameter(name="*")], bar):
         print(f"{config=}")
 
+    expected = ("v1", Config(100, 200, c=300), "v2")
+    assert_parse_args(my_default_command, "v1 100 200 v2 --c=300", *expected)
+    assert_parse_args(my_default_command, "--c=300 v1 100 200 v2", *expected)
     with pytest.raises(MissingArgumentError):
-        app.parse_args("100 200 300", exit_on_error=False)
+        app.parse_args("v1 100 200 300 v2", exit_on_error=False)
+    with pytest.raises(ArgumentOrderError):
+        app.parse_args("v1 --a=100 200 300 v2", exit_on_error=False)
+    with pytest.raises(ArgumentOrderError):
+        app.parse_args("v1 --bar=v2 100 200 --c=300", exit_on_error=False)
 
 
 def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(app, assert_parse_args):
