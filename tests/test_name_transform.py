@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum, auto
 from textwrap import dedent
 from typing import Annotated
@@ -194,3 +195,28 @@ def test_parameter_name_transform_help_enum(app, console):
         """
     )
     assert actual == expected
+
+
+def test_parameter_name_transform_dataclass(app, assert_parse_args):
+    app.default_parameter = Parameter(name_transform=lambda s: s.upper())
+
+    @dataclass
+    class Color:
+        red: int
+        green: int
+        blue: int
+
+    @dataclass
+    class User:
+        name: str
+        favorite_color: Color
+
+    @app.default
+    def default(user: Annotated[User, Parameter(name="--user")]):
+        pass
+
+    assert_parse_args(
+        default,
+        "Bob --user.FAVORITE_COLOR.RED=100 --user.FAVORITE_COLOR.GREEN=200 --user.FAVORITE_COLOR.BLUE=255",
+        User("Bob", Color(100, 200, 255)),
+    )

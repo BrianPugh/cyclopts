@@ -653,11 +653,8 @@ class Argument:
             return
 
         for hint in hints:
-            # accepts_keys is either ``None`` or ``True`` here
-
-            # This could be annotated...
+            # ``self.cparam.accepts_keys`` is either ``None`` or ``True`` here
             origin = get_origin(hint)
-            # TODO: need to resolve Annotation and handle cyclopts.Parameters; or do we?
             hint_origin = {hint, origin}
 
             # Classes that ALWAYS takes keywords (accepts_keys=None)
@@ -800,7 +797,6 @@ class Argument:
             Implicit value.
         """
         if self.iparam.kind is self.iparam.VAR_KEYWORD:
-            # TODO: apply cparam.name_transform to keys here?
             return tuple(term.lstrip("-").split(delimiter)), None
 
         assert self.cparam.name
@@ -842,7 +838,6 @@ class Argument:
             # Still not an actual match.
             raise ValueError
 
-        # TODO: apply cparam.name_transform to keys here?
         return tuple(trailing.split(delimiter)), implicit_value
 
     def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
