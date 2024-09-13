@@ -157,7 +157,7 @@ def _parse_pos(
             argument, _, _ = argument_collection.match(i)
         except ValueError:
             break
-        if argument.iparam.kind is argument.iparam.POSITIONAL_OR_KEYWORD:
+        if argument.field_info.kind is argument.field_info.POSITIONAL_OR_KEYWORD:
             if argument.tokens and argument.tokens[0].keyword is not None:
                 prior_positional_or_keyword_supplied_as_keyword_arguments.append(argument)
                 # Continue in case we hit a VAR_POSITIONAL argument.
@@ -319,7 +319,7 @@ def create_bound_arguments(
 
         for argument in argument_collection:
             # TODO: this doesn't check if all required subkeys were provided.
-            if not _is_required(argument.iparam) or argument.keys or not argument._assignable:
+            if not _is_required(argument.field_info) or argument.keys or not argument._assignable:
                 continue
             if not bool(argument.n_tree_tokens):
                 raise MissingArgumentError(argument=argument)

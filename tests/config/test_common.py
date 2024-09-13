@@ -154,7 +154,7 @@ def test_config_common_kwargs(apps, config):
     config(apps, (), argument_collection)
 
     assert len(argument_collection[-1].tokens) == 1
-    assert argument_collection[-1].iparam.name == "kwargs"
+    assert argument_collection[-1].field_info.name == "kwargs"
     assert argument_collection[-1].tokens[0].keyword == "[key2]"
     assert argument_collection[-1].tokens[0].value == "foo2"
     assert argument_collection[-1].tokens[0].index == 0

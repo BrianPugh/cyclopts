@@ -65,6 +65,7 @@ class FieldInfo(inspect.Parameter):
             name=iparam.name,
             annotation=iparam.annotation,
             kind=iparam.kind,
+            default=iparam.default,
             required=required,
         )
 
@@ -347,7 +348,7 @@ class ArgumentCollection(list["Argument"]):
         if iparam.kind in (iparam.KEYWORD_ONLY, iparam.VAR_KEYWORD):
             positional_index = None
 
-        argument = Argument(iparam=iparam, cparam=cparam, keys=keys, hint=hint)
+        argument = Argument(field_info=FieldInfo.from_iparam(iparam), cparam=cparam, keys=keys, hint=hint)
         if argument._assignable and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
@@ -505,7 +506,7 @@ class ArgumentCollection(list["Argument"]):
         out = ParameterDict()
         for argument in self.root_arguments:
             if argument.value is not UNSET:
-                out[argument.iparam] = argument.value
+                out[argument.field_info] = argument.value
         return out
 
     def filter_by(
@@ -543,7 +544,7 @@ class ArgumentCollection(list["Argument"]):
         if group is not None:
             ac = cls(x for x in ac if group in x.cparam.group)  # pyright: ignore
         if kind is not None:
-            ac = cls(x for x in ac if x.iparam.kind == kind)
+            ac = cls(x for x in ac if x.field_info.kind == kind)
         if has_tokens is not None:
             ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tokens)))
         if has_tree_tokens is not None:
@@ -597,7 +598,7 @@ class Argument:
 
     # Multiple ``Argument`` may be associated with a single iparam.
     # However, each ``Argument`` must have a unique iparam/keys combo
-    iparam: inspect.Parameter = field(default=None)
+    field_info: inspect.Parameter = field(default=None)
 
     # Fully resolved Parameter
     # Resolved parameter should have a fully resolved Parameter.name
@@ -816,7 +817,7 @@ class Argument:
         Any
             Implicit value.
         """
-        if self.iparam.kind is self.iparam.VAR_KEYWORD:
+        if self.field_info.kind is self.field_info.VAR_KEYWORD:
             return tuple(term.lstrip("-").split(delimiter)), None
 
         assert self.cparam.name
@@ -861,9 +862,9 @@ class Argument:
         return tuple(trailing.split(delimiter)), implicit_value
 
     def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
-        if self.index is None or self.iparam in (self.iparam.KEYWORD_ONLY, self.iparam.VAR_KEYWORD):
+        if self.index is None or self.field_info in (self.field_info.KEYWORD_ONLY, self.field_info.VAR_KEYWORD):
             raise ValueError
-        elif self.iparam.kind is self.iparam.VAR_POSITIONAL:
+        elif self.field_info.kind is self.field_info.VAR_POSITIONAL:
             if index < self.index:
                 raise ValueError
         elif index != self.index:
@@ -914,13 +915,13 @@ class Argument:
                     raise MixedArgumentError(argument=self)
 
             if positional:
-                if self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
+                if self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                     # Apply converter to individual values
                     out = tuple(converter(get_args(self.hint)[0], (value,)) for value in positional)
                 else:
                     out = converter(self.hint, tuple(positional))
             elif keyword:
-                if self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD and not self.keys:
+                if self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD and not self.keys:
                     # Apply converter to individual values
                     out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
                 else:
@@ -971,12 +972,12 @@ class Argument:
         assert isinstance(self.cparam.validator, tuple)
 
         try:
-            if not self.keys and self.iparam and self.iparam.kind is self.iparam.VAR_KEYWORD:
+            if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.cparam.validator:
                     for val in value.values():
                         validator(hint, val)
-            elif self.iparam and self.iparam.kind is self.iparam.VAR_POSITIONAL:
+            elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.cparam.validator:
                     for val in value:

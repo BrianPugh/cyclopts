@@ -335,7 +335,7 @@ def create_parameter_help_panel(
         options = list(argument.names)
 
         # Add an all-uppercase name if it's an argument
-        if argument.iparam.kind in (argument.iparam.POSITIONAL_ONLY, argument.iparam.POSITIONAL_OR_KEYWORD):
+        if argument.field_info.kind in (argument.field_info.POSITIONAL_ONLY, argument.field_info.POSITIONAL_OR_KEYWORD):
             arg_name = options[0].lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]
@@ -362,14 +362,14 @@ def create_parameter_help_panel(
         # TODO: this only works if ``not keys``
         if argument.cparam.show_default or (
             argument.cparam.show_default is None
-            and argument.iparam.default is not None
-            and argument.iparam.default != argument.iparam.empty
+            and argument.field_info.default is not None
+            and argument.field_info.default != argument.field_info.empty
         ):
             default = ""
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
-                default = argument.cparam.name_transform(argument.iparam.default.name)
+                default = argument.cparam.name_transform(argument.field_info.default.name)
             else:
-                default = argument.iparam.default
+                default = argument.field_info.default
 
             help_append(rf"[default: {default}]", "dim")
 
