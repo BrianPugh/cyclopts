@@ -19,7 +19,7 @@ class Env:
     def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
         prefix = self.prefix
         if self.command and commands:
-            prefix += "_".join(commands) + "_"
+            prefix += "_".join(x.upper() for x in commands) + "_"
 
         candidate_env_keys = [x for x in os.environ if x.startswith(prefix)]
         candidate_env_keys.sort()

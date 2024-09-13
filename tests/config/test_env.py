@@ -30,6 +30,23 @@ def test_config_env_default(apps, monkeypatch):
     assert argument_collection[0].tokens[0].keys == ()
 
 
+def test_config_env_command_true(apps, monkeypatch):
+    def foo(bar: int):
+        pass
+
+    argument_collection = ArgumentCollection.from_callable(foo)
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_FOO_BAR", "100")
+    Env("CYCLOPTS_TEST_APP_", command=True)(apps, ("foo",), argument_collection)
+
+    assert len(argument_collection[0].tokens) == 1
+    assert argument_collection[0].tokens[0].keyword == "CYCLOPTS_TEST_APP_FOO_BAR"
+    assert argument_collection[0].tokens[0].value == "100"
+    assert argument_collection[0].tokens[0].source == "env"
+    assert argument_collection[0].tokens[0].index == 0
+    assert argument_collection[0].tokens[0].keys == ()
+
+
 def test_config_env_dict(apps, monkeypatch):
     def foo(bar_bar: dict):
         pass
