@@ -1,4 +1,3 @@
-import inspect
 from collections import namedtuple
 from typing import Annotated, Dict, List, Optional, TypedDict, Union
 
@@ -22,17 +21,16 @@ def test_argument_collection_no_annotation_no_default():
     def foo(a, b):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].hint is str
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].hint is str
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
@@ -42,17 +40,16 @@ def test_argument_collection_no_annotation_default():
     def foo(a="foo", b=100):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].hint is str
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].hint is int
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
@@ -62,17 +59,16 @@ def test_argument_collection_basic_annotation():
     def foo(a: str, b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].hint is str
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].hint is int
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
@@ -83,19 +79,18 @@ def test_argument_collection_bare_dict(type_):
     def foo(a: type_, b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is type_
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0].accepts_arbitrary_keywords is True
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].cparam.name == ("--b",)
     assert collection[1].hint is int
     assert collection[1].keys == ()
@@ -106,18 +101,17 @@ def test_argument_collection_typing_dict():
     def foo(a: Dict[str, int], b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].hint == Dict[str, int]
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0].accepts_arbitrary_keywords is True
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].hint is int
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
@@ -131,33 +125,32 @@ def test_argument_collection_typeddict():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 4
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
-    assert collection[1].field_info == iparams["a"]
+    assert collection[1].field_info.name == "foo"
     assert collection[1].cparam.name == ("--a.foo",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
-    assert collection[2].field_info == iparams["a"]
+    assert collection[2].field_info.name == "bar"
     assert collection[2].cparam.name == ("--a.bar",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
-    assert collection[3].field_info == iparams["b"]
+    assert collection[3].field_info.name == "b"
     assert collection[3].cparam.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
@@ -177,47 +170,46 @@ def test_argument_collection_typeddict_nested():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 6
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
-    assert collection[1].field_info == iparams["a"]
+    assert collection[1].field_info.name == "foo"
     assert collection[1].cparam.name == ("--a.foo",)
     assert collection[1].hint is Inner
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is True
     assert collection[1]._assignable is False
 
-    assert collection[2].field_info == iparams["a"]
+    assert collection[2].field_info.name == "fizz"
     assert collection[2].cparam.name == ("--a.foo.fizz",)
     assert collection[2].hint is float
     assert collection[2].keys == ("foo", "fizz")
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
-    assert collection[3].field_info == iparams["a"]
+    assert collection[3].field_info.name == "buzz"
     assert collection[3].cparam.name == ("--a.foo.bazz",)
     assert collection[3].hint is complex
     assert collection[3].keys == ("foo", "buzz")
     assert collection[3]._accepts_keywords is False
     assert collection[3]._assignable is True
 
-    assert collection[4].field_info == iparams["a"]
+    assert collection[4].field_info.name == "bar"
     assert collection[4].cparam.name == ("--a.bar",)
     assert collection[4].hint is int
     assert collection[4].keys == ("bar",)
     assert collection[4]._accepts_keywords is False
     assert collection[4]._assignable is True
 
-    assert collection[5].field_info == iparams["b"]
+    assert collection[5].field_info.name == "b"
     assert collection[5].cparam.name == ("--b",)
     assert collection[5].hint is int
     assert collection[5].keys == ()
@@ -233,33 +225,32 @@ def test_argument_collection_typeddict_annotated_keys_name_change():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 4
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
-    assert collection[1].field_info == iparams["a"]
+    assert collection[1].field_info.name == "foo"
     assert collection[1].cparam.name == ("--a.fizz",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
-    assert collection[2].field_info == iparams["a"]
+    assert collection[2].field_info.name == "bar"
     assert collection[2].cparam.name == ("--a.buzz",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
-    assert collection[3].field_info == iparams["b"]
+    assert collection[3].field_info.name == "b"
     assert collection[3].cparam.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
@@ -275,33 +266,32 @@ def test_argument_collection_typeddict_annotated_keys_name_override():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 4
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
-    assert collection[1].field_info == iparams["a"]
+    assert collection[1].field_info.name == "foo"
     assert collection[1].cparam.name == ("--fizz",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
-    assert collection[2].field_info == iparams["a"]
+    assert collection[2].field_info.name == "bar"
     assert collection[2].cparam.name == ("--buzz",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
-    assert collection[3].field_info == iparams["b"]
+    assert collection[3].field_info.name == "b"
     assert collection[3].cparam.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
@@ -317,31 +307,30 @@ def test_argument_collection_typeddict_flatten_root():
     def foo(a: Annotated[ExampleTypedDict, Parameter(name="*")], b: int):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("*",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
-    assert collection[1].field_info == iparams["a"]
+    assert collection[1].field_info.name == "foo"
     assert collection[1].cparam.name == ("--foo",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
-    assert collection[2].field_info == iparams["a"]
+    assert collection[2].field_info.name == "bar"
     assert collection[2].cparam.name == ("--bar",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
-    assert collection[3].field_info == iparams["b"]
+    assert collection[3].field_info.name == "b"
     assert collection[3].cparam.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
@@ -353,18 +342,16 @@ def test_argument_collection_var_positional():
     def foo(a: int, *b: float):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is int
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].cparam.name == ("B",)
     assert collection[1].hint == tuple[float, ...]
     assert collection[1].keys == ()
@@ -375,18 +362,17 @@ def test_argument_collection_var_keyword():
     def foo(a: int, **b: float):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is int
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].cparam.name == ("--[KEYWORD]",)
     assert collection[1].hint == dict[str, float]
     assert collection[1].keys == ()
@@ -397,18 +383,17 @@ def test_argument_collection_var_keyword_named():
     def foo(a: int, **b: Annotated[float, Parameter(name=("--foo", "--bar"))]):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     assert len(collection) == 2
 
-    assert collection[0].field_info == iparams["a"]
+    assert collection[0].field_info.name == "a"
     assert collection[0].cparam.name == ("--a",)
     assert collection[0].hint is int
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
-    assert collection[1].field_info == iparams["b"]
+    assert collection[1].field_info.name == "b"
     assert collection[1].cparam.name == ("--foo", "--bar")
     assert collection[1].hint == dict[str, float]
     assert collection[1].keys == ()
@@ -419,12 +404,11 @@ def test_argument_collection_var_keyword_match():
     def foo(a: int, **b: float):
         pass
 
-    iparams = inspect.signature(foo).parameters
     collection = ArgumentCollection.from_callable(foo)
 
     argument, keys, _ = collection.match("--fizz")
     assert keys == ("fizz",)
-    assert argument.field_info == iparams["b"]
+    assert argument.field_info.name == "b"
 
 
 @pytest.mark.parametrize(

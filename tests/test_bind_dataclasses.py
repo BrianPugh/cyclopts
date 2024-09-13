@@ -5,7 +5,11 @@ from typing import Annotated, Dict
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.exceptions import ArgumentOrderError, MissingArgumentError, UnusedCliTokensError
+from cyclopts.exceptions import (
+    ArgumentOrderError,
+    MissingArgumentError,
+    UnusedCliTokensError,
+)
 
 
 @dataclass
@@ -108,21 +112,25 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         Build a car.
 
         ╭─ Engine ───────────────────────────────────────────────────────────╮
-        │ *  --car.cylinders           Number of cylinders the engine has.   │
-        │                              [required]                            │
-        │ *  --car.horsepower --car.p  Amount of horsepower the engine can   │
-        │                              generate. [required]                  │
-        │    --car.diesel              If this engine consumes diesel,       │
-        │      --car.no-diesel         instead of gasoline.                  │
+        │ *  CAR.CYLINDERS            Number of cylinders the engine has.    │
+        │      --car.cylinders        [required]                             │
+        │ *  CAR.HORSEPOWER           Amount of horsepower the engine can    │
+        │      --car.horsepower       generate. [required]                   │
+        │      --car.p                                                       │
+        │    CAR.DIESEL --car.diesel  If this engine consumes diesel,        │
+        │      --car.no-diesel        instead of gasoline. [default: False]  │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --license-plate       License plate identifier to give to car.  │
-        │                          [required]                                │
-        │ *  --car.name            The name/model of the car. [required]     │
-        │ *  --car.mileage         How many miles the car has driven.        │
-        │                          [required]                                │
-        │ *  --car.wheel.diameter  Diameter of wheel in inches. [required]   │
-        │    --car.n-axles         Number of axles the car has.              │
+        │ *  --license-plate            License plate identifier to give to  │
+        │                               car. [required]                      │
+        │ *  CAR.NAME --car.name        The name/model of the car.           │
+        │                               [required]                           │
+        │ *  CAR.MILEAGE --car.mileage  How many miles the car has driven.   │
+        │                               [required]                           │
+        │ *  CAR.WHEEL.DIAMETER         Diameter of wheel in inches.         │
+        │      --car.wheel.diameter     [required]                           │
+        │    CAR.N-AXLES --car.n-axles  Number of axles the car has.         │
+        │                               [default: 2]                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

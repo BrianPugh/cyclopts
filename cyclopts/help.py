@@ -359,7 +359,6 @@ def create_parameter_help_panel(
             env_vars = ", ".join(argument.cparam.env_var)
             help_append(rf"[env var: {env_vars}]", "dim")
 
-        # TODO: this only works if ``not keys``
         if argument.cparam.show_default or (
             argument.cparam.show_default is None
             and argument.field_info.default is not None
@@ -373,7 +372,7 @@ def create_parameter_help_panel(
 
             help_append(rf"[default: {default}]", "dim")
 
-        if argument.cparam.required:
+        if argument.required:
             help_append(r"[required]", "dim red")
 
         # populate row
@@ -382,7 +381,7 @@ def create_parameter_help_panel(
                 name=" ".join(long_options),
                 description=format_str(*help_components, format=format),
                 short=" ".join(short_options),
-                required=bool(argument.cparam.required),
+                required=argument.required,
             )
         )
 

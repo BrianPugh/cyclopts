@@ -115,12 +115,12 @@ def _generic_class_field_info(f) -> dict[str, FieldInfo]:
 
 def _pydantic_field_info(model) -> dict[str, FieldInfo]:
     out = {}
-    for k, v in model.model_fields.items():
-        out[k] = FieldInfo(
-            name=k,
-            kind=inspect.Parameter.KEYWORD_ONLY if v.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=v.annotation,
-            required=v.is_required(),
+    for name, pydantic_field in model.model_fields.items():
+        out[name] = FieldInfo(
+            name=name,
+            kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=pydantic_field.annotation,
+            required=pydantic_field.is_required(),
         )
     return out
 
@@ -256,7 +256,7 @@ class ArgumentCollection(list["Argument"]):
     @classmethod
     def _from_type(
         cls,
-        iparam: inspect.Parameter,
+        field_info: FieldInfo,
         hint,
         keys: tuple[str, ...],
         *default_parameters,
@@ -279,9 +279,9 @@ class ArgumentCollection(list["Argument"]):
             cyclopts_parameters_no_group.extend(x for x in annotations if isinstance(x, Parameter))
 
         if not keys:  # root hint annotation
-            if iparam.kind is iparam.VAR_KEYWORD:
+            if field_info.kind is field_info.VAR_KEYWORD:
                 hint = dict[str, hint]
-            elif iparam.kind is iparam.VAR_POSITIONAL:
+            elif field_info.kind is field_info.VAR_POSITIONAL:
                 hint = tuple[hint, ...]
 
         if _resolve_groups:
@@ -302,7 +302,7 @@ class ArgumentCollection(list["Argument"]):
         upstream_parameter = Parameter.combine(
             (
                 Parameter(group=group_arguments)
-                if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL)
+                if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL)
                 else Parameter(group=group_parameters)
             ),
             *default_parameters,
@@ -334,21 +334,21 @@ class ArgumentCollection(list["Argument"]):
             )
             if not cparam.name:
                 # This is directly on iparam; derive default name from it.
-                if iparam.kind in (iparam.POSITIONAL_ONLY, iparam.VAR_POSITIONAL):
+                if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
                     # Name is only used for help-string
-                    cparam = Parameter.combine(cparam, Parameter(name=(iparam.name.upper(),)))
-                elif iparam.kind is iparam.VAR_KEYWORD:
+                    cparam = Parameter.combine(cparam, Parameter(name=(field_info.name.upper(),)))
+                elif field_info.kind is field_info.VAR_KEYWORD:
                     cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:
                     # cparam.name_transform cannot be None due to:
                     #     attrs.converters.default_if_none(default_name_transform)
                     assert cparam.name_transform is not None
-                    cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(iparam.name)]))
+                    cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(field_info.name)]))
 
-        if iparam.kind in (iparam.KEYWORD_ONLY, iparam.VAR_KEYWORD):
+        if field_info.kind in (field_info.KEYWORD_ONLY, field_info.VAR_KEYWORD):
             positional_index = None
 
-        argument = Argument(field_info=FieldInfo.from_iparam(iparam), cparam=cparam, keys=keys, hint=hint)
+        argument = Argument(field_info=FieldInfo.from_iparam(field_info), cparam=cparam, keys=keys, hint=hint)
         if argument._assignable and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
@@ -356,17 +356,17 @@ class ArgumentCollection(list["Argument"]):
         out.append(argument)
         if argument._accepts_keywords:
             docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
-            for field_name, field_info in argument._lookup.items():
-                if field_info.kind is field_info.KEYWORD_ONLY:
+            for sub_field_name, sub_field_info in argument._lookup.items():
+                if sub_field_info.kind is sub_field_info.KEYWORD_ONLY:
                     positional_index = None
 
                 subkey_argument_collection = cls._from_type(
-                    iparam,
-                    field_info.annotation,
-                    keys + (field_name,),
+                    sub_field_info,
+                    sub_field_info.annotation,
+                    keys + (sub_field_name,),
                     cparam,
-                    Parameter(required=bool(cparam.required) & field_info.required),
-                    docstring_lookup.get(field_name, _PARAMETER_EMPTY_HELP),
+                    Parameter(required=bool(cparam.required) & sub_field_info.required),
+                    docstring_lookup.get(sub_field_name, _PARAMETER_EMPTY_HELP),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
@@ -411,7 +411,7 @@ class ArgumentCollection(list["Argument"]):
         hint = _iparam_get_hint(iparam)
 
         return cls._from_type(
-            iparam,
+            FieldInfo.from_iparam(iparam),
             hint,
             (),
             _PARAMETER_EMPTY_HELP,
@@ -596,9 +596,11 @@ class Argument:
     # If tokens is empty, then no tokens have been parsed for this argument.
     tokens: list[Token] = field(factory=list)
 
-    # Multiple ``Argument`` may be associated with a single iparam.
-    # However, each ``Argument`` must have a unique iparam/keys combo
-    field_info: inspect.Parameter = field(default=None)
+    field_info: FieldInfo = field(default=None)
+    """
+    Contains info inferred from the *immediate* python code.
+    Does **not** take any hierarchy into account.
+    """
 
     # Fully resolved Parameter
     # Resolved parameter should have a fully resolved Parameter.name
@@ -1023,6 +1025,10 @@ class Argument:
     @property
     def show(self) -> bool:
         return self._assignable and self.cparam.show
+
+    @property
+    def required(self) -> bool:
+        return bool(self.cparam.required) and self.field_info.required
 
 
 def _resolve_groups_from_callable(
