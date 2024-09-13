@@ -29,25 +29,25 @@ def test_config_env_default(apps, monkeypatch):
 
 
 def test_config_env_dict(apps, monkeypatch):
-    def foo(bar: dict):
+    def foo(bar_bar: dict):
         pass
 
     argument_collection = ArgumentCollection.from_callable(foo)
 
-    monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BUZZ", "100")
-    monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_FIZZ", "200")
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BAR_BUZZ", "100")
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BAR_FIZZ", "200")
 
     Env("CYCLOPTS_TEST_APP_", command=False)(apps, (), argument_collection)
 
     assert len(argument_collection[0].tokens) == 2
 
-    assert argument_collection[0].tokens[0].keyword == "CYCLOPTS_TEST_APP_BAR_BUZZ"
+    assert argument_collection[0].tokens[0].keyword == "CYCLOPTS_TEST_APP_BAR_BAR_BUZZ"
     assert argument_collection[0].tokens[0].value == "100"
     assert argument_collection[0].tokens[0].source == "env"
     assert argument_collection[0].tokens[0].index == 0
     assert argument_collection[0].tokens[0].keys == ("buzz",)
 
-    assert argument_collection[0].tokens[1].keyword == "CYCLOPTS_TEST_APP_BAR_FIZZ"
+    assert argument_collection[0].tokens[1].keyword == "CYCLOPTS_TEST_APP_BAR_BAR_FIZZ"
     assert argument_collection[0].tokens[1].value == "200"
     assert argument_collection[0].tokens[1].source == "env"
     assert argument_collection[0].tokens[1].index == 0
