@@ -48,6 +48,15 @@ def test_basic_2(app, cmd_str, assert_parse_args):
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
 
 
+def test_basic_allow_hyphen_or_underscore(app, assert_parse_args):
+    @app.default
+    def default(foo_bar):
+        pass
+
+    assert_parse_args(default, "--foo-bar=bazz", "bazz")
+    assert_parse_args(default, "--foo_bar=bazz", "bazz")
+
+
 def test_out_of_order_mixed_positional_or_keyword(app, assert_parse_args):
     @app.command
     def foo(a, b, c):

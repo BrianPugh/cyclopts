@@ -53,6 +53,13 @@ class _FieldInfo(NamedTuple):
     kw_only: bool = True
 
 
+def _startswith(string, prefix):
+    def normalize(s):
+        return s.replace("_", "-")
+
+    return normalize(string).startswith(normalize(prefix))
+
+
 def _iparam_get_hint(iparam):
     hint = iparam.annotation
     if hint is inspect.Parameter.empty or resolve(hint) is Any:
@@ -800,7 +807,7 @@ class Argument:
         for name in self.cparam.name:
             if transform:
                 name = transform(name)
-            if term.startswith(name):
+            if _startswith(term, name):
                 trailing = term[len(name) :]
                 implicit_value = True if self.hint is bool else None
                 if trailing:
