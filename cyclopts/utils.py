@@ -2,14 +2,7 @@ import functools
 import inspect
 import sys
 from collections.abc import Iterable, Iterator, MutableMapping
-from typing import (
-    Any,
-    Literal,
-    Optional,
-    Union,
-    get_args,
-    get_origin,
-)
+from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origin
 
 _union_types = set()
 _union_types.add(Union)
@@ -18,7 +11,7 @@ if sys.version_info >= (3, 10):
 
     _union_types.add(UnionType)
 
-from typing import Annotated  # pragma: no cover
+# pragma: no cover
 
 # fmt: off
 if sys.version_info >= (3, 10):
