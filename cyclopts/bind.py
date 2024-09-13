@@ -19,7 +19,6 @@ from cyclopts.exceptions import (
     UnknownOptionError,
     ValidationError,
 )
-from cyclopts.parameter import validate_command
 from cyclopts.token import Token
 from cyclopts.utils import ParameterDict
 
@@ -251,7 +250,6 @@ def _parse_configs(argument_collection: ArgumentCollection, configs):
     for config in configs:
         # Each ``config`` is a partial that already has apps and commands provided.
         config(argument_collection)
-        # TODO: validate argument_collection after every config?
 
 
 def _sort_group(argument_collection) -> list[tuple["Group", ArgumentCollection]]:
@@ -296,8 +294,6 @@ def create_bound_arguments(
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
     unused_tokens = []
-
-    validate_command(func)  # TODO: is this the appropriate location?
 
     try:
         # Build up a mapping of inspect.Parameter->List[str]
