@@ -186,7 +186,7 @@ def _identity_converter(type_, element):
     return element
 
 
-class ArgumentCollection(list):
+class ArgumentCollection(list["Argument"]):
     """Provides easy lookups/pattern matching."""
 
     def __init__(self, *args, groups: Optional[list[Group]] = None):
@@ -481,6 +481,7 @@ class ArgumentCollection(list):
 
         out.groups = []
         for argument in out:
+            assert isinstance(argument.cparam.group, tuple)
             for group in argument.cparam.group:
                 if group not in out.groups:
                     out.groups.append(group)
@@ -540,7 +541,7 @@ class ArgumentCollection(list):
         cls = type(self)
 
         if group is not None:
-            ac = cls(x for x in ac if group in x.cparam.group)
+            ac = cls(x for x in ac if group in x.cparam.group)  # pyright: ignore
         if kind is not None:
             ac = cls(x for x in ac if x.iparam.kind == kind)
         if has_tokens is not None:
