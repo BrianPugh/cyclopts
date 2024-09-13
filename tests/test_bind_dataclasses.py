@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Annotated, Dict
@@ -217,6 +218,7 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str):
     assert_parse_args(my_default_command, cmd_str, Config(a=100, b=200))
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app, assert_parse_args):
     @dataclass
     class Config:
@@ -226,7 +228,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app,
         b: Annotated[int, Parameter(name="bar")] = 2
         """This is the docstring for python parameter "b"."""
 
-        c: int = field(kw_only=True)
+        c: int = field(kw_only=True)  # pyright: ignore
 
     @app.default
     def my_default_command(foo, config: Annotated[Config, Parameter(name="*")], bar):
@@ -243,6 +245,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app,
         app.parse_args("v1 --bar=v2 100 200 --c=300", exit_on_error=False)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(app, assert_parse_args):
     @dataclass
     class Config:
@@ -252,7 +255,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(ap
         b: Annotated[int, Parameter(name="bar")] = 2
         """This is the docstring for python parameter "b"."""
 
-        c: int = field(default=5, kw_only=True)
+        c: int = field(default=5, kw_only=True)  # pyright: ignore
 
     @app.default
     def my_default_command(config: Annotated[Config, Parameter(name="*")]):
