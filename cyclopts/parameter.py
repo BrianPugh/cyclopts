@@ -8,7 +8,7 @@ from attrs import field, frozen
 
 import cyclopts._env_var
 import cyclopts.utils
-from cyclopts._convert import AnnotatedType, convert, resolve, resolve_optional
+from cyclopts._convert import AnnotatedType, convert, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
@@ -197,6 +197,19 @@ class Parameter:
             **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportAttributeAccessIssue]
         )
 
+    @classmethod
+    def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
+        """Resolve the immediate Parameter from a type hint."""
+        cyclopts_parameters = []
+        if type_ is not inspect.Parameter.empty:
+            type_ = resolve_optional(type_)
+
+            if type(type_) is AnnotatedType:
+                annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+                cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+
+        return cls.combine(*default_parameters, *cyclopts_parameters)
+
 
 def validate_command(f: Callable):
     """Validate if a function abides by Cyclopts's rules.
@@ -209,39 +222,6 @@ def validate_command(f: Callable):
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
         get_origin(iparam.annotation)
-        type_, cparam = _get_hint_parameter(iparam)
+        cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
-
-
-def _get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> tuple[type, Parameter]:
-    """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
-
-    If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
-    """
-    cyclopts_parameters = []
-
-    if isinstance(type_, inspect.Parameter):
-        annotation = type_.annotation
-
-        if annotation is inspect.Parameter.empty or resolve(annotation) is Any:
-            if type_.default is inspect.Parameter.empty or type_.default is None:
-                annotation = str
-            else:
-                return _get_hint_parameter(type(type_.default), *default_parameters)
-    else:
-        annotation = type_
-
-        if annotation is inspect.Parameter.empty:
-            annotation = str
-
-    annotation = resolve_optional(annotation)
-
-    if type(annotation) is AnnotatedType:
-        annotations = annotation.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-        annotation = get_args(annotation)[0]
-        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-    annotation = resolve(annotation)
-
-    cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
-    return annotation, cparam
