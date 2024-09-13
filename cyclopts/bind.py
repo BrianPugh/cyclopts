@@ -318,7 +318,6 @@ def create_bound_arguments(
             raise ValidationError(value=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
 
         for argument in argument_collection:
-            # TODO: this doesn't check if all required subkeys were provided.
             if not _is_required(argument.field_info) or argument.keys or not argument._assignable:
                 continue
             if not bool(argument.n_tree_tokens):
