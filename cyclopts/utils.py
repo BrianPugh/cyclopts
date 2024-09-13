@@ -46,6 +46,10 @@ class Sentinel(metaclass=SentinelMeta):
     pass
 
 
+class UNSET(Sentinel):
+    """No data was provided."""
+
+
 def record_init(target: str):
     """Class decorator that records init argument names as a tuple to ``target``."""
 

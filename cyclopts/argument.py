@@ -26,7 +26,7 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import AnnotatedType, NoneType, ParameterDict, Sentinel, is_union
+from cyclopts.utils import UNSET, AnnotatedType, NoneType, ParameterDict, is_union
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired, Required
@@ -484,7 +484,7 @@ class ArgumentCollection(list):
         """
         out = ParameterDict()
         for argument in self.root_arguments:
-            if argument.value is not argument.UNSET:
+            if argument.value is not UNSET:
                 out[argument.iparam] = argument.value
         return out
 
@@ -533,7 +533,7 @@ class ArgumentCollection(list):
         if show is not None:
             ac = cls(x for x in ac if not (x.cparam.show ^ bool(show)))
         if value_set is not None:
-            ac = cls(x for x in ac if ((x.value is x.UNSET) ^ bool(value_set)))
+            ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
 
         return ac
 
@@ -571,12 +571,6 @@ class Argument:
 
     """
 
-    class UNSET(Sentinel):
-        """No data was provided to derive a python value from.
-
-        Or, :meth:`Argument.convert` has not yet been called.
-        """
-
     # List of tokens parsed from various sources
     # If tokens is empty, then no tokens have been parsed for this argument.
     tokens: list[Token] = field(factory=list)
@@ -605,6 +599,11 @@ class Argument:
 
     # Converted value; may be stale.
     _value: Any = field(alias="value", default=UNSET)
+    """
+    Converted value from last ``convert`` call.
+    It may be stale.
+    UNSET if ``convert`` has not yet been called (with tokens).
+    """
 
     _accepts_keywords: bool = field(default=False, init=False, repr=False)
 
@@ -908,7 +907,7 @@ class Argument:
             elif self.cparam.required:
                 raise MissingArgumentError(argument=self)
             else:  # no tokens
-                return self.UNSET
+                return UNSET
         else:  # A dictionary-like structure.
             data = {}
             if is_pydantic(self.hint):
@@ -933,7 +932,7 @@ class Argument:
             elif self.cparam.required:
                 raise MissingArgumentError(argument=self)
             else:
-                out = self.UNSET
+                out = UNSET
 
         return out
 
@@ -969,7 +968,7 @@ class Argument:
 
     def convert_and_validate(self, converter=None):
         val = self.convert(converter=converter)
-        if val is not self.UNSET:
+        if val is not UNSET:
             self.validate(val)
         return val
 

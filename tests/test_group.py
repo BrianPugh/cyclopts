@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 import cyclopts.group
-from cyclopts import App, Group, Parameter
+from cyclopts import UNSET, App, Group, Parameter
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
@@ -49,7 +49,7 @@ def test_group_parameter_converter(app, assert_parse_args):
 def test_group_parameter_converter_delete_arg(app, assert_parse_args):
     def converter(arguments):
         for argument in arguments:
-            argument.value = argument.UNSET if argument.name == "--cone" else argument.value.upper()
+            argument.value = UNSET if argument.name == "--cone" else argument.value.upper()
 
     food_group = Group("Food", converter=converter)
 

@@ -357,6 +357,7 @@ def create_parameter_help_panel(
             env_vars = ", ".join(argument.cparam.env_var)
             help_append(rf"[env var: {env_vars}]", "dim")
 
+        # TODO: this only works if ``not keys``
         if argument.cparam.show_default or (
             argument.cparam.show_default is None
             and argument.iparam.default is not None
@@ -366,7 +367,6 @@ def create_parameter_help_panel(
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
                 default = argument.cparam.name_transform(argument.iparam.default.name)
             else:
-                # TODO: this only works if ``not keys``
                 default = argument.iparam.default
 
             help_append(rf"[default: {default}]", "dim")
