@@ -325,8 +325,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      Indicates that the parameter must be supplied on the help-page.
-      Does **not** directly enforce whether or not a parameter must be supplied; only influences the help-page.
+      Indicates that the parameter must be supplied.
       Defaults to inferring from the function signature; i.e. ``False`` if the parameter has a default, ``True`` otherwise.
 
    .. attribute:: show

@@ -7,6 +7,7 @@ import pytest
 
 from cyclopts import App, Group, Parameter
 from cyclopts.argument import ArgumentCollection
+from cyclopts.exceptions import MissingArgumentError
 from cyclopts.help import (
     HelpPanel,
     create_parameter_help_panel,
@@ -817,11 +818,17 @@ def test_help_print_function(app, console):
 
 
 def test_help_print_parameter_required(app, console):
+    """
+    Notes
+    -----
+        * The default value should not show up in the help-page.
+    """
+
     @app.command(help="Cmd help string.")
     def cmd(
         foo: Annotated[str, Parameter(required=False, help="Docstring for foo.")],
         *,
-        bar: Annotated[str, Parameter(required=True, help="Docstring for bar.")],
+        bar: Annotated[str, Parameter(required=True, help="Docstring for bar.")] = "some-default-value",
     ):
         pass
 
@@ -842,6 +849,9 @@ def test_help_print_parameter_required(app, console):
         """
     )
     assert actual == expected
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("cmd value1", exit_on_error=False)
 
 
 def test_help_print_function_defaults(app, console):

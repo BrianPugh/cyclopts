@@ -363,6 +363,7 @@ def create_parameter_help_panel(
             argument.cparam.show_default is None
             and argument.field_info.default is not None
             and argument.field_info.default != argument.field_info.empty
+            and not argument.required
         ):
             default = ""
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
