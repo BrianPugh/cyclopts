@@ -26,7 +26,7 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, AnnotatedType, NoneType, ParameterDict, is_union
+from cyclopts.utils import UNSET, AnnotatedType, ParameterDict, is_union
 
 if sys.version_info < (3, 11):
     from typing_extensions import NotRequired, Required
@@ -69,20 +69,21 @@ class FieldInfo(inspect.Parameter):
             required=required,
         )
 
+    @property
+    def hint(self):
+        """Annotation with Optional-removed and cyclopts type-inferring."""
+        hint = self.annotation
+        if hint is inspect.Parameter.empty or resolve(hint) is Any:
+            hint = str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
+        hint = resolve_optional(hint)
+        return hint
+
 
 def _startswith(string, prefix):
     def normalize(s):
         return s.replace("_", "-")
 
     return normalize(string).startswith(normalize(prefix))
-
-
-def _iparam_get_hint(iparam):
-    hint = iparam.annotation
-    if hint is inspect.Parameter.empty or resolve(hint) is Any:
-        hint = str if iparam.default is inspect.Parameter.empty or iparam.default is None else type(iparam.default)
-    hint = resolve_optional(hint)
-    return hint
 
 
 def _typed_dict_field_info(typeddict) -> dict[str, FieldInfo]:
@@ -257,7 +258,6 @@ class ArgumentCollection(list["Argument"]):
     def _from_type(
         cls,
         field_info: FieldInfo,
-        hint,
         keys: tuple[str, ...],
         *default_parameters,
         group_lookup: dict[str, Group],
@@ -267,12 +267,11 @@ class ArgumentCollection(list["Argument"]):
         positional_index: Optional[int] = None,
         _resolve_groups: bool = True,
     ):
-        assert hint is not NoneType
         out = cls(groups=list(group_lookup.values()))
 
         cyclopts_parameters_no_group = []
 
-        hint = resolve_optional(hint)
+        hint = field_info.hint
         if type(hint) is AnnotatedType:
             annotations = hint.__metadata__  # pyright: ignore
             hint = get_args(hint)[0]
@@ -362,7 +361,6 @@ class ArgumentCollection(list["Argument"]):
 
                 subkey_argument_collection = cls._from_type(
                     sub_field_info,
-                    sub_field_info.annotation,
                     keys + (sub_field_name,),
                     cparam,
                     Parameter(required=bool(cparam.required) & sub_field_info.required),
@@ -408,11 +406,8 @@ class ArgumentCollection(list["Argument"]):
         group_lookup[group_arguments.name] = group_arguments
         group_lookup[group_parameters.name] = group_parameters
 
-        hint = _iparam_get_hint(iparam)
-
         return cls._from_type(
             FieldInfo.from_iparam(iparam),
-            hint,
             (),
             _PARAMETER_EMPTY_HELP,
             Parameter(
