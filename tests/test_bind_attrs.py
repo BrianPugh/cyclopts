@@ -1,8 +1,10 @@
 from typing import Annotated, Dict, Optional
 
+import pytest
 from attrs import define, field
 
 from cyclopts import Parameter
+from cyclopts.exceptions import MissingArgumentError
 
 
 @define
@@ -42,3 +44,21 @@ def test_bind_attrs_accepts_keys_false(app, assert_parse_args):
 
     assert_parse_args(foo, "foo 5", SimpleClass(5))
     assert_parse_args(foo, "foo --example=5", SimpleClass(5))
+
+
+def test_bind_attrs_kw_only(app, assert_parse_args):
+    @define
+    class Engine:
+        cylinders: int
+        volume: float
+        power: Annotated[float, Parameter(name="--power")] = field(kw_only=True)
+
+    @app.default
+    def default(engine: Engine):
+        pass
+
+    assert_parse_args(default, "4 100 --power=200", Engine(4, 100, power=200))
+    assert_parse_args(default, "--power=200 4 100", Engine(4, 100, power=200))
+    assert_parse_args(default, "4 --power=200 100", Engine(4, 100, power=200))
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("4 100 200", exit_on_error=False)
