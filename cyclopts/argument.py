@@ -363,7 +363,7 @@ class ArgumentCollection(list["Argument"]):
                     sub_field_info,
                     keys + (sub_field_name,),
                     cparam,
-                    Parameter(required=bool(cparam.required) & sub_field_info.required),
+                    Parameter(required=argument.required & sub_field_info.required),
                     docstring_lookup.get(sub_field_name, _PARAMETER_EMPTY_HELP),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
@@ -410,11 +410,6 @@ class ArgumentCollection(list["Argument"]):
             FieldInfo.from_iparam(iparam),
             (),
             _PARAMETER_EMPTY_HELP,
-            Parameter(
-                required=iparam.default is iparam.empty
-                and iparam.kind != iparam.VAR_KEYWORD
-                and iparam.kind != iparam.VAR_POSITIONAL
-            ),
             *default_parameters,
             group_lookup=group_lookup,
             group_arguments=group_arguments,
@@ -923,7 +918,7 @@ class Argument:
                     out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
                 else:
                     out = converter(self.hint, keyword)
-            elif self.cparam.required:
+            elif self.required:
                 raise MissingArgumentError(argument=self)
             else:  # no tokens
                 return UNSET
@@ -937,7 +932,7 @@ class Argument:
                 if child.n_tree_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
 
-            if self._missing_keys_checker and (self.cparam.required or data):
+            if self._missing_keys_checker and (self.required or data):
                 if missing_keys := self._missing_keys_checker(self, data):
                     # Report the first missing argument.
                     missing_key = sorted(missing_keys)[0]
@@ -948,7 +943,7 @@ class Argument:
 
             if data:
                 out = self.hint(**data)
-            elif self.cparam.required:
+            elif self.required:
                 raise MissingArgumentError(argument=self)
             else:
                 out = UNSET
@@ -1023,7 +1018,10 @@ class Argument:
 
     @property
     def required(self) -> bool:
-        return bool(self.cparam.required) and self.field_info.required
+        if self.cparam.required is None:
+            return self.field_info.required
+        else:
+            return self.cparam.required
 
 
 def _resolve_groups_from_callable(
