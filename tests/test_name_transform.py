@@ -96,6 +96,18 @@ def test_parameter_name_transform_custom(app, assert_parse_args):
     assert_parse_args(foo, "--b_a_r 5", b_a_r=5)
 
 
+@pytest.mark.parametrize("transform", [None, lambda s: s])
+def test_parameter_name_transform_kwargs(app, assert_parse_args, transform):
+    """Both custom and non-custom transforms should result in the same kwargs."""
+    app.default_parameter = Parameter(name_transform=transform)
+
+    @app.default
+    def foo(**kwargs: int):
+        pass
+
+    assert_parse_args(foo, "--hy-phen=1 --under_score=2", **{"hy-phen": 1, "under_score": 2})
+
+
 def test_parameter_name_transform_custom_name_override(app, assert_parse_args):
     app.default_parameter = Parameter(name_transform=lambda s: s)
 
