@@ -34,11 +34,11 @@ FontPixelFormat: TypeAlias = Literal["bmp"]
     "type_, expected",
     [
         (FontPixelFormat, "bmp"),
-        (FontSingleFormat, "otf,woff2,ttf,bdf,pcf"),
-        (FontSingleFormat | FontPixelFormat, "otf,woff2,ttf,bdf,pcf,bmp"),
-        (FontSingleFormat | FontCollectionFormat, "otf,woff2,ttf,bdf,pcf,otc,ttc"),
-        (FontSingleFormat | FontCollectionFormat | None, "otf,woff2,ttf,bdf,pcf,otc,ttc"),
-        (list[FontSingleFormat | FontCollectionFormat] | None, "otf,woff2,ttf,bdf,pcf,otc,ttc"),
+        (FontSingleFormat, "otf, woff2, ttf, bdf, pcf"),
+        (FontSingleFormat | FontPixelFormat, "otf, woff2, ttf, bdf, pcf, bmp"),
+        (FontSingleFormat | FontCollectionFormat, "otf, woff2, ttf, bdf, pcf, otc, ttc"),
+        (FontSingleFormat | FontCollectionFormat | None, "otf, woff2, ttf, bdf, pcf, otc, ttc"),
+        (list[FontSingleFormat | FontCollectionFormat] | None, "otf, woff2, ttf, bdf, pcf, otc, ttc"),
     ],
 )
 def test_py312_type_alias_type_help_get_choices(type_, expected):
