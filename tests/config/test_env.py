@@ -17,6 +17,7 @@ def test_config_env_default(apps, monkeypatch):
     argument_collection = ArgumentCollection.from_callable(foo)
 
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR", "100")
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_SOMETHING_ELSE", "100")
     Env("CYCLOPTS_TEST_APP_", command=False)(apps, (), argument_collection)
 
     assert len(argument_collection[0].tokens) == 1
