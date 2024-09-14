@@ -104,7 +104,6 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         app("build --help", console=console)
 
     actual = capture.get()
-    print(actual)
 
     expected = dedent(
         """\
@@ -113,25 +112,21 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         Build a car.
 
         ╭─ Engine ───────────────────────────────────────────────────────────╮
-        │ *  CAR.CYLINDERS            Number of cylinders the engine has.    │
-        │      --car.cylinders        [required]                             │
-        │ *  CAR.HORSEPOWER           Amount of horsepower the engine can    │
-        │      --car.horsepower       generate. [required]                   │
-        │      --car.p                                                       │
-        │    CAR.DIESEL --car.diesel  If this engine consumes diesel,        │
-        │      --car.no-diesel        instead of gasoline. [default: False]  │
+        │ *  --car.cylinders           Number of cylinders the engine has.   │
+        │                              [required]                            │
+        │ *  --car.horsepower --car.p  Amount of horsepower the engine can   │
+        │                              generate. [required]                  │
+        │    --car.diesel              If this engine consumes diesel,       │
+        │      --car.no-diesel         instead of gasoline. [default: False] │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --license-plate            License plate identifier to give to  │
-        │                               car. [required]                      │
-        │ *  CAR.NAME --car.name        The name/model of the car.           │
-        │                               [required]                           │
-        │ *  CAR.MILEAGE --car.mileage  How many miles the car has driven.   │
-        │                               [required]                           │
-        │ *  CAR.WHEEL.DIAMETER         Diameter of wheel in inches.         │
-        │      --car.wheel.diameter     [required]                           │
-        │    CAR.N-AXLES --car.n-axles  Number of axles the car has.         │
-        │                               [default: 2]                         │
+        │ *  --license-plate       License plate identifier to give to car.  │
+        │                          [required]                                │
+        │ *  --car.name            The name/model of the car. [required]     │
+        │ *  --car.mileage         How many miles the car has driven.        │
+        │                          [required]                                │
+        │ *  --car.wheel.diameter  Diameter of wheel in inches. [required]   │
+        │    --car.n-axles         Number of axles the car has. [default: 2] │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -202,7 +197,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
         "--bar 200 100",
     ],
 )
-def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str):
+def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     @dataclass
     class Config:
         a: int = 1
@@ -216,6 +211,27 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str):
         print(f"{config=}")
 
     assert_parse_args(my_default_command, cmd_str, Config(a=100, b=200))
+
+    with console.capture() as capture:
+        app("build --help", console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: my-default-command COMMAND [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ A --a      Docstring for a. [default: 1]                           │
+        │ BAR --bar  This is the docstring for python parameter "b".         │
+        │            [default: 2]                                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")

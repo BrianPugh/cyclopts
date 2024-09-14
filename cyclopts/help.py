@@ -335,7 +335,7 @@ def create_parameter_help_panel(
         options = list(argument.names)
 
         # Add an all-uppercase name if it's an argument
-        if argument.field_info.kind in (argument.field_info.POSITIONAL_ONLY, argument.field_info.POSITIONAL_OR_KEYWORD):
+        if argument.index is not None:
             arg_name = options[0].lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]

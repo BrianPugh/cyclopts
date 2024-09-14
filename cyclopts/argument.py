@@ -600,8 +600,11 @@ class Argument:
     # because this could be a subkey of iparam.
     hint: Any = field(default=str, converter=resolve)
 
-    # Associated positional index for iparam.
     index: Optional[int] = field(default=None)
+    """
+    Associated positional index for iparam.
+    If ``None``, then cannot be assigned positionally.
+    """
 
     # **Python** Keys into iparam that lead to this leaf.
     # Note: that self.cparam.name and self.keys can naively disagree!
