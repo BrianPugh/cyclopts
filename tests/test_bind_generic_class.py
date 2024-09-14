@@ -1,5 +1,7 @@
 from typing import Annotated, Dict, Optional
 
+import pytest
+
 from cyclopts import Parameter
 
 
@@ -48,3 +50,18 @@ def test_bind_generic_class_accepts_keys_true(app, assert_parse_args):
         "foo --user.id=123 --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap",
         User(id=123, tastes={"wine": 9, "cheese": 7, "cabbage": 1}, outfit=Outfit(body="t-shirt", head="baseball-cap")),
     )
+
+
+class Coordinates:
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+
+
+@pytest.mark.skip(reason="Not sure how we want to handle this yet.")
+def test_bind_generic_class_accepts_default_2_args(app, assert_parse_args):
+    @app.command
+    def foo(user: Coordinates):
+        pass
+
+    assert_parse_args(foo, "foo 100 200", Coordinates(100, 200))
