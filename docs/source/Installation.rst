@@ -4,7 +4,7 @@
 Installation
 ============
 
-cyclopts requires Python ``>=3.8`` and can be installed from pypi via:
+Cyclopts requires Python >=3.9 and can be installed from PyPI via:
 
 .. code-block:: bash
 
@@ -17,7 +17,7 @@ To install directly from github, you can run:
 
    python -m pip install git+https://github.com/BrianPugh/cyclopts.git
 
-For development, its recommended to use Poetry:
+For Cyclopts development, its recommended to use Poetry:
 
 .. code-block:: bash
 
