@@ -264,10 +264,14 @@ class ArgumentCollection(list["Argument"]):
         group_arguments: Group,
         group_parameters: Group,
         parse_docstring: bool = True,
+        docstring_lookup: Optional[dict[tuple[str, ...], Parameter]] = None,
         positional_index: Optional[int] = None,
         _resolve_groups: bool = True,
     ):
         out = cls(groups=list(group_lookup.values()))
+
+        if docstring_lookup is None:
+            docstring_lookup = {}
 
         cyclopts_parameters_no_group = []
 
@@ -354,21 +358,28 @@ class ArgumentCollection(list["Argument"]):
 
         out.append(argument)
         if argument._accepts_keywords:
-            docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
+            # This should have lower priority than from a parent
+            hint_docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
+            hint_docstring_lookup.update(docstring_lookup)
             for sub_field_name, sub_field_info in argument._lookup.items():
                 if sub_field_info.kind is sub_field_info.KEYWORD_ONLY:
                     positional_index = None
+
+                subkey_docstring_lookup = {
+                    k[1:]: v for k, v in hint_docstring_lookup.items() if k[0] == sub_field_name and len(k) > 1
+                }
 
                 subkey_argument_collection = cls._from_type(
                     sub_field_info,
                     keys + (sub_field_name,),
                     cparam,
                     Parameter(required=argument.required & sub_field_info.required),
-                    docstring_lookup.get(sub_field_name, _PARAMETER_EMPTY_HELP),
+                    hint_docstring_lookup.get((sub_field_name,), _PARAMETER_EMPTY_HELP),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
                     parse_docstring=parse_docstring,
+                    docstring_lookup=subkey_docstring_lookup,
                     positional_index=positional_index,
                     _resolve_groups=_resolve_groups,
                 )
@@ -393,6 +404,7 @@ class ArgumentCollection(list["Argument"]):
         group_parameters: Optional[Group] = None,
         positional_index: Optional[int] = None,
         parse_docstring: bool = True,
+        docstring_lookup: Optional[dict[tuple[str, ...], Parameter]] = None,
         _resolve_groups: bool = True,
     ):
         # The responsibility of this function is to extract out the root type
@@ -415,6 +427,7 @@ class ArgumentCollection(list["Argument"]):
             group_arguments=group_arguments,
             group_parameters=group_parameters,
             positional_index=positional_index,
+            docstring_lookup=docstring_lookup,
             parse_docstring=parse_docstring,
             _resolve_groups=_resolve_groups,
         )
@@ -452,16 +465,23 @@ class ArgumentCollection(list["Argument"]):
         out = cls()
         positional_index = 0
         for iparam in cyclopts.utils.signature(func).parameters.values():
+            if parse_docstring:
+                subkey_docstring_lookup = {
+                    k[1:]: v for k, v in docstring_lookup.items() if k[0] == iparam.name and len(k) > 1
+                }
+            else:
+                subkey_docstring_lookup = None
             iparam_argument_collection = cls.from_iparam(
                 iparam,
                 _PARAMETER_EMPTY_HELP,
                 *default_parameters,
-                docstring_lookup.get(iparam.name),
+                docstring_lookup.get((iparam.name,)),
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
                 positional_index=positional_index,
                 parse_docstring=parse_docstring,
+                docstring_lookup=subkey_docstring_lookup,
                 _resolve_groups=_resolve_groups,
             )
             if positional_index is not None:
@@ -1078,11 +1098,14 @@ def _resolve_groups_from_callable(
     return resolved_groups
 
 
-def _extract_docstring_help(f: Callable) -> dict[str, Parameter]:
+def _extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
     from docstring_parser import parse_from_object
 
     try:
-        return {dparam.arg_name: Parameter(help=dparam.description) for dparam in parse_from_object(f).params}
+        return {
+            tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)
+            for dparam in parse_from_object(f).params
+        }
     except TypeError:
         # Type hints like ``dict[str, str]`` trigger this.
         return {}
