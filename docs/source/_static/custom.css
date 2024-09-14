@@ -3,6 +3,10 @@
     max-width: none !important
 }
 
+.wy-side-nav-search .version {
+    color: #000000 !important;
+}
+
 /* override table width restrictions */
 .wy-table-responsive table td, .wy-table-responsive table th {
     white-space: normal !important;

@@ -170,7 +170,7 @@ html_theme_options = {
     # "analytics_id": "G-XXXXXXXXXX",  # Provided by Google in your dashboard
     # "analytics_anonymize_ip": False,
     "logo_only": True,
-    "display_version": False,
+    "display_version": True,
     "prev_next_buttons_location": "bottom",
     "style_external_links": False,
     "vcs_pageview_mode": "",
