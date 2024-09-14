@@ -38,7 +38,7 @@ class User:
         )
 
 
-def test_bind_attrs(app, assert_parse_args):
+def test_bind_generic_class_accepts_keys_true(app, assert_parse_args):
     @app.command
     def foo(user: Annotated[User, Parameter(accepts_keys=True)]):
         pass
