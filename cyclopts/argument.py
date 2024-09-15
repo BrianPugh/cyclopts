@@ -34,7 +34,6 @@ else:
     from typing import NotRequired, Required
 
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
-_PARAMETER_EMPTY_HELP = Parameter(help="")
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -42,7 +41,6 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     converter=None,  # pyright: ignore
     validator=None,
     negative=None,
-    # Do NOT include help here; handled elsewhere due to docstring parsing.
     accepts_keys=None,
 )
 
@@ -372,9 +370,9 @@ class ArgumentCollection(list["Argument"]):
                 subkey_argument_collection = cls._from_type(
                     sub_field_info,
                     keys + (sub_field_name,),
+                    hint_docstring_lookup.get((sub_field_name,)),
                     cparam,
                     Parameter(required=argument.required & sub_field_info.required),
-                    hint_docstring_lookup.get((sub_field_name,), _PARAMETER_EMPTY_HELP),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
@@ -421,7 +419,6 @@ class ArgumentCollection(list["Argument"]):
         return cls._from_type(
             FieldInfo.from_iparam(iparam),
             (),
-            _PARAMETER_EMPTY_HELP,
             *default_parameters,
             group_lookup=group_lookup,
             group_arguments=group_arguments,
@@ -473,7 +470,6 @@ class ArgumentCollection(list["Argument"]):
                 subkey_docstring_lookup = None
             iparam_argument_collection = cls.from_iparam(
                 iparam,
-                _PARAMETER_EMPTY_HELP,
                 *default_parameters,
                 docstring_lookup.get((iparam.name,)),
                 group_lookup=group_lookup,
