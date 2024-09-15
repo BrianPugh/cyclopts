@@ -678,21 +678,17 @@ All Cyclopts builtins index into the configuration file with the following rules
 3. Apply each key/value pair if CLI arguments have **not** been provided for that parameter.
 
 .. autoclass:: cyclopts.config.Toml
+   :members:
 
    Automatically read configuration from Toml file.
-
-   .. attribute:: path
-      :type: Union[str, Path]
-
-      Path to the TOML configuration file.
 
    .. attribute:: root_keys
       :type: Iterable[str]
       :value: None
+      :noindex:
 
-      Keys that lead to your application's configuration.
-      For example, if referencing a ``pyproject.toml``, it is common
-      to store all of your projects configuration under:
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a ``pyproject.toml``, it is common to store all of your projects configuration under:
 
       .. code-block:: toml
 
@@ -704,90 +700,17 @@ All Cyclopts builtins index into the configuration file with the following rules
 
          app = cyclopts.App(config=cyclopts.config.Toml("pyproject.toml", root_keys=("tool", "myproject")))
 
-   .. attribute:: must_exist
-      :type: bool
-      :value: False
-
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
-
-   .. attribute:: search_parents
-      :type: bool
-      :value: False
-
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Toml.path` is found.
-
-   .. attribute:: allow_unknown
-      :type: bool
-      :value: False
-
-      Allow unknown keywords configuration values.
-
 .. autoclass:: cyclopts.config.Yaml
+   :members:
 
    Automatically read configuration from Yaml file.
 
-   .. attribute:: path
-      :type: Union[str, Path]
-
-      Path to the YAML configuration file.
-
-   .. attribute:: root_keys
-      :type: Iterable[str]
-      :value: None
-
-      Keys that lead to your application's configuration in the YAML file.
-
-   .. attribute:: must_exist
-      :type: bool
-      :value: False
-
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
-
-   .. attribute:: search_parents
-      :type: bool
-      :value: False
-
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Yaml.path` is found.
-
-   .. attribute:: allow_unknown
-      :type: bool
-      :value: False
-
-      Allow unknown keywords configuration values.
-
 
 .. autoclass:: cyclopts.config.Json
+   :members:
 
    Automatically read configuration from Json file.
 
-   .. attribute:: path
-      :type: Union[str, Path]
-
-      Path to the JSON configuration file.
-
-   .. attribute:: root_keys
-      :type: Iterable[str]
-      :value: None
-
-      Keys that lead to your application's configuration in the YAML file.
-
-   .. attribute:: must_exist
-      :type: bool
-      :value: False
-
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
-
-   .. attribute:: search_parents
-      :type: bool
-      :value: False
-
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Json.path` is found.
-
-   .. attribute:: allow_unknown
-      :type: bool
-      :value: False
-
-      Allow unknown keywords configuration values.
 
 .. autoclass:: cyclopts.config.Env
 

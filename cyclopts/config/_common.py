@@ -5,12 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from itertools import chain
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Optional,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from attrs import define, field
 
@@ -44,12 +39,40 @@ def _walk_leaves(
 @define
 class ConfigFromFile(ABC):
     path: Union[str, Path] = field(converter=Path)
+    "Path to configuration file."
+
     root_keys: Iterable[str] = field(default=(), converter=to_tuple_converter)
+    """
+    The key or sequence of keys that lead to the root configuration structure for this app.
+    """
+
     must_exist: bool = field(default=False, kw_only=True)
+    "The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist."
+
     search_parents: bool = field(default=False, kw_only=True)
+    """
+    If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+    Raises :class:`FileNotFoundError` if no configuration file is found.
+    """
+
     allow_unknown: bool = field(default=False, kw_only=True)
+    "Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`."
+
+    use_commands_as_keys: bool = field(default=True, kw_only=True)
+    """
+    Use the sequence of commands as keys into the configuration.
+
+    For example, the following CLI invocation:
+
+    .. code-block:: console
+
+        $ python my-script.py my-command
+
+    Would search into ``["my-command"]`` for values.
+    """
 
     _config: Optional[dict[str, Any]] = field(default=None, init=False, repr=False)
+    "Loaded configuration structure (to be loaded by subclassed ``_load_config`` method)."
 
     @abstractmethod
     def _load_config(self, path: Path) -> dict[str, Any]:
@@ -94,7 +117,7 @@ class ConfigFromFile(ABC):
     def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
         config: dict[str, Any] = self.config
         try:
-            for key in chain(self.root_keys, commands):
+            for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
                 config = config[key]
         except KeyError:
             return
