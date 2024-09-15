@@ -663,6 +663,19 @@ Annotated types for checking common int/float value constraints.
 
 .. autodata:: cyclopts.types.NonPositiveInt
 
+.. autodata:: cyclopts.types.UInt8
+
+.. autodata:: cyclopts.types.Int8
+
+.. autodata:: cyclopts.types.UInt16
+
+.. autodata:: cyclopts.types.Int16
+
+.. autodata:: cyclopts.types.UInt32
+
+.. autodata:: cyclopts.types.Int32
+
+
 .. _API Config:
 
 ------
