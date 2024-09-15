@@ -356,7 +356,6 @@ class ArgumentCollection(list["Argument"]):
 
         out.append(argument)
         if argument._accepts_keywords:
-            # This should have lower priority than from a parent
             hint_docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
             for sub_field_name, sub_field_info in argument._lookup.items():
@@ -370,8 +369,8 @@ class ArgumentCollection(list["Argument"]):
                 subkey_argument_collection = cls._from_type(
                     sub_field_info,
                     keys + (sub_field_name,),
-                    hint_docstring_lookup.get((sub_field_name,)),
                     cparam,
+                    hint_docstring_lookup.get((sub_field_name,)),
                     Parameter(required=argument.required & sub_field_info.required),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
