@@ -646,6 +646,7 @@ Path
 Number
 ^^^^^^
 Annotated types for checking common int/float value constraints.
+All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]`` or ``List[float]``).
 
 .. autodata:: cyclopts.types.PositiveFloat
 
