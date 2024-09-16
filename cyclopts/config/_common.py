@@ -131,6 +131,7 @@ class ConfigFromFile(ABC):
         except KeyError:
             return
 
+        to_add = []
         for option_key, option_value in config.items():
             if option_key in apps[-1]:  # Check if it's a command.
                 continue
@@ -147,6 +148,9 @@ class ConfigFromFile(ABC):
                     else:
                         raise UnknownOptionError(token=Token(keyword=complete_keyword, source=self.source)) from None
 
+                if argument.tokens:
+                    continue
+
                 if any(x.source != str(self.path) for x in argument.tokens):
                     continue
 
@@ -155,6 +159,12 @@ class ConfigFromFile(ABC):
                 value = tuple(str(x) for x in value)
 
                 for i, v in enumerate(value):
-                    argument.append(
-                        Token(keyword=complete_keyword, value=v, source=self.source, index=i, keys=remaining_keys)
+                    to_add.append(
+                        (
+                            argument,
+                            Token(keyword=complete_keyword, value=v, source=self.source, index=i, keys=remaining_keys),
+                        )
                     )
+
+        for argument, token in to_add:
+            argument.append(token)
