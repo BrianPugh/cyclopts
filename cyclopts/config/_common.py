@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 from attrs import define, field
 
 from cyclopts.argument import Token
-from cyclopts.exceptions import UnknownOptionError
+from cyclopts.exceptions import CycloptsError, UnknownOptionError
 from cyclopts.utils import to_tuple_converter
 
 if TYPE_CHECKING:
@@ -99,7 +99,12 @@ class ConfigFromFile(ABC):
         for parent in self.path.parents:
             candidate = parent / self.path.name
             if candidate.exists():
-                self._config = self._load_config(candidate)
+                try:
+                    self._config = self._load_config(candidate)
+                except Exception as e:
+                    if name := getattr(type(e), "__name__", ""):
+                        name += ": "
+                    raise CycloptsError(msg=f"{name}{e.args[0]}") from e
                 return self._config
             elif self.search_parents:
                 # Continue iterating over parents.
@@ -137,7 +142,7 @@ class ConfigFromFile(ABC):
                 try:
                     argument, remaining_keys, _ = arguments.match(cli_option_name)
                 except ValueError:
-                    if self.allow_unknown:
+                    if self.allow_unknown or apps[-1]._meta_parent:
                         continue
                     else:
                         raise UnknownOptionError(token=Token(keyword=complete_keyword, source=self.source)) from None
