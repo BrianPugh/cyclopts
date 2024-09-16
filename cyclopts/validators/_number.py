@@ -30,13 +30,13 @@ class Number:
                 self(type_, v)
         else:
             if self.lt is not None and value >= self.lt:
-                raise ValueError(f"Must be < {self.lt}")
+                raise ValueError(f"Must be < {self.lt}.")
 
             if self.lte is not None and value > self.lte:
-                raise ValueError(f"Must be <= {self.lte}")
+                raise ValueError(f"Must be <= {self.lte}.")
 
             if self.gt is not None and value <= self.gt:
-                raise ValueError(f"Must be > {self.gt}")
+                raise ValueError(f"Must be > {self.gt}.")
 
             if self.gte is not None and value < self.gte:
-                raise ValueError(f"Must be >= {self.gte}")
+                raise ValueError(f"Must be >= {self.gte}.")

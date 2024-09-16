@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Annotated  # pragma: no cover
 
 from cyclopts import validators
-from cyclopts._convert import convert
 from cyclopts.parameter import Parameter
 
 __all__ = [
@@ -39,8 +38,9 @@ __all__ = [
 ########
 # Path #
 ########
-def _path_resolve_converter(type_, *args):
-    return convert(type_, *args, converter=lambda _, x: Path(x).resolve())
+def _path_resolve_converter(type_, tokens):
+    assert len(tokens) == 1
+    return type_(tokens[0]).resolve()
 
 
 ExistingPath = Annotated[Path, Parameter(validator=validators.Path(exists=True))]

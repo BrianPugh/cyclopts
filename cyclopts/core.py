@@ -762,7 +762,7 @@ class App:
                                 validator(**bound.arguments)
                     except (AssertionError, ValueError, TypeError) as e:
                         raise ValidationError(
-                            value=e.args[0] if e.args else "",
+                            exception_message=e.args[0] if e.args else "",
                             group=command_group,  # pyright: ignore[reportPossiblyUnboundVariable]
                         ) from e
 

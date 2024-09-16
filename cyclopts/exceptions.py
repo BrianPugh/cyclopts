@@ -126,30 +126,31 @@ class CycloptsError(Exception):
 class ValidationError(CycloptsError):
     """Validator function raised an exception."""
 
-    value: str = ""
+    exception_message: str = ""
     """Parenting Assertion/Value/Type Error message."""
 
     group: Optional[Group] = None
     """If a group validator caused the exception."""
 
-    def __attrs_post_init__(self):
+    value: Any = cyclopts.utils.UNSET
+
+    def __str__(self):
         # Make sure only 1 is set.
         assert (bool(self.argument) + bool(self.group)) == 1
 
-    def __str__(self):
         if self.argument:
-            assert self.argument is not None
+            value = self.argument.value if self.value is cyclopts.utils.UNSET else self.value
             token = self.argument.tokens[0]
             provided_by = "" if not token.source or token.source == "cli" else f' provided by "{token.source}"'
             name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
-            message = f'Invalid value "{self.argument.value}" for "{name}"{provided_by}.'
+            message = f'Invalid value "{value}" for "{name}"{provided_by}.'
         elif self.group:
             message = f'Invalid values for group "{self.group}".'
         else:
             raise NotImplementedError
 
-        if self.value:
-            return f"{super().__str__()}{message} {self.value}"
+        if self.exception_message:
+            return f"{super().__str__()}{message} {self.exception_message}"
         else:
             return f"{super().__str__()}{message}"
 

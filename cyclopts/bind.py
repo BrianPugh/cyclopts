@@ -315,7 +315,7 @@ def create_bound_arguments(
                 for validator in group.validator:  # pyright: ignore
                     validator(group_arguments)  # pyright: ignore[reportOptionalCall]
         except (AssertionError, ValueError, TypeError) as e:
-            raise ValidationError(value=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
+            raise ValidationError(exception_message=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
 
         for argument in argument_collection:
             if not _is_required(argument.field_info) or argument.keys or not argument._assignable:

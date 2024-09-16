@@ -17,7 +17,7 @@ from cyclopts._convert import (
     token_count,
 )
 from cyclopts.exceptions import (
-    CoercionError,
+    CycloptsError,
     MissingArgumentError,
     MixedArgumentError,
     RepeatArgumentError,
@@ -972,7 +972,7 @@ class Argument:
         if not self._marked:
             try:
                 self.value = self._convert(converter=converter)
-            except CoercionError as e:
+            except CycloptsError as e:
                 if e.argument is None:
                     e.argument = self
                 raise
@@ -996,7 +996,7 @@ class Argument:
                 for validator in self.cparam.validator:
                     validator(self.hint, value)
         except (AssertionError, ValueError, TypeError) as e:
-            raise ValidationError(value=e.args[0] if e.args else "", argument=self) from e
+            raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
 
     def convert_and_validate(self, converter=None):
         val = self.convert(converter=converter)

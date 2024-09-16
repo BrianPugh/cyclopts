@@ -17,7 +17,7 @@ from typing import (
     get_origin,
 )
 
-from cyclopts.exceptions import CoercionError
+from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.utils import AnnotatedType, NoneType, default_name_transform, is_union
 
 if sys.version_info >= (3, 12):
@@ -155,26 +155,39 @@ def _convert(
     converter: Callable
     name_transform: Callable
     """
+    if type(type_) is AnnotatedType:
+        from cyclopts.parameter import Parameter
+
+        args = get_args(type_)
+        type_ = args[0]
+        cparam = Parameter.combine(*(x for x in args[1:] if isinstance(x, Parameter)))
+        if cparam._converter:
+            converter = lambda t_, value: cparam._converter(t_, (value,))  # noqa: E731
+        if cparam.name_transform:
+            name_transform = cparam.name_transform
+    else:
+        cparam = None
+
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
-    type_ = resolve(type_)
+
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
-        return convert(_implicit_iterable_type_mapping[type_], token)
-
-    if origin_type in (collections.abc.Iterable, collections.abc.Sequence):
+        out = convert(_implicit_iterable_type_mapping[type_], token)
+    elif origin_type in (collections.abc.Iterable, collections.abc.Sequence):
         assert len(inner_types) == 1
-        return convert(list[inner_types[0]], token)  # pyright: ignore[reportGeneralTypeIssues]
+        out = convert(list[inner_types[0]], token)  # pyright: ignore[reportGeneralTypeIssues]
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
-        return convert(type_.__value__, token)
+        out = convert(type_.__value__, token)
     elif is_union(origin_type):
         for t in inner_types:
             if t is NoneType:
                 continue
             try:
-                return convert(t, token)
+                out = convert(t, token)
+                break
             except Exception:
                 pass
         else:
@@ -193,7 +206,8 @@ def _convert(
             except Exception:
                 continue
             if res == choice:
-                return res
+                out = res
+                break
         else:
             if last_coercion_error:
                 last_coercion_error.target_type = type_
@@ -208,15 +222,15 @@ def _convert(
             gen = zip(*[iter(token)] * count)
         else:
             gen = token
-        return origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+        out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
         from cyclopts.argument import Token
 
         if isinstance(token, Token):
             # E.g. Tuple[str] (Annotation: tuple containing a single string)
-            return convert_tuple(type_, token, converter=converter)
+            out = convert_tuple(type_, token, converter=converter)
         else:
-            return convert_tuple(type_, *token, converter=converter)
+            out = convert_tuple(type_, *token, converter=converter)
     elif isclass(type_) and issubclass(type_, Enum):
         if isinstance(token, Sequence):
             raise ValueError
@@ -225,10 +239,12 @@ def _convert(
             element_transformed = name_transform(token.value)
             for member in type_:
                 if name_transform(member.name) == element_transformed:
-                    return member
-            raise CoercionError(token=token, target_type=type_)
+                    out = member
+                    break
+            else:
+                raise CoercionError(token=token, target_type=type_)
         else:
-            return converter(type_, token.value)
+            out = converter(type_, token.value)
     else:
         # The actual casting/converting of the underlying type is performed here.
         if isinstance(token, Sequence):
@@ -241,9 +257,9 @@ def _convert(
                     if first_argument_type is not str:
                         # Prevents infinite recursion
                         inner_value = convert(first_argument_type, token)
-                return _converters.get(type_, type_)(inner_value)
+                out = _converters.get(type_, type_)(inner_value)
             else:
-                return converter(type_, token.value)
+                out = converter(type_, token.value)
         except CoercionError as e:
             if e.target_type is None:
                 e.target_type = type_
@@ -252,6 +268,15 @@ def _convert(
             raise
         except ValueError:
             raise CoercionError(token=token, target_type=type_) from None
+
+    if cparam:
+        try:
+            for validator in cparam.validator:  # pyright: ignore
+                validator(type_, out)
+        except (AssertionError, ValueError, TypeError) as e:
+            raise ValidationError(exception_message=e.args[0] if e.args else "", value=out) from e
+
+    return out
 
 
 def resolve(type_: Any) -> type:
