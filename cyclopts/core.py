@@ -678,6 +678,15 @@ class App:
         unused_tokens: List[str]
             Any remaining CLI tokens that didn't get parsed for ``command``.
         """
+        command, bound, unused_tokens, argument_collection = self._parse_known_args(tokens, console=console)
+        return command, bound, unused_tokens
+
+    def _parse_known_args(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        *,
+        console: Optional["Console"] = None,
+    ) -> tuple[Callable, inspect.BoundArguments, list[str], ArgumentCollection]:
         tokens = normalize_tokens(tokens)
 
         meta_parent = self
@@ -722,6 +731,7 @@ class App:
                 command = meta_parent.help_print
             bound = cyclopts.utils.signature(command).bind(tokens, console=console)
             unused_tokens = []
+            argument_collection = ArgumentCollection()
         elif any(flag in tokens for flag in command_app.version_flags):
             # Version
             command = self.version_print
@@ -729,6 +739,7 @@ class App:
                 command = meta_parent.version_print
             bound = cyclopts.utils.signature(command).bind()
             unused_tokens = []
+            argument_collection = ArgumentCollection()
         else:
             try:
                 if command_app.default_command:
@@ -776,6 +787,7 @@ class App:
                         command = self.help_print
                         bound = cyclopts.utils.signature(command).bind(tokens=tokens, console=console)
                         unused_tokens = []
+                        argument_collection = ArgumentCollection()
             except CycloptsError as e:
                 e.target = command_app.default_command
                 e.app = command_app
@@ -785,7 +797,7 @@ class App:
                     e.console = self._resolve_console(tokens, console)
                 raise
 
-        return command, bound, unused_tokens
+        return command, bound, unused_tokens, argument_collection
 
     def parse_args(
         self,
@@ -834,12 +846,14 @@ class App:
 
         # Normal parsing
         try:
-            command, bound, unused_tokens = self.parse_known_args(tokens, console=console)
+            command, bound, unused_tokens, argument_collection = self._parse_known_args(tokens, console=console)
             if unused_tokens:
                 for token in unused_tokens:
                     if is_option_like(token):
                         token = token.split("=")[0]
-                        raise UnknownOptionError(token=Token(value=token, source="cli"))
+                        raise UnknownOptionError(
+                            token=Token(keyword=token, source="cli"), argument_collection=argument_collection
+                        )
                 raise UnusedCliTokensError(
                     target=command,
                     unused_tokens=unused_tokens,

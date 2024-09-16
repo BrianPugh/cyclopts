@@ -1,5 +1,6 @@
 import inspect
 from collections.abc import Iterable
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from attrs import define, field
@@ -11,7 +12,7 @@ from cyclopts.token import Token
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from cyclopts.argument import Argument
+    from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
 
 
@@ -161,12 +162,25 @@ class UnknownOptionError(CycloptsError):
 
     token: Token
 
+    argument_collection: "ArgumentCollection"
+
     def __str__(self):
+        value = self.token.keyword or self.token.value
         if self.token.source == "cli":
-            out = f'Unknown option: "{self.token.keyword or self.token.value}".'
+            response = f'Unknown option: "{value}".'
         else:
-            out = f'Unknown option: "{self.token.keyword or self.token.value}" from "{self.token.source}".'
-        return super().__str__() + out
+            response = f'Unknown option: "{value}" from "{self.token.source}".'
+
+        if self.token.keyword:
+            import difflib
+
+            candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x._assignable))
+
+            close_matches = difflib.get_close_matches(self.token.keyword, candidates, n=1, cutoff=0.8)
+            if close_matches:
+                response += f' Did you mean "{close_matches[0]}"?'
+
+        return super().__str__() + response
 
 
 @define(kw_only=True)

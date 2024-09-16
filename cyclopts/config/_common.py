@@ -146,7 +146,9 @@ class ConfigFromFile(ABC):
                     if self.allow_unknown or apps[-1]._meta_parent:
                         continue
                     else:
-                        raise UnknownOptionError(token=Token(keyword=complete_keyword, source=self.source)) from None
+                        raise UnknownOptionError(
+                            token=Token(keyword=complete_keyword, source=self.source), argument_collection=arguments
+                        ) from None
 
                 if argument.tokens:
                     continue
