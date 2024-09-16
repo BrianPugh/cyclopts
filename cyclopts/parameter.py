@@ -103,9 +103,9 @@ class Parameter:
 
     allow_leading_hyphen: bool = field(default=False)
 
-    name_transform: Optional[Callable[[str], str]] = field(
+    _name_transform: Optional[Callable[[str], str]] = field(
+        alias="name_transform",
         default=None,
-        converter=attrs.converters.default_if_none(default_name_transform),
         kw_only=True,
     )
 
@@ -122,6 +122,10 @@ class Parameter:
     @property
     def converter(self):
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
+
+    @property
+    def name_transform(self):
+        return self._name_transform if self._name_transform else default_name_transform
 
     def get_negatives(self, type_) -> tuple[str, ...]:
         if is_union(type_):
