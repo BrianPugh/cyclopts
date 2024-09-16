@@ -114,6 +114,10 @@ class ConfigFromFile(ABC):
         self._config = {}
         return self._config
 
+    @property
+    def source(self) -> str:
+        return str(self.path)
+
     def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
         config: dict[str, Any] = self.config
         try:
@@ -136,7 +140,7 @@ class ConfigFromFile(ABC):
                     if self.allow_unknown:
                         continue
                     else:
-                        raise UnknownOptionError(token=complete_keyword) from None
+                        raise UnknownOptionError(token=Token(keyword=complete_keyword, source=self.source)) from None
 
                 if any(x.source != str(self.path) for x in argument.tokens):
                     continue
@@ -147,5 +151,5 @@ class ConfigFromFile(ABC):
 
                 for i, v in enumerate(value):
                     argument.append(
-                        Token(keyword=complete_keyword, value=v, source=str(self.path), index=i, keys=remaining_keys)
+                        Token(keyword=complete_keyword, value=v, source=self.source, index=i, keys=remaining_keys)
                     )

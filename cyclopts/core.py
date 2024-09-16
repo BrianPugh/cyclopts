@@ -48,6 +48,7 @@ from cyclopts.help import (
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
+from cyclopts.token import Token
 from cyclopts.utils import (
     default_name_transform,
     optional_to_tuple_converter,
@@ -838,7 +839,7 @@ class App:
                 for token in unused_tokens:
                     if is_option_like(token):
                         token = token.split("=")[0]
-                        raise UnknownOptionError(token=token)
+                        raise UnknownOptionError(token=Token(value=token, source="cli"))
                 raise UnusedCliTokensError(
                     target=command,
                     unused_tokens=unused_tokens,

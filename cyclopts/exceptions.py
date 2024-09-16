@@ -159,10 +159,14 @@ class ValidationError(CycloptsError):
 class UnknownOptionError(CycloptsError):
     """Unknown/unregistered option provided by the cli."""
 
-    token: str
+    token: Token
 
     def __str__(self):
-        return super().__str__() + f'Unknown option: "{self.token}".'
+        if self.token.source == "cli":
+            out = f'Unknown option: "{self.token.keyword or self.token.value}".'
+        else:
+            out = f'Unknown option: "{self.token.keyword or self.token.value}" from "{self.token.source}".'
+        return super().__str__() + out
 
 
 @define(kw_only=True)
