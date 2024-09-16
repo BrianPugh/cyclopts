@@ -1,4 +1,5 @@
 import pathlib
+from typing import Sequence, Union
 
 from attrs import frozen
 
@@ -28,15 +29,22 @@ class Path:
         if not self.file_okay and not self.dir_okay:
             raise ValueError("file_okay and dir_okay cannot both be False.")
 
-    def __call__(self, type_: type, path: pathlib.Path):
-        if not isinstance(path, pathlib.Path):
-            raise TypeError
+    def __call__(self, type_: type, path: Union[pathlib.Path, Sequence[pathlib.Path]]):
+        if isinstance(path, Sequence):
+            if isinstance(path, str):
+                raise TypeError
 
-        if path.exists():
-            if not self.file_okay and path.is_file():
-                raise ValueError(f"Only directory input is allowed but {path} is a file.")
+            for p in path:
+                self(type_, p)
+        else:
+            if not isinstance(path, pathlib.Path):
+                raise TypeError
 
-            if not self.dir_okay and path.is_dir():
-                raise ValueError(f"Only file input is allowed but {path} is a directory.")
-        elif self.exists:
-            raise ValueError(f"{path} does not exist.")
+            if path.exists():
+                if not self.file_okay and path.is_file():
+                    raise ValueError(f"Only directory input is allowed but {path} is a file.")
+
+                if not self.dir_okay and path.is_dir():
+                    raise ValueError(f"Only file input is allowed but {path} is a directory.")
+            elif self.exists:
+                raise ValueError(f"{path} does not exist.")

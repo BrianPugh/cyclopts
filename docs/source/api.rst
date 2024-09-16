@@ -617,6 +617,7 @@ Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotati
 Path
 ^^^^
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
+All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``List[Path]``).
 
 .. autodata:: cyclopts.types.ExistingPath
 
