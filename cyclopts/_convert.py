@@ -157,6 +157,7 @@ def _convert(
     """
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
+    type_ = resolve(type_)
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
