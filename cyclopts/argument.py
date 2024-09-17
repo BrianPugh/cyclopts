@@ -137,6 +137,17 @@ def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
     return out
 
 
+def get_field_info(hint) -> dict[str, FieldInfo]:
+    if is_pydantic(hint):
+        return _pydantic_field_info(hint)
+    elif is_namedtuple(hint):
+        return _namedtuple_field_info(hint)
+    elif is_typeddict(hint):
+        return _typed_dict_field_info(hint)
+    else:
+        return _generic_class_field_info(hint)
+
+
 def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
     def inner(argument: "Argument", data: dict) -> set[str]:
         field_info = get_field_info(argument.hint)
@@ -715,28 +726,28 @@ class Argument:
             elif is_typeddict(hint):
                 self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(_typed_dict_field_info(hint))
+                self._lookup.update(get_field_info(hint))
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(_generic_class_field_info(hint))
+                self._lookup.update(get_field_info(hint))
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update(_namedtuple_field_info(hint))
+                self._lookup.update(get_field_info(hint))
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(_generic_class_field_info(hint))
+                self._lookup.update(get_field_info(hint))
             elif is_pydantic(hint):
                 self._missing_keys_checker = _missing_keys_factory(_pydantic_field_info)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
-                self._lookup.update(_pydantic_field_info(hint))
+                self._lookup.update(get_field_info(hint))
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True
