@@ -16,10 +16,10 @@ API
 
       Name of application, or subcommand if registering to another application. Name fallback resolution:
 
-      1. User specified ``name``.
+      1. User specified ``name`` parameter.
       2. If a ``default`` function has been registered, the name of that function.
       3. If the module name is ``__main__.py``, the name of the encompassing package.
-      4. The value of ``sys.argv[0]``.
+      4. The value of ``sys.argv[0]``; i.e. the name of the python script.
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
@@ -34,9 +34,8 @@ API
       :value: ("--help", "-h")
 
       Tokens that trigger :meth:`help_print`.
-      Set to an empty list to disable help feature.
+      Set to an empty list to disable this "help" feature.
       Defaults to ``["--help", "-h"]``.
-      Cannot be changed after instantiating the app.
 
    .. attribute:: help_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
@@ -82,7 +81,6 @@ API
       Token(s) that trigger :meth:`version_print`.
       Set to an empty list to disable version feature.
       Defaults to ``["--version"]``.
-      Cannot be changed after instantiating the app.
 
    .. attribute:: console
       :type: rich.console.Console
