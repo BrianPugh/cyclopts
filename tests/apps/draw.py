@@ -1,4 +1,4 @@
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import KW_ONLY, dataclass  # pyright: ignore[reportAttributeAccessIssue]
 from pathlib import Path
 from typing import Annotated, Literal, NamedTuple
 
