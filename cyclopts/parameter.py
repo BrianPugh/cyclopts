@@ -8,11 +8,11 @@ from attrs import field, frozen
 
 import cyclopts._env_var
 import cyclopts.utils
-from cyclopts._convert import AnnotatedType, convert, resolve_optional
+from cyclopts._convert import convert
+from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
-    is_union,
     optional_to_tuple_converter,
     record_init,
     to_tuple_converter,
@@ -208,7 +208,7 @@ class Parameter:
         if type_ is not inspect.Parameter.empty:
             type_ = resolve_optional(type_)
 
-            if type(type_) is AnnotatedType:
+            if is_annotated(type_):
                 annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
                 cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
 

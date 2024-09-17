@@ -17,18 +17,14 @@ from typing import (
     get_origin,
 )
 
+from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
-from cyclopts.utils import AnnotatedType, NoneType, default_name_transform, is_union
+from cyclopts.utils import default_name_transform
 
 if sys.version_info >= (3, 12):
     from typing import TypeAliasType  # pragma: no cover
 else:
     TypeAliasType = None  # pragma: no cover
-
-if sys.version_info < (3, 11):
-    from typing_extensions import NotRequired, Required  # pragma: no cover
-else:
-    from typing import NotRequired, Required  # pragma: no cover
 
 if TYPE_CHECKING:
     from cyclopts.argument import Token
@@ -155,7 +151,7 @@ def _convert(
     converter: Callable
     name_transform: Callable
     """
-    if type(type_) is AnnotatedType:
+    if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
         args = get_args(type_)
@@ -183,7 +179,7 @@ def _convert(
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
         for t in inner_types:
-            if t is NoneType:
+            if is_nonetype(t):
                 continue
             try:
                 out = convert(t, token)
@@ -277,55 +273,6 @@ def _convert(
             raise ValidationError(exception_message=e.args[0] if e.args else "", value=out) from e
 
     return out
-
-
-def resolve(type_: Any) -> type:
-    """Perform all simplifying resolutions."""
-    if type_ is inspect.Parameter.empty:
-        return str
-
-    type_prev = None
-    while type_ != type_prev:
-        type_prev = type_
-        type_ = resolve_annotated(type_)
-        type_ = resolve_optional(type_)
-        type_ = resolve_required(type_)
-    return type_
-
-
-def resolve_optional(type_: Any) -> type:
-    """Only resolves Union's of None + one other type (i.e. Optional)."""
-    # Python will automatically flatten out nested unions when possible.
-    # So we don't need to loop over resolution.
-
-    if not is_union(get_origin(type_)):
-        return type_
-
-    non_none_types = [t for t in get_args(type_) if t is not NoneType]
-    if not non_none_types:  # pragma: no cover
-        # This should never happen; python simplifies:
-        #    ``Union[None, None] -> NoneType``
-        raise ValueError("Union type cannot be all NoneType")
-    elif len(non_none_types) == 1:
-        type_ = non_none_types[0]
-    elif len(non_none_types) > 1:
-        return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
-    else:
-        raise NotImplementedError
-
-    return type_
-
-
-def resolve_annotated(type_: Any) -> type:
-    if type(type_) is AnnotatedType:
-        type_ = get_args(type_)[0]
-    return type_
-
-
-def resolve_required(type_: Any) -> type:
-    if get_origin(type_) in (Required, NotRequired):
-        type_ = get_args(type_)[0]
-    return type_
 
 
 def convert(

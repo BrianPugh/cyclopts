@@ -7,7 +7,7 @@ from typing import Annotated, Any, Iterable, List, Literal, Optional, Set, Tuple
 import pytest
 
 from cyclopts import CoercionError
-from cyclopts._convert import convert, resolve, token_count
+from cyclopts._convert import convert, token_count
 
 
 def _assert_tuple(expected, actual):
@@ -254,14 +254,3 @@ def test_coerce_bytearray():
 
 def test_coerce_empty():
     assert "foo" == convert(inspect.Parameter.empty, ["foo"])
-
-
-def test_resolve_annotated():
-    type_ = Annotated[Literal["foo", "bar"], "fizz"]
-    res = resolve(type_)
-    assert res == Literal["foo", "bar"]
-
-
-def test_resolve_empty():
-    res = resolve(inspect.Parameter.empty)
-    assert res is str

@@ -18,6 +18,7 @@ from typing import (
 from attrs import define, field, frozen
 
 import cyclopts.utils
+from cyclopts.annotations import is_union
 from cyclopts.group import Group
 
 if TYPE_CHECKING:
@@ -297,7 +298,7 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
     _origin = get_origin(type_)
     if isclass(type_) and issubclass(type_, Enum):
         choices = ", ".join(name_transform(x.name) for x in type_)
-    elif cyclopts.utils.is_union(_origin):
+    elif is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
         choices = ", ".join(x for x in inner_choices if x)
     elif _origin is Literal:

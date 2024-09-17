@@ -2,16 +2,7 @@ import functools
 import inspect
 import sys
 from collections.abc import Iterable, Iterator, MutableMapping
-from typing import Annotated, Any, Literal, Optional, Union, get_args, get_origin
-
-_union_types = set()
-_union_types.add(Union)
-if sys.version_info >= (3, 10):
-    from types import UnionType
-
-    _union_types.add(UnionType)
-
-# pragma: no cover
+from typing import Any, Literal, Optional, Union
 
 # fmt: off
 if sys.version_info >= (3, 10):
@@ -21,10 +12,6 @@ else:
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f)
 # fmt: on
-
-# from types import NoneType is available >=3.10
-NoneType = type(None)
-AnnotatedType = type(Annotated[int, 0])
 
 
 class SentinelMeta(type):
@@ -61,14 +48,6 @@ def record_init(target: str):
         return cls
 
     return decorator
-
-
-def is_iterable(obj) -> bool:
-    return isinstance(obj, Iterable) and not isinstance(obj, str)
-
-
-def is_union(type_: Optional[type]) -> bool:
-    return type_ in _union_types or get_origin(type_) in _union_types
 
 
 class ParameterDict(MutableMapping):
@@ -133,25 +112,8 @@ class ParameterDict(MutableMapping):
         self.reverse_mapping.clear()
 
 
-def resolve_callables(t, *args, **kwargs):
-    """Recursively resolves callable elements in a tuple."""
-    if isinstance(t, type(Sentinel)):
-        return t
-
-    if callable(t):
-        return t(*args, **kwargs)
-
-    resolved = []
-    for element in t:
-        if isinstance(element, type(Sentinel)):
-            resolved.append(element)
-        elif callable(element):
-            resolved.append(element(*args, **kwargs))
-        elif is_iterable(element):
-            resolved.append(resolve_callables(element, *args, **kwargs))
-        else:
-            resolved.append(element)
-    return tuple(resolved)
+def is_iterable(obj) -> bool:
+    return isinstance(obj, Iterable) and not isinstance(obj, str)
 
 
 def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:
@@ -218,20 +180,3 @@ def default_name_transform(s: str):
         Transformed name.
     """
     return s.lower().replace("_", "-").strip("-")
-
-
-def get_hint_name(hint) -> str:
-    if isinstance(hint, str):
-        return hint
-    elif hint is Any:
-        return "Any"
-    elif is_union(hint):
-        return "|".join(get_hint_name(arg) for arg in get_args(hint))
-    elif hasattr(hint, "__name__"):
-        return hint.__name__
-    elif getattr(hint, "_name", None) is not None:
-        return hint._name
-    origin = get_origin(hint)
-    if origin is not None:
-        return f"{get_hint_name(origin)}[{', '.join(get_hint_name(arg) for arg in get_args(hint))}]"
-    return str(hint)

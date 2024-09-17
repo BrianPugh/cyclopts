@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 from attrs import define, field
 
 import cyclopts.utils
+from cyclopts.annotations import get_hint_name
 from cyclopts.group import Group
 from cyclopts.token import Token
 
@@ -209,7 +210,7 @@ class CoercionError(CycloptsError):
                 return f"{self.token.keyword}: {self.msg}"
 
         msg = super().__str__()
-        target_type_name = cyclopts.utils.get_hint_name(self.target_type)
+        target_type_name = get_hint_name(self.target_type)
         if self.token.keyword is None:
             if self.token.source == "" or self.token.source == "cli":
                 msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {target_type_name}.'

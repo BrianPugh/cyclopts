@@ -1,20 +1,25 @@
 import inspect
 import itertools
-import sys
 from collections.abc import Iterator
 from contextlib import suppress
 from functools import partial
-from inspect import isclass
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from attrs import define, field
 
 from cyclopts._convert import (
     convert,
-    resolve,
-    resolve_annotated,
-    resolve_optional,
     token_count,
+)
+from cyclopts.annotations import (
+    is_annotated,
+    is_attrs,
+    is_dataclass,
+    is_namedtuple,
+    is_pydantic,
+    is_typeddict,
+    is_union,
+    resolve,
 )
 from cyclopts.exceptions import (
     CycloptsError,
@@ -23,17 +28,17 @@ from cyclopts.exceptions import (
     RepeatArgumentError,
     ValidationError,
 )
+from cyclopts.field_info import (
+    FieldInfo,
+    _generic_class_field_info,
+    _pydantic_field_info,
+    _typed_dict_field_info,
+    get_field_info,
+)
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, AnnotatedType, ParameterDict, is_union
-
-if sys.version_info < (3, 11):
-    from typing_extensions import NotRequired, Required
-else:
-    from typing import NotRequired, Required
-
-_IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
+from cyclopts.utils import UNSET, ParameterDict
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -45,107 +50,11 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
 )
 
 
-class FieldInfo(inspect.Parameter):
-    def __init__(self, *args, required: bool, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.required = required
-
-    @classmethod
-    def from_iparam(cls, iparam, *, required: Optional[bool] = None):
-        if required is None:
-            required = (
-                iparam.default is iparam.empty
-                and iparam.kind != iparam.VAR_KEYWORD
-                and iparam.kind != iparam.VAR_POSITIONAL
-            )
-
-        return cls(
-            name=iparam.name,
-            annotation=iparam.annotation,
-            kind=iparam.kind,
-            default=iparam.default,
-            required=required,
-        )
-
-    @property
-    def hint(self):
-        """Annotation with Optional-removed and cyclopts type-inferring."""
-        hint = self.annotation
-        if hint is inspect.Parameter.empty or resolve(hint) is Any:
-            hint = str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
-        hint = resolve_optional(hint)
-        return hint
-
-
 def _startswith(string, prefix):
     def normalize(s):
         return s.replace("_", "-")
 
     return normalize(string).startswith(normalize(prefix))
-
-
-def _typed_dict_field_info(typeddict) -> dict[str, FieldInfo]:
-    # The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11.
-    out = {}
-    # Don't use get_type_hints because it resolves Annotated automatically.
-    for name, annotation in typeddict.__annotations__.items():
-        origin = get_origin(resolve_annotated(annotation))
-        if origin is Required:
-            required = True
-        elif origin is NotRequired:
-            required = False
-        elif typeddict.__total__:  # Fields are REQUIRED by default.
-            required = True
-        else:  # Fields are OPTIONAL by default
-            required = False
-        out[name] = FieldInfo(name, FieldInfo.KEYWORD_ONLY, annotation=annotation, required=required)
-    return out
-
-
-def _generic_class_field_info(f) -> dict[str, FieldInfo]:
-    signature = inspect.signature(f.__init__)
-    out = {}
-    for name, iparam in signature.parameters.items():
-        if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
-            continue
-        out[name] = FieldInfo.from_iparam(iparam)
-    return out
-
-
-def _pydantic_field_info(model) -> dict[str, FieldInfo]:
-    out = {}
-    for name, pydantic_field in model.model_fields.items():
-        out[name] = FieldInfo(
-            name=name,
-            kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=pydantic_field.annotation,
-            required=pydantic_field.is_required(),
-        )
-    return out
-
-
-def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
-    out = {}
-    for name in hint._fields:
-        out[name] = FieldInfo(
-            name=name,
-            kind=FieldInfo.POSITIONAL_OR_KEYWORD,
-            annotation=hint.__annotations__.get(name, str),
-            default=hint._field_defaults.get(name, FieldInfo.empty),
-            required=name not in hint._field_defaults,
-        )
-    return out
-
-
-def get_field_info(hint) -> dict[str, FieldInfo]:
-    if is_pydantic(hint):
-        return _pydantic_field_info(hint)
-    elif is_namedtuple(hint):
-        return _namedtuple_field_info(hint)
-    elif is_typeddict(hint):
-        return _typed_dict_field_info(hint)
-    else:
-        return _generic_class_field_info(hint)
 
 
 def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
@@ -155,55 +64,6 @@ def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]])
         return set(required) - set(data)
 
     return inner
-
-
-def is_pydantic(hint) -> bool:
-    return hasattr(hint, "__pydantic_core_schema__")
-
-
-def is_dataclass(hint) -> bool:
-    return hasattr(hint, "__dataclass_fields__")
-
-
-def is_namedtuple(hint) -> bool:
-    return isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
-
-
-def is_attrs(hint) -> bool:
-    return hasattr(hint, "__attrs_attrs__")
-
-
-def is_typeddict(hint) -> bool:
-    """Determine if a type annotation is a TypedDict.
-
-    This is surprisingly hard! Modified from Beartype's implementation:
-
-        https://github.com/beartype/beartype/blob/main/beartype/_util/hint/pep/proposal/utilpep589.py
-    """
-    hint = resolve(hint)
-    if is_union(get_origin(hint)):
-        return any(is_typeddict(x) for x in get_args(hint))
-
-    if not (isinstance(hint, type) and issubclass(hint, dict)):
-        return False
-
-    return (
-        # This "dict" subclass defines these "TypedDict" attributes *AND*...
-        hasattr(hint, "__annotations__")
-        and hasattr(hint, "__total__")
-        and
-        # Either...
-        (
-            # The active Python interpreter targets exactly Python 3.8 and
-            # thus fails to unconditionally define the remaining attributes
-            # *OR*...
-            _IS_PYTHON_3_8
-            or
-            # The active Python interpreter targets any other Python version
-            # and thus unconditionally defines the remaining attributes.
-            (hasattr(hint, "__required_keys__") and hasattr(hint, "__optional_keys__"))
-        )
-    )
 
 
 def _identity_converter(type_, element):
@@ -298,7 +158,7 @@ class ArgumentCollection(list["Argument"]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
-        if type(hint) is AnnotatedType:
+        if is_annotated(hint):
             annotations = hint.__metadata__  # pyright: ignore
             hint = get_args(hint)[0]
             cyclopts_parameters_no_group.extend(x for x in annotations if isinstance(x, Parameter))
