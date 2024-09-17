@@ -124,6 +124,19 @@ def _pydantic_field_info(model) -> dict[str, FieldInfo]:
     return out
 
 
+def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
+    out = {}
+    for name in hint._fields:
+        out[name] = FieldInfo(
+            name=name,
+            kind=FieldInfo.POSITIONAL_OR_KEYWORD,
+            annotation=hint.__annotations__.get(name, str),
+            default=hint._field_defaults.get(name, FieldInfo.empty),
+            required=name not in hint._field_defaults,
+        )
+    return out
+
+
 def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
     def inner(argument: "Argument", data: dict) -> set[str]:
         field_info = get_field_info(argument.hint)
@@ -713,18 +726,7 @@ class Argument:
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update(
-                    {
-                        name: FieldInfo(
-                            name=name,
-                            kind=FieldInfo.POSITIONAL_OR_KEYWORD,
-                            annotation=hint.__annotations__.get(name, str),
-                            default=hint._field_defaults.get(name, FieldInfo.empty),
-                            required=name not in hint._field_defaults,
-                        )
-                        for name in hint._fields
-                    }
-                )
+                self._lookup.update(_namedtuple_field_info(hint))
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
