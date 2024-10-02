@@ -1,10 +1,11 @@
-import inspect
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
 
 import pytest
 
-from cyclopts.config._common import ConfigFromFile, Unset
+from cyclopts.argument import ArgumentCollection, Token
+from cyclopts.config._common import ConfigFromFile
 
 
 class Dummy(ConfigFromFile):
@@ -35,6 +36,17 @@ class DummyRootKeys(ConfigFromFile):
         }
 
 
+class DummySubKeys(ConfigFromFile):
+    def _load_config(self, path: Path) -> Dict[str, Any]:
+        return {
+            "key1": {
+                "subkey1": ["subkey1val1", "subkey1val2"],
+                "subkey2": ["subkey2val1", "subkey2val2"],
+            },
+            "key2": "foo2",
+        }
+
+
 def function1(key1, key2):
     pass
 
@@ -50,11 +62,18 @@ def config_root_keys(tmp_path):
 
 
 @pytest.fixture
-def bound():
-    return {
-        "key1": ["cli1"],
-        "key2": Unset(inspect.Parameter("FAKE_NAME", inspect.Parameter.POSITIONAL_OR_KEYWORD)),
-    }
+def config_sub_keys(tmp_path):
+    return DummySubKeys(tmp_path / "cyclopts-config-test-file.dummy")
+
+
+@pytest.fixture
+def argument_collection():
+    def foo(key1, key2):
+        pass
+
+    out = ArgumentCollection.from_callable(foo)
+    out[0].append(Token(keyword="--key1", value="cli1", source="cli"))
+    return out
 
 
 @pytest.fixture
@@ -63,19 +82,21 @@ def apps():
     return [{"function1": None}]
 
 
-def test_config_common_root_keys_empty(apps, config, bound):
+def test_config_common_root_keys_empty(apps, config, argument_collection):
     config.path.touch()
-    config(apps, (), bound)
-    expected = {"key1": ["cli1"], "key2": ["foo2"]}
-    assert expected == bound
+    config(apps, (), argument_collection)
+    assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
+    assert argument_collection[1].tokens == [Token(keyword="[key2]", value="foo2", source=str(config.path))]
 
 
-def test_config_common_root_keys_populated(apps, config_root_keys, bound):
+def test_config_common_root_keys_populated(apps, config_root_keys, argument_collection):
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
-    config_root_keys(apps, (), bound)
-    expected = {"key1": ["cli1"], "key2": ["foo2"]}
-    assert expected == bound
+    config_root_keys(apps, (), argument_collection)
+    assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
+    assert argument_collection[1].tokens == [
+        Token(keyword="[tool][cyclopts][key2]", value="foo2", source=str(config_root_keys.path))
+    ]
 
 
 def test_config_common_must_exist_false(config, mocker):
@@ -138,3 +159,71 @@ def test_config_common_must_exist_false_search_parents_true_missing(tmp_path, co
     assert config.config == {}
 
     spy_load_config.assert_not_called()
+
+
+def test_config_common_kwargs(apps, config):
+    config.path.touch()
+
+    def foo(key1, **kwargs):
+        pass
+
+    argument_collection = ArgumentCollection.from_callable(foo)
+    config(apps, (), argument_collection)
+
+    assert len(argument_collection[-1].tokens) == 1
+    assert argument_collection[-1].field_info.name == "kwargs"
+    assert argument_collection[-1].tokens[0].keyword == "[key2]"
+    assert argument_collection[-1].tokens[0].value == "foo2"
+    assert argument_collection[-1].tokens[0].index == 0
+    assert argument_collection[-1].tokens[0].keys == ("key2",)
+    assert argument_collection[-1].tokens[0].source.endswith("cyclopts-config-test-file.dummy")
+
+
+def test_config_common_subkeys(apps, config_sub_keys):
+    config_sub_keys.path.touch()
+
+    @dataclass
+    class Example:
+        subkey1: list[str]
+        subkey2: list[str]
+
+    def foo(key1: Example, key2):
+        pass
+
+    argument_collection = ArgumentCollection.from_callable(foo)
+    config_sub_keys(apps, (), argument_collection)
+
+    assert len(argument_collection) == 4
+
+    assert len(argument_collection[0].tokens) == 0
+
+    assert len(argument_collection[1].tokens) == 2
+    assert argument_collection[1].tokens[0].keyword == "[key1][subkey1]"
+    assert argument_collection[1].tokens[0].value == "subkey1val1"
+    assert argument_collection[1].tokens[0].index == 0
+    assert argument_collection[1].tokens[0].keys == ()
+    assert argument_collection[1].tokens[0].source.endswith("cyclopts-config-test-file.dummy")
+    assert argument_collection[1].tokens[1].keyword == "[key1][subkey1]"
+    assert argument_collection[1].tokens[1].value == "subkey1val2"
+    assert argument_collection[1].tokens[1].index == 1
+    assert argument_collection[1].tokens[1].keys == ()
+    assert argument_collection[1].tokens[1].source.endswith("cyclopts-config-test-file.dummy")
+
+    assert len(argument_collection[2].tokens) == 2
+    assert argument_collection[2].tokens[0].keyword == "[key1][subkey2]"
+    assert argument_collection[2].tokens[0].value == "subkey2val1"
+    assert argument_collection[2].tokens[0].index == 0
+    assert argument_collection[2].tokens[0].keys == ()
+    assert argument_collection[2].tokens[0].source.endswith("cyclopts-config-test-file.dummy")
+    assert argument_collection[2].tokens[1].keyword == "[key1][subkey2]"
+    assert argument_collection[2].tokens[1].value == "subkey2val2"
+    assert argument_collection[2].tokens[1].index == 1
+    assert argument_collection[2].tokens[1].keys == ()
+    assert argument_collection[2].tokens[1].source.endswith("cyclopts-config-test-file.dummy")
+
+    assert len(argument_collection[3].tokens) == 1
+    assert argument_collection[3].tokens[0].keyword == "[key2]"
+    assert argument_collection[3].tokens[0].value == "foo2"
+    assert argument_collection[3].tokens[0].index == 0
+    assert argument_collection[3].tokens[0].keys == ()
+    assert argument_collection[3].tokens[0].source.endswith("cyclopts-config-test-file.dummy")

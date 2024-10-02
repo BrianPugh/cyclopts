@@ -19,6 +19,12 @@ def test_path_exists(tmp_path):
         validator(Path, tmp_path / "foo")
 
 
+def test_path_exists_sequence(tmp_path):
+    validator = validators.Path()
+    validator(tuple[Path, Path], (tmp_path, tmp_path))
+    validator(list[Path], [tmp_path, tmp_path])
+
+
 def test_path_file_okay(tmp_path):
     validator = validators.Path(file_okay=False)
 

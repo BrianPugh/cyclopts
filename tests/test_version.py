@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_version_print_console_from_init(app, console):
     app.console = console
 

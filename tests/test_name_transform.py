@@ -1,15 +1,11 @@
-import sys
+from dataclasses import dataclass
 from enum import Enum, auto
 from textwrap import dedent
+from typing import Annotated
 
 import pytest
 
 from cyclopts import App, Parameter, default_name_transform
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
 
 
 @pytest.mark.parametrize(
@@ -101,6 +97,18 @@ def test_parameter_name_transform_custom(app, assert_parse_args):
     assert_parse_args(foo, "--b_a_r 5", b_a_r=5)
 
 
+@pytest.mark.parametrize("transform", [None, lambda s: s])
+def test_parameter_name_transform_kwargs(app, assert_parse_args, transform):
+    """Both custom and non-custom transforms should result in the same kwargs."""
+    app.default_parameter = Parameter(name_transform=transform)
+
+    @app.default
+    def foo(**kwargs: int):
+        pass
+
+    assert_parse_args(foo, "--hy-phen=1 --under_score=2", **{"hy-phen": 1, "under_score": 2})
+
+
 def test_parameter_name_transform_custom_name_override(app, assert_parse_args):
     app.default_parameter = Parameter(name_transform=lambda s: s)
 
@@ -144,7 +152,7 @@ def test_parameter_name_transform_help(app, console):
         Usage: foo COMMAND [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -179,9 +187,36 @@ def test_parameter_name_transform_help_enum(app, console):
         Usage: test_name_transform cmd [ARGS] [OPTIONS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: FIZZ,BUZZ] [default: FIZZ] │
-        │ BAR,--bar  Docstring for bar. [choices: FIZZ,BUZZ] [default: BUZZ] │
+        │ FOO --foo  Docstring for foo. [choices: FIZZ, BUZZ] [default:      │
+        │            FIZZ]                                                   │
+        │ BAR --bar  Docstring for bar. [choices: FIZZ, BUZZ] [default:      │
+        │            BUZZ]                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
+
+
+def test_parameter_name_transform_dataclass(app, assert_parse_args):
+    app.default_parameter = Parameter(name_transform=lambda s: s.upper())
+
+    @dataclass
+    class Color:
+        red: int
+        green: int
+        blue: int
+
+    @dataclass
+    class User:
+        name: str
+        favorite_color: Color
+
+    @app.default
+    def default(user: Annotated[User, Parameter(name="--user")]):
+        pass
+
+    assert_parse_args(
+        default,
+        "Bob --user.FAVORITE_COLOR.RED=100 --user.FAVORITE_COLOR.GREEN=200 --user.FAVORITE_COLOR.BLUE=255",
+        User("Bob", Color(100, 200, 255)),
+    )

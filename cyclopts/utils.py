@@ -1,26 +1,8 @@
 import functools
 import inspect
 import sys
-from collections.abc import MutableMapping
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Literal,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
-
-_union_types = set()
-_union_types.add(Union)
-if sys.version_info >= (3, 10):
-    from types import UnionType
-
-    _union_types.add(UnionType)
+from collections.abc import Iterable, Iterator, MutableMapping
+from typing import Any, Literal, Optional, Sequence, Tuple, Union
 
 # fmt: off
 if sys.version_info >= (3, 10):
@@ -30,6 +12,232 @@ else:
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f)
 # fmt: on
+
+if sys.version_info >= (3, 10):
+    from sys import stdlib_module_names
+else:
+    # Copied from python3.11 sys.stdlib_module_names
+    stdlib_module_names = frozenset(
+        {
+            "abc",
+            "aifc",
+            "antigravity",
+            "argparse",
+            "array",
+            "ast",
+            "asynchat",
+            "asyncio",
+            "asyncore",
+            "atexit",
+            "audioop",
+            "base64",
+            "bdb",
+            "binascii",
+            "bisect",
+            "builtins",
+            "bz2",
+            "cProfile",
+            "calendar",
+            "cgi",
+            "cgitb",
+            "chunk",
+            "cmath",
+            "cmd",
+            "code",
+            "codecs",
+            "codeop",
+            "collections",
+            "colorsys",
+            "compileall",
+            "concurrent",
+            "configparser",
+            "contextlib",
+            "contextvars",
+            "copy",
+            "copyreg",
+            "crypt",
+            "csv",
+            "ctypes",
+            "curses",
+            "dataclasses",
+            "datetime",
+            "dbm",
+            "decimal",
+            "difflib",
+            "dis",
+            "distutils",
+            "doctest",
+            "email",
+            "encodings",
+            "ensurepip",
+            "enum",
+            "errno",
+            "faulthandler",
+            "fcntl",
+            "filecmp",
+            "fileinput",
+            "fnmatch",
+            "fractions",
+            "ftplib",
+            "functools",
+            "gc",
+            "genericpath",
+            "getopt",
+            "getpass",
+            "gettext",
+            "glob",
+            "graphlib",
+            "grp",
+            "gzip",
+            "hashlib",
+            "heapq",
+            "hmac",
+            "html",
+            "http",
+            "idlelib",
+            "imaplib",
+            "imghdr",
+            "imp",
+            "importlib",
+            "inspect",
+            "io",
+            "ipaddress",
+            "itertools",
+            "json",
+            "keyword",
+            "lib2to3",
+            "linecache",
+            "locale",
+            "logging",
+            "lzma",
+            "mailbox",
+            "mailcap",
+            "marshal",
+            "math",
+            "mimetypes",
+            "mmap",
+            "modulefinder",
+            "msilib",
+            "msvcrt",
+            "multiprocessing",
+            "netrc",
+            "nis",
+            "nntplib",
+            "nt",
+            "ntpath",
+            "nturl2path",
+            "numbers",
+            "opcode",
+            "operator",
+            "optparse",
+            "os",
+            "ossaudiodev",
+            "pathlib",
+            "pdb",
+            "pickle",
+            "pickletools",
+            "pipes",
+            "pkgutil",
+            "platform",
+            "plistlib",
+            "poplib",
+            "posix",
+            "posixpath",
+            "pprint",
+            "profile",
+            "pstats",
+            "pty",
+            "pwd",
+            "py_compile",
+            "pyclbr",
+            "pydoc",
+            "pydoc_data",
+            "pyexpat",
+            "queue",
+            "quopri",
+            "random",
+            "re",
+            "readline",
+            "reprlib",
+            "resource",
+            "rlcompleter",
+            "runpy",
+            "sched",
+            "secrets",
+            "select",
+            "selectors",
+            "shelve",
+            "shlex",
+            "shutil",
+            "signal",
+            "site",
+            "smtpd",
+            "smtplib",
+            "sndhdr",
+            "socket",
+            "socketserver",
+            "spwd",
+            "sqlite3",
+            "sre_compile",
+            "sre_constants",
+            "sre_parse",
+            "ssl",
+            "stat",
+            "statistics",
+            "string",
+            "stringprep",
+            "struct",
+            "subprocess",
+            "sunau",
+            "symtable",
+            "sys",
+            "sysconfig",
+            "syslog",
+            "tabnanny",
+            "tarfile",
+            "telnetlib",
+            "tempfile",
+            "termios",
+            "textwrap",
+            "this",
+            "threading",
+            "time",
+            "timeit",
+            "tkinter",
+            "token",
+            "tokenize",
+            "tomllib",
+            "trace",
+            "traceback",
+            "tracemalloc",
+            "tty",
+            "turtle",
+            "turtledemo",
+            "types",
+            "typing",
+            "unicodedata",
+            "unittest",
+            "urllib",
+            "uu",
+            "uuid",
+            "venv",
+            "warnings",
+            "wave",
+            "weakref",
+            "webbrowser",
+            "winreg",
+            "winsound",
+            "wsgiref",
+            "xdrlib",
+            "xml",
+            "xmlrpc",
+            "zipapp",
+            "zipfile",
+            "zipimport",
+            "zlib",
+            "zoneinfo",
+        }
+    )
 
 
 class SentinelMeta(type):
@@ -42,6 +250,10 @@ class SentinelMeta(type):
 
 class Sentinel(metaclass=SentinelMeta):
     pass
+
+
+class UNSET(Sentinel):
+    """No data was provided."""
 
 
 def record_init(target: str):
@@ -64,18 +276,10 @@ def record_init(target: str):
     return decorator
 
 
-def is_iterable(obj) -> bool:
-    return isinstance(obj, Iterable) and not isinstance(obj, str)
-
-
-def is_union(type_: Optional[Type]) -> bool:
-    return type_ in _union_types
-
-
 class ParameterDict(MutableMapping):
     """A dictionary implementation that can handle mutable ``inspect.Parameter`` as keys."""
 
-    def __init__(self, store: Optional[Dict[inspect.Parameter, Any]] = None):
+    def __init__(self, store: Optional[dict[inspect.Parameter, Any]] = None):
         self.store = {}
         self.reverse_mapping = {}
         if store is not None:
@@ -134,28 +338,11 @@ class ParameterDict(MutableMapping):
         self.reverse_mapping.clear()
 
 
-def resolve_callables(t, *args, **kwargs):
-    """Recursively resolves callable elements in a tuple."""
-    if isinstance(t, type(Sentinel)):
-        return t
-
-    if callable(t):
-        return t(*args, **kwargs)
-
-    resolved = []
-    for element in t:
-        if isinstance(element, type(Sentinel)):
-            resolved.append(element)
-        elif callable(element):
-            resolved.append(element(*args, **kwargs))
-        elif is_iterable(element):
-            resolved.append(resolve_callables(element, *args, **kwargs))
-        else:
-            resolved.append(element)
-    return tuple(resolved)
+def is_iterable(obj) -> bool:
+    return isinstance(obj, Iterable) and not isinstance(obj, str)
 
 
-def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...]:
+def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:
     """Convert a single element or an iterable of elements into a tuple.
 
     Intended to be used in an ``attrs.Field``. If :obj:`None` is provided, returns an empty tuple.
@@ -179,11 +366,11 @@ def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Tuple[Any, ...
         return (value,)
 
 
-def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> List[Any]:
+def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> list[Any]:
     return list(to_tuple_converter(value))
 
 
-def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[Tuple[Any, ...]]:
+def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[tuple[Any, ...]]:
     """Convert a string or Iterable or None into an Iterable or None.
 
     Intended to be used in an ``attrs.Field``.
@@ -219,3 +406,14 @@ def default_name_transform(s: str):
         Transformed name.
     """
     return s.lower().replace("_", "-").strip("-")
+
+
+def grouper(iterable: Sequence, n: int) -> Iterator[Tuple[Any, ...]]:
+    """Collect data into non-overlapping fixed-length chunks or blocks.
+
+    https://docs.python.org/3/library/itertools.html#itertools-recipes
+    """
+    if len(iterable) % n:
+        raise ValueError(f"{iterable!r} is not divisible by {n}.")
+    iterators = [iter(iterable)] * n
+    return zip(*iterators)

@@ -1,11 +1,11 @@
-import inspect
 import sys
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 import pytest
 
 from cyclopts import Parameter
 from cyclopts.exceptions import (
+    ArgumentOrderError,
     CoercionError,
     InvalidCommandError,
     MissingArgumentError,
@@ -14,20 +14,13 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
 
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "foo 1 --b=2 3",
         "foo 1 2 3",
+        "foo 1 2 --c=3",
         "foo --a 1 --b 2 --c 3",
-        "foo --c 3 1 2",
-        "foo --c 3 --b=2 1",
         "foo --c 3 --b=2 --a 1",
     ],
 )
@@ -43,16 +36,34 @@ def test_basic_1(app, cmd_str, assert_parse_args):
     "cmd_str",
     [
         "foo 1 2 3 --d 10 --some-flag",
-        "foo --some-flag 1 --b=2 3 --d 10",
+        "foo --some-flag 1 --b=2 --c 3 --d 10",
         "foo 1 2 --some-flag 3 --d 10",
     ],
 )
 def test_basic_2(app, cmd_str, assert_parse_args):
     @app.command
-    def foo(a: int, b: int, c: int, d: int = 5, some_flag: bool = False):
+    def foo(a: int, b: int, c: int, d: int = 5, *, some_flag: bool = False):
         pass
 
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
+
+
+def test_basic_allow_hyphen_or_underscore(app, assert_parse_args):
+    @app.default
+    def default(foo_bar):
+        pass
+
+    assert_parse_args(default, "--foo-bar=bazz", "bazz")
+    assert_parse_args(default, "--foo_bar=bazz", "bazz")
+
+
+def test_out_of_order_mixed_positional_or_keyword(app, assert_parse_args):
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with pytest.raises(ArgumentOrderError):
+        app.parse_args("foo --b=5 1 2", print_error=False, exit_on_error=False)
 
 
 def test_command_rename(app, assert_parse_args):

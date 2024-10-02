@@ -1,20 +1,13 @@
-import sys
+from typing import Annotated
 
 import pytest
 
 from cyclopts import (
-    CycloptsError,
     Group,
     Parameter,
     UnknownOptionError,
-    ValidationError,
 )
 from cyclopts.exceptions import CoercionError
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 @pytest.mark.parametrize(
@@ -80,7 +73,7 @@ def test_boolean_flag_app_parameter_default_annotated_override(app, assert_parse
 def test_boolean_flag_app_parameter_default_nested_annotated_override(app, assert_parse_args):
     app.default_parameter = Parameter(negative="")
 
-    def my_converter(type_, *values):
+    def my_converter(type_, tokens):
         return 5
 
     my_int = Annotated[int, Parameter(converter=my_converter)]
@@ -93,7 +86,7 @@ def test_boolean_flag_app_parameter_default_nested_annotated_override(app, asser
 
 
 def test_boolean_flag_group_default_parameter_resolution_1(app, assert_parse_args):
-    food_group = Group("Food", default_parameter=Parameter(negative_bool="--group-"))
+    food_group = Group("Food", default_parameter=Parameter(negative_bool="group-"))
 
     @app.default
     def foo(flag: Annotated[bool, Parameter(group=food_group)]):
