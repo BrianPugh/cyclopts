@@ -1,7 +1,7 @@
 import inspect
 from collections.abc import Iterable
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, get_args, get_origin
 
 from attrs import define, field
 
@@ -210,7 +210,10 @@ class CoercionError(CycloptsError):
                 return f"{self.token.keyword}: {self.msg}"
 
         msg = super().__str__()
-        target_type_name = get_hint_name(self.target_type)
+        if get_origin(self.target_type) is Literal:
+            target_type_name = f"one of {set(get_args(self.target_type))}"
+        else:
+            target_type_name = get_hint_name(self.target_type)
         if self.token.keyword is None:
             if self.token.source == "" or self.token.source == "cli":
                 msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {target_type_name}.'

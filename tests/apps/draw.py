@@ -89,6 +89,13 @@ def circle(
 
 @app.command
 def polygon(*vertices: Coordinate, config: Config):
+    """Draw a polygon.
+
+    Parameters
+    ----------
+    vertices: Coordinate
+        List of (x, y) coordinates that make up the polygon.
+    """
     print(f"Drawing a polygon with {vertices=} {config.units}.")
 
 
