@@ -87,6 +87,11 @@ def circle(
     print(f"Drawing a circle with {radius=} {config.units} at {center=}")
 
 
+@app.command
+def polygon(*vertices: Coordinate, config: Config):
+    print(f"Drawing a polygon with {vertices=} {config.units}.")
+
+
 @app.meta.default
 def meta(
     *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],

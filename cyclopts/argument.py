@@ -38,7 +38,7 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, ParameterDict
+from cyclopts.utils import UNSET, ParameterDict, grouper
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -800,7 +800,9 @@ class Argument:
             if positional:
                 if self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                     # Apply converter to individual values
-                    out = tuple(converter(get_args(self.hint)[0], (value,)) for value in positional)
+                    hint = get_args(self.hint)[0]
+                    tokens_per_element, _ = self.token_count()
+                    out = tuple(converter(hint, values) for values in grouper(positional, tokens_per_element))
                 else:
                     out = converter(self.hint, tuple(positional))
             elif keyword:

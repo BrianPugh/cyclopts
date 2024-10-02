@@ -63,11 +63,19 @@ def _typed_dict_field_info(typeddict) -> dict[str, FieldInfo]:
     return out
 
 
-def _generic_class_field_info(f) -> dict[str, FieldInfo]:
+def _generic_class_field_info(
+    f,
+    include_var_positional=False,
+    include_var_keyword=False,
+) -> dict[str, FieldInfo]:
     signature = inspect.signature(f.__init__)
     out = {}
     for name, iparam in signature.parameters.items():
-        if iparam.name == "self" or iparam.kind is iparam.VAR_KEYWORD or iparam.kind is iparam.VAR_POSITIONAL:
+        if iparam.name == "self":
+            continue
+        if not include_var_positional and iparam.kind is iparam.VAR_POSITIONAL:
+            continue
+        if not include_var_keyword and iparam.kind is iparam.VAR_KEYWORD:
             continue
         out[name] = FieldInfo.from_iparam(iparam)
     return out
@@ -98,7 +106,12 @@ def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
     return out
 
 
-def get_field_info(hint) -> dict[str, FieldInfo]:
+def get_field_info(
+    hint,
+    *,
+    include_var_positional=False,
+    include_var_keyword=False,
+) -> dict[str, FieldInfo]:
     if is_pydantic(hint):
         return _pydantic_field_info(hint)
     elif is_namedtuple(hint):

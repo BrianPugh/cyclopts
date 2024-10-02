@@ -1,8 +1,6 @@
 import collections.abc
-import inspect
 import sys
 from collections.abc import Sequence
-from contextlib import suppress
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -19,7 +17,8 @@ from typing import (
 
 from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
-from cyclopts.utils import default_name_transform, grouper
+from cyclopts.field_info import get_field_info
+from cyclopts.utils import default_name_transform, grouper, stdlib_module_names
 
 if sys.version_info >= (3, 12):
     from typing import TypeAliasType  # pragma: no cover
@@ -81,18 +80,6 @@ _converters = {
 }
 
 
-def _first_argument_type(hint):
-    try:
-        signature = inspect.signature(hint.__init__)
-    except AttributeError:
-        raise ValueError from None
-    for iparam in signature.parameters.values():
-        if iparam.name == "self":
-            continue
-        return str if iparam.annotation is iparam.empty else iparam.annotation
-    raise ValueError
-
-
 def _convert_tuple(
     type_: type[Any],
     *tokens: "Token",
@@ -148,6 +135,8 @@ def _convert(
     converter: Callable
     name_transform: Callable
     """
+    from cyclopts.argument import Token
+
     if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
@@ -217,8 +206,6 @@ def _convert(
             gen = token
         out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif origin_type is tuple:
-        from cyclopts.argument import Token
-
         if isinstance(token, Token):
             # E.g. Tuple[str] (Annotation: tuple containing a single string)
             out = convert_tuple(type_, token, converter=converter)
@@ -238,19 +225,11 @@ def _convert(
                 raise CoercionError(token=token, target_type=type_)
         else:
             out = converter(type_, token.value)
-    else:
-        # The actual casting/converting of the underlying type is performed here.
-        if isinstance(token, Sequence):
-            raise ValueError
+    elif getattr(type_, "__module__", None) in stdlib_module_names:
+        assert isinstance(token, Token)
         try:
             if converter is None:
-                inner_value = token.value
-                with suppress(ValueError):
-                    first_argument_type = _first_argument_type(type_)
-                    if first_argument_type is not str:
-                        # Prevents infinite recursion
-                        inner_value = convert(first_argument_type, token)
-                out = _converters.get(type_, type_)(inner_value)
+                out = _converters.get(type_, type_)(token.value)
             else:
                 out = converter(type_, token.value)
         except CoercionError as e:
@@ -261,6 +240,38 @@ def _convert(
             raise
         except ValueError:
             raise CoercionError(token=token, target_type=type_) from None
+    else:
+        if not isinstance(token, Sequence):
+            token = [token]
+        i = 0
+        pos_values = []
+        hint = type_
+        try:
+            for field_info in get_field_info(type_, include_var_positional=True).values():
+                hint = field_info.hint
+                if hint is str:  # Avoids infinite recursion
+                    pos_values.append(token[i].value)
+                    i += 1
+                else:
+                    tokens_per_element, consume_all = token_count(hint)
+                    if tokens_per_element == 1:
+                        pos_values.append(convert(hint, token[i]))
+                        i += 1
+                    else:
+                        pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                        i += tokens_per_element
+                    if consume_all:
+                        break
+            assert i == len(token)
+            out = type_(*pos_values)
+        except CoercionError as e:
+            if e.target_type is None:
+                e.target_type = hint
+            if e.token is None:
+                e.token = token[i]
+            raise
+        except ValueError:
+            raise CoercionError(token=token[i], target_type=hint) from None
 
     if cparam:
         try:
@@ -373,8 +384,13 @@ def convert(
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
+        tokens_per_element, _ = token_count(type_)
+        if tokens_per_element == 1:
+            return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
+        elif len(tokens) == tokens_per_element:
+            return convert_priv(type_, tokens)  # pyright: ignore
         else:
-            return [convert_priv(type_, item) for item in tokens]  # pyright:ignore
+            raise NotImplementedError("Unreachable?")
 
 
 def token_count(type_: Any) -> tuple[int, bool]:
@@ -408,5 +424,24 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
         return token_count(get_args(annotation)[0])[0], True
-    else:
+    elif getattr(type_, "__module__", None) in stdlib_module_names:
+        # Many builtins actually take in VAR_POSITIONAL when we really just want 1 argument.
         return 1, False
+    else:
+        # This is usually/always a custom user-defined class.
+        field_infos = get_field_info(type_, include_var_positional=True)
+        count, consume_all = 0, False
+        for value in field_infos.values():
+            if value.kind is value.VAR_POSITIONAL:
+                consume_all = True
+            elif not value.required:
+                continue
+            elem_count, elem_consume_all = token_count(value.hint)
+            count += elem_count
+            consume_all |= elem_consume_all
+
+        # classes like ``Enum`` can slip through here with a 0 count.
+        if not count:
+            return 1, False
+
+        return count, consume_all
