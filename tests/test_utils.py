@@ -2,7 +2,7 @@ from typing import List
 
 import pytest
 
-from cyclopts.utils import ParameterDict, signature
+from cyclopts.utils import ParameterDict, grouper, signature
 
 
 @pytest.fixture
@@ -59,3 +59,12 @@ def test_parameter_dict_invalid_contains(parameter_dict):
         # Assert is only here to make the linter happy.
         # Tests __contains__ magic method.
         assert "foo" not in parameter_dict  # pyright: ignore[reportUnusedExpression]
+
+
+def test_grouper():
+    assert [(1,), (2,), (3,), (4,)] == list(grouper([1, 2, 3, 4], 1))
+    assert [(1, 2), (3, 4)] == list(grouper([1, 2, 3, 4], 2))
+    assert [(1, 2, 3, 4)] == list(grouper([1, 2, 3, 4], 4))
+
+    with pytest.raises(ValueError):
+        grouper([1, 2, 3, 4], 3)

@@ -19,7 +19,7 @@ from typing import (
 
 from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
-from cyclopts.utils import default_name_transform
+from cyclopts.utils import default_name_transform, grouper
 
 if sys.version_info >= (3, 12):
     from typing import TypeAliasType  # pragma: no cover
@@ -116,13 +116,10 @@ def _convert_tuple(
         else:
             raise ValueError("A tuple must have 0 or 1 inner-types.")
 
-        if inner_token_count == 1:
-            out = tuple(convert(inner_type, x) for x in tokens)
-        else:
-            out = tuple(
-                convert(inner_type, tokens[i : i + inner_token_count]) for i in range(0, len(tokens), inner_token_count)
-            )
-        return out
+        return tuple(
+            convert(inner_type, chunk[0] if inner_token_count == 1 else chunk)
+            for chunk in grouper(tokens, inner_token_count)
+        )
     else:
         # Fixed-length tuple
         if inner_token_count != len(tokens):

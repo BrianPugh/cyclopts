@@ -2,7 +2,7 @@ import functools
 import inspect
 import sys
 from collections.abc import Iterable, Iterator, MutableMapping
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Sequence, Tuple, Union
 
 # fmt: off
 if sys.version_info >= (3, 10):
@@ -180,3 +180,14 @@ def default_name_transform(s: str):
         Transformed name.
     """
     return s.lower().replace("_", "-").strip("-")
+
+
+def grouper(iterable: Sequence, n: int) -> Iterator[Tuple[Any, ...]]:
+    """Collect data into non-overlapping fixed-length chunks or blocks.
+
+    https://docs.python.org/3/library/itertools.html#itertools-recipes
+    """
+    if len(iterable) % n:
+        raise ValueError(f"{iterable!r} is not divisible by {n}.")
+    iterators = [iter(iterable)] * n
+    return zip(*iterators)
