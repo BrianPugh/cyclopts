@@ -76,6 +76,15 @@ def test_token_count_iterable():
     assert (2, True) == token_count(Iterable[Tuple[int, int]])
 
 
+def test_token_count_union():
+    assert (1, False) == token_count(Union[int, str, float])
+
+
+def test_token_count_union_error():
+    with pytest.raises(ValueError):
+        assert (1, False) == token_count(Union[int, Tuple[int, int]])
+
+
 def test_coerce_bool():
     assert True is convert(bool, ["true"])
     assert False is convert(bool, ["false"])

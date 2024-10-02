@@ -424,6 +424,16 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 1, True
     elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
         return token_count(get_args(annotation)[0])[0], True
+    elif is_union(type_):
+        sub_args = get_args(type_)
+        token_count_target = token_count(sub_args[0])
+        for sub_type_ in sub_args[1:]:
+            this = token_count(sub_type_)
+            if this != token_count_target:
+                raise ValueError(
+                    f"Cannot Union types that consume different numbers of tokens: {sub_args[0]} {sub_type_}"
+                )
+        return token_count_target
     elif getattr(type_, "__module__", None) in stdlib_module_names:
         # Many builtins actually take in VAR_POSITIONAL when we really just want 1 argument.
         return 1, False
