@@ -96,7 +96,19 @@ def polygon(*vertices: Coordinate, config: Config):
     vertices: Coordinate
         List of (x, y) coordinates that make up the polygon.
     """
-    print(f"Drawing a polygon with {vertices=} {config.units}.")
+    print(f"Drawing a polygon with {vertices=} {config.units} in {config.color=}.")
+
+
+@app.command
+def polygon2(vertices: list[Coordinate], /, *, config: Config):
+    """Draw a polygon (alternative implementation).
+
+    Parameters
+    ----------
+    vertices: Coordinate
+        List of (x, y) coordinates that make up the polygon.
+    """
+    print(f"Drawing a polygon with {vertices=} {config.units} in {config.color=}.")
 
 
 @app.meta.default

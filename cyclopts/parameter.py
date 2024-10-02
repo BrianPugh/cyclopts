@@ -141,13 +141,9 @@ class Parameter:
         out = []
         assert isinstance(self.name, tuple)
         for name in self.name:
-            if name.startswith("--"):
-                name = name[2:]
-            elif name.startswith("-"):
-                # Do not support automatic negation for short flags.
+            if not name.startswith("--"):  # Only provide negation for option-like long flags.
                 continue
-            else:
-                raise ValueError("All parameters should have started with '-' or '--'.")
+            name = name[2:]
             name_components = name.split(".")
 
             negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
