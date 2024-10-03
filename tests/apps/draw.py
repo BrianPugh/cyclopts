@@ -69,7 +69,7 @@ def line(
 @app.command
 def circle(
     center: Coordinate,
-    radius: float,
+    radius: Literal["unit"] | float,
     *,
     config: Config,
 ):
@@ -77,6 +77,8 @@ def circle(
 
     Parameters
     ----------
+    center: Literal["origin"] | Coordinate
+        Center of the circle to be drawn.
     center.x: float
         Circle center's X position.
     center.y: float
@@ -84,6 +86,8 @@ def circle(
     radius: float
         Radius of the circle.
     """
+    if radius == "unit":
+        radius = 1.0
     print(f"Drawing a circle with {radius=} {config.units} at {center=}")
 
 

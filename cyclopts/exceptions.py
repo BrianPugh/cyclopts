@@ -236,7 +236,7 @@ class InvalidCommandError(CycloptsError):
 
         assert self.unused_tokens
         token = self.unused_tokens[0]
-        response = super().__str__() + f'Unable to interpret valid command from "{token}".'
+        response = super().__str__() + f'Unknown command "{token}".'
 
         if self.app and self.app._commands:
             close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.8)

@@ -14,14 +14,13 @@ There are 2 function-registering decorators:
    The default :meth:`app.default <cyclopts.App.default>` handler runs :meth:`app.help_print <cyclopts.App.help_print>`.
 
 2. :meth:`@app.command <cyclopts.App.command>` - Registers a function or :class:`.App` as a command.
-   Commands require explicit CLI invocation.
 
 This section will detail how to use the :meth:`@app.command <cyclopts.App.command>` decorator.
 
 ---------------------
 Registering a Command
 ---------------------
-The :meth:`@app.command <cyclopts.App.command>` decorator adds a command to a Cyclopts application.
+The :meth:`@app.command <cyclopts.App.command>` decorator adds a **command** to a Cyclopts application.
 
 .. code-block:: python
 
@@ -49,6 +48,14 @@ The :meth:`@app.command <cyclopts.App.command>` decorator adds a command to a Cy
 
    $ my-script buzz 4
    BUZZ: 4
+
+   $ python scratch.py foo
+   ╭─ Error ────────────────────────────────────────────────╮
+   │ Unknown command "foo".                                 │
+   ╰────────────────────────────────────────────────────────╯
+   ╭─ Error ────────────────────────────────────────────────╮
+   │ Unable to interpret valid command from "foo".          │
+   ╰────────────────────────────────────────────────────────╯
 
 ------------------------
 Registering a SubCommand
