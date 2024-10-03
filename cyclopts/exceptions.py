@@ -177,7 +177,7 @@ class UnknownOptionError(CycloptsError):
 
             candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x._assignable))
 
-            close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.8)
+            close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.6)
             if close_matches:
                 response += f' Did you mean "{close_matches[0]}"?'
 
@@ -232,18 +232,18 @@ class InvalidCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
 
     def __str__(self):
-        import difflib
-
         assert self.unused_tokens
         token = self.unused_tokens[0]
-        response = super().__str__() + f'Unknown command "{token}".'
+        response = f'Unknown command "{token}".'
 
         if self.app and self.app._commands:
-            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.8)
+            import difflib
+
+            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.6)
             if close_matches:
                 response += f' Did you mean "{close_matches[0]}"?'
 
-        return response
+        return super().__str__() + response
 
 
 @define(kw_only=True)

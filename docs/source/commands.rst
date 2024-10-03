@@ -49,10 +49,10 @@ The :meth:`@app.command <cyclopts.App.command>` decorator adds a **command** to 
    $ my-script buzz 4
    BUZZ: 4
 
-   $ python scratch.py foo
-   ╭─ Error ────────────────────────────────────────────────╮
-   │ Unknown command "foo".                                 │
-   ╰────────────────────────────────────────────────────────╯
+   $ my-script fuzz
+   ╭─ Error ────────────────────────────────────────────────────────────────────╮
+   │ Unknown command "fuzz". Did you mean "fizz"?                               │
+   ╰────────────────────────────────────────────────────────────────────────────╯
 
 ------------------------
 Registering a SubCommand
