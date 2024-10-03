@@ -172,12 +172,12 @@ class UnknownOptionError(CycloptsError):
         else:
             response = f'Unknown option: "{value}" from "{self.token.source}".'
 
-        if self.token.keyword:
+        if keyword := self.token.keyword or self.token.value:
             import difflib
 
             candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x._assignable))
 
-            close_matches = difflib.get_close_matches(self.token.keyword, candidates, n=1, cutoff=0.8)
+            close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.8)
             if close_matches:
                 response += f' Did you mean "{close_matches[0]}"?'
 

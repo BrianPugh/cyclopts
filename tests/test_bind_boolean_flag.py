@@ -39,7 +39,7 @@ def test_boolean_flag_app_parameter_default(app, assert_parse_args):
 
     with pytest.raises(UnknownOptionError) as e:
         app.parse_args("--no-my-flag", exit_on_error=False)
-    assert str(e.value) == 'Unknown option: "--no-my-flag".'
+    assert str(e.value) == 'Unknown option: "--no-my-flag". Did you mean "--my-flag"?'
 
 
 def test_boolean_flag_app_parameter_negative(app, assert_parse_args):

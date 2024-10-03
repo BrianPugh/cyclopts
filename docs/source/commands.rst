@@ -53,9 +53,6 @@ The :meth:`@app.command <cyclopts.App.command>` decorator adds a **command** to 
    ╭─ Error ────────────────────────────────────────────────╮
    │ Unknown command "foo".                                 │
    ╰────────────────────────────────────────────────────────╯
-   ╭─ Error ────────────────────────────────────────────────╮
-   │ Unable to interpret valid command from "foo".          │
-   ╰────────────────────────────────────────────────────────╯
 
 ------------------------
 Registering a SubCommand

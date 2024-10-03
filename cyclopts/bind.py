@@ -20,7 +20,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.token import Token
-from cyclopts.utils import ParameterDict
+from cyclopts.utils import ParameterDict, is_option_like
 
 if TYPE_CHECKING:
     from cyclopts.group import Group
@@ -134,17 +134,6 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                 argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
 
     return unused_tokens
-
-
-def is_option_like(token: str) -> bool:
-    """Checks if a token looks like an option.
-
-    Namely, negative numbers are not options, but a token like ``--foo`` is.
-    """
-    with suppress(ValueError):
-        complex(token)
-        return False
-    return token.startswith("-")
 
 
 def _parse_pos(

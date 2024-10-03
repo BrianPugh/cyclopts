@@ -67,6 +67,18 @@ def line(
 
 
 @app.command
+def elliptic_curve(
+    start_point: Coordinate,
+    end_point: Coordinate,
+    r1: float,
+    r2: float,
+    *,
+    config: Config,
+):
+    """Draw a elliptical curve."""
+
+
+@app.command
 def circle(
     center: Coordinate,
     radius: Literal["unit"] | float,

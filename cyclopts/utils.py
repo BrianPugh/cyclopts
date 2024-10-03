@@ -2,6 +2,7 @@ import functools
 import inspect
 import sys
 from collections.abc import Iterable, Iterator, MutableMapping
+from contextlib import suppress
 from typing import Any, Literal, Optional, Sequence, Tuple, Union
 
 # fmt: off
@@ -417,3 +418,14 @@ def grouper(iterable: Sequence, n: int) -> Iterator[Tuple[Any, ...]]:
         raise ValueError(f"{iterable!r} is not divisible by {n}.")
     iterators = [iter(iterable)] * n
     return zip(*iterators)
+
+
+def is_option_like(token: str) -> bool:
+    """Checks if a token looks like an option.
+
+    Namely, negative numbers are not options, but a token like ``--foo`` is.
+    """
+    with suppress(ValueError):
+        complex(token)
+        return False
+    return token.startswith("-")
