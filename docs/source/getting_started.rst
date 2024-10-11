@@ -63,7 +63,7 @@ Executing the script with the argument ``Alice`` produces the following:
    $ python main.py Alice
    Hello Alice!
 
-The step-by-step process of how Cyclopts interpreted the python code and the CLI inputs is outlined below:
+The step-by-step process of how Cyclopts interprets the python code and the CLI inputs is outlined below:
 
 1. The function ``main()`` was registered to ``app`` as the **default** action.
 
@@ -73,7 +73,7 @@ The step-by-step process of how Cyclopts interpreted the python code and the CLI
    In the absence of an explicit type hint, Cyclopts defaults to parsing the value as a ``str``.
 
    .. note::
-      Without a type annotation, Cyclopts will actually first attempt to use the ``type`` of
+      Without a type annotation, Cyclopts will actually first attempt to use the **type** of
       the parameter's **default value**. If the parameter doesn't have a default value, it will
       then fallback to ``str``.
 

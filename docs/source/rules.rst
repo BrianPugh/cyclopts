@@ -17,31 +17,31 @@ No Hint
 *******
 If no explicit type hint is provided:
 
-* If the parameter is optional and has a non-None default value, interpret the type ``type(default_value)``.
+* If the parameter is optional and has a **non-None** default value, interpret the type as ``type(default_value)``.
 
-.. code-block:: python
+  .. code-block:: python
 
-   @app.default
-   def default(value=5):
-       print(f"{value=} {type(value)=}")
+     @app.default
+     def default(value=5):
+         print(f"{value=} {type(value)=}")
 
-.. code-block:: console
+  .. code-block:: console
 
-   $ my-program 3
-   value=3 type(value)=<class 'int'>
+     $ my-program 3
+     value=3 type(value)=<class 'int'>
 
 * Otherwise, interpret the type as string. See `Str`_.
 
-.. code-block:: python
+  .. code-block:: python
 
-   @app.default
-   def default(value):
-       print(f"{value=} {type(value)=}")
+     @app.default
+     def default(value):
+         print(f"{value=} {type(value)=}")
 
-.. code-block:: console
+  .. code-block:: console
 
-   $ my-program foo
-   value='foo' type(value)=<class 'str'>
+     $ my-program foo
+     value='foo' type(value)=<class 'str'>
 
 ***
 Any
@@ -307,5 +307,86 @@ Typer attempts to match the token to an Enum **value**; Cyclopts attempts to mat
    │ Error converting value "french" to <enum 'Language'> for "--language". │
    ╰────────────────────────────────────────────────────────────────────────╯
 
+*************************
+Dataclasses (and similar)
+*************************
+If a parameter's type annotation is one of the following, then Cyclopts will automatically enable **subkey parsing**:
+
+* `attrs <https://www.attrs.org/en/stable/>`_
+* `dataclass <https://docs.python.org/3/library/dataclasses.html>`_
+* `NamedTuple <https://docs.python.org/3/library/typing.html#typing.NamedTuple>`_
+* `pydantic <https://docs.pydantic.dev/latest/>`_
+* `TypedDict <https://docs.python.org/3/library/typing.html#typing.TypedDict>`_
+
+Subkey parsing allows for both positional arguments, as well as keyword arguments with a dot-separator. An example is worth a thousand words:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from dataclasses import dataclass
+
+   app = App()
+
+   @dataclass
+   class User:
+      name: str
+      age: int
+
+   @app.default
+   def main(user: User):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ──────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.           │
+   │ --version  Display application version.             │
+   ╰─────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────╮
+   │ *  USER.NAME            [required]                  │
+   │      --user.name                                    │
+   │ *  USER.AGE --user.age  [required]                  │
+   ╰─────────────────────────────────────────────────────╯
+
+   $ my-program 'Bob Smith' 30
+   User(name='Bob Smith', age=30)
+
+   $ my-program --user.name 'Bob Smith' --user.age 30
+   User(name='Bob Smith', age=30)
+
+Cyclopts will recursively search for :class:`Parameter` annotations and respect them:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from dataclasses import dataclass
+   from typing import Annotated
+
+   app = App()
+
+   @dataclass
+   class User:
+      # Beginning with "--" will completely override the parenting parameter name.
+      name: Annotated[str, Parameter(name="--nickname")]
+      # Not beginning with "--" will tack it on to the parenting parameter name.
+      age: Annotated[int, Parameter(name="years-young")]
+
+   @app.default
+   def main(user: Annotated[User, Parameter(name="player")]):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+
+To enable subkey parsing for a vanilla python class:
 
 .. _Typer: https://typer.tiangolo.com
