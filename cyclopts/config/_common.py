@@ -169,7 +169,7 @@ class ConfigFromFile(ABC):
                         else:
                             continue
 
-                if argument.tokens:
+                if argument.tokens or argument.field_info.kind is argument.field_info.VAR_KEYWORD:
                     continue
 
                 if any(x.source != str(self.path) for x in argument.tokens):

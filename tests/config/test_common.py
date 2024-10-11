@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Annotated, Any, Dict
 
 import pytest
 
 from cyclopts.argument import ArgumentCollection, Token
 from cyclopts.config._common import ConfigFromFile
+from cyclopts.parameter import Parameter
 
 
 class Dummy(ConfigFromFile):
@@ -17,6 +18,7 @@ class Dummy(ConfigFromFile):
                 "key1": "bar1",
                 "key2": "bar2",
             },
+            "meta_param": 123,
         }
 
 
@@ -77,9 +79,19 @@ def argument_collection():
 
 
 @pytest.fixture
-def apps():
-    """App is only used as a dictionary in these tests."""
-    return [{"function1": None}]
+def apps(app):
+    @app.command
+    def function1():
+        pass
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        meta_param: Annotated[int, Parameter(negative=())] = 42,
+    ):
+        pass
+
+    return [app]
 
 
 def test_config_common_root_keys_empty(apps, config, argument_collection):
@@ -170,13 +182,8 @@ def test_config_common_kwargs(apps, config):
     argument_collection = ArgumentCollection.from_callable(foo)
     config(apps, (), argument_collection)
 
-    assert len(argument_collection[-1].tokens) == 1
-    assert argument_collection[-1].field_info.name == "kwargs"
-    assert argument_collection[-1].tokens[0].keyword == "[key2]"
-    assert argument_collection[-1].tokens[0].value == "foo2"
-    assert argument_collection[-1].tokens[0].index == 0
-    assert argument_collection[-1].tokens[0].keys == ("key2",)
-    assert argument_collection[-1].tokens[0].source.endswith("cyclopts-config-test-file.dummy")
+    # Don't parse ``kwargs`` from config.
+    assert len(argument_collection[-1].tokens) == 0
 
 
 def test_config_common_subkeys(apps, config_sub_keys):
