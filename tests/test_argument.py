@@ -423,6 +423,8 @@ def test_argument_collection_var_keyword_match():
         Case(args=(("*",), ("bar",)), expected=("--bar",)),
         Case(args=(("--foo", "*"), ("bar",)), expected=("--foo.bar", "--bar")),
         Case(args=(("--foo",), ("*",), ("bar",)), expected=("--foo.bar",)),
+        Case(args=(("foo",), ("--bar",)), expected=("--bar",)),
+        Case(args=(("foo",), ("bar",)), expected=("--foo.bar",)),
     ],
 )
 def test_resolve_parameter_name(args, expected):

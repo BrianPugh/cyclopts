@@ -1004,13 +1004,10 @@ def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
     for a1 in argss[0]:
         if a1.endswith("*"):
             a1 = a1[:-1]
-        elif not a1.startswith("-"):
-            continue
-
-        if not a1:
-            a1 = "--"
-        elif not a1.endswith("."):
+        if a1 and not a1.endswith("."):
             a1 += "."
+        if not a1.startswith("-"):
+            a1 = "--" + a1
 
         for a2 in argss[1]:
             if a2.startswith("-"):
@@ -1018,4 +1015,7 @@ def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
             else:
                 out.append(a1 + a2)
 
-    return _resolve_parameter_name(tuple(out), *argss[2:])
+    if out:
+        return _resolve_parameter_name(tuple(out), *argss[2:])
+    else:
+        return _resolve_parameter_name(*argss[1:])

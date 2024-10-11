@@ -190,6 +190,28 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
 
 
 @pytest.mark.parametrize(
+    "cmd",
+    [
+        "'Bob Smith' 30",
+        "--nickname='Bob Smith' --player.years-young=30",
+    ],
+)
+def test_bind_dataclass_double_name_override_no_hyphen(app, assert_parse_args, console, cmd):
+    @dataclass
+    class User:
+        # Beginning with "--" will completely override the parenting parameter name.
+        name: Annotated[str, Parameter(name="--nickname")]
+        # Not beginning with "--" will tack it on to the parenting parameter name.
+        age: Annotated[int, Parameter(name="years-young")]
+
+    @app.default
+    def main(user: Annotated[User, Parameter(name="player")]):  # but what about without --?
+        print(user)
+
+    assert_parse_args(main, cmd, user=User("Bob Smith", 30))
+
+
+@pytest.mark.parametrize(
     "cmd_str",
     [
         "100 200",
