@@ -38,11 +38,12 @@ pyyaml = {version = ">=6.0.1", optional = true}
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "~7.1.2"
-sphinx_rtd_theme = ">=1.3,<2.1"
+sphinx_rtd_theme = ">=3.0.0,<4.0.0"
 gitpython = ">=3.1.31"
 sphinx-copybutton = "^0.5"
 myst-parser = {extras = ["linkify"], version = "^3.0.1"}
 sphinx-autodoc-typehints = ">=1.25.2,<3.0.0"
+sphinx-rtd-dark-mode = "^1.3.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {extras = ["toml"], version = ">=5.1"}
