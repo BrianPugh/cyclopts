@@ -21,7 +21,7 @@ app = App(
     help="Demo drawing app.",
     config=(
         cyclopts.config.Toml(toml_path, root_keys=("tool", "draw")),
-        cyclopts.config.Toml(toml_path, root_keys=("tool", "draw"), use_commands_as_keys=False, allow_unknown=True),
+        cyclopts.config.Toml(toml_path, root_keys=("tool", "draw"), use_commands_as_keys=False),
     ),
 )
 

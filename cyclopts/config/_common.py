@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING, Any, Optional, Union
 
 from attrs import define, field
 
-from cyclopts.argument import Token
+from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError, UnknownOptionError
+from cyclopts.token import Token
 from cyclopts.utils import to_tuple_converter
 
 if TYPE_CHECKING:
-    from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
 
 
@@ -34,6 +34,15 @@ def _walk_leaves(
                 yield current_keys, value
     else:
         yield (), d
+
+
+def _meta_arguments(apps: list["App"]) -> "ArgumentCollection":
+    argument_collection = ArgumentCollection()
+    for i, app in enumerate(apps):
+        if app._meta is None:
+            continue
+        argument_collection.extend(app._meta._parse_argument_collection(apps=apps[:i]))
+    return argument_collection
 
 
 @define
@@ -133,8 +142,12 @@ class ConfigFromFile(ABC):
 
         to_add = []
         for option_key, option_value in config.items():
-            if option_key in apps[-1]:  # Check if it's a command.
-                continue
+            if self.use_commands_as_keys:
+                if option_key in apps[-1]:  # Check if it's a command.
+                    continue
+            else:
+                if option_key in apps[0]:
+                    continue
 
             for subkeys, value in _walk_leaves(option_value):
                 cli_option_name = "--" + ".".join(chain((option_key,), subkeys))
@@ -146,9 +159,15 @@ class ConfigFromFile(ABC):
                     if self.allow_unknown or apps[-1]._meta_parent:
                         continue
                     else:
-                        raise UnknownOptionError(
-                            token=Token(keyword=complete_keyword, source=self.source), argument_collection=arguments
-                        ) from None
+                        meta_arguments = _meta_arguments(apps)
+                        try:
+                            meta_arguments.match(cli_option_name)
+                        except ValueError:
+                            raise UnknownOptionError(
+                                token=Token(keyword=complete_keyword, source=self.source), argument_collection=arguments
+                            ) from None
+                        else:
+                            continue
 
                 if argument.tokens:
                     continue

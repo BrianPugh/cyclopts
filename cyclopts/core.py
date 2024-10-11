@@ -15,6 +15,7 @@ from typing import (
     Callable,
     Literal,
     Optional,
+    Sequence,
     TypeVar,
     Union,
     overload,
@@ -148,6 +149,9 @@ def _get_command_groups(parent_app, child_app):
 
 def _resolve_default_parameter_from_apps(apps) -> Parameter:
     """The default_parameter resolution depends on the parent-child path traversed."""
+    if not apps:
+        return Parameter()
+
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
         # child_app could be a command of parent_app.meta
@@ -280,8 +284,8 @@ class App:
 
     _parents: list["App"] = field(init=False, factory=list)
 
-    _meta: "App" = field(init=False, default=None)
-    _meta_parent: "App" = field(init=False, default=None)
+    _meta: Optional["App"] = field(init=False, default=None)
+    _meta_parent: Optional["App"] = field(init=False, default=None)
 
     def __attrs_post_init__(self):
         # Trigger the setters
@@ -650,6 +654,15 @@ class App:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
+    def _parse_argument_collection(self, *, apps: Sequence["App"], parse_docstring: bool = False):
+        return ArgumentCollection.from_callable(
+            self.default_command,  # pyright: ignore
+            _resolve_default_parameter_from_apps(apps),
+            group_arguments=self.group_arguments,  # pyright: ignore
+            group_parameters=self.group_parameters,  # pyright: ignore
+            parse_docstring=parse_docstring,
+        )
+
     def parse_known_args(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
@@ -744,13 +757,7 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    argument_collection = ArgumentCollection.from_callable(
-                        command_app.default_command,  # pyright: ignore
-                        _resolve_default_parameter_from_apps(apps),
-                        group_arguments=command_app.group_arguments,  # pyright: ignore
-                        group_parameters=command_app.group_parameters,  # pyright: ignore
-                        parse_docstring=False,
-                    )
+                    argument_collection = command_app._parse_argument_collection(apps=apps)
 
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
