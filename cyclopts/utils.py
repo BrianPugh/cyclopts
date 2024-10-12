@@ -429,3 +429,7 @@ def is_option_like(token: str) -> bool:
         complex(token)
         return False
     return token.startswith("-")
+
+
+def is_builtin(obj: Any) -> bool:
+    return getattr(obj, "__module__", None) in stdlib_module_names

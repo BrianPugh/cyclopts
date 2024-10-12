@@ -38,7 +38,7 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, ParameterDict, grouper
+from cyclopts.utils import UNSET, ParameterDict, grouper, is_builtin
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -607,6 +607,10 @@ class Argument:
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
+                self._lookup.update(get_field_info(hint))
+            elif not is_builtin(hint) and token_count(hint)[0] > 1:
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
+                self._accepts_keywords = True
                 self._lookup.update(get_field_info(hint))
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint

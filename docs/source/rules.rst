@@ -307,6 +307,8 @@ Typer attempts to match the token to an Enum **value**; Cyclopts attempts to mat
    │ Error converting value "french" to <enum 'Language'> for "--language". │
    ╰────────────────────────────────────────────────────────────────────────╯
 
+.. _Coercion Rules - Dataclasses:
+
 *************************
 Dataclasses (and similar)
 *************************
@@ -318,7 +320,7 @@ If a parameter's type annotation is one of the following, then Cyclopts will aut
 * `pydantic <https://docs.pydantic.dev/latest/>`_
 * `TypedDict <https://docs.python.org/3/library/typing.html#typing.TypedDict>`_
 
-Subkey parsing allows for both positional arguments, as well as keyword arguments with a dot-separator. An example is worth a thousand words:
+Subkey parsing allows for both positional arguments, as well as keyword arguments with a dot-separator. Subkey parsing will respect positional-only as well as keyword-only inference from the function signature.
 
 .. code-block:: python
 
@@ -386,7 +388,190 @@ Cyclopts will recursively search for :class:`Parameter` annotations and respect 
 .. code-block:: console
 
    $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
 
-To enable subkey parsing for a vanilla python class:
+   ╭─ Commands ────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                 │
+   │ --version  Display application version.                   │
+   ╰───────────────────────────────────────────────────────────╯
+   ╭─ Parameters ──────────────────────────────────────────────╮
+   │ *  NICKNAME --nickname     [required]                     │
+   │ *  PLAYER.YEARS-YOUNG      [required]                     │
+   │      --player.years-young                                 │
+   ╰───────────────────────────────────────────────────────────╯
+
+The special name ``"*"`` will remove the immediate parameter's name from the dotted-hierarchal name:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from dataclasses import dataclass
+   from typing import Annotated
+
+   app = App()
+
+   @dataclass
+   class User:
+      name: str
+      age: int
+
+   @app.default
+   def main(user: Annotated[User, Parameter(name="*")]):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ─────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.              │
+   │ --version  Display application version.                │
+   ╰────────────────────────────────────────────────────────╯
+   ╭─ Parameters ───────────────────────────────────────────╮
+   │ *  NAME --name  [required]                             │
+   │ *  AGE --age    [required]                             │
+   ╰────────────────────────────────────────────────────────╯
+
+***************
+General Classes
+***************
+
+Generic classes (not defined with :ref:`one of the dataclass-like libraries described above <Coercion Rules - Dataclasses>`) have their own set of rules who's behavior can be controlled with :attr:`Parameter.accepts_keys <cyclopts.Parameter.accepts_keys>`.
+
+==========================================
+``Parameter(accepts_keys=None)`` (default)
+==========================================
+If the class has a single required argument, then only a single element will be displayed on the help page and the coerced values will be passed along to the single argument
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   class User:
+      def __init__(self, name: str):
+         self.name = name
+
+   @app.default
+   def main(user: User):
+      print(f"Hello {user.name}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ─────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                      │
+   │ --version  Display application version.                        │
+   ╰────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ───────────────────────────────────────────────────╮
+   │ *  USER --user  [required]                                     │
+   ╰────────────────────────────────────────────────────────────────╯
+
+   $ my-program 'Bob Smith'
+   Hello Bob Smith
+
+If the class has multiple required arguments, then will be displayed with dot-notation.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   class User:
+      def __init__(self, name: str, age: int):
+         self.name = name
+         self.age = age
+
+   @app.default
+   def main(user: User):
+      print(f"Hello {user.name}, you are {user.age} old!")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ─────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                      │
+   │ --version  Display application version.                        │
+   ╰────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ───────────────────────────────────────────────────╮
+   │ *  USER.NAME --user.name  [required]                           │
+   │ *  USER.AGE --user.age    [required]                           │
+   ╰────────────────────────────────────────────────────────────────╯
+
+   $ my-program 'Bob Smith' 42
+   Hello Bob Smith, you are 42 old!
+
+   $ my-program --user.name 'Bob Smith' --user.age 42
+   Hello Bob Smith, you are 42 old!
+
+   $ my-program 'Bob Smith' --user.age 42
+   Hello Bob Smith, you are 42 old!
+
+If a default value is provided, that parameter **must** be provided by keyword:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   class User:
+      def __init__(self, name: str, age: int = 42):
+         self.name = name
+         self.age = age
+
+   @app.default
+   def main(user: User):
+      print(f"Hello {user.name}, you are {user.age} old!")
+
+   app()
+
+Keyword-only and positional-only parameters are also handled as expected:
+
+================================
+``Parameter(accepts_keys=True)``
+================================
+1. If
+
+
+``Parameter(accepts_keys=False)``
+Whether specified positionally or via keyword, the parameter will consume the number of tokens necessary to populate all of the POSITIONAL_ONLY/POSITIONAL_OR_KEYWORD arguments that **do not have a default value**. Other parameters will not be accessible from the CLI.
+
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   class User:
+      def __init__(self, name: str, age: int):
+          self.name = name
+          self.age = age
+
+      def __repr__(self):
+          return f"User(name={self.name}, age={self.age})"
+
+   @app.default
+   def main(user: User):
+      print(user)
+
+   app()
+
+
 
 .. _Typer: https://typer.tiangolo.com

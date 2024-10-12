@@ -18,7 +18,7 @@ from typing import (
 from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_info
-from cyclopts.utils import default_name_transform, grouper, stdlib_module_names
+from cyclopts.utils import default_name_transform, grouper, is_builtin
 
 if sys.version_info >= (3, 12):
     from typing import TypeAliasType  # pragma: no cover
@@ -225,7 +225,7 @@ def _convert(
                 raise CoercionError(token=token, target_type=type_)
         else:
             out = converter(type_, token.value)
-    elif getattr(type_, "__module__", None) in stdlib_module_names:
+    elif is_builtin(type_):
         assert isinstance(token, Token)
         try:
             if converter is None:
@@ -262,6 +262,8 @@ def _convert(
                         i += tokens_per_element
                     if consume_all:
                         break
+                if i == len(token):
+                    break
             assert i == len(token)
             out = type_(*pos_values)
         except CoercionError as e:
@@ -434,7 +436,7 @@ def token_count(type_: Any) -> tuple[int, bool]:
                     f"Cannot Union types that consume different numbers of tokens: {sub_args[0]} {sub_type_}"
                 )
         return token_count_target
-    elif getattr(type_, "__module__", None) in stdlib_module_names:
+    elif is_builtin(type_):
         # Many builtins actually take in VAR_POSITIONAL when we really just want 1 argument.
         return 1, False
     else:
