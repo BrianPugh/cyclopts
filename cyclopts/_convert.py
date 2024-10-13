@@ -17,7 +17,7 @@ from typing import (
 
 from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
-from cyclopts.field_info import get_field_info
+from cyclopts.field_info import get_field_infos
 from cyclopts.utils import default_name_transform, grouper, is_builtin
 
 if sys.version_info >= (3, 12):
@@ -247,7 +247,7 @@ def _convert(
         pos_values = []
         hint = type_
         try:
-            for field_info in get_field_info(type_, include_var_positional=True).values():
+            for field_info in get_field_infos(type_, include_var_positional=True).values():
                 hint = field_info.hint
                 if hint is str:  # Avoids infinite recursion
                     pos_values.append(token[i].value)
@@ -441,7 +441,7 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 1, False
     else:
         # This is usually/always a custom user-defined class.
-        field_infos = get_field_info(type_, include_var_positional=True)
+        field_infos = get_field_infos(type_, include_var_positional=True)
         count, consume_all = 0, False
         for value in field_infos.values():
             if value.kind is value.VAR_POSITIONAL:

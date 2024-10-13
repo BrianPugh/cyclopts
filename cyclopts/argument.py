@@ -29,11 +29,16 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.field_info import (
+    KEYWORD_ONLY,
+    POSITIONAL_ONLY,
+    POSITIONAL_OR_KEYWORD,
+    VAR_KEYWORD,
+    VAR_POSITIONAL,
     FieldInfo,
     _generic_class_field_info,
     _pydantic_field_info,
     _typed_dict_field_info,
-    get_field_info,
+    get_field_infos,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
@@ -48,6 +53,35 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     negative=None,
     accepts_keys=None,
 )
+
+
+_kind_parent_child_reassignment = {
+    (POSITIONAL_OR_KEYWORD, POSITIONAL_OR_KEYWORD): POSITIONAL_OR_KEYWORD,
+    (POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY): POSITIONAL_ONLY,
+    (POSITIONAL_OR_KEYWORD, KEYWORD_ONLY): KEYWORD_ONLY,
+    (POSITIONAL_OR_KEYWORD, VAR_POSITIONAL): VAR_POSITIONAL,
+    (POSITIONAL_OR_KEYWORD, VAR_KEYWORD): VAR_KEYWORD,
+    (POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD): POSITIONAL_ONLY,
+    (POSITIONAL_ONLY, POSITIONAL_ONLY): POSITIONAL_ONLY,
+    (POSITIONAL_ONLY, KEYWORD_ONLY): None,
+    (POSITIONAL_ONLY, VAR_POSITIONAL): VAR_POSITIONAL,
+    (POSITIONAL_ONLY, VAR_KEYWORD): None,
+    (KEYWORD_ONLY, POSITIONAL_OR_KEYWORD): KEYWORD_ONLY,
+    (KEYWORD_ONLY, POSITIONAL_ONLY): None,
+    (KEYWORD_ONLY, KEYWORD_ONLY): KEYWORD_ONLY,
+    (KEYWORD_ONLY, VAR_POSITIONAL): None,
+    (KEYWORD_ONLY, VAR_KEYWORD): VAR_KEYWORD,
+    (VAR_POSITIONAL, POSITIONAL_OR_KEYWORD): POSITIONAL_ONLY,
+    (VAR_POSITIONAL, POSITIONAL_ONLY): POSITIONAL_ONLY,
+    (VAR_POSITIONAL, KEYWORD_ONLY): None,
+    (VAR_POSITIONAL, VAR_POSITIONAL): VAR_POSITIONAL,
+    (VAR_POSITIONAL, VAR_KEYWORD): None,
+    (VAR_KEYWORD, POSITIONAL_OR_KEYWORD): KEYWORD_ONLY,
+    (VAR_KEYWORD, POSITIONAL_ONLY): None,
+    (VAR_KEYWORD, KEYWORD_ONLY): KEYWORD_ONLY,
+    (VAR_KEYWORD, VAR_POSITIONAL): None,
+    (VAR_KEYWORD, VAR_KEYWORD): VAR_KEYWORD,
+}
 
 
 def _startswith(string, prefix):
@@ -243,6 +277,12 @@ class ArgumentCollection(list["Argument"]):
             hint_docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
             for sub_field_name, sub_field_info in argument._lookup.items():
+                updated_kind = _kind_parent_child_reassignment[(argument.field_info.kind, sub_field_info.kind)]  # pyright: ignore
+                if updated_kind is None:
+                    continue
+
+                sub_field_info.kind = updated_kind
+
                 if sub_field_info.kind is sub_field_info.KEYWORD_ONLY:
                     positional_index = None
 
@@ -486,10 +526,6 @@ class Argument:
     tokens: list[Token] = field(factory=list)
 
     field_info: FieldInfo = field(default=None)
-    """
-    Contains info inferred from the *immediate* python code.
-    Does **not** take any hierarchy into account.
-    """
 
     # Fully resolved Parameter
     # Resolved parameter should have a fully resolved Parameter.name
@@ -572,7 +608,7 @@ class Argument:
             hint_origin = {hint, origin}
 
             # Classes that ALWAYS takes keywords (accepts_keys=None)
-            field_info = get_field_info(hint)
+            field_infos = get_field_infos(hint)
             if dict in hint_origin:
                 self._assignable = True
                 self._accepts_keywords = True
@@ -587,33 +623,33 @@ class Argument:
             elif is_typeddict(hint):
                 self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(field_info)
+                self._lookup.update(field_infos)
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(field_info)
+                self._lookup.update(field_infos)
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update(field_info)
+                self._lookup.update(field_infos)
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(field_info)
+                self._lookup.update(field_infos)
             elif is_pydantic(hint):
                 self._missing_keys_checker = _missing_keys_factory(_pydantic_field_info)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
-                self._lookup.update(field_info)
-            elif not is_builtin(hint) and field_info:
+                self._lookup.update(field_infos)
+            elif not is_builtin(hint) and field_infos:
                 # Some classic user class.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(field_info)
+                self._lookup.update(field_infos)
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True

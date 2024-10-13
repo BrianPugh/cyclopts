@@ -12,11 +12,31 @@ from cyclopts.annotations import (
     resolve_optional,
 )
 
+POSITIONAL_OR_KEYWORD = inspect.Parameter.POSITIONAL_OR_KEYWORD
+POSITIONAL_ONLY = inspect.Parameter.POSITIONAL_ONLY
+KEYWORD_ONLY = inspect.Parameter.KEYWORD_ONLY
+VAR_POSITIONAL = inspect.Parameter.VAR_POSITIONAL
+VAR_KEYWORD = inspect.Parameter.VAR_KEYWORD
+
 
 class FieldInfo(inspect.Parameter):
+    POSITIONAL = frozenset({POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY, VAR_POSITIONAL})
+    KEYWORD = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
+
     def __init__(self, *args, required: bool, **kwargs):
         super().__init__(*args, **kwargs)
         self.required = required
+        self._mutable_kind = super().kind
+
+    @property
+    def kind(self):
+        return self._mutable_kind
+
+    @kind.setter
+    def kind(self, value):
+        if not isinstance(value, inspect._ParameterKind):
+            raise TypeError("'kind' must be an instance of _ParameterKind")
+        self._mutable_kind = value
 
     @classmethod
     def from_iparam(cls, iparam, *, required: Optional[bool] = None):
@@ -43,6 +63,14 @@ class FieldInfo(inspect.Parameter):
             hint = str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
         hint = resolve_optional(hint)
         return hint
+
+    @property
+    def is_positional(self):
+        return self.kind in self.POSITIONAL
+
+    @property
+    def is_keyword(self):
+        return self.kind in self.KEYWORD
 
 
 def _typed_dict_field_info(typeddict) -> dict[str, FieldInfo]:
@@ -106,7 +134,7 @@ def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
     return out
 
 
-def get_field_info(
+def get_field_infos(
     hint,
     *,
     include_var_positional=False,

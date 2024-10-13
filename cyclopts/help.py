@@ -327,6 +327,7 @@ def create_parameter_help_panel(
         else:
             help_components.append(text)
 
+    entries_positional, entries_kw = [], []
     for argument in argument_collection.filter_by(show=True):
         if not argument._assignable:
             continue
@@ -378,14 +379,20 @@ def create_parameter_help_panel(
             help_append(r"[required]", "dim red")
 
         # populate row
-        help_panel.entries.append(
-            HelpEntry(
-                name=" ".join(long_options),
-                description=format_str(*help_components, format=format),
-                short=" ".join(short_options),
-                required=argument.required,
-            )
+        entry = HelpEntry(
+            name=" ".join(long_options),
+            description=format_str(*help_components, format=format),
+            short=" ".join(short_options),
+            required=argument.required,
         )
+
+        if argument.field_info.is_positional:
+            entries_positional.append(entry)
+        else:
+            entries_kw.append(entry)
+
+    help_panel.entries.extend(entries_positional)
+    help_panel.entries.extend(entries_kw)
 
     return help_panel
 

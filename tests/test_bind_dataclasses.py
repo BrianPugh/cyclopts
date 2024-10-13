@@ -42,6 +42,7 @@ def test_bind_dataclass(app, assert_parse_args):
     )
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_recursive(app, assert_parse_args, console):
     @dataclass
     class Wheel:
@@ -67,7 +68,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         mileage: float
         "How many miles the car has driven."
 
-        engine: Annotated[Engine, Parameter(name="*", group="Engine")]
+        engine: Annotated[Engine, Parameter(name="*", group="Engine")] = field(kw_only=True)
         "The kind of engine the car is using."
 
         wheel: Wheel

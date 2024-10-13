@@ -139,10 +139,10 @@ class Coordinates:
 
 def test_bind_generic_class_accepts_default_multiple_args(app, assert_parse_args, console):
     @app.command
-    def foo(coords: Coordinates):
+    def foo(coords: Coordinates, priority: int):
         pass
 
-    assert_parse_args(foo, "foo 100 200", Coordinates(100, 200))
+    assert_parse_args(foo, "foo 100 200 7", Coordinates(100, 200), 7)
 
     with console.capture() as capture:
         app("foo --help", console=console)
@@ -156,6 +156,7 @@ def test_bind_generic_class_accepts_default_multiple_args(app, assert_parse_args
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  COORDS.X --coords.x  [required]                                 │
         │ *  COORDS.Y --coords.y  [required]                                 │
+        │ *  PRIORITY --priority  [required]                                 │
         │    --coords.color       [choices: red, green, blue] [default: red] │
         ╰────────────────────────────────────────────────────────────────────╯
         """
