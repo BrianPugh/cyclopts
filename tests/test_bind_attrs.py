@@ -1,3 +1,4 @@
+from textwrap import dedent
 from typing import Annotated, Dict, Optional
 
 import pytest
@@ -33,17 +34,34 @@ def test_bind_attrs(app, assert_parse_args):
     )
 
 
-def test_bind_attrs_accepts_keys_false(app, assert_parse_args):
+def test_bind_attrs_accepts_keys_false(app, assert_parse_args, console):
     @define
     class SimpleClass:
         value: int
+        name: str
 
     @app.command
     def foo(example: Annotated[SimpleClass, Parameter(accepts_keys=False)]):
         pass
 
-    assert_parse_args(foo, "foo 5", SimpleClass(5))
-    assert_parse_args(foo, "foo --example=5", SimpleClass(5))
+    assert_parse_args(foo, "foo 5 foo", SimpleClass(5, "foo"))
+    assert_parse_args(foo, "foo --example=5 foo", SimpleClass(5, "foo"))
+
+    with console.capture() as capture:
+        app("foo --help", console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_bind_attrs foo [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  EXAMPLE --example  [required]                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
 
 def test_bind_attrs_kw_only(app, assert_parse_args):
