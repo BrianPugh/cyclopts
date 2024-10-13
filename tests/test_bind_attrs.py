@@ -20,9 +20,10 @@ class User:
     name: str = "John Doe"
     tastes: Dict[str, int] = field(factory=dict)
     outfit: Optional[Outfit] = None
+    staff: Annotated[bool, Parameter(parse=False)] = False
 
 
-def test_bind_attrs(app, assert_parse_args):
+def test_bind_attrs(app, assert_parse_args, console):
     @app.command
     def foo(user: User):
         pass
@@ -32,6 +33,28 @@ def test_bind_attrs(app, assert_parse_args):
         "foo --user.id=123 --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap",
         User(id=123, tastes={"wine": 9, "cheese": 7, "cabbage": 1}, outfit=Outfit(body="t-shirt", head="baseball-cap")),
     )
+
+    with console.capture() as capture:
+        app("foo --help", console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_bind_attrs foo [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  USER.ID --user.id          [required]                           │
+        │    USER.NAME --user.name      [default: John Doe]                  │
+        │    USER.TASTES --user.tastes  [default: _Nothing.NOTHING]          │
+        │    USER.OUTFIT.BODY                                                │
+        │      --user.outfit.body                                            │
+        │    USER.OUTFIT.HEAD                                                │
+        │      --user.outfit.head                                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
 
 def test_bind_attrs_accepts_keys_false(app, assert_parse_args, console):
