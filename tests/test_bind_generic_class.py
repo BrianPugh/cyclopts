@@ -51,7 +51,7 @@ def test_bind_generic_class_accepts_keys_true(app, assert_parse_args):
     )
 
 
-def test_bind_generic_class_accepts_default_1_args(app, assert_parse_args, console):
+def test_bind_generic_class_accepts_keys_none_1_args(app, assert_parse_args, console):
     class User:
         def __init__(self, age: int):
             self.age = age
@@ -63,6 +63,40 @@ def test_bind_generic_class_accepts_default_1_args(app, assert_parse_args, conso
 
     @app.command
     def foo(user: User):
+        pass
+
+    assert_parse_args(foo, "foo 100", User(100))
+
+    with console.capture() as capture:
+        app("foo --help", console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_bind_generic_class foo [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  USER.AGE --user.age  [required]                                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_bind_generic_class_accepts_keys_false_1_args(app, assert_parse_args, console):
+    class User:
+        def __init__(self, age: int):
+            self.age = age
+
+        def __eq__(self, other):
+            if not isinstance(other, type(self)):
+                return False
+            return self.age == other.age
+
+    @app.command
+    def foo(user: Annotated[User, Parameter(accepts_keys=False)]):
         pass
 
     assert_parse_args(foo, "foo 100", User(100))

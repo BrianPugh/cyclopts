@@ -572,6 +572,7 @@ class Argument:
             hint_origin = {hint, origin}
 
             # Classes that ALWAYS takes keywords (accepts_keys=None)
+            field_info = get_field_info(hint)
             if dict in hint_origin:
                 self._assignable = True
                 self._accepts_keywords = True
@@ -586,32 +587,33 @@ class Argument:
             elif is_typeddict(hint):
                 self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(get_field_info(hint))
+                self._lookup.update(field_info)
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(get_field_info(hint))
+                self._lookup.update(field_info)
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update(get_field_info(hint))
+                self._lookup.update(field_info)
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(get_field_info(hint))
+                self._lookup.update(field_info)
             elif is_pydantic(hint):
                 self._missing_keys_checker = _missing_keys_factory(_pydantic_field_info)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
-                self._lookup.update(get_field_info(hint))
-            elif not is_builtin(hint) and token_count(hint)[0] > 1:
+                self._lookup.update(field_info)
+            elif not is_builtin(hint) and field_info:
+                # Some classic user class.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
                 self._accepts_keywords = True
-                self._lookup.update(get_field_info(hint))
+                self._lookup.update(field_info)
             elif self.cparam.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True
