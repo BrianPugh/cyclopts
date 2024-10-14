@@ -36,7 +36,7 @@ _implicit_iterable_type_mapping: dict[type, type] = {
     dict: dict[str, str],
 }
 
-_iterable_types = {list, set}
+_iterable_types = {list, set, frozenset, Sequence}
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 

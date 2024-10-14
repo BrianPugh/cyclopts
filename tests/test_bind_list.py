@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import pytest
 
@@ -79,3 +79,11 @@ def test_list_tuple_missing_arguments_non_divisible(app, cmd):
 
     with pytest.raises(MissingArgumentError):
         app(cmd, exit_on_error=False)
+
+
+def test_pos_sequence(app, assert_parse_args):
+    @app.command
+    def foo(a: Sequence[int]):
+        pass
+
+    assert_parse_args(foo, "foo 1 2 3", [1, 2, 3])

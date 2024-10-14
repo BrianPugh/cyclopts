@@ -2,7 +2,7 @@ import inspect
 import sys
 from enum import Enum, auto
 from pathlib import Path
-from typing import Annotated, Any, Iterable, List, Literal, Optional, Set, Tuple, Union
+from typing import Annotated, Any, Iterable, List, Literal, Optional, Sequence, Set, Tuple, Union
 
 import pytest
 
@@ -53,6 +53,11 @@ def test_token_count_bool():
 
 def test_token_count_list():
     assert (1, True) == token_count(List[int])
+
+
+def test_token_count_sequence():
+    assert (1, True) == token_count(Sequence[int])
+    assert (2, True) == token_count(Sequence[Tuple[int, int]])
 
 
 def test_token_count_list_generic():
@@ -229,6 +234,11 @@ def test_coerce_iterable():
 def test_coerce_set():
     assert {"123", "456"} == convert(Set[str], ["123", "456"])
     assert {123, 456} == convert(Set[Union[int, str]], ["123", "456"])
+
+
+def test_coerce_frozenset():
+    assert frozenset({"123", "456"}) == convert(frozenset[str], ["123", "456"])
+    assert frozenset({123, 456}) == convert(frozenset[Union[int, str]], ["123", "456"])
 
 
 def test_coerce_literal():

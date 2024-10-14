@@ -99,9 +99,19 @@ Iterable
 ********
 Follows the same rules as `List`_. The passed in data will be a list.
 
+********
+Sequence
+********
+Follows the same rules as `List`_. The passed in data will be a list.
+
 ***
 Set
 ***
+Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
+
+*********
+Frozenset
+*********
 Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
 
 *****
