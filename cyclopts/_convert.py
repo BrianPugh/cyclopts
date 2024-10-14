@@ -185,8 +185,6 @@ def _convert(
             except CoercionError as e:
                 last_coercion_error = e
                 continue
-            except Exception:
-                continue
             if res == choice:
                 out = res
                 break

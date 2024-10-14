@@ -95,6 +95,7 @@ exclude_lines = [
     "if TYPE_CHECKING:",
 
     "if sys.version_info < (3, 10):",
+    "if sys.version_info >= (3, 10):",
     "from typing import Annotated",
     "except ImportError:",
 ]

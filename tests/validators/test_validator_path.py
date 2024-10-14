@@ -7,6 +7,8 @@ from cyclopts import validators
 
 def test_path_type(tmp_path):
     validator = validators.Path()
+    validator(Path, Path(tmp_path) / "does-not-exist")  # default configuration doesn't really check much.
+
     with pytest.raises(TypeError):
         validator(Path, "this is a string.")  # pyright: ignore[reportArgumentType]
 

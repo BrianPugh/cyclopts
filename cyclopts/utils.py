@@ -9,14 +9,14 @@ from typing import Any, Literal, Optional, Sequence, Tuple, Union
 if sys.version_info >= (3, 10):
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f, eval_str=True)
-else:
+else:  # pragma: no cover
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f)
 # fmt: on
 
 if sys.version_info >= (3, 10):
     from sys import stdlib_module_names
-else:
+else:  # pragma: no cover
     # Copied from python3.11 sys.stdlib_module_names
     stdlib_module_names = frozenset(
         {
@@ -280,12 +280,9 @@ def record_init(target: str):
 class ParameterDict(MutableMapping):
     """A dictionary implementation that can handle mutable ``inspect.Parameter`` as keys."""
 
-    def __init__(self, store: Optional[dict[inspect.Parameter, Any]] = None):
+    def __init__(self):
         self.store = {}
         self.reverse_mapping = {}
-        if store is not None:
-            for k, v in store.items():
-                self[k] = v
 
     def _param_key(self, param: inspect.Parameter) -> tuple:
         if not isinstance(param, inspect.Parameter):
