@@ -432,4 +432,4 @@ def is_option_like(token: str) -> bool:
 
 
 def is_builtin(obj: Any) -> bool:
-    return getattr(obj, "__module__", None) in stdlib_module_names
+    return getattr(obj, "__module__", "").split(".")[0] in stdlib_module_names

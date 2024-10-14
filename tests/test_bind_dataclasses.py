@@ -68,7 +68,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         mileage: float
         "How many miles the car has driven."
 
-        engine: Annotated[Engine, Parameter(name="*", group="Engine")] = field(kw_only=True)
+        engine: Annotated[Engine, Parameter(name="*", group="Engine")] = field(kw_only=True)  # pyright: ignore
         "The kind of engine the car is using."
 
         wheel: Wheel
