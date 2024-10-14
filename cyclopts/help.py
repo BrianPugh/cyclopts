@@ -9,7 +9,6 @@ from typing import (
     TYPE_CHECKING,
     Callable,
     Literal,
-    Optional,
     Union,
     get_args,
     get_origin,
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
 
 if sys.version_info >= (3, 12):
     from typing import TypeAliasType
-else:
+else:  # pragma: no cover
     TypeAliasType = None
 
 
@@ -413,22 +412,17 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list:
     return entries
 
 
-def resolve_help_format(app_chain: Optional[Iterable["App"]]) -> str:
+def resolve_help_format(app_chain: Iterable["App"]) -> str:
     # Resolve help_format; None fallsback to parent; non-None overwrites parent.
     format_ = "restructuredtext"
-    if app_chain is None:
-        return format_
     for app in app_chain:
         if app.help_format is not None:
             format_ = app.help_format
     return format_
 
 
-def resolve_version_format(app_chain: Optional[Iterable["App"]]) -> str:
-    # Resolve version_format; None fallsback to parent; non-None overwrites parent.
+def resolve_version_format(app_chain: Iterable["App"]) -> str:
     format_ = resolve_help_format(app_chain)
-    if app_chain is None:
-        return format_
     for app in app_chain:
         if app.version_format is not None:
             format_ = app.version_format
