@@ -20,10 +20,10 @@ from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_infos
 from cyclopts.utils import default_name_transform, grouper, is_builtin
 
-if sys.version_info >= (3, 12):
-    from typing import TypeAliasType  # pragma: no cover
-else:
-    TypeAliasType = None  # pragma: no cover
+if sys.version_info >= (3, 12):  # pragma: no cover
+    from typing import TypeAliasType
+else:  # pragma: no cover
+    TypeAliasType = None
 
 if TYPE_CHECKING:
     from cyclopts.argument import Token

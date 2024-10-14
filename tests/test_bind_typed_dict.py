@@ -7,9 +7,9 @@ import pytest
 from cyclopts import MissingArgumentError, Parameter
 from cyclopts.exceptions import UnknownOptionError
 
-if sys.version_info < (3, 11):
+if sys.version_info < (3, 11):  # pragma: no cover
     from typing_extensions import NotRequired, Required
-else:
+else:  # pragma: no cover
     from typing import NotRequired, Required
 
 

@@ -6,7 +6,7 @@ from contextlib import suppress
 from typing import Any, Literal, Optional, Sequence, Tuple, Union
 
 # fmt: off
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 10):  # pragma: no cover
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f, eval_str=True)
 else:  # pragma: no cover
@@ -14,7 +14,7 @@ else:  # pragma: no cover
         return inspect.signature(f)
 # fmt: on
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 10):  # pragma: no cover
     from sys import stdlib_module_names
 else:  # pragma: no cover
     # Copied from python3.11 sys.stdlib_module_names

@@ -7,15 +7,15 @@ _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
 _union_types = set()
 _union_types.add(Union)
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 10):  # pragma: no cover
     from types import UnionType
 
     _union_types.add(UnionType)
 
-if sys.version_info < (3, 11):
-    from typing_extensions import NotRequired, Required  # pragma: no cover
-else:
-    from typing import NotRequired, Required  # pragma: no cover
+if sys.version_info < (3, 11):  # pragma: no cover
+    from typing_extensions import NotRequired, Required
+else:  # pragma: no cover
+    from typing import NotRequired, Required
 
 # from types import NoneType is available >=3.10
 NoneType = type(None)

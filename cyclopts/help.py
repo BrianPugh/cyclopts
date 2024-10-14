@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
 else:  # pragma: no cover
     TypeAliasType = None
