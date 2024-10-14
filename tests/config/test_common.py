@@ -6,7 +6,18 @@ import pytest
 
 from cyclopts.argument import ArgumentCollection, Token
 from cyclopts.config._common import ConfigFromFile
+from cyclopts.exceptions import CycloptsError
 from cyclopts.parameter import Parameter
+
+
+class DummyErrorConfigNoMsg(ConfigFromFile):
+    def _load_config(self, path: Path) -> Dict[str, Any]:
+        raise ValueError
+
+
+class DummyErrorConfigMsg(ConfigFromFile):
+    def _load_config(self, path: Path) -> Dict[str, Any]:
+        raise ValueError("My exception's message.")
 
 
 class Dummy(ConfigFromFile):
@@ -234,3 +245,21 @@ def test_config_common_subkeys(apps, config_sub_keys):
     assert argument_collection[3].tokens[0].index == 0
     assert argument_collection[3].tokens[0].keys == ()
     assert argument_collection[3].tokens[0].source.endswith("cyclopts-config-test-file.dummy")
+
+
+def test_config_exception_during_load_config_no_msg(tmp_path):
+    path = tmp_path / "config"
+    path.touch()
+    dummy_error_config = DummyErrorConfigNoMsg(path)
+    with pytest.raises(CycloptsError) as e:
+        _ = dummy_error_config.config
+    assert str(e.value) == "ValueError"
+
+
+def test_config_exception_during_load_config_msg(tmp_path):
+    path = tmp_path / "config"
+    path.touch()
+    dummy_error_config = DummyErrorConfigMsg(path)
+    with pytest.raises(CycloptsError) as e:
+        _ = dummy_error_config.config
+    assert str(e.value) == "ValueError: My exception's message."

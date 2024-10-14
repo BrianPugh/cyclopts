@@ -3,6 +3,7 @@ import itertools
 import os
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
+from contextlib import suppress
 from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
@@ -111,9 +112,13 @@ class ConfigFromFile(ABC):
                 try:
                     self._config = self._load_config(candidate)
                 except Exception as e:
-                    if name := getattr(type(e), "__name__", ""):
-                        name += ": "
-                    raise CycloptsError(msg=f"{name}{e.args[0]}") from e
+                    msg = getattr(type(e), "__name__", "")
+                    with suppress(IndexError):
+                        exception_msg = e.args[0]
+                        if msg:
+                            msg += ": "
+                        msg += exception_msg
+                    raise CycloptsError(msg=msg) from e
                 return self._config
             elif self.search_parents:
                 # Continue iterating over parents.
