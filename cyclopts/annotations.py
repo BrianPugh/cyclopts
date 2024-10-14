@@ -135,15 +135,19 @@ def resolve_required(type_: Any) -> type:
 def get_hint_name(hint) -> str:
     if isinstance(hint, str):
         return hint
-    elif hint is Any:
+    if is_nonetype(hint):
+        return "None"
+    if hint is Any:
         return "Any"
-    elif is_union(hint):
+    if is_union(hint):
         return "|".join(get_hint_name(arg) for arg in get_args(hint))
-    elif hasattr(hint, "__name__"):
+    if origin := get_origin(hint):
+        out = get_hint_name(origin)
+        if args := get_args(hint):
+            out += "[" + ", ".join(get_hint_name(arg) for arg in args) + "]"
+        return out
+    if hasattr(hint, "__name__"):
         return hint.__name__
-    elif getattr(hint, "_name", None) is not None:
+    if getattr(hint, "_name", None) is not None:
         return hint._name
-    origin = get_origin(hint)
-    if origin is not None:
-        return f"{get_hint_name(origin)}[{', '.join(get_hint_name(arg) for arg in get_args(hint))}]"
     return str(hint)
