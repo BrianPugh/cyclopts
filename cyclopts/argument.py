@@ -22,6 +22,7 @@ from cyclopts.annotations import (
     resolve,
 )
 from cyclopts.exceptions import (
+    CoercionError,
     CycloptsError,
     MissingArgumentError,
     MixedArgumentError,
@@ -92,16 +93,16 @@ def _startswith(string, prefix):
 
 
 def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
-    def inner(argument: "Argument", data: dict) -> set[str]:
+    def inner(argument: "Argument", data: dict) -> list[str]:
+        provided_keys = set(data)
         field_info = get_field_info(argument.hint)
-        required = {k for k, v in field_info.items() if v.required}
-        return set(required) - set(data)
+        return [k for k, v in field_info.items() if (v.required and k not in provided_keys)]
 
     return inner
 
 
-def _identity_converter(type_, element):
-    return element
+def _identity_converter(type_, token):
+    return token
 
 
 class ArgumentCollection(list["Argument"]):
@@ -821,7 +822,8 @@ class Argument:
         if converter is None:
             converter = self.cparam.converter
         if self._assignable:
-            positional, keyword = [], {}
+            positional: list[Token] = []
+            keyword = {}
             for token in self.tokens:
                 if token.implicit_value is not None:
                     assert len(self.tokens) == 1
@@ -831,9 +833,9 @@ class Argument:
                     lookup = keyword
                     for key in token.keys[:-1]:
                         lookup = lookup.setdefault(key, {})
-                    lookup.setdefault(token.keys[-1], []).append(token.value)
+                    lookup.setdefault(token.keys[-1], []).append(token)
                 else:
-                    positional.append(token.value)
+                    positional.append(token)
 
                 if positional and keyword:
                     # This should never happen due to checks in ``Argument.append``
@@ -870,7 +872,7 @@ class Argument:
             if self._missing_keys_checker and (self.required or data):
                 if missing_keys := self._missing_keys_checker(self, data):
                     # Report the first missing argument.
-                    missing_key = sorted(missing_keys)[0]
+                    missing_key = missing_keys[0]
                     missing_argument = self.children.filter_by(
                         keys_prefix=self.keys + (missing_key,),
                     )[0]
@@ -889,10 +891,17 @@ class Argument:
         if not self._marked:
             try:
                 self.value = self._convert(converter=converter)
+            except CoercionError as e:
+                if e.argument is None:
+                    e.argument = self
+                if e.target_type is None:
+                    e.target_type = self.hint
+                raise
             except CycloptsError as e:
                 if e.argument is None:
                     e.argument = self
                 raise
+
         return self.value
 
     def validate(self, value):

@@ -112,7 +112,7 @@ Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
 *********
 Frozenset
 *********
-Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
+Follows the same rules as `Set`_, but the resulting datatype is a :class:`frozenset`.
 
 *****
 Tuple

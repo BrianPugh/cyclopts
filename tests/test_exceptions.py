@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Union
+from typing import Annotated, Union
 
 import pytest
 
@@ -151,7 +151,7 @@ def test_exceptions_validation_error_cli_multi_keyword(app, console):
     assert str(e.value) == expected
 
 
-def test_exceptions_coercion_error(app, console):
+def test_exceptions_coercion_error_from_positional_cli(app, console):
     @app.command
     def foo(bar: int):
         pass
@@ -165,6 +165,27 @@ def test_exceptions_coercion_error(app, console):
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ Invalid value for "--bar": unable to convert "fizz" into int.      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_coercion_error_from_keyword_cli(app, console):
+    @app.command
+    def foo(bar: Annotated[int, Parameter(name=("--bar", "-b"))]):
+        pass
+
+    with console.capture() as capture, pytest.raises(CoercionError):
+        app("foo -b fizz", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Invalid value for "-b": unable to convert "fizz" into int.         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

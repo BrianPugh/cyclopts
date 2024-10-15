@@ -210,10 +210,13 @@ class CoercionError(CycloptsError):
                 return f"{self.token.keyword}: {self.msg}"
 
         msg = super().__str__()
+
         if get_origin(self.target_type) is Literal:
-            target_type_name = f"one of {set(get_args(self.target_type))}"
+            choices = "{" + ", ".join(repr(x) for x in get_args(self.target_type)) + "}"
+            target_type_name = f"one of {choices}"
         else:
             target_type_name = get_hint_name(self.target_type)
+
         if self.token.keyword is None:
             if self.token.source == "" or self.token.source == "cli":
                 msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {target_type_name}.'
@@ -221,9 +224,9 @@ class CoercionError(CycloptsError):
                 msg += f'Invalid value for "{self.argument.name}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
         else:
             if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for "{self.token.keyword}": unable to convert value "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for "{self.token.keyword}": unable to convert "{self.token.value}" into {target_type_name}.'
             else:
-                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert value "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
 
         return msg
 

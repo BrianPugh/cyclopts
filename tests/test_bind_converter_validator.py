@@ -13,7 +13,7 @@ def validator():
 
 def test_custom_converter(app, assert_parse_args):
     def custom_converter(type_, tokens):
-        return 2 * int(tokens[0])
+        return 2 * int(tokens[0].value)
 
     @app.default
     def foo(age: Annotated[int, Parameter(converter=custom_converter)]):
@@ -77,7 +77,7 @@ def test_custom_converter_and_validator(app, assert_parse_args, validator):
             raise ValueError("An unreasonable age was entered.")
 
     def custom_converter(type_, tokens):
-        return 2 * int(tokens[0])
+        return 2 * int(tokens[0].value)
 
     @app.default
     def foo(age: Annotated[int, Parameter(converter=custom_converter, validator=validator)]):

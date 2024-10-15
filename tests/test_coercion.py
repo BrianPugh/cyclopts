@@ -3,6 +3,7 @@ import sys
 from enum import Enum, auto
 from pathlib import Path
 from typing import Annotated, Any, Iterable, List, Literal, Optional, Sequence, Set, Tuple, Union
+from unittest.mock import Mock
 
 import pytest
 
@@ -246,8 +247,26 @@ def test_coerce_literal():
     assert "bar" == convert(Literal["foo", "bar", 3], ["bar"])
     assert 3 == convert(Literal["foo", "bar", 3], ["3"])
 
-    with pytest.raises(CoercionError):
-        convert(Literal["foo", "bar", 3], ["invalid-choice"])
+
+def assert_convert_coercion_error(*args, msg, **kwargs):
+    mock_argument = Mock()
+    mock_argument.name = "mocked_argument_name"
+    with pytest.raises(CoercionError) as e:
+        try:
+            convert(*args, **kwargs)
+        except CoercionError as coercion_error:
+            coercion_error.argument = mock_argument
+            raise
+    exception_message = str(e.value).split("\n", 1)[1]
+    assert exception_message == msg
+
+
+def test_coerce_literal_invalid_choice():
+    assert_convert_coercion_error(
+        Literal["foo", "bar", 3],
+        ["invalid-choice"],
+        msg="""Invalid value for "mocked_argument_name": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+    )
 
 
 def test_coerce_path():

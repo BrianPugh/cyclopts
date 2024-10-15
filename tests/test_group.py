@@ -1,17 +1,17 @@
 import itertools
-from typing import Annotated, List
+from typing import Annotated, Sequence
 from unittest.mock import Mock
 
 import pytest
 
 import cyclopts.group
-from cyclopts import UNSET, App, Group, Parameter
+from cyclopts import UNSET, App, Group, Parameter, Token
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
 
-def upper(type_, tokens: List[str]):
-    return tokens[0].upper()
+def upper(type_, tokens: Sequence[Token]):
+    return tokens[0].value.upper()
 
 
 def test_group_str_method():

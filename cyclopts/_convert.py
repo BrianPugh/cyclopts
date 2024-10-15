@@ -125,7 +125,7 @@ def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
     *,
-    converter: Optional[Callable[[type, str], Any]],
+    converter: Optional[Callable[[Any, str], Any]],
     name_transform: Callable[[str], str],
 ):
     """Inner recursive conversion function for public ``convert``.
@@ -137,6 +137,7 @@ def _convert(
     """
     from cyclopts.argument import Token
 
+    converter_needs_token = False
     if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
@@ -144,6 +145,7 @@ def _convert(
         type_ = args[0]
         cparam = Parameter.combine(*(x for x in args[1:] if isinstance(x, Parameter)))
         if cparam._converter:
+            converter_needs_token = True
             converter = lambda t_, value: cparam._converter(t_, (value,))  # noqa: E731
         if cparam.name_transform:
             name_transform = cparam.name_transform
@@ -228,6 +230,8 @@ def _convert(
         try:
             if converter is None:
                 out = _converters.get(type_, type_)(token.value)
+            elif converter_needs_token:
+                out = converter(type_, token)  # pyright: ignore[reportArgumentType]
             else:
                 out = converter(type_, token.value)
         except CoercionError as e:
@@ -239,6 +243,7 @@ def _convert(
         except ValueError:
             raise CoercionError(token=token, target_type=type_) from None
     else:
+        # Convert it into a user-supplied class.
         if not isinstance(token, Sequence):
             token = [token]
         i = 0

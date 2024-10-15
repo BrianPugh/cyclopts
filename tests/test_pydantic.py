@@ -44,6 +44,7 @@ def test_pydantic_error_msg(app, console):
 class Outfit(BaseModel):
     body: str
     head: str
+    has_socks: bool
 
 
 class User(BaseModel):
@@ -70,11 +71,12 @@ def test_bind_pydantic_basemodel(app, assert_parse_args):
         "outfit": {
             "body": "t-shirt",
             "head": "baseball-cap",
+            "has_socks": True,
         },
     }
     assert_parse_args(
         foo,
-        'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap',
+        'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap --user.outfit.has-socks',
         User(**external_data),
     )
 

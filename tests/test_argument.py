@@ -499,7 +499,7 @@ def test_argument_convert_var_keyword():
 
 def test_argument_convert_cparam_provided():
     def my_converter(type_, tokens):
-        return f"my_converter_{tokens[0]}"
+        return f"my_converter_{tokens[0].value}"
 
     argument = Argument(
         hint=str,

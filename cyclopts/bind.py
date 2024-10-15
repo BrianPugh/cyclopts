@@ -196,14 +196,6 @@ def _parse_env(argument_collection):
                 break
 
 
-def _is_required(iparam: inspect.Parameter) -> bool:
-    """A token must be provided for the given :class:``inspect.Parameter``."""
-    return iparam.default is iparam.empty and iparam.kind not in (
-        iparam.VAR_KEYWORD,
-        iparam.VAR_POSITIONAL,
-    )
-
-
 def _bind(
     func: Callable,
     mapping: ParameterDict,
@@ -309,7 +301,7 @@ def create_bound_arguments(
             raise ValidationError(exception_message=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
 
         for argument in argument_collection:
-            if not _is_required(argument.field_info) or argument.keys or not argument._assignable:
+            if not argument.field_info.required or argument.keys or not argument._assignable:
                 continue
             if not bool(argument.n_tree_tokens):
                 raise MissingArgumentError(argument=argument)
