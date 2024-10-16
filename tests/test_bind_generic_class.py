@@ -1,6 +1,8 @@
 from textwrap import dedent
 from typing import Annotated, Dict, Literal, Optional
 
+import pytest
+
 from cyclopts import Parameter
 
 
@@ -188,3 +190,32 @@ def test_bind_generic_class_accepts_false_multiple_args(app, assert_parse_args, 
     )
 
     assert actual == expected
+
+
+def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console):
+    """This test has a keyword-only parameter that has position-only subkeys, which are skipped."""
+
+    class User:
+        def __init__(self, name: str, age: int, /):
+            self.name = name
+            self.age = age
+
+        def __eq__(self, other):
+            if not isinstance(other, type(self)):
+                return False
+            return self.name == other.name and self.age == other.age
+
+    @app.command
+    def foo(*, user: User):
+        pass
+
+    with console.capture() as capture:
+        app("foo --help", console=console)
+
+    actual = capture.get()
+
+    # No arguments/parameters
+    assert actual == "Usage: test_bind_generic_class foo [OPTIONS]\n\n"
+
+    with pytest.raises(ValueError):
+        app("foo --user.name=Bob --user.age=100")

@@ -885,10 +885,14 @@ class Argument:
                 if missing_keys := self._missing_keys_checker(self, data):
                     # Report the first missing argument.
                     missing_key = missing_keys[0]
-                    missing_argument = self.children.filter_by(
-                        keys_prefix=self.keys + (missing_key,),
-                    )[0]
-                    raise MissingArgumentError(argument=missing_argument)
+                    keys = self.keys + (missing_key,)
+                    missing_arguments = self.children.filter_by(keys_prefix=keys)
+                    if missing_arguments:
+                        raise MissingArgumentError(argument=missing_arguments[0])
+                    else:
+                        raise ValueError(
+                            f"Required field \"{self.field_info.name + "->" + '->'.join(keys)}\" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements."
+                        )
 
             if data:
                 out = self.hint(**data)
