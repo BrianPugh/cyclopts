@@ -15,6 +15,16 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group
 
 
+def test_parse_known_args(app):
+    @app.command
+    def foo(a: int, b: int):
+        pass
+
+    command, _, unused_tokens = app.parse_known_args("foo 1 2 --bar 100")
+    assert command == foo
+    assert unused_tokens == ["--bar", "100"]
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [

@@ -448,9 +448,13 @@ class App:
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over command & meta command names."""
-        yield from self._commands
+        commands = list(self._commands)
+        yield from commands
+        commands = set(commands)
         if self._meta_parent:
-            yield from self._meta_parent
+            for command in self._meta_parent:
+                if command not in commands:
+                    yield command
 
     @property
     def meta(self) -> "App":
@@ -513,7 +517,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def command(
+    def command(  # pragma: no cover
         self,
         obj: T,
         name: Union[None, str, Iterable[str]] = None,
@@ -526,7 +530,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def command(
+    def command(  # pragma: no cover
         self,
         obj: None = None,
         name: Union[None, str, Iterable[str]] = None,
@@ -607,7 +611,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def default(
+    def default(  # pragma: no cover
         self,
         obj: T,
         *,
@@ -621,7 +625,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def default(
+    def default(  # pragma: no cover
         self,
         obj: None = None,
         *,
@@ -1119,9 +1123,11 @@ class App:
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
-        if os.name == "posix":
+        if os.name == "posix":  # pragma: no cover
+            # Mac/Linux
             print("Interactive shell. Press Ctrl-D to exit.")
-        else:  # Windows
+        else:  # pragma: no cover
+            # Windows
             print("Interactive shell. Press Ctrl-Z followed by Enter to exit.")
 
         if quit is None:
@@ -1140,7 +1146,7 @@ class App:
         while True:
             try:
                 user_input = input(prompt)
-            except EOFError:
+            except EOFError:  # pragma: no cover
                 break
 
             tokens = normalize_tokens(user_input)

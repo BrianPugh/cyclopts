@@ -14,6 +14,14 @@ def test_version_print_console_from_method(app, console):
     assert "0.0.0\n" == capture.get()
 
 
+def test_version_print_console_none(app, console):
+    app.version = None
+    with console.capture() as capture:
+        app.version_print(console)
+
+    assert "0.0.0\n" == capture.get()
+
+
 def test_version_print_custom_string(app, console):
     """The asterisks also test to make sure the proper help_format is being used."""
     app.version = "**foo**"

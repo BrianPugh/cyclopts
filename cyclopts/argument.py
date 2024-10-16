@@ -849,7 +849,7 @@ class Argument:
                 else:
                     positional.append(token)
 
-                if positional and keyword:
+                if positional and keyword:  # pragma: no cover
                     # This should never happen due to checks in ``Argument.append``
                     raise MixedArgumentError(argument=self)
 
@@ -897,7 +897,8 @@ class Argument:
             if data:
                 out = self.hint(**data)
             elif self.required:
-                raise MissingArgumentError(argument=self)
+                # This should NEVER happen: empty data to a required dict field.
+                raise MissingArgumentError(argument=self)  # pragma: no cover
             else:
                 out = UNSET
 
