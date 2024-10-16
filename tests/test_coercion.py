@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from cyclopts import CoercionError
+from cyclopts import CoercionError, Token
 from cyclopts._convert import convert, token_count
 
 
@@ -266,6 +266,30 @@ def test_coerce_literal_invalid_choice():
         Literal["foo", "bar", 3],
         ["invalid-choice"],
         msg="""Invalid value for "mocked_argument_name": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+    )
+
+
+def test_coerce_literal_invalid_choice_keyword():
+    assert_convert_coercion_error(
+        Literal["foo", "bar", 3],
+        [Token(keyword="--MY_KEYWORD", value="invalid-choice")],
+        msg="""Invalid value for "--MY_KEYWORD": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+    )
+
+
+def test_coerce_literal_invalid_choice_non_cli_token():
+    assert_convert_coercion_error(
+        Literal["foo", "bar", 3],
+        [Token(value="invalid-choice", source="TEST")],
+        msg="""Invalid value for "mocked_argument_name" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+    )
+
+
+def test_coerce_literal_invalid_choice_keyword_non_cli_token():
+    assert_convert_coercion_error(
+        Literal["foo", "bar", 3],
+        [Token(keyword="--MY-KEYWORD", value="invalid-choice", source="TEST")],
+        msg="""Invalid value for "--MY-KEYWORD" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
     )
 
 
