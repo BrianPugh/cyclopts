@@ -1,6 +1,5 @@
 import inspect
 import itertools
-from collections.abc import Iterator
 from contextlib import suppress
 from functools import partial
 from typing import Any, Callable, Optional, Union, get_args, get_origin
@@ -810,10 +809,6 @@ class Argument:
             if bool(token.keys) ^ any(x.keys for x in self.tokens):
                 raise MixedArgumentError(argument=self)
         self.tokens.append(token)
-
-    def values(self) -> Iterator[str]:
-        for token in self.tokens:
-            yield token.value
 
     @property
     def n_tree_tokens(self) -> int:
