@@ -249,34 +249,25 @@ def _convert(
         i = 0
         pos_values = []
         hint = type_
-        try:
-            for field_info in get_field_infos(type_, include_var_positional=True).values():
-                hint = field_info.hint
-                if hint is str:  # Avoids infinite recursion
-                    pos_values.append(token[i].value)
+        for field_info in get_field_infos(type_, include_var_positional=True).values():
+            hint = field_info.hint
+            if hint is str:  # Avoids infinite recursion
+                pos_values.append(token[i].value)
+                i += 1
+            else:
+                tokens_per_element, consume_all = token_count(hint)
+                if tokens_per_element == 1:
+                    pos_values.append(convert(hint, token[i]))
                     i += 1
                 else:
-                    tokens_per_element, consume_all = token_count(hint)
-                    if tokens_per_element == 1:
-                        pos_values.append(convert(hint, token[i]))
-                        i += 1
-                    else:
-                        pos_values.append(convert(hint, token[i : i + tokens_per_element]))
-                        i += tokens_per_element
-                    if consume_all:
-                        break
-                if i == len(token):
+                    pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                    i += tokens_per_element
+                if consume_all:
                     break
-            assert i == len(token)
-            out = type_(*pos_values)
-        except CoercionError as e:
-            if e.target_type is None:
-                e.target_type = hint
-            if e.token is None:
-                e.token = token[i]
-            raise
-        except ValueError:
-            raise CoercionError(token=token[i], target_type=hint) from None
+            if i == len(token):
+                break
+        assert i == len(token)
+        out = type_(*pos_values)
 
     if cparam:
         try:
