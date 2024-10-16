@@ -482,7 +482,7 @@ class ArgumentCollection(list["Argument"]):
         if keys_prefix is not None:
             ac = cls(x for x in ac if x.keys[: len(keys_prefix)] == keys_prefix)
         if show is not None:
-            ac = cls(x for x in ac if not (x.cparam.show ^ bool(show)))
+            ac = cls(x for x in ac if not (x.show ^ bool(show)))
         if value_set is not None:
             ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
 
