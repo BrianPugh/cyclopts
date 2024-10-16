@@ -200,14 +200,13 @@ class CoercionError(CycloptsError):
 
     def __str__(self):
         assert self.argument is not None
-        assert self.token is not None
         assert self.target_type is not None
 
         if self.msg is not None:
-            if self.token.keyword is None:
+            if not self.token or self.token.keyword is None:
                 return self.msg
             else:
-                return f"{self.token.keyword}: {self.msg}"
+                return f"Invalid value for {self.token.keyword}: {self.msg}"
 
         msg = super().__str__()
 
@@ -217,7 +216,9 @@ class CoercionError(CycloptsError):
         else:
             target_type_name = get_hint_name(self.target_type)
 
-        if self.token.keyword is None:
+        if not self.token:
+            msg += f'Invalid value for "{self.argument.name}": unable to convert value to {target_type_name}.'
+        elif self.token.keyword is None:
             if self.token.source == "" or self.token.source == "cli":
                 msg += f'Invalid value for "{self.argument.name}": unable to convert "{self.token.value}" into {target_type_name}.'
             else:

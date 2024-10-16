@@ -822,6 +822,22 @@ class Argument:
     def _convert(self, converter=None):
         if converter is None:
             converter = self.cparam.converter
+
+        def safe_converter(hint, tokens):
+            if isinstance(tokens, dict):
+                try:
+                    return converter(hint, tokens)  # pyright: ignore
+                except (AssertionError, ValueError, TypeError) as e:
+                    raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
+            else:
+                try:
+                    return converter(hint, tokens)  # pyright: ignore
+                except (AssertionError, ValueError, TypeError) as e:
+                    token = tokens[0] if len(tokens) == 1 else None
+                    raise CoercionError(
+                        msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
+                    ) from e
+
         if self._assignable:
             positional: list[Token] = []
             keyword = {}
@@ -847,15 +863,15 @@ class Argument:
                     # Apply converter to individual values
                     hint = get_args(self.hint)[0]
                     tokens_per_element, _ = self.token_count()
-                    out = tuple(converter(hint, values) for values in grouper(positional, tokens_per_element))
+                    out = tuple(safe_converter(hint, values) for values in grouper(positional, tokens_per_element))
                 else:
-                    out = converter(self.hint, tuple(positional))
+                    out = safe_converter(self.hint, tuple(positional))
             elif keyword:
                 if self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD and not self.keys:
                     # Apply converter to individual values
-                    out = {key: converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
+                    out = {key: safe_converter(get_args(self.hint)[1], value) for key, value in keyword.items()}
                 else:
-                    out = converter(self.hint, keyword)
+                    out = safe_converter(self.hint, keyword)
             elif self.required:
                 raise MissingArgumentError(argument=self)
             else:  # no tokens
