@@ -28,7 +28,7 @@ def multi_positive_validator(type_, values):
             raise ValueError("Value must be positive.")
 
 
-def test_exceptions_missing_argument(app, console):
+def test_exceptions_missing_argument_single(app, console):
     @app.command
     def foo(bar: int):
         pass
@@ -42,6 +42,27 @@ def test_exceptions_missing_argument(app, console):
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ Command "foo" parameter "--bar" requires an argument.              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_missing_argument_flag(app, console):
+    @app.command
+    def foo(bar: bool):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app("foo", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--bar" flag required.                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

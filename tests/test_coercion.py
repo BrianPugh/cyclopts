@@ -91,6 +91,11 @@ def test_token_count_union_error():
         assert (1, False) == token_count(Union[int, Tuple[int, int]])
 
 
+def test_coerce_no_tokens():
+    with pytest.raises(ValueError):
+        convert(int, [])
+
+
 def test_coerce_bool():
     assert True is convert(bool, ["true"])
     assert False is convert(bool, ["false"])
@@ -314,5 +319,5 @@ def test_coerce_bytearray():
     assert [bytearray(b"foo"), bytearray(b"bar")] == convert(bytearray, ["foo", "bar"])
 
 
-def test_coerce_empty():
+def test_coerce_parameter_kind_empty():
     assert "foo" == convert(inspect.Parameter.empty, ["foo"])
