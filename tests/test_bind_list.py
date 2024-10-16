@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 import pytest
@@ -87,3 +88,11 @@ def test_pos_sequence(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "foo 1 2 3", [1, 2, 3])
+
+
+def test_list_positional_all_but_last(app, assert_parse_args):
+    @app.command
+    def foo(inputs: list[Path], output: Path, /):
+        pass
+
+    assert_parse_args(foo, "foo fizz buzz bar", [Path("fizz"), Path("buzz")], Path("bar"))

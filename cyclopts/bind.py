@@ -19,6 +19,7 @@ from cyclopts.exceptions import (
     UnknownOptionError,
     ValidationError,
 )
+from cyclopts.field_info import POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD, VAR_KEYWORD, VAR_POSITIONAL
 from cyclopts.token import Token
 from cyclopts.utils import ParameterDict, is_option_like
 
@@ -136,6 +137,22 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
     return unused_tokens
 
 
+def _future_positional_only_token_count(argument_collection: ArgumentCollection, starting_index: int) -> int:
+    n_tokens_to_leave = 0
+    for i in itertools.count():
+        try:
+            argument, _, _ = argument_collection.match(starting_index + i)
+        except ValueError:
+            break
+        if argument.field_info.kind is not POSITIONAL_ONLY:
+            break
+        future_tokens_per_element, future_consume_all = argument.token_count()
+        if future_consume_all:
+            raise ValueError("Cannot have 2 all-consuming positional arguments.")
+        n_tokens_to_leave += future_tokens_per_element
+    return n_tokens_to_leave
+
+
 def _parse_pos(
     argument_collection: ArgumentCollection,
     tokens: list[str],
@@ -148,7 +165,7 @@ def _parse_pos(
             argument, _, _ = argument_collection.match(i)
         except ValueError:
             break
-        if argument.field_info.kind is argument.field_info.POSITIONAL_OR_KEYWORD:
+        if argument.field_info.kind is POSITIONAL_OR_KEYWORD:
             if argument.tokens and argument.tokens[0].keyword is not None:
                 prior_positional_or_keyword_supplied_as_keyword_arguments.append(argument)
                 # Continue in case we hit a VAR_POSITIONAL argument.
@@ -162,9 +179,20 @@ def _parse_pos(
 
         tokens_per_element, consume_all = argument.token_count()
         tokens_per_element = max(1, tokens_per_element)
+
+        if consume_all and argument.field_info.kind is POSITIONAL_ONLY:
+            # POSITIONAL_ONLY parameters can come after a POSITIONAL_ONLY list/iterable.
+            # This makes it easier to create programs that do something like:
+            #    $ python my-program.py input_folder/*.csv output.csv
+
+            # Need to see how many tokens we need to leave for subsequent POSITIONAL_ONLY parameters.
+            n_tokens_to_leave = _future_positional_only_token_count(argument_collection, i + 1)
+        else:
+            n_tokens_to_leave = 0
+
         new_tokens = []
-        while tokens:
-            if len(tokens) < tokens_per_element:
+        while (len(tokens) - n_tokens_to_leave) > 0:
+            if (len(tokens) - n_tokens_to_leave) < tokens_per_element:
                 raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
 
             for index, token in enumerate(tokens[:tokens_per_element]):
@@ -214,12 +242,12 @@ def _bind(
 
     signature = cyclopts.utils.signature(func)
     for iparam in signature.parameters.values():
-        if use_pos and iparam.kind in (iparam.POSITIONAL_ONLY, iparam.POSITIONAL_OR_KEYWORD):
+        if use_pos and iparam.kind in (POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD):
             f_pos_append(iparam)
-        elif use_pos and iparam.kind is iparam.VAR_POSITIONAL:
+        elif use_pos and iparam.kind is VAR_POSITIONAL:
             f_pos.extend(mapping.get(iparam, []))
             use_pos = False
-        elif iparam.kind is iparam.VAR_KEYWORD:
+        elif iparam.kind is VAR_KEYWORD:
             f_kwargs.update(mapping.get(iparam, {}))
         else:
             with suppress(KeyError):
