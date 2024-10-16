@@ -4,6 +4,7 @@ import pytest
 
 from cyclopts.argument import ArgumentCollection
 from cyclopts.config import Env
+from cyclopts.token import Token
 
 
 @pytest.fixture
@@ -26,6 +27,25 @@ def test_config_env_default(apps, monkeypatch):
     assert argument_collection[0].tokens[0].keyword == "CYCLOPTS_TEST_APP_BAR"
     assert argument_collection[0].tokens[0].value == "100"
     assert argument_collection[0].tokens[0].source == "env"
+    assert argument_collection[0].tokens[0].index == 0
+    assert argument_collection[0].tokens[0].keys == ()
+
+
+def test_config_env_default_already_populated(apps, monkeypatch):
+    def foo(bar: int):
+        pass
+
+    argument_collection = ArgumentCollection.from_callable(foo)
+    argument_collection[0].append(Token(keyword="--bar", value="500", source="cli"))
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR", "100")
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_SOMETHING_ELSE", "100")
+    Env("CYCLOPTS_TEST_APP_", command=False)(apps, (), argument_collection)
+
+    assert len(argument_collection[0].tokens) == 1
+    assert argument_collection[0].tokens[0].keyword == "--bar"
+    assert argument_collection[0].tokens[0].value == "500"
+    assert argument_collection[0].tokens[0].source == "cli"
     assert argument_collection[0].tokens[0].index == 0
     assert argument_collection[0].tokens[0].keys == ()
 
