@@ -302,3 +302,16 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(ap
 
     with pytest.raises(UnusedCliTokensError):
         app.parse_args("100 200 300", exit_on_error=False)
+
+
+def test_bind_dataclass_tuple_in_var_args(app, assert_parse_args):
+    @dataclass
+    class Square:
+        center: tuple[float, float]
+        side_length: float
+
+    @app.default
+    def my_default_command(*squares: Square):
+        pass
+
+    assert_parse_args(my_default_command, "10 20 30", Square(center=(10.0, 20.0), side_length=30.0))
