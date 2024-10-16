@@ -168,8 +168,9 @@ class ArgumentCollection(list["Argument"]):
             argument.convert_and_validate()
 
     @property
-    def names(self):
-        return (name for argument in self for name in argument.names)
+    def names(self) -> tuple[str, ...]:
+        """The name for each argument in the collection."""
+        return tuple(name for argument in self for name in argument.names)
 
     @classmethod
     def _from_type(
@@ -946,10 +947,12 @@ class Argument:
 
     @property
     def name(self) -> str:
+        """The **first** name of this argument."""
         return self.names[0]
 
     @property
     def names(self) -> tuple[str, ...]:
+        """Names the argument goes by."""
         assert isinstance(self.cparam.name, tuple)
         return tuple(itertools.chain(self.cparam.name, self.negatives))
 

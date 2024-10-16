@@ -35,6 +35,8 @@ def test_argument_collection_no_annotation_no_default():
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
 
+    assert collection.names == ("--a", "--b")
+
 
 def test_argument_collection_no_annotation_default():
     def foo(a="foo", b=100):
