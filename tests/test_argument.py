@@ -414,6 +414,7 @@ def test_argument_collection_var_keyword_match():
 @pytest.mark.parametrize(
     "args, expected",
     [
+        Case(args=(), expected=()),
         Case(args=(("--foo",),), expected=("--foo",)),
         Case(args=(("--foo", "--bar"),), expected=("--foo", "--bar")),
         Case(args=(("--foo",), ("--bar",)), expected=("--bar",)),

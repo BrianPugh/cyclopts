@@ -1045,6 +1045,7 @@ def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
     tuple[str, ...]
         A tuple of resolved parameter names.
     """
+    argss = tuple(x for x in argss if x)
     if len(argss) == 0:
         return ()
     elif len(argss) == 1:
@@ -1066,7 +1067,4 @@ def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
             else:
                 out.append(a1 + a2)
 
-    if out:
-        return _resolve_parameter_name(tuple(out), *argss[2:])
-    else:
-        return _resolve_parameter_name(*argss[1:])
+    return _resolve_parameter_name(tuple(out), *argss[2:])
