@@ -75,21 +75,14 @@ jobs:
           source ${{ env.ACTIVATE_PYTHON_VENV }}
           pre-commit run --show-diff-on-failure --color=always --all-files
 
-      - name: Check tests folder existence
-        id: check_test_files
-        uses: andstor/file-existence-action@v3
-        with:
-          files: "tests"
-
       - name: Run tests
-        if: steps.check_test_files.outputs.files_exists == 'true'
         run: |
           source ${{ env.ACTIVATE_PYTHON_VENV }}
           python -m pytest --cov=cyclopts --cov-report term --cov-report xml --junitxml=testresults.xml
           coverage report
 
       - name: Upload coverage to Codecov
-        if: steps.check_test_files.outputs.files_exists == 'true'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
