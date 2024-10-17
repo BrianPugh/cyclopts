@@ -890,8 +890,9 @@ class Argument:
                     if missing_arguments:
                         raise MissingArgumentError(argument=missing_arguments[0])
                     else:
+                        missing_description = self.field_info.name + "->" + "->".join(keys)
                         raise ValueError(
-                            f"Required field \"{self.field_info.name + "->" + '->'.join(keys)}\" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements."
+                            f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
                         )
 
             if data:
