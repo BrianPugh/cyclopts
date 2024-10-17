@@ -26,8 +26,8 @@ generate-setup-file = false
 
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
-python = ">=3.8"
-typing-extensions = { version = ">=4.8.0", python = "^3.8.0" }
+python = ">=3.9"
+typing-extensions = { version = ">=4.8.0", python = "<3.11" }
 importlib-metadata = { version = ">=4.4", python = '<3.10' }
 attrs = ">=23.1.0"
 rich = ">=13.6.0"
@@ -38,11 +38,12 @@ pyyaml = {version = ">=6.0.1", optional = true}
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "~7.1.2"
-sphinx_rtd_theme = ">=1.3,<2.1"
+sphinx_rtd_theme = ">=3.0.0,<4.0.0"
 gitpython = ">=3.1.31"
 sphinx-copybutton = "^0.5"
 myst-parser = {extras = ["linkify"], version = "^3.0.1"}
 sphinx-autodoc-typehints = ">=1.25.2,<3.0.0"
+sphinx-rtd-dark-mode = "^1.3.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = {extras = ["toml"], version = ">=5.1"}
@@ -93,8 +94,8 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 
-    "if sys.version_info < (3, 9):",
     "if sys.version_info < (3, 10):",
+    "if sys.version_info >= (3, 10):",
     "from typing import Annotated",
     "except ImportError:",
 ]
@@ -157,7 +158,6 @@ ignore = [
     "D401",
     "E402",
     "E501",
-    "F401",
     "PGH003",  # Use specific rule codes when ignoring type issues
     "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
     "TRY300",  # Consider moving this statement to an `else` block

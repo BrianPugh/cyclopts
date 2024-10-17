@@ -4,9 +4,6 @@
 Coercion Rules
 ==============
 This page intends to serve as a terse set of type coercion rules that Cyclopts follows.
-If a specific type (including custom types) is not specified, the coercion defaults to ``type(token: str)``.
-For example, Cyclopts does not have an explicit rule for :class:`pathlib.Path`, so if the value ``"foo.bin"`` is
-provided, Cyclopts will default to coercing it as ``pathlib.Path("foo.bin")``.
 
 Automatic coercion can always be overridden by the :attr:`.Parameter.converter` field.
 Typically, the ``converter`` function will receive a single token, but it may receive multiple tokens
@@ -17,36 +14,38 @@ No Hint
 *******
 If no explicit type hint is provided:
 
-* If the parameter is optional and has a non-None default value, interpret the type ``type(default_value)``.
+* If the parameter has a **non-None** default value, interpret the type as ``type(default_value)``.
 
-.. code-block:: python
+  .. code-block:: python
 
-   @app.default
-   def default(value=5):
-       print(f"{value=} {type(value)=}")
+     @app.default
+     def default(value=5):
+         print(f"{value=} {type(value)=}")
 
-.. code-block:: console
+  .. code-block:: console
 
-   $ my-program 3
-   value=3 type(value)=<class 'int'>
+     $ my-program 3
+     value=3 type(value)=<class 'int'>
 
-* Otherwise, interpret the type as string. See `Str`_.
+* Otherwise, :ref:`interpret the type as string <Coercion Rules - Str>`.
 
-.. code-block:: python
+  .. code-block:: python
 
-   @app.default
-   def default(value):
-       print(f"{value=} {type(value)=}")
+     @app.default
+     def default(value):
+         print(f"{value=} {type(value)=}")
 
-.. code-block:: console
+  .. code-block:: console
 
-   $ my-program foo
-   value='foo' type(value)=<class 'str'>
+     $ my-program foo
+     value='foo' type(value)=<class 'str'>
 
 ***
 Any
 ***
 A standalone ``Any`` type hint is equivalent to `No Hint`_
+
+.. _Coercion Rules - Str:
 
 ***
 Str
@@ -100,10 +99,20 @@ Iterable
 ********
 Follows the same rules as `List`_. The passed in data will be a list.
 
+********
+Sequence
+********
+Follows the same rules as `List`_. The passed in data will be a list.
+
 ***
 Set
 ***
 Follows the same rules as `List`_, but the resulting datatype is a :class:`set`.
+
+*********
+Frozenset
+*********
+Follows the same rules as `Set`_, but the resulting datatype is a :class:`frozenset`.
 
 *****
 Tuple
@@ -306,6 +315,247 @@ Typer attempts to match the token to an Enum **value**; Cyclopts attempts to mat
    ╭─ Error ────────────────────────────────────────────────────────────────╮
    │ Error converting value "french" to <enum 'Language'> for "--language". │
    ╰────────────────────────────────────────────────────────────────────────╯
+
+.. _Coercion Rules - Dataclasses:
+
+********************
+User-Defined Classes
+********************
+Cyclopts supports classically defined user classes, as well as classes defined by the following dataclass-like libraries:
+
+* `attrs <https://www.attrs.org/en/stable/>`_
+* `dataclass <https://docs.python.org/3/library/dataclasses.html>`_
+* `NamedTuple <https://docs.python.org/3/library/typing.html#typing.NamedTuple>`_
+* `pydantic <https://docs.pydantic.dev/latest/>`_
+* `TypedDict <https://docs.python.org/3/library/typing.html#typing.TypedDict>`_
+
+.. note:
+   For ``pydantic`` classes, Cyclopts will *not* internally perform type conversions and instead relies on pydantic's coercion engine.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``Parameter(accepts_keys=None)`` (default)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Same behavior as ``Parameter(accepts_keys=True)``.
+
+================================
+``Parameter(accepts_keys=True)``
+================================
+Subkey parsing allows for assigning values positionally and by keyword with a dot-separator. Subkey parsing will respect positional-only as well as keyword-only inference from the function signature.
+
+.. code-block:: python
+
+   from cyclopts import App
+   from dataclasses import dataclass
+   from typing import Literal
+
+   app = App()
+
+   @dataclass
+   class User:
+      name: str
+      age: int
+      region: Literal["us", "ca"] = "us"
+
+   @app.default
+   def main(user: User):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ──────────────────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                                       │
+   │ --version  Display application version.                                         │
+   ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────────────────────────────────╮
+   │ *  USER.NAME --user.name      [required]                                        │
+   │ *  USER.AGE --user.age        [required]                                        │
+   │    USER.REGION --user.region  [choices: us, ca] [default: us]                   │
+   ╰─────────────────────────────────────────────────────────────────────────────────╯
+
+   $ my-program 'Bob Smith' 30
+   User(name='Bob Smith', age=30, region='us')
+
+   $ my-program --user.name 'Bob Smith' --user.age 30
+   User(name='Bob Smith', age=30, region='us')
+
+   $ my-program --user.name 'Bob Smith' 30 --user.region=ca
+   User(name='Bob Smith', age=30, region='ca')
+
+
+Cyclopts will recursively search for :class:`Parameter` annotations and respect them:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from dataclasses import dataclass
+   from typing import Annotated
+
+   app = App()
+
+   @dataclass
+   class User:
+      # Beginning with "--" will completely override the parenting parameter name.
+      name: Annotated[str, Parameter(name="--nickname")]
+      # Not beginning with "--" will tack it on to the parenting parameter name.
+      age: Annotated[int, Parameter(name="years-young")]
+
+   @app.default
+   def main(user: Annotated[User, Parameter(name="player")]):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                 │
+   │ --version  Display application version.                   │
+   ╰───────────────────────────────────────────────────────────╯
+   ╭─ Parameters ──────────────────────────────────────────────╮
+   │ *  NICKNAME --nickname     [required]                     │
+   │ *  PLAYER.YEARS-YOUNG      [required]                     │
+   │      --player.years-young                                 │
+   ╰───────────────────────────────────────────────────────────╯
+
+The special name ``"*"`` will remove the immediate parameter's name from the dotted-hierarchal name:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from dataclasses import dataclass
+   from typing import Annotated
+
+   app = App()
+
+   @dataclass
+   class User:
+      name: str
+      age: int
+
+   @app.default
+   def main(user: Annotated[User, Parameter(name="*")]):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ─────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.              │
+   │ --version  Display application version.                │
+   ╰────────────────────────────────────────────────────────╯
+   ╭─ Parameters ───────────────────────────────────────────╮
+   │ *  NAME --name  [required]                             │
+   │ *  AGE --age    [required]                             │
+   ╰────────────────────────────────────────────────────────╯
+
+Docstrings from the class are used for the help page. Docstrings from the decorated command have priority, if supplied:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from dataclasses import dataclass
+
+   app = App()
+
+   @dataclass
+   class User:
+      name: str
+      "First and last name of the user."
+
+      age: int
+      "Age in years of the user."
+
+   @app.default
+   def main(user: User):
+      """A short summary of what this program does.
+
+      Parameters
+      ----------
+      user.age: int
+         User's age docstring from the command docstring.
+      """
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   A short summary of what this program does.
+
+   ╭─ Commands ──────────────────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                                       │
+   │ --version  Display application version.                                         │
+   ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────────────────────────────────╮
+   │ *  USER.NAME --user.name  First and last name of the user. [required]           │
+   │ *  USER.AGE --user.age    User's age docstring from the command docstring.      │
+   │                           [required]                                            │
+   ╰─────────────────────────────────────────────────────────────────────────────────╯
+
+
+=================================
+``Parameter(accepts_keys=False)``
+=================================
+If the class is annotated with ``Parameter(accepts_keys=False)``, then no dot-notation parameters are exported.
+The class parameter will consume enough tokens to populate the required positional arguments.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from dataclasses import dataclass
+   from typing import Annotated, Literal
+
+   app = App()
+
+   @dataclass
+   class User:
+      name: str
+      age: int
+      region: Literal["us", "ca"] = "us"
+
+   @app.default
+   def main(user: Annotated[User, Parameter(accepts_keys=False)]):
+      print(user)
+
+   app()
+
+.. code-block:: console
+
+   $ my-program --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   ╭─ Commands ─────────────────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                                      │
+   │ --version  Display application version.                                        │
+   ╰────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ───────────────────────────────────────────────────────────────────╮
+   │ *  USER --user  [required]                                                     │
+   ╰────────────────────────────────────────────────────────────────────────────────╯
+
+   $ my-program 'Bob Smith' 27
+   User(name='Bob Smith', age=27, region='us')
+
+   $ my-program 'Bob Smith'
+   ╭─ Error ────────────────────────────────────────────────────────────────────────╮
+   │ Parameter "--user" requires 2 arguments. Only got 1.                           │
+   ╰────────────────────────────────────────────────────────────────────────────────╯
+
+In this example, we are unable to change the ``region`` parameter of ``User`` from the CLI.
 
 
 .. _Typer: https://typer.tiangolo.com

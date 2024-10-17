@@ -4,7 +4,7 @@
 
 <div align="center">
 
-![Python compat](https://img.shields.io/badge/>=python-3.8-blue.svg)
+![Python compat](https://img.shields.io/badge/>=python-3.9-blue.svg)
 [![PyPI](https://img.shields.io/pypi/v/cyclopts.svg)](https://pypi.org/project/cyclopts/)
 [![ReadTheDocs](https://readthedocs.org/projects/cyclopts/badge/?version=latest)](https://cyclopts.readthedocs.io)
 [![codecov](https://codecov.io/gh/BrianPugh/cyclopts/graph/badge.svg?token=HA393WIYUK)](https://codecov.io/gh/BrianPugh/cyclopts)
@@ -37,7 +37,7 @@ Cyclopts aims to provide an intuitive and efficient developer experience, making
 
 
 # Installation
-Cyclopts requires Python >=3.8; to install Cyclopts, run:
+Cyclopts requires Python >=3.9; to install Cyclopts, run:
 
 ```console
 pip install cyclopts

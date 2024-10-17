@@ -128,8 +128,8 @@ Lets consider a case where we want the user to specify a file size, and we want 
    }
 
 
-   def byte_units(type_, *values):
-       value = values[0].lower()
+   def byte_units(type_, tokens):
+       value = tokens[0].lower()
        try:
            return int(value)  # If this works, it didn't have a suffix.
        except ValueError:
