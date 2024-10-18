@@ -166,6 +166,30 @@ class ArgumentCollection(list["Argument"]):
                 continue
             argument.convert_and_validate()
 
+    def __getitem__(self, key: int | str) -> "Argument":  # pyright: ignore
+        if isinstance(key, (int, slice)):
+            return super().__getitem__(key)
+        elif isinstance(key, str):
+            for argument in self:
+                if key in argument.names:
+                    return argument
+            raise KeyError
+        else:
+            raise TypeError(f"Unable to interpret index/key type {type(key)!r}")
+
+    def __contains__(self, key: Union[str, "Argument"]) -> bool:  # pyright: ignore
+        if isinstance(key, Argument):
+            return super().__contains__(key)
+        elif isinstance(key, str):
+            try:
+                self[key]
+            except KeyError:
+                return False
+            else:
+                return True
+        else:
+            raise TypeError(f"Unable to interpret index/key type {type(key)!r}")
+
     @property
     def names(self) -> tuple[str, ...]:
         """The name for each argument in the collection."""
