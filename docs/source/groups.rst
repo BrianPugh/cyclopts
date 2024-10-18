@@ -1,20 +1,38 @@
 ======
 Groups
 ======
-Groups offer a way of organizing parameters and commands on the help-page.
+Groups offer a way of organizing parameters and commands on the help-page; for example:
+
+.. code-block:: console
+
+   Usage: my-script.py create [OPTIONS]
+
+   ╭─ Vehicle (choose one) ───────────────────────────────────────────────────────╮
+   │ --car    [default: False]                                                    │
+   │ --truck  [default: False]                                                    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Engine ─────────────────────────────────────────────────────────────────────╮
+   │ --hp         [default: 200]                                                  │
+   │ --cylinders  [default: 6]                                                    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Wheels ─────────────────────────────────────────────────────────────────────╮
+   │ --wheel-diameter  [default: 18]                                              │
+   │ --rims,--no-rims  [default: False]                                           │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+
 They also provide an additional abstraction layer that converters and validators can operate on.
 
-Groups can be created in 2 ways:
+Groups can be created in two ways:
 
-1. Creating an instance of the :class:`.Group` object.
+1. Explicitly creating an instance of the :class:`.Group` object.
 
-2. Implicitly with string title name.
-   This is short for ``Group(my_group_name)``.
+2. Implicitly with a **string**.
+   This is short for ``Group(my_str_group_name)``.
    If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
 
 Every command and parameter belongs to one (or more) groups.
 
-Group(s) can be provided to the ``group`` keyword argument of :meth:`@app.command <cyclopts.App.command>` and :class:`.Parameter`.
+Group(s) can be provided to the ``group`` keyword argument of :meth:`app.command <cyclopts.App.command>` and :class:`.Parameter`.
 The :class:`.Group` class itself only marks objects with metadata and doesn't contain a set of it's members.
 This means that groups can be re-used across commands.
 
@@ -69,11 +87,13 @@ An example of using groups with commands:
    │ upload    Upload a file.                                                     │
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
-The default group is defined by the registering app's :attr:`.App.group_command`, which defaults to a group named ``"Commands"``.
+The default group is defined by the registering app's :attr:`.App.group_commands`, which defaults to a group named ``"Commands"``.
 
 ----------------
 Parameter Groups
 ----------------
+Like commands above, parameter groups allow us to organize parameters on the help page.
+They also allow us to add additional inter-parameter validators (e.g. mutually-exclusive parameters).
 An example of using groups with parameters:
 
 .. code-block:: python
@@ -133,6 +153,8 @@ An example of using groups with parameters:
    │ Mutually exclusive arguments: {--car, --truck}                               │
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
+In this example, we use the :ref:`LimitedChoice <Group Validators - LimitedChoice>` validator to make it so the user can only specify ``--car`` or ``--truck``.
+
 The default groups are defined by the registering app:
 
 * :attr:`.App.group_arguments` for positional-only arguments, which defaults to a group named ``"Arguments"``.
@@ -145,6 +167,10 @@ Converters
 Converters offer a way of having parameters within a group interact during processing.
 Groups with an empty name, or with ``show=False``, are a way of using converters without impacting the help-page.
 See :attr:`.Group.converter` for details.
+
+.. code-block:: python
+
+   TODO
 
 ----------
 Validators

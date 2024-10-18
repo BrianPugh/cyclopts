@@ -5,6 +5,8 @@ Group Validators
 ================
 Cyclopts has some builtin common group validators in the :ref:`cyclopts.validators <API Validators>` module.
 
+.. _Group Validators - LimitedChoice:
+
 -------------
 LimitedChoice
 -------------
