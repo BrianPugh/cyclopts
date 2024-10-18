@@ -150,7 +150,7 @@ API
       This converter runs **after** :class:`Parameter` and :class:`Group` converters.
 
    .. attribute:: validator
-      :type: Union[None, Callable, List[Callable]]
+      :type: Union[None, Callable, list[Callable]]
       :value: []
 
       A function where all the converted CLI-provided variables will be keyword-unpacked,
@@ -194,7 +194,7 @@ API
 
       .. code-block:: python
 
-         def config(apps: List["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
+         def config(apps: list["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
@@ -237,7 +237,7 @@ API
               pass
 
       Where ``type_`` is the parameter's type hint, and ``tokens`` is either:
-      * A ``List[str]`` of CLI tokens.
+      * A ``list[str]`` of CLI tokens.
       * A ``Dict`` of CLI tokens if keys are specified in the CLI. E.g.
 
         .. code-block:: bash
@@ -379,7 +379,7 @@ API
 
       .. code-block:: python
 
-         def env_var_split(type_: type, val: str) -> List[str]:
+         def env_var_split(type_: type, val: str) -> list[str]:
              ...
 
       where ``type_`` is the associated parameter type-hint, and ``val`` is the environment value.
@@ -615,7 +615,7 @@ Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotati
 Path
 ^^^^
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
-All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``List[Path]``).
+All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``list[Path]``).
 
 .. autodata:: cyclopts.types.ExistingPath
 
@@ -645,7 +645,7 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 Number
 ^^^^^^
 Annotated types for checking common int/float value constraints.
-All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]`` or ``List[float]``).
+All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]`` or ``list[float]``).
 
 .. autodata:: cyclopts.types.PositiveFloat
 

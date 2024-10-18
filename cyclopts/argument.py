@@ -973,6 +973,10 @@ class Argument:
         assert isinstance(self.cparam.name, tuple)
         return tuple(itertools.chain(self.cparam.name, self.negatives))
 
+    @property
+    def positional_name(self) -> str:
+        return self.name.lstrip("-").upper()
+
     def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
         return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
 

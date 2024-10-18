@@ -185,7 +185,7 @@ def test_exceptions_coercion_error_from_positional_cli(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for "--bar": unable to convert "fizz" into int.      │
+        │ Invalid value for "BAR": unable to convert "fizz" into int.        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -236,7 +236,7 @@ def test_exceptions_coercion_error_verbose(app, console):
         """\
         │     foo(bar: int)                                                  │
         │ Root Input Tokens: ['foo', 'fizz']                                 │
-        │ Invalid value for "--bar": unable to convert "fizz" into int.      │
+        │ Invalid value for "BAR": unable to convert "fizz" into int.        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

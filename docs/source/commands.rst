@@ -4,16 +4,16 @@
 Commands
 ========
 
-There are 2 function-registering decorators:
+There are two different ways of registering functions:
 
-1. :meth:`@app.default <cyclopts.App.default>` -
+1. :meth:`app.default <cyclopts.App.default>` -
    Registers an action for when no registered command is provided.
    This was previously demonstrated in :ref:`Getting Started`.
 
-   A sub-app **cannot** be registered with :meth:`@app.default <cyclopts.App.default>`.
-   The default :meth:`app.default <cyclopts.App.default>` handler runs :meth:`app.help_print <cyclopts.App.help_print>`.
+   A sub-app **cannot** be registered with :meth:`app.default <cyclopts.App.default>`.
+   If no ``default`` command is registered, Cyclopts will display the help-page.
 
-2. :meth:`@app.command <cyclopts.App.command>` - Registers a function or :class:`.App` as a command.
+2. :meth:`app.command <cyclopts.App.command>` - Registers a function or :class:`.App` as a command.
 
 This section will detail how to use the :meth:`@app.command <cyclopts.App.command>` decorator.
 
@@ -28,18 +28,17 @@ The :meth:`@app.command <cyclopts.App.command>` decorator adds a **command** to 
 
    app = App()
 
-
    @app.command
    def fizz(n: int):
        print(f"FIZZ: {n}")
-
 
    @app.command
    def buzz(n: int):
        print(f"BUZZ: {n}")
 
-
    app()
+
+We can now control which command runs from the CLI:
 
 .. code-block:: console
 
@@ -57,7 +56,7 @@ The :meth:`@app.command <cyclopts.App.command>` decorator adds a **command** to 
 ------------------------
 Registering a SubCommand
 ------------------------
-The :meth:`@app.command <cyclopts.App.command>` method can also register another Cyclopts :class:`.App` as a command.
+The :meth:`app.command <cyclopts.App.command>` method can also register another Cyclopts :class:`.App` as a command.
 
 .. code-block:: python
 
@@ -97,43 +96,63 @@ Cyclopts's command structure is fully recursive.
 
 .. _Command Changing Name:
 
--------------
-Changing Name
--------------
-By default, a command is registered to the function name with underscores replaced with hyphens.
-Any leading or trailing underscore/hyphens will also be stripped.
+---------------------
+Changing Command Name
+---------------------
+By default, commands are registered to the python function's name with underscores replaced with hyphens.
+Any leading or trailing underscores will be stripped.
 For example, the function ``_foo_bar()`` will become the command ``foo-bar``.
-This automatic command name transform can be configured by :attr:`App.name_transform <cyclopts.App.name_transform>`.
+This renaming is done because CLI programs generally tend to use hyphens instead of underscores.
+The name transform can be configured by :attr:`App.name_transform <cyclopts.App.name_transform>`.
 For example, to make CLI command names be identical to their python function name counterparts, we can configure :class:`~cyclopts.App` as follows:
 
 .. code-block:: python
 
+   from cyclopts import App
+
    app = App(name_transform=lambda s: s)
 
-Alternatively, the name can be manually changed in the :meth:`@app.command <cyclopts.App.command>` decorator.
-Manually set names are not subject to :attr:`App.name_transform <cyclopts.App.name_transform>`.
+   @app.command
+   def foo_bar():  # will now be "foo_bar" instead of "foo-bar"
+       print("running function foo_bar")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script foo_bar
+   running function foo_bar
+
+
+Alternatively, the name can be **manually** changed in the :meth:`@app.command <cyclopts.App.command>` decorator.
+Manually set names are **not** subject to :attr:`App.name_transform <cyclopts.App.name_transform>`.
 
 .. code-block:: python
 
+   from cyclopts import App
+
+   app = App()
+
    @app.command(name="bar")
-   def foo():
+   def foo():  # function name will NOT be used.
        print("Hello World!")
 
+   app()
 
-   app(["bar"])
-   # Hello World!
+.. code-block:: console
+
+   $ my-script bar
+   Hello World!
 
 -----------
 Adding Help
 -----------
-There are a few ways to adding a help string to a command:
+There are a few ways to add a help string to a command:
 
-1. If the function has a docstring, the short description will be
-   used as the help string for the command.
-   This is generally the preferred method.
+1. If the function has a docstring, the **short description** will be used as the help string for the command.
+   This is generally the preferred method of providing help strings.
 
-2. If the registered command is a sub app, the sub app's :attr:`help <cyclopts.App.help>` field
-   will be used.
+2. If the registered command is a sub app, the sub app's :attr:`help <cyclopts.App.help>` field will be used.
 
    .. code-block:: python
 
@@ -142,35 +161,37 @@ There are a few ways to adding a help string to a command:
 
 3. The :attr:`help <cyclopts.App.help>` field of :meth:`@app.command <cyclopts.App.command>`. If provided, the docstring or subapp help field will **not** be used.
 
-.. code-block:: python
+   .. code-block:: python
 
-   app = cyclopts.App()
+      from cyclopts import App
 
+      app = cyclopts.App()
 
-   @app.command
-   def foo():
-       """Help string for foo."""
-       pass
+      @app.command
+      def foo():
+          """Help string for foo."""
+          pass
 
+      @app.command(help="Help string for bar.")
+      def bar():
+          """This got overridden."""
 
-   @app.command(help="Help string for bar.")
-   def bar():
-       """This got overridden."""
+      app()
 
-.. code-block:: console
+   .. code-block:: console
 
-   $ my-script --help
-   ╭─ Commands ────────────────────────────────────────────────────────────╮
-   │ bar        Help string for bar.                                       │
-   │ foo        Help string for foo.                                       │
-   │ --help,-h  Display this message and exit.                             │
-   │ --version  Display application version.                               │
-   ╰───────────────────────────────────────────────────────────────────────╯
+      $ my-script --help
+      ╭─ Commands ────────────────────────────────────────────────────────────╮
+      │ bar        Help string for bar.                                       │
+      │ foo        Help string for foo.                                       │
+      │ --help,-h  Display this message and exit.                             │
+      │ --version  Display application version.                               │
+      ╰───────────────────────────────────────────────────────────────────────╯
 
 -----
 Async
 -----
-Cyclopts works with async functions too, it will run async function with ``asyncio.run``
+Cyclopts also works with **async** commands:
 
 .. code-block:: python
 
@@ -189,5 +210,4 @@ Cyclopts works with async functions too, it will run async function with ``async
 Decorated Function Details
 --------------------------
 Cyclopts **does not modify the decorated function in any way**.
-The returned function is the exact same function being decorated.
-There is minimal overhead, and the function can be used exactly as if it were not decorated by Cyclopts.
+The returned function is the exact same function being decorated and can be used exactly as if it were not decorated by Cyclopts.

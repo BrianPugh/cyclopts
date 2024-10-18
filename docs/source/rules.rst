@@ -18,9 +18,15 @@ If no explicit type hint is provided:
 
   .. code-block:: python
 
+     from cyclopts import App
+
+     app = App()
+
      @app.default
      def default(value=5):
          print(f"{value=} {type(value)=}")
+
+     app()
 
   .. code-block:: console
 
@@ -31,9 +37,15 @@ If no explicit type hint is provided:
 
   .. code-block:: python
 
+     from cyclopts import App
+
+     app = App()
+
      @app.default
      def default(value):
          print(f"{value=} {type(value)=}")
+
+     app()
 
   .. code-block:: console
 
@@ -54,14 +66,120 @@ No operation is performed, CLI tokens are natively strings.
 
 .. code-block:: python
 
+   from cyclopts import App
+
+   app = App()
+
    @app.default
    def default(value: str):
        print(f"{value=} {type(value)=}")
+
+   app()
 
 .. code-block:: console
 
    $ my-program foo
    value='foo' type(value)=<class 'str'>
+
+***
+Int
+***
+For convenience, Cyclopts provides a richer feature-set of parsing integers than just naively calling ``int``.
+
+* Accepts vanilla decimal values (e.g. `123`, `3.1415`). Floating-point values will be rounded prior to casting to an ``int``.
+* Accepts hexadecimal values (strings starting with `0x`).
+* Accepts binary values (strings starting with `0b`)
+
+*****
+Float
+*****
+Token gets cast as ``float(token)``. For example, ``float("3.14")``.
+
+*******
+Complex
+*******
+Token gets cast as ``complex(token)``. For example, ``complex("3+5j")``
+
+****
+Bool
+****
+1. If specified as a **keyword**, booleans are interpreted flags that take no parameter.
+   The default **false-like** flag are ``--no-FLAG-NAME``.
+   See :attr:`.Parameter.negative` for more about this feature.
+
+   Example:
+
+   .. code-block:: python
+
+      from cyclopts import App
+
+      app = App()
+
+      @app.command
+      def foo(my_flag: bool):
+          print(my_flag)
+
+      app()
+
+   .. code-block:: console
+
+       $ my-program foo --my-flag
+       True
+
+       $ my-program foo --no-my-flag
+       False
+
+2. If specified as a **positional** argument, a case-insensitive lookup is performed:
+
+   * If the token is a **true-like value** ``{"yes", "y", "1", "true", "t"}``, then it is parsed as ``True``.
+
+   * If the token is a **false-like value** ``{"no", "n", "0", "false", "f"}``, then it is parsed as ``False``.
+
+   * Otherwise, a :exc:`CoercionError` will be raised.
+
+   .. code-block:: console
+
+      $ my-program foo 1
+      True
+
+      $ my-program foo 0
+      False
+
+      $ my-program foo not-a-true-or-false-value
+      ╭─ Error ─────────────────────────────────────────────────╮
+      │ Invalid value for "--my-flag": unable to convert        │
+      │ "not-a-true-or-false-value" into bool.                  │
+      ╰─────────────────────────────────────────────────────────╯
+
+
+3. If specified as a keyword with a value attached with an ``=``, then the provided value will be parsed according to positional argument rules above (2).
+
+  .. code-block:: python
+
+     from cyclopts import App
+
+     app = App()
+
+     @app.command
+     def foo(my_flag: bool):
+         print(my_flag)
+
+      app()
+
+  .. code-block:: console
+
+      $ my-program foo --my-flag=true
+      True
+
+      $ my-program foo --my-flag=false
+      False
+
+      $ my-program foo --no-my-flag=true
+      False
+
+      $ my-program foo --no-my-flag=false
+      True
+
 
 ****
 List
@@ -72,17 +190,29 @@ List
 
 * If ``Parameter.allow_leading_hyphen=True``, all remaining tokens will be unconditionally consumed.
 
+* The keyword can be specified multiple times.
+
 .. code-block:: python
 
-    @app.default
-    def main(*, favorite_numbers: List[int]):
-        pass
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def main(*, favorite_numbers: list[int]):
+      print(f"My favorite numbers are: {favorite_numbers}")
+
+   app()
 
 .. code-block:: console
 
    $ my-program --favorite-numbers 1 2 3
-   # favorite_numbers argument is a list containing 3 integers: ``[1, 2, 3]``.
+   My favorite numbers are: [1, 2, 3]
 
+
+^^^^^^^^^^
+Empty List
+^^^^^^^^^^
 * To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
   Continuing the previous example:
 
@@ -92,6 +222,41 @@ List
      # favorite_numbers argument is an empty list: ``[]``.
 
   See :attr:`.Parameter.negative` for more about this feature.
+
+^^^^^^^^^^^^^^^
+Positional Only
+^^^^^^^^^^^^^^^
+When a list is **positional-only**, it will consume tokens such that it leaves enough tokens for subsequent positional-only parameters.
+
+.. code-block:: python
+
+   from pathlib import Path
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def main(srcs: list[Path], dst: Path, /):  # "/" makes all prior parameters POSITIONAL_ONLY
+       print(f"Processing files {srcs!r} to {dst!r}.")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program foo.bin bar.bin output.bin
+   Processing files [PosixPath('foo.bin'), PosixPath('bar.bin')] to PosixPath('output.bin').
+
+
+The console wildcard ``*`` is expanded by the console, so this example will naturally work with wildcards.
+
+.. code-block:: console
+
+   $ ls foo
+   buzz.bin fizz.bin
+
+   $ my-program foo/*.bin output.bin
+   Processing files [PosixPath('foo/buzz.bin'), PosixPath('foo/fizz.bin')] to PosixPath('output.bin').
+
 
 
 ********
@@ -121,37 +286,85 @@ Tuple
 
 * The inner annotation type will be applied independently to each element.
 
-* Nested fixed-length tuples are allowed: E.g. ``Tuple[Tuple[int, str], str]`` will consume 3 CLI tokens.
+* Nested fixed-length tuples are allowed: E.g. ``tuple[tuple[int, str], str]`` will consume 3 CLI tokens.
 
-* Indeterminite-size tuples ``Tuple[type, ...]`` are only supported at the root-annotation level and behave similarly to `List`_.
+* Indeterminite-size tuples ``tuple[type, ...]`` are only supported at the root-annotation level and behave similarly to `List`_.
 
 .. code-block:: python
 
-  @app.default
-  def default(coordinates: Tuple[float, float, str]):
-      pass
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(coordinates: tuple[float, float, str]):
+      print(f"{coordinates=}")
+
+   app()
 
 And invoke our script:
 
 .. code-block:: console
 
    $ my-program --coordinates 3.14 2.718 my-coord-name
-   # coordinates argument is a tuple containing two floats and a string: ``(3.14, 2.718, "my-coord-name")``
+   coordinates=(3.14, 2.718, 'my-coord-name')
 
 .. _Coercion Rules - Union:
+
+****
+Dict
+****
+Cyclopts can populate dictionaries using keyword dot-notation:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(message: str, *, mapping: dict[str, str] | None = None):
+       if mapping:
+           for find, replace in mapping.items():
+               message = message.replace(find, replace)
+       print(message)
+
+   app()
+
+.. code-block:: console
+
+   $ my_program 'Hello Cyclopts users!'
+   Hello Cyclopts users!
+
+   $ my_program 'Hello Cyclopts users!' --mapping.Hello Hey
+   Hey Cyclopts users!
+
+   $ my_program 'Hello Cyclopts users!' --mapping.Hello Hey --mapping.users developers
+   Hey Cyclopts developers!
+
+Due to the way of specifying keys, it is recommended to make dict parameters keyword-only; dicts **cannot** be populated positionally.
+If you do not wish for the user to be able to specify arbitrary keys, see `User-Defined Classes`_.
+For specifying arbitrary keywords at the root level, see :ref:`kwargs <Args & Kwargs - Kwargs>`.
 
 *****
 Union
 *****
 
-The unioned types will be iterated left-to-right until a successful coercion is performed.
+The unioned types will be iterated **left-to-right** until a successful coercion is performed.
 :obj:`None` type hints are ignored.
 
 .. code-block:: python
 
-      @app.default
-      def default(a: Union[None, int, str]):
-          print(type(a))
+   from cyclopts import App
+   from typing import Union
+
+   app = App()
+
+   @app.default
+   def default(a: Union[None, int, str]):
+       print(type(a))
+
+   app()
 
 .. code-block:: console
 
@@ -167,98 +380,28 @@ Optional
 ********
 ``Optional[...]`` is syntactic sugar for ``Union[..., None]``.  See Union_ rules.
 
-***
-Int
-***
-For convenience, Cyclopts provides a richer feature-set of parsing integers than just naively calling ``int``.
-
-* Accepts vanilla decimal values (e.g. `123`, `3.1415`). Floating-point values will be rounded prior to casting to an ``int``.
-* Accepts hexadecimal values (strings starting with `0x`).
-* Accepts binary values (strings starting with `0b`)
-
-*****
-Float
-*****
-Not explicitly handled by Cyclopts, token gets cast as ``float(token)``. For example, ``float("3.14")``.
-
-*******
-Complex
-*******
-Not explicitly handled by Cyclopts, token gets cast as ``complex(token)``. For example, ``complex("3+5j")``
-
-****
-Bool
-****
-1. If specified as a keyword, booleans are interpreted flags that take no parameter.
-   The false-like flag name defaults to ``--no-FLAG-NAME``.
-   See :attr:`.Parameter.negative` for more about this feature.
-
-   Example:
-
-   .. code-block:: python
-
-     @app.command
-     def foo(my_flag: bool):
-         print(my_flag)
-
-   .. code-block:: console
-
-       $ my-program foo --my-flag
-       True
-
-       $ my-program foo --no-my-flag
-       False
-
-2. If specified as a positional argument, a case-insensitive lookup is performed.
-   If the token is in the set of **false-like values** ``{"no", "n", "0", "false", "f"}``, then it is parsed as ``False``.
-   If the token is in the set of **true-like values** ``{"yes", "y", "1", "true", "t"}``, then it is parsed as ``True``.
-   Otherwise, a :exc:`CoercionError` will be raised.
-
-   .. code-block:: console
-
-       $ my-program foo 1
-       True
-
-       $ my-program foo 0
-       False
-
-3. If specified as a keyword with a value attached with an ``=``, then the provided value will be parsed according to positional argument rules above (2).
-   Only the positive flag can be specified this way, attempting to assign a value to the negative value will result in a :exc:`ValidationError`.
-
-  .. code-block:: python
-
-    @app.command
-    def foo(my_flag: bool):
-        print(my_flag)
-
-  .. code-block:: console
-
-      $ my-program foo --my-flag=true
-      True
-
-      $ my-program foo --my-flag=false
-      False
-
-      $ my-program foo --no-my-flag=true
-      ╭─ Error ───────────────────────────────────────────────────────────╮
-      │ Cannot assign value to negative flag "--no-my-flag".              │
-      ╰───────────────────────────────────────────────────────────────────╯
-
 .. _Coercion Rules - Literal:
 
 *******
 Literal
 *******
-The :obj:`~typing.Literal` type is a good option for limiting the user input to a set of choices.
-The :obj:`~typing.Literal` options will be iterated left-to-right until a successful coercion is performed.
+The :obj:`~typing.Literal` type is a good option for limiting user input to a set of choices.
+Like Union_, the :obj:`~typing.Literal` options will be iterated **left-to-right** until a successful coercion is performed.
 Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typing.Literal` option.
 
 
 .. code-block:: python
 
+   from cyclopts import App
+   from typing import Literal
+
+   app = App()
+
    @app.default
    def default(value: Literal["foo", "bar", 3]):
        print(f"{value=} {type(value)=}")
+
+   app()
 
 .. code-block:: console
 
@@ -272,49 +415,55 @@ Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typ
    value=3 type(value)=<class 'int'>
 
    $ my-program fizz
-   ╭─ Error ─────────────────────────────────────────────────────────────────────────╮
-   │ Error converting value "fizz" to typing.Literal['foo', 'bar', 3] for "--value". │
-   ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Error ─────────────────────────────────────────────────╮
+   │ Invalid value for "VALUE": unable to convert "fizz"     │
+   │ into one of {'foo', 'bar', 3}.                          │
+   ╰─────────────────────────────────────────────────────────╯
 
 
 ****
 Enum
 ****
-While `Literal`_ is the recommended way of providing the user options, another method is using :class:`~enum.Enum`.
+While `Literal`_ is the recommended way of providing the user a set of choices, another method is using :class:`~enum.Enum`.
 
-:attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets applied to all :class:`~enum.Enum` names, as well as the CLI provided token.
+The :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets applied to all :class:`~enum.Enum` names, as well as the CLI provided token.
 By default,this means that a **case-insensitive name** lookup is performed.
 If an enum name contains an underscore, the CLI parameter **may** instead contain a hyphen, ``-``.
 Leading/Trailing underscores will be stripped.
 
 If coming from Typer_, **Cyclopts Enum handling is the reverse of Typer**.
 Typer attempts to match the token to an Enum **value**; Cyclopts attempts to match the token to an Enum **name**.
+This is done because generally the **name** of the enum is meant to be human readable, while the **value** has some program/machine significance.
 
+As a real-world example, the PNG image format supports `5 different color-types <https://www.w3.org/TR/2003/REC-PNG-20031110/#6Colour-values>`_, which gets encoded into a `1-byte int in the image header <https://www.w3.org/TR/2003/REC-PNG-20031110/#11IHDR>`_.
 
 .. code-block:: python
 
-   class Language(str, Enum):
-       ENGLISH = "en"
-       SPANISH = "es"
-       GERMAN = "de"
+   from cyclopts import App
+   from enum import IntEnum
 
+   app = App()
+
+   class ColorType(IntEnum):
+       GRAYSCALE = 0
+       RGB = 2
+       PALETTE = 3
+       GRAYSCALE_ALPHA = 4
+       RGBA = 6
 
    @app.default
-   def default(language: Language = Language.ENGLISH):
-       print(f"Using: {language}")
+   def default(color_type: ColorType = ColorType.RGB):
+       print(f"Writing color-type value: {color_type} to the image header.")
+
+   app()
 
 .. code-block:: console
 
-   $ my-program english
-   Using: Language.ENGLISH
+   $ my-program
+   Writing color-type value: 2 to the image header.
 
-   $ my-program german
-   Using: Language.GERMAN
-
-   $ my-program french
-   ╭─ Error ────────────────────────────────────────────────────────────────╮
-   │ Error converting value "french" to <enum 'Language'> for "--language". │
-   ╰────────────────────────────────────────────────────────────────────────╯
+   $ my-program grayscale-alpha
+   Writing color-type value: 4 to the image header.
 
 .. _Coercion Rules - Dataclasses:
 
@@ -332,15 +481,7 @@ Cyclopts supports classically defined user classes, as well as classes defined b
 .. note:
    For ``pydantic`` classes, Cyclopts will *not* internally perform type conversions and instead relies on pydantic's coercion engine.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-``Parameter(accepts_keys=None)`` (default)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Same behavior as ``Parameter(accepts_keys=True)``.
-
-================================
-``Parameter(accepts_keys=True)``
-================================
-Subkey parsing allows for assigning values positionally and by keyword with a dot-separator. Subkey parsing will respect positional-only as well as keyword-only inference from the function signature.
+Subkey parsing allows for assigning values positionally and by keyword with a dot-separator.
 
 .. code-block:: python
 
@@ -387,7 +528,7 @@ Subkey parsing allows for assigning values positionally and by keyword with a do
    User(name='Bob Smith', age=30, region='ca')
 
 
-Cyclopts will recursively search for :class:`Parameter` annotations and respect them:
+Cyclopts will recursively search for :class:`~.Parameter` annotations and respect them:
 
 .. code-block:: python
 
@@ -425,7 +566,10 @@ Cyclopts will recursively search for :class:`Parameter` annotations and respect 
    │      --player.years-young                                 │
    ╰───────────────────────────────────────────────────────────╯
 
-The special name ``"*"`` will remove the immediate parameter's name from the dotted-hierarchal name:
+^^^^^^^^^^^^^^^^^^^^
+Namespace Flattening
+^^^^^^^^^^^^^^^^^^^^
+The special parameter name ``"*"`` will remove the immediate parameter's name from the dotted-hierarchal name:
 
 .. code-block:: python
 
@@ -460,7 +604,12 @@ The special name ``"*"`` will remove the immediate parameter's name from the dot
    │ *  AGE --age    [required]                             │
    ╰────────────────────────────────────────────────────────╯
 
-Docstrings from the class are used for the help page. Docstrings from the decorated command have priority, if supplied:
+This can be used to conveniently share parameters between commands, and to create a global config object. See TODO.
+
+^^^^^^^^^^
+Docstrings
+^^^^^^^^^^
+Docstrings from the class are used for the help page. Docstrings from the command have priority over class docstrings, if supplied:
 
 .. code-block:: python
 
@@ -508,11 +657,11 @@ Docstrings from the class are used for the help page. Docstrings from the decora
    ╰─────────────────────────────────────────────────────────────────────────────────╯
 
 
-=================================
-``Parameter(accepts_keys=False)``
-=================================
-If the class is annotated with ``Parameter(accepts_keys=False)``, then no dot-notation parameters are exported.
-The class parameter will consume enough tokens to populate the required positional arguments.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Parameter(accepts_keys=False)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If the class is annotated with ``Parameter(accepts_keys=False)``, then no dot-notation subkeys are exported.
+The class parameter will consume enough tokens to populate the **required positional** arguments.
 
 .. code-block:: python
 

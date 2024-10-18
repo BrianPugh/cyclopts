@@ -63,7 +63,7 @@ Executing the script with the argument ``Alice`` produces the following:
    $ python main.py Alice
    Hello Alice!
 
-The step-by-step process of how Cyclopts interprets the python code and the CLI inputs is outlined below:
+Code explanation:
 
 1. The function ``main()`` was registered to ``app`` as the **default** action.
 
@@ -75,10 +75,10 @@ The step-by-step process of how Cyclopts interprets the python code and the CLI 
    .. note::
       Without a type annotation, Cyclopts will actually first attempt to use the **type** of
       the parameter's **default value**. If the parameter doesn't have a default value, it will
-      then fallback to ``str``.
+      then fallback to ``str``. See :ref:`Coercion Rules`.
 
 
-4. Cyclopts calls the registered default function ``main("Alice")``, and the greeting is printed.
+4. Cyclopts calls the registered **default** function ``main("Alice")``, and the greeting is printed.
 
 
 ------------------
@@ -108,20 +108,20 @@ Extending the example, lets add more arguments and type hints:
    Hello Alice!
 
 The command line input ``"3"`` is converted to an integer because the parameter ``count`` has the type hint ``int``.
-Cyclopts natively handles all python builtin types (and more!); see :ref:`Coercion Rules` for more details.
+Cyclopts natively handles all python builtin types (and more!). See :ref:`Coercion Rules` for more details.
 Cyclopts adheres to Python's argument binding rules, allowing for both positional and keyword arguments.
 All of the following CLI invocations are equivalent:
 
 .. code-block:: console
 
-   $ python main.py Alice 3
-   $ python main.py --name Alice --count 3
-   $ python main.py --name=Alice --count=3
-   $ python main.py --count 3 --name=Alice
-   $ python main.py Alice --count 3
-   $ python main.py --count 3 Alice
+   $ python main.py Alice 3                  # Supplying arguments positionally.
+   $ python main.py --name Alice --count 3   # Supplying arguments via keywords.
+   $ python main.py --name=Alice --count=3   # Using = for matching keywords to values is allowed.
+   $ python main.py --count 3 --name=Alice   # Keyword order does not matter.
+   $ python main.py Alice --count 3          # positional followed by keyword
+   $ python main.py --count 3 Alice          # Keywords can come before positional if the keyword is later in the function signature.
 
-Positional arguments cannot be specified after a prior argument in the function signature was specified via keyword (same as python).
+Like calling functions in python, positional arguments cannot be specified after a prior argument in the function signature was specified via keyword.
 For example, you cannot supply the count value ``"3"`` positionally while the value for ``name`` is specified via keyword:
 
 .. code-block:: bash

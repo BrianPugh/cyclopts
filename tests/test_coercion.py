@@ -256,6 +256,7 @@ def test_coerce_literal():
 def assert_convert_coercion_error(*args, msg, **kwargs):
     mock_argument = Mock()
     mock_argument.name = "mocked_argument_name"
+    mock_argument.positional_name = "MOCKED_ARGUMENT_NAME"
     with pytest.raises(CoercionError) as e:
         try:
             convert(*args, **kwargs)
@@ -270,7 +271,7 @@ def test_coerce_literal_invalid_choice():
     assert_convert_coercion_error(
         Literal["foo", "bar", 3],
         ["invalid-choice"],
-        msg="""Invalid value for "mocked_argument_name": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
     )
 
 
@@ -286,7 +287,7 @@ def test_coerce_literal_invalid_choice_non_cli_token():
     assert_convert_coercion_error(
         Literal["foo", "bar", 3],
         [Token(value="invalid-choice", source="TEST")],
-        msg="""Invalid value for "mocked_argument_name" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
     )
 
 
