@@ -46,8 +46,8 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
    │ *  VALUE,--value  Cyclopts uses this description for ``value``'s help. [required]   │
    ╰─────────────────────────────────────────────────────────────────────────────────────╯
 
-This keeps the code as terse and clean as possible.
-However, if more control is required, we can use :class:`.Parameter` along with the python builtin :obj:`~typing.Annotated`.
+This keeps the code as clean and terse as possible.
+However, if more control is required, we can provide additional information by annotating type hints with :class:`.Parameter`.
 
 .. code-block:: python
 
@@ -60,12 +60,12 @@ However, if more control is required, we can use :class:`.Parameter` along with 
        pass
 
 :class:`.Parameter` gives complete control on how Cyclopts processes the annotated parameter.
-See the API page for all configurable options.
+See the :ref:`API` page for all configurable options.
 
 ------
 Naming
 ------
-Like :ref:`command names <Command Changing Name>`, commandline parameters are derived from their python function argument counterparts.
+Like :ref:`command names <Command Changing Name>`, command-line parameter names are derived from their python counterparts.
 This automatic command name transform can be configured by :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`. Note that the resulting string is **before** the standard ``--`` is prepended.
 
 To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app, add the following to your :class:`~cyclopts.App` configuration:
@@ -76,6 +76,7 @@ To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app,
        default_parameter=Parameter(name_transform=my_custom_name_transform),
    )
 
+The :attr:`~.App.default_parameter` mechanism is described in the :ref:`Default Parameter` section.
 Manually set names via :attr:`Parameter.name <cyclopts.Parameter.name>` are not subject to :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`.
 
 ----
@@ -126,9 +127,10 @@ Lets consider a case where we want the user to specify a file size, and we want 
        "gb": 1024 * 1024 * 1024,
    }
 
-
    def byte_units(type_, tokens):
-       value = tokens[0].lower()
+       # type_ is ``int``
+       # tokens is list[cyclopts.Token]
+       value = tokens[0].value.lower()
        try:
            return int(value)  # If this works, it didn't have a suffix.
        except ValueError:
@@ -137,13 +139,11 @@ Lets consider a case where we want the user to specify a file size, and we want 
        number, suffix = value[:-2], value[-2:]
        return int(number) * mapping[suffix]
 
-
    @app.command
    def zero(file: Path, size: Annotated[int, Parameter(converter=byte_units)]):
        """Creates a file of all-zeros."""
        print(f"Writing {size} zeros to {file}.")
        file.write_bytes(bytes(size))
-
 
    app()
 
@@ -158,8 +158,8 @@ Lets consider a case where we want the user to specify a file size, and we want 
    $ my-script zero out.bin 3mb
    Writing 3145728 zeros to out.bin.
 
-The converter function gets the annotated type, and all the string tokens parsed for this argument.
-The returned value gets used by the function.
+The converter function gets the annotated type, and the :class:`.Token` s parsed for this argument.
+The returned value is supplied to the parameter for the function.
 
 ----------------
 Validating Input
@@ -169,20 +169,20 @@ If we had a program that accepted an integer user age as an input, ``-1`` is an 
 
 .. code-block:: python
 
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App()
+
    def validate_age(type_, value):
        if value < 0:
            raise ValueError("Negative ages not allowed.")
        if value > 150:
            raise ValueError("You are too old to be using this application.")
 
-
    @app.default
-   def allowed_to_buy_alcohol(age: int):
-       if age < 21:
-           print("Under 21: prohibited.")
-       else:
-           print("Good to go!")
-
+   def allowed_to_buy_alcohol(age: Annotated[int, Parameter(validator=validate_age)]):
+       print("Under 21: prohibited." if age < 21 else "Good to go!")
 
    app()
 
@@ -195,19 +195,20 @@ If we had a program that accepted an integer user age as an input, ``-1`` is an 
    Under 21: prohibited.
 
    $ my-script -1
-   ╭─ Error ──────────────────────────────────────────────────────────────────╮
-   │ Invalid value for --age. Negative ages not allowed.                      │
-   ╰──────────────────────────────────────────────────────────────────────────╯
+   ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+   │ Invalid value "-1" for "AGE". Negative ages not allowed.                     │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
 
    $ my-script 200
-   ╭─ Error ──────────────────────────────────────────────────────────────────╮
-   │ Invalid value for --age. You are too old to be using this application.   │
-   ╰──────────────────────────────────────────────────────────────────────────╯
+   ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+   │ Invalid value "200" for "AGE". You are too old to be using this application. │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
 
 --------------------
 Parameter Resolution
 --------------------
-Say you want to define a new ``int`` type that uses the :ref:`byte-centric converter from above<Converters>`.
+Cyclopts can combine multiple :class:`.Parameter` annotations together.
+Say you want to define a new :obj:`int` type that uses the :ref:`byte-centric converter from above<Converters>`.
 
 We can define the type:
 
@@ -228,11 +229,18 @@ or even stack annotations to add additional features, like a validator:
 .. code-block:: python
 
    def must_be_multiple_of_4096(type_, value):
-       assert value % 4096 == 0
+       assert value % 4096 == 0, "Size must be a multiple of 4096"
 
 
    @app.command
    def zero(size: Annotated[ByteSize, Parameter(validator=must_be_multiple_of_4096)]):
        pass
+
+.. code-block:: console
+
+   $ my-script 1234
+   ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+   │ Invalid value "1234" for "SIZE". Size must be a multiple of 4096             │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
 
 See :ref:`Parameter Resolution Order<Parameter Resolution Order>` for more details.
