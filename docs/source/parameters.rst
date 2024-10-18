@@ -48,12 +48,11 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
 
 This keeps the code as terse and clean as possible.
 However, if more control is required, we can use :class:`.Parameter` along with the python builtin :obj:`~typing.Annotated`.
-Prior to Python 3.9, :obj:`~typing.Annotated` has to be imported from ``typing_extensions``; in more recent python versions it can be directly imported from the :mod:`typing` module.
 
 .. code-block:: python
 
    from cyclopts import Parameter
-   from typing_extensions import Annotated
+   from typing import Annotated
 
 
    @app.command
@@ -116,7 +115,7 @@ Lets consider a case where we want the user to specify a file size, and we want 
 .. code-block:: python
 
    from cyclopts import App, Parameter
-   from typing_extensions import Annotated
+   from typing import Annotated
    from pathlib import Path
 
    app = App()

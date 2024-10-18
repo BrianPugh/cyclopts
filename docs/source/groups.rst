@@ -79,7 +79,7 @@ An example of using groups with parameters:
 .. code-block:: python
 
    from cyclopts import App, Group, Parameter, validators
-   from typing_extensions import Annotated
+   from typing import Annotated
 
    app = App()
 
