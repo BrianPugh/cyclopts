@@ -1,22 +1,17 @@
 import itertools
-import sys
+from typing import Annotated, Sequence
 from unittest.mock import Mock
 
 import pytest
 
 import cyclopts.group
-from cyclopts import App, Group, Parameter
+from cyclopts import UNSET, App, Group, Parameter, Token
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
-
-def upper(type_, *args: str):
-    return args[0].upper()
+def upper(type_, tokens: Sequence[Token]):
+    return tokens[0].value.upper()
 
 
 def test_group_str_method():
@@ -35,8 +30,9 @@ def test_group_show_property():
 
 
 def test_group_parameter_converter(app, assert_parse_args):
-    def converter(**kwargs):
-        return {k: v.upper() for k, v in kwargs.items()}
+    def converter(arguments):
+        for argument in arguments:
+            argument.value = argument.value.upper()
 
     food_group = Group("Food", converter=converter)
 
@@ -51,10 +47,9 @@ def test_group_parameter_converter(app, assert_parse_args):
 
 
 def test_group_parameter_converter_delete_arg(app, assert_parse_args):
-    def converter(**kwargs):
-        # This doesn't have a "cone" key in the response, meaning it should not be
-        # in the resulting bound arguments.
-        return {k: v.upper() for k, v in kwargs.items() if k != "cone"}
+    def converter(arguments):
+        for argument in arguments:
+            argument.value = UNSET if argument.name == "--cone" else argument.value.upper()
 
     food_group = Group("Food", converter=converter)
 
@@ -157,7 +152,11 @@ def test_group_validator(app):
 
     app.parse_args("--rock-salt --peppercorn --ketchup")
 
-    validator.assert_called_once_with(salt=True, pepper=True)
+    validator.assert_called_once()
+    provided_arguments = validator.call_args_list[0][0][0]
+    assert len(provided_arguments) == 2
+    assert provided_arguments[0].name == "--rock-salt"
+    assert provided_arguments[1].name == "--peppercorn"
 
 
 def test_group_sort_key_property():

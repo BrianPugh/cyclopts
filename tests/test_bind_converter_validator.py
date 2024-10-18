@@ -1,15 +1,10 @@
-import inspect
-import sys
+from typing import Annotated
 from unittest.mock import Mock
 
 import pytest
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
 from cyclopts import Parameter, ValidationError
+from cyclopts.exceptions import CoercionError
 
 
 @pytest.fixture
@@ -18,14 +13,79 @@ def validator():
 
 
 def test_custom_converter(app, assert_parse_args):
-    def custom_converter(type_, *args):
-        return 2 * int(args[0])
+    def custom_converter(type_, tokens):
+        return 2 * int(tokens[0].value)
 
     @app.default
     def foo(age: Annotated[int, Parameter(converter=custom_converter)]):
         pass
 
     assert_parse_args(foo, "5", age=10)
+
+
+def test_custom_converter_user_value_error_single_token(app):
+    def custom_converter(type_, tokens):
+        raise ValueError
+
+    @app.default
+    def foo(age: Annotated[int, Parameter(converter=custom_converter)]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("5", exit_on_error=False)
+    assert str(e.value) == 'Invalid value for "AGE": unable to convert "5" into int.'
+
+
+def test_custom_converter_user_value_error_multi_token(app):
+    def custom_converter(type_, tokens):
+        raise ValueError
+
+    @app.default
+    def foo(age: Annotated[tuple[int, int], Parameter(converter=custom_converter)]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("5 6", exit_on_error=False)
+    assert str(e.value) == 'Invalid value for "--age": unable to convert value to tuple[int, int].'
+
+
+def test_custom_converter_user_value_error_with_message(app):
+    def custom_converter(type_, tokens):
+        raise ValueError("Some user-provided message.")
+
+    @app.default
+    def foo(age: Annotated[int, Parameter(converter=custom_converter)]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("5", exit_on_error=False)
+    assert str(e.value) == "Some user-provided message."
+
+
+def test_custom_converter_user_kwargs_error(app):
+    def custom_converter(type_, tokens):
+        raise ValueError
+
+    @app.default
+    def foo(**kwargs: Annotated[int, Parameter(converter=custom_converter)]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("--foo 5", exit_on_error=False)
+    assert str(e.value) == 'Invalid value for "--foo": unable to convert "5" into int.'
+
+
+def test_custom_converter_user_kwargs_error_with_message(app):
+    def custom_converter(type_, tokens):
+        raise ValueError("Some user-provided message.")
+
+    @app.default
+    def foo(**kwargs: Annotated[int, Parameter(converter=custom_converter)]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("--foo 5", exit_on_error=False)
+    assert str(e.value) == "Invalid value for --foo: Some user-provided message."
 
 
 def test_custom_validator_positional_or_keyword(app, assert_parse_args, validator):
@@ -82,8 +142,8 @@ def test_custom_converter_and_validator(app, assert_parse_args, validator):
         if not (0 < value < 150):
             raise ValueError("An unreasonable age was entered.")
 
-    def custom_converter(type_, *args):
-        return 2 * int(args[0])
+    def custom_converter(type_, tokens):
+        return 2 * int(tokens[0].value)
 
     @app.default
     def foo(age: Annotated[int, Parameter(converter=custom_converter, validator=validator)]):

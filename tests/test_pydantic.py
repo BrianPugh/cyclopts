@@ -1,8 +1,12 @@
+from datetime import datetime
 from textwrap import dedent
+from typing import Dict, Optional, Union
 
 import pytest
-from pydantic import PositiveInt, validate_call
+from pydantic import BaseModel, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
+
+from cyclopts import MissingArgumentError
 
 
 def test_pydantic_error_msg(app, console):
@@ -34,3 +38,71 @@ def test_pydantic_error_msg(app, console):
     )
 
     assert actual.startswith(expected_prefix)
+
+
+# Modified from https://docs.pydantic.dev/latest/#pydantic-examples
+class Outfit(BaseModel):
+    body: str
+    head: str
+    has_socks: bool
+
+
+class User(BaseModel):
+    id: int
+    name: str = "John Doe"
+    signup_ts: Union[datetime, None]
+    tastes: Dict[str, PositiveInt]
+    outfit: Optional[Outfit] = None
+
+
+def test_bind_pydantic_basemodel(app, assert_parse_args):
+    @app.command
+    def foo(user: User):
+        pass
+
+    external_data = {
+        "id": 123,
+        "signup_ts": "2019-06-01 12:22",
+        "tastes": {
+            "wine": 9,
+            b"cheese": 7,
+            "cabbage": "1",
+        },
+        "outfit": {
+            "body": "t-shirt",
+            "head": "baseball-cap",
+            "has_socks": True,
+        },
+    }
+    assert_parse_args(
+        foo,
+        'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap --user.outfit.has-socks',
+        User(**external_data),
+    )
+
+
+def test_bind_pydantic_basemodel_missing_arg(app, assert_parse_args, console):
+    """Partially defining an Outfit should raise a MissingArgumentError."""
+
+    @app.command
+    def foo(user: User):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app.parse_args(
+            'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt',
+            console=console,
+            exit_on_error=False,
+        )
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "--user.outfit.head" requires an argument. │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected

@@ -2,6 +2,7 @@ import inspect
 import os
 import sys
 import traceback
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import suppress
 from copy import copy
 from functools import partial
@@ -9,16 +10,12 @@ from itertools import chain
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     Literal,
-    Mapping,
     Optional,
-    Tuple,
+    Sequence,
     TypeVar,
     Union,
     overload,
@@ -27,11 +24,13 @@ from typing import (
 from attrs import define, field
 
 import cyclopts.utils
-from cyclopts.bind import create_bound_arguments, normalize_tokens
+from cyclopts.argument import ArgumentCollection
+from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
     InvalidCommandError,
+    UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
     format_cyclopts_error,
@@ -50,7 +49,7 @@ from cyclopts.help import (
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
-from cyclopts.resolve import ResolvedCommand
+from cyclopts.token import Token
 from cyclopts.utils import (
     default_name_transform,
     optional_to_tuple_converter,
@@ -61,15 +60,10 @@ from cyclopts.utils import (
 T = TypeVar("T", bound=Callable)
 
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
-
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
-    import readline  # Not available on windows
+    # Not available on windows
+    import readline  # noqa: F401
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -153,8 +147,11 @@ def _get_command_groups(parent_app, child_app):
     return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
 
 
-def resolve_default_parameter_from_apps(apps) -> Parameter:
+def _resolve_default_parameter_from_apps(apps) -> Parameter:
     """The default_parameter resolution depends on the parent-child path traversed."""
+    if not apps:
+        return Parameter()
+
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
         # child_app could be a command of parent_app.meta
@@ -171,7 +168,7 @@ def resolve_default_parameter_from_apps(apps) -> Parameter:
     return Parameter.combine(*cparams)
 
 
-def walk_metas(app):
+def _walk_metas(app):
     # Iterates from deepest to shallowest meta-apps
     meta_list = [app]  # shallowest to deepest
     meta = app
@@ -184,7 +181,7 @@ def walk_metas(app):
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    _name: Union[None, str, Tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
+    _name: Union[None, str, tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
     _help: Optional[str] = field(default=None, alias="help")
 
@@ -247,7 +244,7 @@ class App:
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    group: Union[Group, str, Tuple[Union[Group, str], ...]] = field(
+    group: Union[Group, str, tuple[Union[Group, str], ...]] = field(
         default=None, converter=to_tuple_converter, kw_only=True
     )
 
@@ -271,7 +268,7 @@ class App:
     )
 
     converter: Optional[Callable[..., Mapping[str, Any]]] = field(default=None, kw_only=True)
-    validator: List[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
+    validator: list[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
 
     _name_transform: Optional[Callable[[str], str]] = field(
         default=None,
@@ -283,12 +280,12 @@ class App:
     # Private Attributes #
     ######################
     # Maps CLI-name of a command to a function handle.
-    _commands: Dict[str, "App"] = field(init=False, factory=dict)
+    _commands: dict[str, "App"] = field(init=False, factory=dict)
 
-    _parents: List["App"] = field(init=False, factory=list)
+    _parents: list["App"] = field(init=False, factory=list)
 
-    _meta: "App" = field(init=False, default=None)
-    _meta_parent: "App" = field(init=False, default=None)
+    _meta: Optional["App"] = field(init=False, default=None)
+    _meta_parent: Optional["App"] = field(init=False, default=None)
 
     def __attrs_post_init__(self):
         # Trigger the setters
@@ -354,7 +351,7 @@ class App:
             )
 
     @property
-    def name(self) -> Tuple[str, ...]:
+    def name(self) -> tuple[str, ...]:
         """Application name(s). Dynamically derived if not previously set."""
         if self._name:
             return self._name  # pyright: ignore[reportReturnType]
@@ -367,7 +364,7 @@ class App:
             return (self.name_transform(self.default_command.__name__),)
 
     @property
-    def config(self) -> Tuple[str, ...]:
+    def config(self) -> tuple[str, ...]:
         if self._config is None and self._meta_parent is not None:
             return self._meta_parent.config
         else:
@@ -451,11 +448,13 @@ class App:
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over command & meta command names."""
-        for k in self._commands:
-            yield k
+        commands = list(self._commands)
+        yield from commands
+        commands = set(commands)
         if self._meta_parent:
-            for k in self._meta_parent:
-                yield k
+            for command in self._meta_parent:
+                if command not in commands:
+                    yield command
 
     @property
     def meta(self) -> "App":
@@ -473,7 +472,7 @@ class App:
     def parse_commands(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
-    ) -> Tuple[Tuple[str, ...], Tuple["App", ...], List[str]]:
+    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
         """Extract out the command tokens from a command.
 
         Parameters
@@ -518,7 +517,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def command(
+    def command(  # pragma: no cover
         self,
         obj: T,
         name: Union[None, str, Iterable[str]] = None,
@@ -531,7 +530,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def command(
+    def command(  # pragma: no cover
         self,
         obj: None = None,
         name: Union[None, str, Iterable[str]] = None,
@@ -612,7 +611,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def default(
+    def default(  # pragma: no cover
         self,
         obj: T,
         *,
@@ -626,7 +625,7 @@ class App:
     # def my_command(foo: str):
     #   ...
     @overload
-    def default(
+    def default(  # pragma: no cover
         self,
         obj: None = None,
         *,
@@ -659,12 +658,21 @@ class App:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
+    def _parse_argument_collection(self, *, apps: Sequence["App"], parse_docstring: bool = False):
+        return ArgumentCollection.from_callable(
+            self.default_command,  # pyright: ignore
+            _resolve_default_parameter_from_apps(apps),
+            group_arguments=self.group_arguments,  # pyright: ignore
+            group_parameters=self.group_parameters,  # pyright: ignore
+            parse_docstring=parse_docstring,
+        )
+
     def parse_known_args(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
-    ) -> Tuple[Callable, inspect.BoundArguments, List[str]]:
+    ) -> tuple[Callable, inspect.BoundArguments, list[str]]:
         """Interpret arguments into a function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
         Parameters
@@ -687,6 +695,15 @@ class App:
         unused_tokens: List[str]
             Any remaining CLI tokens that didn't get parsed for ``command``.
         """
+        command, bound, unused_tokens, argument_collection = self._parse_known_args(tokens, console=console)
+        return command, bound, unused_tokens
+
+    def _parse_known_args(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        *,
+        console: Optional["Console"] = None,
+    ) -> tuple[Callable, inspect.BoundArguments, list[str], ArgumentCollection]:
         tokens = normalize_tokens(tokens)
 
         meta_parent = self
@@ -705,7 +722,7 @@ class App:
         except IndexError:
             parent_app = None
 
-        config: Tuple[Callable, ...] = ()
+        config: tuple[Callable, ...] = ()
         for app in reversed(apps):
             if app.config:
                 config = app.config  # pyright: ignore[reportAssignmentType]
@@ -731,6 +748,7 @@ class App:
                 command = meta_parent.help_print
             bound = cyclopts.utils.signature(command).bind(tokens, console=console)
             unused_tokens = []
+            argument_collection = ArgumentCollection()
         elif any(flag in tokens for flag in command_app.version_flags):
             # Version
             command = self.version_print
@@ -738,15 +756,22 @@ class App:
                 command = meta_parent.version_print
             bound = cyclopts.utils.signature(command).bind()
             unused_tokens = []
+            argument_collection = ArgumentCollection()
         else:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    resolved_command = self._resolve_command(tokens, parse_docstring=False)
+                    argument_collection = command_app._parse_argument_collection(apps=apps)
+
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
 
-                    bound, unused_tokens = create_bound_arguments(resolved_command, unused_tokens, config)
+                    bound, unused_tokens = create_bound_arguments(
+                        command_app.default_command,
+                        argument_collection,
+                        unused_tokens,
+                        config,
+                    )
                     try:
                         if command_app.converter:
                             bound.arguments = command_app.converter(**bound.arguments)  # pyright: ignore[reportAttributeAccessIssue]
@@ -760,7 +785,7 @@ class App:
                                 validator(**bound.arguments)
                     except (AssertionError, ValueError, TypeError) as e:
                         raise ValidationError(
-                            value=e.args[0] if e.args else "",
+                            exception_message=e.args[0] if e.args else "",
                             group=command_group,  # pyright: ignore[reportPossiblyUnboundVariable]
                         ) from e
 
@@ -773,7 +798,9 @@ class App:
                         command = self.help_print
                         bound = cyclopts.utils.signature(command).bind(tokens=tokens, console=console)
                         unused_tokens = []
+                        argument_collection = ArgumentCollection()
             except CycloptsError as e:
+                e.target = command_app.default_command
                 e.app = command_app
                 if command_chain:
                     e.command_chain = command_chain
@@ -781,7 +808,7 @@ class App:
                     e.console = self._resolve_console(tokens, console)
                 raise
 
-        return command, bound, unused_tokens
+        return command, bound, unused_tokens, argument_collection
 
     def parse_args(
         self,
@@ -791,7 +818,7 @@ class App:
         print_error: bool = True,
         exit_on_error: bool = True,
         verbose: bool = False,
-    ) -> Tuple[Callable, inspect.BoundArguments]:
+    ) -> tuple[Callable, inspect.BoundArguments]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
         Raises
@@ -830,8 +857,14 @@ class App:
 
         # Normal parsing
         try:
-            command, bound, unused_tokens = self.parse_known_args(tokens, console=console)
+            command, bound, unused_tokens, argument_collection = self._parse_known_args(tokens, console=console)
             if unused_tokens:
+                for token in unused_tokens:
+                    if is_option_like(token):
+                        token = token.split("=")[0]
+                        raise UnknownOptionError(
+                            token=Token(keyword=token, source="cli"), argument_collection=argument_collection
+                        )
                 raise UnusedCliTokensError(
                     target=command,
                     unused_tokens=unused_tokens,
@@ -962,38 +995,16 @@ class App:
 
         # Print the App/Command's Doc String.
         help_format = resolve_help_format(apps)
-        console.print(format_doc(self, executing_app, help_format))
+        console.print(format_doc(executing_app, help_format))
 
         for help_panel in self._assemble_help_panels(tokens, help_format):
             console.print(help_panel)
-
-    def _resolve_command(
-        self,
-        tokens: Union[None, str, Iterable[str]] = None,
-        parse_docstring: bool = True,
-    ) -> ResolvedCommand:
-        _, apps, _ = self.parse_commands(tokens)
-
-        if not apps[-1].default_command:
-            raise InvalidCommandError
-
-        assert isinstance(apps[-1].group_arguments, Group)
-        assert isinstance(apps[-1].group_parameters, Group)
-
-        resolved_command = ResolvedCommand(
-            apps[-1].default_command,
-            resolve_default_parameter_from_apps(apps),
-            apps[-1].group_arguments,
-            apps[-1].group_parameters,
-            parse_docstring=parse_docstring,
-        )
-        return resolved_command
 
     def _assemble_help_panels(
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> List[HelpPanel]:
+    ) -> list[HelpPanel]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -1001,10 +1012,10 @@ class App:
 
         help_format = resolve_help_format(apps)
 
-        panels: Dict[str, Tuple[Group, HelpPanel]] = {}
+        panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in walk_metas(apps[-1]):
+        for subapp in _walk_metas(apps[-1]):
             # Handle Commands
             for group, elements in groups_from_app(subapp):
                 if not group.show:
@@ -1030,24 +1041,30 @@ class App:
                 command_panel.entries.extend(format_command_entries(elements, format=help_format))
 
         # Handle Arguments/Parameters
-        for subapp in walk_metas(apps[-1]):
+        for subapp in _walk_metas(apps[-1]):
             if not subapp.default_command:
                 continue
-            command = ResolvedCommand(
+
+            argument_collection = ArgumentCollection.from_callable(
                 subapp.default_command,
-                resolve_default_parameter_from_apps(apps),
-                subapp.group_arguments,
-                subapp.group_parameters,
+                _resolve_default_parameter_from_apps(apps),
+                group_arguments=subapp.group_arguments,  # pyright: ignore
+                group_parameters=subapp.group_parameters,  # pyright: ignore
+                parse_docstring=True,
             )
-            for group, iparams in command.groups_iparams:
+            for group in argument_collection.groups:
                 if not group.show:
                     continue
-                cparams = [command.iparam_to_cparam[x] for x in iparams]
+                group_argument_collection = argument_collection.filter_by(group=group)
+                if not group_argument_collection:
+                    continue
+
                 try:
                     _, existing_panel = panels[group.name]
                 except KeyError:
                     existing_panel = None
-                new_panel = create_parameter_help_panel(group, iparams, cparams, help_format)
+
+                new_panel = create_parameter_help_panel(group, group_argument_collection, help_format)
 
                 if existing_panel:
                     # An imperfect merging process
@@ -1106,9 +1123,11 @@ class App:
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
-        if os.name == "posix":
+        if os.name == "posix":  # pragma: no cover
+            # Mac/Linux
             print("Interactive shell. Press Ctrl-D to exit.")
-        else:  # Windows
+        else:  # pragma: no cover
+            # Windows
             print("Interactive shell. Press Ctrl-Z followed by Enter to exit.")
 
         if quit is None:
@@ -1127,7 +1146,7 @@ class App:
         while True:
             try:
                 user_input = input(prompt)
-            except EOFError:
+            except EOFError:  # pragma: no cover
                 break
 
             tokens = normalize_tokens(user_input)

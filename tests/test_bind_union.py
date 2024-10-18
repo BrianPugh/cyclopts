@@ -1,12 +1,7 @@
-import sys
-from typing import Union
+from textwrap import dedent
+from typing import Annotated, Union
 
 import pytest
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 from cyclopts import Parameter
 from cyclopts.exceptions import CoercionError
@@ -44,10 +39,22 @@ def test_union_required_implicit_coercion(app, cmd_str, expected, annotated, ass
     assert_parse_args(foo, cmd_str, expected)
 
 
-def test_union_coercion_cannot_coerce_error(app):
+def test_union_coercion_cannot_coerce_error(app, console):
     @app.default
     def default(a: Union[None, int, float]):
         pass
 
-    with pytest.raises(CoercionError):
-        app.parse_args("foo", exit_on_error=False)
+    with console.capture() as capture, pytest.raises(CoercionError):
+        app.parse_args("foo", console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Invalid value for "A": unable to convert "foo" into int|float.     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected

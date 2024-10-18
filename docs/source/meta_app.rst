@@ -24,7 +24,7 @@ To change how the primary app is run, you can use the meta-app feature of Cyclop
 .. code-block:: python
 
    from cyclopts import App, Group, Parameter
-   from typing_extensions import Annotated
+   from typing import Annotated
 
    app = App()
    # Rename the meta's "Parameter" -> "Session Parameters".
@@ -125,7 +125,7 @@ This might be useful to share an expensive-to-create object amongst commands in 
 .. code-block:: python
 
    from cyclopts import App, Parameter
-   from typing_extensions import Annotated
+   from typing import Annotated
 
    app = App()
 

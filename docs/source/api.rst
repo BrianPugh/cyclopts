@@ -16,10 +16,10 @@ API
 
       Name of application, or subcommand if registering to another application. Name fallback resolution:
 
-      1. User specified ``name``.
+      1. User specified ``name`` parameter.
       2. If a ``default`` function has been registered, the name of that function.
       3. If the module name is ``__main__.py``, the name of the encompassing package.
-      4. The value of ``sys.argv[0]``.
+      4. The value of ``sys.argv[0]``; i.e. the name of the python script.
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
@@ -34,9 +34,8 @@ API
       :value: ("--help", "-h")
 
       Tokens that trigger :meth:`help_print`.
-      Set to an empty list to disable help feature.
+      Set to an empty list to disable this "help" feature.
       Defaults to ``["--help", "-h"]``.
-      Cannot be changed after instantiating the app.
 
    .. attribute:: help_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
@@ -82,7 +81,6 @@ API
       Token(s) that trigger :meth:`version_print`.
       Set to an empty list to disable version feature.
       Defaults to ``["--version"]``.
-      Cannot be changed after instantiating the app.
 
    .. attribute:: console
       :type: rich.console.Console
@@ -152,7 +150,7 @@ API
       This converter runs **after** :class:`Parameter` and :class:`Group` converters.
 
    .. attribute:: validator
-      :type: Union[None, Callable, List[Callable]]
+      :type: Union[None, Callable, list[Callable]]
       :value: []
 
       A function where all the converted CLI-provided variables will be keyword-unpacked,
@@ -196,7 +194,7 @@ API
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
+         def config(apps: list["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
@@ -206,11 +204,8 @@ API
                 The current command app is the last element of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
-             mapping: Dict[str, Union[Unset, List[str]]]
-                A dictionary mapping CLI keyword names to their tokens (before App and Group converters/validators have been invoked).
-                For example, if the user specifies --my-var=foo, then this dictionary will be {"my-var": ["foo"]}.
-                If the value is an cyclopts.config.Unset object, then no tokens have been parsed for that parameter yet.
-                Deleting keys from this dictionary will unset their value.
+             arguments: ArgumentCollection
+                TODO
              """
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
@@ -238,8 +233,24 @@ API
 
       .. code-block:: python
 
-          def converter(type_, *args) -> Any:
+          def converter(type_, tokens) -> Any:
               pass
+
+      Where ``type_`` is the parameter's type hint, and ``tokens`` is either:
+      * A ``list[str]`` of CLI tokens.
+      * A ``Dict`` of CLI tokens if keys are specified in the CLI. E.g.
+
+        .. code-block:: bash
+
+           python my-script.py --foo.key1=val1
+
+        would be parsed into:
+
+        .. code-block:: python
+
+           tokens = {
+              "key1": ["val1"],
+           }
 
       If not provided, defaults to Cyclopts's internal coercion engine.
 
@@ -312,8 +323,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      Indicates that the parameter must be supplied on the help-page.
-      Does **not** directly enforce whether or not a parameter must be supplied; only influences the help-page.
+      Indicates that the parameter must be supplied.
       Defaults to inferring from the function signature; i.e. ``False`` if the parameter has a default, ``True`` otherwise.
 
    .. attribute:: show
@@ -369,7 +379,7 @@ API
 
       .. code-block:: python
 
-         def env_var_split(type_: type, val: str) -> List[str]:
+         def env_var_split(type_: type, val: str) -> list[str]:
              ...
 
       where ``type_`` is the associated parameter type-hint, and ``val`` is the environment value.
@@ -492,20 +502,16 @@ API
    .. attribute:: converter
       :type: Optional[Callable]
 
-      A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
+      A function that takes in an :class:`cyclopts.ArgumentCollection` and updates their value(s) in-place.
 
       .. code-block:: python
 
-          def converter(**kwargs) -> Dict[str, Any]:
-              """Return an updated dictionary."""
+          def converter(argument_collection: ArgumentCollection):
+              """Updates argument values in-place."""
+              for argument in argument_collection:
+                 argument.value = ...  # set to argument.UNSET to unbind
 
-      The **python variable names will be used**, which may differ from their CLI names.
-      If a variable isn't populated from the CLI or environment variable, it will not be provided to the converter.
-      I.e. defaults from the function signature are **not** applied prior.
-
-      The returned dictionary will be used for subsequent execution.
-      Removing variables from the returned dictionary will unbind them.
-      When used with :meth:`@app.command <cyclopts.App.command>`, all function arguments are provided.
+      TODO: reference ArgumentCollection documentation here.
 
    .. attribute:: validator
       :type: Optional[Callable]
@@ -609,6 +615,7 @@ Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotati
 Path
 ^^^^
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
+All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``list[Path]``).
 
 .. autodata:: cyclopts.types.ExistingPath
 
@@ -638,6 +645,7 @@ Path
 Number
 ^^^^^^
 Annotated types for checking common int/float value constraints.
+All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]`` or ``list[float]``).
 
 .. autodata:: cyclopts.types.PositiveFloat
 
@@ -655,6 +663,19 @@ Annotated types for checking common int/float value constraints.
 
 .. autodata:: cyclopts.types.NonPositiveInt
 
+.. autodata:: cyclopts.types.UInt8
+
+.. autodata:: cyclopts.types.Int8
+
+.. autodata:: cyclopts.types.UInt16
+
+.. autodata:: cyclopts.types.Int16
+
+.. autodata:: cyclopts.types.UInt32
+
+.. autodata:: cyclopts.types.Int32
+
+
 .. _API Config:
 
 ------
@@ -670,21 +691,17 @@ All Cyclopts builtins index into the configuration file with the following rules
 3. Apply each key/value pair if CLI arguments have **not** been provided for that parameter.
 
 .. autoclass:: cyclopts.config.Toml
+   :members:
 
    Automatically read configuration from Toml file.
-
-   .. attribute:: path
-      :type: Union[str, Path]
-
-      Path to the TOML configuration file.
 
    .. attribute:: root_keys
       :type: Iterable[str]
       :value: None
+      :noindex:
 
-      Keys that lead to your application's configuration.
-      For example, if referencing a ``pyproject.toml``, it is common
-      to store all of your projects configuration under:
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a ``pyproject.toml``, it is common to store all of your projects configuration under:
 
       .. code-block:: toml
 
@@ -696,90 +713,17 @@ All Cyclopts builtins index into the configuration file with the following rules
 
          app = cyclopts.App(config=cyclopts.config.Toml("pyproject.toml", root_keys=("tool", "myproject")))
 
-   .. attribute:: must_exist
-      :type: bool
-      :value: False
-
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
-
-   .. attribute:: search_parents
-      :type: bool
-      :value: False
-
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Toml.path` is found.
-
-   .. attribute:: allow_unknown
-      :type: bool
-      :value: False
-
-      Allow unknown keywords configuration values.
-
 .. autoclass:: cyclopts.config.Yaml
+   :members:
 
    Automatically read configuration from Yaml file.
 
-   .. attribute:: path
-      :type: Union[str, Path]
-
-      Path to the YAML configuration file.
-
-   .. attribute:: root_keys
-      :type: Iterable[str]
-      :value: None
-
-      Keys that lead to your application's configuration in the YAML file.
-
-   .. attribute:: must_exist
-      :type: bool
-      :value: False
-
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
-
-   .. attribute:: search_parents
-      :type: bool
-      :value: False
-
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Yaml.path` is found.
-
-   .. attribute:: allow_unknown
-      :type: bool
-      :value: False
-
-      Allow unknown keywords configuration values.
-
 
 .. autoclass:: cyclopts.config.Json
+   :members:
 
    Automatically read configuration from Json file.
 
-   .. attribute:: path
-      :type: Union[str, Path]
-
-      Path to the JSON configuration file.
-
-   .. attribute:: root_keys
-      :type: Iterable[str]
-      :value: None
-
-      Keys that lead to your application's configuration in the YAML file.
-
-   .. attribute:: must_exist
-      :type: bool
-      :value: False
-
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
-
-   .. attribute:: search_parents
-      :type: bool
-      :value: False
-
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Json.path` is found.
-
-   .. attribute:: allow_unknown
-      :type: bool
-      :value: False
-
-      Allow unknown keywords configuration values.
 
 .. autoclass:: cyclopts.config.Env
 
@@ -832,9 +776,6 @@ All Cyclopts builtins index into the configuration file with the following rules
       :value: cyclopts.env_var_split
 
       Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
-
-.. autoclass:: cyclopts.config.Unset
-   :members: related_set
 
 ----------
 Exceptions

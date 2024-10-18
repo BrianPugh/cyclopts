@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Annotated, Iterable, List, Optional, Tuple
 
 import pytest
 
@@ -22,6 +22,7 @@ def test_env_var_split_path_windows(mocker):
         List[Optional[Path]],
         Tuple[Path, ...],
         Tuple[Optional[Path], ...],
+        Annotated[List[Path], "test annotation"],
     ],
 )
 def test_env_var_split_path_posix_multiple(mocker, type_):

@@ -1,7 +1,5 @@
 from typing import Tuple, Union
 
-import pytest
-
 from cyclopts.parameter import validate_command
 
 

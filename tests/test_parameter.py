@@ -1,80 +1,71 @@
 import inspect
-import sys
-from typing import List, Optional, Set
+from typing import Annotated, List, Optional, Set
 
 import pytest
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
-
 from cyclopts import Parameter
-from cyclopts.parameter import get_hint_parameter
 
 
 def test_parameter_get_negatives_bool_default():
-    p = Parameter()
-    assert ("--no-foo", "--no-bar") == p.get_negatives(bool, "--foo", "--bar")
+    p = Parameter(name=("--foo", "--bar"))
+    assert ("--no-foo", "--no-bar") == p.get_negatives(bool)
 
 
 @pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
 def test_parameter_get_negatives_iterable_default(type_):
-    p = Parameter()
-    assert ("--empty-foo", "--empty-bar") == p.get_negatives(type_, "--foo", "--bar")
+    p = Parameter(name=("--foo", "--bar"))
+    assert ("--empty-foo", "--empty-bar") == p.get_negatives(type_)
 
 
 @pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
 def test_parameter_get_negatives_iterable_custom_prefix(type_):
-    p = Parameter(negative_iterable="--vacant-")
-    assert ("--vacant-foo", "--vacant-bar") == p.get_negatives(type_, "--foo", "--bar")
+    p = Parameter(negative_iterable="vacant-", name=("--foo", "--bar"))
+    assert ("--vacant-foo", "--vacant-bar") == p.get_negatives(type_)
 
 
 @pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
 def test_parameter_get_negatives_iterable_custom_prefix_list(type_):
-    p = Parameter(negative_iterable=["--vacant-", "--blank-"])
-    assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(
-        p.get_negatives(type_, "--foo", "--bar")
-    )
+    p = Parameter(negative_iterable=["vacant-", "blank-"], name=("--foo", "--bar"))
+    assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(p.get_negatives(type_))
 
 
 def test_parameter_negative_iterable_invalid_name(app, assert_parse_args):
     Parameter(negative_iterable=())  # Valid
     with pytest.raises(ValueError):
-        Parameter(negative_iterable="doesnt-start-with-hyphens")
+        Parameter(negative_iterable="--starts-with-hyphens")
 
 
 @pytest.mark.parametrize("type_", [bool, list, set])
 def test_parameter_get_negatives_custom_single(type_):
-    p = Parameter(negative="--foo")
-    assert ("--foo",) == p.get_negatives(type_, "this-string-doesnt-matter", "neither-does-this-one")
+    p = Parameter(negative="--foo", name=("this-string-doesnt-matter", "neither-does-this-one"))
+    assert ("--foo",) == p.get_negatives(type_)
 
 
 @pytest.mark.parametrize("type_", [bool, list, set])
 def test_parameter_get_negatives_bool_custom_list(type_):
-    p = Parameter(negative=["--foo", "--bar"])
-    assert ("--foo", "--bar") == p.get_negatives(type_, "this-string-doesnt-matter")
+    p = Parameter(negative=["--foo", "--bar"], name="this-string-doesnt-matter")
+    assert ("--foo", "--bar") == p.get_negatives(type_)
 
 
 @pytest.mark.parametrize("type_", [bool, list, set])
 def test_parameter_get_negatives_bool_custom_prefix(type_):
-    p = Parameter(negative_bool="--yesnt-")
-    assert ("--yesnt-foo", "--yesnt-bar") == p.get_negatives(bool, "--foo", "--bar")
+    p = Parameter(negative_bool="yesnt-", name=("--foo", "--bar"))
+    assert ("--yesnt-foo", "--yesnt-bar") == p.get_negatives(bool)
 
 
 def test_parameter_negative_bool_invalid_name(app, assert_parse_args):
     Parameter(negative_bool=())  # Valid
     with pytest.raises(ValueError):
-        Parameter(negative_bool="doesnt-start-with-hyphens")
+        Parameter(negative_bool="--starts-with-hyphens")
 
 
 @pytest.mark.parametrize("type_", [bool, list, set])
 def test_parameter_get_negatives_bool_custom_prefix_list(type_):
-    p = Parameter(negative_bool=["--yesnt-", "--not-"])
-    assert {"--yesnt-foo", "--yesnt-bar", "--not-foo", "--not-bar"} == set(p.get_negatives(bool, "--foo", "--bar"))
+    p = Parameter(negative_bool=["yesnt-", "not-"], name=("--foo", "--bar"))
+    assert {"--yesnt-foo", "--yesnt-bar", "--not-foo", "--not-bar"} == set(p.get_negatives(bool))
 
 
-def test_get_hint_parameter_basic():
+def test_parameter_from_annotation_basic():
     expected_cparam = Parameter(
         name=["--help", "-h"],
         negative="",
@@ -82,12 +73,10 @@ def test_get_hint_parameter_basic():
         help="Display this message and exit.",
     )
 
-    type_, cparam = get_hint_parameter(Annotated[bool, expected_cparam], Parameter())
-    assert type_ is bool
-    assert cparam == expected_cparam
+    assert Parameter.from_annotation(Annotated[bool, expected_cparam], Parameter()) == expected_cparam
 
 
-def test_get_hint_parameter_optional_annotated():
+def test_parameter_from_annotation_optional_annotated():
     expected_cparam = Parameter(
         name=["--help", "-h"],
         negative="",
@@ -95,26 +84,11 @@ def test_get_hint_parameter_optional_annotated():
         help="Display this message and exit.",
     )
 
-    type_, cparam = get_hint_parameter(Optional[Annotated[bool, expected_cparam]], Parameter())
-    assert type_ is bool
-    assert cparam == expected_cparam
+    assert Parameter.from_annotation(Optional[Annotated[bool, expected_cparam]], Parameter()) == expected_cparam
 
 
-def test_get_hint_parameter_empty_iparam_1():
-    p = inspect.Parameter("foo", inspect.Parameter.POSITIONAL_ONLY)
-    type_, _ = get_hint_parameter(p, Parameter())
-    assert type_ is str
-
-
-def test_get_hint_parameter_empty_iparam_2():
-    type_, _ = get_hint_parameter(inspect.Parameter.empty, Parameter())
-    assert type_ is str
-
-
-def test_get_hint_parameter_empty_iparam_w_default():
-    p = inspect.Parameter("foo", inspect.Parameter.POSITIONAL_ONLY, default=5)
-    type_, _ = get_hint_parameter(p, Parameter())
-    assert type_ is int
+def test_parameter_from_annotation_empty_annotation():
+    assert Parameter.from_annotation(inspect.Parameter.empty, Parameter()) == Parameter()
 
 
 def test_parameter_combine():
