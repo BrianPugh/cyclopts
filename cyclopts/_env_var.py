@@ -22,10 +22,10 @@ def env_var_split(
     val: str,
     *,
     delimiter: Optional[str] = None,
-):
+) -> list[str]:
     """Type-dependent environment variable value splitting.
 
-    Performs splitting when:
+    Converts a single string into a list of strings. Splits when:
 
     * The ``type_`` is some variant of ``Iterable[pathlib.Path]`` objects.
       If Windows, split on ``;``, otherwise split on ``:``.
@@ -33,7 +33,7 @@ def env_var_split(
     * Otherwise, if the ``type_`` is an ``Iterable``, split on whitespace.
       Leading/trailing whitespace of each output element will be stripped.
 
-    Is the default value for :attr:`cyclopts.App.env_var_split`.
+    This function is the default value for :attr:`cyclopts.App.env_var_split`.
 
     Parameters
     ----------
@@ -48,7 +48,7 @@ def env_var_split(
     Returns
     -------
     list[str]
-        List of individual tokens.
+        List of individual string tokens.
     """
     from cyclopts._convert import resolve, token_count
 

@@ -250,11 +250,12 @@ class SentinelMeta(type):
 
 
 class Sentinel(metaclass=SentinelMeta):
-    pass
+    def __new__(cls, *args, **kwargs):
+        raise ValueError("Sentinel objects are not intended to be instantiated. Subclass instead.")
 
 
 class UNSET(Sentinel):
-    """No data was provided."""
+    """Special sentinel value indicating that no data was provided. Do not instantiate."""
 
 
 def record_init(target: str):

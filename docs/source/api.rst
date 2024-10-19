@@ -150,8 +150,6 @@ API
 
       This validator runs **after** :class:`Parameter` and :class:`Group` validators.
 
-      The raised error message will be presented to the user with python-variables prepended with "--" remapped to their CLI counterparts.
-
    .. attribute:: name_transform
       :type: Optional[Callable[[str], str]]
       :value: None
@@ -497,47 +495,56 @@ API
          def validator(**kwargs):
              "Raise an exception if something is invalid."
 
-      Validators are **not** invoked on command groups.
+      Validators are **not** invoked at the command group level.
 
-      The raised error message will be presented to the user with python-variables prepended with ``"--"`` remapped to their CLI counterparts.
+.. autoclass:: cyclopts.Token
 
-      In the following example, the python variable name ``"--bar"`` in the error message is remapped to ``"--buzz"``.
+   .. attribute:: keyword
+      :type: Optional[str]
+      :value: None
 
-      .. code-block:: python
+      **Unadulterated** user-supplied keyword like ``--foo`` or ``--foo.bar.baz``; ``None`` when token was pared positionally.
+      Could also be something like ``tool.project.foo`` if from non-cli sources.
 
-         from cyclopts import Parameter, App, Group
-         from typing import Annotated
+   .. attribute:: value
+      :type: str
+      :value: ""
 
-         app = App()
+      The parsed token value (unadulterated).
+
+   .. attribute:: source
+      :type: str
+      :value: ""
+
+      Where the token came from; used for error message purposes.
+      Cyclopts uses the string ``cli`` for cli-parsed tokens.
+
+   .. attribute:: index
+      :type: int
+      :value: 0
+
+      The relative positional index in which the value was provided.
+
+   .. attribute:: keys
+      :type: tuple[str, ...]
+      :value: ()
+
+      The additional parsed **python** variable keys from :attr:`keyword`.
+
+      Only used for Arguments that take arbitrary keys.
+
+   .. attribute:: implicit_value
+      :type: Any
+      :value: cyclopts.UNSET
+
+      Final value that should be used instead of converting from :attr:`value`.
+
+      Commonly used for boolean flags.
+
+      Ignored if :obj:`~.UNSET`.
 
 
-         def upper_case_only(**kwargs):
-             for k, v in kwargs.items():
-                 if not v.isupper():
-                     raise ValueError(f'--{k} value "{v}" needs to be uppercase.')
-
-
-         group = Group("", validator=upper_case_only)
-
-
-         @app.default
-         def foo(
-             bar: Annotated[str, Parameter(name="--fizz", group=group)],
-             baz: Annotated[str, Parameter(name="--buzz", group=group)],
-         ):
-             pass
-
-
-         app()
-
-      .. code-block:: console
-
-         $ python meow.py ALICE bob
-         ╭─ Error ─────────────────────────────────────────────────╮
-         │ --buzz value "bob" needs to be uppercase.               │
-         ╰─────────────────────────────────────────────────────────╯
-
-.. autofunction:: cyclopts.convert
+.. autoclass:: cyclopts.UNSET
 
 .. autofunction:: cyclopts.default_name_transform
 

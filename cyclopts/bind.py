@@ -123,7 +123,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                         token = tokens[i + 1 + j]
                         if not argument.cparam.allow_leading_hyphen and is_option_like(token):
                             raise UnknownOptionError(
-                                token=CliToken(keyword=token), argument_collection=argument_collection
+                                token=CliToken(keyword=token, index=j), argument_collection=argument_collection
                             )
                         cli_values.append(token)
                         skip_next_iterations += 1

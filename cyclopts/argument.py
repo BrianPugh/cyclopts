@@ -861,7 +861,7 @@ class Argument:
             positional: list[Token] = []
             keyword = {}
             for token in self.tokens:
-                if token.implicit_value is not None:
+                if token.implicit_value is not UNSET:
                     assert len(self.tokens) == 1
                     return token.implicit_value
 
