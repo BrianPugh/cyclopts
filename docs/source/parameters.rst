@@ -54,10 +54,11 @@ However, if more control is required, we can provide additional information by a
    from cyclopts import Parameter
    from typing import Annotated
 
-
    @app.command
    def foo(bar: Annotated[int, Parameter(...)]):
        pass
+
+   app()
 
 :class:`.Parameter` gives complete control on how Cyclopts processes the annotated parameter.
 See the :ref:`API` page for all configurable options.
@@ -65,8 +66,96 @@ See the :ref:`API` page for all configurable options.
 ------
 Naming
 ------
-Like :ref:`command names <Command Changing Name>`, command-line parameter names are derived from their python counterparts.
-This automatic command name transform can be configured by :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`. Note that the resulting string is **before** the standard ``--`` is prepended.
+Like :ref:`command names <Command Changing Name>`, CLI parameter names are derived from their python counterparts.
+However, sometimes customization is needed.
+
+.. _Parameters - Naming - Manual Naming:
+
+^^^^^^^^^^^^^
+Manual Naming
+^^^^^^^^^^^^^
+Parameter names (and their short forms) can be manually specified:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App()
+
+   @app.default
+   def main(
+       *,
+       foo: Annotated[str, Parameter(name=["--foo", "-f"])],  # Adding a short-form
+       bar: Annotated[str, Parameter(name="--something-else")],
+   ):
+       pass
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --help
+
+   Usage: main COMMAND [OPTIONS]
+   ╭─ Commands ──────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.               │
+   │ --version  Display application version.                 │
+   ╰─────────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────────╮
+   │ *  --foo             -f  [required]                     │
+   │ *  --something-else      [required]                     │
+   ╰─────────────────────────────────────────────────────────╯
+
+Manually set names via :attr:`Parameter.name <cyclopts.Parameter.name>` are not subject to :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`.
+
+
+^^^^^^^^^^^^^^
+Name Transform
+^^^^^^^^^^^^^^
+The name transform function that converts the python variable name to it's CLI counterpart can be configured by setting :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` (defaults to :func:`.default_name_transform`).
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App()
+
+   def name_transform(s: str) -> str:
+       return s.upper()
+
+   @app.default
+   def main(
+       *,
+       foo: Annotated[str, Parameter(name_transform=name_transform)],
+       bar: Annotated[str, Parameter(name_transform=name_transform)],
+   ):
+       pass
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --help
+   Usage: main COMMAND [OPTIONS]
+
+   ╭─ Commands ──────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.               │
+   │ --version  Display application version.                 │
+   ╰─────────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────────╮
+   │ *  --FOO  [required]                                    │
+   │ *  --BAR  [required]                                    │
+   ╰─────────────────────────────────────────────────────────╯
+
+Notice how the parameter is now ``--FOO`` instead of the standard ``--foo``.
+
+.. note:
+   The returned string is **before** the standard ``--`` is prepended.
+
+Generally, it is not very useful to set the name transform on **individual** parameters; it would be easier/clearer :ref:`to manually specify the name <Parameters - Naming - Manual Naming>`.
+However, we can change the default name transform for the **entire app** by configuring the app's :ref:`default_parameter <Default Parameter>`.
 
 To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app, add the following to your :class:`~cyclopts.App` configuration:
 
@@ -76,13 +165,10 @@ To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app,
        default_parameter=Parameter(name_transform=my_custom_name_transform),
    )
 
-The :attr:`~.App.default_parameter` mechanism is described in the :ref:`Default Parameter` section.
-Manually set names via :attr:`Parameter.name <cyclopts.Parameter.name>` are not subject to :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`.
-
 ----
 Help
 ----
-It's recommended to use docstrings for your parameter help, but if necessary, you can explicitly set a help string:
+It is recommended to use docstrings for your parameter help, but if necessary, you can explicitly set a help string:
 
 .. code-block:: python
 
@@ -109,13 +195,13 @@ Converters
 ----------
 
 Cyclopts has a powerful coercion engine that automatically converts CLI string tokens to the types hinted in a function signature.
-However, sometimes a custom converter is required.
+However, sometimes a custom :attr:`~.Parameter.converter` is required.
 
 Lets consider a case where we want the user to specify a file size, and we want to allows suffixes like `"MB"`.
 
 .. code-block:: python
 
-   from cyclopts import App, Parameter
+   from cyclopts import App, Parameter, Token
    from typing import Annotated
    from pathlib import Path
 
@@ -127,15 +213,13 @@ Lets consider a case where we want the user to specify a file size, and we want 
        "gb": 1024 * 1024 * 1024,
    }
 
-   def byte_units(type_, tokens):
-       # type_ is ``int``
-       # tokens is list[cyclopts.Token]
+   def byte_units(type_, tokens: list[Token]) -> int:
+       # type_ is ``int``,
        value = tokens[0].value.lower()
        try:
-           return int(value)  # If this works, it didn't have a suffix.
+           return type_(value)  # If this works, it didn't have a suffix.
        except ValueError:
            pass
-
        number, suffix = value[:-2], value[-2:]
        return int(number) * mapping[suffix]
 
@@ -165,7 +249,7 @@ The returned value is supplied to the parameter for the function.
 Validating Input
 ----------------
 Just because data is of the correct type, doesn't mean it's valid.
-If we had a program that accepted an integer user age as an input, ``-1`` is an integer, but not a valid age.
+If we had a program that accepts integer user age as an input, ``-1`` is an integer, but not a valid age.
 
 .. code-block:: python
 
@@ -204,6 +288,8 @@ If we had a program that accepted an integer user age as an input, ``-1`` is an 
    │ Invalid value "200" for "AGE". You are too old to be using this application. │
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
+Certain builtin error types (:exc:`ValueError`, :exc:`TypeError`, :exc:`AssertionError`) will be re-interpreted by Cyclopts and formatted into a prettier message for the application user.
+
 --------------------
 Parameter Resolution
 --------------------
@@ -235,6 +321,14 @@ or even stack annotations to add additional features, like a validator:
    @app.command
    def zero(size: Annotated[ByteSize, Parameter(validator=must_be_multiple_of_4096)]):
        pass
+
+Python interprets this type annotation as:
+
+.. code-block:: python
+
+   Annotated[ByteSize, Parameter(converter=byte_units), Parameter(validator=must_be_multiple_of_4096)]
+
+Cyclopts will search **right-to-left** for **set** parameter attributes until one is found. I.e. right-most parameter attributes have the highest priority.
 
 .. code-block:: console
 

@@ -23,6 +23,17 @@ def test_custom_converter(app, assert_parse_args):
     assert_parse_args(foo, "5", age=10)
 
 
+def test_custom_converter_dict(app, assert_parse_args):
+    def custom_converter(type_, tokens):
+        return {k: 2 * int(v[0].value) for k, v in tokens.items()}
+
+    @app.default
+    def foo(*, color: Annotated[dict[str, int], Parameter(converter=custom_converter)]):
+        pass
+
+    assert_parse_args(foo, "--color.red 5 --color.green 10", color={"red": 10, "green": 20})
+
+
 def test_custom_converter_user_value_error_single_token(app):
     def custom_converter(type_, tokens):
         raise ValueError

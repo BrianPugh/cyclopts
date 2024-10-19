@@ -163,6 +163,7 @@ API
          def name_transform(s: str) -> str:
              ...
 
+      The returned string should be **without** a leading ``--``.
       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
       If a subapp, inherits from first non-:obj:`None` parent.
 
@@ -196,8 +197,6 @@ API
 
 .. autoclass:: cyclopts.Parameter
 
-   Cyclopts configuration for individual function parameters.
-
    .. attribute:: name
       :type: Union[None, str, Iterable[str]]
       :value: None
@@ -211,20 +210,44 @@ API
       :type: Optional[Callable]
       :value: None
 
-      A function that converts string token(s) into an object. The converter must have signature:
+      A function that converts tokens into an object. The converter should have signature:
 
       .. code-block:: python
 
-          def converter(type_, tokens: list[cyclopts.Token]) -> Any:
+          def converter(type_, tokens) -> Any:
               pass
 
       Where ``type_`` is the parameter's type hint, and ``tokens`` is either:
-      * A ``list[str]`` of CLI tokens.
-      * A ``Dict`` of CLI tokens if keys are specified in the CLI. E.g.
 
-        .. code-block:: bash
+      * A ``list[cyclopts.Token]`` of CLI tokens (most commonly).
 
-           python my-script.py --foo.key1=val1
+        .. code-block:: python
+
+           from cyclopts import App, Parameter
+           from typing import Annotated
+
+           app = App()
+
+           def converter(type_, tokens):
+              assert type_ == tuple[int, int]
+              return tuple(2 * int(x.value) for x in tokens)
+
+           @app.default
+           def main(coordinates: Annotated[tuple[int, int], Parameter(converter=converter)]):
+              print(f"{coordinates=}")
+
+           app()
+
+        .. code-block:: console
+
+           $ python my-script.py 7 12
+           coordinates=(14, 24)
+
+      * A ``dict`` of :class:`Token` if keys are specified in the CLI. E.g.
+
+        .. code-block:: console
+
+           $ python my-script.py --foo.key1=val1
 
         would be parsed into:
 
