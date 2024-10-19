@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Union
+from typing import Any, Optional, Sequence, Union
 
 from attrs import frozen
 
@@ -22,7 +22,7 @@ class Number:
     gte: Optional[Numeric] = None
     """Input value must be **greater than or equal** this value."""
 
-    def __call__(self, type_: type, value: Union[Numeric, NumericSequence]):
+    def __call__(self, type_: Any, value: Union[Numeric, NumericSequence]):
         if isinstance(value, Sequence):
             if isinstance(value, str):
                 raise TypeError

@@ -315,12 +315,6 @@ def create_bound_arguments(
 
         argument_collection.convert()
         groups_with_arguments = _sort_group(argument_collection)
-        for group, group_arguments in groups_with_arguments:
-            if group.converter is None:
-                continue
-            group.converter(group_arguments)  # pyright: ignore[reportOptionalCall]
-            # A downstream Argument may have been overrode, so we have to reconvert the tree.
-            argument_collection.convert()
         try:
             for group, group_arguments in groups_with_arguments:
                 for validator in group.validator:  # pyright: ignore

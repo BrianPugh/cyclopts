@@ -20,7 +20,7 @@ Groups offer a way of organizing parameters and commands on the help-page; for e
    │ --rims,--no-rims  [default: False]                                           │
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
-They also provide an additional abstraction layer that converters and validators can operate on.
+They also provide an additional abstraction layer that validators can operate on.
 
 Groups can be created in two ways:
 
@@ -160,17 +160,6 @@ The default groups are defined by the registering app:
 * :attr:`.App.group_arguments` for positional-only arguments, which defaults to a group named ``"Arguments"``.
 
 * :attr:`.App.group_parameters` for all other parameters, which defaults to a group named ``"Parameters"``.
-
-----------
-Converters
-----------
-Converters offer a way of having parameters within a group interact during processing.
-Groups with an empty name, or with ``show=False``, are a way of using converters without impacting the help-page.
-See :attr:`.Group.converter` for details.
-
-.. code-block:: python
-
-   TODO
 
 ----------
 Validators

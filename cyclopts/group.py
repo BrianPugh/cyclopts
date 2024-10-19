@@ -48,8 +48,6 @@ class Group:
         converter=lambda x: NO_USER_SORT_KEY if x is None else x,
     )
 
-    converter: Optional[Callable] = field(default=None, kw_only=True)
-
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
         default=None,

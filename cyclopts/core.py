@@ -2,7 +2,7 @@ import inspect
 import os
 import sys
 import traceback
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator
 from contextlib import suppress
 from copy import copy
 from functools import partial
@@ -267,7 +267,6 @@ class App:
         kw_only=True,
     )
 
-    converter: Optional[Callable[..., Mapping[str, Any]]] = field(default=None, kw_only=True)
     validator: list[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
 
     _name_transform: Optional[Callable[[str], str]] = field(
@@ -615,7 +614,6 @@ class App:
         self,
         obj: T,
         *,
-        converter: Optional[Callable[..., Mapping[str, Any]]] = None,
         validator: Optional[Callable[..., Any]] = None,
     ) -> T: ...
 
@@ -629,7 +627,6 @@ class App:
         self,
         obj: None = None,
         *,
-        converter: Optional[Callable[..., Mapping[str, Any]]] = None,
         validator: Optional[Callable[..., Any]] = None,
     ) -> Callable[[T], T]: ...
 
@@ -637,12 +634,11 @@ class App:
         self,
         obj: Optional[T] = None,
         *,
-        converter: Optional[Callable[..., Mapping[str, Any]]] = None,
         validator: Optional[Callable[..., Any]] = None,
     ) -> Union[T, Callable[[T], T]]:
         """Decorator to register a function as the default action handler."""
         if obj is None:  # Called ``@app.default_command(...)``
-            return partial(self.default, converter=converter, validator=validator)  # pyright: ignore[reportReturnType]
+            return partial(self.default, validator=validator)  # pyright: ignore[reportReturnType]
 
         if isinstance(obj, App):  # Registering a sub-App
             raise TypeError("Cannot register a sub-App to default.")
@@ -652,8 +648,6 @@ class App:
 
         validate_command(obj)
         self.default_command = obj
-        if converter:
-            self.converter = converter
         if validator:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
@@ -773,20 +767,19 @@ class App:
                         config,
                     )
                     try:
-                        if command_app.converter:
-                            bound.arguments = command_app.converter(**bound.arguments)  # pyright: ignore[reportAttributeAccessIssue]
-                        for command_group in command_groups:
-                            if command_group.converter:
-                                bound.arguments = command_group.converter(**bound.arguments)
                         for validator in command_app.validator:
                             validator(**bound.arguments)
+                    except (AssertionError, ValueError, TypeError) as e:
+                        raise ValidationError(exception_message=e.args[0] if e.args else "", app=command_app) from e
+
+                    try:
                         for command_group in command_groups:
                             for validator in command_group.validator:  # pyright: ignore
                                 validator(**bound.arguments)
                     except (AssertionError, ValueError, TypeError) as e:
                         raise ValidationError(
                             exception_message=e.args[0] if e.args else "",
-                            group=command_group,  # pyright: ignore[reportPossiblyUnboundVariable]
+                            group=command_group,  # pyright: ignore
                         ) from e
 
                 else:

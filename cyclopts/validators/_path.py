@@ -1,5 +1,5 @@
 import pathlib
-from typing import Sequence, Union
+from typing import Any, Sequence, Union
 
 from attrs import frozen
 
@@ -29,7 +29,7 @@ class Path:
         if not self.file_okay and not self.dir_okay:
             raise ValueError("file_okay and dir_okay cannot both be False.")
 
-    def __call__(self, type_: type, path: Union[pathlib.Path, Sequence[pathlib.Path]]):
+    def __call__(self, type_: Any, path: Union[pathlib.Path, Sequence[pathlib.Path]]):
         if isinstance(path, Sequence):
             if isinstance(path, str):
                 raise TypeError

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 import cyclopts.group
-from cyclopts import UNSET, App, Group, Parameter, Token
+from cyclopts import App, Group, Parameter, Token
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
@@ -29,40 +29,6 @@ def test_group_show_property():
     assert g.show is False
 
 
-def test_group_parameter_converter(app, assert_parse_args):
-    def converter(arguments):
-        for argument in arguments:
-            argument.value = argument.value.upper()
-
-    food_group = Group("Food", converter=converter)
-
-    @app.default
-    def foo(
-        ice_cream: Annotated[str, Parameter(group=food_group)],
-        cone: Annotated[str, Parameter(group="Food")],
-    ):
-        pass
-
-    assert_parse_args(foo, "chocolate sugar", "CHOCOLATE", "SUGAR")
-
-
-def test_group_parameter_converter_delete_arg(app, assert_parse_args):
-    def converter(arguments):
-        for argument in arguments:
-            argument.value = UNSET if argument.name == "--cone" else argument.value.upper()
-
-    food_group = Group("Food", converter=converter)
-
-    @app.default
-    def foo(
-        ice_cream: Annotated[str, Parameter(group=food_group)],
-        cone: Annotated[str, Parameter(group="Food")] = "waffle",
-    ):
-        pass
-
-    assert_parse_args(foo, "chocolate sugar", "CHOCOLATE")
-
-
 def test_group_default_parameter_converter(app, assert_parse_args):
     food_group = Group("Food", default_parameter=Parameter(converter=upper))
 
@@ -73,20 +39,7 @@ def test_group_default_parameter_converter(app, assert_parse_args):
     assert_parse_args(foo, "chocolate", "CHOCOLATE")
 
 
-def test_group_command_converter(app, mocker):
-    group_converter = mocker.MagicMock(side_effect=lambda **kwargs: kwargs)
-    group = Group("Group Name", converter=group_converter)
-
-    @app.command(group=group)
-    def foo(bar: int):
-        pass
-
-    app("foo 10")
-
-    group_converter.assert_called_once_with(bar=10)
-
-
-def test_group_command_validator(app, assert_parse_args):
+def test_command_validator(app, assert_parse_args):
     def bar_must_be_1(bar):
         if bar == 1:
             return
@@ -98,8 +51,28 @@ def test_group_command_validator(app, assert_parse_args):
 
     assert_parse_args(foo, "foo 1", bar=1)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as e:
         app("foo 2", exit_on_error=False)
+
+    assert str(e.value) == "Invalid values for command 'foo'."
+
+
+def test_command_validator_with_message(app, assert_parse_args):
+    def bar_must_be_1(bar):
+        if bar == 1:
+            return
+        raise ValueError("The value 'bar' must be 1.")
+
+    @app.command(validator=bar_must_be_1)
+    def foo(bar: int):
+        pass
+
+    assert_parse_args(foo, "foo 1", bar=1)
+
+    with pytest.raises(ValidationError) as e:
+        app("foo 2", exit_on_error=False)
+
+    assert str(e.value) == "Invalid values for command 'foo'. The value 'bar' must be 1."
 
 
 def test_group_command_default_parameter_resolution(app):

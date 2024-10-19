@@ -1,7 +1,6 @@
 import inspect
-from collections.abc import Iterable
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Sequence, get_args, get_origin
 
 from attrs import define, field
 
@@ -87,7 +86,7 @@ class CycloptsError(Exception):
     :class:`Argument` that was matched.
     """
 
-    command_chain: Optional[Iterable[str]] = None
+    command_chain: Optional[Sequence[str]] = None
     """
     List of command that lead to ``target``.
     """
@@ -137,9 +136,6 @@ class ValidationError(CycloptsError):
     value: Any = cyclopts.utils.UNSET
 
     def __str__(self):
-        # Make sure only 1 is set.
-        assert (bool(self.argument) + bool(self.group)) == 1
-
         if self.argument:
             value = self.argument.value if self.value is cyclopts.utils.UNSET else self.value
             token = self.argument.tokens[0]
@@ -148,6 +144,8 @@ class ValidationError(CycloptsError):
             message = f'Invalid value "{value}" for "{name}"{provided_by}.'
         elif self.group:
             message = f'Invalid values for group "{self.group}".'
+        elif self.command_chain:
+            message = f"Invalid values for command {self.command_chain[-1]!r}."
         else:
             raise NotImplementedError
 

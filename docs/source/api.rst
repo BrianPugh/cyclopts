@@ -133,22 +133,6 @@ API
 
       The default group that non-positional-only parameters are assigned to.
 
-   .. attribute:: converter
-      :type: Optional[Callable]
-      :value: None
-
-      A function where all the converted CLI-provided variables will be keyword-unpacked,
-      regardless of their positional/keyword-type in the command function signature.
-      The python variable names will be used, which may differ from their CLI names.
-
-      .. code-block:: python
-
-          def converter(**kwargs) -> Dict[str, Any]:
-              "Return an updated dictionary."
-
-      The returned dictionary will be used passed along to the command invocation.
-      This converter runs **after** :class:`Parameter` and :class:`Group` converters.
-
    .. attribute:: validator
       :type: Union[None, Callable, list[Callable]]
       :value: []
@@ -233,7 +217,7 @@ API
 
       .. code-block:: python
 
-          def converter(type_, tokens) -> Any:
+          def converter(type_, tokens: list[cyclopts.Token]) -> Any:
               pass
 
       Where ``type_`` is the parameter's type hint, and ``tokens`` is either:
@@ -499,20 +483,6 @@ API
       Default :class:`Parameter` in the parameter-resolution-stack that goes between :attr:`.App.default_parameter` and the function signature's :obj:`Annotated` :class:`.Parameter`.
       The provided :class:`Parameter` is not allowed to have a :attr:`~Parameter.group` value.
 
-   .. attribute:: converter
-      :type: Optional[Callable]
-
-      A function that takes in an :class:`cyclopts.ArgumentCollection` and updates their value(s) in-place.
-
-      .. code-block:: python
-
-          def converter(argument_collection: ArgumentCollection):
-              """Updates argument values in-place."""
-              for argument in argument_collection:
-                 argument.value = ...  # set to argument.UNSET to unbind
-
-      TODO: reference ArgumentCollection documentation here.
-
    .. attribute:: validator
       :type: Optional[Callable]
       :value: None
@@ -528,7 +498,6 @@ API
              "Raise an exception if something is invalid."
 
       Validators are **not** invoked on command groups.
-      The group-validator runs **after** the group-converter.
 
       The raised error message will be presented to the user with python-variables prepended with ``"--"`` remapped to their CLI counterparts.
 
