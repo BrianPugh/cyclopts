@@ -8,7 +8,7 @@ from attrs import field, frozen
 
 import cyclopts._env_var
 import cyclopts.utils
-from cyclopts._convert import convert
+from cyclopts._convert import ITERABLE_TYPES, convert
 from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
@@ -17,6 +17,8 @@ from cyclopts.utils import (
     record_init,
     to_tuple_converter,
 )
+
+_NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES])
 
 
 def _not_hyphen_validator(instance, attribute, values):
@@ -133,12 +135,17 @@ class Parameter:
 
         type_ = get_origin(type_) or type_
 
-        if self.negative is not None:
-            return self.negative  # pyright: ignore
-        elif type_ not in (bool, list, set):
+        if (self.negative is not None and not self.negative) or type_ not in _NEGATIVE_FLAG_TYPES:
             return ()
 
-        out = []
+        out, user_negatives = [], []
+        if self.negative:
+            for negative in self.negative:
+                (out if negative.startswith("-") else user_negatives).append(negative)
+
+            if not user_negatives:
+                return tuple(out)
+
         assert isinstance(self.name, tuple)
         for name in self.name:
             if not name.startswith("--"):  # Only provide negation for option-like long flags.
@@ -151,8 +158,12 @@ class Parameter:
             if name_prefix:
                 name_prefix += "."
             assert isinstance(negative_prefixes, tuple)
-            for negative_prefix in negative_prefixes:
-                out.append(f"--{name_prefix}{negative_prefix}{name_components[-1]}")
+            if self.negative is None:
+                for negative_prefix in negative_prefixes:
+                    out.append(f"--{name_prefix}{negative_prefix}{name_components[-1]}")
+            else:
+                for negative in user_negatives:
+                    out.append(f"--{name_prefix}{negative}")
         return tuple(out)
 
     def __repr__(self):

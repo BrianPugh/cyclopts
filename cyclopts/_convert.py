@@ -8,6 +8,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Iterable,
     Literal,
     Optional,
     Union,
@@ -36,7 +37,7 @@ _implicit_iterable_type_mapping: dict[type, type] = {
     dict: dict[str, str],
 }
 
-_iterable_types = {list, set, frozenset, Sequence}
+ITERABLE_TYPES = {list, set, frozenset, Sequence, Iterable, tuple}
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
@@ -196,7 +197,13 @@ def _convert(
                 raise last_coercion_error
             else:
                 raise CoercionError(token=token[0] if isinstance(token, Sequence) else token, target_type=type_)
-    elif origin_type in _iterable_types:  # NOT including tuple
+    elif origin_type is tuple:
+        if isinstance(token, Token):
+            # E.g. Tuple[str] (Annotation: tuple containing a single string)
+            out = convert_tuple(type_, token, converter=converter)
+        else:
+            out = convert_tuple(type_, *token, converter=converter)
+    elif origin_type in ITERABLE_TYPES:  # NOT including tuple
         count, _ = token_count(inner_types[0])
         if not isinstance(token, Sequence):
             raise ValueError
@@ -205,12 +212,6 @@ def _convert(
         else:
             gen = token
         out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
-    elif origin_type is tuple:
-        if isinstance(token, Token):
-            # E.g. Tuple[str] (Annotation: tuple containing a single string)
-            out = convert_tuple(type_, token, converter=converter)
-        else:
-            out = convert_tuple(type_, *token, converter=converter)
     elif isclass(type_) and issubclass(type_, Enum):
         if isinstance(token, Sequence):
             raise ValueError
@@ -362,7 +363,7 @@ def convert(
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
-    elif maybe_origin_type in _iterable_types or origin_type is collections.abc.Iterable:
+    elif maybe_origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable:
         return convert_priv(type_, tokens)  # pyright: ignore
     elif maybe_origin_type is dict:
         if not isinstance(tokens, dict):
@@ -416,9 +417,9 @@ def token_count(type_: Any) -> tuple[int, bool]:
             return 1, True
     elif (origin_type or annotation) is bool:
         return 0, False
-    elif annotation in _iterable_types or (origin_type in _iterable_types and len(get_args(annotation)) == 0):
+    elif annotation in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(annotation)) == 0):
         return 1, True
-    elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
+    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
         return token_count(get_args(annotation)[0])[0], True
     elif is_union(type_):
         sub_args = get_args(type_)
