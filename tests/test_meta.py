@@ -1,13 +1,8 @@
-import sys
+from typing import Annotated
 
 import pytest
 
 from cyclopts import Parameter
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 @pytest.mark.parametrize(

@@ -43,8 +43,8 @@ release = __version__
 extensions = [
     "myst_parser",
     "sphinx_rtd_theme",
+    "sphinx_rtd_dark_mode",
     "sphinx.ext.autodoc",
-    "sphinx_autodoc_typehints",
     "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx.ext.linkcode",
@@ -61,6 +61,8 @@ exclude_patterns = []
 
 smartquotes = False
 
+# user starts in light mode
+default_dark_mode = False
 
 # Myst
 myst_enable_extensions = [
@@ -167,10 +169,8 @@ html_logo = "../../assets/logo_512w.png"
 html_favicon = "../../assets/favicon-192.png"
 
 html_theme_options = {
-    # "analytics_id": "G-XXXXXXXXXX",  # Provided by Google in your dashboard
-    # "analytics_anonymize_ip": False,
     "logo_only": True,
-    "display_version": False,
+    "version_selector": True,
     "prev_next_buttons_location": "bottom",
     "style_external_links": False,
     "vcs_pageview_mode": "",

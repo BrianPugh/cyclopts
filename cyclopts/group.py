@@ -1,21 +1,20 @@
 import itertools
+from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Iterable,
-    List,
     Optional,
-    Tuple,
     Union,
     cast,
 )
 
 from attrs import define, field
 
-from cyclopts.utils import Sentinel, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import Sentinel, is_iterable, to_tuple_converter
 
 if TYPE_CHECKING:
+    from cyclopts.argument import ArgumentCollection
     from cyclopts.parameter import Parameter
 
 
@@ -50,13 +49,13 @@ class Group:
         converter=lambda x: NO_USER_SORT_KEY if x is None else x,
     )
 
-    converter: Optional[Callable] = field(default=None, kw_only=True)
-
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable, Iterable[Callable]] = field(
-        default=None,
-        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
-        kw_only=True,
+    validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]] = (
+        field(
+            default=None,
+            converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+            kw_only=True,
+        )
     )
 
     default_parameter: Optional["Parameter"] = field(
@@ -116,6 +115,8 @@ class Group:
 
 @define
 class GroupConverter:
+    """Configurable attrs converter."""
+
     default_group: Group
 
     def __call__(self, input_value: Union[None, str, Group]) -> Group:
@@ -129,7 +130,7 @@ class GroupConverter:
             raise TypeError
 
 
-def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group], List[Any]]:
+def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group], list[Any]]:
     """Sort groups for the help-page."""
     assert len(groups) == len(attributes)
     if not groups:
@@ -144,9 +145,9 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
         else:
             sort_key__group_attributes.append((group._sort_key, value))
 
-    sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
-    ordered_no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
-    no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
+    sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
+    ordered_no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
+    no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
 
     for sort_key, (group, attribute) in sort_key__group_attributes:
         value = (group, attribute)
@@ -166,3 +167,24 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
     out_groups, out_attributes = zip(*[x[1] for x in combined])
 
     return list(out_groups), list(out_attributes)
+
+
+def resolve_callables(t, *args, **kwargs):
+    """Recursively resolves callable elements in a tuple."""
+    if isinstance(t, type(Sentinel)):
+        return t
+
+    if callable(t):
+        return t(*args, **kwargs)
+
+    resolved = []
+    for element in t:
+        if isinstance(element, type(Sentinel)):
+            resolved.append(element)
+        elif callable(element):
+            resolved.append(element(*args, **kwargs))
+        elif is_iterable(element):
+            resolved.append(resolve_callables(element, *args, **kwargs))
+        else:
+            resolved.append(element)
+    return tuple(resolved)

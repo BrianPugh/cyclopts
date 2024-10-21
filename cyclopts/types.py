@@ -1,14 +1,11 @@
-import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Sequence
 
 from cyclopts import validators
-from cyclopts._convert import convert
 from cyclopts.parameter import Parameter
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
+if TYPE_CHECKING:
+    from cyclopts.token import Token
 
 __all__ = [
     # Path
@@ -22,6 +19,7 @@ __all__ = [
     "ResolvedExistingDirectory",
     "ResolvedDirectory",
     "ResolvedFile",
+    "ResolvedPath",
     # Number
     "PositiveFloat",
     "NonNegativeFloat",
@@ -31,14 +29,21 @@ __all__ = [
     "NonNegativeInt",
     "NegativeInt",
     "NonPositiveInt",
+    "UInt8",
+    "Int8",
+    "UInt16",
+    "Int16",
+    "UInt32",
+    "Int32",
 ]
 
 
 ########
 # Path #
 ########
-def _path_resolve_converter(type_, *args):
-    return convert(type_, *args, converter=lambda _, x: Path(x).resolve())
+def _path_resolve_converter(type_, tokens: Sequence["Token"]):
+    assert len(tokens) == 1
+    return type_(tokens[0].value).resolve()
 
 
 ExistingPath = Annotated[Path, Parameter(validator=validators.Path(exists=True))]
@@ -89,3 +94,18 @@ NegativeInt = Annotated[int, Parameter(validator=validators.Number(lt=0))]
 "An int that **must** be ``<0``."
 NonPositiveInt = Annotated[int, Parameter(validator=validators.Number(lte=0))]
 "An int that **must** be ``<=0``."
+
+UInt8 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=255))]
+"An unsigned 8-bit integer."
+Int8 = Annotated[int, Parameter(validator=validators.Number(gte=-128, lte=127))]
+"A signed 8-bit integer."
+
+UInt16 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535))]
+"An unsigned 16-bit integer."
+Int16 = Annotated[int, Parameter(validator=validators.Number(gte=-32768, lte=32767))]
+"A signed 16-bit integer."
+
+UInt32 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=4294967295))]
+"An unsigned 32-bit integer."
+Int32 = Annotated[int, Parameter(validator=validators.Number(gte=-2147483648, lte=2147483647))]
+"A signed 32-bit integer."

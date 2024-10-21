@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 import typer
 
 import cyclopts

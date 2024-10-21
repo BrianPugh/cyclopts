@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_version_print_console_from_init(app, console):
     app.console = console
 
@@ -11,6 +8,14 @@ def test_version_print_console_from_init(app, console):
 
 
 def test_version_print_console_from_method(app, console):
+    with console.capture() as capture:
+        app.version_print(console)
+
+    assert "0.0.0\n" == capture.get()
+
+
+def test_version_print_console_none(app, console):
+    app.version = None
     with console.capture() as capture:
         app.version_print(console)
 

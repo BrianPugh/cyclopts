@@ -26,6 +26,8 @@ The priority ruleset is as follows:
 3. All remaining tokens get consumed by ``*args``, if specified.
    A prevalant use-case is in a typical :ref:`Meta App`.
 
+.. _Args & Kwargs - Args:
+
 --------------------------
 Args (Variable Positional)
 --------------------------
@@ -49,6 +51,8 @@ Individual elements are converted to the annotated type.
 
    $ my-script foo Brian 777 2
    Brian's favorite numbers are: (777, 2)
+
+.. _Args & Kwargs - Kwargs:
 
 --------------------------
 Kwargs (Variable Keywords)

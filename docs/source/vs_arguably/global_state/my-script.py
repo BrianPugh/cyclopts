@@ -1,5 +1,5 @@
 import arguably
-import library_using_arguably
+import library_using_arguably  # noqa: F401
 
 
 @arguably.command
