@@ -360,12 +360,7 @@ def create_parameter_help_panel(
             env_vars = ", ".join(argument.cparam.env_var)
             help_append(rf"[env var: {env_vars}]", "dim")
 
-        if argument.cparam.show_default or (
-            argument.cparam.show_default is None
-            and argument.field_info.default is not None
-            and argument.field_info.default != argument.field_info.empty
-            and not argument.required
-        ):
+        if argument.show_default:
             default = ""
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
                 default = argument.cparam.name_transform(argument.field_info.default.name)

@@ -4,6 +4,7 @@ from contextlib import suppress
 from functools import partial
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
+import attrs
 from attrs import define, field
 
 from cyclopts._convert import (
@@ -52,6 +53,12 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     validator=None,
     negative=None,
     accepts_keys=None,
+)
+
+_SHOW_DEFAULT_BLOCKLIST = (
+    None,
+    attrs.NOTHING,
+    inspect.Parameter.empty,
 )
 
 
@@ -703,6 +710,13 @@ class Argument:
             return False
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
+
+    @property
+    def show_default(self) -> bool:
+        if self.cparam.show_default is None:
+            return not self.required and self.field_info.default not in _SHOW_DEFAULT_BLOCKLIST
+        else:
+            return self.cparam.show_default
 
     def type_hint_for_key(self, key: str):
         try:

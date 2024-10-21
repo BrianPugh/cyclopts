@@ -396,9 +396,10 @@ def test_help_format_group_parameters_bool_flag(capture_format_group_parameters)
     assert actual == expected
 
 
-def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_group_parameters):
+@pytest.mark.parametrize("negative_str", ["--yesnt-foo", "yesnt-foo"])
+def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_group_parameters, negative_str):
     def cmd(
-        foo: Annotated[bool, Parameter(negative="--yesnt-foo", help="Docstring for foo.")] = True,
+        foo: Annotated[bool, Parameter(negative=negative_str, help="Docstring for foo.")] = True,
     ):
         pass
 
