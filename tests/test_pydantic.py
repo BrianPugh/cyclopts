@@ -3,7 +3,7 @@ from textwrap import dedent
 from typing import Dict, Optional, Union
 
 import pytest
-from pydantic import BaseModel, PositiveInt, validate_call
+from pydantic import BaseModel, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 
 from cyclopts import MissingArgumentError
@@ -49,7 +49,7 @@ class Outfit(BaseModel):
 
 class User(BaseModel):
     id: int
-    name: str = "John Doe"
+    name: str = Field(default="John Doe")
     signup_ts: Union[datetime, None]
     tastes: Dict[str, PositiveInt]
     outfit: Optional[Outfit] = None
@@ -81,7 +81,43 @@ def test_bind_pydantic_basemodel(app, assert_parse_args):
     )
 
 
-def test_bind_pydantic_basemodel_missing_arg(app, assert_parse_args, console):
+def test_bind_pydantic_basemodel_help(app, console):
+    @app.default
+    def foo(user: User):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: foo COMMAND [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  USER.ID --user.id          [required]                           │
+        │    USER.NAME --user.name      [default: John Doe]                  │
+        │ *  USER.SIGNUP-TS             [required]                           │
+        │      --user.signup-ts                                              │
+        │ *  USER.TASTES --user.tastes  [required]                           │
+        │    USER.OUTFIT.BODY                                                │
+        │      --user.outfit.body                                            │
+        │    USER.OUTFIT.HEAD                                                │
+        │      --user.outfit.head                                            │
+        │    USER.OUTFIT.HAS-SOCKS                                           │
+        │      --user.outfit.has-socks                                       │
+        │      --user.outfit.no-has-so                                       │
+        │      cks                                                           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_bind_pydantic_basemodel_missing_arg(app, console):
     """Partially defining an Outfit should raise a MissingArgumentError."""
 
     @app.command

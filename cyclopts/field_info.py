@@ -1,9 +1,12 @@
 import inspect
 from typing import Any, Optional, get_origin
 
+import attrs
+
 from cyclopts.annotations import (
     NotRequired,
     Required,
+    is_attrs,
     is_namedtuple,
     is_pydantic,
     is_typeddict,
@@ -73,7 +76,7 @@ class FieldInfo(inspect.Parameter):
         return self.kind in self.KEYWORD
 
 
-def _typed_dict_field_info(typeddict) -> dict[str, FieldInfo]:
+def _typed_dict_field_infos(typeddict) -> dict[str, FieldInfo]:
     # The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11.
     out = {}
     # Don't use get_type_hints because it resolves Annotated automatically.
@@ -91,7 +94,7 @@ def _typed_dict_field_info(typeddict) -> dict[str, FieldInfo]:
     return out
 
 
-def _generic_class_field_info(
+def _generic_class_field_infos(
     f,
     include_var_positional=False,
     include_var_keyword=False,
@@ -109,19 +112,22 @@ def _generic_class_field_info(
     return out
 
 
-def _pydantic_field_info(model) -> dict[str, FieldInfo]:
+def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
+    from pydantic_core import PydanticUndefined
+
     out = {}
     for name, pydantic_field in model.model_fields.items():
         out[name] = FieldInfo(
             name=name,
             kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
             annotation=pydantic_field.annotation,
+            default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
             required=pydantic_field.is_required(),
         )
     return out
 
 
-def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
+def _namedtuple_field_infos(hint) -> dict[str, FieldInfo]:
     out = {}
     for name in hint._fields:
         out[name] = FieldInfo(
@@ -134,6 +140,33 @@ def _namedtuple_field_info(hint) -> dict[str, FieldInfo]:
     return out
 
 
+def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
+    out = {}
+    signature = inspect.signature(hint.__init__)
+    iparams = signature.parameters
+    for attribute in hint.__attrs_attrs__:
+        iparam = iparams[attribute.name]
+
+        if isinstance(attribute.default, attrs.Factory):  # pyright: ignore
+            required = False
+            default = None  # Not strictly True, but we don't want to invoke factory
+        elif attribute.default is attrs.NOTHING:
+            required = True
+            default = FieldInfo.empty
+        else:
+            required = False
+            default = attribute.default
+
+        out[iparam.name] = FieldInfo(
+            name=attribute.alias,
+            annotation=attribute.type,
+            kind=iparam.kind,
+            default=default,
+            required=required,
+        )
+    return out
+
+
 def get_field_infos(
     hint,
     *,
@@ -141,10 +174,12 @@ def get_field_infos(
     include_var_keyword=False,
 ) -> dict[str, FieldInfo]:
     if is_pydantic(hint):
-        return _pydantic_field_info(hint)
+        return _pydantic_field_infos(hint)
     elif is_namedtuple(hint):
-        return _namedtuple_field_info(hint)
+        return _namedtuple_field_infos(hint)
     elif is_typeddict(hint):
-        return _typed_dict_field_info(hint)
+        return _typed_dict_field_infos(hint)
+    elif is_attrs(hint):
+        return _attrs_field_infos(hint)
     else:
-        return _generic_class_field_info(hint)
+        return _generic_class_field_infos(hint)

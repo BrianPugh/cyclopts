@@ -4,7 +4,6 @@ from contextlib import suppress
 from functools import partial
 from typing import Any, Callable, Optional, Union, get_args, get_origin
 
-import attrs
 from attrs import define, field
 
 from cyclopts._convert import (
@@ -36,9 +35,10 @@ from cyclopts.field_info import (
     VAR_KEYWORD,
     VAR_POSITIONAL,
     FieldInfo,
-    _generic_class_field_info,
-    _pydantic_field_info,
-    _typed_dict_field_info,
+    _attrs_field_infos,
+    _generic_class_field_infos,
+    _pydantic_field_infos,
+    _typed_dict_field_infos,
     get_field_infos,
 )
 from cyclopts.group import Group
@@ -57,7 +57,6 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
 
 _SHOW_DEFAULT_BLOCKLIST = (
     None,
-    attrs.NOTHING,
     inspect.Parameter.empty,
 )
 
@@ -653,33 +652,33 @@ class Argument:
                     raise TypeError('Dictionary type annotations must have "str" keys.')
                 self._default = val_type
             elif is_typeddict(hint):
-                self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_info)
+                self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_infos)
                 self._accepts_keywords = True
                 self._lookup.update(field_infos)
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 self._lookup.update(field_infos)
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
                 self._lookup.update(field_infos)
             elif is_attrs(hint):
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
+                self._missing_keys_checker = _missing_keys_factory(_attrs_field_infos)
                 self._accepts_keywords = True
                 self._lookup.update(field_infos)
             elif is_pydantic(hint):
-                self._missing_keys_checker = _missing_keys_factory(_pydantic_field_info)
+                self._missing_keys_checker = _missing_keys_factory(_pydantic_field_infos)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
                 self._lookup.update(field_infos)
             elif not is_builtin(hint) and field_infos:
                 # Some classic user class.
-                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
+                self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 self._lookup.update(field_infos)
             elif self.cparam.accepts_keys is None:
@@ -695,7 +694,7 @@ class Argument:
             # They must be explicitly specified ``accepts_keys=True`` because otherwise
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
-            self._missing_keys_checker = _missing_keys_factory(_generic_class_field_info)
+            self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
             for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
