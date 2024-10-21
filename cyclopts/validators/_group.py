@@ -1,4 +1,7 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from cyclopts.argument import ArgumentCollection
 
 
 class LimitedChoice:
@@ -20,7 +23,7 @@ class LimitedChoice:
         if self.max < self.min:
             raise ValueError("max must be >=min.")
 
-    def __call__(self, argument_collection):
+    def __call__(self, argument_collection: "ArgumentCollection"):
         argument_collection = argument_collection.filter_by(value_set=True)
         n_arguments = len(argument_collection)
 
@@ -34,3 +37,12 @@ class LimitedChoice:
             raise ValueError(
                 f"Received {n_arguments} arguments: {offenders}. Only [{self.min}, {self.max}] choices may be specified."
             )
+
+
+class MutuallyExclusive(LimitedChoice):
+    def __init__(self):
+        """Alias for :class:`LimitedChoice` to make intentions more obvious.
+
+        Only 1 argument in the group can be supplied a value.
+        """
+        super().__init__()

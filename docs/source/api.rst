@@ -290,25 +290,24 @@ API
       :value: None
 
       Name(s) for empty iterables or false boolean flags.
-      For booleans, defaults to ``--no-{name}``.
-      For iterables, defaults to ``--empty-{name}``.
-      Set to an empty list to disable this feature.
+
+      * For booleans, defaults to ``no-{name}`` (see :attr:`negative_bool`).
+
+      * For iterables, defaults to ``empty-{name}`` (see :attr:`negative_iterable`).
+
+      Set to an empty list or string to disable the creation of negative flags.
 
    .. attribute:: negative_bool
       :type: Optional[str]
       :value: None
 
-      Prefix for negative boolean flags.
-      Must start with ``"--"``.
-      Defaults to ``"--no-"``.
+      Prefix for negative boolean flags. Defaults to ``"no-"``.
 
    .. attribute:: negative_iterable
       :type: Optional[str]
       :value: None
 
-      Prefix for empty iterables (like lists and sets) flags.
-      Must start with ``"--"``.
-      Defaults to ``"--empty-"``.
+      Prefix for empty iterables (like lists and sets) flags. Defaults to ``"empty-"``.
 
    .. attribute:: allow_leading_hyphen
       :type: bool
@@ -508,17 +507,16 @@ API
       :type: Optional[Callable]
       :value: None
 
-      A function (or list of functions) where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
-      The **python variable names will be used**, which may differ from their CLI names.
+      A function (or list of functions) that validates an :class:`.ArgumentCollection`.
 
       Example usage:
 
       .. code-block:: python
 
-         def validator(**kwargs):
+         def validator(argument_collection: ArgumentCollection):
              "Raise an exception if something is invalid."
 
-      Validators are **not** invoked at the command group level.
+      Validators are **not** invoked for command groups.
 
 .. autoclass:: cyclopts.Token
 
@@ -581,6 +579,9 @@ Validators
 Cyclopts has several builtin validators for common CLI inputs.
 
 .. autoclass:: cyclopts.validators.LimitedChoice
+   :members:
+
+.. autoclass:: cyclopts.validators.MutuallyExclusive
    :members:
 
 .. autoclass:: cyclopts.validators.Number

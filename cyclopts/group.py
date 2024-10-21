@@ -14,6 +14,7 @@ from attrs import define, field
 from cyclopts.utils import Sentinel, is_iterable, to_tuple_converter
 
 if TYPE_CHECKING:
+    from cyclopts.argument import ArgumentCollection
     from cyclopts.parameter import Parameter
 
 
@@ -49,10 +50,12 @@ class Group:
     )
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable, Iterable[Callable]] = field(
-        default=None,
-        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
-        kw_only=True,
+    validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]] = (
+        field(
+            default=None,
+            converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+            kw_only=True,
+        )
     )
 
     default_parameter: Optional["Parameter"] = field(

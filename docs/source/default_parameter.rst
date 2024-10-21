@@ -3,7 +3,7 @@
 =================
 Default Parameter
 =================
-The default values of :class:`Parameter` can be configured via :attr:`.App.default_parameter`.
+The default values of :class:`Parameter` for an app can be configured via :attr:`.App.default_parameter`.
 
 For example, to disable the :attr:`~.Parameter.negative` flag feature across your entire app:
 
@@ -74,4 +74,3 @@ When resolving what the :class:`.Parameter` values for an individual function pa
 5. **Lowest Priority:** (2-4) recursively of the parenting app call-chain.
 
 Any of Parameter's fields can be set to `None` to revert back to the true-original Cyclopts default.
-All App/Group/Parameter ``default_parameter`` values default to :obj:`None`.
