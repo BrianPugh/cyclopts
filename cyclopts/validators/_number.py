@@ -8,7 +8,40 @@ NumericSequence = Sequence[Union[Numeric, "NumericSequence"]]
 
 @frozen(kw_only=True)
 class Number:
-    """Limit input number to a value range."""
+    """Limit input number to a value range.
+
+    Example Usage:
+
+    .. code-block:: python
+
+        from cyclopts import App, Parameter, validators
+        from typing import Annotated
+
+        app = App()
+
+
+        @app.default
+        def main(age: Annotated[int, Parameter(validator=validators.Number(gte=0, lte=150))]):
+            print(f"You are {age} years old.")
+
+
+        app()
+
+    .. code-block:: console
+
+        $ my-script 100
+        You are 100 years old.
+
+        $ my-script -1
+        ╭─ Error ───────────────────────────────────────────────────────╮
+        │ Invalid value "-1" for "AGE". Must be >= 0.                   │
+        ╰───────────────────────────────────────────────────────────────╯
+
+        $ my-script 200
+        ╭─ Error ───────────────────────────────────────────────────────╮
+        │ Invalid value "200" for "AGE". Must be <= 150.                │
+        ╰───────────────────────────────────────────────────────────────╯
+    """
 
     lt: Optional[Numeric] = None
     """Input value must be **less than** this value."""

@@ -56,4 +56,4 @@ def test_path_dir_okay(tmp_path):
 
 def test_path_invalid_values():
     with pytest.raises(ValueError):
-        validators.Path(dir_okay=False, file_okay=False)
+        validators.Path(exists=True, dir_okay=False, file_okay=False)
