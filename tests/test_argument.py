@@ -90,7 +90,7 @@ def test_argument_collection_bare_dict(type_):
     assert collection[0].hint is type_
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0].accepts_arbitrary_keywords is True
+    assert collection[0]._accepts_arbitrary_keywords is True
 
     assert collection[1].field_info.name == "b"
     assert collection[1].parameter.name == ("--b",)
@@ -111,7 +111,7 @@ def test_argument_collection_typing_dict():
     assert collection[0].hint == Dict[str, int]
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0].accepts_arbitrary_keywords is True
+    assert collection[0]._accepts_arbitrary_keywords is True
 
     assert collection[1].field_info.name == "b"
     assert collection[1].hint is int

@@ -256,7 +256,6 @@ def test_coerce_literal():
 def assert_convert_coercion_error(*args, msg, **kwargs):
     mock_argument = Mock()
     mock_argument.name = "mocked_argument_name"
-    mock_argument.positional_name = "MOCKED_ARGUMENT_NAME"
     with pytest.raises(CoercionError) as e:
         try:
             convert(*args, **kwargs)

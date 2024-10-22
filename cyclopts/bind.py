@@ -326,7 +326,7 @@ def create_bound_arguments(
         for argument in argument_collection:
             if not argument.field_info.required or argument.keys or not argument._assignable:
                 continue
-            if not bool(argument.n_tree_tokens):
+            if not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)
 
         bound = _bind(func, argument_collection.iparam_to_value())

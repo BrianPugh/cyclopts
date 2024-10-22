@@ -490,7 +490,7 @@ class ArgumentCollection(list["Argument"]):
         kind: Optional[inspect._ParameterKind]
             The ``kind`` of ``inspect.Parameter``.
         has_tokens: Optional[bool]
-            Has parsed tokens.
+            Immediately has tokens (not including children).
         has_tree_tokens: Optional[bool]
             Argument and/or it's children have parsed tokens.
         show: Optional[bool]
@@ -606,7 +606,7 @@ class Argument:
             return
 
         for hint in hints:
-            # ``self.cparam.accepts_keys`` is either ``None`` or ``True`` here
+            # ``self.parameter.accepts_keys`` is either ``None`` or ``True`` here
             origin = get_origin(hint)
             hint_origin = {hint, origin}
 
@@ -660,7 +660,7 @@ class Argument:
 
             if self.parameter.accepts_keys is None:
                 continue
-            # Only explicit ``self.cparam.accepts_keys == True`` from here on
+            # Only explicit ``self.parameter.accepts_keys == True`` from here on
 
             # Classes that MAY take keywords (accepts_keys=True)
             # They must be explicitly specified ``accepts_keys=True`` because otherwise
@@ -701,7 +701,7 @@ class Argument:
         self._marked_converted = value
 
     @property
-    def accepts_arbitrary_keywords(self) -> bool:
+    def _accepts_arbitrary_keywords(self) -> bool:
         if not self._assignable:
             return False
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
@@ -709,6 +709,7 @@ class Argument:
 
     @property
     def show_default(self) -> bool:
+        """Show the default value on the help page."""
         if self.parameter.show_default is None:
             return not self.required and self.field_info.default not in _SHOW_DEFAULT_BLOCKLIST
         else:
@@ -757,8 +758,8 @@ class Argument:
     ) -> tuple[tuple[str, ...], Any]:
         """Check how well this argument matches a token keyword identifier.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         term: str
             Something like "--foo"
         transform: Callable
@@ -816,7 +817,7 @@ class Argument:
                 # No negative-name matches found.
                 raise ValueError
 
-        if not self.accepts_arbitrary_keywords:
+        if not self._accepts_arbitrary_keywords:
             # Still not an actual match.
             raise ValueError
 
@@ -847,10 +848,11 @@ class Argument:
         self.tokens.append(token)
 
     @property
-    def n_tree_tokens(self) -> int:
-        return len(self.tokens) + sum(child.n_tree_tokens for child in self.children)
+    def has_tokens(self) -> bool:
+        """This argument, or a children argument, has at least 1 parsed token."""  # noqa: D404
+        return bool(self.tokens) or any(x.has_tokens for x in self.children)
 
-    def _convert(self, converter=None):
+    def _convert(self, converter: Optional[Callable] = None):
         if converter is None:
             converter = self.parameter.converter
 
@@ -916,7 +918,7 @@ class Argument:
                 )
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
-                if child.n_tree_tokens:
+                if child.has_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
 
             if self._missing_keys_checker and (self.required or data):
@@ -943,7 +945,19 @@ class Argument:
 
         return out
 
-    def convert(self, converter=None):
+    def convert(self, converter: Optional[Callable] = None):
+        """Converts :attr:`tokens` into :attr:`value`.
+
+        Parameters
+        ----------
+        converter: Optional[Callable]
+            Converter function to use. Overrides ``self.parameter.converter``
+
+        Returns
+        -------
+        Any
+            The converted data. Same as :attr:`value`.
+        """
         if not self._marked:
             try:
                 self.value = self._convert(converter=converter)
@@ -961,6 +975,18 @@ class Argument:
         return self.value
 
     def validate(self, value):
+        """Validates provided value.
+
+        Parameters
+        ----------
+        value:
+            Value to validate.
+
+        Returns
+        -------
+        Any
+            The converted data. Same as :attr:`value`.
+        """
         assert isinstance(self.parameter.validator, tuple)
 
         try:
@@ -980,13 +1006,41 @@ class Argument:
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
 
-    def convert_and_validate(self, converter=None):
+    def convert_and_validate(self, converter: Optional[Callable] = None):
+        """Converts and validates :attr:`tokens` into :attr:`value`.
+
+        Parameters
+        ----------
+        converter: Optional[Callable]
+            Converter function to use. Overrides ``self.parameter.converter``
+
+        Returns
+        -------
+        Any
+            The converted data. Same as :attr:`value`.
+        """
         val = self.convert(converter=converter)
         if val is not UNSET:
             self.validate(val)
         return val
 
     def token_count(self, keys: tuple[str, ...] = ()):
+        """The number of string tokens this argument consumes.
+
+        Parameters
+        ----------
+        keys: tuple[str, ...]
+            The **python** keys into this argument.
+            If provided, returns the number of string tokens that specific
+            data type within the argument consumes.
+
+        Returns
+        -------
+        int
+            Number of string tokens to create 1 element.
+        consume_all: bool
+            :obj:`True` if this data type is iterable.
+        """
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:
@@ -998,32 +1052,32 @@ class Argument:
 
     @property
     def negatives(self):
+        """Negative flags from :meth:`.Parameter.get_negatives`."""
         return self.parameter.get_negatives(self.hint)
 
     @property
     def name(self) -> str:
-        """The **first** name of this argument."""
+        """The **first** provided name this argument goes by."""
         return self.names[0]
 
     @property
     def names(self) -> tuple[str, ...]:
-        """Names the argument goes by."""
+        """Names the argument goes by (both positive and negative)."""
         assert isinstance(self.parameter.name, tuple)
         return tuple(itertools.chain(self.parameter.name, self.negatives))
 
-    @property
-    def positional_name(self) -> str:
-        return self.name.lstrip("-").upper()
-
     def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
+        """Split a given value with :meth:`.Parameter.env_var_split`."""
         return self.parameter.env_var_split(self.hint, value, delimiter=delimiter)
 
     @property
     def show(self) -> bool:
+        """Show this argument on the help page."""
         return self._assignable and self.parameter.show
 
     @property
     def required(self) -> bool:
+        """Whether or not this argument requires a user-provided value."""
         if self.parameter.required is None:
             return self.field_info.required
         else:

@@ -217,10 +217,11 @@ class CoercionError(CycloptsError):
         if not self.token:
             msg += f'Invalid value for "{self.argument.name}": unable to convert value to {target_type_name}.'
         elif self.token.keyword is None:
+            positional_name = self.argument.name.lstrip("-").upper()
             if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for "{self.argument.positional_name}": unable to convert "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for "{positional_name}": unable to convert "{self.token.value}" into {target_type_name}.'
             else:
-                msg += f'Invalid value for "{self.argument.positional_name}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for "{positional_name}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
         else:
             if self.token.source == "" or self.token.source == "cli":
                 msg += f'Invalid value for "{self.token.keyword}": unable to convert "{self.token.value}" into {target_type_name}.'
