@@ -73,7 +73,7 @@ def test_exceptions_missing_argument_flag(app, console):
 def test_exceptions_validation_error_cli_single_positional(app, console):
     argument = Argument(
         hint=int,
-        cparam=Parameter(name=("--bar",), validator=positive_validator),
+        parameter=Parameter(name=("--bar",), validator=positive_validator),
         tokens=[
             Token(keyword=None, value="-2", source="cli"),
         ],
@@ -93,7 +93,7 @@ def test_exceptions_validation_error_cli_single_positional(app, console):
 def test_exceptions_validation_error_cli_single_keyword(app, console):
     argument = Argument(
         hint=int,
-        cparam=Parameter(name=("--bar",), validator=positive_validator),
+        parameter=Parameter(name=("--bar",), validator=positive_validator),
         tokens=[
             Token(keyword="--bar", value="-2", source="cli"),
         ],
@@ -113,7 +113,7 @@ def test_exceptions_validation_error_cli_single_keyword(app, console):
 def test_exceptions_validation_error_non_cli_single_keyword(app, console):
     argument = Argument(
         hint=int,
-        cparam=Parameter(name=("--bar",), validator=positive_validator),
+        parameter=Parameter(name=("--bar",), validator=positive_validator),
         tokens=[
             Token(value="-2", source="test"),
         ],
@@ -133,7 +133,7 @@ def test_exceptions_validation_error_non_cli_single_keyword(app, console):
 def test_exceptions_validation_error_cli_multi_positional(app, console):
     argument = Argument(
         hint=tuple[int, int],
-        cparam=Parameter(name=("--bar",), validator=multi_positive_validator),
+        parameter=Parameter(name=("--bar",), validator=multi_positive_validator),
         tokens=[
             Token(keyword=None, value="100", source="cli"),
             Token(keyword=None, value="-2", source="cli"),
@@ -154,7 +154,7 @@ def test_exceptions_validation_error_cli_multi_positional(app, console):
 def test_exceptions_validation_error_cli_multi_keyword(app, console):
     argument = Argument(
         hint=tuple[int, int],
-        cparam=Parameter(name=("--bar",), validator=multi_positive_validator),
+        parameter=Parameter(name=("--bar",), validator=multi_positive_validator),
         tokens=[
             Token(keyword="--bar", value="100", source="cli"),
             Token(keyword="--bar", value="-2", source="cli"),

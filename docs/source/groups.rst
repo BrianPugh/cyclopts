@@ -20,17 +20,17 @@ Groups offer a way of organizing parameters and commands on the help-page; for e
    │ --rims,--no-rims  [default: False]                                           │
    ╰──────────────────────────────────────────────────────────────────────────────╯
 
-They also provide an additional abstraction layer that validators can operate on.
+They also provide an additional abstraction layer that :ref:`validators <API Validators>` can operate on.
 
 Groups can be created in two ways:
 
 1. Explicitly creating a :class:`.Group` object.
 
 2. Implicitly with a **string**.
-   This is short for ``Group(my_str_group_name)``.
+   This will implicitly create a group, ``Group(my_str_group_name)``, if it doesn't exist.
    If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
 
-Every command and parameter belongs to one (or more) groups.
+Every command and parameter belongs to at least one group.
 
 Group(s) can be provided to the ``group`` keyword argument of :meth:`app.command <cyclopts.App.command>` and :class:`.Parameter`.
 The :class:`.Group` class itself only marks objects with metadata and does not directly reference it's members.

@@ -298,7 +298,7 @@ class ArgumentCollection(list["Argument"]):
         if field_info.kind in (field_info.KEYWORD_ONLY, field_info.VAR_KEYWORD):
             positional_index = None
 
-        argument = Argument(field_info=FieldInfo.from_iparam(field_info), cparam=cparam, keys=keys, hint=hint)
+        argument = Argument(field_info=FieldInfo.from_iparam(field_info), parameter=cparam, keys=keys, hint=hint)
         if argument._assignable and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
@@ -442,8 +442,8 @@ class ArgumentCollection(list["Argument"]):
 
         out.groups = []
         for argument in out:
-            assert isinstance(argument.cparam.group, tuple)
-            for group in argument.cparam.group:
+            assert isinstance(argument.parameter.group, tuple)
+            for group in argument.parameter.group:
                 if group not in out.groups:
                     out.groups.append(group)
         return out
@@ -502,7 +502,7 @@ class ArgumentCollection(list["Argument"]):
         cls = type(self)
 
         if group is not None:
-            ac = cls(x for x in ac if group in x.cparam.group)  # pyright: ignore
+            ac = cls(x for x in ac if group in x.parameter.group)  # pyright: ignore
         if kind is not None:
             ac = cls(x for x in ac if x.field_info.kind == kind)
         if has_tokens is not None:
@@ -521,70 +521,55 @@ class ArgumentCollection(list["Argument"]):
 
 @define(kw_only=True)
 class Argument:
-    """Tracks the lifespan of a parsed argument.
+    """Encapsulates functionality and additional contextual information for parsing a parameter.
 
-    An argument is defined as:
-
-        * the finest unit that can have a Parameter assigned to it.
-        * a leaf in the iparam/key tree.
-        * anything that would have its own entry in the --help page.
-        * If a type hint has a ``dict`` in it, it's a leaf.
-        * Individual tuple elements do NOT get their own Argument.
-
-    e.g.
-
-    ... code-block:: python
-
-        def foo(bar: Annotated[int, Parameter(help="bar's help")]):
-            ...
-
-    ... code-block:: python
-
-        from attrs import define
-
-        @define
-        class Foo:
-            bar: Annotated[int, Parameter(help="bar's help")]  # This gets an Argument
-            baz: Annotated[int, Parameter(help="baz's help")]  # This gets an Argument
-
-        def foo(fizz: Annotated[Foo, Parameter(help="bar's help")]):  # This gets an Argument
-            ...
-
+    An argument is defined as anything that would have its own entry in the help page.
     """
 
-    # List of tokens parsed from various sources
-    # If tokens is empty, then no tokens have been parsed for this argument.
     tokens: list[Token] = field(factory=list)
+    """
+    List of :class:`.Token` parsed from various sources.
+    Do not directly mutate; see :meth:`append`.
+    """
 
     field_info: FieldInfo = field(default=None)
+    """
+    Additional information about the parameter from surrounding python syntax.
+    """
 
-    # Fully resolved Parameter
-    # Resolved parameter should have a fully resolved Parameter.name
-    cparam: Parameter = field(factory=Parameter)
+    parameter: Parameter = field(factory=Parameter)
+    """
+    Fully resolved user-provided :class:`.Parameter`.
+    """
 
-    # The type for this leaf; may be different from ``iparam.annotation``
-    # because this could be a subkey of iparam.
     hint: Any = field(default=str, converter=resolve)
+    """
+    The type for this leaf; may be different from :attr:``.FieldInfo.annotation``.
+    """
 
     index: Optional[int] = field(default=None)
     """
-    Associated positional index for iparam.
+    Associated python positional index for argument.
     If ``None``, then cannot be assigned positionally.
     """
 
-    # **Python** Keys into iparam that lead to this leaf.
-    # Note: that self.cparam.name and self.keys can naively disagree!
-    # For example, a cparam.name=="--foo.bar.baz" could be aliased to "--fizz".
-    # "keys" may be an empty tuple.
-    # This should be populated based on type-hints, not ``Parameter.name``
     keys: tuple[str, ...] = field(default=())
+    """
+    **Python** keys that lead to this leaf.
+
+    ``self.parameter.name`` and ``self.keys`` can naively disagree!
+    For example, a ``self.parameter.name="--foo.bar.baz"`` could be aliased to "--fizz".
+    The resulting ``self.keys`` would be ``("bar", "baz")``.
+
+    This is populated based on type-hints and class-structure, not ``Parameter.name``
+    """
 
     # Converted value; may be stale.
     _value: Any = field(alias="value", default=UNSET)
     """
-    Converted value from last ``convert`` call.
-    It may be stale.
-    UNSET if ``convert`` has not yet been called (with tokens).
+    Converted value from last :meth:`convert` call.
+    This value may be stale if fields have changed since last :meth:`convert` call.
+    :class:`.UNSET` if :meth:`convert` has not yet been called with tokens.
     """
 
     _accepts_keywords: bool = field(default=False, init=False, repr=False)
@@ -592,10 +577,17 @@ class Argument:
     _default: Any = field(default=None, init=False, repr=False)
     _lookup: dict[str, FieldInfo] = field(factory=dict, init=False, repr=False)
 
-    # Can assign values directly to this argument
-    # If _assignable is ``False``, it's a non-visible node used only for the conversion process.
     _assignable: bool = field(default=False, init=False, repr=False)
+    """
+    Can assign values directly to this argument
+    If _assignable is ``False``, it's a non-visible node used only for the conversion process.
+    """
+
     children: "ArgumentCollection" = field(factory=ArgumentCollection, init=False, repr=False)
+    """
+    Collection of other :class:`Argument` that eventually culminate into the python variable represented by :attr:`field_info`.
+    """
+
     _marked_converted: bool = field(default=False, init=False, repr=False)  # for mark & sweep algos
     _mark_converted_override: bool = field(default=False, init=False, repr=False)
 
@@ -604,32 +596,12 @@ class Argument:
 
     _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
 
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, val):
-        if self._marked:
-            self._mark_converted_override = True
-        self._marked = True
-        self._value = val
-
-    @property
-    def _marked(self):
-        """If ``True``, then this node in the tree has already been converted and ``value`` has been populated."""
-        return self._marked_converted | self._mark_converted_override
-
-    @_marked.setter
-    def _marked(self, value: bool):
-        self._marked_converted = value
-
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
         hint = resolve(self.hint)
         hints = get_args(hint) if is_union(hint) else (hint,)
 
-        if self.cparam.accepts_keys is False:  # ``None`` means to infer.
+        if self.parameter.accepts_keys is False:  # ``None`` means to infer.
             self._assignable = True
             return
 
@@ -681,12 +653,12 @@ class Argument:
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 self._lookup.update(field_infos)
-            elif self.cparam.accepts_keys is None:
+            elif self.parameter.accepts_keys is None:
                 # Typical builtin hint
                 self._assignable = True
                 continue
 
-            if self.cparam.accepts_keys is None:
+            if self.parameter.accepts_keys is None:
                 continue
             # Only explicit ``self.cparam.accepts_keys == True`` from here on
 
@@ -704,6 +676,31 @@ class Argument:
                     self._lookup[iparam.name] = FieldInfo.from_iparam(iparam)
 
     @property
+    def value(self):
+        """Converted value from last :meth:`convert` call.
+
+        This value may be stale if fields have changed since last :meth:`convert` call.
+        :class:`.UNSET` if :meth:`convert` has not yet been called with tokens.
+        """
+        return self._value
+
+    @value.setter
+    def value(self, val):
+        if self._marked:
+            self._mark_converted_override = True
+        self._marked = True
+        self._value = val
+
+    @property
+    def _marked(self):
+        """If ``True``, then this node in the tree has already been converted and ``value`` has been populated."""
+        return self._marked_converted | self._mark_converted_override
+
+    @_marked.setter
+    def _marked(self, value: bool):
+        self._marked_converted = value
+
+    @property
     def accepts_arbitrary_keywords(self) -> bool:
         if not self._assignable:
             return False
@@ -712,12 +709,12 @@ class Argument:
 
     @property
     def show_default(self) -> bool:
-        if self.cparam.show_default is None:
+        if self.parameter.show_default is None:
             return not self.required and self.field_info.default not in _SHOW_DEFAULT_BLOCKLIST
         else:
-            return self.cparam.show_default
+            return self.parameter.show_default
 
-    def type_hint_for_key(self, key: str):
+    def _type_hint_for_key(self, key: str):
         try:
             return self._lookup[key].annotation
         except KeyError:
@@ -741,6 +738,7 @@ class Argument:
             Used if this argument accepts_arbitrary_keywords.
         Any
             Implicit value.
+            :obj:`None` if no implicit value is applicable.
         """
         if not self._assignable:
             raise ValueError
@@ -783,8 +781,8 @@ class Argument:
         if self.field_info.kind is self.field_info.VAR_KEYWORD:
             return tuple(term.lstrip("-").split(delimiter)), None
 
-        assert self.cparam.name
-        for name in self.cparam.name:
+        assert self.parameter.name
+        for name in self.parameter.name:
             if transform:
                 name = transform(name)
             if _startswith(term, name):
@@ -825,7 +823,7 @@ class Argument:
         return tuple(trailing.split(delimiter)), implicit_value
 
     def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
-        if self.index is None or self.field_info in (self.field_info.KEYWORD_ONLY, self.field_info.VAR_KEYWORD):
+        if self.index is None:
             raise ValueError
         elif self.field_info.kind is self.field_info.VAR_POSITIONAL:
             if index < self.index:
@@ -835,6 +833,7 @@ class Argument:
         return (), None
 
     def append(self, token: Token):
+        """Safely add a :class:`Token`."""
         if not self._assignable:
             raise ValueError
         if (
@@ -853,7 +852,7 @@ class Argument:
 
     def _convert(self, converter=None):
         if converter is None:
-            converter = self.cparam.converter
+            converter = self.parameter.converter
 
         def safe_converter(hint, tokens):
             if isinstance(tokens, dict):
@@ -912,7 +911,9 @@ class Argument:
             data = {}
             if is_pydantic(self.hint):
                 # Don't convert any subkeys, let pydantic handle them.
-                converter = partial(convert, converter=_identity_converter, name_transform=self.cparam.name_transform)
+                converter = partial(
+                    convert, converter=_identity_converter, name_transform=self.parameter.name_transform
+                )
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child.n_tree_tokens:
@@ -960,21 +961,21 @@ class Argument:
         return self.value
 
     def validate(self, value):
-        assert isinstance(self.cparam.validator, tuple)
+        assert isinstance(self.parameter.validator, tuple)
 
         try:
             if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
-                for validator in self.cparam.validator:
+                for validator in self.parameter.validator:
                     for val in value.values():
                         validator(hint, val)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
-                for validator in self.cparam.validator:
+                for validator in self.parameter.validator:
                     for val in value:
                         validator(hint, val)
             else:
-                for validator in self.cparam.validator:
+                for validator in self.parameter.validator:
                     validator(self.hint, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
@@ -989,7 +990,7 @@ class Argument:
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:
-            hint = self.type_hint_for_key(keys[0])
+            hint = self._type_hint_for_key(keys[0])
         else:
             hint = self.hint
         tokens_per_element, consume_all = token_count(hint)
@@ -997,7 +998,7 @@ class Argument:
 
     @property
     def negatives(self):
-        return self.cparam.get_negatives(self.hint)
+        return self.parameter.get_negatives(self.hint)
 
     @property
     def name(self) -> str:
@@ -1007,26 +1008,26 @@ class Argument:
     @property
     def names(self) -> tuple[str, ...]:
         """Names the argument goes by."""
-        assert isinstance(self.cparam.name, tuple)
-        return tuple(itertools.chain(self.cparam.name, self.negatives))
+        assert isinstance(self.parameter.name, tuple)
+        return tuple(itertools.chain(self.parameter.name, self.negatives))
 
     @property
     def positional_name(self) -> str:
         return self.name.lstrip("-").upper()
 
     def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
-        return self.cparam.env_var_split(self.hint, value, delimiter=delimiter)
+        return self.parameter.env_var_split(self.hint, value, delimiter=delimiter)
 
     @property
     def show(self) -> bool:
-        return self._assignable and self.cparam.show
+        return self._assignable and self.parameter.show
 
     @property
     def required(self) -> bool:
-        if self.cparam.required is None:
+        if self.parameter.required is None:
             return self.field_info.required
         else:
-            return self.cparam.required
+            return self.parameter.required
 
 
 def _resolve_groups_from_callable(
@@ -1051,7 +1052,7 @@ def _resolve_groups_from_callable(
         resolved_groups.append(group_parameters)
 
     for argument in argument_collection:
-        for group in argument.cparam.group:  # pyright: ignore
+        for group in argument.parameter.group:  # pyright: ignore
             if not isinstance(group, Group):
                 continue
 
@@ -1069,7 +1070,7 @@ def _resolve_groups_from_callable(
                 resolved_groups.append(group)
 
     for argument in argument_collection:
-        for group in argument.cparam.group:  # pyright: ignore
+        for group in argument.parameter.group:  # pyright: ignore
             if not isinstance(group, str):
                 continue
             try:

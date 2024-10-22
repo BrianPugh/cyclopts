@@ -23,6 +23,8 @@ VAR_KEYWORD = inspect.Parameter.VAR_KEYWORD
 
 
 class FieldInfo(inspect.Parameter):
+    """Extension of :class:`inspect.Parameter`."""
+
     POSITIONAL = frozenset({POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY, VAR_POSITIONAL})
     KEYWORD = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
 
@@ -68,12 +70,20 @@ class FieldInfo(inspect.Parameter):
         return hint
 
     @property
-    def is_positional(self):
+    def is_positional(self) -> bool:
         return self.kind in self.POSITIONAL
 
     @property
-    def is_keyword(self):
+    def is_positional_only(self) -> bool:
+        return self.kind in (POSITIONAL_ONLY, VAR_POSITIONAL)
+
+    @property
+    def is_keyword(self) -> bool:
         return self.kind in self.KEYWORD
+
+    @property
+    def is_keyword_only(self) -> bool:
+        return self.kind in (KEYWORD_ONLY, VAR_KEYWORD)
 
 
 def _typed_dict_field_infos(typeddict) -> dict[str, FieldInfo]:

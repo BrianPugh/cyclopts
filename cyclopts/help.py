@@ -330,7 +330,7 @@ def create_parameter_help_panel(
     for argument in argument_collection.filter_by(show=True):
         if not argument._assignable:
             continue
-        assert argument.cparam.name_transform
+        assert argument.parameter.name_transform
 
         help_components = []
         options = list(argument.names)
@@ -348,22 +348,22 @@ def create_parameter_help_panel(
             else:
                 long_options.append(option)
 
-        if argument.cparam.help:
-            help_append(argument.cparam.help)
+        if argument.parameter.help:
+            help_append(argument.parameter.help)
 
-        if argument.cparam.show_choices:
-            choices = _get_choices(argument.hint, argument.cparam.name_transform)
+        if argument.parameter.show_choices:
+            choices = _get_choices(argument.hint, argument.parameter.name_transform)
             if choices:
                 help_append(rf"[choices: {choices}]", "dim")
 
-        if argument.cparam.show_env_var and argument.cparam.env_var:
-            env_vars = ", ".join(argument.cparam.env_var)
+        if argument.parameter.show_env_var and argument.parameter.env_var:
+            env_vars = ", ".join(argument.parameter.env_var)
             help_append(rf"[env var: {env_vars}]", "dim")
 
         if argument.show_default:
             default = ""
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
-                default = argument.cparam.name_transform(argument.field_info.default.name)
+                default = argument.parameter.name_transform(argument.field_info.default.name)
             else:
                 default = argument.field_info.default
 

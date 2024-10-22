@@ -12,9 +12,9 @@ from cyclopts.validators import LimitedChoice
 def argument_collection_0():
     return ArgumentCollection(
         [
-            Argument(cparam=Parameter(name="--foo")),
-            Argument(cparam=Parameter(name="--bar")),
-            Argument(cparam=Parameter(name="--baz")),
+            Argument(parameter=Parameter(name="--foo")),
+            Argument(parameter=Parameter(name="--bar")),
+            Argument(parameter=Parameter(name="--baz")),
         ]
     )
 
@@ -25,11 +25,11 @@ def argument_collection_1():
         [
             Argument(
                 tokens=[Token(keyword="--foo", value="100", source="test")],
-                cparam=Parameter(name="--foo"),
+                parameter=Parameter(name="--foo"),
                 value=100,
             ),
-            Argument(cparam=Parameter(name="--bar")),
-            Argument(cparam=Parameter(name="--baz")),
+            Argument(parameter=Parameter(name="--bar")),
+            Argument(parameter=Parameter(name="--baz")),
         ]
     )
 
@@ -40,15 +40,15 @@ def argument_collection_2():
         [
             Argument(
                 tokens=[Token(keyword="--foo", value="100", source="test")],
-                cparam=Parameter(name="--foo"),
+                parameter=Parameter(name="--foo"),
                 value=100,
             ),
             Argument(
                 tokens=[Token(keyword="--bar", value="200", source="test")],
-                cparam=Parameter(name="--bar"),
+                parameter=Parameter(name="--bar"),
                 value=200,
             ),
-            Argument(cparam=Parameter(name="--baz")),
+            Argument(parameter=Parameter(name="--baz")),
         ]
     )
 
@@ -59,17 +59,17 @@ def argument_collection_3():
         [
             Argument(
                 tokens=[Token(keyword="--foo", value="100", source="test")],
-                cparam=Parameter(name="--foo"),
+                parameter=Parameter(name="--foo"),
                 value=100,
             ),
             Argument(
                 tokens=[Token(keyword="--bar", value="200", source="test")],
-                cparam=Parameter(name="--bar"),
+                parameter=Parameter(name="--bar"),
                 value=200,
             ),
             Argument(
                 tokens=[Token(keyword="--baz", value="300", source="test")],
-                cparam=Parameter(name="--baz"),
+                parameter=Parameter(name="--baz"),
                 value=300,
             ),
         ]

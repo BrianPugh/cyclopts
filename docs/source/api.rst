@@ -564,6 +564,10 @@ API
 
       Ignored if :obj:`~.UNSET`.
 
+.. autoclass:: cyclopts.field_info.FieldInfo
+
+.. autoclass:: cyclopts.Argument
+   :members:
 
 .. autoclass:: cyclopts.UNSET
 

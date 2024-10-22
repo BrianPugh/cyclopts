@@ -86,14 +86,14 @@ def test_argument_collection_bare_dict(type_):
     assert len(collection) == 2
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is type_
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0].accepts_arbitrary_keywords is True
 
     assert collection[1].field_info.name == "b"
-    assert collection[1].cparam.name == ("--b",)
+    assert collection[1].parameter.name == ("--b",)
     assert collection[1].hint is int
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
@@ -132,28 +132,28 @@ def test_argument_collection_typeddict():
     assert len(collection) == 4
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
     assert collection[1].field_info.name == "foo"
-    assert collection[1].cparam.name == ("--a.foo",)
+    assert collection[1].parameter.name == ("--a.foo",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
     assert collection[2].field_info.name == "bar"
-    assert collection[2].cparam.name == ("--a.bar",)
+    assert collection[2].parameter.name == ("--a.bar",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
     assert collection[3].field_info.name == "b"
-    assert collection[3].cparam.name == ("--b",)
+    assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
@@ -177,42 +177,42 @@ def test_argument_collection_typeddict_nested():
     assert len(collection) == 6
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
     assert collection[1].field_info.name == "foo"
-    assert collection[1].cparam.name == ("--a.foo",)
+    assert collection[1].parameter.name == ("--a.foo",)
     assert collection[1].hint is Inner
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is True
     assert collection[1]._assignable is False
 
     assert collection[2].field_info.name == "fizz"
-    assert collection[2].cparam.name == ("--a.foo.fizz",)
+    assert collection[2].parameter.name == ("--a.foo.fizz",)
     assert collection[2].hint is float
     assert collection[2].keys == ("foo", "fizz")
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
     assert collection[3].field_info.name == "buzz"
-    assert collection[3].cparam.name == ("--a.foo.bazz",)
+    assert collection[3].parameter.name == ("--a.foo.bazz",)
     assert collection[3].hint is complex
     assert collection[3].keys == ("foo", "buzz")
     assert collection[3]._accepts_keywords is False
     assert collection[3]._assignable is True
 
     assert collection[4].field_info.name == "bar"
-    assert collection[4].cparam.name == ("--a.bar",)
+    assert collection[4].parameter.name == ("--a.bar",)
     assert collection[4].hint is int
     assert collection[4].keys == ("bar",)
     assert collection[4]._accepts_keywords is False
     assert collection[4]._assignable is True
 
     assert collection[5].field_info.name == "b"
-    assert collection[5].cparam.name == ("--b",)
+    assert collection[5].parameter.name == ("--b",)
     assert collection[5].hint is int
     assert collection[5].keys == ()
     assert collection[5]._accepts_keywords is False
@@ -232,28 +232,28 @@ def test_argument_collection_typeddict_annotated_keys_name_change():
     assert len(collection) == 4
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
     assert collection[1].field_info.name == "foo"
-    assert collection[1].cparam.name == ("--a.fizz",)
+    assert collection[1].parameter.name == ("--a.fizz",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
     assert collection[2].field_info.name == "bar"
-    assert collection[2].cparam.name == ("--a.buzz",)
+    assert collection[2].parameter.name == ("--a.buzz",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
     assert collection[3].field_info.name == "b"
-    assert collection[3].cparam.name == ("--b",)
+    assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
@@ -273,28 +273,28 @@ def test_argument_collection_typeddict_annotated_keys_name_override():
     assert len(collection) == 4
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
     assert collection[1].field_info.name == "foo"
-    assert collection[1].cparam.name == ("--fizz",)
+    assert collection[1].parameter.name == ("--fizz",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
     assert collection[2].field_info.name == "bar"
-    assert collection[2].cparam.name == ("--buzz",)
+    assert collection[2].parameter.name == ("--buzz",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
     assert collection[3].field_info.name == "b"
-    assert collection[3].cparam.name == ("--b",)
+    assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
@@ -312,28 +312,28 @@ def test_argument_collection_typeddict_flatten_root():
     collection = ArgumentCollection.from_callable(foo)
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("*",)
+    assert collection[0].parameter.name == ("*",)
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._assignable is False
 
     assert collection[1].field_info.name == "foo"
-    assert collection[1].cparam.name == ("--foo",)
+    assert collection[1].parameter.name == ("--foo",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
     assert collection[1]._assignable is True
 
     assert collection[2].field_info.name == "bar"
-    assert collection[2].cparam.name == ("--bar",)
+    assert collection[2].parameter.name == ("--bar",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
     assert collection[2]._assignable is True
 
     assert collection[3].field_info.name == "b"
-    assert collection[3].cparam.name == ("--b",)
+    assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
@@ -348,13 +348,13 @@ def test_argument_collection_var_positional():
 
     assert len(collection) == 2
 
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is int
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
     assert collection[1].field_info.name == "b"
-    assert collection[1].cparam.name == ("B",)
+    assert collection[1].parameter.name == ("B",)
     assert collection[1].hint == tuple[float, ...]
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
@@ -369,13 +369,13 @@ def test_argument_collection_var_keyword():
     assert len(collection) == 2
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is int
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
     assert collection[1].field_info.name == "b"
-    assert collection[1].cparam.name == ("--[KEYWORD]",)
+    assert collection[1].parameter.name == ("--[KEYWORD]",)
     assert collection[1].hint == dict[str, float]
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is True
@@ -390,13 +390,13 @@ def test_argument_collection_var_keyword_named():
     assert len(collection) == 2
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].cparam.name == ("--a",)
+    assert collection[0].parameter.name == ("--a",)
     assert collection[0].hint is int
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is False
 
     assert collection[1].field_info.name == "b"
-    assert collection[1].cparam.name == ("--foo", "--bar")
+    assert collection[1].parameter.name == ("--foo", "--bar")
     assert collection[1].hint == dict[str, float]
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is True
@@ -507,7 +507,7 @@ def test_argument_convert_cparam_provided():
     argument = Argument(
         hint=str,
         tokens=[Token(value="my_value", source="test")],
-        cparam=Parameter(
+        parameter=Parameter(
             converter=my_converter,
         ),
     )

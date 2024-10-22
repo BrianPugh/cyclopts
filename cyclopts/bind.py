@@ -113,7 +113,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                 if consume_all:
                     for j in itertools.count():
                         token = tokens[i + 1 + j]
-                        if not argument.cparam.allow_leading_hyphen and is_option_like(token):
+                        if not argument.parameter.allow_leading_hyphen and is_option_like(token):
                             break
                         cli_values.append(token)
                         skip_next_iterations += 1
@@ -121,7 +121,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
                     consume_count += tokens_per_element
                     for j in range(consume_count):
                         token = tokens[i + 1 + j]
-                        if not argument.cparam.allow_leading_hyphen and is_option_like(token):
+                        if not argument.parameter.allow_leading_hyphen and is_option_like(token):
                             raise UnknownOptionError(
                                 token=CliToken(keyword=token, index=j), argument_collection=argument_collection
                             )
@@ -196,7 +196,7 @@ def _parse_pos(
                 raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
 
             for index, token in enumerate(tokens[:tokens_per_element]):
-                if not argument.cparam.allow_leading_hyphen and is_option_like(token):
+                if not argument.parameter.allow_leading_hyphen and is_option_like(token):
                     raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
                 new_tokens.append(CliToken(value=token, index=index))
             tokens = tokens[tokens_per_element:]
@@ -209,12 +209,13 @@ def _parse_pos(
     return tokens
 
 
-def _parse_env(argument_collection):
+def _parse_env(argument_collection: ArgumentCollection):
     for argument in argument_collection:
         if argument.tokens:
             # Don't check environment variables for parameters that already have values from CLI.
             continue
-        for env_var_name in argument.cparam.env_var:
+        assert argument.parameter.env_var is not None
+        for env_var_name in argument.parameter.env_var:
             try:
                 env_var_value = os.environ[env_var_name]
             except KeyError:
