@@ -84,7 +84,7 @@ def argument_collection():
     def foo(key1, key2):
         pass
 
-    out = ArgumentCollection.from_callable(foo)
+    out = ArgumentCollection._from_callable(foo)
     out[0].append(Token(keyword="--key1", value="cli1", source="cli"))
     return out
 
@@ -190,7 +190,7 @@ def test_config_common_kwargs(apps, config):
     def foo(key1, **kwargs):
         pass
 
-    argument_collection = ArgumentCollection.from_callable(foo)
+    argument_collection = ArgumentCollection._from_callable(foo)
     config(apps, (), argument_collection)
 
     # Don't parse ``kwargs`` from config.
@@ -208,7 +208,7 @@ def test_config_common_subkeys(apps, config_sub_keys):
     def foo(key1: Example, key2):
         pass
 
-    argument_collection = ArgumentCollection.from_callable(foo)
+    argument_collection = ArgumentCollection._from_callable(foo)
     config_sub_keys(apps, (), argument_collection)
 
     assert len(argument_collection) == 4

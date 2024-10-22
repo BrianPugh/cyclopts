@@ -653,7 +653,7 @@ class App:
         return obj
 
     def _parse_argument_collection(self, *, apps: Sequence["App"], parse_docstring: bool = False):
-        return ArgumentCollection.from_callable(
+        return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
             _resolve_default_parameter_from_apps(apps),
             group_arguments=self.group_arguments,  # pyright: ignore
@@ -1038,7 +1038,7 @@ class App:
             if not subapp.default_command:
                 continue
 
-            argument_collection = ArgumentCollection.from_callable(
+            argument_collection = ArgumentCollection._from_callable(
                 subapp.default_command,
                 _resolve_default_parameter_from_apps(apps),
                 group_arguments=subapp.group_arguments,  # pyright: ignore

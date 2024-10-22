@@ -17,7 +17,7 @@ def test_config_env_default(apps, monkeypatch):
     def foo(bar: int):
         pass
 
-    argument_collection = ArgumentCollection.from_callable(foo)
+    argument_collection = ArgumentCollection._from_callable(foo)
 
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR", "100")
     monkeypatch.setenv("CYCLOPTS_TEST_APP_SOMETHING_ELSE", "100")
@@ -35,7 +35,7 @@ def test_config_env_default_already_populated(apps, monkeypatch):
     def foo(bar: int):
         pass
 
-    argument_collection = ArgumentCollection.from_callable(foo)
+    argument_collection = ArgumentCollection._from_callable(foo)
     argument_collection[0].append(Token(keyword="--bar", value="500", source="cli"))
 
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR", "100")
@@ -54,7 +54,7 @@ def test_config_env_command_true(apps, monkeypatch):
     def foo(bar: int):
         pass
 
-    argument_collection = ArgumentCollection.from_callable(foo)
+    argument_collection = ArgumentCollection._from_callable(foo)
 
     monkeypatch.setenv("CYCLOPTS_TEST_APP_FOO_BAR", "100")
     Env("CYCLOPTS_TEST_APP_", command=True)(apps, ("foo",), argument_collection)
@@ -71,7 +71,7 @@ def test_config_env_dict(apps, monkeypatch):
     def foo(bar_bar: dict):
         pass
 
-    ac = ArgumentCollection.from_callable(foo)
+    ac = ArgumentCollection._from_callable(foo)
 
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BAR_BUZZ", "100")
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BAR_FIZZ", "200")
@@ -102,7 +102,7 @@ def test_config_env_dataclass(apps, monkeypatch):
     def foo(bar_bar: User):
         pass
 
-    ac = ArgumentCollection.from_callable(foo)
+    ac = ArgumentCollection._from_callable(foo)
 
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BAR_BUZZ_BUZZ", "100")
     monkeypatch.setenv("CYCLOPTS_TEST_APP_BAR_BAR_FIZZ_FIZZ", "200")

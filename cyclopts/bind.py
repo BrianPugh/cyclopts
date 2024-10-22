@@ -314,7 +314,7 @@ def create_bound_arguments(
         _parse_env(argument_collection)
         _parse_configs(argument_collection, configs)
 
-        argument_collection.convert()
+        argument_collection._convert()
         groups_with_arguments = _sort_group(argument_collection)
         try:
             for group, group_arguments in groups_with_arguments:
@@ -329,7 +329,7 @@ def create_bound_arguments(
             if not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)
 
-        bound = _bind(func, argument_collection.iparam_to_value())
+        bound = _bind(func, argument_collection._field_info_to_value())
     except CycloptsError as e:
         e.root_input_tokens = tokens
         e.unused_tokens = unused_tokens

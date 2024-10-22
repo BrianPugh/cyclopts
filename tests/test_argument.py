@@ -21,7 +21,7 @@ def test_argument_collection_no_annotation_no_default():
     def foo(a, b):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -35,14 +35,12 @@ def test_argument_collection_no_annotation_no_default():
     assert collection[1].keys == ()
     assert collection[1]._accepts_keywords is False
 
-    assert collection.names == ("--a", "--b")
-
 
 def test_argument_collection_no_annotation_default():
     def foo(a="foo", b=100):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -61,7 +59,7 @@ def test_argument_collection_basic_annotation():
     def foo(a: str, b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -81,7 +79,7 @@ def test_argument_collection_bare_dict(type_):
     def foo(a: type_, b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -103,7 +101,7 @@ def test_argument_collection_typing_dict():
     def foo(a: Dict[str, int], b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -127,7 +125,7 @@ def test_argument_collection_typeddict():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 4
 
@@ -172,7 +170,7 @@ def test_argument_collection_typeddict_nested():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 6
 
@@ -227,7 +225,7 @@ def test_argument_collection_typeddict_annotated_keys_name_change():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 4
 
@@ -268,7 +266,7 @@ def test_argument_collection_typeddict_annotated_keys_name_override():
     def foo(a: ExampleTypedDict, b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 4
 
@@ -309,7 +307,7 @@ def test_argument_collection_typeddict_flatten_root():
     def foo(a: Annotated[ExampleTypedDict, Parameter(name="*")], b: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert collection[0].field_info.name == "a"
     assert collection[0].parameter.name == ("*",)
@@ -344,7 +342,7 @@ def test_argument_collection_var_positional():
     def foo(a: int, *b: float):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -364,7 +362,7 @@ def test_argument_collection_var_keyword():
     def foo(a: int, **b: float):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -385,7 +383,7 @@ def test_argument_collection_var_keyword_named():
     def foo(a: int, **b: Annotated[float, Parameter(name=("--foo", "--bar"))]):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 2
 
@@ -406,7 +404,7 @@ def test_argument_collection_var_keyword_match():
     def foo(a: int, **b: float):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     argument, keys, _ = collection.match("--fizz")
     assert keys == ("fizz",)
@@ -468,7 +466,7 @@ def test_argument_convert_dict():
     def foo(bar: Dict[str, int]):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 1
     argument = collection[0]
@@ -486,7 +484,7 @@ def test_argument_convert_var_keyword():
     def foo(**kwargs: int):
         pass
 
-    collection = ArgumentCollection.from_callable(foo)
+    collection = ArgumentCollection._from_callable(foo)
 
     assert len(collection) == 1
     argument = collection[0]

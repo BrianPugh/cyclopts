@@ -569,6 +569,9 @@ API
 .. autoclass:: cyclopts.Argument
    :members:
 
+.. autoclass:: cyclopts.ArgumentCollection
+   :members:
+
 .. autoclass:: cyclopts.UNSET
 
 .. autofunction:: cyclopts.default_name_transform

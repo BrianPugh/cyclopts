@@ -111,13 +111,14 @@ def _identity_converter(type_, token):
 
 
 class ArgumentCollection(list["Argument"]):
-    """Provides easy lookups/pattern matching."""
+    """A list-like container for :class:`Argument`."""
 
     def __init__(self, *args, groups: Optional[list[Group]] = None):
         super().__init__(*args)
         self.groups = [] if groups is None else groups
 
     def copy(self) -> "ArgumentCollection":
+        """Returns a shallow copy of the :class:`ArgumentCollection`."""
         return type(self)(self)
 
     def match(
@@ -131,8 +132,17 @@ class ArgumentCollection(list["Argument"]):
 
         Parameters
         ----------
-        token: str
-            Something like "--foo" or "-f" or "--foo.bar.baz" or an integer index.
+        term: str | int
+            One of:
+
+            * :obj:`str` keyword like ``"--foo"`` or ``"-f"`` or ``"--foo.bar.baz"``.
+
+            * :obj:`int` global positional index.
+
+        Raises
+        ------
+        ValueError
+            If the provided ``term`` doesn't match.
 
         Returns
         -------
@@ -165,41 +175,13 @@ class ArgumentCollection(list["Argument"]):
         for argument in self:
             argument._marked = val
 
-    def convert(self):
+    def _convert(self):
+        """Convert and validate all elements."""
         self._set_marks(False)
         for argument in sorted(self, key=lambda x: x.keys):
             if argument._marked:
                 continue
             argument.convert_and_validate()
-
-    def __getitem__(self, key: int | str) -> "Argument":  # pyright: ignore
-        if isinstance(key, (int, slice)):
-            return super().__getitem__(key)
-        elif isinstance(key, str):
-            for argument in self:
-                if key in argument.names:
-                    return argument
-            raise KeyError
-        else:
-            raise TypeError(f"Unable to interpret index/key type {type(key)!r}")
-
-    def __contains__(self, key: Union[str, "Argument"]) -> bool:  # pyright: ignore
-        if isinstance(key, Argument):
-            return super().__contains__(key)
-        elif isinstance(key, str):
-            try:
-                self[key]
-            except KeyError:
-                return False
-            else:
-                return True
-        else:
-            raise TypeError(f"Unable to interpret index/key type {type(key)!r}")
-
-    @property
-    def names(self) -> tuple[str, ...]:
-        """The name for each argument in the collection."""
-        return tuple(name for argument in self for name in argument.names)
 
     @classmethod
     def _from_type(
@@ -347,7 +329,7 @@ class ArgumentCollection(list["Argument"]):
         return out
 
     @classmethod
-    def from_iparam(
+    def _from_iparam(
         cls,
         iparam: inspect.Parameter,
         *default_parameters: Optional[Parameter],
@@ -384,7 +366,7 @@ class ArgumentCollection(list["Argument"]):
         )
 
     @classmethod
-    def from_callable(
+    def _from_callable(
         cls,
         func: Callable,
         *default_parameters: Optional[Parameter],
@@ -422,7 +404,7 @@ class ArgumentCollection(list["Argument"]):
                 }
             else:
                 subkey_docstring_lookup = None
-            iparam_argument_collection = cls.from_iparam(
+            iparam_argument_collection = cls._from_iparam(
                 iparam,
                 *default_parameters,
                 docstring_lookup.get((iparam.name,)),
@@ -449,7 +431,7 @@ class ArgumentCollection(list["Argument"]):
         return out
 
     @property
-    def root_arguments(self):
+    def _root_arguments(self):
         for argument in self:
             if not argument.keys:
                 yield argument
@@ -458,13 +440,13 @@ class ArgumentCollection(list["Argument"]):
     def _max_index(self) -> Optional[int]:
         return max((x.index for x in self if x.index is not None), default=None)
 
-    def iparam_to_value(self) -> ParameterDict:
-        """Mapping iparam to converted values.
+    def _field_info_to_value(self) -> ParameterDict:
+        """Mapping :class:`.FieldInfo` to converted values.
 
-        Assumes that ``self.convert`` has already been called.
+        Assumes that :meth:`convert` has already been called.
         """
         out = ParameterDict()
-        for argument in self.root_arguments:
+        for argument in self._root_arguments:
             if argument.value is not UNSET:
                 out[argument.field_info] = argument.value
         return out
@@ -473,22 +455,23 @@ class ArgumentCollection(list["Argument"]):
         self,
         *,
         group: Optional[Group] = None,
-        kind=None,
+        kind: Optional[inspect._ParameterKind] = None,
         has_tokens: Optional[bool] = None,
         has_tree_tokens: Optional[bool] = None,
         keys_prefix: Optional[tuple[str, ...]] = None,
         show: Optional[bool] = None,
         value_set: Optional[bool] = None,
     ) -> "ArgumentCollection":
-        """Filter the ArgumentCollection by something.
+        """Filter the :class:`ArgumentCollection`.
 
-        All non-``None`` arguments will be applied.
+        All non-:obj:`None` filters will be applied.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         group: Optional[Group]
+            The :class:`.Group` the arguments should be in.
         kind: Optional[inspect._ParameterKind]
-            The ``kind`` of ``inspect.Parameter``.
+            The :attr:`~inspect.Parameter.kind` of the argument.
         has_tokens: Optional[bool]
             Immediately has tokens (not including children).
         has_tree_tokens: Optional[bool]
@@ -731,6 +714,11 @@ class Argument:
         delimiter: str = ".",
     ) -> tuple[tuple[str, ...], Any]:
         """Match a name search-term, or a positional integer index.
+
+        Raises
+        ------
+        ValueError
+            If no match is found.
 
         Returns
         -------
@@ -1090,7 +1078,7 @@ def _resolve_groups_from_callable(
     group_arguments: Optional[Group] = None,
     group_parameters: Optional[Group] = None,
 ) -> list[Group]:
-    argument_collection = ArgumentCollection.from_callable(
+    argument_collection = ArgumentCollection._from_callable(
         func,
         *default_parameters,
         group_arguments=group_arguments,

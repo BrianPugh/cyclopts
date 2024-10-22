@@ -291,7 +291,7 @@ def test_help_empty(console):
 @pytest.fixture
 def capture_format_group_parameters(console, default_function_groups):
     def inner(cmd):
-        argument_collection = ArgumentCollection.from_callable(
+        argument_collection = ArgumentCollection._from_callable(
             cmd,
             None,
             parse_docstring=True,
