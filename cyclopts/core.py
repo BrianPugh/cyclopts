@@ -674,14 +674,14 @@ class App:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
-    def _parse_argument_collection(
+    def assemble_argument_collection(
         self,
         *,
         apps: Optional[Sequence["App"]] = None,
         default_parameter: Optional[Parameter] = None,
         parse_docstring: bool = False,
     ) -> ArgumentCollection:
-        """Parse the argument collection.
+        """Assemble the argument collection for this app.
 
         Parameters
         ----------
@@ -692,10 +692,12 @@ class App:
             Default parameter with highest priority.
         parse_docstring: bool
             Parse the docstring of :attr:`default_command`.
+            Set to :obj:`True` if we need help strings, otherwise set to :obj:`False` for performance reasons.
 
         Returns
         -------
         ArgumentCollection
+            All arguments for this app.
         """
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
@@ -799,7 +801,7 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    argument_collection = command_app._parse_argument_collection(apps=apps)
+                    argument_collection = command_app.assemble_argument_collection(apps=apps)
 
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
@@ -1082,7 +1084,7 @@ class App:
             if not subapp.default_command:
                 continue
 
-            argument_collection = subapp._parse_argument_collection(apps=apps, parse_docstring=True)
+            argument_collection = subapp.assemble_argument_collection(apps=apps, parse_docstring=True)
             for group in argument_collection.groups:
                 if not group.show:
                     continue
