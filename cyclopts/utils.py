@@ -250,7 +250,7 @@ class SentinelMeta(type):
 
 
 class Sentinel(metaclass=SentinelMeta):
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls):
         raise ValueError("Sentinel objects are not intended to be instantiated. Subclass instead.")
 
 

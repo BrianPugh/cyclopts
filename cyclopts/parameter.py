@@ -40,9 +40,25 @@ def _negative_converter(default: tuple[str, ...]):
 @record_init("_provided_args")
 @frozen
 class Parameter:
-    """Cyclopts configuration for individual function parameters."""
+    """Cyclopts configuration for individual function parameters with :class:`~typing.Annotated`.
 
-    # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
+    .. code-block:: python
+
+        from cyclopts import app, Parameter
+        from typing import Annotated
+
+        app = App()
+
+
+        @app.default
+        def main(foo: Annotated[int, Parameter(name="bar")]):
+            print(foo)
+
+
+        app()
+    """
+
+    # All attribute docstrings has been moved to ``docs/api.rst`` for greater control with attrs.
 
     # This can ONLY ever be a Tuple[str, ...]
     # Usually starts with "--" or "-"

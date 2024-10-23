@@ -128,7 +128,7 @@ class ArgumentCollection(list["Argument"]):
         transform: Optional[Callable[[str], str]] = None,
         delimiter: str = ".",
     ) -> tuple["Argument", tuple[str, ...], Any]:
-        """Maps keyword CLI arguments to their :class:`Argument`.
+        """Matches CLI keyword or index to their :class:`Argument`.
 
         Parameters
         ----------
@@ -527,7 +527,7 @@ class Argument:
 
     hint: Any = field(default=str, converter=resolve)
     """
-    The type for this leaf; may be different from :attr:``.FieldInfo.annotation``.
+    The type for this leaf; may be different from :attr:`.FieldInfo.annotation`.
     """
 
     index: Optional[int] = field(default=None)
@@ -837,7 +837,7 @@ class Argument:
 
     @property
     def has_tokens(self) -> bool:
-        """This argument, or a children argument, has at least 1 parsed token."""  # noqa: D404
+        """This argument, or a child argument, has at least 1 parsed token."""  # noqa: D404
         return bool(self.tokens) or any(x.has_tokens for x in self.children)
 
     def _convert(self, converter: Optional[Callable] = None):

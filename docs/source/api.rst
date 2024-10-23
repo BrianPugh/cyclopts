@@ -16,8 +16,8 @@ API
 
       Name of application, or subcommand if registering to another application. Name fallback resolution:
 
-      1. User specified ``name`` parameter.
-      2. If a ``default`` function has been registered, the name of that function.
+      1. User specified :attr:`~.App.name` parameter.
+      2. If a :attr:`~.App.default` function has been registered, the name of that function.
       3. If the module name is ``__main__.py``, the name of the encompassing package.
       4. The value of ``sys.argv[0]``; i.e. the name of the python script.
 
@@ -28,13 +28,14 @@ API
       :value: None
 
       Text to display on help screen.
+      If not supplied, fallbacks to parsing the docstring of function registered with :meth:`.App.default`.
 
    .. attribute:: help_flags
       :type: Union[str, Iterable[str]]
       :value: ("--help", "-h")
 
-      Tokens that trigger :meth:`help_print`.
-      Set to an empty list to disable this "help" feature.
+      Flags that trigger :meth:`help_print`.
+      Set to an empty list to disable this feature.
       Defaults to ``["--help", "-h"]``.
 
    .. attribute:: help_format

@@ -652,7 +652,7 @@ class App:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
-    def _parse_argument_collection(self, *, apps: Sequence["App"], parse_docstring: bool = False):
+    def _parse_argument_collection(self, *, apps: Sequence["App"], parse_docstring: bool = False) -> ArgumentCollection:
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
             _resolve_default_parameter_from_apps(apps),
@@ -1038,13 +1038,7 @@ class App:
             if not subapp.default_command:
                 continue
 
-            argument_collection = ArgumentCollection._from_callable(
-                subapp.default_command,
-                _resolve_default_parameter_from_apps(apps),
-                group_arguments=subapp.group_arguments,  # pyright: ignore
-                group_parameters=subapp.group_parameters,  # pyright: ignore
-                parse_docstring=True,
-            )
+            argument_collection = subapp._parse_argument_collection(apps=apps, parse_docstring=True)
             for group in argument_collection.groups:
                 if not group.show:
                     continue
