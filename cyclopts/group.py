@@ -113,23 +113,6 @@ class Group:
         return cls(*args, sort_key=sort_key, **kwargs)
 
 
-@define
-class GroupConverter:
-    """Configurable attrs converter."""
-
-    default_group: Group
-
-    def __call__(self, input_value: Union[None, str, Group]) -> Group:
-        if input_value is None:
-            return self.default_group
-        elif isinstance(input_value, str):
-            return Group(input_value)
-        elif isinstance(input_value, Group):
-            return input_value
-        else:
-            raise TypeError
-
-
 def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group], list[Any]]:
     """Sort groups for the help-page."""
     assert len(groups) == len(attributes)

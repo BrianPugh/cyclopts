@@ -1,7 +1,7 @@
 import pytest
 
 from cyclopts import App, Parameter
-from cyclopts.core import _resolve_default_parameter_from_apps
+from cyclopts.core import resolve_default_parameter_from_apps
 
 
 def test_subapp_basic(app):
@@ -55,7 +55,7 @@ def test_resolve_default_parameter_1():
     sub_app = App(name="bar")
     parent_app_1.command(sub_app)
 
-    actual_parameter = _resolve_default_parameter_from_apps([parent_app_1, sub_app])
+    actual_parameter = resolve_default_parameter_from_apps([parent_app_1, sub_app])
     assert actual_parameter == Parameter("foo")
 
 
@@ -65,5 +65,5 @@ def test_resolve_default_parameter_2():
     sub_app = App(name="bar", default_parameter=Parameter("bar"))
     parent_app_1.command(sub_app)
 
-    actual_parameter = _resolve_default_parameter_from_apps([parent_app_1, sub_app])
+    actual_parameter = resolve_default_parameter_from_apps([parent_app_1, sub_app])
     assert actual_parameter == Parameter("bar")

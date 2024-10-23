@@ -527,7 +527,7 @@ class Argument:
 
     hint: Any = field(default=str, converter=resolve)
     """
-    The type for this leaf; may be different from :attr:`.FieldInfo.annotation`.
+    The type hint for this argument; may be different from :attr:`.FieldInfo.annotation`.
     """
 
     index: Optional[int] = field(default=None)

@@ -29,9 +29,10 @@ def _create_or_append(
 
 def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
     """Extract Group/App association from all commands of ``app``."""
-    assert isinstance(app.group_commands, Group)
+    assert not isinstance(app.group_commands, str)
+    group_commands = app.group_commands or Group.create_default_commands()
     group_mapping: list[tuple[Group, list[App]]] = [
-        (app.group_commands, []),
+        (group_commands, []),
     ]
 
     # This does NOT include app._meta commands
@@ -58,7 +59,7 @@ def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
             for group in subapp.group:
                 _create_or_append(group_mapping, group, subapp)
         else:
-            _create_or_append(group_mapping, app.group_commands, subapp)
+            _create_or_append(group_mapping, app.group_commands or Group.create_default_commands(), subapp)
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]

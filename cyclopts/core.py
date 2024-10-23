@@ -35,7 +35,7 @@ from cyclopts.exceptions import (
     ValidationError,
     format_cyclopts_error,
 )
-from cyclopts.group import Group, GroupConverter, sort_groups
+from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     HelpPanel,
@@ -134,20 +134,22 @@ def _validate_default_command(x):
     return x
 
 
-def _combined_meta_command_mapping(app):
+def _combined_meta_command_mapping(app: Optional["App"]) -> dict[str, "App"]:
     """Return a copied and combined mapping containing app and meta-app commands."""
+    if app is None:
+        return {}
     command_mapping = copy(app._commands)
     while (app := app._meta) and app._commands:
         command_mapping.update(app._commands)
     return command_mapping
 
 
-def _get_command_groups(parent_app, child_app):
+def _get_command_groups(parent_app: "App", child_app: "App"):
     """Extract out the command groups from the ``parent_app`` for a given ``child_app``."""
     return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
 
 
-def _resolve_default_parameter_from_apps(apps) -> Parameter:
+def resolve_default_parameter_from_apps(apps: Optional[Sequence["App"]]) -> Parameter:
     """The default_parameter resolution depends on the parent-child path traversed."""
     if not apps:
         return Parameter()
@@ -168,13 +170,24 @@ def _resolve_default_parameter_from_apps(apps) -> Parameter:
     return Parameter.combine(*cparams)
 
 
-def _walk_metas(app):
+def _walk_metas(app: "App"):
     # Iterates from deepest to shallowest meta-apps
     meta_list = [app]  # shallowest to deepest
     meta = app
     while (meta := meta._meta) and meta.default_command:
         meta_list.append(meta)
     yield from reversed(meta_list)
+
+
+def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
+    if input_value is None:
+        return None
+    elif isinstance(input_value, str):
+        return Group(input_value)
+    elif isinstance(input_value, Group):
+        return input_value
+    else:
+        raise TypeError
 
 
 @define
@@ -248,22 +261,22 @@ class App:
         default=None, converter=to_tuple_converter, kw_only=True
     )
 
-    # This can ONLY ever be a Group
+    # This can ONLY ever be a Group or None
     group_arguments: Union[Group, str, None] = field(
         default=None,
-        converter=GroupConverter(Group.create_default_arguments()),
+        converter=_group_converter,
         kw_only=True,
     )
-    # This can ONLY ever be a Group
+    # This can ONLY ever be a Group or None
     group_parameters: Union[Group, str, None] = field(
         default=None,
-        converter=GroupConverter(Group.create_default_parameters()),
+        converter=_group_converter,
         kw_only=True,
     )
-    # This can ONLY ever be a Group
+    # This can ONLY ever be a Group or None
     group_commands: Union[Group, str, None] = field(
         default=None,
-        converter=GroupConverter(Group.create_default_commands()),
+        converter=_group_converter,
         kw_only=True,
     )
 
@@ -493,7 +506,7 @@ class App:
 
         command_chain = []
         app = self
-        apps = [app]
+        apps: list[App] = [app]
         unused_tokens = tokens
 
         command_mapping = _combined_meta_command_mapping(app)
@@ -568,6 +581,15 @@ class App:
 
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
+
+            if app.group_commands is None:
+                app.group_arguments = copy(self.group_commands)
+
+            if app.group_parameters is None:
+                app.group_arguments = copy(self.group_parameters)
+
+            if app.group_arguments is None:
+                app.group_arguments = copy(self.group_arguments)
         else:
             validate_command(obj)
 
@@ -652,10 +674,32 @@ class App:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
         return obj
 
-    def _parse_argument_collection(self, *, apps: Sequence["App"], parse_docstring: bool = False) -> ArgumentCollection:
+    def _parse_argument_collection(
+        self,
+        *,
+        apps: Optional[Sequence["App"]] = None,
+        default_parameter: Optional[Parameter] = None,
+        parse_docstring: bool = False,
+    ) -> ArgumentCollection:
+        """Parse the argument collection.
+
+        Parameters
+        ----------
+        apps: Optional[Sequence[App]]
+            List of parenting apps that lead to this app.
+            If provided, will resolve ``default_parameter`` from the apps.
+        default_parameter: Optional[Parameter]
+            Default parameter with highest priority.
+        parse_docstring: bool
+            Parse the docstring of :attr:`default_command`.
+
+        Returns
+        -------
+        ArgumentCollection
+        """
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
-            _resolve_default_parameter_from_apps(apps),
+            Parameter.combine(resolve_default_parameter_from_apps(apps), self.default_parameter, default_parameter),
             group_arguments=self.group_arguments,  # pyright: ignore
             group_parameters=self.group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
