@@ -680,6 +680,7 @@ class App:
         apps: Optional[Sequence["App"]] = None,
         default_parameter: Optional[Parameter] = None,
         parse_docstring: bool = False,
+        assignable: bool = True,
     ) -> ArgumentCollection:
         """Assemble the argument collection for this app.
 
@@ -693,6 +694,8 @@ class App:
         parse_docstring: bool
             Parse the docstring of :attr:`default_command`.
             Set to :obj:`True` if we need help strings, otherwise set to :obj:`False` for performance reasons.
+        assignable: bool
+            Only return arguments that can have tokens assigned to them.
 
         Returns
         -------
@@ -705,6 +708,7 @@ class App:
             group_arguments=self.group_arguments,  # pyright: ignore
             group_parameters=self.group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
+            assignable=assignable,
         )
 
     def parse_known_args(
@@ -801,7 +805,7 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
-                    argument_collection = command_app.assemble_argument_collection(apps=apps)
+                    argument_collection = command_app.assemble_argument_collection(apps=apps, assignable=False)
 
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)

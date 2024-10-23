@@ -3,6 +3,7 @@ from typing import Any, Optional, get_origin
 
 import attrs
 
+import cyclopts.utils
 from cyclopts.annotations import (
     NotRequired,
     Required,
@@ -109,7 +110,7 @@ def _generic_class_field_infos(
     include_var_positional=False,
     include_var_keyword=False,
 ) -> dict[str, FieldInfo]:
-    signature = inspect.signature(f.__init__)
+    signature = cyclopts.utils.signature(f.__init__)
     out = {}
     for name, iparam in signature.parameters.items():
         if iparam.name == "self":
@@ -152,7 +153,7 @@ def _namedtuple_field_infos(hint) -> dict[str, FieldInfo]:
 
 def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
     out = {}
-    signature = inspect.signature(hint.__init__)
+    signature = cyclopts.utils.signature(hint.__init__)
     iparams = signature.parameters
     for attribute in hint.__attrs_attrs__:
         iparam = iparams[attribute.name]

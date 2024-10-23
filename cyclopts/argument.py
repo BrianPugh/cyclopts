@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional, Union, get_args, get_origin
 
 from attrs import define, field
 
+import cyclopts.utils
 from cyclopts._convert import (
     convert,
     token_count,
@@ -277,7 +278,7 @@ class ArgumentCollection(list["Argument"]):
                     assert cparam.name_transform is not None
                     cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(field_info.name)]))
 
-        if field_info.kind in (field_info.KEYWORD_ONLY, field_info.VAR_KEYWORD):
+        if field_info.is_keyword_only:
             positional_index = None
 
         argument = Argument(field_info=FieldInfo.from_iparam(field_info), parameter=cparam, keys=keys, hint=hint)
@@ -296,7 +297,7 @@ class ArgumentCollection(list["Argument"]):
 
                 sub_field_info.kind = updated_kind
 
-                if sub_field_info.kind is sub_field_info.KEYWORD_ONLY:
+                if sub_field_info.is_keyword_only:
                     positional_index = None
 
                 subkey_docstring_lookup = {
@@ -375,8 +376,11 @@ class ArgumentCollection(list["Argument"]):
         group_parameters: Optional[Group] = None,
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
+        assignable: bool = False,
     ):
         import cyclopts.utils
+
+        out = cls()
 
         if group_arguments is None:
             group_arguments = Group.create_default_arguments()
@@ -395,7 +399,6 @@ class ArgumentCollection(list["Argument"]):
             }
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
-        out = cls()
         positional_index = 0
         for iparam in cyclopts.utils.signature(func).parameters.values():
             if parse_docstring:
@@ -422,12 +425,16 @@ class ArgumentCollection(list["Argument"]):
                     positional_index += 1
             out.extend(iparam_argument_collection)
 
+        if assignable:
+            out = cls([x for x in out if x._assignable])
+
         out.groups = []
         for argument in out:
             assert isinstance(argument.parameter.group, tuple)
             for group in argument.parameter.group:
                 if group not in out.groups:
                     out.groups.append(group)
+
         return out
 
     @property
@@ -544,7 +551,36 @@ class Argument:
     For example, a ``self.parameter.name="--foo.bar.baz"`` could be aliased to "--fizz".
     The resulting ``self.keys`` would be ``("bar", "baz")``.
 
-    This is populated based on type-hints and class-structure, not ``Parameter.name``
+    This is populated based on type-hints and class-structure, not ``Parameter.name``.
+
+    .. code-block:: python
+
+        from cyclopts import App, Parameter
+        from dataclasses import dataclass
+        from typing import Annotated
+
+        app = App()
+
+
+        @dataclass
+        class User:
+            id: int
+            name: Annotated[str, Parameter(name="--fullname")]
+
+
+        @app.default
+        def main(user: User):
+            pass
+
+
+        for argument in app.assemble_argument_collection():
+            print(f"name: {argument.name:16} hint: {str(argument.hint):16} keys: {str(argument.keys)}")
+
+    .. code-block:: bash
+
+        $ my-script
+        name: --user.id        hint: <class 'int'>    keys: ('id',)
+        name: --fullname       hint: <class 'str'>    keys: ('name',)
     """
 
     # Converted value; may be stale.
@@ -650,7 +686,7 @@ class Argument:
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
             self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
-            for i, iparam in enumerate(inspect.signature(hint.__init__).parameters.values()):
+            for i, iparam in enumerate(cyclopts.utils.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
                 if iparam.kind is iparam.VAR_KEYWORD:
