@@ -67,7 +67,7 @@ def test_runtime_exception_bad_command(app, console):
     actual = capture.get()
     assert actual == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Unable to interpret valid command from "bad-command".              │\n'
+        '│ Unknown command "bad-command".                                     │\n'
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
@@ -83,8 +83,7 @@ def test_runtime_exception_bad_command_recommend(app, console):
     actual = capture.get()
     assert actual == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Unable to interpret valid command from "bad-command". Did you mean │\n'
-        '│ "mad-command"?                                                     │\n'
+        '│ Unknown command "bad-command". Did you mean "mad-command"?         │\n'
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 

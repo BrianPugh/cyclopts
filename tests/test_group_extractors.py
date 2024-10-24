@@ -12,7 +12,7 @@ def test_groups_annotated_invalid_recursive_definition():
 
 
 def test_groups_from_app_implicit():
-    def validator(**kwargs):
+    def validator(argument_collection):
         pass
 
     app = App(help_flags=[], version_flags=[])

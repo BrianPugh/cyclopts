@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from cyclopts.group import Group
 
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 def _create_or_append(
-    group_mapping: List[Tuple[Group, List[Any]]],
+    group_mapping: list[tuple[Group, list[Any]]],
     group: Union[str, Group],
     element: Any,
 ):
@@ -27,15 +27,26 @@ def _create_or_append(
         group_mapping.append((group, [element]))
 
 
-def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
-    """Extract Group/App association from all commands of ``app``."""
-    assert isinstance(app.group_commands, Group)
-    group_mapping: List[Tuple[Group, List[App]]] = [
-        (app.group_commands, []),
+def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
+    """Extract Group/App association from all commands of ``app``.
+
+    Returns
+    -------
+    list
+        List of items where each item is a tuple containing:
+
+        * :class:`.Group` - The group
+
+        * ``list[App]`` - The list of app subcommands within the group.
+    """
+    assert not isinstance(app.group_commands, str)
+    group_commands = app.group_commands or Group.create_default_commands()
+    group_mapping: list[tuple[Group, list[App]]] = [
+        (group_commands, []),
     ]
 
     # This does NOT include app._meta commands
-    subapps = [subapp for subapp in app._commands.values() if subapp.show]
+    subapps = list(app._commands.values())
 
     # 2 iterations need to be performed:
     # 1. Extract out all Group objects as they may have additional configuration.
@@ -58,7 +69,7 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
             for group in subapp.group:
                 _create_or_append(group_mapping, group, subapp)
         else:
-            _create_or_append(group_mapping, app.group_commands, subapp)
+            _create_or_append(group_mapping, app.group_commands or Group.create_default_commands(), subapp)
 
     # Remove the empty groups
     group_mapping = [x for x in group_mapping if x[1]]
@@ -69,7 +80,7 @@ def groups_from_app(app: "App") -> List[Tuple[Group, List["App"]]]:
     return group_mapping
 
 
-def inverse_groups_from_app(input_app: "App") -> List[Tuple["App", List[Group]]]:
+def inverse_groups_from_app(input_app: "App") -> list[tuple["App", list[Group]]]:
     out = []
     seen_apps = []
     for group, apps in groups_from_app(input_app):

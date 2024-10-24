@@ -6,7 +6,7 @@ from rich.console import Console
 
 import cyclopts
 import cyclopts.utils
-from cyclopts import App, Group, Parameter
+from cyclopts import Group, Parameter
 
 
 def pytest_ignore_collect(collection_path):

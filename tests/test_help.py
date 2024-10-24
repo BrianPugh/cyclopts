@@ -1,23 +1,19 @@
 import sys
 from enum import Enum
 from textwrap import dedent
-from typing import List, Literal, Optional, Set, Tuple, Union
+from typing import Annotated, List, Literal, Optional, Set, Tuple, Union
 
 import pytest
 
 from cyclopts import App, Group, Parameter
+from cyclopts.argument import ArgumentCollection
+from cyclopts.exceptions import MissingArgumentError
 from cyclopts.help import (
     HelpPanel,
     create_parameter_help_panel,
     format_command_entries,
     format_usage,
 )
-from cyclopts.resolve import ResolvedCommand
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 @pytest.fixture
@@ -61,7 +57,7 @@ def test_help_default_action(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -82,7 +78,7 @@ def test_help_custom_usage(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -102,7 +98,7 @@ def test_help_custom_usage_subapp(app, console):
         My custom usage.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -124,7 +120,7 @@ def test_help_default_help_flags(console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -207,7 +203,7 @@ def test_format_commands_docstring_long_only(app, console):
     )
 
 
-def test_format_commands_no_show(app, console):
+def test_format_commands_no_show(app, console, assert_parse_args):
     @app.command
     def foo():
         """Docstring for foo."""
@@ -218,8 +214,8 @@ def test_format_commands_no_show(app, console):
         """Should not be shown."""
         pass
 
-    panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app,), format="restructuredtext"))
+    assert_parse_args(foo, "foo")
+    assert_parse_args(bar, "bar")
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -233,7 +229,7 @@ def test_format_commands_no_show(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo        Docstring for foo.                                      │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -295,11 +291,16 @@ def test_help_empty(console):
 @pytest.fixture
 def capture_format_group_parameters(console, default_function_groups):
     def inner(cmd):
-        command = ResolvedCommand(cmd, *default_function_groups)
+        argument_collection = ArgumentCollection._from_callable(
+            cmd,
+            None,
+            parse_docstring=True,
+        )
+
         with console.capture() as capture:
-            group, iparams = command.groups_iparams[0]
-            cparams = [command.iparam_to_cparam[x] for x in iparams]
-            console.print(create_parameter_help_panel(group, iparams, cparams, "restructuredtext"))
+            group = argument_collection.groups[0]
+            group_argument_collection = argument_collection.filter_by(group=group)
+            console.print(create_parameter_help_panel(group, group_argument_collection, "restructuredtext"))
 
         return capture.get()
 
@@ -328,8 +329,8 @@ def test_help_format_group_parameters(capture_format_group_parameters):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
-        │ *  BAR,--bar  Docstring for bar. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
+        │ *  BAR --bar  Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -346,7 +347,7 @@ def test_help_format_group_parameters_short_name(capture_format_group_parameters
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  -f  Docstring for foo. [required]                    │
+        │ *  FOO --foo  -f  Docstring for foo. [required]                    │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -370,8 +371,8 @@ def test_help_format_group_parameters_from_docstring(capture_format_group_parame
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
-        │ *  BAR,--bar  Docstring for bar. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
+        │ *  BAR --bar  Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -388,16 +389,17 @@ def test_help_format_group_parameters_bool_flag(capture_format_group_parameters)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo,--no-foo  Docstring for foo. [default: True]             │
+        │ FOO --foo --no-foo  Docstring for foo. [default: True]             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
 
 
-def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_group_parameters):
+@pytest.mark.parametrize("negative_str", ["--yesnt-foo", "yesnt-foo"])
+def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_group_parameters, negative_str):
     def cmd(
-        foo: Annotated[bool, Parameter(negative="--yesnt-foo", help="Docstring for foo.")] = True,
+        foo: Annotated[bool, Parameter(negative=negative_str, help="Docstring for foo.")] = True,
     ):
         pass
 
@@ -405,7 +407,7 @@ def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_g
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo,--yesnt-foo  Docstring for foo. [default: True]          │
+        │ FOO --foo --yesnt-foo  Docstring for foo. [default: True]          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -422,7 +424,7 @@ def test_help_format_group_parameters_list_flag(capture_format_group_parameters)
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo,--empty-foo  Docstring for foo.                          │
+        │ FOO --foo --empty-foo  Docstring for foo.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -440,8 +442,8 @@ def test_help_format_group_parameters_defaults(capture_format_group_parameters):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [default: fizz]                      │
-        │ BAR,--bar  Docstring for bar. [default: buzz]                      │
+        │ FOO --foo  Docstring for foo. [default: fizz]                      │
+        │ BAR --bar  Docstring for bar. [default: buzz]                      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -459,8 +461,8 @@ def test_help_format_group_parameters_defaults_no_show(capture_format_group_para
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo.                                      │
-        │ BAR,--bar  Docstring for bar. [default: buzz]                      │
+        │ FOO --foo  Docstring for foo.                                      │
+        │ BAR --bar  Docstring for bar. [default: buzz]                      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -478,8 +480,9 @@ def test_help_format_group_parameters_choices_literal_no_show(capture_format_gro
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [default: fizz]                      │
-        │ BAR,--bar  Docstring for bar. [choices: fizz,buzz] [default: buzz] │
+        │ FOO --foo  Docstring for foo. [default: fizz]                      │
+        │ BAR --bar  Docstring for bar. [choices: fizz, buzz] [default:      │
+        │            buzz]                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -498,7 +501,7 @@ def test_help_format_group_parameters_choices_literal_union(capture_format_group
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz,bar] [default:   │
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz, bar] [default: │
         │            fizz]                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -519,7 +522,7 @@ def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(c
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz,bar] [default:   │
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz, bar] [default: │
         │            fizz]                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -536,7 +539,7 @@ def test_help_format_group_parameters_choices_literal_union_python310_syntax_1(c
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  [choices: fizz,buzz,bar] [default: fizz]                │
+        │ FOO --foo  [choices: fizz, buzz, bar] [default: fizz]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -558,17 +561,16 @@ def test_help_format_group_parameters_choices_enum(capture_format_group_paramete
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz] [default: fizz] │
-        │ BAR,--bar  Docstring for bar. [choices: fizz,buzz] [default: buzz] │
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz] [default:      │
+        │            fizz]                                                   │
+        │ BAR --bar  Docstring for bar. [choices: fizz, buzz] [default:      │
+        │            buzz]                                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
-)
 def test_help_format_group_parameters_choices_enum_list(capture_format_group_parameters):
     class CompSciProblem(Enum):
         fizz = "bleep bloop blop"
@@ -586,7 +588,7 @@ def test_help_format_group_parameters_choices_enum_list(capture_format_group_par
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz]                 │
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz]                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -610,16 +612,13 @@ def test_help_format_group_parameters_choices_enum_list_typing(capture_format_gr
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [choices: fizz,buzz]                 │
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz]                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
-)
 def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
@@ -633,8 +632,8 @@ def test_help_format_group_parameters_choices_literal_set(capture_format_group_p
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy]             │
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -650,16 +649,16 @@ def test_help_parameter_string_annotation(capture_format_group_parameters):
         """Print number.
 
         Args:
-            number (int): a number to print.
+            number (int): A number to print.
         """
         pass
 
     actual = capture_format_group_parameters(cmd)
     expected = dedent(
         """\
-╭─ Parameters ───────────────────────────────────────────────────────╮
-│ *  NUMBER,--number  -n  a number to print. [required]              │
-╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  NUMBER --number  -n  A number to print. [required]              │
+        ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     print(actual)
@@ -680,17 +679,14 @@ def test_help_format_group_parameters_choices_literal_set_typing(capture_format_
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy]             │
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
-)
 def test_help_format_group_parameters_choices_literal_tuple(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
@@ -704,8 +700,8 @@ def test_help_format_group_parameters_choices_literal_tuple(capture_format_group
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy]             │
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -726,9 +722,8 @@ def test_help_format_group_parameters_choices_literal_tuple_typing(capture_forma
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy] [default:   │
-        │                                ('build',)]                         │
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy] [default: ('build',)]                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -748,18 +743,14 @@ def test_help_format_group_parameters_choices_literal_tuple_variadic_typing(capt
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy] [default:   │
-        │                                ()]                                 │
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy] [default: ()]                           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9), reason="https://peps.python.org/pep-0585/ Standard Collections Type Hints"
-)
 def test_help_format_group_parameters_choices_literal_tuple_variadic(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
@@ -773,9 +764,8 @@ def test_help_format_group_parameters_choices_literal_tuple_variadic(capture_for
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ STEPS-TO-SKIP,--steps-to-skip  Docstring for steps_to_skip.        │
-        │                                [choices: build,deploy] [default:   │
-        │                                ('build',)]                         │
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy] [default: ('build',)]                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -793,7 +783,7 @@ def test_help_format_group_parameters_env_var(capture_format_group_parameters):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO,--foo  Docstring for foo. [env var: FOO BAR] [default: 123]    │
+        │ FOO --foo  Docstring for foo. [env var: FOO, BAR] [default: 123]   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -820,7 +810,7 @@ def test_help_print_function(app, console):
         Cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
         │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -829,11 +819,17 @@ def test_help_print_function(app, console):
 
 
 def test_help_print_parameter_required(app, console):
+    """
+    Notes
+    -----
+        * The default value should not show up in the help-page.
+    """
+
     @app.command(help="Cmd help string.")
     def cmd(
         foo: Annotated[str, Parameter(required=False, help="Docstring for foo.")],
         *,
-        bar: Annotated[str, Parameter(required=True, help="Docstring for bar.")],
+        bar: Annotated[str, Parameter(required=True, help="Docstring for bar.")] = "some-default-value",
     ):
         pass
 
@@ -848,12 +844,15 @@ def test_help_print_parameter_required(app, console):
         Cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │    FOO,--foo  Docstring for foo.                                   │
+        │    FOO --foo  Docstring for foo.                                   │
         │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("cmd value1", exit_on_error=False)
 
 
 def test_help_print_function_defaults(app, console):
@@ -904,7 +903,7 @@ def test_help_print_function_no_parse(app, console):
         Cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -931,7 +930,7 @@ def test_help_print_parameter_group_description(app, console):
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
         │ Parameter description.                                             │
         │                                                                    │
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -958,7 +957,7 @@ def test_help_print_parameter_group_no_show(app, console):
         Usage: app cmd [ARGS] [OPTIONS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -986,7 +985,7 @@ def test_help_print_command_group_description(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
@@ -1023,7 +1022,7 @@ def test_help_print_command_group_no_show(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd2                                                               │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1055,7 +1054,7 @@ def test_help_print_combined_parameter_command_group(app, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
-        │ *  VALUE1,--value1      [required]                                 │
+        │ *  VALUE1 --value1      [required]                                 │
         │    --help           -h  Display this message and exit.             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1086,7 +1085,7 @@ def test_help_print_commands(app, console):
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1134,7 +1133,7 @@ def test_help_print_commands_sort_key(app, console):
         │ cmd3                                                               │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1172,11 +1171,11 @@ def test_help_print_commands_and_function(app, console):
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO,--foo  Docstring for foo. [required]                        │
+        │ *  FOO --foo  Docstring for foo. [required]                        │
         │ *  --bar      Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1197,7 +1196,7 @@ def test_help_print_commands_special_flag_reassign(app, console):
         App Help String Line 1.
 
         ╭─ Admin ────────────────────────────────────────────────────────────╮
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --version  Display application version.                            │
@@ -1339,11 +1338,13 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
         │ meta-cmd   Meta cmd help string.                                   │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Arguments ────────────────────────────────────────────────╮
+        │ TOKENS                                                             │
+        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  TOKENS          [required]                                      │
         │ *  --hostname  -n  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1376,14 +1377,16 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ cmd1       Cmd1 help string.                                       │
         │ cmd2       Cmd2 help string.                                       │
         │ meta-cmd   Meta cmd help string.                                   │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  RDP,--rdp  RDP description. [required]                          │
+        │ *  RDP --rdp  RDP description. [required]                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Session Arguments ────────────────────────────────────────────────╮
+        │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  TOKENS          [required]                                      │
         │ *  --hostname  -n  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1402,7 +1405,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         Meta cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  A,--a  Some value. [required]                                   │
+        │ *  A --a  Some value. [required]                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1453,7 +1456,7 @@ def test_help_restructuredtext(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo        This is bold.                                           │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1510,7 +1513,7 @@ def test_help_markdown(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo        This is bold.                                           │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1561,7 +1564,7 @@ def test_help_rich(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo        This is italic.                                         │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -1618,7 +1621,7 @@ def test_help_plaintext(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo        This is [italic]italic[/italic].                        │
-        │ --help,-h  Display this message and exit.                          │
+        │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
