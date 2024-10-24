@@ -1,3 +1,5 @@
+.. _Config Files:
+
 ============
 Config Files
 ============
@@ -16,12 +18,12 @@ For more complicated CLI applications, it is common to have an external user con
        commands: Tuple[str, ...]
           The CLI strings that led to the current command function.
        arguments: ArgumentCollection
-          TODO
-
+          Complete ArgumentCollection for the app.
+          Modify this collection inplace to influence values provided to the function.
        """
        ...
 
-The provided ``config`` does not have to be a function; all the Cyclopts builtin configs are classes that implement the ``__call__`` method. The Cyclopts builtins offer good standard functionality for common configuration files like yaml or toml. See :ref:`cyclopts.config <API Config>`.
+The provided ``config`` does not have to be a function; all the Cyclopts builtin configs are classes that implement the ``__call__`` method. The Cyclopts builtins offer good standard functionality for common configuration files like yaml or toml.
 
 ------------
 TOML Example

@@ -442,6 +442,23 @@ class App:
 
         All commands get registered to Cyclopts as subapps.
         The actual function handler is at ``app[key].default_command``.
+
+        Example usage:
+
+        .. code-block:: python
+
+            from cyclopts import App
+
+            app = App()
+            app.command(App(name="foo"))
+
+
+            @app["foo"].command
+            def bar():
+                print("Running bar.")
+
+
+            app()
         """
         if self._meta:
             with suppress(KeyError):
@@ -459,7 +476,30 @@ class App:
         return False
 
     def __iter__(self) -> Iterator[str]:
-        """Iterate over command & meta command names."""
+        """Iterate over command & meta command names.
+
+        Example usage:
+
+        .. code-block:: python
+
+            from cyclopts import App
+
+            app = App()
+
+
+            @app.command
+            def foo():
+                pass
+
+
+            @app.command
+            def bar():
+                pass
+
+
+            # help and version flags are treated as commands.
+            assert list(app) == ["--help", "-h", "--version", "foo", "bar"]
+        """
         commands = list(self._commands)
         yield from commands
         commands = set(commands)
@@ -487,6 +527,8 @@ class App:
     ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
         """Extract out the command tokens from a command.
 
+        You are probably actually looking for :meth:`parse_args`.
+
         Parameters
         ----------
         tokens: Union[None, str, Iterable[str]]
@@ -496,9 +538,9 @@ class App:
         Returns
         -------
         List[str]
-            Tokens that are interpreted as a valid command chain.
+            Strings that are interpreted as a valid command chain.
         List[App]
-            The associated :class:`App` object with each of those tokens.
+            The associated :class:`App` object for each element in the command chain.
         List[str]
             The remaining non-command tokens.
         """
@@ -556,6 +598,24 @@ class App:
         **kwargs: object,
     ) -> Union[T, Callable[[T], T]]:
         """Decorator to register a function as a CLI command.
+
+        Example usage:
+
+        .. code-block::
+
+            from cyclopts import App
+
+            app = App()
+
+            @app.command
+            def foo():
+                pass
+
+            @app.command(name="buzz")
+            def bar():
+                pass
+
+            app()
 
         Parameters
         ----------
@@ -658,7 +718,29 @@ class App:
         *,
         validator: Optional[Callable[..., Any]] = None,
     ) -> Union[T, Callable[[T], T]]:
-        """Decorator to register a function as the default action handler."""
+        """Decorator to register a function as the default action handler.
+
+        Example usage:
+
+        .. code-block:: python
+
+            from cyclopts import App
+
+            app = App()
+
+
+            @app.default
+            def main():
+                print("Hello world!")
+
+
+            app()
+
+        .. code-block:: console
+
+            $ my-script
+            Hello world!
+        """
         if obj is None:  # Called ``@app.default_command(...)``
             return partial(self.default, validator=validator)  # pyright: ignore[reportReturnType]
 
@@ -717,7 +799,7 @@ class App:
         *,
         console: Optional["Console"] = None,
     ) -> tuple[Callable, inspect.BoundArguments, list[str]]:
-        """Interpret arguments into a function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
+        """Interpret arguments into a registered function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
         Parameters
         ----------
@@ -960,7 +1042,7 @@ class App:
         Returns
         -------
         return_value: Any
-            The value the parsed command handler returns.
+            The value the command function returns.
         """
         tokens = normalize_tokens(tokens)
         command, bound = self.parse_args(

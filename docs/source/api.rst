@@ -5,7 +5,7 @@ API
 ===
 
 .. autoclass:: cyclopts.App
-   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args
+   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args, assemble_argument_collection
    :special-members: __call__, __getitem__, __iter__
 
    Cyclopts Application.
@@ -23,6 +23,26 @@ API
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App()
+         app.command(App(name="foo"))
+
+         @app["foo"].command
+         def bar():
+             print("Running bar.")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script foo bar
+         Running bar.
+
    .. attribute:: help
       :type: Optional[str]
       :value: None
@@ -30,11 +50,30 @@ API
       Text to display on help screen.
       If not supplied, fallbacks to parsing the docstring of function registered with :meth:`.App.default`.
 
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(help="This is my help string.")
+         app()
+
+      .. code-block::
+
+         $ my-script --help
+         Usage: scratch.py COMMAND
+
+         This is my help string.
+
+         ╭─ Commands ────────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                             │
+         │ --version  Display application version.                               │
+         ╰───────────────────────────────────────────────────────────────────────╯
+
    .. attribute:: help_flags
       :type: Union[str, Iterable[str]]
       :value: ("--help", "-h")
 
-      Flags that trigger :meth:`help_print`.
+      CLI flags that trigger :meth:`help_print`.
       Set to an empty list to disable this feature.
       Defaults to ``["--help", "-h"]``.
 
@@ -42,7 +81,7 @@ API
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
 
-      The markup language of docstring function descriptions.
+      The markup language used in function docstring.
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
 
@@ -50,7 +89,7 @@ API
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
 
-      The markup language of the version string; used in :meth:`version_print`.
+      The markup language used in the version string.
       If :obj:`None`, fallback to parenting :attr:`~.App.version_format`.
       If no :attr:`~.App.version_format` is defined, falls back to resolved :attr:`~.App.help_format`.
 
@@ -65,15 +104,48 @@ API
       :type: bool
       :value: True
 
-      Show this command on the help screen.
+      Show this **command** on the help screen.
+      Hidden commands (``show=False``) are still executable.
+
+      .. code-block:: python
+
+         from cyclopts import App
+         app = App()
+
+         @app.command
+         def foo():
+            print("Running foo.")
+
+         @app.command(show=False)
+         def bar():
+            print("Running bar.")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script foo
+         Running foo.
+
+         $ my-script bar
+         Running bar.
+
+         $ my-script --help
+         Usage: scratch.py COMMAND
+
+         ╭─ Commands ─────────────────────────────────────────────────╮
+         │ foo                                                        │
+         │ --help -h  Display this message and exit.                  │
+         │ --version  Display application version.                    │
+         ╰────────────────────────────────────────────────────────────╯
 
    .. attribute:: version
       :type: Union[None, str, Callable]
       :value: None
 
-      Version to be displayed when a token of ``version_flags`` is parsed.
-      Defaults to attempting to using version of the package instantiating :class:`App`.
-      If a ``Callable``, it will be invoked with no arguments when version is queried.
+      Version to be displayed when a :attr:`version_flags` is parsed.
+      Defaults to the version of the package instantiating :class:`App`.
+      If a :obj:`~typing.Callable`, it will be invoked with no arguments when version is queried.
 
    .. attribute:: version_flags
       :type: Union[str, Iterable[str]]
@@ -87,7 +159,7 @@ API
       :type: rich.console.Console
       :value: None
 
-      Default :class:`rich.console.Console` to use when displaying runtime errors.
+      Default :class:`rich.console.Console` to use when displaying runtime messages.
       Cyclopts console resolution is as follows:
 
       #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
@@ -101,7 +173,7 @@ API
       :value: None
 
       Default :class:`Parameter` configuration. Unspecified values of command-annotated :class:`Parameter` will inherit these values.
-      See :ref:`Parameter Resolution Order<Parameter Resolution Order>` for more details.
+      See :ref:`Default Parameter` for more details.
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
@@ -111,7 +183,7 @@ API
 
       * If :obj:`None`, defaults to the ``"Commands"`` group.
 
-      * If ``str``, use an existing Group (from neighboring sub-commands) with name,
+      * If :obj:`str`, use an existing :class:`Group` (from neighboring sub-commands) with name,
         **or** create a :class:`Group` with provided name if it does not exist.
 
       * If :class:`Group`, directly use it.
@@ -120,25 +192,25 @@ API
       :type: Group
       :value: Group("Commands")
 
-      The default group that sub-commands are assigned to.
+      The default :class:`Group` that sub-commands are assigned to.
 
    .. attribute:: group_arguments
       :type: Group
       :value: Group("Arguments")
 
-      The default group that positional-only parameters are assigned to.
+      The default :class:`Group` that positional-only parameters are assigned to.
 
    .. attribute:: group_parameters
       :type: Group
       :value: Group("Parameters")
 
-      The default group that non-positional-only parameters are assigned to.
+      The default :class:`Group` that non-positional-only parameters are assigned to.
 
    .. attribute:: validator
       :type: Union[None, Callable, list[Callable]]
       :value: []
 
-      A function where all the converted CLI-provided variables will be keyword-unpacked,
+      A function where all the converted CLI-provided variables will be **keyword-unpacked**,
       regardless of their positional/keyword-type in the command function signature.
       The python variable names will be used, which may differ from their CLI names.
 
@@ -166,15 +238,15 @@ API
 
       The returned string should be **without** a leading ``--``.
       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
-      If a subapp, inherits from first non-:obj:`None` parent.
+      Subapps inherit from the first non-:obj:`None` parent ``name_transform``.
 
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
-      A function or list of functions that are consecutively applied to keyword arguments.
-      These function(s) are called before any additional conversion and validation.
-      Each function must have signature:
+      A function or list of functions that are consecutively executed after parsing CLI tokens and environment variables.
+      These function(s) are called **before** any conversion and validation.
+      Each config function must have signature:
 
       .. code-block:: python
 
@@ -189,11 +261,12 @@ API
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              arguments: ArgumentCollection
-                TODO
+                Complete ArgumentCollection for the app.
+                Modify this collection inplace to influence values provided to the function.
              """
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
-      See :ref:`cyclopts.config <API Config>` for useful builtins.
+      See :ref:`cyclopts.config <API Config>` for useful builtins and :ref:`Config Files` for examples.
 
 
 .. autoclass:: cyclopts.Parameter
