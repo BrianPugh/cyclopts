@@ -394,6 +394,8 @@ def create_parameter_help_panel(
 def format_command_entries(apps: Iterable["App"], format: str) -> list:
     entries = []
     for app in apps:
+        if not app.show:
+            continue
         short_names, long_names = [], []
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)

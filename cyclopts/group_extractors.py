@@ -28,7 +28,17 @@ def _create_or_append(
 
 
 def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
-    """Extract Group/App association from all commands of ``app``."""
+    """Extract Group/App association from all commands of ``app``.
+
+    Returns
+    -------
+    list
+        List of items where each item is a tuple containing:
+
+        * :class:`.Group` - The group
+
+        * ``list[App]`` - The list of app subcommands within the group.
+    """
     assert not isinstance(app.group_commands, str)
     group_commands = app.group_commands or Group.create_default_commands()
     group_mapping: list[tuple[Group, list[App]]] = [
@@ -36,7 +46,7 @@ def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
     ]
 
     # This does NOT include app._meta commands
-    subapps = [subapp for subapp in app._commands.values() if subapp.show]
+    subapps = list(app._commands.values())
 
     # 2 iterations need to be performed:
     # 1. Extract out all Group objects as they may have additional configuration.

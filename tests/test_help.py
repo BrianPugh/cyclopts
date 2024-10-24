@@ -203,7 +203,7 @@ def test_format_commands_docstring_long_only(app, console):
     )
 
 
-def test_format_commands_no_show(app, console):
+def test_format_commands_no_show(app, console, assert_parse_args):
     @app.command
     def foo():
         """Docstring for foo."""
@@ -214,8 +214,8 @@ def test_format_commands_no_show(app, console):
         """Should not be shown."""
         pass
 
-    panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app,), format="restructuredtext"))
+    assert_parse_args(foo, "foo")
+    assert_parse_args(bar, "bar")
 
     with console.capture() as capture:
         app.help_print([], console=console)
