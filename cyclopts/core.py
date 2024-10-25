@@ -858,17 +858,18 @@ class App:
         # Special flags (help/version) get intercepted by the root app.
         # Special flags are allows to be **anywhere** in the token stream.
 
-        for help_flag in command_app.help_flags:
-            try:
-                help_flag_index = tokens.index(help_flag)
-                break
-            except ValueError:
-                pass
-        else:
-            help_flag_index = None
+        help_flag_index = _get_help_flag_index(tokens, command_app.help_flags)
 
         if help_flag_index is not None:
             tokens.pop(help_flag_index)
+
+            help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+            if help_flag_index is not None:
+                unused_tokens.pop(help_flag_index)
+
+            if unused_tokens and not command_app.default_command:
+                raise InvalidCommandError(unused_tokens=unused_tokens)
+
             command = self.help_print
             while meta_parent := meta_parent._meta_parent:
                 command = meta_parent.help_print
@@ -1296,3 +1297,14 @@ class App:
 
         signature = ", ".join(f"{k}={v!r}" for k, v in non_defaults.items())
         return f"{type(self).__name__}({signature})"
+
+
+def _get_help_flag_index(tokens, help_flags) -> Optional[int]:
+    for help_flag in help_flags:
+        with suppress(ValueError):
+            index = tokens.index(help_flag)
+            break
+    else:
+        index = None
+
+    return index
