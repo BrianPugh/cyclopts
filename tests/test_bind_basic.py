@@ -399,3 +399,20 @@ def test_missing_keyword_argument(app, cmd_str_e):
 
     with pytest.raises(e):
         app.parse_args(cmd_str, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "1 -- --2 3 4",
+        "-- 1 --2 3 4",
+        "--c=3 4 -- 1 --2",
+        "--c 3 4 -- 1 --2",
+    ],
+)
+def test_double_hyphen_positional_only(app, cmd_str, assert_parse_args):
+    @app.default
+    def foo(a: int, b: str, c: tuple[int, int]):
+        pass
+
+    assert_parse_args(foo, cmd_str, 1, "--2", (3, 4))

@@ -6,7 +6,7 @@ import sys
 from collections.abc import Iterable
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Union
+from typing import TYPE_CHECKING, Callable, Sequence, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
@@ -57,9 +57,21 @@ def _common_root_keys(argument_collection) -> tuple[str, ...]:
     return common
 
 
-def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
+def _parse_kw_and_flags(
+    argument_collection: ArgumentCollection,
+    tokens: Sequence[str],
+    *,
+    delimiter: str = "--",
+):
     unused_tokens = []
     skip_next_iterations = 0
+    try:
+        delimiter_index = tokens.index(delimiter)
+    except ValueError:
+        positional_only_tokens = []
+    else:
+        positional_only_tokens = tokens[delimiter_index:]
+        tokens = tokens[:delimiter_index]
     for i, token in enumerate(tokens):
         # If the previous argument was a keyword, then this is its value
         if skip_next_iterations > 0:
@@ -134,6 +146,7 @@ def _parse_kw_and_flags(argument_collection: ArgumentCollection, tokens):
             for index, cli_value in enumerate(cli_values):
                 argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
 
+    unused_tokens.extend(positional_only_tokens)
     return unused_tokens
 
 
@@ -156,11 +169,21 @@ def _future_positional_only_token_count(argument_collection: ArgumentCollection,
 def _parse_pos(
     argument_collection: ArgumentCollection,
     tokens: list[str],
+    *,
+    delimiter: str = "--",
 ) -> list[str]:
     prior_positional_or_keyword_supplied_as_keyword_arguments = []
     if not tokens:
         return []
+
+    force_positional = False
     for i in itertools.count():
+        if tokens[0] == delimiter:
+            force_positional = True
+            tokens = tokens[1:]
+            if not tokens:
+                break
+
         try:
             argument, _, _ = argument_collection.match(i)
         except ValueError:
@@ -196,7 +219,7 @@ def _parse_pos(
                 raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
 
             for index, token in enumerate(tokens[:tokens_per_element]):
-                if not argument.parameter.allow_leading_hyphen and is_option_like(token):
+                if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token):
                     raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
                 new_tokens.append(CliToken(value=token, index=index))
             tokens = tokens[tokens_per_element:]
@@ -285,6 +308,8 @@ def create_bound_arguments(
     argument_collection: ArgumentCollection,
     tokens: list[str],
     configs: Iterable[Callable],
+    *,
+    delimiter: str = "--",
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -292,10 +317,12 @@ def create_bound_arguments(
     ----------
     func: Callable
         Function.
-    argument_collection: ArgumentCollection,
+    argument_collection: ArgumentCollection
     tokens: List[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
-    configs: Iterable[Callable],
+    configs: Iterable[Callable]
+    delimiter: str
+        Everything after this special token is forced to be supplied as a positional argument.
 
     Returns
     -------
@@ -305,12 +332,12 @@ def create_bound_arguments(
     unused_tokens: List[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
-    unused_tokens = []
+    unused_tokens = tokens
 
     try:
-        # Build up a mapping of inspect.Parameter->List[str]
-        unused_tokens = _parse_kw_and_flags(argument_collection, tokens)
-        unused_tokens = _parse_pos(argument_collection, unused_tokens)
+        unused_tokens = _parse_kw_and_flags(argument_collection, unused_tokens, delimiter=delimiter)
+        unused_tokens = _parse_pos(argument_collection, unused_tokens, delimiter=delimiter)
+
         _parse_env(argument_collection)
         _parse_configs(argument_collection, configs)
 
