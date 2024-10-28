@@ -527,7 +527,7 @@ class Argument:
     Additional information about the parameter from surrounding python syntax.
     """
 
-    parameter: Parameter = field(factory=Parameter)
+    parameter: Parameter = field(factory=Parameter)  # pyright: ignore
     """
     Fully resolved user-provided :class:`.Parameter`.
     """

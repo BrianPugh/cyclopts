@@ -73,7 +73,7 @@ def _bytearray(s: str) -> bytearray:
 
 
 # For types that need more logic than just invoking their type
-_converters = {
+_converters: dict[Any, Callable] = {
     bool: _bool,
     int: _int,
     bytes: _bytes,

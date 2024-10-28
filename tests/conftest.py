@@ -73,7 +73,7 @@ def convert(app):
             cmd = cmd.as_posix()
 
         @app.default
-        def target(arg1: type_):
+        def target(arg1: type_):  # pyright: ignore
             return arg1
 
         return app(cmd, exit_on_error=False)

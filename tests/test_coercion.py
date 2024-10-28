@@ -15,7 +15,7 @@ def _assert_tuple(expected, actual):
     assert type(actual) is tuple
     assert len(expected) == len(actual)
     for e, a in zip(expected, actual):
-        assert type(e) == type(a)
+        assert type(e) is type(a)
         assert e == a
 
 

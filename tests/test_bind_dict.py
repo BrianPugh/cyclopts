@@ -13,7 +13,7 @@ import pytest
 )
 def test_bind_dict_str_to_str(app, assert_parse_args, type_):
     @app.command
-    def foo(d: type_):
+    def foo(d: type_):  # pyright: ignore
         pass
 
     assert_parse_args(foo, "foo --d.key_1='val1' --d.key-2='val2'", d={"key_1": "val1", "key-2": "val2"})

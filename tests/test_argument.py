@@ -76,7 +76,7 @@ def test_argument_collection_basic_annotation():
 
 @pytest.mark.parametrize("type_", [dict, Dict])
 def test_argument_collection_bare_dict(type_):
-    def foo(a: type_, b: int):
+    def foo(a: type_, b: int):  # pyright: ignore
         pass
 
     collection = ArgumentCollection._from_callable(foo)

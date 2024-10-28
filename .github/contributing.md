@@ -11,7 +11,7 @@ Whenever possible, please add docstrings to your code!
 We use [numpy-style napoleon docstrings](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/#google-vs-numpy).
 To confirm docstrings are valid, build the docs by running `poetry run make html` in the `docs/` folder.
 
-I typically write dosctrings first, it will act as a guide to limit scope and encourage unit-testable code.
+I typically write docstrings first, it will act as a guide to limit scope and encourage unit-testable code.
 Good docstrings include information like:
 
 1. If not immediately obvious, what is the intended use-case? When should this function be used?

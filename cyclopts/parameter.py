@@ -133,7 +133,7 @@ class Parameter:
     accepts_keys: Optional[bool] = field(default=None)
 
     # Populated by the record_attrs_init_args decorator.
-    _provided_args: tuple[str] = field(default=(), init=False, eq=False)
+    _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
 
     @property
     def show(self) -> bool:
