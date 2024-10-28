@@ -42,6 +42,8 @@ def _negative_converter(default: tuple[str, ...]):
 class Parameter:
     """Cyclopts configuration for individual function parameters with :class:`~typing.Annotated`.
 
+    Example usage:
+
     .. code-block:: python
 
         from cyclopts import app, Parameter
