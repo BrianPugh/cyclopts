@@ -90,9 +90,19 @@ def test_pos_sequence(app, assert_parse_args):
     assert_parse_args(foo, "foo 1 2 3", [1, 2, 3])
 
 
-def test_list_positional_all_but_last(app, assert_parse_args):
-    @app.command
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "fizz buzz bar",
+        "-- fizz buzz bar",
+        "fizz -- buzz bar",
+        "fizz buzz -- bar",
+        "fizz buzz bar --",
+    ],
+)
+def test_list_positional_all_but_last(app, cmd_str, assert_parse_args):
+    @app.default
     def foo(inputs: list[Path], output: Path, /):
         pass
 
-    assert_parse_args(foo, "foo fizz buzz bar", [Path("fizz"), Path("buzz")], Path("bar"))
+    assert_parse_args(foo, cmd_str, [Path("fizz"), Path("buzz")], Path("bar"))

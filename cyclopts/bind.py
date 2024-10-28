@@ -166,6 +166,14 @@ def _future_positional_only_token_count(argument_collection: ArgumentCollection,
     return n_tokens_to_leave
 
 
+def _preprocess_positional_tokens(tokens: Sequence[str], delimiter: str) -> list[tuple[str, bool]]:
+    try:
+        delimiter_index = tokens.index(delimiter)
+        return [(t, False) for t in tokens[:delimiter_index]] + [(t, True) for t in tokens[delimiter_index + 1 :]]
+    except ValueError:  # delimiter not found
+        return [(t, False) for t in tokens]
+
+
 def _parse_pos(
     argument_collection: ArgumentCollection,
     tokens: list[str],
@@ -173,17 +181,13 @@ def _parse_pos(
     delimiter: str = "--",
 ) -> list[str]:
     prior_positional_or_keyword_supplied_as_keyword_arguments = []
+
     if not tokens:
         return []
 
-    force_positional = False
-    for i in itertools.count():
-        if tokens[0] == delimiter:
-            force_positional = True
-            tokens = tokens[1:]
-            if not tokens:
-                break
+    tokens_and_force_positional = _preprocess_positional_tokens(tokens, delimiter)
 
+    for i in itertools.count():
         try:
             argument, _, _ = argument_collection.match(i)
         except ValueError:
@@ -197,7 +201,7 @@ def _parse_pos(
                 raise ArgumentOrderError(
                     argument=argument,
                     prior_positional_or_keyword_supplied_as_keyword_arguments=prior_positional_or_keyword_supplied_as_keyword_arguments,
-                    token=tokens[0],
+                    token=tokens_and_force_positional[0][0],
                 )
 
         tokens_per_element, consume_all = argument.token_count()
@@ -214,22 +218,25 @@ def _parse_pos(
             n_tokens_to_leave = 0
 
         new_tokens = []
-        while (len(tokens) - n_tokens_to_leave) > 0:
-            if (len(tokens) - n_tokens_to_leave) < tokens_per_element:
-                raise MissingArgumentError(argument=argument, tokens_so_far=tokens)
+        while (len(tokens_and_force_positional) - n_tokens_to_leave) > 0:
+            if (len(tokens_and_force_positional) - n_tokens_to_leave) < tokens_per_element:
+                raise MissingArgumentError(
+                    argument=argument,
+                    tokens_so_far=[x[0] for x in tokens_and_force_positional],
+                )
 
-            for index, token in enumerate(tokens[:tokens_per_element]):
+            for index, (token, force_positional) in enumerate(tokens_and_force_positional[:tokens_per_element]):
                 if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token):
                     raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
                 new_tokens.append(CliToken(value=token, index=index))
-            tokens = tokens[tokens_per_element:]
+            tokens_and_force_positional = tokens_and_force_positional[tokens_per_element:]
             if not consume_all:
                 break
         argument.tokens[:0] = new_tokens  # Prepend the new tokens to the argument.
-        if not tokens:
+        if not tokens_and_force_positional:
             break
 
-    return tokens
+    return [x[0] for x in tokens_and_force_positional]
 
 
 def _parse_env(argument_collection: ArgumentCollection):
