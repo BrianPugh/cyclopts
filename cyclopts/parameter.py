@@ -132,6 +132,9 @@ class Parameter:
     # Should not get inherited
     accepts_keys: Optional[bool] = field(default=None)
 
+    # Should not get inherited
+    consume_multiple: bool = field(default=None, converter=attrs.converters.default_if_none(False))
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
 

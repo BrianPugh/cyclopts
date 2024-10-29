@@ -122,7 +122,7 @@ def _parse_kw_and_flags(
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
             with suppress(IndexError):
-                if consume_all:
+                if consume_all and argument.parameter.consume_multiple:
                     for j in itertools.count():
                         token = tokens[i + 1 + j]
                         if not argument.parameter.allow_leading_hyphen and is_option_like(token):
@@ -134,8 +134,9 @@ def _parse_kw_and_flags(
                     for j in range(consume_count):
                         token = tokens[i + 1 + j]
                         if not argument.parameter.allow_leading_hyphen and is_option_like(token):
-                            raise UnknownOptionError(
-                                token=CliToken(keyword=token, index=j), argument_collection=argument_collection
+                            raise MissingArgumentError(
+                                argument=argument,
+                                tokens_so_far=cli_values,
                             )
                         cli_values.append(token)
                         skip_next_iterations += 1

@@ -388,7 +388,7 @@ API
       :value: False
 
       Allow parsing non-numeric values that begin with a hyphen ``-``.
-      This is disabled by default, allowing for more helpful error messages for unknown CLI options.
+      This is disabled (:obj:`False`) by default, allowing for more helpful error messages for unknown CLI options.
 
    .. attribute:: parse
       :type: Optional[bool]
@@ -463,19 +463,50 @@ API
       where ``type_`` is the associated parameter type-hint, and ``val`` is the environment value.
 
    .. attribute:: name_transform
-       :type: Optional[Callable[[str], str]]
-       :value: None
+      :type: Optional[Callable[[str], str]]
+      :value: None
 
-       A function that converts python parameter names to their CLI command counterparts.
+      A function that converts python parameter names to their CLI command counterparts.
 
-       The function must have signature:
+      The function must have signature:
 
-       .. code-block:: python
+      .. code-block:: python
 
-          def name_transform(s: str) -> str:
-              ...
+         def name_transform(s: str) -> str:
+             ...
 
-       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+      If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+
+   .. attribute:: accepts_keys
+      :type: Optional[bool]
+      :value: None
+
+      TODO
+
+   .. attribute:: consume_multiple
+      :type: Optional[bool]
+      :value: None
+
+      When a parameter is **specified by keyword**, consume multiple elements worth of CLI tokens.
+      Will consume tokens until the stream is exhausted, or an and :attr:`.allow_leading_hyphen` is False
+      If ``False`` (default behavior), then only a single element worth of CLI tokens will be consumed.
+
+      .. code-block:: python
+
+         from cyclopts import App
+         from pathlib import Path
+
+         app = App()
+
+         @app.default
+         def rules(files: list[Path], ext: list[str] = []):
+            pass
+
+         app()
+
+      .. code-block:: console
+
+         $ cmd --ext .pdf --ext .html foo.md bar.md
 
    .. automethod:: combine
 

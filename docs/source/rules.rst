@@ -184,44 +184,183 @@ Bool
 ****
 List
 ****
-* The inner annotation type will be applied independently to each element.
+Unlike more simple types like :obj:`str` and :obj:`int`, lists use different parsing rules depending on if the values are provided positionally or by keyword.
 
-* If ``Parameter.allow_leading_hyphen=False`` (default behavior), all tokens will be consumed until a hyphenated-option is reached.
+^^^^^^^^^^
+Positional
+^^^^^^^^^^
+When arguments are provided positionally:
 
-* If ``Parameter.allow_leading_hyphen=True``, all remaining tokens will be unconditionally consumed.
+* If :attr:`Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will stop parsing for this parameter.
+  If the number of consumed tokens is not a multiple of the required number of tokens to create an element of the list, a :exc:`MissingArgumentError` will be raised.
+
+  .. code-block:: python
+
+     from cyclopts import App
+
+     app = App()
+
+     @app.command
+     def foo(values: list[int]):  # 1 CLI token per element
+        print(values)
+
+     @app.command
+     def bar(values: list[tuple[int, str]]):  # 2 CLI tokens per element
+        print(values)
+
+     app()
+
+  .. code-block:: console
+
+     $ my-program foo 1 2 3
+     [1, 2, 3]
+
+     $ my-program bar 1 one 2 two
+     [(1, 'one'), (2, 'two')]
+
+     $ my-program bar 1 one 2
+     ╭─ Error ─────────────────────────────────────────────────────╮
+     │ Command "bar" parameter "--values" requires 2 arguments.    │
+     │ Only got 1.                                                 │
+     ╰─────────────────────────────────────────────────────────────╯
+
+* If :attr:`Parameter.allow_leading_hyphen` is :obj:`True`, CLI tokens will be consumed unconditionally until exhausted.
+
+  .. code-block:: python
+
+     from cyclopts import App, Parameter
+     from pathlib import Path
+     from typing import Annotated
+
+     app = App()
+
+     @app.default
+     def main(
+        files: Annotated[list[Path], Parameter(allow_leading_hyphen=True)],
+        some_flag: bool = False,
+      ):
+        print(f"{some_flag=}")
+        print(f"Analyzing files {files}")
+
+     app()
+
+  .. code-block:: console
+
+     $ my-program foo.bin bar.bin --fizz.bin buzz.bin --some-flag
+     some_flag=True
+     Analyzing files [PosixPath('foo.bin'), PosixPath('bar.bin'), PosixPath('--fizz.bin'), PosixPath('buzz.bin')]
+
+  Known keyword arguments are parsed first (in this case, ``--some-flag``).
+  To unambiguously pass in values positionally, provide them after a bare ``--``:
+
+  .. code-block:: console
+
+     $ my-program -- foo.bin bar.bin --fizz.bin buzz.bin --some-flag
+     some_flag=False
+     Analyzing files [PosixPath('foo.bin'), PosixPath('bar.bin'), PosixPath('--fizz.bin'), PosixPath('buzz.bin'), PosixPath('--some-flag')]
+
+
+^^^^^^^
+Keyword
+^^^^^^^
+When arguments are provided by keyword:
+
+* Tokens will be consumed until enough data is collected to form the type-hinted object.
 
 * The keyword can be specified multiple times.
 
+* If :attr:`Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will raise :exc:`MissingArgumentError` if insufficient tokens have been parsed.
+
+  .. code-block:: python
+
+     from cyclopts import App
+
+     app = App()
+
+     @app.command
+     def foo(values: list[int]):  # 1 CLI token per element
+        print(values)
+
+     @app.command
+     def bar(values: list[tuple[int, str]]):  # 2 CLI tokens per element
+        print(values)
+
+     app()
+
+  .. code-block:: console
+
+     $ my-program foo --values 1 --values 2 --values 3
+     [1, 2, 3]
+
+     $ my-program bar --values 1 one --values 2 two
+     [(1, 'one'), (2, 'two')]
+
+     $ my-program bar --values 1 --values 2
+     ╭─ Error ─────────────────────────────────────────────────────╮
+     │ Command "bar" parameter "--values" requires 2 arguments.    │
+     │ Only got 1.                                                 │
+     ╰─────────────────────────────────────────────────────────────╯
+
+
+* If :attr:`Parameter.consume_multiple` is :obj:`True`, all remaining tokens will be consumed (until an option-like token is reached if :attr:`Parameter.allow_leading_hyphen` is :obj:`False`)
+
+  .. code-block:: python
+
+     from cyclopts import App, Parameter
+     from typing import Annotated
+
+     app = App()
+
+     @app.default
+     def foo(values: Annotated[list[int], Parameter(consume_multiple=True)]):  # 1 CLI token per element
+        print(values)
+
+     app()
+
+  .. code-block:: console
+
+     $ my-program foo --values 1 2 3
+     [1, 2, 3]
+
+^^^^^^^^^^
+Empty List
+^^^^^^^^^^
+Commonly, if we want a default list for a parameter in a function, we set the default value to ``None`` in the signature and then set it to the actual list in the function body:
+
 .. code-block:: python
+
+   def foo(extensions: Optional[list] = None):
+      if extensions is None:
+         extensions = [".png", ".jpg"]
+
+We do this because mutable defaults is a `common unexpected source of bugs <https://docs.python-guide.org/writing/gotchas/#mutable-default-arguments>`_.
+
+However, sometimes we actually want to specify an empty list.
+To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
+
+.. code-block::
 
    from cyclopts import App
 
    app = App()
 
    @app.default
-   def main(*, favorite_numbers: list[int]):
-      print(f"My favorite numbers are: {favorite_numbers}")
+   def main(extensions: list | None = None):
+      if extensions is None:
+         extensions = [".png", ".jpg"]
+      print(f"{extensions=}")
 
    app()
 
 .. code-block:: console
 
-   $ my-program --favorite-numbers 1 2 3
-   My favorite numbers are: [1, 2, 3]
+   $ my-program
+   extensions=['.png', '.jpg']
 
+   $ my-program --empty-extensions
+   extensions=[]
 
-^^^^^^^^^^
-Empty List
-^^^^^^^^^^
-* To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
-  Continuing the previous example:
-
-  .. code-block:: console
-
-     $ my-program --empty-favorite-numbers
-     # favorite_numbers argument is an empty list: ``[]``.
-
-  See :attr:`.Parameter.negative` for more about this feature.
+See :attr:`.Parameter.negative` for more about this feature.
 
 ^^^^^^^^^^^^^^^
 Positional Only
@@ -258,16 +397,15 @@ The console wildcard ``*`` is expanded by the console, so this example will natu
    Processing files [PosixPath('foo/buzz.bin'), PosixPath('foo/fizz.bin')] to PosixPath('output.bin').
 
 
-
 ********
 Iterable
 ********
-Follows the same rules as `List`_. The passed in data will be a list.
+Follows the same rules as `List`_. The passed in data will be a :class:`list`.
 
 ********
 Sequence
 ********
-Follows the same rules as `List`_. The passed in data will be a list.
+Follows the same rules as `List`_. The passed in data will be a :class:`list`.
 
 ***
 Set

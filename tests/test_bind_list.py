@@ -67,7 +67,7 @@ def test_list_tuple_missing_arguments_no_arguments(app, cmd):
 @pytest.mark.parametrize(
     "cmd",
     [
-        "foo --item 1 alice 2",
+        "foo --item 1",
         "foo --item a --stuff g",
     ],
 )
