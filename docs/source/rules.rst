@@ -333,7 +333,7 @@ Commonly, if we want a default list for a parameter in a function, we set the de
       if extensions is None:
          extensions = [".png", ".jpg"]
 
-We do this because mutable defaults is a `common unexpected source of bugs <https://docs.python-guide.org/writing/gotchas/#mutable-default-arguments>`_.
+We do this because mutable defaults is a `common unexpected source of bugs in python <https://docs.python-guide.org/writing/gotchas/#mutable-default-arguments>`_.
 
 However, sometimes we actually want to specify an empty list.
 To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
@@ -362,9 +362,9 @@ To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
 
 See :attr:`.Parameter.negative` for more about this feature.
 
-^^^^^^^^^^^^^^^
-Positional Only
-^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Positional Only With Subsequent Parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 When a list is **positional-only**, it will consume tokens such that it leaves enough tokens for subsequent positional-only parameters.
 
 .. code-block:: python

@@ -481,7 +481,80 @@ API
       :type: Optional[bool]
       :value: None
 
-      TODO
+      If ``False``, treat the user-defined class annotation similar to a tuple.
+      Individual class sub-parameters will not be addressable by CLI keywords.
+      The class will consume enough tokens to populate all required positional parameters.
+
+      Default behavior (``accepts_keys=True``):
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         class Image:
+            def __init__(self, path, label):
+               self.path = path
+               self.label = label
+
+            def __repr__(self):
+               return f"Image(path={self.path!r}, label={self.label!r})"
+
+         @app.default
+         def main(image: Image):
+            print(f"{image=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ──────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                           │
+         │ --version  Display application version.                             │
+         ╰─────────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ────────────────────────────────────────────────────────╮
+         │ *  IMAGE.PATH --image.path    [required]                            │
+         │ *  IMAGE.LABEL --image.label  [required]                            │
+         ╰─────────────────────────────────────────────────────────────────────╯
+
+         $ my-program foo.jpg nature
+         image=Image(path='foo.jpg', label='nature')
+
+         $ my-program --image.path foo.jpg --image.label nature
+         image=Image(path='foo.jpg', label='nature')
+
+      Behavior when ``accepts_keys=False``:
+
+      .. code-block:: python
+
+         # Modify the default command function's signature.
+         @app.default
+         def main(image: Annotated[Image, Parameter(accepts_keys=False)]):
+            print(f"{image=}")
+
+      .. code-block:: console
+
+         $ my-program --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ──────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                           │
+         │ --version  Display application version.                             │
+         ╰─────────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ────────────────────────────────────────────────────────╮
+         │ *  IMAGE --image  [required]                                        │
+         ╰─────────────────────────────────────────────────────────────────────╯
+
+         $ my-program foo.jpg nature
+         image=Image(path='foo.jpg', label='nature')
+
+         $ my-program --image foo.jpg nature
+         image=Image(path='foo.jpg', label='nature')
 
    .. attribute:: consume_multiple
       :type: Optional[bool]
