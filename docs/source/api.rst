@@ -781,14 +781,14 @@ Cyclopts has several builtin validators for common CLI inputs.
 -----
 Types
 -----
-Cyclopts has builtin pre-defined annotated-types for common validation configurations.
-All definitions in this section are just predefined annotations for convenience:
+Cyclopts has builtin pre-defined annotated-types for common conversion and validation configurations.
+All definitions in this section are simply predefined annotations for convenience:
 
 .. code-block:: python
 
    Annotated[..., Parameter(...)]
 
-Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated. E.g:
+Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated to further configure behavior. E.g:
 
 .. code-block::
 
@@ -928,11 +928,9 @@ All Cyclopts builtins index into the configuration file with the following rules
 
       app = cyclopts.App(config=cyclopts.config.Env("MY_SCRIPT_"))
 
-
       @app.command
       def my_command(foo, bar):
           print(f"{foo=} {bar=}")
-
 
       app()
 
@@ -961,6 +959,8 @@ All Cyclopts builtins index into the configuration file with the following rules
    .. attribute:: command
       :type: bool
       :value: True
+
+      If :obj:`True`, add the command's name (uppercase) after :attr:`prefix`.
 
    .. attribute:: split
       :type: Callable
