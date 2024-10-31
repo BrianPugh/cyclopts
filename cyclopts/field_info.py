@@ -1,5 +1,5 @@
 import inspect
-from typing import Any, Optional, get_origin
+from typing import Annotated, Any, Optional, get_args, get_origin
 
 import attrs
 
@@ -7,6 +7,7 @@ import cyclopts.utils
 from cyclopts.annotations import (
     NotRequired,
     Required,
+    is_annotated,
     is_attrs,
     is_namedtuple,
     is_pydantic,
@@ -21,6 +22,13 @@ POSITIONAL_ONLY = inspect.Parameter.POSITIONAL_ONLY
 KEYWORD_ONLY = inspect.Parameter.KEYWORD_ONLY
 VAR_POSITIONAL = inspect.Parameter.VAR_POSITIONAL
 VAR_KEYWORD = inspect.Parameter.VAR_KEYWORD
+
+
+def _replace_annotated_type(src_type, dst_type):
+    if not is_annotated(src_type):
+        return dst_type
+    metadata = get_args(src_type)[1:]
+    return Annotated[dst_type, *metadata]
 
 
 class FieldInfo(inspect.Parameter):
@@ -66,7 +74,9 @@ class FieldInfo(inspect.Parameter):
         """Annotation with Optional-removed and cyclopts type-inferring."""
         hint = self.annotation
         if hint is inspect.Parameter.empty or resolve(hint) is Any:
-            hint = str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
+            hint = _replace_annotated_type(
+                hint, str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
+            )
         hint = resolve_optional(hint)
         return hint
 
