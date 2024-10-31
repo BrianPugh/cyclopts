@@ -860,6 +860,12 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.Int32
 
+^^^^
+Json
+^^^^
+Annotated types for parsing a json-string from the CLI.
+
+.. autodata:: cyclopts.types.Json
 
 .. _API Config:
 

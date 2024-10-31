@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Sequence
+from typing import TYPE_CHECKING, Annotated, Any, Sequence
 
 from cyclopts import validators
 from cyclopts.parameter import Parameter
@@ -35,6 +35,8 @@ __all__ = [
     "Int16",
     "UInt32",
     "Int32",
+    # Json,
+    "Json",
 ]
 
 
@@ -109,3 +111,39 @@ UInt32 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=4294967
 "An unsigned 32-bit integer."
 Int32 = Annotated[int, Parameter(validator=validators.Number(gte=-2147483648, lte=2147483647))]
 "A signed 32-bit integer."
+
+
+########
+# Json #
+########
+def _json_converter(type_, tokens: Sequence["Token"]):
+    import json
+
+    assert len(tokens) == 1
+    out = json.loads(tokens[0].value)
+    return out
+
+
+Json = Annotated[Any, Parameter(converter=_json_converter)]
+"""
+Parse a json-string from the CLI.
+
+Usage example:
+
+.. code-block:: python
+
+    from cyclopts import App, types
+
+    app = App()
+
+    @app.default
+    def main(json: types.Json):
+        print(json)
+
+    app()
+
+.. code-block:: console
+
+    $ my-script '{"foo": 1, "bar": 2}'
+    {'foo': 1, 'bar': 2}
+"""
