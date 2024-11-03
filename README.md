@@ -20,21 +20,17 @@
 
 ---
 
-Cyclopts is a modern, easy-to-use command-line interface (CLI) framework.
-It offers a streamlined approach for building CLI applications with an emphasis on simplicity, extensibility, and robustness.
-Cyclopts aims to provide an intuitive and efficient developer experience, making python CLI development more accessible and enjoyable.
-
+Cyclopts is a modern, easy-to-use command-line interface (CLI) framework that aims to provide an intuitive & efficient developer experience.
 
 # Why Cyclopts?
 
-- **Intuitive API**: Cyclopts features a straightforward and intuitive API, making it easy for developers to create complex CLI applications with minimal code.
+- **Intuitive API**: Quickly write CLI applications using a terse, intuitive syntax.
 
-- **Advanced Type Hinting**: Cyclopts offers advanced type hinting features, allowing for more accurate and informative command-line interfaces.
+- **Advanced Type Hinting**: Full support of all builtin types and even user-specified (yes, including [Pydantic](https://docs.pydantic.dev/latest/), [Dataclasses](https://docs.python.org/3/library/dataclasses.html), and [Attrs](https://www.attrs.org/en/stable/api.html)).
 
-- **Rich Help Generation**: Automatically generates beautiful, user-friendly help messages, ensuring that users can easily understand and utilize your CLI application.
+- **Rich Help Generation**: Automatically generates beautiful help pages from **docstrings** and other contextual data.
 
-- **Extensible and Customizable**: Designed with extensibility in mind, Cyclopts allows developers to easily add custom behaviors and integrate with other systems.
-
+- **Extendable**: Easily customize converters, validators, token parsing, and application launching.
 
 # Installation
 Cyclopts requires Python >=3.9; to install Cyclopts, run:
@@ -53,17 +49,14 @@ from cyclopts import App
 
 app = App()
 
-
 @app.command
 def foo(loops: int):
     for i in range(loops):
         print(f"Looping! {i}")
 
-
 @app.default
 def default_action():
     print("Hello world! This runs when no command is specified.")
-
 
 app()
 ```
@@ -87,14 +80,13 @@ Cyclopts is what you thought Typer was.
 Cyclopts's includes information from docstrings, support more complex types (even Unions and Literals!), and include proper validation support.
 See [the documentation for a complete Typer comparison](https://cyclopts.readthedocs.io/en/latest/vs_typer/README.html).
 
-Consider the following short Cyclopts application:
+Consider the following short 29-line Cyclopts application:
 
 ```python
 import cyclopts
 from typing import Literal
 
 app = cyclopts.App()
-
 
 @app.command
 def deploy(
@@ -124,14 +116,15 @@ if __name__ == "__main__":
 
 ```console
 $ my-script deploy --help
-Usage: my-script deploy [ARGS] [OPTIONS]
+Usage: my-script.py deploy [ARGS] [OPTIONS]
 
 Deploy code to an environment.
 
-╭─ Parameters ────────────────────────────────────────────────────────────────────────────────────────────╮
-│ *  ENV,--env            Environment to deploy to. [choices: dev,staging,prod] [required]                │
-│    REPLICAS,--replicas  Number of workers to spin up. [choices: default,performance] [default: default] │
-╰─────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Parameters ────────────────────────────────────────────────────────────────────────────────────╮
+│ *  ENV --env            Environment to deploy to. [choices: dev, staging, prod] [required]      │
+│    REPLICAS --replicas  Number of workers to spin up. [choices: default, performance] [default: │
+│                         default]                                                                │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 $ my-script deploy staging
 Deploying to staging with 10 replicas.
@@ -146,24 +139,25 @@ $ my-script deploy nonexistent-env
 ╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Error converting value "nonexistent-env" to typing.Literal['dev', 'staging', 'prod'] for "--env".  │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+$ my-script --version
+0.0.0
 ```
 
 In its current state, this application would be impossible to implement in Typer.
-However, lets see how close we can get with Typer:
+However, lets see how close we can get with Typer (47-lines):
 
 ```python
-from typer import Typer, Argument
+import typer
 from typing import Annotated, Literal
 from enum import Enum
 
-app = Typer()
-
+app = typer.Typer()
 
 class Environment(str, Enum):
     dev = "dev"
     staging = "staging"
     prod = "prod"
-
 
 def replica_parser(value: str):
     if value == "default":
@@ -173,18 +167,25 @@ def replica_parser(value: str):
     else:
         return int(value)
 
+def _version_callback(value: bool):
+    if value:
+        print("0.0.0")
+        raise typer.Exit()
 
 @app.callback()
-def dummy_callback():
+def callback(
+    version: Annotated[
+        bool | None, typer.Option("--version", callback=_version_callback)
+    ] = None,
+):
     pass
-
 
 @app.command(help="Deploy code to an environment.")
 def deploy(
-    env: Annotated[Environment, Argument(help="Environment to deploy to.")],
+    env: Annotated[Environment, typer.Argument(help="Environment to deploy to.")],
     replicas: Annotated[
         int,
-        Argument(
+        typer.Argument(
             parser=replica_parser,
             help="Number of workers to spin up.",
         ),
@@ -192,28 +193,24 @@ def deploy(
 ):
     print(f"Deploying to {env.name} with {replicas} replicas.")
 
-
 if __name__ == "__main__":
     app()
 ```
 
 ```console
 $ my-script deploy --help
-Usage: my-script [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
+
+Usage: my-script deploy [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
 
  Deploy code to an environment.
 
-╭─ Arguments ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ *    env           ENV:{dev|staging|prod}  Environment to deploy to. [default: None] [required]                                       │
-│      replicas      [REPLICAS]              Number of workers to spin up. [default: 10]                                                │
-╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ --install-completion        [bash|zsh|fish|powershell|pwsh]  Install completion for the specified shell. [default: None]              │
-│ --show-completion           [bash|zsh|fish|powershell|pwsh]  Show completion for the specified shell, to copy it or customize the     │
-│                                                              installation.                                                            │
-│                                                              [default: None]                                                          │
-│ --help                                                       Show this message and exit.                                              │
-╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────╮
+│ *    env           ENV:{dev|staging|prod}  Environment to deploy to. [default: None] [required] │
+│      replicas      [REPLICAS]              Number of workers to spin up. [default: 10]          │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Options ───────────────────────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                                     │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 $ my-script deploy staging
 Deploying to staging with 10 replicas.
@@ -225,14 +222,17 @@ $ my-script deploy staging performance
 Deploying to staging with 20 replicas.
 
 $ my-script deploy nonexistent-env
-Usage: my-script deploy [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
-Try 'my-script deploy --help' for help.
-╭─ Error ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Invalid value for 'ENV:{dev|staging|prod}': 'nonexistent-env' is not one of 'dev', 'staging', 'prod'.                                  │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Usage: my-script.py deploy [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
+Try 'my-script.py deploy --help' for help.
+╭─ Error ─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Invalid value for '[REPLICAS]': nonexistent-env                                                 │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+$ my-script --version
+0.0.0
 ```
 
-The Typer implementation is 43 lines long, while the Cyclopts implementation is just 30, all while including a proper docstring.
-Since Typer doesn't support Unions, the choices for ``replica`` could not be displayed on the help page.
-We also had to include a dummy callback since our application currently only has a single command.
+The Typer implementation is 47 lines long, while the Cyclopts implementation is just 29 (38% shorter!).
+Not only is the Cyclopts implementation significantly shorter, but the code is easier to read.
+Since Typer does not support Unions, the choices for ``replica`` could not be displayed on the help page.
 Cyclopts is much more terse, much more readable, and much more intuitive to use.
