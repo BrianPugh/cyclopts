@@ -9,7 +9,7 @@ from typing import (
     cast,
 )
 
-from attrs import define, field
+from attrs import field, frozen
 
 from cyclopts.utils import Sentinel, is_iterable, to_tuple_converter
 
@@ -34,7 +34,7 @@ class NO_USER_SORT_KEY(Sentinel):  # noqa: N801
     pass
 
 
-@define
+@frozen
 class Group:
     name: str = ""
 
@@ -47,6 +47,7 @@ class Group:
         default=None,
         alias="sort_key",
         converter=lambda x: NO_USER_SORT_KEY if x is None else x,
+        kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[Callable, ...]
@@ -64,24 +65,13 @@ class Group:
         kw_only=True,
     )
 
-    def __str__(self):
-        return self.name
-
     @property
     def show(self):
         return bool(self.name) if self._show is None else self._show
 
-    @show.setter
-    def show(self, value):
-        self._show = value
-
     @property
     def sort_key(self):
         return None if self._sort_key is NO_USER_SORT_KEY else self._sort_key
-
-    @sort_key.setter
-    def sort_key(self, value):
-        self._sort_key = value
 
     @classmethod
     def create_default_arguments(cls):

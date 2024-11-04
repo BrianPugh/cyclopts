@@ -14,19 +14,10 @@ def upper(type_, tokens: Sequence[Token]):
     return tokens[0].value.upper()
 
 
-def test_group_str_method():
-    food_group = Group("Food")
-    assert "Food" == str(food_group)
-
-
 def test_group_show_property():
     assert Group().show is False
     assert Group("Foo").show is True
     assert Group("Foo", show=False).show is False
-
-    g = Group("foo")
-    g.show = False
-    assert g.show is False
 
 
 def test_group_default_parameter_converter(app, assert_parse_args):
@@ -138,13 +129,6 @@ def test_group_sort_key_property():
 
     g = Group(sort_key=1)
     assert g.sort_key == 1
-
-    g.sort_key = 2
-    assert g.sort_key == 2
-
-    g.sort_key = None
-    assert g.sort_key is None
-    assert g._sort_key == cyclopts.group.NO_USER_SORT_KEY
 
 
 @pytest.fixture
