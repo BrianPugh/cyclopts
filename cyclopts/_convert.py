@@ -57,6 +57,8 @@ def _int(s: str) -> int:
     s = s.lower()
     if s.startswith("0x"):
         return int(s, 16)
+    elif s.startswith("0o"):
+        return int(s, 8)
     elif s.startswith("0b"):
         return int(s, 2)
     else:
