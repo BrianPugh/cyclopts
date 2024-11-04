@@ -1,5 +1,5 @@
 import inspect
-from typing import Annotated, Any, Optional, get_args, get_origin
+from typing import Annotated, Any, Optional, get_args, get_origin  # noqa: F401
 
 import attrs
 
@@ -27,8 +27,7 @@ VAR_KEYWORD = inspect.Parameter.VAR_KEYWORD
 def _replace_annotated_type(src_type, dst_type):
     if not is_annotated(src_type):
         return dst_type
-    metadata = get_args(src_type)[1:]
-    return Annotated[dst_type, *metadata]
+    return Annotated[(dst_type,) + get_args(src_type)[1:]]  # pyright: ignore
 
 
 class FieldInfo(inspect.Parameter):
