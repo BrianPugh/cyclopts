@@ -55,6 +55,9 @@ class Number:
     gte: Optional[Numeric] = None
     """Input value must be **greater than or equal** this value."""
 
+    modulo: Optional[Numeric] = None
+    """Input value must be a multiple of this value."""
+
     def __call__(self, type_: Any, value: Union[Numeric, NumericSequence]):
         if isinstance(value, Sequence):
             if isinstance(value, str):
@@ -73,3 +76,6 @@ class Number:
 
             if self.gte is not None and value < self.gte:
                 raise ValueError(f"Must be >= {self.gte}.")
+
+            if self.modulo is not None and value % self.modulo:
+                raise ValueError(f"Must be a multiple of {self.modulo}.")
