@@ -136,6 +136,7 @@ class ValidationError(CycloptsError):
     value: Any = cyclopts.utils.UNSET
 
     def __str__(self):
+        message = ""
         if self.argument:
             value = self.argument.value if self.value is cyclopts.utils.UNSET else self.value
             token = self.argument.tokens[0]
@@ -143,7 +144,8 @@ class ValidationError(CycloptsError):
             name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
             message = f'Invalid value "{value}" for "{name}"{provided_by}.'
         elif self.group:
-            message = f'Invalid values for group "{self.group}".'
+            if self.group.name:
+                message = f'Invalid values for group "{self.group.name}".'
         elif self.command_chain:
             message = f"Invalid values for command {self.command_chain[-1]!r}."
         else:
