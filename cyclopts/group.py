@@ -86,12 +86,30 @@ class Group:
         return cls("Commands")
 
     @classmethod
-    def create_ordered(cls, *args, sort_key=None, **kwargs):
-        """Create a group with a globally incremented :attr:`~Group.sort_key`.
+    def create_ordered(cls, name="", help="", *, show=None, sort_key=None, validator=None, default_parameter=None):
+        """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
-        Used to create a group that will be displayed **after** a previously declared :meth:`Group.create_ordered` group on the help-page.
+        Used to create a group that will be displayed **after** a previously instantiated :meth:`Group.create_ordered` group on the help-page.
 
-        If a :attr:`~Group.sort_key` is provided, it is **prepended** to the globally incremented counter value (i.e. has priority during sorting).
+        Parameters
+        ----------
+        name: str
+            Group name used for the help-page and for group-referenced-by-string.
+            This is a title, so the first character should be capitalized.
+            If a name is not specified, it will not be shown on the help-page.
+        help: str
+            Additional documentation shown on the help-page.
+            This will be displayed inside the group's panel, above the parameters/commands.
+        show: Optional[bool]
+            Show this group on the help-page.
+            Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
+        sort_key: Any
+            If provided, **prepended** to the globally incremented counter value (i.e. has priority during sorting).
+
+        validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]]
+            Group validator to collectively apply.
+        default_parameter: Optional[cyclopts.Parameter]
+            Default parameter for elements within the group.
         """
         count = next(_sort_key_counter)
         if sort_key is None:
@@ -100,7 +118,14 @@ class Group:
             sort_key = (tuple(sort_key), count)
         else:
             sort_key = (sort_key, count)
-        return cls(*args, sort_key=sort_key, **kwargs)
+        return cls(
+            name,
+            help,
+            show=show,
+            sort_key=sort_key,
+            validator=validator,
+            default_parameter=default_parameter,
+        )
 
 
 def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group], list[Any]]:

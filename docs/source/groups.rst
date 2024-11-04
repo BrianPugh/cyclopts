@@ -218,7 +218,7 @@ Groups form titled panels on the help-page.
 Groups with an empty name, or with :attr:`show=False <.Group.show>`, are **not** shown on the help-page.
 This is useful for applying additional grouping logic (such as applying a :class:`.LimitedChoice` validator) without impacting the help-page.
 
-By default, the ordering of panels is alphabetical.
+By default, the ordering of panels is **alphabetical**.
 However, the sorting can be manipulated by :attr:`.Group.sort_key`. See it's documentation for usage.
 
 The :meth:`.Group.create_ordered` convenience classmethod creates a :class:`.Group` with a :attr:`~.Group.sort_key` value drawn drawn from a global monotonically increasing counter.

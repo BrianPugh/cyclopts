@@ -630,6 +630,10 @@ API
 
       .. code-block:: python
 
+         from cyclopts import App, Group
+
+         app = App()
+
          @app.command(group=Group("4", sort_key=5))
          def cmd1():
              pass
@@ -649,13 +653,13 @@ API
          def cmd4():
              pass
 
+         app()
+
       Resulting help-page:
 
       .. code-block:: bash
 
         Usage: app COMMAND
-
-        App Help String Line 1.
 
         ╭─ 4 ────────────────────────────────────────────────────────────────╮
         │ cmd1                                                               │
