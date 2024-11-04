@@ -262,19 +262,22 @@ class App:
     )
 
     # This can ONLY ever be a Group or None
-    group_arguments: Union[Group, str, None] = field(
+    _group_arguments: Union[Group, str, None] = field(
+        alias="group_arguments",
         default=None,
         converter=_group_converter,
         kw_only=True,
     )
     # This can ONLY ever be a Group or None
-    group_parameters: Union[Group, str, None] = field(
+    _group_parameters: Union[Group, str, None] = field(
+        alias="group_parameters",
         default=None,
         converter=_group_converter,
         kw_only=True,
     )
     # This can ONLY ever be a Group or None
-    group_commands: Union[Group, str, None] = field(
+    _group_commands: Union[Group, str, None] = field(
+        alias="group_commands",
         default=None,
         converter=_group_converter,
         kw_only=True,
@@ -374,6 +377,36 @@ class App:
             return (name,)
         else:
             return (self.name_transform(self.default_command.__name__),)
+
+    @property
+    def group_arguments(self):
+        if self._group_arguments is None:
+            return Group.create_default_arguments()
+        return self._group_arguments
+
+    @group_arguments.setter
+    def group_arguments(self, value):
+        self._group_arguments = value
+
+    @property
+    def group_parameters(self):
+        if self._group_parameters is None:
+            return Group.create_default_parameters()
+        return self._group_parameters
+
+    @group_parameters.setter
+    def group_parameters(self, value):
+        self._group_parameters = value
+
+    @property
+    def group_commands(self):
+        if self._group_commands is None:
+            return Group.create_default_commands()
+        return self._group_commands
+
+    @group_commands.setter
+    def group_commands(self, value):
+        self._group_commands = value
 
     @property
     def config(self) -> tuple[str, ...]:
@@ -514,9 +547,9 @@ class App:
             self._meta = type(self)(
                 help_flags=self.help_flags,
                 version_flags=self.version_flags,
-                group_commands=copy(self.group_commands),
-                group_arguments=copy(self.group_arguments),
-                group_parameters=copy(self.group_parameters),
+                group_commands=copy(self._group_commands),
+                group_arguments=copy(self._group_arguments),
+                group_parameters=copy(self._group_parameters),
             )
             self._meta._meta_parent = self
         return self._meta
@@ -642,14 +675,14 @@ class App:
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
 
-            if app.group_commands is None:
-                app.group_arguments = copy(self.group_commands)
+            if app._group_commands is None:
+                app._group_arguments = copy(self._group_commands)
 
-            if app.group_parameters is None:
-                app.group_arguments = copy(self.group_parameters)
+            if app._group_parameters is None:
+                app._group_arguments = copy(self._group_parameters)
 
-            if app.group_arguments is None:
-                app.group_arguments = copy(self.group_arguments)
+            if app._group_arguments is None:
+                app._group_arguments = copy(self._group_arguments)
         else:
             validate_command(obj)
 
@@ -657,11 +690,11 @@ class App:
             kwargs.setdefault("version_flags", self.version_flags)
 
             if "group_commands" not in kwargs:
-                kwargs["group_commands"] = copy(self.group_commands)
+                kwargs["group_commands"] = copy(self._group_commands)
             if "group_parameters" not in kwargs:
-                kwargs["group_parameters"] = copy(self.group_parameters)
+                kwargs["group_parameters"] = copy(self._group_parameters)
             if "group_arguments" not in kwargs:
-                kwargs["group_arguments"] = copy(self.group_arguments)
+                kwargs["group_arguments"] = copy(self._group_arguments)
             app = App(default_command=obj, **kwargs)  # pyright: ignore
 
             for flag in chain(kwargs["help_flags"], kwargs["version_flags"]):  # pyright: ignore
@@ -787,8 +820,8 @@ class App:
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
             Parameter.combine(resolve_default_parameter_from_apps(apps), self.default_parameter, default_parameter),
-            group_arguments=self.group_arguments,  # pyright: ignore
-            group_parameters=self.group_parameters,  # pyright: ignore
+            group_arguments=self._group_arguments,  # pyright: ignore
+            group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
             assignable=assignable,
         )

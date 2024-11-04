@@ -1136,7 +1136,7 @@ def _resolve_groups_from_callable(
                 continue
 
             # Ensure a different, but same-named group doesn't already exist
-            if any(group is not x and x.name == group.name for x in resolved_groups):
+            if any(group != x and x.name == group.name for x in resolved_groups):
                 raise ValueError("Cannot register 2 distinct Group objects with same name.")
 
             if group.default_parameter is not None and group.default_parameter.group:
