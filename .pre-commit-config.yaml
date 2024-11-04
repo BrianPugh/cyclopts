@@ -19,8 +19,7 @@ repos:
       - id: check-xml
       - id: check-yaml
       - id: debug-statements
-        language_version: "3.12"
-        exclude: '^tests/test_py3.*\.py$'
+        exclude: '^tests/test_py3.*\.py$|^cyclopts/field_info\.py$'
       - id: destroyed-symlinks
       - id: detect-private-key
       - id: end-of-file-fixer
