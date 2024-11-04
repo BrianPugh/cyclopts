@@ -3,10 +3,10 @@
 ====================
 Parameter Validators
 ====================
-In a CLI application, users have the freedom to input a wide range of data.
+In CLI applications, users have the freedom to input a wide range of data.
 This flexibility can lead to inputs the application does not expect.
-By coercing the input into a data type (like an ``int``), we are already limiting the input to a certain degree.
-To further restrict the user input, you can populate the ``validator`` field of :class:`.Parameter`.
+By coercing the input into a data type (like an :obj:`int`), we are already limiting the input to a certain degree.
+To further restrict the user input, you can populate the :attr:`~.Parameter.validator` field of :class:`.Parameter`.
 
 A validator is any callable object (such as a function) that has the signature:
 
@@ -15,11 +15,12 @@ A validator is any callable object (such as a function) that has the signature:
    def validator(type_, value: Any) -> None:
        pass  # Raise any exception here if ``value`` is invalid.
 
-Validation happens after the data converter runs.
-Any of :exc:`AssertionError`, :exc:`TypeError` or :exc:`ValidationError` will be promoted to a :exc:`cyclopts.ValidationError`.
-More than one validator can be supplied as a list to the ``validator`` field.
+Validation happens **after** the data converter runs.
+Any of :exc:`AssertionError`, :exc:`TypeError` or :exc:`ValidationError` will be promoted to a :exc:`cyclopts.ValidationError` so that the exception gets presented to the end-user in a nicer way.
+More than one validator can be supplied as a list to the :attr:`~.Parameter.validator` field.
 
 Cyclopts has some builtin common validators in the :ref:`cyclopts.validators <API Validators>` module.
+See :ref:`Annotated Types` for common specific definitions provided as convenient pre-annotated types.
 
 ----
 Path

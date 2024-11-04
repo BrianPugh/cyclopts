@@ -33,7 +33,7 @@ Groups can be created in two ways:
 Every command and parameter belongs to at least one group.
 
 Group(s) can be provided to the ``group`` keyword argument of :meth:`app.command <cyclopts.App.command>` and :class:`.Parameter`.
-The :class:`.Group` class itself only marks objects with metadata and does not directly reference it's members.
+Like :class:`.Parameter`, the :class:`.Group` class itself only marks objects with metadata; the group does **not** contain direct references to it's members.
 This means that groups can be re-used across commands.
 
 --------------
@@ -163,20 +163,25 @@ Groups with an empty name, or with ``show=False``, are a way of using group vali
 
 .. code-block:: python
 
-   from cyclopts import App, Group, validators
+   from cyclopts import App, Group, Parameter, validators
+   from typing import Annotated
 
    app = App()
+
    mutually_exclusive = Group(
-      validator=validatorsMutuallyExclusive(),
+      # This Group has no name, so it won't impact the help page.
+      validator=validators.MutuallyExclusive(),
+      # show_default=False - Showing "[default: False]" isn't too meaningful for mutually-exclusive options.
+      # negative="" - Don't create a "--no-" flag
       default_parameter=Parameter(show_default=False, negative=""),
    )
 
    @app.command
    def foo(
-       car: Annotated[bool, Parameter(group=(app.group_parameters, mutually_exclusive))],
-       truck: Annotated[bool, Parameter(group=(app.group_parameters, mutually_exclusive))],
+       car: Annotated[bool, Parameter(group=(app.group_parameters, mutually_exclusive))] = False,
+       truck: Annotated[bool, Parameter(group=(app.group_parameters, mutually_exclusive))] = False,
    ):
-       pass
+       print(f"{car=} {truck=}")
 
    app()
 
@@ -188,6 +193,17 @@ Groups with an empty name, or with ``show=False``, are a way of using group vali
    ╭─ Parameters ──────────────────────────────────────────────────────╮
    │ CAR,--car                                                         │
    │ TRUCK,--truck                                                     │
+   ╰───────────────────────────────────────────────────────────────────╯
+
+   $ python demo.py foo --car
+   car=True truck=False
+
+   $ python demo.py foo --truck
+   car=False truck=True
+
+   $ python demo.py foo --car --truck
+   ╭─ Error ───────────────────────────────────────────────────────────╮
+   │  Mutually exclusive arguments: {--car, --truck}                   │
    ╰───────────────────────────────────────────────────────────────────╯
 
 See :attr:`.Group.validator` for details.

@@ -65,3 +65,9 @@ Most commonly used for mutually-exclusive arguments (default behavior).
    ╰───────────────────────────────────────────────────────────────────────╯
 
 See the :class:`.LimitedChoice` docs for more info.
+
+-----------------
+MutuallyExclusive
+-----------------
+Alias for :class:`.LimitedChoice` with default arguments.
+Exists primarily because the usage/implication will be more directly obvious and searchable to developers than :class:`.LimitedChoice`.
