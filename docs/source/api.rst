@@ -913,20 +913,20 @@ All Cyclopts builtins index into the configuration file with the following rules
 
    .. attribute:: must_exist
       :type: bool
-      :value: True
+      :value: False
 
       The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
 
    .. attribute:: search_parents
       :type: bool
-      :value: True
+      :value: False
 
       If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
       Raises :class:`FileNotFoundError` if no configuration file is found.
 
    .. attribute:: allow_unknown
       :type: bool
-      :value: True
+      :value: False
 
       Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
    .. attribute:: use_commands_as_keys
@@ -967,20 +967,20 @@ All Cyclopts builtins index into the configuration file with the following rules
 
    .. attribute:: must_exist
       :type: bool
-      :value: True
+      :value: False
 
       The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
 
    .. attribute:: search_parents
       :type: bool
-      :value: True
+      :value: False
 
       If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
       Raises :class:`FileNotFoundError` if no configuration file is found.
 
    .. attribute:: allow_unknown
       :type: bool
-      :value: True
+      :value: False
 
       Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
    .. attribute:: use_commands_as_keys
@@ -1022,20 +1022,20 @@ All Cyclopts builtins index into the configuration file with the following rules
 
    .. attribute:: must_exist
       :type: bool
-      :value: True
+      :value: False
 
       The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
 
    .. attribute:: search_parents
       :type: bool
-      :value: True
+      :value: False
 
       If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
       Raises :class:`FileNotFoundError` if no configuration file is found.
 
    .. attribute:: allow_unknown
       :type: bool
-      :value: True
+      :value: False
 
       Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
    .. attribute:: use_commands_as_keys
