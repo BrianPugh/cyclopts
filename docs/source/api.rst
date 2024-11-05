@@ -886,14 +886,17 @@ All Cyclopts builtins index into the configuration file with the following rules
 3. Apply each key/value pair if CLI arguments have **not** been provided for that parameter.
 
 .. autoclass:: cyclopts.config.Toml
-   :members:
 
    Automatically read configuration from Toml file.
+
+   .. attribute:: path
+      :type: str | pathlib.Path
+
+      Path to TOML configuration file.
 
    .. attribute:: root_keys
       :type: Iterable[str]
       :value: None
-      :noindex:
 
       The key or sequence of keys that lead to the root configuration structure for this app.
       For example, if referencing a ``pyproject.toml``, it is common to store all of your projects configuration under:
@@ -908,16 +911,146 @@ All Cyclopts builtins index into the configuration file with the following rules
 
          app = cyclopts.App(config=cyclopts.config.Toml("pyproject.toml", root_keys=("tool", "myproject")))
 
-.. autoclass:: cyclopts.config.Yaml
-   :members:
+   .. attribute:: must_exist
+      :type: bool
+      :value: True
 
-   Automatically read configuration from Yaml file.
+      The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: True
+
+      If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+      Raises :class:`FileNotFoundError` if no configuration file is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: True
+
+      Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
+   .. attribute:: use_commands_as_keys
+      :type: bool
+      :value: True
+
+      Use the sequence of commands as keys into the configuration.
+
+      For example, the following CLI invocation:
+
+      .. code-block:: console
+
+          $ python my-script.py my-command
+
+      Would search into ``["my-command"]`` for values.
+
+.. autoclass:: cyclopts.config.Yaml
+
+   Automatically read configuration from YAML file.
+
+   .. attribute:: path
+      :type: str | pathlib.Path
+
+      Path to YAML configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a common ``config.yaml`` that is shared with other applications, it is common to store your projects configuration under a key like ``myproject:``.
+
+      Your Cyclopts :class:`~cyclopts.App` would be configured as:
+
+      .. code-block:: python
+
+         app = cyclopts.App(config=cyclopts.config.Yaml("config.yaml", root_keys="myproject"))
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: True
+
+      The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: True
+
+      If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+      Raises :class:`FileNotFoundError` if no configuration file is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: True
+
+      Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
+   .. attribute:: use_commands_as_keys
+      :type: bool
+      :value: True
+
+      Use the sequence of commands as keys into the configuration.
+
+      For example, the following CLI invocation:
+
+      .. code-block:: console
+
+          $ python my-script.py my-command
+
+      Would search into ``["my-command"]`` for values.
 
 
 .. autoclass:: cyclopts.config.Json
-   :members:
 
    Automatically read configuration from Json file.
+
+   .. attribute:: path
+      :type: str | pathlib.Path
+
+      Path to JSON configuration file.
+
+   .. attribute:: root_keys
+      :type: Iterable[str]
+      :value: None
+
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a common ``config.json`` that is shared with other applications, it is common to store your projects configuration under a key like ``"myproject":``.
+
+      Your Cyclopts :class:`~cyclopts.App` would be configured as:
+
+      .. code-block:: python
+
+         app = cyclopts.App(config=cyclopts.config.Json("config.json", root_keys="myproject"))
+
+   .. attribute:: must_exist
+      :type: bool
+      :value: True
+
+      The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
+
+   .. attribute:: search_parents
+      :type: bool
+      :value: True
+
+      If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+      Raises :class:`FileNotFoundError` if no configuration file is found.
+
+   .. attribute:: allow_unknown
+      :type: bool
+      :value: True
+
+      Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
+   .. attribute:: use_commands_as_keys
+      :type: bool
+      :value: True
+
+      Use the sequence of commands as keys into the configuration.
+
+      For example, the following CLI invocation:
+
+      .. code-block:: console
+
+          $ python my-script.py my-command
+
+      Would search into ``["my-command"]`` for values.
 
 
 .. autoclass:: cyclopts.config.Env
@@ -1001,6 +1134,14 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.MissingArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.RepeatArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.MixedArgumentError
    :show-inheritance:
    :members:
 

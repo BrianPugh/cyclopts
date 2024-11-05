@@ -255,7 +255,7 @@ class Sentinel(metaclass=SentinelMeta):
 
 
 class UNSET(Sentinel):
-    """Special sentinel value indicating that no data was provided. Do not instantiate."""
+    """Special sentinel value indicating that no data was provided. **Do not instantiate**."""
 
 
 def record_init(target: str):

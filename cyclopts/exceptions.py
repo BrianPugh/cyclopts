@@ -51,8 +51,8 @@ class DocstringError(Exception):
 class CycloptsError(Exception):
     """Root exception for runtime errors.
 
-    As CycloptsErrors bubble up the Cyclopts stack, more information is added to it.
-    Finally, :func:`cyclopts.exceptions.format_cyclopts_error` formats the message nicely for the user.
+    As CycloptsErrors bubble up the Cyclopts call-stack, more information is added to it.
+    Finally, :meth:`format_cyclopts_error` formats the message nicely for the user.
     """
 
     msg: Optional[str] = None
@@ -134,6 +134,7 @@ class ValidationError(CycloptsError):
     """If a group validator caused the exception."""
 
     value: Any = cyclopts.utils.UNSET
+    """Converted value that failed validation."""
 
     def __str__(self):
         message = ""
@@ -159,11 +160,16 @@ class ValidationError(CycloptsError):
 
 @define(kw_only=True)
 class UnknownOptionError(CycloptsError):
-    """Unknown/unregistered option provided by the cli."""
+    """Unknown/unregistered option provided by the cli.
+
+    A nearest-neighbor parameter suggestion may be printed.
+    """
 
     token: Token
+    """Token without a matching parameter."""
 
     argument_collection: "ArgumentCollection"
+    """Argument collection of plausible options."""
 
     def __str__(self):
         value = self.token.keyword or self.token.value
@@ -262,7 +268,10 @@ class UnusedCliTokensError(CycloptsError):
 
 @define(kw_only=True)
 class MissingArgumentError(CycloptsError):
+    """A required argument was not provided."""
+
     tokens_so_far: list[str] = field(factory=list)
+    """If the matched parameter requires multiple tokens, these are the ones we have parsed so far."""
 
     def __str__(self):
         assert self.argument is not None
@@ -297,6 +306,7 @@ class RepeatArgumentError(CycloptsError):
     """The same parameter has erroneously been specified multiple times."""
 
     token: "Token"
+    """The repeated token."""
 
     def __str__(self):
         return super().__str__() + f"Parameter {self.token.keyword} specified multiple times."
