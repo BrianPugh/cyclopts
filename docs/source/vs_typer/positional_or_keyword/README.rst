@@ -9,11 +9,9 @@ For example, lets say we want to implement a ``mv``\-like program that takes in 
 
    typer_app = typer.Typer()
 
-
    @typer_app.command()
    def mv(src, dst):
        print(f"Moving {src} -> {dst}")
-
 
    typer_app(["foo", "bar"], standalone_mode=False)
    # Moving foo -> bar
@@ -32,11 +30,9 @@ Cyclopts handles both situations:
 
    cyclopts_app = cyclopts.App()
 
-
    @cyclopts_app.default()
    def mv(src, dst):
        print(f"Moving {src} -> {dst}")
-
 
    cyclopts_app(["foo", "bar"])
    # Moving foo -> bar

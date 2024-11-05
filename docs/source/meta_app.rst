@@ -31,18 +31,15 @@ To change how the primary app is run, you can use the meta-app feature of Cyclop
    # Set sort_key so it will be drawn higher up the help-page.
    app.meta.group_parameters = Group("Session Parameters", sort_key=0)
 
-
    @app.command
    def foo(loops: int):
        for i in range(loops):
            print(f"Looping! {i}")
 
-
    @app.meta.default
    def my_app_launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
        print(f"Hello {user}")
        app(tokens)
-
 
    app.meta()
 

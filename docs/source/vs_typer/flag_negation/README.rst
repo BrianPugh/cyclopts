@@ -5,16 +5,15 @@ Flag Negation
 =============
 For boolean parameters, Typer adds a ``--no-MY-FLAG-NAME`` to specify a ``False`` argument.
 
-
 .. code-block:: python
 
-   typer_app = typer.Typer()
+   import typer
 
+   typer_app = typer.Typer()
 
    @typer_app.command()
    def foo(my_flag: bool = False):
        print(f"{my_flag=}")
-
 
    typer_app(["--my-flag"], standalone_mode=False)
    # my_flag=True
@@ -25,10 +24,14 @@ Overriding the option's name will disable Typer's negative-flag generation logic
 
 .. code-block:: python
 
+   import typer
+   from typing import Annotated
+
+   typer_app = typer.Typer()
+
    @typer_app.command()
    def foo(my_flag: Annotated[bool, Option("--my-flag")] = False):
        print(f"{my_flag=}")
-
 
    typer_app(["--my-flag"], standalone_mode=False)
    # my_flag=True
@@ -40,10 +43,13 @@ To use a different negative flag, you can supply the name after a slash in your 
 
 .. code-block:: python
 
+   import typer
+
+   typer_app = typer.Typer()
+
    @typer_app.command()
    def foo(my_flag: Annotated[bool, Option("--my-flag/--your-flag")] = False):
        print(f"{my_flag=}")
-
 
    typer_app(["--my-flag"], standalone_mode=False)
    # my_flag=True
@@ -55,13 +61,14 @@ To suppress the negative-flag generation, set this argument to either an empty s
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
+   from typing import Annotated
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.default
    def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative="")] = False):
        print(f"{my_flag=}")
-
 
    print("Cyclopts:")
    cyclopts_app(["--my-flag"])
@@ -80,7 +87,6 @@ To define your own custom negative flag, just provide it as a string or list of 
    def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative="--your-flag")] = False):
        print(f"{my_flag=}")
 
-
    print("Cyclopts:")
    cyclopts_app(["--my-flag"])
    # my_flag=True
@@ -94,7 +100,6 @@ The default ``--no-`` negation prefix can also be customized with :attr:`~.Param
    @cyclopts_app.default
    def foo(my_flag: Annotated[bool, cyclopts.Parameter(negative_bool="--disable-")] = False):
        print(f"{my_flag=}")
-
 
    print("Cyclopts:")
    cyclopts_app(["--my-flag"])

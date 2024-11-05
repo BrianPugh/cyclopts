@@ -3,7 +3,6 @@ App Calling & Return Values
 ===========================
 In this section, we'll take a closer look at the :meth:`.App.__call__` method.
 
-
 -------------
 Input Command
 -------------
@@ -11,13 +10,13 @@ Typically, a Cyclopts app looks something like:
 
 .. code-block:: python
 
-   app = cyclopts.App()
+   from cyclopts import App
 
+   app = App()
 
    @app.command
    def foo(a: int, b: int, c: int):
        print(a + b + c)
-
 
    app()
 
@@ -46,13 +45,13 @@ The ``app`` invocation returns the value of the called command.
 
 .. code-block:: python
 
-   app = cyclopts.App()
+   from cyclopts import App
 
+   app = App()
 
    @app.command
    def foo(a: int, b: int, c: int):
        return a + b + c
-
 
    return_value = app("foo 1 2 3")
    print(f"The return value was: {return_value}.")
@@ -69,8 +68,8 @@ If you decide you want each command to return an exit code, you could invoke you
 ------------------------------
 Exception Handling and Exiting
 ------------------------------
-For the most part, Cyclopts is hands-off when it comes to exiting the application.
-However, by default, if there is a Cyclopts runtime error, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a ``sys.exit(1)``.
+For the most part, Cyclopts is **hands-off** when it comes to handling exceptions and exiting the application.
+However, by default, if there is a **Cyclopts runtime error**, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a ``sys.exit(1)``.
 This is to avoid displaying the unformatted, uncaught exception to the CLI user.
 This can be disabled by specifying ``exit_on_error=False`` when calling the app.
 At the same time, you may want to set ``print_error=False`` to disable the printing

@@ -19,14 +19,11 @@ Consider the following function signatures:
    def pos_or_keyword(a, b):
        pass
 
-
    def pos_only(a, b, /):
        pass
 
-
    def keyword_only(*, a, b=2):
        pass
-
 
    def mixture(a, /, b, *, c=3):
        pass
@@ -46,7 +43,6 @@ I believe that Typer's separate ``Argument`` and ``Option`` classes are a relic 
 .. code-block:: python
 
    app = typer.Typer()
-
 
    @app.command()
    def foo(a=Argument(), b=Option(default=2)):

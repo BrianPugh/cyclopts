@@ -16,7 +16,9 @@ If you would like your CLI application to be able to upgrade itself, you can add
    import mypackage
    import subprocess
    import sys
+   from cyclopts import App
 
+   app = App()
 
    @app.command
    def upgrade():
@@ -31,6 +33,8 @@ If you would like your CLI application to be able to upgrade itself, you can add
        else:
            print(f"mypackage updated from v{old_version} to v{new_version}.")
 
-``sys.executable`` points to the currently used python interpreter's path; if your package was installed via pipx, then it points to the python interpreter in it's respective virtual environment.
+   app()
+
+:obj:`sys.executable` points to the currently used python interpreter's path; if your package was installed via pipx_, then it points to the python interpreter in it's respective virtual environment.
 
 .. _pipx: https://github.com/pypa/pipx

@@ -45,7 +45,6 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
 
    cookbook/app_upgrade.rst
    cookbook/interactive_help.rst
-   cookbook/pyproject.rst
    cookbook/rich_formatted_exceptions.rst
 
 .. toctree::

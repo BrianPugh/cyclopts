@@ -36,9 +36,15 @@ Individual elements are converted to the annotated type.
 
 .. code-block:: python
 
+   from cyclopts import App
+
+   app = App()
+
    @app.command
    def foo(name: str, *favorite_numbers: int):
        print(f"{name}'s favorite numbers are: {favorite_numbers}")
+
+   app()
 
 
 .. code-block:: console
@@ -59,20 +65,23 @@ Kwargs (Variable Keywords)
 --------------------------
 A variable number of keyword arguments consume all remaining CLI tokens starting with ``--``.
 Individual values are converted to the annotated type.
-As with normal python ``**kwargs``, the keywords are limited to python identifiers.
-Most prominently, no spaces allowed.
-Keyword name-conversion is the :ref:`same as commands <Command Changing Name>`.
 
 .. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
 
    @app.command
    def add(**country_to_capitols):
        for country, capitol in country_to_capitols.items():
            print(f"Adding {country} with capitol {capitol}.")
 
+   app()
+
 
 .. code-block:: console
 
    $ my-script add --united-states="Washington, D.C." --canada=Ottawa
-   Adding united_states with capitol Washington, D.C..
+   Adding united-states with capitol Washington, D.C..
    Adding canada with capitol Ottawa.

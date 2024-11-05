@@ -14,11 +14,9 @@ Consider the following example:
 
     app = App()
 
-
     @app.default
     def main(name: str):
         print(name + 3)
-
 
     if __name__ == "__main__":
         app()
@@ -52,11 +50,9 @@ To create a more visually appealing and informative traceback, you can use the `
     console = Console()
     app = App(console=console)  # Use same Console object for Cyclopts operations.
 
-
     @app.default
     def main(name: str):
         print(name + 3)
-
 
     if __name__ == "__main__":
         try:

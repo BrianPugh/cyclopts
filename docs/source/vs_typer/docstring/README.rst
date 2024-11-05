@@ -11,14 +11,14 @@ Consider the following Typer program:
 
 .. code-block:: python
 
-   typer_app = typer.Typer()
+   import typer
 
+   typer_app = typer.Typer()
 
    @typer_app.callback()
    def dummy():
        # So that ``foo`` is considered a command.
        pass
-
 
    @typer_app.command()
    def foo(bar):
@@ -29,7 +29,8 @@ Consider the following Typer program:
        bar: str
            Bar parameter docstring.
        """
-       pass
+
+   typer_app()
 
 .. code-block:: console
 
@@ -64,8 +65,9 @@ Compare this to Cyclopts:
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.command()
    def foo(bar):
@@ -76,7 +78,8 @@ Compare this to Cyclopts:
        bar: str
            Bar parameter docstring.
        """
-       pass
+
+   cyclopts_app()
 
 .. code-block:: console
 

@@ -29,15 +29,12 @@ A pretty bare-bones Cyclopts ``mypackage/__main__.py`` will look like:
 
    app = cyclopts.App()
 
-
    @app.command
    def foo(name: str):
        print(f"Hello {name}!")
 
-
    def main():
        app()
-
 
    if __name__ == "__main__":
        main()

@@ -140,7 +140,7 @@ A flattened dataclass provides a natural way of easily sharing a set of paramete
 Config File
 -----------
 Having the user specify ``--user`` every single call is a bit cumbersome, especially if they're always going to provide the same value.
-We can have Cyclopts fallback to a configuration file.
+We can have Cyclopts fallback to a :ref:`toml configuration file <Config Files>`.
 
 Consider the following toml data saved to ``config.toml``:
 

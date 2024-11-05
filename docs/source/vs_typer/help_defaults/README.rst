@@ -5,8 +5,9 @@ In Typer's ``--help`` display, default values are unhelpfully shown for required
 
 .. code-block:: python
 
-   typer_app = typer.Typer()
+   import typer
 
+   typer_app = typer.Typer()
 
    @typer_app.command()
    def compress(
@@ -14,7 +15,6 @@ In Typer's ``--help`` display, default values are unhelpfully shown for required
        dst: Annotated[Path, typer.Argument(help="Path to save compressed data to.")] = Path("out.zip"),
    ):
        print(f"Compressing data from {src} to {dst}")
-
 
    print("Typer positional:")
    typer_app(["--help"], standalone_mode=False)
@@ -24,13 +24,13 @@ In Typer's ``--help`` display, default values are unhelpfully shown for required
    # ╰───────────────────────────────────────────────────────────────────────────╯
 
 It doesn't make any sense to show a default for a parameter that is required and has no default.
-
 Cyclopts fixes this:
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.default()
    def compress(
@@ -38,7 +38,6 @@ Cyclopts fixes this:
        dst: Annotated[Path, cyclopts.Parameter(help="Path to save compressed data to.")] = Path("out.zip"),
    ):
        print(f"Compressing data from {src} to {dst}")
-
 
    cyclopts_app(["--help"])
    # ╭─ Parameters ───────────────────────────────────────────────────────╮
@@ -54,8 +53,10 @@ Additionally, the cleaner, docstring-centric way of writing this program with Cy
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
+   from pathlib import Path
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.default()
    def compress(src: Path, dst: Path = Path("out.zip")):
@@ -69,7 +70,6 @@ Additionally, the cleaner, docstring-centric way of writing this program with Cy
           Path to save compressed data to.
        """
        print(f"Compressing data from {src} to {dst}")
-
 
    cyclopts_app(["--help"])
    # ╭─ Parameters ───────────────────────────────────────────────────────╮

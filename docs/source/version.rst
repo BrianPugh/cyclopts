@@ -9,8 +9,8 @@ All CLI applications should have the basic ability to check the installed versio
    $ my-application --version
    7.5.8
 
-By default, cyclopts adds a command, :meth:`--version <cyclopts.App.version_print>`:, that does exactly this.
-
+By default, Cyclopts adds a command, :meth:`--version <cyclopts.App.version_print>`:, that does exactly this.
+Cyclopts try's to reasonably figure out your package's version by itself.
 The resolution order for determining the version string is as follows:
 
 1. An explicitly supplied version string or callable to the root Cyclopts application:

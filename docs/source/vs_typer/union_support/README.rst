@@ -6,13 +6,13 @@ Currently, Typer does not support :obj:`~typing.Union` type annotations.
 
 .. code-block:: python
 
-   typer_app = typer.Typer()
+   import typer
 
+   typer_app = typer.Typer()
 
    @typer_app.command()
    def foo(value: Union[int, str] = "default_str"):
        print(f"{type(value)=} {value=}")
-
 
    typer_app(["123"])
    # AssertionError: Typer Currently doesn't support Union types
@@ -23,13 +23,13 @@ Cyclopt's :ref:`Coercion Rules <Coercion Rules - Union>` iterate left-to-right o
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.default
    def foo(value: Union[int, str] = "default_str"):
        print(f"{type(value)=} {value=}")
-
 
    print("Cyclopts:")
    cyclopts_app(["123"])

@@ -3,12 +3,12 @@
 ============
 Config Files
 ============
-For more complicated CLI applications, it is common to have an external user configuration file. For example, the popular python tools ``poetry``, ``ruff``, and ``pytest`` are all configurable from a ``pyproject.toml`` file. The :attr:`App.config <cyclopts.App.config>` attribute accepts a callable (or list of callables) that add (or remove) values to the parsed CLI tokens. The provided callable must have signature:
+For more complicated CLI applications, it is common to have an external user configuration file. For example, the popular python tools ``poetry``, ``ruff``, and ``pytest`` are all configurable from a ``pyproject.toml`` file. The :attr:`App.config <cyclopts.App.config>` attribute accepts a `callable <https://docs.python.org/3/glossary.html#term-callable>`_ (or list of callables) that add (or remove) values to the parsed CLI tokens. The provided callable must have signature:
 
 .. code-block:: python
 
    def config(apps: List["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
-       """Modifies given mapping inplace with some injected values.
+       """Modifies the argument collection inplace with some injected values.
 
        Parameters
        ----------
@@ -47,14 +47,11 @@ In this example, we create a small CLI tool that counts the number of times a gi
        ),
    )
 
-
    @app.command
    def count(filename: Path, *, character="-"):
        print(filename.read_text().count(character))
 
-
-   if __name__ == "__main__":
-       app()
+   app()
 
 Running this code without a ``pyproject.toml`` present:
 
@@ -98,14 +95,11 @@ To automatically derive and read appropriate environment variables, use the :cla
        ),
    )
 
-
    @app.command
    def count(filename: Path, *, character="-"):
        print(filename.read_text().count(character))
 
-
-   if __name__ == "__main__":
-       app()
+   app()
 
 :class:`~cyclopts.config.Env` assembles the environment variable name by joining the following components (in-order):
 
