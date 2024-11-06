@@ -3,6 +3,8 @@ import sys
 from inspect import isclass
 from typing import Annotated, Any, Optional, Union, get_args, get_origin
 
+import attrs
+
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
 _union_types = set()
 _union_types.add(Union)
@@ -43,7 +45,7 @@ def is_namedtuple(hint) -> bool:
 
 
 def is_attrs(hint) -> bool:
-    return hasattr(hint, "__attrs_attrs__")
+    return attrs.has(hint)
 
 
 def is_annotated(hint) -> bool:
