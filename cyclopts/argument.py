@@ -243,8 +243,8 @@ class ArgumentCollection(list["Argument"]):
         )
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
 
-        if not immediate_parameter.parse:
-            return out
+        # if not immediate_parameter.parse:
+        #    return out
 
         if keys:
             cparam = Parameter.combine(
@@ -463,10 +463,11 @@ class ArgumentCollection(list["Argument"]):
         self,
         *,
         group: Optional[Group] = None,
-        kind: Optional[inspect._ParameterKind] = None,
         has_tokens: Optional[bool] = None,
         has_tree_tokens: Optional[bool] = None,
         keys_prefix: Optional[tuple[str, ...]] = None,
+        kind: Optional[inspect._ParameterKind] = None,
+        parse: Optional[bool] = None,
         show: Optional[bool] = None,
         value_set: Optional[bool] = None,
     ) -> "ArgumentCollection":
@@ -478,12 +479,14 @@ class ArgumentCollection(list["Argument"]):
         ----------
         group: Optional[Group]
             The :class:`.Group` the arguments should be in.
-        kind: Optional[inspect._ParameterKind]
-            The :attr:`~inspect.Parameter.kind` of the argument.
         has_tokens: Optional[bool]
             Immediately has tokens (not including children).
         has_tree_tokens: Optional[bool]
             Argument and/or it's children have parsed tokens.
+        kind: Optional[inspect._ParameterKind]
+            The :attr:`~inspect.Parameter.kind` of the argument.
+        parse: Optional[bool]
+            If the argument is intended to be parsed or not.
         show: Optional[bool]
             The Argument is intended to be show on the help page.
         value_set: Optional[bool]
@@ -506,6 +509,8 @@ class ArgumentCollection(list["Argument"]):
             ac = cls(x for x in ac if not (x.show ^ bool(show)))
         if value_set is not None:
             ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
+        if parse is not None:
+            ac = cls(x for x in ac if not (x.parameter.parse ^ parse))
 
         return ac
 
@@ -620,6 +625,10 @@ class Argument:
         # By definition, self.hint is Not AnnotatedType
         hint = resolve(self.hint)
         hints = get_args(hint) if is_union(hint) else (hint,)
+
+        if not self.parameter.parse:
+            self._assignable = False
+            return
 
         if self.parameter.accepts_keys is False:  # ``None`` means to infer.
             self._assignable = True
@@ -766,7 +775,7 @@ class Argument:
             Implicit value.
             :obj:`None` if no implicit value is applicable.
         """
-        if not self._assignable:
+        if not self._assignable or not self.parameter.parse:
             raise ValueError
         return (
             self._match_index(term)
@@ -896,7 +905,9 @@ class Argument:
                         msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
                     ) from e
 
-        if self._assignable:
+        if not self.parameter.parse:
+            out = UNSET
+        elif self._assignable:
             positional: list[Token] = []
             keyword = {}
             for token in self.tokens:

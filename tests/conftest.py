@@ -35,7 +35,7 @@ def assert_parse_args(app):
     def inner(f, cmd: str, *args, **kwargs):
         signature = cyclopts.utils.signature(f)
         expected_bind = signature.bind(*args, **kwargs)
-        actual_command, actual_bind = app.parse_args(cmd, print_error=False, exit_on_error=False)
+        actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f
         assert actual_bind == expected_bind
 
@@ -47,7 +47,7 @@ def assert_parse_args_partial(app):
     def inner(f, cmd: str, *args, **kwargs):
         signature = cyclopts.utils.signature(f)
         expected_bind = signature.bind_partial(*args, **kwargs)
-        actual_command, actual_bind = app.parse_args(cmd, print_error=False, exit_on_error=False)
+        actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f
         assert actual_bind == expected_bind
 

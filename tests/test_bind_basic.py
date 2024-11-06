@@ -20,7 +20,8 @@ def test_parse_known_args(app):
     def foo(a: int, b: int):
         pass
 
-    command, _, unused_tokens = app.parse_known_args("foo 1 2 --bar 100")
+    command, _, unused_tokens, ignored = app.parse_known_args("foo 1 2 --bar 100")
+    assert ignored == {}
     assert command == foo
     assert unused_tokens == ["--bar", "100"]
 
@@ -365,7 +366,8 @@ def test_bind_override_app_groups(app):
 
 def test_bind_version(app, capsys):
     app.version = "1.2.3"
-    actual_command, actual_bind = app.parse_args("--version")
+    actual_command, actual_bind, ignored = app.parse_args("--version")
+    assert ignored == {}
     assert actual_command == app.version_print
 
     actual_command(*actual_bind.args, **actual_bind.kwargs)
@@ -375,7 +377,8 @@ def test_bind_version(app, capsys):
 
 def test_bind_version_factory(app, capsys):
     app.version = lambda: "1.2.3"
-    actual_command, actual_bind = app.parse_args("--version")
+    actual_command, actual_bind, ignored = app.parse_args("--version")
+    assert ignored == {}
     assert actual_command == app.version_print
 
     actual_command(*actual_bind.args, **actual_bind.kwargs)

@@ -11,6 +11,8 @@ def test_no_parse_pos(app, assert_parse_args_partial):
         pass
 
     assert_parse_args_partial(foo, "buzz_value", "buzz_value")
+    _, _, ignored = app.parse_args("buzz_value")
+    assert ignored == {"fizz": str}
 
 
 def test_no_parse_invalid_kind(app):

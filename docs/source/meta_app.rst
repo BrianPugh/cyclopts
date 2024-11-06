@@ -112,11 +112,11 @@ The core logic of :meth:`App.__call__` method is the following:
 
     def __call__(self, tokens=None, **kwargs):
         tokens = normalize_tokens(tokens)
-        command, bound = self.parse_args(tokens, **kwargs)
+        command, bound, ignored = self.parse_args(tokens, **kwargs)
         return command(*bound.args, **bound.kwargs)
 
 Knowing this, we can easily customize how we actually invoke actions with Cyclopts.
-Let's imagine that we want to instantiate an object, ``User`` in our meta app, and pass it to all subsequent commands.
+Let's imagine that we want to instantiate an object, ``User`` in our meta app, and pass it to subsequent commands that need it.
 This might be useful to share an expensive-to-create object amongst commands in a single session; see :ref:`Command Chaining`.
 
 .. code-block:: python
@@ -126,11 +126,9 @@ This might be useful to share an expensive-to-create object amongst commands in 
 
    app = App()
 
-
    class User:
        def __init__(self, name):
            self.name = name
-
 
    @app.command
    def create(
@@ -140,13 +138,15 @@ This might be useful to share an expensive-to-create object amongst commands in 
    ):
        print(f"Creating user {user_obj.name} with age {age}.")
 
-
    @app.meta.default
    def launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
-       user_obj = User(user)
-       command, bound = app.parse_args(tokens)
-       return command(*bound.args, **bound.kwargs, user_obj=user_obj)
-
+       additional_kwargs = {}
+       command, bound, ignored = app.parse_args(tokens)
+       # "ignored" is a dict mapping python-variable-name to it's type annotation for parameters with "parse=False".
+       if "user_obj" in ignored:
+           # 'ignored["user_obj"]' is the class "User"
+           additional_kwargs["user_obj"] = ignored["user_obj"](user)
+       return command(*bound.args, **bound.kwargs, **additional_kwargs)
 
    if __name__ == "__main__":
        app.meta()

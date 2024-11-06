@@ -78,23 +78,22 @@ of the formatted exception.
 .. code-block:: python
 
    app("this-is-not-a-registered-command")
-   print("this will not be printed since cyclopts exited.")
-   # ╭─ Error ─────────────────────────────────────────────────────────────────────╮
-   # │ Unable to interpret valid command from "this-is-not-a-registered-command".  │
-   # ╰─────────────────────────────────────────────────────────────────────────────╯
+   print("this will not be printed since cyclopts exited above.")
+   # ╭─ Error ─────────────────────────────────────────────────────────────╮
+   # │ Unknown command "this-is-not-a-registered-command".                 │
+   # ╰─────────────────────────────────────────────────────────────────────╯
 
    app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
    # Traceback (most recent call last):
-   # File "<stdin>", line 1, in <module>
-   # File "/cyclopts/cyclopts/core.py", line 318, in __call__
-   #   command, bound = self.parse_args(tokens)
-   #                    ^^^^^^^^^^^^^^^^^^^^^^^
-   # File "/cyclopts/cyclopts/core.py", line 281, in parse_args
-   #   command, bound, unused_tokens = self.parse_known_args(tokens)
-   #                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   # File "/cyclopts/cyclopts/core.py", line 246, in parse_known_args
-   #   raise InvalidCommandError(unused_tokens=unused_tokens)
-   # cyclopts.exceptions.InvalidCommandError: Unable to interpret valid command from "this-is-not-a-registered-command".
+   #   File "/cyclopts/scratch.py", line 9, in <module>
+   #     app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
+   #   File "/cyclopts/cyclopts/core.py", line 1102, in __call__
+   #     command, bound, _ = self.parse_args(
+   #   File "/cyclopts/cyclopts/core.py", line 1037, in parse_args
+   #     command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
+   #   File "/cyclopts/cyclopts/core.py", line 966, in _parse_known_args
+   #     raise InvalidCommandError(unused_tokens=unused_tokens)
+   # cyclopts.exceptions.InvalidCommandError: Unknown command "this-is-not-a-registered-command".
 
    try:
        app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)

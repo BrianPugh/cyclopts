@@ -24,6 +24,7 @@ from typing import (
 from attrs import define, field
 
 import cyclopts.utils
+from cyclopts.annotations import resolve_annotated
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.exceptions import (
@@ -831,7 +832,7 @@ class App:
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
-    ) -> tuple[Callable, inspect.BoundArguments, list[str]]:
+    ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any]]:
         """Interpret arguments into a registered function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
         Parameters
@@ -853,22 +854,30 @@ class App:
 
         unused_tokens: List[str]
             Any remaining CLI tokens that didn't get parsed for ``command``.
+
+        ignored: dict[str, Any]
+            A mapping of python-variable-name to annotated type of any
+            parameter with annotation ``parse=False``.
+            :obj:`~typing.Annotated` will be resolved.
+            Intended to simplify meta apps.
         """
-        command, bound, unused_tokens, argument_collection = self._parse_known_args(tokens, console=console)
-        return command, bound, unused_tokens
+        command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(tokens, console=console)
+        return command, bound, unused_tokens, ignored
 
     def _parse_known_args(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
-    ) -> tuple[Callable, inspect.BoundArguments, list[str], ArgumentCollection]:
+    ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
         tokens = normalize_tokens(tokens)
 
         meta_parent = self
 
         command_chain, apps, unused_tokens = self.parse_commands(tokens)
         command_app = apps[-1]
+
+        ignored: dict[str, Any] = {}
 
         # We don't want the command_app to be the version/help handler.
         with suppress(IndexError):
@@ -922,6 +931,10 @@ class App:
                 if command_app.default_command:
                     command = command_app.default_command
                     argument_collection = command_app.assemble_argument_collection(apps=apps, assignable=False)
+                    ignored: dict[str, Any] = {
+                        argument.field_info.name: resolve_annotated(argument.field_info.annotation)
+                        for argument in argument_collection.filter_by(parse=False)
+                    }
 
                     # We want the resolved group that ``app`` belongs to.
                     command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
@@ -967,7 +980,7 @@ class App:
                     e.console = self._resolve_console(tokens, console)
                 raise
 
-        return command, bound, unused_tokens, argument_collection
+        return command, bound, unused_tokens, ignored, argument_collection
 
     def parse_args(
         self,
@@ -977,7 +990,7 @@ class App:
         print_error: bool = True,
         exit_on_error: bool = True,
         verbose: bool = False,
-    ) -> tuple[Callable, inspect.BoundArguments]:
+    ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
         Raises
@@ -1011,12 +1024,19 @@ class App:
 
         bound: inspect.BoundArguments
             Parsed and converted ``args`` and ``kwargs`` to be used when calling ``command``.
+
+        ignored: dict[str, Any]
+            A mapping of python-variable-name to type-hint of any parameter with annotation ``parse=False``.
+            :obj:`~typing.Annotated` will be resolved.
+            Intended to simplify meta apps.
         """
         tokens = normalize_tokens(tokens)
 
         # Normal parsing
         try:
-            command, bound, unused_tokens, argument_collection = self._parse_known_args(tokens, console=console)
+            command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
+                tokens, console=console
+            )
             if unused_tokens:
                 for token in unused_tokens:
                     if is_option_like(token):
@@ -1041,7 +1061,7 @@ class App:
                 sys.exit(1)
             raise
 
-        return command, bound
+        return command, bound, ignored
 
     def __call__(
         self,
@@ -1079,7 +1099,7 @@ class App:
             The value the command function returns.
         """
         tokens = normalize_tokens(tokens)
-        command, bound = self.parse_args(
+        command, bound, _ = self.parse_args(
             tokens,
             console=console,
             print_error=print_error,
@@ -1288,7 +1308,7 @@ class App:
         if isinstance(quit, str):
             quit = [quit]
 
-        def default_dispatcher(command, bound):
+        def default_dispatcher(command, bound, _):
             return command(*bound.args, **bound.kwargs)
 
         if dispatcher is None:
@@ -1309,8 +1329,8 @@ class App:
                 break
 
             try:
-                command, bound = self.parse_args(tokens, **kwargs)
-                dispatcher(command, bound)
+                command, bound, ignored = self.parse_args(tokens, **kwargs)
+                dispatcher(command, bound, ignored)
             except CycloptsError:
                 # Upstream ``parse_args`` already printed the error
                 pass
