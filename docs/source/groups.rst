@@ -1,3 +1,5 @@
+.. _Groups:
+
 ======
 Groups
 ======
@@ -29,6 +31,9 @@ Groups can be created in two ways:
 2. Implicitly with a **string**.
    This will implicitly create a group, ``Group(my_str_group_name)``, if it doesn't exist.
    If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
+
+   .. warning::
+      While convenient and terse, mistyping a group name as a string will create a new group!
 
 Every command and parameter belongs to at least one group.
 

@@ -401,7 +401,7 @@ API
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
-      A function (or list of functions) that validates data returned by the ``converter``.
+      A function (or list of functions) that validates data returned by the :attr:`converter`.
 
       .. code-block:: python
 
@@ -423,6 +423,8 @@ API
       2. Parenting :attr:`.App.group_parameters` otherwise.
          By default, this is ``Group("Parameters")``.
 
+      See :ref:`Groups` for examples.
+
    .. attribute:: negative
       :type: Union[None, str, Iterable[str]]
       :value: None
@@ -434,6 +436,34 @@ API
       * For iterables, defaults to ``empty-{name}`` (see :attr:`negative_iterable`).
 
       Set to an empty list or string to disable the creation of negative flags.
+
+      Example usage:
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(*, verbose: Annotated[bool, Parameter(negative="--quiet")] = False):
+            print(f"{verbose=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ─────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                      │
+         │ --version  Display application version.                        │
+         ╰────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ --verbose --quiet  [default: False]                            │
+         ╰────────────────────────────────────────────────────────────────╯
 
    .. attribute:: negative_bool
       :type: Optional[str]
@@ -460,35 +490,34 @@ API
 
       Attempt to use this parameter while parsing.
       Annotated parameter **must** be keyword-only.
+      This is intended to be used with :ref:`meta apps <Meta App>` for injecting values.
 
    .. attribute:: required
       :type: Optional[bool]
       :value: None
 
       Indicates that the parameter must be supplied.
-      Defaults to inferring from the function signature; i.e. ``False`` if the parameter has a default, ``True`` otherwise.
+      Defaults to inferring from the function signature; i.e. :obj:`False` if the parameter has a default, :obj:`True` otherwise.
 
    .. attribute:: show
       :type: Optional[bool]
       :value: None
 
       Show this parameter on the help screen.
-      If ``False``, state of all other ``show_*`` flags are ignored.
-      Defaults to ``parse`` value (``True``).
+      Defaults to :attr:`parse` value (default: :obj:`True`).
 
    .. attribute:: show_default
       :type: Optional[bool]
       :value: None
 
       If a variable has a default, display the default on the help page.
-      Defaults to :obj:`None`, similar to ``True``, but will not display the default if it's :obj:`None`.
+      Defaults to :obj:`None`, similar to :obj:`True`, but will not display the default if it's :obj:`None`.
 
    .. attribute:: show_choices
       :type: Optional[bool]
       :value: True
 
       If a variable has a set of choices, display the choices on the help page.
-      Defaults to ``True``.
 
    .. attribute:: help
       :type: Optional[str]
@@ -501,15 +530,14 @@ API
       :type: Optional[bool]
       :value: True
 
-      If a variable has ``env_var`` set, display the variable name on the help page.
-      Defaults to ``True``.
+      If a variable has :attr:`env_var` set, display the variable name on the help page.
 
    .. attribute:: env_var
       :type: Union[None, str, Iterable[str]]
       :value: None
 
       Fallback to environment variable(s) if CLI value not provided.
-      If multiple environment variables are given, the left-most environment variable with a set value will be used.
+      If multiple environment variables are given, the left-most environment variable **with a set value** will be used.
       If no environment variable is set, Cyclopts will fallback to the function-signature default.
 
    .. attribute:: env_var_split
