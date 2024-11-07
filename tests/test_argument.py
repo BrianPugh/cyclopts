@@ -415,6 +415,7 @@ def test_argument_collection_var_keyword_match():
     "args, expected",
     [
         Case(args=(), expected=()),
+        Case(args=(("foo",),), expected=("--foo",)),
         Case(args=(("--foo",),), expected=("--foo",)),
         Case(args=(("--foo", "--bar"),), expected=("--foo", "--bar")),
         Case(args=(("--foo",), ("--bar",)), expected=("--bar",)),

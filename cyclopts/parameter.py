@@ -40,7 +40,7 @@ def _negative_converter(default: tuple[str, ...]):
 @record_init("_provided_args")
 @frozen
 class Parameter:
-    """Cyclopts configuration for individual function parameters with :class:`~typing.Annotated`.
+    """Cyclopts configuration for individual function parameters with :obj:`~typing.Annotated`.
 
     Example usage:
 
@@ -58,6 +58,14 @@ class Parameter:
 
 
         app()
+
+    .. code-block:: console
+
+        $ my-script 100
+        100
+
+        $ my-script --bar 100
+        100
     """
 
     # All attribute docstrings has been moved to ``docs/api.rst`` for greater control with attrs.

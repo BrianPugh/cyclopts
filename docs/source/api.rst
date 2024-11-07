@@ -179,7 +179,7 @@ API
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
       :value: None
 
-      The group(s) that ``default_command`` belongs to.
+      The group(s) that :attr:`default_command` belongs to.
 
       * If :obj:`None`, defaults to the ``"Commands"`` group.
 
@@ -210,7 +210,7 @@ API
       :type: Union[None, Callable, list[Callable]]
       :value: []
 
-      A function where all the converted CLI-provided variables will be **keyword-unpacked**,
+      A function (or list of functions) where all the converted CLI-provided variables will be **keyword-unpacked**,
       regardless of their positional/keyword-type in the command function signature.
       The python variable names will be used, which may differ from their CLI names.
 
@@ -237,8 +237,8 @@ API
              ...
 
       The returned string should be **without** a leading ``--``.
-      If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
-      Subapps inherit from the first non-:obj:`None` parent ``name_transform``.
+      If :obj:`None` (default value), uses :func:`~.default_name_transform`.
+      Subapps inherit from the first non-:obj:`None` parent :attr:`name_transform`.
 
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
@@ -276,9 +276,73 @@ API
       :value: None
 
       Name(s) to expose to the CLI.
-      Defaults to the python parameter's name, prepended with ``--``.
-      Single-character options should start with ``-``.
-      Full-name options should start with ``--``.
+      If not specified, cyclopts will apply :attr:`name_transform` to the python parameter name.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(foo: Annotated[int, Parameter(name=("bar", "-b"))]):
+            print(f"{foo=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ─────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                      │
+         │ --version  Display application version.                        │
+         ╰────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ *  BAR --bar  -b  [required]                                   │
+         ╰────────────────────────────────────────────────────────────────╯
+
+         $ my-script --bar 100
+         foo=100
+
+         $ my-script -b 100
+         foo=100
+
+      If specifying name in a nested data structure (e.g. a dataclass), beginning the name with a hyphen ``-`` will override any hierarchical dot-notation.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from dataclasses import dataclass
+         from typing import Annotated
+
+         app = App()
+
+         @dataclass
+         class User:
+            id: int  # default behavior
+            email: Annotated[str, Parameter(name="--email")]  # overrides
+            pwd: Annotated[str, Parameter(name="password")]  # dot-notation with parent
+
+         @app.command
+         def create(user: User):
+            print(f"Creating {user=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script create --help
+         Usage: scratch.py create [ARGS] [OPTIONS]
+
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ *  USER.ID --user.id  [required]                               │
+         │ *  EMAIL --email      [required]                               │
+         │ *  USER.PASSWORD      [required]                               │
+         │      --user.password                                           │
+         ╰────────────────────────────────────────────────────────────────╯
 
    .. attribute:: converter
       :type: Optional[Callable]

@@ -643,24 +643,32 @@ class App:
 
             @app.command
             def foo():
-                pass
+                print("foo!")
 
             @app.command(name="buzz")
             def bar():
-                pass
+                print("bar!")
 
             app()
+
+        .. code-block:: console
+
+            $ my-script foo
+            foo!
+
+            $ my-script buzz
+            bar!
 
         Parameters
         ----------
         obj: Optional[Callable]
             Function or :class:`App` to be registered as a command.
         name: Union[None, str, Iterable[str]]
-            Name(s) to register the ``obj`` to.
+            Name(s) to register the command to.
             If not provided, defaults to:
 
             * If registering an :class:`App`, then the app's name.
-            * If registering a function, then the function's name.
+            * If registering a **function**, then the function's name after applying :attr:`name_transform`.
         `**kwargs`
             Any argument that :class:`App` can take.
         """
@@ -855,7 +863,7 @@ class App:
             A mapping of python-variable-name to annotated type of any
             parameter with annotation ``parse=False``.
             :obj:`~typing.Annotated` will be resolved.
-            Intended to simplify meta apps.
+            Intended to simplify :ref:`meta apps <Meta App>`.
         """
         command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(tokens, console=console)
         return command, bound, unused_tokens, ignored
@@ -1024,7 +1032,7 @@ class App:
         ignored: dict[str, Any]
             A mapping of python-variable-name to type-hint of any parameter with annotation ``parse=False``.
             :obj:`~typing.Annotated` will be resolved.
-            Intended to simplify meta apps.
+            Intended to simplify :ref:`meta apps <Meta App>`.
         """
         tokens = normalize_tokens(tokens)
 

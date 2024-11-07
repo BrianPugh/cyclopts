@@ -124,6 +124,22 @@ def test_multiple_names(app, cmd_str, assert_parse_args):
 @pytest.mark.parametrize(
     "cmd_str",
     [
+        "foo --age 10",
+        "foo --duration 10",
+        "foo -a 10",
+    ],
+)
+def test_multiple_names_no_hyphen(app, cmd_str, assert_parse_args):
+    @app.command
+    def foo(age: Annotated[int, Parameter(name=["age", "duration", "-a"])]):
+        pass
+
+    assert_parse_args(foo, cmd_str, age=10)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
         "foo 1",
         "foo --a=1",
         "foo --a 1",

@@ -261,12 +261,16 @@ class ArgumentCollection(list["Argument"]):
                 ),
             )
         else:
+            # This is directly on iparam
             cparam = Parameter.combine(
                 upstream_parameter,
                 immediate_parameter,
             )
-            if not cparam.name:
-                # This is directly on iparam; derive default name from it.
+            if cparam.name:
+                if field_info.is_keyword:
+                    assert isinstance(cparam.name, tuple)
+                    cparam = Parameter.combine(cparam, Parameter(name=_resolve_parameter_name(cparam.name)))
+            else:
                 if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
                     # Name is only used for help-string
                     cparam = Parameter.combine(cparam, Parameter(name=(field_info.name.upper(),)))
@@ -1185,6 +1189,14 @@ def _extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
         return {}
 
 
+def _resolve_parameter_name_helper(elem):
+    if elem.endswith("*"):
+        elem = elem[:-1].rstrip(".")
+    if elem and not elem.startswith("-"):
+        elem = "--" + elem
+    return elem
+
+
 def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
     """Resolve parameter names by combining and formatting multiple tuples of strings.
 
@@ -1199,25 +1211,20 @@ def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
         A tuple of resolved parameter names.
     """
     argss = tuple(x for x in argss if x)
+
     if len(argss) == 0:
         return ()
     elif len(argss) == 1:
-        return argss[0]
+        return tuple("*" if x == "*" else _resolve_parameter_name_helper(x) for x in argss[0])
 
     # Combine the first 2, and do a recursive call.
     out = []
     for a1 in argss[0]:
-        if a1.endswith("*"):
-            a1 = a1[:-1]
-        if a1 and not a1.endswith("."):
-            a1 += "."
-        if not a1.startswith("-"):
-            a1 = "--" + a1
-
+        a1 = _resolve_parameter_name_helper(a1)
         for a2 in argss[1]:
-            if a2.startswith("-"):
+            if a2.startswith("-") or not a1:
                 out.append(a2)
             else:
-                out.append(a1 + a2)
+                out.append(a1 + "." + a2)
 
     return _resolve_parameter_name(tuple(out), *argss[2:])

@@ -20,6 +20,8 @@ Typically, a Cyclopts application is launched by calling the :class:`.App` objec
    app()  # Run the app
 
 To change how the primary app is run, you can use the meta-app feature of Cyclopts.
+The meta app is just like a normal Cyclopts :class:`.App`, the only thing special about
+it is that it's help-page gets merged in with it's parenting app.
 
 .. code-block:: python
 
