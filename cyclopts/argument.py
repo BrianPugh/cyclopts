@@ -115,9 +115,8 @@ def _identity_converter(type_, token):
 class ArgumentCollection(list["Argument"]):
     """A list-like container for :class:`Argument`."""
 
-    def __init__(self, *args, groups: Optional[list[Group]] = None):
+    def __init__(self, *args):
         super().__init__(*args)
-        self.groups = [] if groups is None else groups
 
     def copy(self) -> "ArgumentCollection":
         """Returns a shallow copy of the :class:`ArgumentCollection`."""
@@ -199,7 +198,7 @@ class ArgumentCollection(list["Argument"]):
         positional_index: Optional[int] = None,
         _resolve_groups: bool = True,
     ):
-        out = cls(groups=list(group_lookup.values()))
+        out = cls()  # groups=list(group_lookup.values()))
 
         if docstring_lookup is None:
             docstring_lookup = {}
@@ -377,7 +376,6 @@ class ArgumentCollection(list["Argument"]):
         group_parameters: Optional[Group] = None,
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
-        assignable: bool = False,
     ):
         import cyclopts.utils
 
@@ -426,17 +424,17 @@ class ArgumentCollection(list["Argument"]):
                     positional_index += 1
             out.extend(iparam_argument_collection)
 
-        if assignable:
-            out = cls([x for x in out if x._assignable])
+        return out
 
-        out.groups = []
-        for argument in out:
+    @property
+    def groups(self):
+        groups = []
+        for argument in self:
             assert isinstance(argument.parameter.group, tuple)
             for group in argument.parameter.group:
-                if group not in out.groups:
-                    out.groups.append(group)
-
-        return out
+                if group not in groups:
+                    groups.append(group)
+        return groups
 
     @property
     def _root_arguments(self):
@@ -470,6 +468,7 @@ class ArgumentCollection(list["Argument"]):
         parse: Optional[bool] = None,
         show: Optional[bool] = None,
         value_set: Optional[bool] = None,
+        assignable: Optional[bool] = None,
     ) -> "ArgumentCollection":
         """Filter the :class:`ArgumentCollection`.
 
@@ -511,6 +510,8 @@ class ArgumentCollection(list["Argument"]):
             ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
         if parse is not None:
             ac = cls(x for x in ac if not (x.parameter.parse ^ parse))
+        if assignable is not None:
+            ac = cls(x for x in ac if not (x._assignable ^ assignable))
 
         return ac
 

@@ -14,7 +14,7 @@ API
       :type: Optional[Union[str, Iterable[str]]]
       :value: None
 
-      Name of application, or subcommand if registering to another application. Name fallback resolution:
+      Name of application, or subcommand if registering to another application. Name resolution order:
 
       1. User specified :attr:`~.App.name` parameter.
       2. If a :attr:`~.App.default` function has been registered, the name of that function.
