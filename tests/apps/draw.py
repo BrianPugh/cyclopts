@@ -104,7 +104,7 @@ def circle(
 
 
 @app.command
-def polygon(*vertices: Coordinate, config: Config):
+def polygon(*vertices: Annotated[Coordinate, Parameter(required=True)], config: Config):
     """Draw a polygon.
 
     Parameters

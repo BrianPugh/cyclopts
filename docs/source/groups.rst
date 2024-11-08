@@ -33,7 +33,7 @@ Groups can be created in two ways:
    If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
 
    .. warning::
-      While convenient and terse, mistyping a group name as a string will create a new group!
+      While convenient and terse, mistyping a group name as a string will unintentionally create a new group!
 
 Every command and parameter belongs to at least one group.
 
@@ -90,6 +90,8 @@ An example of using groups to organize commands:
 
 The default group is defined by the registering app's :attr:`.App.group_commands`, which defaults to a group named ``"Commands"``.
 
+.. _Parameter Groups:
+
 ----------------
 Parameter Groups
 ----------------
@@ -112,7 +114,7 @@ An example of using groups with parameters:
 
    @app.command
    def create(
-       *,
+       *,  # force all subsequent variables to be keyword-only
        # Using an explicitly created group object.
        car: Annotated[bool, Parameter(group=vehicle_type_group)] = False,
        truck: Annotated[bool, Parameter(group=vehicle_type_group)] = False,
@@ -235,29 +237,29 @@ This means that the order in the help-page will match the order that the groups 
 
    app = App()
 
-   g_plants = Group.create_ordered("Plants")
-   g_animals = Group.create_ordered("Animals")
-   g_mushrooms = Group.create_ordered("Mushrooms")
+   plants = Group.create_ordered("Plants")
+   animals = Group.create_ordered("Animals")
+   fungi = Group.create_ordered("Fungi")
 
-
-   @app.command(group=g_animals)
+   @app.command(group=animals)
    def zebra():
        pass
 
-
-   @app.command(group=g_plants)
+   @app.command(group=plants)
    def daisy():
        pass
 
-
-   @app.command(group=g_mushrooms)
+   @app.command(group=fungi)
    def portobello():
        pass
 
-
    app()
 
-.. code-block:: bash
+.. code-block:: console
+
+   $ my-script --help
+
+   Usage: scratch.py COMMAND
 
    ╭─ Plants ───────────────────────────────────────────────────────────╮
    │ daisy                                                              │
@@ -265,12 +267,12 @@ This means that the order in the help-page will match the order that the groups 
    ╭─ Animals ──────────────────────────────────────────────────────────╮
    │ zebra                                                              │
    ╰────────────────────────────────────────────────────────────────────╯
-   ╭─ Mushrooms ────────────────────────────────────────────────────────╮
+   ╭─ Fungi ────────────────────────────────────────────────────────────╮
    │ portobello                                                         │
    ╰────────────────────────────────────────────────────────────────────╯
    ╭─ Commands ─────────────────────────────────────────────────────────╮
-   │ --help,-h  Display this message and exit.                          │
+   │ --help -h  Display this message and exit.                          │
    │ --version  Display application version.                            │
    ╰────────────────────────────────────────────────────────────────────╯
 
-A :attr:`~.Group.sort_key` can still be supplied; the global counter will only be used to break sorting ties.
+Even when using :meth:`.Group.create_ordered`, a :attr:`~.Group.sort_key` can still be supplied; the global counter will only be used to break sorting ties.

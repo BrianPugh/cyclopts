@@ -3,6 +3,7 @@
 ================
 Group Validators
 ================
+Group validators operate on a set of parameters, :ref:`ensuring that their values are mutually compatible <Parameter Groups>`.
 Cyclopts has some builtin common group validators in the :ref:`cyclopts.validators <API Validators>` module.
 
 .. _Group Validators - LimitedChoice:
@@ -27,7 +28,6 @@ Most commonly used for mutually-exclusive arguments (default behavior).
        validator=validators.LimitedChoice(),  # Mutually Exclusive Options
    )
 
-
    @app.default
    def main(
        *,
@@ -39,7 +39,6 @@ Most commonly used for mutually-exclusive arguments (default behavior).
        if truck:
            print("I'm driving a truck.")
 
-
    app()
 
 .. code-block:: console
@@ -47,22 +46,23 @@ Most commonly used for mutually-exclusive arguments (default behavior).
    $ python drive.py --help
    Usage: main COMMAND [OPTIONS]
 
-   ╭─ Vehicle (choose one) ────────────────────────────────────────────────╮
-   │ --car    [default: False]                                             │
-   │ --truck  [default: False]                                             │
-   ╰───────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ────────────────────────────────────────────────────────────╮
-   │ --help,-h  Display this message and exit.                             │
-   │ --version  Display application version.                               │
-   ╰───────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ─────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                          │
+   │ --version  Display application version.                            │
+   ╰────────────────────────────────────────────────────────────────────╯
+   ╭─ Vehicle (choose one) ─────────────────────────────────────────────╮
+   │ --car    [default: False]                                          │
+   │ --truck  [default: False]                                          │
+   ╰────────────────────────────────────────────────────────────────────╯
 
    $ python drive.py --car
    I'm driving a car.
 
    $ python drive.py --car --truck
-   ╭─ Error ───────────────────────────────────────────────────────────────╮
-   │ Mutually exclusive arguments: {--car, --truck}                        │
-   ╰───────────────────────────────────────────────────────────────────────╯
+   ╭─ Error ────────────────────────────────────────────────────────────╮
+   │ Invalid values for group "Vehicle (choose one)". Mutually          │
+   │ exclusive arguments: {--car, --truck}                              │
+   ╰────────────────────────────────────────────────────────────────────╯
 
 See the :class:`.LimitedChoice` docs for more info.
 

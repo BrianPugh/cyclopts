@@ -88,10 +88,10 @@ The :meth:`app.command <cyclopts.App.command>` method can also register another 
    $ my-script foo bar 3
    BAR: 3
 
-   $ my-script foo bar 4
+   $ my-script foo baz 4
    BAZ: 4
 
-The subcommand may have it's own registered ``default`` action.
+The subcommand may have their own registered ``default`` action.
 Cyclopts's command structure is fully recursive.
 
 .. _Command Changing Name:
@@ -165,7 +165,7 @@ There are a few ways to add a help string to a command:
 
       from cyclopts import App
 
-      app = cyclopts.App()
+      app = App()
 
       @app.command
       def foo():
@@ -195,19 +195,19 @@ Cyclopts also works with **async** commands:
 
 .. code-block:: python
 
-   app = cyclopts.App()
+   import asyncio
+   from cyclopts import App
 
+   app = App()
 
    @app.command
    async def foo():
        await asyncio.sleep(10)
 
-
    app()
-
 
 --------------------------
 Decorated Function Details
 --------------------------
 Cyclopts **does not modify the decorated function in any way**.
-The returned function is the exact same function being decorated and can be used exactly as if it were not decorated by Cyclopts.
+The returned function is the **exact same function** being decorated and can be used exactly as if it were not decorated by Cyclopts.

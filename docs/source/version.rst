@@ -17,17 +17,23 @@ The resolution order for determining the version string is as follows:
 
    .. code-block:: python
 
-      app = cyclopts.App(version="7.5.8")
+      from cyclopts import App
+
+      app = App(version="7.5.8")
+
+      app()
 
    If a callable is provided, it will be invoked when running the ``--version`` command:
 
    .. code-block:: python
 
+      from cyclopts import App
+
       def get_my_application_version() -> str:
           return "7.5.8"
 
-
-      app = cyclopts.App(version=get_my_application_version)
+      app = App(version=get_my_application_version)
+      app()
 
 2. The invoking-package's `Distribution Package's Version Number`_ via `importlib.metadata.version`_.
    Cyclopts attempts to derive the package module that instantiated the :class:`.App` object by traversing the call stack.

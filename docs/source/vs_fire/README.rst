@@ -2,7 +2,7 @@
 Fire Comparison
 ===============
 Fire_ is a CLI parsing library by Google that attempts to generate a CLI from any Python object.
-To that end, I think Fire definitely achieves it's goal.
+To that end, I think Fire definitely achieves its goal.
 However, I think Fire has too much magic, and not enough control.
 
 From the `Fire documentation`_:

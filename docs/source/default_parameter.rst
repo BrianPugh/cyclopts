@@ -33,12 +33,12 @@ Consequently, ``--no-flag`` is no longer an allowed flag:
 Explicitly annotating the parameter with  :attr:`~.Parameter.negative` overrides this configuration and works as expected:
 
 
-.. code-block::
+.. code-block:: python
 
    from cyclopts import App, Parameter
    from typing import Annotated
 
-   app = App()
+   app = App(default_parameter=Parameter(negative=()))
 
    @app.command
    def foo(*, flag: Annotated[bool, Parameter(negative="--anti-flag")]):
@@ -46,13 +46,13 @@ Explicitly annotating the parameter with  :attr:`~.Parameter.negative` overrides
 
    app()
 
-.. code-block::
+.. code-block:: console
 
    $ my-script foo --help
    Usage: my-script foo [ARGS] [OPTIONS]
 
    ╭─ Parameters ──────────────────────────────────────────────────╮
-   │ *  --flag,--anti-flag  [required]                             │
+   │ *  --flag --anti-flag  [required]                             │
    ╰───────────────────────────────────────────────────────────────╯
 
 .. _Parameter Resolution Order:

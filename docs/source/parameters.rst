@@ -6,10 +6,9 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
 
 .. code-block:: python
 
-   import cyclopts
+   from cyclopts import App
 
-   app = cyclopts.App(help="This is help for the root application.")
-
+   app = App(help="This is help for the root application.")
 
    @app.command
    def foo(value: int):  # Cyclopts uses the ``value`` name and ``int`` type hint
@@ -20,7 +19,6 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
        value: int
            Cyclopts uses this description for ``value``'s help.
        """
-
 
    app()
 
@@ -42,17 +40,19 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
 
    Cyclopts uses this short description for help.
 
-   ╭─ Parameters ────────────────────────────────────────────────────────────────────────╮
-   │ *  VALUE,--value  Cyclopts uses this description for ``value``'s help. [required]   │
-   ╰─────────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────────────────────╮
+   │ *  VALUE --value  Cyclopts uses this description for value's help. [required]        │
+   ╰──────────────────────────────────────────────────────────────────────────────────────╯
 
 This keeps the code as clean and terse as possible.
-However, if more control is required, we can provide additional information by annotating type hints with :class:`.Parameter`.
+However, if more control is required, we can provide additional information by `annotating <https://docs.python.org/3/library/typing.html#typing.Annotated>`_ type hints with :class:`.Parameter`.
 
 .. code-block:: python
 
-   from cyclopts import Parameter
+   from cyclopts import App, Parameter
    from typing import Annotated
+
+   app = App()
 
    @app.command
    def foo(bar: Annotated[int, Parameter(...)]):
@@ -203,7 +203,7 @@ Lets consider a case where we want the user to specify a file size, and we want 
 .. code-block:: python
 
    from cyclopts import App, Parameter, Token
-   from typing import Annotated
+   from typing import Annotated, Sequence
    from pathlib import Path
 
    app = App()
@@ -214,7 +214,7 @@ Lets consider a case where we want the user to specify a file size, and we want 
        "gb": 1024 * 1024 * 1024,
    }
 
-   def byte_units(type_, tokens: list[Token]) -> int:
+   def byte_units(type_, tokens: Sequence[Token]) -> int:
        # type_ is ``int``,
        value = tokens[0].value.lower()
        try:
@@ -244,7 +244,19 @@ Lets consider a case where we want the user to specify a file size, and we want 
    Writing 3145728 zeros to out.bin.
 
 The converter function gets the annotated type, and the :class:`.Token` s parsed for this argument.
-The returned value is supplied to the parameter for the function.
+Tokens are Cyclopt's way of bookkeeping user inputs; in the last command the ``tokens`` object would look like:
+
+.. code-block:: python
+
+    # tokens is a length-1 tuple. The variable "size" only takes in 1 token:
+    tuple(
+      Token(
+         keyword=None,  # "3mb" was provided positionally, not by keyword
+         value='3mb',   # The string from the command line
+         source='cli',  # The value came from the command line, as opposed to other Cyclopts mechanisms.
+         index=0,       # For the variable "size", this is the first (0th) token.
+      ),
+   )
 
 ----------------
 Validating Input
@@ -291,6 +303,39 @@ If we had a program that accepts integer user age as an input, ``-1`` is an inte
 
 Certain builtin error types (:exc:`ValueError`, :exc:`TypeError`, :exc:`AssertionError`) will be re-interpreted by Cyclopts and formatted into a prettier message for the application user.
 
+Cyclopts has some :ref:`builtin validators <Parameter Validators>` for common situations
+We can create a similar app as above:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter, validators
+   from typing import Annotated
+
+   app = App()
+
+   @app.default
+   def allowed_to_buy_alcohol(age: Annotated[int, Parameter(validator=validators.Number(gte=0, lte=150))]):
+       # gte - greater than or equal to
+       # lte - less than or equal to
+       print("Under 21: prohibited." if age < 21 else "Good to go!")
+
+   app()
+
+Taking this one step further, Cyclopts has some :ref:`builtin convenience types <Annotated Types>`. If we didn't care about the upper age bound, we could simplify the application to:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from cyclopts.types import NonNegativeInt
+
+   app = App()
+
+   @app.default
+   def allowed_to_buy_alcohol(age: NonNegativeInt):
+       print("Under 21: prohibited." if age < 21 else "Good to go!")
+
+   app()
+
 --------------------
 Parameter Resolution
 --------------------
@@ -323,7 +368,7 @@ or even stack annotations to add additional features, like a validator:
    def zero(size: Annotated[ByteSize, Parameter(validator=must_be_multiple_of_4096)]):
        pass
 
-Python interprets this type annotation as:
+Python automatically flattens out annotations, so this is interpreted as:
 
 .. code-block:: python
 

@@ -107,8 +107,8 @@ Extending the example, lets add more arguments and type hints:
    Hello Alice!
    Hello Alice!
 
-The command line input ``"3"`` is converted to an integer because the parameter ``count`` has the type hint ``int``.
-Cyclopts natively handles all python builtin types (and more!). See :ref:`Coercion Rules` for more details.
+The command line input ``"3"`` is converted to an integer because the parameter ``count`` has the type hint :obj:`int`.
+Cyclopts natively handles all python builtin types (:ref:`and more! <Coercion Rules>`).
 Cyclopts adheres to Python's argument binding rules, allowing for both positional and keyword arguments.
 All of the following CLI invocations are equivalent:
 
@@ -121,7 +121,7 @@ All of the following CLI invocations are equivalent:
    $ python main.py Alice --count 3          # positional followed by keyword
    $ python main.py --count 3 Alice          # Keywords can come before positional if the keyword is later in the function signature.
 
-Like calling functions in python, positional arguments cannot be specified after a prior argument in the function signature was specified via keyword.
+Like calling functions in python, positional arguments cannot be specified after a **prior** argument in the function signature was specified via keyword.
 For example, you cannot supply the count value ``"3"`` positionally while the value for ``name`` is specified via keyword:
 
 .. code-block:: bash
@@ -171,7 +171,7 @@ We can add application-level help documentation when creating our ``app``:
    Help flags can be changed with :attr:`~cyclopts.App.help_flags`.
 
 Let's add some help documentation for our parameters.
-Cyclopts uses the function's docstring and can interpret ReST, Google, Numpydoc-style and Epydoc docstrings.
+Cyclopts uses the function's docstring and can interpret ReST, Google, Numpydoc-style and Epydoc docstrings (shoutout to `docstring_parser <https://github.com/rr-/docstring_parser>`_).
 
 .. code-block:: python
 

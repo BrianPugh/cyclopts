@@ -15,7 +15,7 @@ Cyclopts by-default adds ``--help`` and ``-h`` flags to the application:
    ╭─ Commands ─────────────────────────────────────────────────────────╮
    │ foo        Foo help string.                                        │
    │ bar        Bar help string.                                        │
-   │ --help,-h  Display this message and exit.                          │
+   │ --help -h  Display this message and exit.                          │
    │ --version  Display application version.                            │
    ╰────────────────────────────────────────────────────────────────────╯
 
@@ -100,8 +100,9 @@ Do not perform any additional parsing, display supplied text as-is.
 
 .. code-block:: python
 
-   app = App(help_format="plaintext")
+   from cyclopts import App
 
+   app = App(help_format="plaintext")
 
    @app.default
    def default():
@@ -117,6 +118,7 @@ Do not perform any additional parsing, display supplied text as-is.
        Some new paragraph.
        """
 
+   app()
 
 .. code-block:: text
 
@@ -141,7 +143,7 @@ Do not perform any additional parsing, display supplied text as-is.
    │ --version  Display application version.                        │
    ╰────────────────────────────────────────────────────────────────╯
 
-Most noteworthy, is no additional text reflow is performed; newlines are presented as-is.
+Most noteworthy, is **no additional text reflow is performed**; newlines are presented as-is.
 
 ^^^^
 Rich
@@ -154,7 +156,31 @@ Displays text as `Rich Markup`_.
 
 .. code-block:: python
 
+   from cyclopts import App
+
    app = App(help_format="rich")
+
+   @app.default
+   def default():
+      """Rich can display colors like [red]red[/red] easily.
+
+      However, I cannot be bothered to figure out how to show that in documentation.
+      """
+
+   app()
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: 'JetBrains Mono', 'Fira Code', Monaco, Consolas, monospace;">Usage: default COMMAND
+
+   Rich can display colors like <span style="color: #ff6666">red</span> easily.
+
+   ╭─ Commands ───────────────────────────────────────────────────────╮
+   │ <span style="color: #66b3ff">--help -h  </span>Display this message and exit.                        │
+   │ <span style="color: #66b3ff">--version  </span>Display application version.                          │
+   ╰──────────────────────────────────────────────────────────────────╯</pre>
+   </div>
 
 ^^^^^^^^^^^^^^^^
 ReStructuredText
@@ -165,7 +191,6 @@ ReStructuredText is the default parsing behavior of Cyclopts, so `help_format` w
 
    app = App(help_format="restructuredtext")  # or "rst"
    # or don't supply help_format at all; rst is default.
-
 
    @app.default
    def default():
@@ -180,12 +205,15 @@ ReStructuredText is the default parsing behavior of Cyclopts, so `help_format` w
        * bullet point 2.
        """
 
+   app()
+
 
 Resulting help:
 
 .. raw:: html
 
-   <div class="custom-code-block"><pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-style: italic">Usage: default COMMAND
+   <div class="highlight-default notranslate">
+         <pre style="font-family: 'JetBrains Mono', 'Fira Code', Monaco, Consolas, monospace;">Usage: default COMMAND
 
    My application summary.
 
@@ -194,12 +222,12 @@ Resulting help:
 
    This is a new paragraph with some bulletpoints below:
 
-   • bullet point 1.
-   • bullet point 2.
+   1. bullet point 1.
+   2. bullet point 2.
 
    ╭─ Commands ──────────────────────────────────────────────────────────╮
-   │ --help,-h  Display this message and exit.                           │
-   │ --version  Display application version.                             │
+   │ <span style="color: #66b3ff">--help -h  </span>Display this message and exit.                           │
+   │ <span style="color: #66b3ff">--version  </span>Display application version.                             │
    ╰─────────────────────────────────────────────────────────────────────╯
    </pre></div>
 
@@ -227,18 +255,18 @@ Resulting help:
 
 .. raw:: html
 
-   <div class="custom-code-block"><pre style="font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-style: italic">Usage: default COMMAND
+   <div class="highlight-default notranslate">
+         <pre style="font-family: 'JetBrains Mono', 'Fira Code', Monaco, Consolas, monospace;">Usage: default COMMAND
 
    My application summary.
 
-   We can do markdown things like have <span style="font-weight: bold">bold text</span>. <a href="https://cyclopts.readthedocs.io">Hyperlinks work as well</a>.
+   We can do markdown things like have <span style="font-weight: bold">bold text</span>. <a href="https://cyclopts.readthedocs.io" style="color: #66b3ff">Hyperlinks work as well</a>.
 
    ╭─ Commands ──────────────────────────────────────────────────────────╮
-   │ --help,-h  Display this message and exit.                           │
-   │ --version  Display application version.                             │
+   │ <span style="color: #66b3ff">--help -h  </span>Display this message and exit.                           │
+   │ <span style="color: #66b3ff">--version  </span>Display application version.                             │
    ╰─────────────────────────────────────────────────────────────────────╯
    </pre></div>
-
 
 ----------
 Help Flags
