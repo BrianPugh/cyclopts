@@ -742,7 +742,7 @@ The special parameter name ``"*"`` will remove the immediate parameter's name fr
    │ *  AGE --age    [required]                             │
    ╰────────────────────────────────────────────────────────╯
 
-This can be used to conveniently share parameters between commands, and to create a global config object. See TODO.
+This can be used to conveniently share parameters between commands, and to create a global config object. See :ref:`Sharing Parameters`.
 
 ^^^^^^^^^^
 Docstrings
