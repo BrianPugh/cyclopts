@@ -9,7 +9,6 @@ This is because Cyclopts opted for more flexible and robust CLI parsing, rather 
 With that said, Cyclopts gives you the tools to create your own command chaining experience.
 In this example, we will use a special delimiter token (e.g. ``"AND"``) to separate commands.
 
-
 .. code-block:: python
 
    import itertools
@@ -18,16 +17,13 @@ In this example, we will use a special delimiter token (e.g. ``"AND"``) to separ
 
    app = App()
 
-
    @app.command
    def foo(val: int):
        print(f"FOO {val=}")
 
-
    @app.command
    def bar(flag: bool):
        print(f"BAR {flag=}")
-
 
    @app.meta.default
    def main(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
@@ -40,7 +36,6 @@ In this example, we will use a special delimiter token (e.g. ``"AND"``) to separ
        for group in groups:
            # Execute each group
            app(group)
-
 
    if __name__ == "__main__":
        app.meta(["foo", "123", "AND", "foo", "456", "AND", "bar", "--flag"])

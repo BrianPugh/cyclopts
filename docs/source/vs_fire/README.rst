@@ -72,9 +72,8 @@ The equivalent in Cyclopts:
    $ my-script True
    name='True' type(name)=<class 'str'>
 
-Fire is fine for some quick prototyping and has some cool parlour tricks, but is not suitable for a serious CLI.
+Fire is fine for some quick prototyping, but is not suitable for a serious CLI.
 Therefore, I wouldn't say Fire is a direct competitor to Cyclopts.
-
 
 
 .. _Fire: https://github.com/google/python-fire

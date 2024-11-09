@@ -43,7 +43,6 @@ To make the application still work as-expected from the CLI, it is more appropri
    def shell():
        app.interactive_shell()
 
-
    if __name__ == "__main__":
        app()  # Don't call ``app.interactive_shell()`` here.
 

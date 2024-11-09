@@ -113,7 +113,6 @@ The core logic of :meth:`App.__call__` method is the following:
 .. code-block:: python
 
     def __call__(self, tokens=None, **kwargs):
-        tokens = normalize_tokens(tokens)
         command, bound, ignored = self.parse_args(tokens, **kwargs)
         return command(*bound.args, **bound.kwargs)
 
@@ -159,4 +158,5 @@ This might be useful to share an expensive-to-create object amongst commands in 
    Creating user Alice with age 30.
 
 The ``parse=False`` configuration tells Cyclopts to not try and bind arguments to this parameter.
+Cyclopts will pass it along to ``ignored`` to make custom meta-app logic easier.
 The annotated parameter **must** be a keyword-only parameter.

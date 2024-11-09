@@ -6,7 +6,7 @@ Coercion Rules
 This page intends to serve as a terse set of type coercion rules that Cyclopts follows.
 
 Automatic coercion can always be overridden by the :attr:`.Parameter.converter` field.
-Typically, the ``converter`` function will receive a single token, but it may receive multiple tokens
+Typically, the :attr:`~.Parameter.converter` function will receive a single token, but it may receive multiple tokens
 if the annotated type is iterable (e.g. :class:`list`, :class:`set`).
 
 *******
@@ -87,8 +87,9 @@ Int
 For convenience, Cyclopts provides a richer feature-set of parsing integers than just naively calling ``int``.
 
 * Accepts vanilla decimal values (e.g. `123`, `3.1415`). Floating-point values will be rounded prior to casting to an ``int``.
-* Accepts hexadecimal values (strings starting with `0x`).
 * Accepts binary values (strings starting with `0b`)
+* Accepts octal values (strings starting with `0o`)
+* Accepts hexadecimal values (strings starting with `0x`).
 
 *****
 Float
@@ -131,9 +132,9 @@ Bool
 
 2. If specified as a **positional** argument, a case-insensitive lookup is performed:
 
-   * If the token is a **true-like value** ``{"yes", "y", "1", "true", "t"}``, then it is parsed as ``True``.
+   * If the token is a **true-like value** ``{"yes", "y", "1", "true", "t"}``, then it is parsed as :obj:`True`.
 
-   * If the token is a **false-like value** ``{"no", "n", "0", "false", "f"}``, then it is parsed as ``False``.
+   * If the token is a **false-like value** ``{"no", "n", "0", "false", "f"}``, then it is parsed as :obj:`False`.
 
    * Otherwise, a :exc:`CoercionError` will be raised.
 
@@ -420,9 +421,7 @@ Follows the same rules as `Set`_, but the resulting datatype is a :class:`frozen
 *****
 Tuple
 *****
-* Parses the same number of tokens as the size of the annotated tuple.
-
-* The inner annotation type will be applied independently to each element.
+* The inner type hint(s) will be applied independently to each element. Enough CLI tokens will be consumed to populate the inner types.
 
 * Nested fixed-length tuples are allowed: E.g. ``tuple[tuple[int, str], str]`` will consume 3 CLI tokens.
 
