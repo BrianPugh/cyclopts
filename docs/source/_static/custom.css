@@ -7,6 +7,10 @@
     color: #000000 !important;
 }
 
+.wy-side-nav-search>div.switch-menus>div.version-switch select {
+    color: #000000;
+}
+
 /* override table width restrictions */
 .wy-table-responsive table td, .wy-table-responsive table th {
     white-space: normal !important;
