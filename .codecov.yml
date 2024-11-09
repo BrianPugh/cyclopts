@@ -3,9 +3,9 @@ coverage:
     project:
       default:
         # Commits pushed to main should not make the overall
-        # project coverage decrease by more than 1%
+        # project coverage decrease by more than 2%
         target: auto
-        threshold: 1%
+        threshold: 2%
     patch:
       default:
         # Be tolerant on code coverage diff on PRs to limit

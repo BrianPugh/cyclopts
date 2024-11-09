@@ -12,20 +12,20 @@ With Typer, this is accomplished via declaring an :class:`~enum.Enum`.
 
 .. code-block:: python
 
+   import typer
+   from enum import Enum
+
    class Environment(str, Enum):
        # Values end in "_value" to avoid confusion in this example.
        DEV = "dev_value"
        STAGING = "staging_value"
        PROD = "prod_value"
 
-
    typer_app = typer.Typer()
-
 
    @typer_app.command
    def foo(env: Environment = Environment.DEV):
        print(f"Using: {env.name}")
-
 
    print("Typer (Enum):")
    typer_app(["--env", "staging_value"])
@@ -36,18 +36,17 @@ IMHO, this is backwards; typically the enum name (e.g. ``DEV``) is intended to b
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.default
    def foo(env: Environment = Environment.DEV):
        print(f"Using: {env.name}")
 
-
    print("Cyclopts (Enum):")
    cyclopts_app(["--env", "staging"])
    # Using: STAGING
-
 
 -------
 Literal
@@ -60,8 +59,10 @@ Cyclopts has builtin support for :obj:`~typing.Literal`, see :ref:`Coercion Rule
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
+   from typing import Literal
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.default
    def foo(env: Literal["dev", "staging", "prod"] = "staging"):
@@ -73,6 +74,5 @@ Cyclopts has builtin support for :obj:`~typing.Literal`, see :ref:`Coercion Rule
    print(cmd)
    cyclopts_app(cmd)
    # Using: staging
-
 
 .. _a feature request dating back to early 2020: https://github.com/tiangolo/typer/issues/76

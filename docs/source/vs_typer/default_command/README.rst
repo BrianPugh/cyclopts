@@ -6,16 +6,15 @@ Default Command
 Typer has an annoying design quirk where if you register a single command, it **won't** expect you to provide the command name in the CLI.
 For example:
 
-
 .. code-block:: python
 
-   typer_app = typer.Typer()
+   import typer
 
+   typer_app = typer.Typer()
 
    @typer_app.command()
    def foo():
        print("FOO")
-
 
    typer_app([], standalone_mode=False)
    # FOO
@@ -55,13 +54,13 @@ To avoid this confusion, Cyclopts has two ways of registering a function:
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   import cyclopts
 
+   cyclopts_app = cyclopts.App()
 
    @cyclopts_app.command
    def foo():
        print("FOO")
-
 
    cyclopts_app(["foo"])
    # FOO

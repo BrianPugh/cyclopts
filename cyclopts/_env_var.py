@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, List, Optional, get_args
+from typing import Any, Optional, get_args
 
 
 def _is_path(type_) -> bool:
@@ -22,10 +22,10 @@ def env_var_split(
     val: str,
     *,
     delimiter: Optional[str] = None,
-):
+) -> list[str]:
     """Type-dependent environment variable value splitting.
 
-    Performs splitting when:
+    Converts a single string into a list of strings. Splits when:
 
     * The ``type_`` is some variant of ``Iterable[pathlib.Path]`` objects.
       If Windows, split on ``;``, otherwise split on ``:``.
@@ -33,7 +33,7 @@ def env_var_split(
     * Otherwise, if the ``type_`` is an ``Iterable``, split on whitespace.
       Leading/trailing whitespace of each output element will be stripped.
 
-    Is the default value for :attr:`cyclopts.App.env_var_split`.
+    This function is the default value for :attr:`cyclopts.App.env_var_split`.
 
     Parameters
     ----------
@@ -48,18 +48,14 @@ def env_var_split(
     Returns
     -------
     list[str]
-        List of individual tokens.
+        List of individual string tokens.
     """
-    from cyclopts._convert import token_count
-    from cyclopts.parameter import get_hint_parameter
+    from cyclopts._convert import resolve, token_count
 
+    type_ = resolve(type_)
     count, consume_all = token_count(type_)
-    type_ = get_hint_parameter(type_)[0]
 
     if count > 1 or consume_all:
-        if _is_path(type_):
-            return val.split(os.pathsep)
-        else:
-            return val.split(delimiter)
+        return val.split(os.pathsep) if _is_path(type_) else val.split(delimiter)
     else:
         return [val]

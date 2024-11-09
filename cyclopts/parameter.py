@@ -1,30 +1,15 @@
 import inspect
+from collections.abc import Iterable
 from functools import partial
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-    cast,
-    get_args,
-    get_origin,
-)
+from typing import Any, Callable, Optional, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
 
 import cyclopts._env_var
 import cyclopts.utils
-from cyclopts._convert import (
-    AnnotatedType,
-    convert,
-    get_origin_and_validate,
-    resolve,
-    resolve_optional,
-)
+from cyclopts._convert import ITERABLE_TYPES, convert
+from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
@@ -33,18 +18,17 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
+_NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES])
 
-def _double_hyphen_validator(instance, attribute, values):
-    if not values:
-        return
 
+def _not_hyphen_validator(instance, attribute, values):
     for value in values:
-        if value is not None and not value.startswith("--"):
-            raise ValueError(f'{attribute.alias} value must start with "--".')
+        if value is not None and value.startswith("-"):
+            raise ValueError(f'{attribute.alias} value must NOT start with "-".')
 
 
-def _negative_converter(default: Tuple[str, ...]):
-    def converter(value) -> Tuple[str, ...]:
+def _negative_converter(default: tuple[str, ...]):
+    def converter(value) -> tuple[str, ...]:
         if value is None:
             return default
         else:
@@ -56,14 +40,41 @@ def _negative_converter(default: Tuple[str, ...]):
 @record_init("_provided_args")
 @frozen
 class Parameter:
-    """Cyclopts configuration for individual function parameters."""
+    """Cyclopts configuration for individual function parameters with :obj:`~typing.Annotated`.
 
-    # All documentation has been moved to ``docs/api.rst`` for greater control with attrs.
+    Example usage:
+
+    .. code-block:: python
+
+        from cyclopts import app, Parameter
+        from typing import Annotated
+
+        app = App()
+
+
+        @app.default
+        def main(foo: Annotated[int, Parameter(name="bar")]):
+            print(foo)
+
+
+        app()
+
+    .. code-block:: console
+
+        $ my-script 100
+        100
+
+        $ my-script --bar 100
+        100
+    """
+
+    # All attribute docstrings has been moved to ``docs/api.rst`` for greater control with attrs.
 
     # This can ONLY ever be a Tuple[str, ...]
+    # Usually starts with "--" or "-"
     name: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
     _converter: Callable = field(default=None, alias="converter")
@@ -71,7 +82,7 @@ class Parameter:
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
         default=(),
-        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
     )
 
     # This can ONLY ever be a Tuple[str, ...]
@@ -97,7 +108,7 @@ class Parameter:
     # This can ONLY ever be a Tuple[str, ...]
     env_var: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=lambda x: cast(Tuple[str, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
     env_var_split: Callable = cyclopts._env_var.env_var_split
@@ -105,60 +116,83 @@ class Parameter:
     # This can ONLY ever be a Tuple[str, ...]
     negative_bool: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=_negative_converter(("--no-",)),
-        validator=_double_hyphen_validator,
+        converter=_negative_converter(("no-",)),
+        validator=_not_hyphen_validator,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
     negative_iterable: Union[None, str, Iterable[str]] = field(
         default=None,
-        converter=_negative_converter(("--empty-",)),
-        validator=_double_hyphen_validator,
+        converter=_negative_converter(("empty-",)),
+        validator=_not_hyphen_validator,
     )
 
     required: Optional[bool] = field(default=None)
 
     allow_leading_hyphen: bool = field(default=False)
 
-    name_transform: Optional[Callable[[str], str]] = field(
+    _name_transform: Optional[Callable[[str], str]] = field(
+        alias="name_transform",
         default=None,
-        converter=attrs.converters.default_if_none(default_name_transform),
         kw_only=True,
     )
 
+    # Should not get inherited
+    accepts_keys: Optional[bool] = field(default=None)
+
+    # Should not get inherited
+    consume_multiple: bool = field(default=None, converter=attrs.converters.default_if_none(False))
+
     # Populated by the record_attrs_init_args decorator.
-    _provided_args: Tuple[str] = field(default=(), init=False, eq=False)
+    _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
 
     @property
-    def show(self):
+    def show(self) -> bool:
         return self._show if self._show is not None else self.parse
 
     @property
     def converter(self):
         return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
-    def get_negatives(self, type_, *names: str) -> Tuple[str, ...]:
+    @property
+    def name_transform(self):
+        return self._name_transform if self._name_transform else default_name_transform
+
+    def get_negatives(self, type_) -> tuple[str, ...]:
+        if is_union(type_):
+            type_ = next(x for x in get_args(type_) if x is not None)
+
         type_ = get_origin(type_) or type_
 
-        if self.negative is not None:
-            return self.negative  # pyright: ignore
-        elif type_ not in (bool, list, set):
+        if (self.negative is not None and not self.negative) or type_ not in _NEGATIVE_FLAG_TYPES:
             return ()
 
-        out = []
-        for name in names:
-            if name.startswith("--"):
-                name = name[2:]
-            elif name.startswith("-"):
-                # Do not support automatic negation for short flags.
+        out, user_negatives = [], []
+        if self.negative:
+            for negative in self.negative:
+                (out if negative.startswith("-") else user_negatives).append(negative)
+
+            if not user_negatives:
+                return tuple(out)
+
+        assert isinstance(self.name, tuple)
+        for name in self.name:
+            if not name.startswith("--"):  # Only provide negation for option-like long flags.
                 continue
-            else:
-                raise ValueError("All parameters should have started with '-' or '--'.")
+            name = name[2:]
+            name_components = name.split(".")
 
             negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
+            name_prefix = ".".join(name_components[:-1])
+            if name_prefix:
+                name_prefix += "."
             assert isinstance(negative_prefixes, tuple)
-            for negative_prefix in negative_prefixes:
-                out.append(f"{negative_prefix}{name}")
+            if self.negative is None:
+                for negative_prefix in negative_prefixes:
+                    out.append(f"--{name_prefix}{negative_prefix}{name_components[-1]}")
+            else:
+                for negative in user_negatives:
+                    out.append(f"--{name_prefix}{negative}")
         return tuple(out)
 
     def __repr__(self):
@@ -203,6 +237,19 @@ class Parameter:
             **{a.alias: a.default for a in cls.__attrs_attrs__ if a.init}  # pyright: ignore[reportAttributeAccessIssue]
         )
 
+    @classmethod
+    def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
+        """Resolve the immediate Parameter from a type hint."""
+        cyclopts_parameters = []
+        if type_ is not inspect.Parameter.empty:
+            type_ = resolve_optional(type_)
+
+            if is_annotated(type_):
+                annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
+                cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+
+        return cls.combine(*default_parameters, *cyclopts_parameters)
+
 
 def validate_command(f: Callable):
     """Validate if a function abides by Cyclopts's rules.
@@ -214,40 +261,7 @@ def validate_command(f: Callable):
     """
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
-        get_origin_and_validate(iparam.annotation)
-        type_, cparam = get_hint_parameter(iparam)
+        get_origin(iparam.annotation)
+        cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
-
-
-def get_hint_parameter(type_: Any, *default_parameters: Optional[Parameter]) -> Tuple[Type, Parameter]:
-    """Get the type hint and Cyclopts :class:`Parameter` from a type-hint.
-
-    If a ``cyclopts.Parameter`` is not found, a default Parameter is returned.
-    """
-    cyclopts_parameters = []
-
-    if isinstance(type_, inspect.Parameter):
-        annotation = type_.annotation
-
-        if annotation is inspect.Parameter.empty or resolve(annotation) is Any:
-            if type_.default in (inspect.Parameter.empty, None):
-                annotation = str
-            else:
-                return get_hint_parameter(type(type_.default), *default_parameters)
-    else:
-        annotation = type_
-
-        if annotation is inspect.Parameter.empty:
-            annotation = str
-
-    annotation = resolve_optional(annotation)
-
-    if type(annotation) is AnnotatedType:
-        annotations = annotation.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-        annotation = get_args(annotation)[0]
-        cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-    annotation = resolve(annotation)
-
-    cparam = Parameter.combine(*default_parameters, *cyclopts_parameters)
-    return annotation, cparam

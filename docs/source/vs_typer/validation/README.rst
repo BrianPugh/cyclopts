@@ -6,8 +6,9 @@ Typer has builtin argument validation for certain type annotations.
 
 .. code-block:: python
 
-   typer_app = typer.Typer()
+   import typer
 
+   typer_app = typer.Typer()
 
    @typer_app.command()
    def foo(age: Annotated[int, typer.Argument(min=0)]):
@@ -75,17 +76,20 @@ Cyclopts has an explicit :attr:`~.Parameter.validator` field that accepts a func
 
 .. code-block:: python
 
-   cyclopts_app = cyclopts.App()
+   from cyclopts import App, parameter
+   from typing import Annotated
 
+   cyclopts_app = App()
 
    def age_validator(type_, value: int):
        if value < 0:
            raise ValueError
 
-
    @cyclopts_app.command()
    def foo(age: Annotated[int, Parameter(validator=age_validator)]):
        pass
+
+    cyclopts_app()
 
 This solution is similar to how other libraries, like Attrs_ or Pydantic_, perform validation.
 

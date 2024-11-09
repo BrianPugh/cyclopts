@@ -9,25 +9,31 @@ All CLI applications should have the basic ability to check the installed versio
    $ my-application --version
    7.5.8
 
-By default, cyclopts adds a command, :meth:`--version <cyclopts.App.version_print>`:, that does exactly this.
-
+By default, Cyclopts adds a command, :meth:`--version <cyclopts.App.version_print>`:, that does exactly this.
+Cyclopts try's to reasonably figure out your package's version by itself.
 The resolution order for determining the version string is as follows:
 
 1. An explicitly supplied version string or callable to the root Cyclopts application:
 
    .. code-block:: python
 
-      app = cyclopts.App(version="7.5.8")
+      from cyclopts import App
+
+      app = App(version="7.5.8")
+
+      app()
 
    If a callable is provided, it will be invoked when running the ``--version`` command:
 
    .. code-block:: python
 
+      from cyclopts import App
+
       def get_my_application_version() -> str:
           return "7.5.8"
 
-
-      app = cyclopts.App(version=get_my_application_version)
+      app = App(version=get_my_application_version)
+      app()
 
 2. The invoking-package's `Distribution Package's Version Number`_ via `importlib.metadata.version`_.
    Cyclopts attempts to derive the package module that instantiated the :class:`.App` object by traversing the call stack.

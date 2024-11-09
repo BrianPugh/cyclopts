@@ -29,15 +29,12 @@ A pretty bare-bones Cyclopts ``mypackage/__main__.py`` will look like:
 
    app = cyclopts.App()
 
-
    @app.command
    def foo(name: str):
        print(f"Hello {name}!")
 
-
    def main():
        app()
-
 
    if __name__ == "__main__":
        main()
@@ -47,6 +44,8 @@ A pretty bare-bones Cyclopts ``mypackage/__main__.py`` will look like:
 
    $ python -m mypackage World
    Hello World!
+
+In the current state, the :func:`main` function is an unnecessary extra level of indirection (could just directly call :obj:`app`), but it can sometimes offer you additional flexibility in the future if you need it.
 
 -----------
 Entrypoints

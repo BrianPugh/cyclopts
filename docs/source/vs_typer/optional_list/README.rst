@@ -19,15 +19,15 @@ Consider the following Typer example:
 
 .. code-block:: python
 
+   import typer
+
    typer_app = typer.Typer()
 
-
    @typer_app.command()
-   def foo(favorite_numbers: Optional[List[int]] = None):
+   def foo(favorite_numbers: Optional[list[int]] = None):
        if favorite_numbers is None:
            favorite_numbers = [1, 2, 3]
        print(f"My favorite numbers are: {favorite_numbers}")
-
 
    typer_app(["--favorite-numbers", "100", "--favorite-numbers", "200"], standalone_mode=False)
    # My favorite numbers are: [100, 200]
@@ -44,15 +44,15 @@ This feature is configurable via :attr:`.Parameter.negative_iterable`.
 
 .. code-block:: python
 
+   import cyclopts
+
    cyclopts_app = cyclopts.App()
 
-
    @cyclopts_app.default()
-   def foo(favorite_numbers: Optional[List[int]] = None):
+   def foo(favorite_numbers: Optional[list[int]] = None):
        if favorite_numbers is None:
            favorite_numbers = [1, 2, 3]
        print(f"My favorite numbers are: {favorite_numbers}")
-
 
    cyclopts_app(["--favorite-numbers", "100", "--favorite-numbers", "200"])
    # My favorite numbers are: [100, 200]

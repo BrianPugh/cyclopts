@@ -1,6 +1,6 @@
 import collections.abc
-import inspect
 import sys
+from collections.abc import Sequence
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -8,46 +8,38 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    List,
+    Iterable,
     Literal,
     Optional,
-    Set,
-    Tuple,
-    Type,
     Union,
     get_args,
     get_origin,
 )
 
-from cyclopts.exceptions import CoercionError
-from cyclopts.utils import default_name_transform, is_union
+from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
+from cyclopts.exceptions import CoercionError, ValidationError
+from cyclopts.field_info import get_field_infos
+from cyclopts.utils import default_name_transform, grouper, is_builtin
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
-else:
+else:  # pragma: no cover
     TypeAliasType = None
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated  # pragma: no cover
-else:
-    from typing import Annotated  # pragma: no cover
-
-
 if TYPE_CHECKING:
-    from cyclopts.parameter import Parameter
+    from cyclopts.argument import Token
 
-# from types import NoneType is available >=3.10
-NoneType = type(None)
-AnnotatedType = type(Annotated[int, 0])
 
-_implicit_iterable_type_mapping: Dict[Type, Type] = {
-    list: List[str],
-    set: Set[str],
-    tuple: Tuple[str, ...],
+_implicit_iterable_type_mapping: dict[type, type] = {
+    list: list[str],
+    set: set[str],
+    tuple: tuple[str, ...],
+    dict: dict[str, str],
 }
 
-_iterable_types = {list, set}
+ITERABLE_TYPES = {list, set, frozenset, Sequence, Iterable, tuple}
+
+NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
 
 def _bool(s: str) -> bool:
@@ -58,13 +50,15 @@ def _bool(s: str) -> bool:
         return True
     else:
         # Cyclopts is a little bit conservative when coercing strings into boolean.
-        raise CoercionError(target_type=bool, input_value=s)
+        raise CoercionError(target_type=bool)
 
 
 def _int(s: str) -> int:
     s = s.lower()
     if s.startswith("0x"):
         return int(s, 16)
+    elif s.startswith("0o"):
+        return int(s, 8)
     elif s.startswith("0b"):
         return int(s, 2)
     else:
@@ -81,7 +75,7 @@ def _bytearray(s: str) -> bytearray:
 
 
 # For types that need more logic than just invoking their type
-_converters = {
+_converters: dict[Any, Callable] = {
     bool: _bool,
     int: _int,
     bytes: _bytes,
@@ -90,20 +84,20 @@ _converters = {
 
 
 def _convert_tuple(
-    type_: Type[Any],
-    *args: str,
-    converter: Optional[Callable[[Type, str], Any]],
+    type_: type[Any],
+    *tokens: "Token",
+    converter: Optional[Callable[[type, str], Any]],
     name_transform: Callable[[str], str],
-) -> Tuple:
+) -> tuple:
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     inner_types = tuple(x for x in get_args(type_) if x is not ...)
     inner_token_count, consume_all = token_count(type_)
     if consume_all:
         # variable-length tuple (list-like)
-        remainder = len(args) % inner_token_count
+        remainder = len(tokens) % inner_token_count
         if remainder:
             raise CoercionError(
-                msg=f"Incorrect number of arguments: expected multiple of {inner_token_count} but got {len(args)}."
+                msg=f"Incorrect number of arguments: expected multiple of {inner_token_count} but got {len(tokens)}."
             )
         if len(inner_types) == 1:
             inner_type = inner_types[0]
@@ -112,19 +106,18 @@ def _convert_tuple(
         else:
             raise ValueError("A tuple must have 0 or 1 inner-types.")
 
-        if inner_token_count == 1:
-            out = tuple(convert(inner_type, x) for x in args)
-        else:
-            out = tuple(
-                convert(inner_type, args[i : i + inner_token_count]) for i in range(0, len(args), inner_token_count)
-            )
-        return out
+        return tuple(
+            convert(inner_type, chunk[0] if inner_token_count == 1 else chunk)
+            for chunk in grouper(tokens, inner_token_count)
+        )
     else:
         # Fixed-length tuple
-        if inner_token_count != len(args):
-            raise CoercionError(msg=f"Incorrect number of arguments: expected {inner_token_count} but got {len(args)}.")
+        if inner_token_count != len(tokens):
+            raise CoercionError(
+                msg=f"Incorrect number of arguments: expected {inner_token_count} but got {len(tokens)}."
+            )
         args_per_convert = [token_count(x)[0] for x in inner_types]
-        it = iter(args)
+        it = iter(tokens)
         batched = [[next(it) for _ in range(size)] for size in args_per_convert]
         batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
         out = tuple(convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
@@ -133,9 +126,9 @@ def _convert_tuple(
 
 def _convert(
     type_,
-    element,
+    token: Union["Token", Sequence["Token"]],
     *,
-    converter: Optional[Callable[[Type, str], Any]],
+    converter: Optional[Callable[[Any, str], Any]],
     name_transform: Callable[[str], str],
 ):
     """Inner recursive conversion function for public ``convert``.
@@ -145,133 +138,154 @@ def _convert(
     converter: Callable
     name_transform: Callable
     """
+    from cyclopts.argument import Token
+
+    converter_needs_token = False
+    if is_annotated(type_):
+        from cyclopts.parameter import Parameter
+
+        args = get_args(type_)
+        type_ = args[0]
+        cparam = Parameter.combine(*(x for x in args[1:] if isinstance(x, Parameter)))
+        if cparam._converter:
+            converter_needs_token = True
+            converter = lambda t_, value: cparam._converter(t_, (value,))  # noqa: E731
+        if cparam.name_transform:
+            name_transform = cparam.name_transform
+    else:
+        cparam = None
+
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
+
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
     if type_ in _implicit_iterable_type_mapping:
-        return convert(_implicit_iterable_type_mapping[type_], element)
-
-    if origin_type is collections.abc.Iterable:
+        out = convert(_implicit_iterable_type_mapping[type_], token)
+    elif origin_type in (collections.abc.Iterable, collections.abc.Sequence):
         assert len(inner_types) == 1
-        return convert(List[inner_types[0]], element)  # pyright: ignore[reportGeneralTypeIssues]
+        out = convert(list[inner_types[0]], token)  # pyright: ignore[reportGeneralTypeIssues]
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
-        return convert(type_.__value__, element)
+        out = convert(type_.__value__, token)
     elif is_union(origin_type):
         for t in inner_types:
-            if t is NoneType:
+            if is_nonetype(t):
                 continue
             try:
-                return convert(t, element)
+                out = convert(t, token)
+                break
             except Exception:
                 pass
         else:
-            raise CoercionError(input_value=element, target_type=type_)
+            if isinstance(token, Sequence):
+                raise ValueError  # noqa: TRY004
+            raise CoercionError(token=token, target_type=type_)
     elif origin_type is Literal:
         # Try coercing the token into each allowed Literal value (left-to-right).
+        last_coercion_error = None
         for choice in get_args(type_):
             try:
-                res = convert(type(choice), (element))
-            except Exception:
+                res = convert(type(choice), token)
+            except CoercionError as e:
+                last_coercion_error = e
                 continue
             if res == choice:
-                return res
+                out = res
+                break
         else:
-            raise CoercionError(input_value=element, target_type=type_)
-    elif origin_type in _iterable_types:  # NOT including tuple
-        count, _ = token_count(inner_types[0])
-        if count > 1:
-            gen = zip(*[iter(element)] * count)
-        else:
-            gen = element
-        return origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+            if last_coercion_error:
+                last_coercion_error.target_type = type_
+                raise last_coercion_error
+            else:
+                raise CoercionError(token=token[0] if isinstance(token, Sequence) else token, target_type=type_)
     elif origin_type is tuple:
-        if isinstance(element, str):
+        if isinstance(token, Token):
             # E.g. Tuple[str] (Annotation: tuple containing a single string)
-            return convert_tuple(type_, element, converter=converter)
+            out = convert_tuple(type_, token, converter=converter)
         else:
-            return convert_tuple(type_, *element, converter=converter)
+            out = convert_tuple(type_, *token, converter=converter)
+    elif origin_type in ITERABLE_TYPES:  # NOT including tuple
+        count, _ = token_count(inner_types[0])
+        if not isinstance(token, Sequence):
+            raise ValueError
+        if count > 1:
+            gen = zip(*[iter(token)] * count)
+        else:
+            gen = token
+        out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
     elif isclass(type_) and issubclass(type_, Enum):
+        if isinstance(token, Sequence):
+            raise ValueError
+
         if converter is None:
-            element_transformed = name_transform(element)
+            element_transformed = name_transform(token.value)
             for member in type_:
                 if name_transform(member.name) == element_transformed:
-                    return member
-            raise CoercionError(input_value=element, target_type=type_)
+                    out = member
+                    break
+            else:
+                raise CoercionError(token=token, target_type=type_)
         else:
-            return converter(type_, element)
-    else:
-        # The actual casting/converting of the underlying type is performed here.
+            out = converter(type_, token.value)
+    elif is_builtin(type_):
+        assert isinstance(token, Token)
         try:
             if converter is None:
-                return _converters.get(type_, type_)(element)
+                out = _converters.get(type_, type_)(token.value)
+            elif converter_needs_token:
+                out = converter(type_, token)  # pyright: ignore[reportArgumentType]
             else:
-                return converter(type_, element)
+                out = converter(type_, token.value)
+        except CoercionError as e:
+            if e.target_type is None:
+                e.target_type = type_
+            if e.token is None:
+                e.token = token
+            raise
         except ValueError:
-            raise CoercionError(input_value=element, target_type=type_) from None
-
-
-_unsupported_target_types = {dict}
-
-
-def get_origin_and_validate(type_: Type):
-    origin_type = get_origin(type_)
-    if origin_type is None:
-        if type_ in _unsupported_target_types:
-            raise TypeError(f"Unsupported Type: {type_}")
+            raise CoercionError(token=token, target_type=type_) from None
     else:
-        if origin_type in _unsupported_target_types:
-            raise TypeError(f"Unsupported Type: {type_}")
-    return origin_type
+        # Convert it into a user-supplied class.
+        if not isinstance(token, Sequence):
+            token = [token]
+        i = 0
+        pos_values = []
+        hint = type_
+        for field_info in get_field_infos(type_, include_var_positional=True).values():
+            hint = field_info.hint
+            if hint is str:  # Avoids infinite recursion
+                pos_values.append(token[i].value)
+                i += 1
+            else:
+                tokens_per_element, consume_all = token_count(hint)
+                if tokens_per_element == 1:
+                    pos_values.append(convert(hint, token[i]))
+                    i += 1
+                else:
+                    pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                    i += tokens_per_element
+                if consume_all:
+                    break
+            if i == len(token):
+                break
+        assert i == len(token)
+        out = type_(*pos_values)
 
+    if cparam:
+        try:
+            for validator in cparam.validator:  # pyright: ignore
+                validator(type_, out)
+        except (AssertionError, ValueError, TypeError) as e:
+            raise ValidationError(exception_message=e.args[0] if e.args else "", value=out) from e
 
-def resolve(type_: Any) -> Type:
-    """Perform all simplifying resolutions."""
-    if type_ is inspect.Parameter.empty:
-        return str
-
-    type_prev = None
-    while type_ != type_prev:
-        type_prev = type_
-        type_ = resolve_annotated(type_)
-        type_ = resolve_optional(type_)
-    return type_
-
-
-def resolve_optional(type_: Any) -> Type:
-    """Only resolves Union's of None + one other type (i.e. Optional)."""
-    # Python will automatically flatten out nested unions when possible.
-    # So we don't need to loop over resolution.
-
-    if not is_union(get_origin(type_)):
-        return type_
-
-    non_none_types = [t for t in get_args(type_) if t is not NoneType]
-    if not non_none_types:  # pragma: no cover
-        # This should never happen; python simplifies:
-        #    ``Union[None, None] -> NoneType``
-        raise ValueError("Union type cannot be all NoneType")
-    elif len(non_none_types) == 1:
-        type_ = non_none_types[0]
-    elif len(non_none_types) > 1:
-        return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
-    else:
-        raise NotImplementedError
-
-    return type_
-
-
-def resolve_annotated(type_: Any) -> Type:
-    if type(type_) is AnnotatedType:
-        type_ = get_args(type_)[0]
-    return type_
+    return out
 
 
 def convert(
     type_: Any,
-    *args: str,
-    converter: Optional[Callable[[Type, str], Any]] = None,
+    tokens: Union[Sequence[str], Sequence["Token"], NestedCliArgs],
+    converter: Optional[Callable[[type, str], Any]] = None,
     name_transform: Optional[Callable[[str], str]] = None,
 ):
     """Coerce variables into a specified type.
@@ -280,18 +294,20 @@ def convert(
     Externally, may be useful in a custom converter.
     See Cyclopt's automatic coercion rules :doc:`/rules`.
 
-    If ``type_`` **is not** iterable, then each element of ``*args`` will be converted independently.
+    If ``type_`` **is not** iterable, then each element of ``tokens`` will be converted independently.
     If there is more than one element, then the return type will be a ``Tuple[type_, ...]``.
     If there is a single element, then the return type will be ``type_``.
 
-    If ``type_`` **is** iterable, then all elements of ``*args`` will be collated.
+    If ``type_`` **is** iterable, then all elements of ``tokens`` will be collated.
 
     Parameters
     ----------
     type_: Type
         A type hint/annotation to coerce ``*args`` into.
-    `*args`: str
+    tokens: Union[Sequence[str], NestedCliArgs]
         String tokens to coerce.
+        Generally, either a list of strings, or a dictionary of list of strings (recursive).
+        Each leaf in the dictionary tree should be a list of strings.
     converter: Optional[Callable[[Type, str], Any]]
         An optional function to convert tokens to the inner-most types.
         The converter should have signature:
@@ -324,10 +340,18 @@ def convert(
     Any
         Coerced version of input ``*args``.
     """
+    from cyclopts.argument import Token
+
+    if not tokens:
+        raise ValueError
+
+    if not isinstance(tokens, dict) and isinstance(tokens[0], str):
+        tokens = tuple(Token(value=str(x)) for x in tokens)
+
     if name_transform is None:
         name_transform = default_name_transform
 
-    convert = partial(_convert, converter=converter, name_transform=name_transform)
+    convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
     type_ = resolve(type_)
 
@@ -336,19 +360,39 @@ def convert(
 
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
-    origin_type = get_origin_and_validate(type_)
+    origin_type = get_origin(type_)
+    maybe_origin_type = origin_type or type_
 
     if origin_type is tuple:
-        return convert_tuple(type_, *args)
-    elif (origin_type or type_) in _iterable_types or origin_type is collections.abc.Iterable:
-        return convert(type_, args)
-    elif len(args) == 1:
-        return convert(type_, args[0])
+        return convert_tuple(type_, *tokens)  # pyright: ignore
+    elif maybe_origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable:
+        return convert_priv(type_, tokens)  # pyright: ignore
+    elif maybe_origin_type is dict:
+        if not isinstance(tokens, dict):
+            raise ValueError  # Programming error
+        try:
+            value_type = get_args(type_)[1]
+        except IndexError:
+            value_type = str
+        dict_converted = {
+            k: convert(value_type, v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
+        }
+        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)  # pyright: ignore
+    elif isinstance(tokens, dict):
+        raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
     else:
-        return [convert(type_, item) for item in args]
+        if len(tokens) == 1:
+            return convert_priv(type_, tokens[0])  # pyright: ignore
+        tokens_per_element, _ = token_count(type_)
+        if tokens_per_element == 1:
+            return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
+        elif len(tokens) == tokens_per_element:
+            return convert_priv(type_, tokens)  # pyright: ignore
+        else:
+            raise NotImplementedError("Unreachable?")
 
 
-def token_count(type_: Any) -> Tuple[int, bool]:
+def token_count(type_: Any) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -364,12 +408,8 @@ def token_count(type_: Any) -> Tuple[int, bool]:
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    from cyclopts.parameter import get_hint_parameter
-
-    annotation = get_hint_parameter(type_)[0]
-
-    annotation = resolve(annotation)
-    origin_type = get_origin_and_validate(annotation)
+    annotation = resolve(type_)
+    origin_type = get_origin(annotation)
 
     if (origin_type or annotation) is tuple:
         args = get_args(annotation)
@@ -379,9 +419,38 @@ def token_count(type_: Any) -> Tuple[int, bool]:
             return 1, True
     elif (origin_type or annotation) is bool:
         return 0, False
-    elif annotation in _iterable_types or (origin_type in _iterable_types and len(get_args(annotation)) == 0):
+    elif annotation in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(annotation)) == 0):
         return 1, True
-    elif (origin_type in _iterable_types or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
+    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
         return token_count(get_args(annotation)[0])[0], True
-    else:
+    elif is_union(type_):
+        sub_args = get_args(type_)
+        token_count_target = token_count(sub_args[0])
+        for sub_type_ in sub_args[1:]:
+            this = token_count(sub_type_)
+            if this != token_count_target:
+                raise ValueError(
+                    f"Cannot Union types that consume different numbers of tokens: {sub_args[0]} {sub_type_}"
+                )
+        return token_count_target
+    elif is_builtin(type_):
+        # Many builtins actually take in VAR_POSITIONAL when we really just want 1 argument.
         return 1, False
+    else:
+        # This is usually/always a custom user-defined class.
+        field_infos = get_field_infos(type_, include_var_positional=True)
+        count, consume_all = 0, False
+        for value in field_infos.values():
+            if value.kind is value.VAR_POSITIONAL:
+                consume_all = True
+            elif not value.required:
+                continue
+            elem_count, elem_consume_all = token_count(value.hint)
+            count += elem_count
+            consume_all |= elem_consume_all
+
+        # classes like ``Enum`` can slip through here with a 0 count.
+        if not count:
+            return 1, False
+
+        return count, consume_all

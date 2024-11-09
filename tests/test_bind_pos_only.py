@@ -2,15 +2,13 @@ import sys
 
 import pytest
 
-from cyclopts import MissingArgumentError, UnknownOptionError, ValidationError
+from cyclopts import MissingArgumentError, UnknownOptionError
 
 
 @pytest.mark.parametrize(
     "cmd_str",
     [
         "foo 1 2 3 4 5",
-        "foo --a=1 --b=2 3 4 5",
-        "foo 3 4 5 --b=2 --a=1",
     ],
 )
 def test_star_args(app, cmd_str, assert_parse_args):

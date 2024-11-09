@@ -5,7 +5,7 @@ API
 ===
 
 .. autoclass:: cyclopts.App
-   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args
+   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args, assemble_argument_collection
    :special-members: __call__, __getitem__, __iter__
 
    Cyclopts Application.
@@ -14,35 +14,74 @@ API
       :type: Optional[Union[str, Iterable[str]]]
       :value: None
 
-      Name of application, or subcommand if registering to another application. Name fallback resolution:
+      Name of application, or subcommand if registering to another application. Name resolution order:
 
-      1. User specified ``name``.
-      2. If a ``default`` function has been registered, the name of that function.
+      1. User specified :attr:`~.App.name` parameter.
+      2. If a :attr:`~.App.default` function has been registered, the name of that function.
       3. If the module name is ``__main__.py``, the name of the encompassing package.
-      4. The value of ``sys.argv[0]``.
+      4. The value of ``sys.argv[0]``; i.e. the name of the python script.
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App()
+         app.command(App(name="foo"))
+
+         @app["foo"].command
+         def bar():
+             print("Running bar.")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script foo bar
+         Running bar.
 
    .. attribute:: help
       :type: Optional[str]
       :value: None
 
       Text to display on help screen.
+      If not supplied, fallbacks to parsing the docstring of function registered with :meth:`.App.default`.
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(help="This is my help string.")
+         app()
+
+      .. code-block::
+
+         $ my-script --help
+         Usage: scratch.py COMMAND
+
+         This is my help string.
+
+         ╭─ Commands ────────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                             │
+         │ --version  Display application version.                               │
+         ╰───────────────────────────────────────────────────────────────────────╯
 
    .. attribute:: help_flags
       :type: Union[str, Iterable[str]]
       :value: ("--help", "-h")
 
-      Tokens that trigger :meth:`help_print`.
-      Set to an empty list to disable help feature.
+      CLI flags that trigger :meth:`help_print`.
+      Set to an empty list to disable this feature.
       Defaults to ``["--help", "-h"]``.
-      Cannot be changed after instantiating the app.
 
    .. attribute:: help_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
 
-      The markup language of docstring function descriptions.
+      The markup language used in function docstring.
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
 
@@ -50,7 +89,7 @@ API
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
 
-      The markup language of the version string; used in :meth:`version_print`.
+      The markup language used in the version string.
       If :obj:`None`, fallback to parenting :attr:`~.App.version_format`.
       If no :attr:`~.App.version_format` is defined, falls back to resolved :attr:`~.App.help_format`.
 
@@ -65,15 +104,48 @@ API
       :type: bool
       :value: True
 
-      Show this command on the help screen.
+      Show this **command** on the help screen.
+      Hidden commands (``show=False``) are still executable.
+
+      .. code-block:: python
+
+         from cyclopts import App
+         app = App()
+
+         @app.command
+         def foo():
+            print("Running foo.")
+
+         @app.command(show=False)
+         def bar():
+            print("Running bar.")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script foo
+         Running foo.
+
+         $ my-script bar
+         Running bar.
+
+         $ my-script --help
+         Usage: scratch.py COMMAND
+
+         ╭─ Commands ─────────────────────────────────────────────────╮
+         │ foo                                                        │
+         │ --help -h  Display this message and exit.                  │
+         │ --version  Display application version.                    │
+         ╰────────────────────────────────────────────────────────────╯
 
    .. attribute:: version
       :type: Union[None, str, Callable]
       :value: None
 
-      Version to be displayed when a token of ``version_flags`` is parsed.
-      Defaults to attempting to using version of the package instantiating :class:`App`.
-      If a ``Callable``, it will be invoked with no arguments when version is queried.
+      Version to be displayed when a :attr:`version_flags` is parsed.
+      Defaults to the version of the package instantiating :class:`App`.
+      If a :obj:`~typing.Callable`, it will be invoked with no arguments when version is queried.
 
    .. attribute:: version_flags
       :type: Union[str, Iterable[str]]
@@ -82,13 +154,12 @@ API
       Token(s) that trigger :meth:`version_print`.
       Set to an empty list to disable version feature.
       Defaults to ``["--version"]``.
-      Cannot be changed after instantiating the app.
 
    .. attribute:: console
       :type: rich.console.Console
       :value: None
 
-      Default :class:`rich.console.Console` to use when displaying runtime errors.
+      Default :class:`rich.console.Console` to use when displaying runtime messages.
       Cyclopts console resolution is as follows:
 
       #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
@@ -102,17 +173,17 @@ API
       :value: None
 
       Default :class:`Parameter` configuration. Unspecified values of command-annotated :class:`Parameter` will inherit these values.
-      See :ref:`Parameter Resolution Order<Parameter Resolution Order>` for more details.
+      See :ref:`Default Parameter` for more details.
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
       :value: None
 
-      The group(s) that ``default_command`` belongs to.
+      The group(s) that :attr:`default_command` belongs to.
 
       * If :obj:`None`, defaults to the ``"Commands"`` group.
 
-      * If ``str``, use an existing Group (from neighboring sub-commands) with name,
+      * If :obj:`str`, use an existing :class:`Group` (from neighboring sub-commands) with name,
         **or** create a :class:`Group` with provided name if it does not exist.
 
       * If :class:`Group`, directly use it.
@@ -121,41 +192,25 @@ API
       :type: Group
       :value: Group("Commands")
 
-      The default group that sub-commands are assigned to.
+      The default :class:`Group` that sub-commands are assigned to.
 
    .. attribute:: group_arguments
       :type: Group
       :value: Group("Arguments")
 
-      The default group that positional-only parameters are assigned to.
+      The default :class:`Group` that positional-only parameters are assigned to.
 
    .. attribute:: group_parameters
       :type: Group
       :value: Group("Parameters")
 
-      The default group that non-positional-only parameters are assigned to.
-
-   .. attribute:: converter
-      :type: Optional[Callable]
-      :value: None
-
-      A function where all the converted CLI-provided variables will be keyword-unpacked,
-      regardless of their positional/keyword-type in the command function signature.
-      The python variable names will be used, which may differ from their CLI names.
-
-      .. code-block:: python
-
-          def converter(**kwargs) -> Dict[str, Any]:
-              "Return an updated dictionary."
-
-      The returned dictionary will be used passed along to the command invocation.
-      This converter runs **after** :class:`Parameter` and :class:`Group` converters.
+      The default :class:`Group` that non-positional-only parameters are assigned to.
 
    .. attribute:: validator
-      :type: Union[None, Callable, List[Callable]]
+      :type: Union[None, Callable, list[Callable]]
       :value: []
 
-      A function where all the converted CLI-provided variables will be keyword-unpacked,
+      A function (or list of functions) where all the converted CLI-provided variables will be **keyword-unpacked**,
       regardless of their positional/keyword-type in the command function signature.
       The python variable names will be used, which may differ from their CLI names.
 
@@ -167,8 +222,6 @@ API
              "Raise an exception if something is invalid."
 
       This validator runs **after** :class:`Parameter` and :class:`Group` validators.
-
-      The raised error message will be presented to the user with python-variables prepended with "--" remapped to their CLI counterparts.
 
    .. attribute:: name_transform
       :type: Optional[Callable[[str], str]]
@@ -183,20 +236,21 @@ API
          def name_transform(s: str) -> str:
              ...
 
-      If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
-      If a subapp, inherits from first non-:obj:`None` parent.
+      The returned string should be **without** a leading ``--``.
+      If :obj:`None` (default value), uses :func:`~.default_name_transform`.
+      Subapps inherit from the first non-:obj:`None` parent :attr:`name_transform`.
 
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
-      A function or list of functions that are consecutively applied to keyword arguments.
-      These function(s) are called before any additional conversion and validation.
-      Each function must have signature:
+      A function or list of functions that are consecutively executed after parsing CLI tokens and environment variables.
+      These function(s) are called **before** any conversion and validation.
+      Each config function must have signature:
 
       .. code-block:: python
 
-         def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
+         def config(apps: list["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
@@ -206,40 +260,140 @@ API
                 The current command app is the last element of this tuple.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
-             mapping: Dict[str, Union[Unset, List[str]]]
-                A dictionary mapping CLI keyword names to their tokens (before App and Group converters/validators have been invoked).
-                For example, if the user specifies --my-var=foo, then this dictionary will be {"my-var": ["foo"]}.
-                If the value is an cyclopts.config.Unset object, then no tokens have been parsed for that parameter yet.
-                Deleting keys from this dictionary will unset their value.
+             arguments: ArgumentCollection
+                Complete ArgumentCollection for the app.
+                Modify this collection inplace to influence values provided to the function.
              """
 
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
-      See :ref:`cyclopts.config <API Config>` for useful builtins.
+      See :ref:`cyclopts.config <API Config>` for useful builtins and :ref:`Config Files` for examples.
 
 
 .. autoclass:: cyclopts.Parameter
-
-   Cyclopts configuration for individual function parameters.
 
    .. attribute:: name
       :type: Union[None, str, Iterable[str]]
       :value: None
 
       Name(s) to expose to the CLI.
-      Defaults to the python parameter's name, prepended with ``--``.
-      Single-character options should start with ``-``.
-      Full-name options should start with ``--``.
+      If not specified, cyclopts will apply :attr:`name_transform` to the python parameter name.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(foo: Annotated[int, Parameter(name=("bar", "-b"))]):
+            print(f"{foo=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ─────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                      │
+         │ --version  Display application version.                        │
+         ╰────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ *  BAR --bar  -b  [required]                                   │
+         ╰────────────────────────────────────────────────────────────────╯
+
+         $ my-script --bar 100
+         foo=100
+
+         $ my-script -b 100
+         foo=100
+
+      If specifying name in a nested data structure (e.g. a dataclass), beginning the name with a hyphen ``-`` will override any hierarchical dot-notation.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from dataclasses import dataclass
+         from typing import Annotated
+
+         app = App()
+
+         @dataclass
+         class User:
+            id: int  # default behavior
+            email: Annotated[str, Parameter(name="--email")]  # overrides
+            pwd: Annotated[str, Parameter(name="password")]  # dot-notation with parent
+
+         @app.command
+         def create(user: User):
+            print(f"Creating {user=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script create --help
+         Usage: scratch.py create [ARGS] [OPTIONS]
+
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ *  USER.ID --user.id  [required]                               │
+         │ *  EMAIL --email      [required]                               │
+         │ *  USER.PASSWORD      [required]                               │
+         │      --user.password                                           │
+         ╰────────────────────────────────────────────────────────────────╯
 
    .. attribute:: converter
       :type: Optional[Callable]
       :value: None
 
-      A function that converts string token(s) into an object. The converter must have signature:
+      A function that converts tokens into an object. The converter should have signature:
 
       .. code-block:: python
 
-          def converter(type_, *args) -> Any:
+          def converter(type_, tokens) -> Any:
               pass
+
+      Where ``type_`` is the parameter's type hint, and ``tokens`` is either:
+
+      * A ``list[cyclopts.Token]`` of CLI tokens (most commonly).
+
+        .. code-block:: python
+
+           from cyclopts import App, Parameter
+           from typing import Annotated
+
+           app = App()
+
+           def converter(type_, tokens):
+              assert type_ == tuple[int, int]
+              return tuple(2 * int(x.value) for x in tokens)
+
+           @app.default
+           def main(coordinates: Annotated[tuple[int, int], Parameter(converter=converter)]):
+              print(f"{coordinates=}")
+
+           app()
+
+        .. code-block:: console
+
+           $ python my-script.py 7 12
+           coordinates=(14, 24)
+
+      * A ``dict`` of :class:`Token` if keys are specified in the CLI. E.g.
+
+        .. code-block:: console
+
+           $ python my-script.py --foo.key1=val1
+
+        would be parsed into:
+
+        .. code-block:: python
+
+           tokens = {
+              "key1": ["val1"],
+           }
 
       If not provided, defaults to Cyclopts's internal coercion engine.
 
@@ -247,7 +401,7 @@ API
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
 
-      A function (or list of functions) that validates data returned by the ``converter``.
+      A function (or list of functions) that validates data returned by the :attr:`converter`.
 
       .. code-block:: python
 
@@ -269,37 +423,66 @@ API
       2. Parenting :attr:`.App.group_parameters` otherwise.
          By default, this is ``Group("Parameters")``.
 
+      See :ref:`Groups` for examples.
+
    .. attribute:: negative
       :type: Union[None, str, Iterable[str]]
       :value: None
 
       Name(s) for empty iterables or false boolean flags.
-      For booleans, defaults to ``--no-{name}``.
-      For iterables, defaults to ``--empty-{name}``.
-      Set to an empty list to disable this feature.
+
+      * For booleans, defaults to ``no-{name}`` (see :attr:`negative_bool`).
+
+      * For iterables, defaults to ``empty-{name}`` (see :attr:`negative_iterable`).
+
+      Set to an empty list or string to disable the creation of negative flags.
+
+      Example usage:
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(*, verbose: Annotated[bool, Parameter(negative="--quiet")] = False):
+            print(f"{verbose=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ─────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                      │
+         │ --version  Display application version.                        │
+         ╰────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ --verbose --quiet  [default: False]                            │
+         ╰────────────────────────────────────────────────────────────────╯
 
    .. attribute:: negative_bool
       :type: Optional[str]
       :value: None
 
-      Prefix for negative boolean flags.
-      Must start with ``"--"``.
-      Defaults to ``"--no-"``.
+      Prefix for negative boolean flags. Defaults to ``"no-"``.
 
    .. attribute:: negative_iterable
       :type: Optional[str]
       :value: None
 
-      Prefix for empty iterables (like lists and sets) flags.
-      Must start with ``"--"``.
-      Defaults to ``"--empty-"``.
+      Prefix for empty iterables (like lists and sets) flags. Defaults to ``"empty-"``.
 
    .. attribute:: allow_leading_hyphen
       :type: bool
       :value: False
 
       Allow parsing non-numeric values that begin with a hyphen ``-``.
-      This is disabled by default, allowing for more helpful error messages for unknown CLI options.
+      This is disabled (:obj:`False`) by default, allowing for more helpful error messages for unknown CLI options.
 
    .. attribute:: parse
       :type: Optional[bool]
@@ -307,36 +490,34 @@ API
 
       Attempt to use this parameter while parsing.
       Annotated parameter **must** be keyword-only.
+      This is intended to be used with :ref:`meta apps <Meta App>` for injecting values.
 
    .. attribute:: required
       :type: Optional[bool]
       :value: None
 
-      Indicates that the parameter must be supplied on the help-page.
-      Does **not** directly enforce whether or not a parameter must be supplied; only influences the help-page.
-      Defaults to inferring from the function signature; i.e. ``False`` if the parameter has a default, ``True`` otherwise.
+      Indicates that the parameter must be supplied.
+      Defaults to inferring from the function signature; i.e. :obj:`False` if the parameter has a default, :obj:`True` otherwise.
 
    .. attribute:: show
       :type: Optional[bool]
       :value: None
 
       Show this parameter on the help screen.
-      If ``False``, state of all other ``show_*`` flags are ignored.
-      Defaults to ``parse`` value (``True``).
+      Defaults to :attr:`parse` value (default: :obj:`True`).
 
    .. attribute:: show_default
       :type: Optional[bool]
       :value: None
 
       If a variable has a default, display the default on the help page.
-      Defaults to :obj:`None`, similar to ``True``, but will not display the default if it's :obj:`None`.
+      Defaults to :obj:`None`, similar to :obj:`True`, but will not display the default if it's :obj:`None`.
 
    .. attribute:: show_choices
       :type: Optional[bool]
       :value: True
 
       If a variable has a set of choices, display the choices on the help page.
-      Defaults to ``True``.
 
    .. attribute:: help
       :type: Optional[str]
@@ -349,15 +530,14 @@ API
       :type: Optional[bool]
       :value: True
 
-      If a variable has ``env_var`` set, display the variable name on the help page.
-      Defaults to ``True``.
+      If a variable has :attr:`env_var` set, display the variable name on the help page.
 
    .. attribute:: env_var
       :type: Union[None, str, Iterable[str]]
       :value: None
 
       Fallback to environment variable(s) if CLI value not provided.
-      If multiple environment variables are given, the left-most environment variable with a set value will be used.
+      If multiple environment variables are given, the left-most environment variable **with a set value** will be used.
       If no environment variable is set, Cyclopts will fallback to the function-signature default.
 
    .. attribute:: env_var_split
@@ -369,25 +549,129 @@ API
 
       .. code-block:: python
 
-         def env_var_split(type_: type, val: str) -> List[str]:
+         def env_var_split(type_: type, val: str) -> list[str]:
              ...
 
       where ``type_`` is the associated parameter type-hint, and ``val`` is the environment value.
 
    .. attribute:: name_transform
-       :type: Optional[Callable[[str], str]]
-       :value: None
+      :type: Optional[Callable[[str], str]]
+      :value: None
 
-       A function that converts python parameter names to their CLI command counterparts.
+      A function that converts python parameter names to their CLI command counterparts.
 
-       The function must have signature:
+      The function must have signature:
 
-       .. code-block:: python
+      .. code-block:: python
 
-          def name_transform(s: str) -> str:
-              ...
+         def name_transform(s: str) -> str:
+             ...
 
-       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+      If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+
+   .. attribute:: accepts_keys
+      :type: Optional[bool]
+      :value: None
+
+      If ``False``, treat the user-defined class annotation similar to a tuple.
+      Individual class sub-parameters will not be addressable by CLI keywords.
+      The class will consume enough tokens to populate all required positional parameters.
+
+      Default behavior (``accepts_keys=True``):
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         class Image:
+            def __init__(self, path, label):
+               self.path = path
+               self.label = label
+
+            def __repr__(self):
+               return f"Image(path={self.path!r}, label={self.label!r})"
+
+         @app.default
+         def main(image: Image):
+            print(f"{image=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ──────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                           │
+         │ --version  Display application version.                             │
+         ╰─────────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ────────────────────────────────────────────────────────╮
+         │ *  IMAGE.PATH --image.path    [required]                            │
+         │ *  IMAGE.LABEL --image.label  [required]                            │
+         ╰─────────────────────────────────────────────────────────────────────╯
+
+         $ my-program foo.jpg nature
+         image=Image(path='foo.jpg', label='nature')
+
+         $ my-program --image.path foo.jpg --image.label nature
+         image=Image(path='foo.jpg', label='nature')
+
+      Behavior when ``accepts_keys=False``:
+
+      .. code-block:: python
+
+         # Modify the default command function's signature.
+         @app.default
+         def main(image: Annotated[Image, Parameter(accepts_keys=False)]):
+            print(f"{image=}")
+
+      .. code-block:: console
+
+         $ my-program --help
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Commands ──────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                           │
+         │ --version  Display application version.                             │
+         ╰─────────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ────────────────────────────────────────────────────────╮
+         │ *  IMAGE --image  [required]                                        │
+         ╰─────────────────────────────────────────────────────────────────────╯
+
+         $ my-program foo.jpg nature
+         image=Image(path='foo.jpg', label='nature')
+
+         $ my-program --image foo.jpg nature
+         image=Image(path='foo.jpg', label='nature')
+
+   .. attribute:: consume_multiple
+      :type: Optional[bool]
+      :value: None
+
+      When a parameter is **specified by keyword**, consume multiple elements worth of CLI tokens.
+      Will consume tokens until the stream is exhausted, or an and :attr:`.allow_leading_hyphen` is False
+      If ``False`` (default behavior), then only a single element worth of CLI tokens will be consumed.
+
+      .. code-block:: python
+
+         from cyclopts import App
+         from pathlib import Path
+
+         app = App()
+
+         @app.default
+         def rules(files: list[Path], ext: list[str] = []):
+            pass
+
+         app()
+
+      .. code-block:: console
+
+         $ cmd --ext .pdf --ext .html foo.md bar.md
 
    .. automethod:: combine
 
@@ -438,6 +722,10 @@ API
 
       .. code-block:: python
 
+         from cyclopts import App, Group
+
+         app = App()
+
          @app.command(group=Group("4", sort_key=5))
          def cmd1():
              pass
@@ -457,13 +745,13 @@ API
          def cmd4():
              pass
 
+         app()
+
       Resulting help-page:
 
       .. code-block:: bash
 
         Usage: app COMMAND
-
-        App Help String Line 1.
 
         ╭─ 4 ────────────────────────────────────────────────────────────────╮
         │ cmd1                                                               │
@@ -489,80 +777,76 @@ API
       Default :class:`Parameter` in the parameter-resolution-stack that goes between :attr:`.App.default_parameter` and the function signature's :obj:`Annotated` :class:`.Parameter`.
       The provided :class:`Parameter` is not allowed to have a :attr:`~Parameter.group` value.
 
-   .. attribute:: converter
-      :type: Optional[Callable]
-
-      A function where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature. The python variable names will be used, which may differ from their CLI names.
-
-      .. code-block:: python
-
-          def converter(**kwargs) -> Dict[str, Any]:
-              """Return an updated dictionary."""
-
-      The **python variable names will be used**, which may differ from their CLI names.
-      If a variable isn't populated from the CLI or environment variable, it will not be provided to the converter.
-      I.e. defaults from the function signature are **not** applied prior.
-
-      The returned dictionary will be used for subsequent execution.
-      Removing variables from the returned dictionary will unbind them.
-      When used with :meth:`@app.command <cyclopts.App.command>`, all function arguments are provided.
-
    .. attribute:: validator
       :type: Optional[Callable]
       :value: None
 
-      A function (or list of functions) where the CLI-provided group variables will be keyword-unpacked, regardless of their positional/keyword-type in the command function signature.
-      The **python variable names will be used**, which may differ from their CLI names.
+      A function (or list of functions) that validates an :class:`.ArgumentCollection`.
 
       Example usage:
 
       .. code-block:: python
 
-         def validator(**kwargs):
+         def validator(argument_collection: ArgumentCollection):
              "Raise an exception if something is invalid."
 
-      Validators are **not** invoked on command groups.
-      The group-validator runs **after** the group-converter.
+      Validators are **not** invoked for command groups.
 
-      The raised error message will be presented to the user with python-variables prepended with ``"--"`` remapped to their CLI counterparts.
+.. autoclass:: cyclopts.Token
 
-      In the following example, the python variable name ``"--bar"`` in the error message is remapped to ``"--buzz"``.
+   .. attribute:: keyword
+      :type: Optional[str]
+      :value: None
 
-      .. code-block:: python
+      **Unadulterated** user-supplied keyword like ``--foo`` or ``--foo.bar.baz``; ``None`` when token was pared positionally.
+      Could also be something like ``tool.project.foo`` if from non-cli sources.
 
-         from cyclopts import Parameter, App, Group
-         from typing import Annotated
+   .. attribute:: value
+      :type: str
+      :value: ""
 
-         app = App()
+      The parsed token value (unadulterated).
 
+   .. attribute:: source
+      :type: str
+      :value: ""
 
-         def upper_case_only(**kwargs):
-             for k, v in kwargs.items():
-                 if not v.isupper():
-                     raise ValueError(f'--{k} value "{v}" needs to be uppercase.')
+      Where the token came from; used for error message purposes.
+      Cyclopts uses the string ``cli`` for cli-parsed tokens.
 
+   .. attribute:: index
+      :type: int
+      :value: 0
 
-         group = Group("", validator=upper_case_only)
+      The relative positional index in which the value was provided.
 
+   .. attribute:: keys
+      :type: tuple[str, ...]
+      :value: ()
 
-         @app.default
-         def foo(
-             bar: Annotated[str, Parameter(name="--fizz", group=group)],
-             baz: Annotated[str, Parameter(name="--buzz", group=group)],
-         ):
-             pass
+      The additional parsed **python** variable keys from :attr:`keyword`.
 
+      Only used for Arguments that take arbitrary keys.
 
-         app()
+   .. attribute:: implicit_value
+      :type: Any
+      :value: cyclopts.UNSET
 
-      .. code-block:: console
+      Final value that should be used instead of converting from :attr:`value`.
 
-         $ python meow.py ALICE bob
-         ╭─ Error ─────────────────────────────────────────────────╮
-         │ --buzz value "bob" needs to be uppercase.               │
-         ╰─────────────────────────────────────────────────────────╯
+      Commonly used for boolean flags.
 
-.. autofunction:: cyclopts.convert
+      Ignored if :obj:`~.UNSET`.
+
+.. autoclass:: cyclopts.field_info.FieldInfo
+
+.. autoclass:: cyclopts.Argument
+   :members:
+
+.. autoclass:: cyclopts.ArgumentCollection
+   :members:
+
+.. autoclass:: cyclopts.UNSET
 
 .. autofunction:: cyclopts.default_name_transform
 
@@ -578,6 +862,9 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.LimitedChoice
    :members:
 
+.. autoclass:: cyclopts.validators.MutuallyExclusive
+   :members:
+
 .. autoclass:: cyclopts.validators.Number
    :members:
 
@@ -590,14 +877,14 @@ Cyclopts has several builtin validators for common CLI inputs.
 -----
 Types
 -----
-Cyclopts has builtin pre-defined annotated-types for common validation configurations.
-All definitions in this section are just predefined annotations for convenience:
+Cyclopts has builtin pre-defined annotated-types for common conversion and validation configurations.
+All definitions in this section are simply predefined annotations for convenience:
 
 .. code-block:: python
 
    Annotated[..., Parameter(...)]
 
-Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated. E.g:
+Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated to further configure behavior. E.g:
 
 .. code-block::
 
@@ -609,6 +896,7 @@ Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotati
 Path
 ^^^^
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
+All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``list[Path]``).
 
 .. autodata:: cyclopts.types.ExistingPath
 
@@ -638,6 +926,7 @@ Path
 Number
 ^^^^^^
 Annotated types for checking common int/float value constraints.
+All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]`` or ``list[float]``).
 
 .. autodata:: cyclopts.types.PositiveFloat
 
@@ -654,6 +943,25 @@ Annotated types for checking common int/float value constraints.
 .. autodata:: cyclopts.types.NegativeInt
 
 .. autodata:: cyclopts.types.NonPositiveInt
+
+.. autodata:: cyclopts.types.UInt8
+
+.. autodata:: cyclopts.types.Int8
+
+.. autodata:: cyclopts.types.UInt16
+
+.. autodata:: cyclopts.types.Int16
+
+.. autodata:: cyclopts.types.UInt32
+
+.. autodata:: cyclopts.types.Int32
+
+^^^^
+Json
+^^^^
+Annotated types for parsing a json-string from the CLI.
+
+.. autodata:: cyclopts.types.Json
 
 .. _API Config:
 
@@ -674,17 +982,16 @@ All Cyclopts builtins index into the configuration file with the following rules
    Automatically read configuration from Toml file.
 
    .. attribute:: path
-      :type: Union[str, Path]
+      :type: str | pathlib.Path
 
-      Path to the TOML configuration file.
+      Path to TOML configuration file.
 
    .. attribute:: root_keys
       :type: Iterable[str]
       :value: None
 
-      Keys that lead to your application's configuration.
-      For example, if referencing a ``pyproject.toml``, it is common
-      to store all of your projects configuration under:
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a ``pyproject.toml``, it is common to store all of your projects configuration under:
 
       .. code-block:: toml
 
@@ -700,52 +1007,87 @@ All Cyclopts builtins index into the configuration file with the following rules
       :type: bool
       :value: False
 
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+      The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
 
    .. attribute:: search_parents
       :type: bool
       :value: False
 
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Toml.path` is found.
+      If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+      Raises :class:`FileNotFoundError` if no configuration file is found.
 
    .. attribute:: allow_unknown
       :type: bool
       :value: False
 
-      Allow unknown keywords configuration values.
+      Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
+   .. attribute:: use_commands_as_keys
+      :type: bool
+      :value: True
+
+      Use the sequence of commands as keys into the configuration.
+
+      For example, the following CLI invocation:
+
+      .. code-block:: console
+
+          $ python my-script.py my-command
+
+      Would search into ``["my-command"]`` for values.
 
 .. autoclass:: cyclopts.config.Yaml
 
-   Automatically read configuration from Yaml file.
+   Automatically read configuration from YAML file.
 
    .. attribute:: path
-      :type: Union[str, Path]
+      :type: str | pathlib.Path
 
-      Path to the YAML configuration file.
+      Path to YAML configuration file.
 
    .. attribute:: root_keys
       :type: Iterable[str]
       :value: None
 
-      Keys that lead to your application's configuration in the YAML file.
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a common ``config.yaml`` that is shared with other applications, it is common to store your projects configuration under a key like ``myproject:``.
+
+      Your Cyclopts :class:`~cyclopts.App` would be configured as:
+
+      .. code-block:: python
+
+         app = cyclopts.App(config=cyclopts.config.Yaml("config.yaml", root_keys="myproject"))
 
    .. attribute:: must_exist
       :type: bool
       :value: False
 
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+      The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
 
    .. attribute:: search_parents
       :type: bool
       :value: False
 
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Yaml.path` is found.
+      If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+      Raises :class:`FileNotFoundError` if no configuration file is found.
 
    .. attribute:: allow_unknown
       :type: bool
       :value: False
 
-      Allow unknown keywords configuration values.
+      Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
+   .. attribute:: use_commands_as_keys
+      :type: bool
+      :value: True
+
+      Use the sequence of commands as keys into the configuration.
+
+      For example, the following CLI invocation:
+
+      .. code-block:: console
+
+          $ python my-script.py my-command
+
+      Would search into ``["my-command"]`` for values.
 
 
 .. autoclass:: cyclopts.config.Json
@@ -753,33 +1095,55 @@ All Cyclopts builtins index into the configuration file with the following rules
    Automatically read configuration from Json file.
 
    .. attribute:: path
-      :type: Union[str, Path]
+      :type: str | pathlib.Path
 
-      Path to the JSON configuration file.
+      Path to JSON configuration file.
 
    .. attribute:: root_keys
       :type: Iterable[str]
       :value: None
 
-      Keys that lead to your application's configuration in the YAML file.
+      The key or sequence of keys that lead to the root configuration structure for this app.
+      For example, if referencing a common ``config.json`` that is shared with other applications, it is common to store your projects configuration under a key like ``"myproject":``.
+
+      Your Cyclopts :class:`~cyclopts.App` would be configured as:
+
+      .. code-block:: python
+
+         app = cyclopts.App(config=cyclopts.config.Json("config.json", root_keys="myproject"))
 
    .. attribute:: must_exist
       :type: bool
       :value: False
 
-      The configuration file must exist. If a matching file is not found, raises :exc:`FileNotFoundError`.
+      The configuration file MUST exist. Raises :class:`FileNotFoundError` if it does not exist.
 
    .. attribute:: search_parents
       :type: bool
       :value: False
 
-      Iteratively search parenting directories until a file matching :attr:`~cyclopts.config.Json.path` is found.
+      If ``path`` doesn't exist, iteratively search parenting directories for a same-named configuration file.
+      Raises :class:`FileNotFoundError` if no configuration file is found.
 
    .. attribute:: allow_unknown
       :type: bool
       :value: False
 
-      Allow unknown keywords configuration values.
+      Allow for unknown keys. Otherwise, if an unknown key is provided, raises :class:`UnknownOptionError`.
+   .. attribute:: use_commands_as_keys
+      :type: bool
+      :value: True
+
+      Use the sequence of commands as keys into the configuration.
+
+      For example, the following CLI invocation:
+
+      .. code-block:: console
+
+          $ python my-script.py my-command
+
+      Would search into ``["my-command"]`` for values.
+
 
 .. autoclass:: cyclopts.config.Env
 
@@ -793,11 +1157,9 @@ All Cyclopts builtins index into the configuration file with the following rules
 
       app = cyclopts.App(config=cyclopts.config.Env("MY_SCRIPT_"))
 
-
       @app.command
       def my_command(foo, bar):
           print(f"{foo=} {bar=}")
-
 
       app()
 
@@ -827,14 +1189,13 @@ All Cyclopts builtins index into the configuration file with the following rules
       :type: bool
       :value: True
 
+      If :obj:`True`, add the command's name (uppercase) after :attr:`prefix`.
+
    .. attribute:: split
       :type: Callable
       :value: cyclopts.env_var_split
 
       Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
-
-.. autoclass:: cyclopts.config.Unset
-   :members: related_set
 
 ----------
 Exceptions
@@ -865,6 +1226,14 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.MissingArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.RepeatArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.MixedArgumentError
    :show-inheritance:
    :members:
 

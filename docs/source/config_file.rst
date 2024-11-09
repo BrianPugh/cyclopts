@@ -1,12 +1,14 @@
+.. _Config Files:
+
 ============
 Config Files
 ============
-For more complicated CLI applications, it is common to have an external user configuration file. For example, the popular python tools ``poetry``, ``ruff``, and ``pytest`` are all configurable from a ``pyproject.toml`` file. The :attr:`App.config <cyclopts.App.config>` attribute accepts a callable (or list of callables) that add (or remove) values to the parsed CLI tokens. The provided callable must have signature:
+For more complicated CLI applications, it is common to have an external user configuration file. For example, the popular python tools ``poetry``, ``ruff``, and ``pytest`` are all configurable from a ``pyproject.toml`` file. The :attr:`App.config <cyclopts.App.config>` attribute accepts a `callable <https://docs.python.org/3/glossary.html#term-callable>`_ (or list of callables) that add (or remove) values to the parsed CLI tokens. The provided callable must have signature:
 
 .. code-block:: python
 
-   def config(apps: Tuple[App, ...], commands: Tuple[str, ...], mapping: Dict[str, Union[Unset, List[str]]]):
-       """Modifies given mapping inplace with some injected values.
+   def config(apps: List["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
+       """Modifies the argument collection inplace with some injected values.
 
        Parameters
        ----------
@@ -15,15 +17,13 @@ For more complicated CLI applications, it is common to have an external user con
           The current command app is the last element of this tuple.
        commands: Tuple[str, ...]
           The CLI strings that led to the current command function.
-       mapping: Dict[str, Union[Unset, List[str]]]
-          A dictionary mapping CLI keyword names to their tokens (before App and Group converters/validators have been invoked).
-          For example, if the user specifies --my-var=foo, then this dictionary will be {"my-var": ["foo"]}.
-          If the value is an cyclopts.config.Unset object, then no tokens have been parsed for that parameter yet.
-          Deleting keys from this dictionary will unset their value.
+       arguments: ArgumentCollection
+          Complete ArgumentCollection for the app.
+          Modify this collection inplace to influence values provided to the function.
        """
        ...
 
-The provided ``config`` does not have to be a function; all the Cyclopts builtin configs are classes that implement the ``__call__`` method. The Cyclopts builtins offer good standard functionality for common configuration files like yaml or toml. See :ref:`cyclopts.config <API Config>`.
+The provided ``config`` does not have to be a function; all the Cyclopts builtin configs are classes that implement the ``__call__`` method. The Cyclopts builtins offer good standard functionality for common configuration files like yaml or toml.
 
 ------------
 TOML Example
@@ -47,14 +47,11 @@ In this example, we create a small CLI tool that counts the number of times a gi
        ),
    )
 
-
    @app.command
    def count(filename: Path, *, character="-"):
        print(filename.read_text().count(character))
 
-
-   if __name__ == "__main__":
-       app()
+   app()
 
 Running this code without a ``pyproject.toml`` present:
 
@@ -98,14 +95,11 @@ To automatically derive and read appropriate environment variables, use the :cla
        ),
    )
 
-
    @app.command
    def count(filename: Path, *, character="-"):
        print(filename.read_text().count(character))
 
-
-   if __name__ == "__main__":
-       app()
+   app()
 
 :class:`~cyclopts.config.Env` assembles the environment variable name by joining the following components (in-order):
 

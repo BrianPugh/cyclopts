@@ -6,9 +6,6 @@ Cyclopts
    :parser: myst_parser.sphinx_
 
 
----
-API
----
 For extensive documentation on all the features Cyclopts has to offer, checkout the :ref:`API` page.
 
 .. toctree::
@@ -33,13 +30,13 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    :maxdepth: 2
    :caption: Advanced Usage
 
+   user_classes.rst
    args_and_kwargs.rst
    config_file.rst
    packaging.rst
    app_calling.rst
    meta_app.rst
    command_chaining.rst
-   pydantic.rst
    autoregistry
 
 .. toctree::
@@ -48,7 +45,6 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
 
    cookbook/app_upgrade.rst
    cookbook/interactive_help.rst
-   cookbook/pyproject.rst
    cookbook/rich_formatted_exceptions.rst
 
 .. toctree::

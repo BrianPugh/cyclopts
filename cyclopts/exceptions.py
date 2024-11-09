@@ -1,26 +1,18 @@
 import inspect
-import re
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Type,
-)
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Sequence, get_args, get_origin
 
 from attrs import define, field
 
 import cyclopts.utils
+from cyclopts.annotations import get_hint_name
 from cyclopts.group import Group
-from cyclopts.utils import ParameterDict
+from cyclopts.token import Token
 
 if TYPE_CHECKING:
     from rich.console import Console
 
+    from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
 
 
@@ -31,6 +23,7 @@ __all__ = [
     "DocstringError",
     "InvalidCommandError",
     "MissingArgumentError",
+    "MixedArgumentError",
     "RepeatArgumentError",
     "UnknownOptionError",
     "UnusedCliTokensError",
@@ -58,8 +51,8 @@ class DocstringError(Exception):
 class CycloptsError(Exception):
     """Root exception for runtime errors.
 
-    As CycloptsErrors bubble up the Cyclopts stack, more information is added to it.
-    Finally, :func:`cyclopts.exceptions.format_cyclopts_error` formats the message nicely for the user.
+    As CycloptsErrors bubble up the Cyclopts call-stack, more information is added to it.
+    Finally, :meth:`format_cyclopts_error` formats the message nicely for the user.
     """
 
     msg: Optional[str] = None
@@ -73,12 +66,12 @@ class CycloptsError(Exception):
     Defaults to ``False``.
     """
 
-    root_input_tokens: Optional[List[str]] = None
+    root_input_tokens: Optional[list[str]] = None
     """
     The parsed CLI tokens that were initially fed into the :class:`App`.
     """
 
-    unused_tokens: Optional[List[str]] = None
+    unused_tokens: Optional[list[str]] = None
     """
     Leftover tokens after parsing is complete.
     """
@@ -88,17 +81,12 @@ class CycloptsError(Exception):
     The python function associated with the command being parsed.
     """
 
-    cli2parameter: Optional[Dict[str, Tuple[inspect.Parameter, Any]]] = None
+    argument: Optional["Argument"] = None
     """
-    Dictionary mapping CLI strings to python parameters.
-    """
-
-    parameter2cli: Optional[ParameterDict] = None
-    """
-    Dictionary mapping function parameters to possible CLI tokens.
+    :class:`Argument` that was matched.
     """
 
-    command_chain: Optional[Iterable[str]] = None
+    command_chain: Optional[Sequence[str]] = None
     """
     List of command that lead to ``target``.
     """
@@ -134,115 +122,139 @@ class CycloptsError(Exception):
         else:
             return ""
 
-    def _find_and_replace(self, s: str) -> str:
-        """Replaces all instances of "--python-variable-name" with "--cli-variable-name"."""
-        if self.parameter2cli is None:
-            return s
-        for p, names in self.parameter2cli.items():
-            pattern = rf"--\b{re.escape(p.name)}\b(?=\W|$)"
-            replacement = names[0]
-            s = re.sub(pattern, replacement, s)
-        return s
-
 
 @define(kw_only=True)
 class ValidationError(CycloptsError):
     """Validator function raised an exception."""
 
-    value: str
+    exception_message: str = ""
     """Parenting Assertion/Value/Type Error message."""
 
-    parameter: Optional[inspect.Parameter] = None
-    """Parameter who's ``validator`` function failed."""
-
     group: Optional[Group] = None
-    """Group who's ``validator`` function failed."""
+    """If a group validator caused the exception."""
+
+    value: Any = cyclopts.utils.UNSET
+    """Converted value that failed validation."""
 
     def __str__(self):
-        # Either parameter or group must be set (but not both!)
-        assert bool(self.parameter) is not bool(self.group)
-
-        if self.parameter:
-            assert self.parameter2cli is not None
-            # TODO: The displayed ``parameter_cli_name`` may not match the actual offending
-            # cli --option token provided (i.e. aliases).
-            # It would be much nicer to directly get the offending raw cli --option token.
-            parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-            return super().__str__() + f'Invalid value for "{parameter_cli_name}". {self.value}'
+        message = ""
+        if self.argument:
+            value = self.argument.value if self.value is cyclopts.utils.UNSET else self.value
+            token = self.argument.tokens[0]
+            provided_by = "" if not token.source or token.source == "cli" else f' provided by "{token.source}"'
+            name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
+            message = f'Invalid value "{value}" for "{name}"{provided_by}.'
         elif self.group:
-            # TODO: it would be much nicer to directly get the offending raw cli --option token(s).
-            # However, this information is not available to the validator, so it's a bit hopeless.
-            self.value = self._find_and_replace(self.value)
-            return super().__str__() + f'Invalid values for group "{self.group}". {self.value}'
+            if self.group.name:
+                message = f'Invalid values for group "{self.group.name}".'
+        elif self.command_chain:
+            message = f"Invalid values for command {self.command_chain[-1]!r}."
         else:
             raise NotImplementedError
+
+        if self.exception_message:
+            return f"{super().__str__()}{message} {self.exception_message}"
+        else:
+            return f"{super().__str__()}{message}"
 
 
 @define(kw_only=True)
 class UnknownOptionError(CycloptsError):
-    """Unknown/unregistered option provided by the cli."""
+    """Unknown/unregistered option provided by the cli.
 
-    token: str
+    A nearest-neighbor parameter suggestion may be printed.
+    """
+
+    token: Token
+    """Token without a matching parameter."""
+
+    argument_collection: "ArgumentCollection"
+    """Argument collection of plausible options."""
 
     def __str__(self):
-        return super().__str__() + f'Unknown option: "{self.token}".'
+        value = self.token.keyword or self.token.value
+        if self.token.source == "cli":
+            response = f'Unknown option: "{value}".'
+        else:
+            response = f'Unknown option: "{value}" from "{self.token.source}".'
+
+        if keyword := self.token.keyword or self.token.value:
+            import difflib
+
+            candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x._assignable))
+
+            close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.6)
+            if close_matches:
+                response += f' Did you mean "{close_matches[0]}"?'
+
+        return super().__str__() + response
 
 
 @define(kw_only=True)
 class CoercionError(CycloptsError):
     """There was an error performing automatic type coercion."""
 
-    input_value: str = ""
+    token: Optional["Token"] = None
     """
-    String input token that couldn't be coerced.
+    Input token that couldn't be coerced.
     """
 
-    target_type: Optional[Type] = None
+    target_type: Optional[type] = None
     """
     Intended type to coerce into.
     """
 
-    parameter: Optional[inspect.Parameter] = None
-
     def __str__(self):
-        if self.parameter:
-            assert self.parameter2cli is not None
-            parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
+        assert self.argument is not None
+        assert self.target_type is not None
 
         if self.msg is not None:
-            if self.parameter:
-                return f"{parameter_cli_name}: " + self.msg  # pyright: ignore[reportPossiblyUnboundVariable]
-            else:
+            if not self.token or self.token.keyword is None:
                 return self.msg
+            else:
+                return f"Invalid value for {self.token.keyword}: {self.msg}"
 
-        response = f'Error converting value "{self.input_value}"'
+        msg = super().__str__()
 
-        if self.target_type is not None:
-            target_type = str(self.target_type).lstrip("typing.")  # lessens the verbosity a little bit.
-            response += f" to {target_type}"
+        if get_origin(self.target_type) is Literal:
+            choices = "{" + ", ".join(repr(x) for x in get_args(self.target_type)) + "}"
+            target_type_name = f"one of {choices}"
+        else:
+            target_type_name = get_hint_name(self.target_type)
 
-        if self.parameter:
-            response += f' for "{parameter_cli_name}"'  # pyright: ignore[reportPossiblyUnboundVariable]
+        if not self.token:
+            msg += f'Invalid value for "{self.argument.name}": unable to convert value to {target_type_name}.'
+        elif self.token.keyword is None:
+            positional_name = self.argument.name.lstrip("-").upper()
+            if self.token.source == "" or self.token.source == "cli":
+                msg += f'Invalid value for "{positional_name}": unable to convert "{self.token.value}" into {target_type_name}.'
+            else:
+                msg += f'Invalid value for "{positional_name}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
+        else:
+            if self.token.source == "" or self.token.source == "cli":
+                msg += f'Invalid value for "{self.token.keyword}": unable to convert "{self.token.value}" into {target_type_name}.'
+            else:
+                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
 
-        return super().__str__() + response + "."
+        return msg
 
 
 class InvalidCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
 
     def __str__(self):
-        import difflib
-
         assert self.unused_tokens
         token = self.unused_tokens[0]
-        response = super().__str__() + f'Unable to interpret valid command from "{token}".'
+        response = f'Unknown command "{token}".'
 
         if self.app and self.app._commands:
-            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.8)
+            import difflib
+
+            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.6)
             if close_matches:
                 response += f' Did you mean "{close_matches[0]}"?'
 
-        return response
+        return super().__str__() + response
 
 
 @define(kw_only=True)
@@ -256,22 +268,15 @@ class UnusedCliTokensError(CycloptsError):
 
 @define(kw_only=True)
 class MissingArgumentError(CycloptsError):
-    """A parameter had insufficient tokens to be populated."""
+    """A required argument was not provided."""
 
-    parameter: inspect.Parameter
-    """
-    The parameter that failed to parse.
-    """
-
-    tokens_so_far: List[str] = field(factory=list)
-    """
-    The tokens that were parsed so far for this Parameter.
-    """
+    tokens_so_far: list[str] = field(factory=list)
+    """If the matched parameter requires multiple tokens, these are the ones we have parsed so far."""
 
     def __str__(self):
-        from cyclopts._convert import token_count
-
-        count, _ = token_count(self.parameter)
+        assert self.argument is not None
+        strings = []
+        count, _ = self.argument.token_count()
         if count == 0:
             required_string = "flag required"
             only_got_string = ""
@@ -283,16 +288,12 @@ class MissingArgumentError(CycloptsError):
             received_count = len(self.tokens_so_far) % count
             only_got_string = f" Only got {received_count}." if received_count else ""
 
-        assert self.parameter2cli is not None
-        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-
-        strings = []
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{parameter_cli_name}" {required_string}.{only_got_string}'
+                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.names[0]}" {required_string}.{only_got_string}'
             )
         else:
-            strings.append(f'Parameter "{parameter_cli_name}" {required_string}.{only_got_string}')
+            strings.append(f'Parameter "{self.argument.names[0]}" {required_string}.{only_got_string}')
 
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")
@@ -304,15 +305,44 @@ class MissingArgumentError(CycloptsError):
 class RepeatArgumentError(CycloptsError):
     """The same parameter has erroneously been specified multiple times."""
 
-    parameter: inspect.Parameter
-    """
-    The repeated parameter.
-    """
+    token: "Token"
+    """The repeated token."""
 
     def __str__(self):
-        assert self.parameter2cli is not None
-        parameter_cli_name = ",".join(self.parameter2cli[self.parameter])
-        return super().__str__() + f"Parameter {parameter_cli_name} specified multiple times."
+        return super().__str__() + f"Parameter {self.token.keyword} specified multiple times."
+
+
+@define(kw_only=True)
+class ArgumentOrderError(CycloptsError):
+    """Cannot supply a POSITIONAL_OR_KEYWORD argument with a keyword, and then a later POSITIONAL_OR_KEYWORD argument positionally."""
+
+    token: str
+    prior_positional_or_keyword_supplied_as_keyword_arguments: list["Argument"]
+
+    def __str__(self):
+        assert self.argument is not None
+        plural = len(self.prior_positional_or_keyword_supplied_as_keyword_arguments) > 1
+        display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name).lstrip("-")
+        prior_display_names = [
+            x.tokens[0].keyword for x in self.prior_positional_or_keyword_supplied_as_keyword_arguments
+        ]
+        if len(prior_display_names) == 1:
+            prior_display_names = prior_display_names[0]
+
+        return (
+            super().__str__()
+            + f"Cannot specify token {self.token!r} positionally for parameter {display_name!r} due to previously specified keyword{'s' if plural else ''} {prior_display_names!r}. {prior_display_names!r} must either be passed positionally, or {self.token!r} must be passed as a keyword to {self.argument.name!r}."
+        )
+
+
+@define(kw_only=True)
+class MixedArgumentError(CycloptsError):
+    """Cannot supply keywords and non-keywords to the same argument."""
+
+    def __str__(self):
+        assert self.argument is not None
+        display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
+        return super().__str__() + f'Cannot supply keyword & non-keyword arguments to "{display_name}".'
 
 
 def format_cyclopts_error(e: Any):

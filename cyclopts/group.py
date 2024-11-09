@@ -1,21 +1,20 @@
 import itertools
+from collections.abc import Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Iterable,
-    List,
     Optional,
-    Tuple,
     Union,
     cast,
 )
 
-from attrs import define, field
+from attrs import field, frozen
 
-from cyclopts.utils import Sentinel, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import Sentinel, is_iterable, to_tuple_converter
 
 if TYPE_CHECKING:
+    from cyclopts.argument import ArgumentCollection
     from cyclopts.parameter import Parameter
 
 
@@ -35,7 +34,7 @@ class NO_USER_SORT_KEY(Sentinel):  # noqa: N801
     pass
 
 
-@define
+@frozen
 class Group:
     name: str = ""
 
@@ -48,15 +47,16 @@ class Group:
         default=None,
         alias="sort_key",
         converter=lambda x: NO_USER_SORT_KEY if x is None else x,
+        kw_only=True,
     )
 
-    converter: Optional[Callable] = field(default=None, kw_only=True)
-
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable, Iterable[Callable]] = field(
-        default=None,
-        converter=lambda x: cast(Tuple[Callable, ...], to_tuple_converter(x)),
-        kw_only=True,
+    validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]] = (
+        field(
+            default=None,
+            converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+            kw_only=True,
+        )
     )
 
     default_parameter: Optional["Parameter"] = field(
@@ -65,24 +65,13 @@ class Group:
         kw_only=True,
     )
 
-    def __str__(self):
-        return self.name
-
     @property
     def show(self):
         return bool(self.name) if self._show is None else self._show
 
-    @show.setter
-    def show(self, value):
-        self._show = value
-
     @property
     def sort_key(self):
         return None if self._sort_key is NO_USER_SORT_KEY else self._sort_key
-
-    @sort_key.setter
-    def sort_key(self, value):
-        self._sort_key = value
 
     @classmethod
     def create_default_arguments(cls):
@@ -97,12 +86,30 @@ class Group:
         return cls("Commands")
 
     @classmethod
-    def create_ordered(cls, *args, sort_key=None, **kwargs):
-        """Create a group with a globally incremented :attr:`~Group.sort_key`.
+    def create_ordered(cls, name="", help="", *, show=None, sort_key=None, validator=None, default_parameter=None):
+        """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
-        Used to create a group that will be displayed **after** a previously declared :meth:`Group.create_ordered` group on the help-page.
+        Used to create a group that will be displayed **after** a previously instantiated :meth:`Group.create_ordered` group on the help-page.
 
-        If a :attr:`~Group.sort_key` is provided, it is **prepended** to the globally incremented counter value (i.e. has priority during sorting).
+        Parameters
+        ----------
+        name: str
+            Group name used for the help-page and for group-referenced-by-string.
+            This is a title, so the first character should be capitalized.
+            If a name is not specified, it will not be shown on the help-page.
+        help: str
+            Additional documentation shown on the help-page.
+            This will be displayed inside the group's panel, above the parameters/commands.
+        show: Optional[bool]
+            Show this group on the help-page.
+            Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
+        sort_key: Any
+            If provided, **prepended** to the globally incremented counter value (i.e. has priority during sorting).
+
+        validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]]
+            Group validator to collectively apply.
+        default_parameter: Optional[cyclopts.Parameter]
+            Default parameter for elements within the group.
         """
         count = next(_sort_key_counter)
         if sort_key is None:
@@ -111,25 +118,17 @@ class Group:
             sort_key = (tuple(sort_key), count)
         else:
             sort_key = (sort_key, count)
-        return cls(*args, sort_key=sort_key, **kwargs)
+        return cls(
+            name,
+            help,
+            show=show,
+            sort_key=sort_key,
+            validator=validator,
+            default_parameter=default_parameter,
+        )
 
 
-@define
-class GroupConverter:
-    default_group: Group
-
-    def __call__(self, input_value: Union[None, str, Group]) -> Group:
-        if input_value is None:
-            return self.default_group
-        elif isinstance(input_value, str):
-            return Group(input_value)
-        elif isinstance(input_value, Group):
-            return input_value
-        else:
-            raise TypeError
-
-
-def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group], List[Any]]:
+def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group], list[Any]]:
     """Sort groups for the help-page."""
     assert len(groups) == len(attributes)
     if not groups:
@@ -144,9 +143,9 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
         else:
             sort_key__group_attributes.append((group._sort_key, value))
 
-    sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
-    ordered_no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
-    no_user_sort_key_panels: List[Tuple[Tuple, Tuple[Group, Any]]] = []
+    sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
+    ordered_no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
+    no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
 
     for sort_key, (group, attribute) in sort_key__group_attributes:
         value = (group, attribute)
@@ -166,3 +165,24 @@ def sort_groups(groups: List[Group], attributes: List[Any]) -> Tuple[List[Group]
     out_groups, out_attributes = zip(*[x[1] for x in combined])
 
     return list(out_groups), list(out_attributes)
+
+
+def resolve_callables(t, *args, **kwargs):
+    """Recursively resolves callable elements in a tuple."""
+    if isinstance(t, type(Sentinel)):
+        return t
+
+    if callable(t):
+        return t(*args, **kwargs)
+
+    resolved = []
+    for element in t:
+        if isinstance(element, type(Sentinel)):
+            resolved.append(element)
+        elif callable(element):
+            resolved.append(element(*args, **kwargs))
+        elif is_iterable(element):
+            resolved.append(resolve_callables(element, *args, **kwargs))
+        else:
+            resolved.append(element)
+    return tuple(resolved)

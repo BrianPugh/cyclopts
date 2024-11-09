@@ -42,9 +42,8 @@ def test_bind_tuple_nested(app, cmd_str, assert_parse_args):
     "cmd_str",
     [
         "1 2 alice 100 bob 200",
-        "--coordinates 1 2 --data alice 100 bob 200",
+        "--coordinates 1 2 --data alice 100 --data bob 200",
         "--data alice 100 --coordinates 1 2 --data bob 200",
-        "--data alice 100 bob 200 --coordinates 1 2",
     ],
 )
 def test_bind_tuple_ellipsis(app, cmd_str, assert_parse_args):
@@ -59,8 +58,7 @@ def test_bind_tuple_ellipsis(app, cmd_str, assert_parse_args):
     "cmd_str",
     [
         "1 2 3",
-        "1 2 --values 3",
-        "--values 1 2 3",
+        "--values 1 --values 2 --values 3",
     ],
 )
 def test_bind_tuple_no_inner_types(app, cmd_str, assert_parse_args):
@@ -95,7 +93,6 @@ def test_bind_tuple_insufficient_tokens(app, cmd_str):
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "1 2 --coordinates 3 4 --color 80 160 255",
         "--coordinates 1 2 --color 80 160 255 --coordinates 3 4",
         "--coordinates 1 2 --coordinates 3 4 --color 80 160 255",
         "1 2 3 4 --color 80 160 255",

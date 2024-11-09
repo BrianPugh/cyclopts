@@ -15,15 +15,15 @@ To achieve this in Typer, we need the following `bulky implementation`_:
 
 .. code-block:: python
 
+   import typer
+   from typing import Annotated
+
    typer_app = typer.Typer()
 
-
    def version_callback(value: bool):
-       if not value:
-           return
-       print("1.2.3")
-       raise typer.Exit()
-
+       if value:
+           print("1.2.3")
+           raise typer.Exit()
 
    @typer_app.callback()
    def common(
@@ -31,14 +31,12 @@ To achieve this in Typer, we need the following `bulky implementation`_:
            bool,
            typer.Option(
                "--version",
-               "-v",
                callback=version_callback,
                help="Print version.",
            ),
        ] = False,
    ):
        print("Callback body executed.")
-
 
    print("Typer:")
    typer_app(["--version"])
@@ -55,6 +53,8 @@ If you prefer explicitness, :attr:`~.App.version` can also be explicitly supplie
 
 
 .. code-block:: python
+
+   import cyclopts
 
    cyclopts_app = cyclopts.App(version="1.2.3")
    cyclopts_app(["--version"])

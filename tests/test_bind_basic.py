@@ -1,11 +1,11 @@
-import inspect
 import sys
-from typing import Any, Optional
+from typing import Annotated, Any, Optional
 
 import pytest
 
 from cyclopts import Parameter
 from cyclopts.exceptions import (
+    ArgumentOrderError,
     CoercionError,
     InvalidCommandError,
     MissingArgumentError,
@@ -14,20 +14,24 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
+
+def test_parse_known_args(app):
+    @app.command
+    def foo(a: int, b: int):
+        pass
+
+    command, _, unused_tokens, ignored = app.parse_known_args("foo 1 2 --bar 100")
+    assert ignored == {}
+    assert command == foo
+    assert unused_tokens == ["--bar", "100"]
 
 
 @pytest.mark.parametrize(
     "cmd_str",
     [
-        "foo 1 --b=2 3",
         "foo 1 2 3",
+        "foo 1 2 --c=3",
         "foo --a 1 --b 2 --c 3",
-        "foo --c 3 1 2",
-        "foo --c 3 --b=2 1",
         "foo --c 3 --b=2 --a 1",
     ],
 )
@@ -43,16 +47,34 @@ def test_basic_1(app, cmd_str, assert_parse_args):
     "cmd_str",
     [
         "foo 1 2 3 --d 10 --some-flag",
-        "foo --some-flag 1 --b=2 3 --d 10",
+        "foo --some-flag 1 --b=2 --c 3 --d 10",
         "foo 1 2 --some-flag 3 --d 10",
     ],
 )
 def test_basic_2(app, cmd_str, assert_parse_args):
     @app.command
-    def foo(a: int, b: int, c: int, d: int = 5, some_flag: bool = False):
+    def foo(a: int, b: int, c: int, d: int = 5, *, some_flag: bool = False):
         pass
 
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
+
+
+def test_basic_allow_hyphen_or_underscore(app, assert_parse_args):
+    @app.default
+    def default(foo_bar):
+        pass
+
+    assert_parse_args(default, "--foo-bar=bazz", "bazz")
+    assert_parse_args(default, "--foo_bar=bazz", "bazz")
+
+
+def test_out_of_order_mixed_positional_or_keyword(app, assert_parse_args):
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with pytest.raises(ArgumentOrderError):
+        app.parse_args("foo --b=5 1 2", print_error=False, exit_on_error=False)
 
 
 def test_command_rename(app, assert_parse_args):
@@ -94,6 +116,22 @@ def test_command_multiple_alias(app, assert_parse_args):
 def test_multiple_names(app, cmd_str, assert_parse_args):
     @app.command
     def foo(age: Annotated[int, Parameter(name=["--age", "--duration", "-a"])]):
+        pass
+
+    assert_parse_args(foo, cmd_str, age=10)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo --age 10",
+        "foo --duration 10",
+        "foo -a 10",
+    ],
+)
+def test_multiple_names_no_hyphen(app, cmd_str, assert_parse_args):
+    @app.command
+    def foo(age: Annotated[int, Parameter(name=["age", "duration", "-a"])]):
         pass
 
     assert_parse_args(foo, cmd_str, age=10)
@@ -344,7 +382,8 @@ def test_bind_override_app_groups(app):
 
 def test_bind_version(app, capsys):
     app.version = "1.2.3"
-    actual_command, actual_bind = app.parse_args("--version")
+    actual_command, actual_bind, ignored = app.parse_args("--version")
+    assert ignored == {}
     assert actual_command == app.version_print
 
     actual_command(*actual_bind.args, **actual_bind.kwargs)
@@ -354,7 +393,8 @@ def test_bind_version(app, capsys):
 
 def test_bind_version_factory(app, capsys):
     app.version = lambda: "1.2.3"
-    actual_command, actual_bind = app.parse_args("--version")
+    actual_command, actual_bind, ignored = app.parse_args("--version")
+    assert ignored == {}
     assert actual_command == app.version_print
 
     actual_command(*actual_bind.args, **actual_bind.kwargs)
@@ -378,3 +418,20 @@ def test_missing_keyword_argument(app, cmd_str_e):
 
     with pytest.raises(e):
         app.parse_args(cmd_str, print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "1 -- --2 3 4",
+        "-- 1 --2 3 4",
+        "--c=3 4 -- 1 --2",
+        "--c 3 4 -- 1 --2",
+    ],
+)
+def test_double_hyphen_positional_only(app, cmd_str, assert_parse_args):
+    @app.default
+    def foo(a: int, b: str, c: tuple[int, int]):
+        pass
+
+    assert_parse_args(foo, cmd_str, 1, "--2", (3, 4))

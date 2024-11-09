@@ -9,7 +9,6 @@ Cyclopts has a builtin :meth:`interactive shell-like feature<cyclopts.App.intera
 
    app = App()
 
-
    @app.command
    def foo(p1):
        """Foo Docstring.
@@ -19,7 +18,7 @@ Cyclopts has a builtin :meth:`interactive shell-like feature<cyclopts.App.intera
        p1: str
            Foo's first parameter.
        """
-
+       print(f"foo {p1}")
 
    @app.command
    def bar(p1):
@@ -30,7 +29,7 @@ Cyclopts has a builtin :meth:`interactive shell-like feature<cyclopts.App.intera
        p1: str
            Bar's first parameter.
        """
-
+       print(f"bar {p1}")
 
    # A blocking call, launching an interactive shell.
    app.interactive_shell(prompt="cyclopts> ")
@@ -43,7 +42,6 @@ To make the application still work as-expected from the CLI, it is more appropri
    @app.command
    def shell():
        app.interactive_shell()
-
 
    if __name__ == "__main__":
        app()  # Don't call ``app.interactive_shell()`` here.
@@ -82,7 +80,7 @@ To resolve this, we can explicitly add a ``help`` command:
    @app.command
    def help():
        """Display the help screen."""
-       app.help_print([])
+       app.help_print()
 
 .. code-block:: console
 

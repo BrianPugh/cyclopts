@@ -20,29 +20,28 @@ Typically, a Cyclopts application is launched by calling the :class:`.App` objec
    app()  # Run the app
 
 To change how the primary app is run, you can use the meta-app feature of Cyclopts.
+The meta app is just like a normal Cyclopts :class:`.App`, the only thing special about
+it is that it's help-page gets merged in with it's parenting app.
 
 .. code-block:: python
 
    from cyclopts import App, Group, Parameter
-   from typing_extensions import Annotated
+   from typing import Annotated
 
    app = App()
    # Rename the meta's "Parameter" -> "Session Parameters".
    # Set sort_key so it will be drawn higher up the help-page.
    app.meta.group_parameters = Group("Session Parameters", sort_key=0)
 
-
    @app.command
    def foo(loops: int):
        for i in range(loops):
            print(f"Looping! {i}")
 
-
    @app.meta.default
    def my_app_launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
        print(f"Hello {user}")
        app(tokens)
-
 
    app.meta()
 
@@ -114,26 +113,23 @@ The core logic of :meth:`App.__call__` method is the following:
 .. code-block:: python
 
     def __call__(self, tokens=None, **kwargs):
-        tokens = normalize_tokens(tokens)
-        command, bound = self.parse_args(tokens, **kwargs)
+        command, bound, ignored = self.parse_args(tokens, **kwargs)
         return command(*bound.args, **bound.kwargs)
 
 Knowing this, we can easily customize how we actually invoke actions with Cyclopts.
-Let's imagine that we want to instantiate an object, ``User`` in our meta app, and pass it to all subsequent commands.
+Let's imagine that we want to instantiate an object, ``User`` in our meta app, and pass it to subsequent commands that need it.
 This might be useful to share an expensive-to-create object amongst commands in a single session; see :ref:`Command Chaining`.
 
 .. code-block:: python
 
    from cyclopts import App, Parameter
-   from typing_extensions import Annotated
+   from typing import Annotated
 
    app = App()
-
 
    class User:
        def __init__(self, name):
            self.name = name
-
 
    @app.command
    def create(
@@ -143,13 +139,15 @@ This might be useful to share an expensive-to-create object amongst commands in 
    ):
        print(f"Creating user {user_obj.name} with age {age}.")
 
-
    @app.meta.default
    def launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
-       user_obj = User(user)
-       command, bound = app.parse_args(tokens)
-       return command(*bound.args, **bound.kwargs, user_obj=user_obj)
-
+       additional_kwargs = {}
+       command, bound, ignored = app.parse_args(tokens)
+       # "ignored" is a dict mapping python-variable-name to it's type annotation for parameters with "parse=False".
+       if "user_obj" in ignored:
+           # 'ignored["user_obj"]' is the class "User"
+           additional_kwargs["user_obj"] = ignored["user_obj"](user)
+       return command(*bound.args, **bound.kwargs, **additional_kwargs)
 
    if __name__ == "__main__":
        app.meta()
@@ -160,4 +158,5 @@ This might be useful to share an expensive-to-create object amongst commands in 
    Creating user Alice with age 30.
 
 The ``parse=False`` configuration tells Cyclopts to not try and bind arguments to this parameter.
+Cyclopts will pass it along to ``ignored`` to make custom meta-app logic easier.
 The annotated parameter **must** be a keyword-only parameter.

@@ -6,7 +6,7 @@ from rich.console import Console
 
 import cyclopts
 import cyclopts.utils
-from cyclopts import App, Group, Parameter
+from cyclopts import Group, Parameter
 
 
 def pytest_ignore_collect(collection_path):
@@ -35,7 +35,7 @@ def assert_parse_args(app):
     def inner(f, cmd: str, *args, **kwargs):
         signature = cyclopts.utils.signature(f)
         expected_bind = signature.bind(*args, **kwargs)
-        actual_command, actual_bind = app.parse_args(cmd, print_error=False, exit_on_error=False)
+        actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f
         assert actual_bind == expected_bind
 
@@ -47,7 +47,7 @@ def assert_parse_args_partial(app):
     def inner(f, cmd: str, *args, **kwargs):
         signature = cyclopts.utils.signature(f)
         expected_bind = signature.bind_partial(*args, **kwargs)
-        actual_command, actual_bind = app.parse_args(cmd, print_error=False, exit_on_error=False)
+        actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f
         assert actual_bind == expected_bind
 
@@ -73,7 +73,7 @@ def convert(app):
             cmd = cmd.as_posix()
 
         @app.default
-        def target(arg1: type_):
+        def target(arg1: type_):  # pyright: ignore
             return arg1
 
         return app(cmd, exit_on_error=False)

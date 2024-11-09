@@ -15,15 +15,13 @@ The most basic Cyclopts application is as follows:
 
 .. code-block:: python
 
-   import cyclopts
+   from cyclopts import App
 
-   app = cyclopts.App()
-
+   app = App()
 
    @app.default
    def main():
        print("Hello World!")
-
 
    if __name__ == "__main__":
        app()
@@ -36,48 +34,51 @@ Save this as ``main.py`` and execute it to see:
    Hello World!
 
 
-The :class:`.App` class offers various configuration options that we'll investigate in future guides.
-The ``app`` object has a decorator method, :meth:`default <cyclopts.App.default>`, which registers a function as the default action.
-An application can have only a single default action.
-In this example, the ``main`` function is our default, and is executed when no CLI command is provided.
+The :class:`.App` class offers various configuration options that we'll explore in more detail later.
+The ``app`` object has a decorator method, :meth:`default <cyclopts.App.default>`, which registers a function as the **default action**.
+In this example, the ``main`` function is our default action, and is executed when no CLI command is provided.
 
 ------------------
 Function Arguments
 ------------------
-Let's add some arguments to make this program a little more exciting.
+Let's add some arguments to make this program a little more interesting.
 
 .. code-block:: python
 
-   import cyclopts
+   from cyclopts import App
 
-   app = cyclopts.App()
-
+   app = App()
 
    @app.default
    def main(name):
        print(f"Hello {name}!")
 
-
    if __name__ == "__main__":
        app()
 
-Execute it with an argument:
+Executing the script with the argument ``Alice`` produces the following:
 
 .. code-block:: console
 
    $ python main.py Alice
    Hello Alice!
 
-Here's what's happening:
+Code explanation:
 
-1. The function ``main`` was registered to ``app`` as the default action.
+1. The function ``main()`` was registered to ``app`` as the **default** action.
 
-2. Calling ``app()`` triggers Cyclopts to parse CLI inputs.
+2. Calling ``app()`` at the bottom triggers the app to begin parsing CLI inputs.
 
-3. Cyclopts identifies ``"Alice"`` as a positional argument, matching it to the parameter ``name``.
-   In the absence of an explicit type hint, Cyclopts defaults to ``str``.
+3. Cyclopts identifies ``"Alice"`` as a positional argument and matches it to the parameter ``name``.
+   In the absence of an explicit type hint, Cyclopts defaults to parsing the value as a ``str``.
 
-4. Cyclopts calls the registered default ``main("Alice")``, and the greeting is printed.
+   .. note::
+      Without a type annotation, Cyclopts will actually first attempt to use the **type** of
+      the parameter's **default value**. If the parameter doesn't have a default value, it will
+      then fallback to ``str``. See :ref:`Coercion Rules`.
+
+
+4. Cyclopts calls the registered **default** function ``main("Alice")``, and the greeting is printed.
 
 
 ------------------
@@ -87,16 +88,14 @@ Extending the example, lets add more arguments and type hints:
 
 .. code-block:: python
 
-   import cyclopts
+   from cyclopts import App
 
-   app = cyclopts.App()
-
+   app = App()
 
    @app.default
    def main(name: str, count: int):
        for _ in range(count):
            print(f"Hello {name}!")
-
 
    if __name__ == "__main__":
        app()
@@ -108,48 +107,113 @@ Extending the example, lets add more arguments and type hints:
    Hello Alice!
    Hello Alice!
 
-The command line input ``"3"`` is converted to an integer because of ``count``'s type hint ``int``.
-Cyclopts natively handles all python builtin types, see :ref:`Coercion Rules` for more details.
-Cyclopts adheres to Python's argument binding rules, allowing both positional and keyword arguments.
-Therefore, all these commands are equivalent:
+The command line input ``"3"`` is converted to an integer because the parameter ``count`` has the type hint :obj:`int`.
+Cyclopts natively handles all python builtin types (:ref:`and more! <Coercion Rules>`).
+Cyclopts adheres to Python's argument binding rules, allowing for both positional and keyword arguments.
+All of the following CLI invocations are equivalent:
 
 .. code-block:: console
 
-   $ python main.py Alice 3
-   $ python main.py --name Alice --count 3
-   $ python main.py --name=Alice --count=3
-   $ python main.py --count 3 --name=Alice
-   $ python main.py Alice --count 3
-   $ python main.py --count 3 Alice
-   $ python main.py --name=Alice 3
-   $ python main.py 3 --name=Alice
+   $ python main.py Alice 3                  # Supplying arguments positionally.
+   $ python main.py --name Alice --count 3   # Supplying arguments via keywords.
+   $ python main.py --name=Alice --count=3   # Using = for matching keywords to values is allowed.
+   $ python main.py --count 3 --name=Alice   # Keyword order does not matter.
+   $ python main.py Alice --count 3          # positional followed by keyword
+   $ python main.py --count 3 Alice          # Keywords can come before positional if the keyword is later in the function signature.
 
-Cyclopts parses keyword arguments first, then fills in the gaps with positional arguments.
+Like calling functions in python, positional arguments cannot be specified after a **prior** argument in the function signature was specified via keyword.
+For example, you cannot supply the count value ``"3"`` positionally while the value for ``name`` is specified via keyword:
 
------------
-Adding Help
------------
+.. code-block:: bash
+
+   # The following are NOT allowed.
+   $ python main.py --name=Alice 3  # invalid python: main(name="Alice", 3)
+   $ python main.py 3 --name=Alice  # invalid python: main(3, name="Alice")
+
+------------------
+Adding a Help Page
+------------------
+All CLI apps need to have a help page explaining how to use the application.
+By default, Cyclopts adds the ``--help`` (and the shortform ``-h``) commands to your CLI.
 We can add application-level help documentation when creating our ``app``:
 
 .. code-block:: python
 
-   app = cyclopts.App(help="Help string for this demo application.")
-   app()
+   from cyclopts import App
+
+   app = App(help="Help string for this demo application.")
+
+   @app.default
+   def main(name: str, count: int):
+       for _ in range(count):
+           print(f"Hello {name}!")
+
+   if __name__ == "__main__":
+       app()
 
 .. code-block:: console
 
-   $ my-script --help
-   Usage: my-script COMMAND
+   $ python main.py --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
 
    Help string for this demo application.
 
    ╭─ Commands ──────────────────────────────────────────────────────────╮
-   │ --help,-h  Display this message and exit.                           │
+   │ --help -h  Display this message and exit.                           │
    │ --version  Display application version.                             │
    ╰─────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────────────────────╮
+   │ *  NAME --name    [required]                                        │
+   │ *  COUNT --count  [required]                                        │
+   ╰─────────────────────────────────────────────────────────────────────╯
 
-By default, Cyclopts adds ``--help`` and ``--version`` commands to your CLI.
-If :attr:`.App.help` is not set, Cyclopts will fallback to the first line
-(short description) of the registered ``@app.default`` function's docstring.
+.. note:
+   Help flags can be changed with :attr:`~cyclopts.App.help_flags`.
+
+Let's add some help documentation for our parameters.
+Cyclopts uses the function's docstring and can interpret ReST, Google, Numpydoc-style and Epydoc docstrings (shoutout to `docstring_parser <https://github.com/rr-/docstring_parser>`_).
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def main(name: str, count: int):
+       """Help string for this demo application.
+
+       Parameters
+       ----------
+       name: str
+           Name of the user to be greeted.
+       count: int
+           Number of times to greet.
+       """
+       for _ in range(count):
+           print(f"Hello {name}!")
+
+   if __name__ == "__main__":
+       app()
+
+.. code-block:: console
+
+   $ python main.py --help
+   Usage: main COMMAND [ARGS] [OPTIONS]
+
+   Help string for this demo application.
+
+   ╭─ Commands ──────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                           │
+   │ --version  Display application version.                             │
+   ╰─────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ────────────────────────────────────────────────────────╮
+   │ *  NAME --name    Name of the user to be greeted. [required]        │
+   │ *  COUNT --count  Number of times to greet. [required]              │
+   ╰─────────────────────────────────────────────────────────────────────╯
+
+.. note:
+   If :attr:`.App.help` is not explicitly set, Cyclopts will fallback to the first line
+   (short description) of the registered ``@app.default`` function's docstring.
 
 .. _checkout the mypy cheatsheet: https://mypy.readthedocs.io/en/latest/cheat_sheet_py3.html

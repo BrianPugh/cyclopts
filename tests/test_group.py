@@ -1,71 +1,23 @@
 import itertools
-import sys
+from typing import Annotated, Sequence
 from unittest.mock import Mock
 
 import pytest
 
 import cyclopts.group
-from cyclopts import App, Group, Parameter
+from cyclopts import App, Group, Parameter, Token
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
-
-def upper(type_, *args: str):
-    return args[0].upper()
-
-
-def test_group_str_method():
-    food_group = Group("Food")
-    assert "Food" == str(food_group)
+def upper(type_, tokens: Sequence[Token]):
+    return tokens[0].value.upper()
 
 
 def test_group_show_property():
     assert Group().show is False
     assert Group("Foo").show is True
     assert Group("Foo", show=False).show is False
-
-    g = Group("foo")
-    g.show = False
-    assert g.show is False
-
-
-def test_group_parameter_converter(app, assert_parse_args):
-    def converter(**kwargs):
-        return {k: v.upper() for k, v in kwargs.items()}
-
-    food_group = Group("Food", converter=converter)
-
-    @app.default
-    def foo(
-        ice_cream: Annotated[str, Parameter(group=food_group)],
-        cone: Annotated[str, Parameter(group="Food")],
-    ):
-        pass
-
-    assert_parse_args(foo, "chocolate sugar", "CHOCOLATE", "SUGAR")
-
-
-def test_group_parameter_converter_delete_arg(app, assert_parse_args):
-    def converter(**kwargs):
-        # This doesn't have a "cone" key in the response, meaning it should not be
-        # in the resulting bound arguments.
-        return {k: v.upper() for k, v in kwargs.items() if k != "cone"}
-
-    food_group = Group("Food", converter=converter)
-
-    @app.default
-    def foo(
-        ice_cream: Annotated[str, Parameter(group=food_group)],
-        cone: Annotated[str, Parameter(group="Food")] = "waffle",
-    ):
-        pass
-
-    assert_parse_args(foo, "chocolate sugar", "CHOCOLATE")
 
 
 def test_group_default_parameter_converter(app, assert_parse_args):
@@ -78,20 +30,7 @@ def test_group_default_parameter_converter(app, assert_parse_args):
     assert_parse_args(foo, "chocolate", "CHOCOLATE")
 
 
-def test_group_command_converter(app, mocker):
-    group_converter = mocker.MagicMock(side_effect=lambda **kwargs: kwargs)
-    group = Group("Group Name", converter=group_converter)
-
-    @app.command(group=group)
-    def foo(bar: int):
-        pass
-
-    app("foo 10")
-
-    group_converter.assert_called_once_with(bar=10)
-
-
-def test_group_command_validator(app, assert_parse_args):
+def test_command_validator(app, assert_parse_args):
     def bar_must_be_1(bar):
         if bar == 1:
             return
@@ -103,8 +42,28 @@ def test_group_command_validator(app, assert_parse_args):
 
     assert_parse_args(foo, "foo 1", bar=1)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as e:
         app("foo 2", exit_on_error=False)
+
+    assert str(e.value) == "Invalid values for command 'foo'."
+
+
+def test_command_validator_with_message(app, assert_parse_args):
+    def bar_must_be_1(bar):
+        if bar == 1:
+            return
+        raise ValueError("The value 'bar' must be 1.")
+
+    @app.command(validator=bar_must_be_1)
+    def foo(bar: int):
+        pass
+
+    assert_parse_args(foo, "foo 1", bar=1)
+
+    with pytest.raises(ValidationError) as e:
+        app("foo 2", exit_on_error=False)
+
+    assert str(e.value) == "Invalid values for command 'foo'. The value 'bar' must be 1."
 
 
 def test_group_command_default_parameter_resolution(app):
@@ -157,7 +116,11 @@ def test_group_validator(app):
 
     app.parse_args("--rock-salt --peppercorn --ketchup")
 
-    validator.assert_called_once_with(salt=True, pepper=True)
+    validator.assert_called_once()
+    provided_arguments = validator.call_args_list[0][0][0]
+    assert len(provided_arguments) == 2
+    assert provided_arguments[0].name == "--rock-salt"
+    assert provided_arguments[1].name == "--peppercorn"
 
 
 def test_group_sort_key_property():
@@ -166,13 +129,6 @@ def test_group_sort_key_property():
 
     g = Group(sort_key=1)
     assert g.sort_key == 1
-
-    g.sort_key = 2
-    assert g.sort_key == 2
-
-    g.sort_key = None
-    assert g.sort_key is None
-    assert g._sort_key == cyclopts.group.NO_USER_SORT_KEY
 
 
 @pytest.fixture

@@ -3,6 +3,10 @@ __version__ = "0.0.0"
 
 __all__ = [
     "App",
+    "Argument",
+    "ArgumentCollection",
+    "ArgumentOrderError",
+    "Token",
     "CoercionError",
     "CommandCollisionError",
     "CycloptsError",
@@ -11,9 +15,12 @@ __all__ = [
     "Group",
     "InvalidCommandError",
     "MissingArgumentError",
+    "MixedArgumentError",
+    "RepeatArgumentError",
     "Parameter",
     "UnknownOptionError",
     "UnusedCliTokensError",
+    "UNSET",
     "ValidationError",
     "config",
     "convert",
@@ -25,14 +32,18 @@ __all__ = [
 
 from cyclopts._convert import convert
 from cyclopts._env_var import env_var_split
+from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App
 from cyclopts.exceptions import (
+    ArgumentOrderError,
     CoercionError,
     CommandCollisionError,
     CycloptsError,
     DocstringError,
     InvalidCommandError,
     MissingArgumentError,
+    MixedArgumentError,
+    RepeatArgumentError,
     UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
@@ -40,6 +51,7 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
-from cyclopts.utils import default_name_transform
+from cyclopts.token import Token
+from cyclopts.utils import UNSET, default_name_transform
 
 from . import config, types, validators

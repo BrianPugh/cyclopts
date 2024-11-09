@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Tuple
 
 import pytest
@@ -134,6 +133,5 @@ def test_types_path_resolve_converter(convert, tmp_path):
     dir1.mkdir()
     dir2.mkdir()
 
-    assert (dir1, dir2) == convert(
-        Tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [dir1.as_posix(), dir2.as_posix()]
-    )
+    actual = convert(Tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [dir1.as_posix(), dir2.as_posix()])
+    assert (dir1, dir2) == actual
