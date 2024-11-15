@@ -48,6 +48,27 @@ def test_keyword_optional_list_none_default(app, assert_parse_args):
 
 
 @pytest.mark.parametrize(
+    "cmd_expected",
+    [
+        ("", None),
+        ("--verbose", [True]),
+        ("--verbose --verbose", [True, True]),
+    ],
+)
+def test_keyword_list_of_bool(app, assert_parse_args, cmd_expected):
+    cmd, expected = cmd_expected
+
+    @app.default
+    def foo(*, verbose: Optional[list[bool]] = None):
+        pass
+
+    if expected is None:
+        assert_parse_args(foo, cmd)
+    else:
+        assert_parse_args(foo, cmd, verbose=expected)
+
+
+@pytest.mark.parametrize(
     "cmd",
     [
         "foo --item",
