@@ -31,13 +31,22 @@ if TYPE_CHECKING:
 
 
 _implicit_iterable_type_mapping: dict[type, type] = {
+    Iterable: list[str],
+    Sequence: list[str],
+    frozenset: frozenset[str],
     list: list[str],
     set: set[str],
     tuple: tuple[str, ...],
-    dict: dict[str, str],
 }
 
-ITERABLE_TYPES = {list, set, frozenset, Sequence, Iterable, tuple}
+ITERABLE_TYPES = {
+    Iterable,
+    Sequence,
+    frozenset,
+    list,
+    set,
+    tuple,
+}
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
@@ -161,7 +170,9 @@ def _convert(
     origin_type = get_origin(type_)
     inner_types = [resolve(x) for x in get_args(type_)]
 
-    if type_ in _implicit_iterable_type_mapping:
+    if type_ is dict:
+        out = convert(dict[str, str], token)
+    elif type_ in _implicit_iterable_type_mapping:
         out = convert(_implicit_iterable_type_mapping[type_], token)
     elif origin_type in (collections.abc.Iterable, collections.abc.Sequence):
         assert len(inner_types) == 1

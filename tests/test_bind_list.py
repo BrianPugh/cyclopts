@@ -53,6 +53,10 @@ def test_keyword_optional_list_none_default(app, assert_parse_args):
         ("", None),
         ("--verbose", [True]),
         ("--verbose --verbose", [True, True]),
+        ("--verbose --verbose --no-verbose", [True, True, False]),
+        ("--verbose --verbose=False", [True, False]),
+        ("--verbose --no-verbose=False", [True, True]),
+        ("--verbose --verbose=True", [True, True]),
     ],
 )
 def test_keyword_list_of_bool(app, assert_parse_args, cmd_expected):
