@@ -827,10 +827,7 @@ class Argument:
                 name = transform(name)
             if _startswith(term, name):
                 trailing = term[len(name) :]
-                if self.hint is bool or self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
-                    implicit_value = True
-                else:
-                    implicit_value = None
+                implicit_value = True if self.hint is bool or self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE else None
                 if trailing:
                     if trailing[0] == delimiter:
                         trailing = trailing[1:]
