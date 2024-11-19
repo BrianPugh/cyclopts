@@ -97,7 +97,7 @@ class Parameter:
         converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
     )
 
-    # This can ONLY ever be a Tuple[str, ...]
+    # This can ONLY ever be ``None`` or ``Tuple[str, ...]``
     negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
 
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
@@ -176,8 +176,6 @@ class Parameter:
 
         origin = get_origin(type_)
 
-        if self.negative is False:
-            return ()
         if type_ not in _NEGATIVE_FLAG_TYPES:
             if origin:
                 if origin not in _NEGATIVE_FLAG_TYPES:
