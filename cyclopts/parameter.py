@@ -1,7 +1,7 @@
 import inspect
 from collections.abc import Iterable
 from functools import partial
-from typing import Any, Callable, Optional, Union, cast, get_args, get_origin
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast, get_args, get_origin
 
 import attrs
 from attrs import field, frozen
@@ -18,7 +18,19 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-_NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES])
+ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
+    {
+        Iterable[bool],
+        Sequence[bool],
+        List[bool],
+        list[bool],
+        Tuple[bool, ...],
+        tuple[bool, ...],
+    }
+)
+
+
+_NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES, *ITERATIVE_BOOL_IMPLICIT_VALUE])
 
 
 def _not_hyphen_validator(instance, attribute, values):
@@ -85,7 +97,7 @@ class Parameter:
         converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
     )
 
-    # This can ONLY ever be a Tuple[str, ...]
+    # This can ONLY ever be ``None`` or ``Tuple[str, ...]``
     negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
 
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
@@ -162,10 +174,14 @@ class Parameter:
         if is_union(type_):
             type_ = next(x for x in get_args(type_) if x is not None)
 
-        type_ = get_origin(type_) or type_
+        origin = get_origin(type_)
 
-        if (self.negative is not None and not self.negative) or type_ not in _NEGATIVE_FLAG_TYPES:
-            return ()
+        if type_ not in _NEGATIVE_FLAG_TYPES:
+            if origin:
+                if origin not in _NEGATIVE_FLAG_TYPES:
+                    return ()
+            else:
+                return ()
 
         out, user_negatives = [], []
         if self.negative:
@@ -182,7 +198,10 @@ class Parameter:
             name = name[2:]
             name_components = name.split(".")
 
-            negative_prefixes = self.negative_bool if type_ is bool else self.negative_iterable
+            if type_ is bool or type_ in ITERATIVE_BOOL_IMPLICIT_VALUE:
+                negative_prefixes = self.negative_bool
+            else:
+                negative_prefixes = self.negative_iterable
             name_prefix = ".".join(name_components[:-1])
             if name_prefix:
                 name_prefix += "."

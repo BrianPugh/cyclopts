@@ -43,7 +43,7 @@ from cyclopts.field_info import (
     get_field_infos,
 )
 from cyclopts.group import Group
-from cyclopts.parameter import Parameter
+from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, ParameterDict, grouper, is_builtin
 
@@ -827,7 +827,7 @@ class Argument:
                 name = transform(name)
             if _startswith(term, name):
                 trailing = term[len(name) :]
-                implicit_value = True if self.hint is bool else None
+                implicit_value = True if self.hint is bool or self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE else None
                 if trailing:
                     if trailing[0] == delimiter:
                         trailing = trailing[1:]
@@ -843,7 +843,10 @@ class Argument:
                     name = transform(name)
                 if term.startswith(name):
                     trailing = term[len(name) :]
-                    implicit_value = (get_origin(self.hint) or self.hint)()
+                    if self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
+                        implicit_value = False
+                    else:
+                        implicit_value = (get_origin(self.hint) or self.hint)()
                     if trailing:
                         if trailing[0] == delimiter:
                             trailing = trailing[1:]
@@ -917,8 +920,11 @@ class Argument:
             keyword = {}
             for token in self.tokens:
                 if token.implicit_value is not UNSET:
-                    assert len(self.tokens) == 1
-                    return token.implicit_value
+                    if self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
+                        return get_origin(self.hint)(x.implicit_value for x in self.tokens)
+                    else:
+                        assert len(self.tokens) == 1
+                        return token.implicit_value
 
                 if token.keys:
                     lookup = keyword
