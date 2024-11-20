@@ -26,6 +26,7 @@ __all__ = [
     "UnusedCliTokensError",
     "UNSET",
     "ValidationError",
+    "completion",
     "config",
     "convert",
     "default_name_transform",
@@ -61,4 +62,4 @@ from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, default_name_transform
 
-from . import config, types, validators
+from . import completion, config, types, validators
