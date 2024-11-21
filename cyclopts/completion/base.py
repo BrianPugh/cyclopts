@@ -1,10 +1,21 @@
 import os
 from abc import abstractmethod
 from contextlib import suppress
+from enum import Enum, auto
 from pathlib import Path
+from typing import Optional
 
 from attrs import define
 from autoregistry import Registry
+
+
+class ValueType(Enum):
+    FILE = auto()
+    DIRECTORY = auto()
+    CHOICE = auto()
+    STRING = auto()
+    INTEGER = auto()
+    FLOAT = auto()
 
 
 @define
@@ -13,6 +24,10 @@ class Option:
     abbrev: str
     desc: str = ""
     val_desc: str = ""
+    value_type: Optional[ValueType] = None
+    choices: Optional[list[str]] = None
+    multiple: bool = False  # Whether the option can accept multiple values
+    required: bool = False  # Whether the option is required
 
 
 @define
@@ -22,7 +37,7 @@ class Command:
     subcommands: list["Command"]
     options: list[Option]
     hidden: bool = False
-    requires_repo: bool = True
+    positional_args: Optional[list[Option]] = None  # For handling positional arguments
 
 
 class UnknownShellError(Exception):

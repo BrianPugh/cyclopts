@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from textwrap import dedent
 
-from cyclopts.completion.base import Command, CompletionGenerator, Option
+from cyclopts.completion.base import Command, CompletionGenerator, Option, ValueType
 
 
 class ZshCompletionGenerator(CompletionGenerator):
@@ -34,7 +34,7 @@ class ZshCompletionGenerator(CompletionGenerator):
         """
         _{cmd}() {{
             _arguments -s \\
-        {args}
+        {args}{positional}
         }}
         """
     )
@@ -50,6 +50,15 @@ class ZshCompletionGenerator(CompletionGenerator):
     _CMD_VALUE_FMT = '                    "{name}[{desc}]"'
     _ARG_SWITCH_FMT = "                {name})\n                    _{full_name}\n                    ;;"
     _markdown_regex = re.compile(r"\{\{[\.a-zA-Z]+\}\}")
+
+    _VALUE_TYPE_COMPLETIONS = {
+        ValueType.FILE: "_files",
+        ValueType.DIRECTORY: "_dirs",
+        ValueType.CHOICE: "_values",
+        ValueType.STRING: "_guard '[^-]#'",  # Allows any string not starting with -
+        ValueType.INTEGER: "_guard '[0-9]#'",  # Allows only numbers
+        ValueType.FLOAT: "_guard '[0-9.]#'",  # Allows numbers and decimal point
+    }
 
     def _install(self) -> Path:
         completion_dir = self._get_completion_dir()
@@ -98,19 +107,19 @@ class ZshCompletionGenerator(CompletionGenerator):
             return new_dir
 
     def _dump_zsh(self, cmd_str: str, subcommands: list[Command]) -> None:
-        """Generate completion functions for a command and its subcommands."""
         subcmds, subargs = [], []
 
         for subcmd in subcommands:
-            subcmds.append(self._CMD_VALUE_FMT.format(name=subcmd.name, desc=subcmd.description))
+            if not subcmd.hidden:
+                subcmds.append(self._CMD_VALUE_FMT.format(name=subcmd.name, desc=subcmd.description))
 
-            full_name = f"{cmd_str}_{subcmd.name}"
-            subargs.append(self._ARG_SWITCH_FMT.format(name=subcmd.name, full_name=full_name))
+                full_name = f"{cmd_str}_{subcmd.name}"
+                subargs.append(self._ARG_SWITCH_FMT.format(name=subcmd.name, full_name=full_name))
 
-            if subcmd.subcommands:
-                self._dump_zsh(full_name, subcmd.subcommands)
-            else:
-                self._dump_zsh_leaf(full_name, subcmd)
+                if subcmd.subcommands:
+                    self._dump_zsh(full_name, subcmd.subcommands)
+                else:
+                    self._dump_zsh_leaf(full_name, subcmd)
 
         self._out.append(
             self._SUBCMD_FMT.format(
@@ -121,28 +130,66 @@ class ZshCompletionGenerator(CompletionGenerator):
         )
 
     def _dump_zsh_leaf(self, cmd_string: str, command: Command) -> None:
-        """Generate completion function for a leaf command (one without subcommands)."""
-        if not command.options:
+        if not command.options and not command.positional_args:
             self._out.append(self._NO_OPT_CMD_FMT.format(cmd=cmd_string))
             return
 
         args = [self._format_option(opt) for opt in command.options]
-        self._out.append(self._LEAF_CMD_FMT.format(cmd=cmd_string, args=self._LINE_JOINER.join(args)))
+
+        # Handle positional arguments
+        positional = ""
+        if command.positional_args:
+            for i, pos_arg in enumerate(command.positional_args, 1):
+                completion = self._get_value_completion(pos_arg)
+                desc = self._sanitize_desc(pos_arg.desc)
+                required = "" if pos_arg.multiple else f":{desc}:{completion}"
+                positional += f' \\\n               "{i}{required}"'
+
+        self._out.append(
+            self._LEAF_CMD_FMT.format(
+                cmd=cmd_string, args=self._LINE_JOINER.join(args) if args else "", positional=positional
+            )
+        )
+
+    def _get_value_completion(self, opt: Option) -> str:
+        """Get the appropriate completion function for an option's value type."""
+        if not opt.value_type:
+            return ""
+
+        completion_func = self._VALUE_TYPE_COMPLETIONS[opt.value_type]
+
+        if opt.value_type == ValueType.CHOICE and opt.choices:
+            choices = " ".join(f'"{c}"' for c in opt.choices)
+            return f"{completion_func} '{choices}'"
+
+        return completion_func
 
     def _format_option(self, opt: Option) -> str:
         """Format a command option for the completion script."""
+        completion = self._get_value_completion(opt)
+
+        # Handle options that take values
+        value_spec = f":{opt.val_desc or opt.desc}:{completion}" if completion else ""
+
+        # Handle required/optional arguments
+        if opt.required:
+            value_spec = f":{opt.val_desc or opt.desc}:{completion}"
+        elif completion:
+            value_spec = f"::{completion}"
+
+        # Handle multiple values
+        if opt.multiple and completion:
+            value_spec = f"*{value_spec}"
+
         if opt.abbrev and opt.name:
-            format_string = f"-{opt.abbrev},--{opt.name}"
-            template = "               {{{}}}'{} [{}]'" if opt.desc else "               {{{}}}'{} {}'"
-            return template.format(format_string, format_string, self._sanitize_desc(opt.desc))
+            format_string = f"{'-' + opt.abbrev},--{opt.name}"
+            return f"               '{format_string}[{self._sanitize_desc(opt.desc)}]{value_spec}'"
         elif opt.name:
             format_string = f"--{opt.name}"
-            template = "               '({}){} [{}]'" if opt.desc else "               '({}){}'"
-            return template.format(format_string, format_string, self._sanitize_desc(opt.desc))
+            return f"               '({format_string}){format_string}[{self._sanitize_desc(opt.desc)}]{value_spec}'"
         elif opt.abbrev:
             format_string = f"-{opt.abbrev}"
-            template = "               '({}){} [{}]'" if opt.desc else "               '({}){}'"
-            return template.format(format_string, format_string, self._sanitize_desc(opt.desc))
+            return f"               '({format_string}){format_string}[{self._sanitize_desc(opt.desc)}]{value_spec}'"
         else:
             raise ValueError("Option must have either name or abbreviation")
 
