@@ -11,7 +11,7 @@ from typing import (
 
 from attrs import field, frozen
 
-from cyclopts.utils import Sentinel, is_iterable, to_tuple_converter
+from cyclopts.utils import UNSET, Sentinel, is_iterable, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -30,10 +30,6 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
 _sort_key_counter = itertools.count()
 
 
-class NO_USER_SORT_KEY(Sentinel):  # noqa: N801
-    pass
-
-
 @frozen
 class Group:
     name: str = ""
@@ -46,7 +42,7 @@ class Group:
     _sort_key: Any = field(
         default=None,
         alias="sort_key",
-        converter=lambda x: NO_USER_SORT_KEY if x is None else x,
+        converter=lambda x: UNSET if x is None else x,
         kw_only=True,
     )
 
@@ -71,7 +67,7 @@ class Group:
 
     @property
     def sort_key(self):
-        return None if self._sort_key is NO_USER_SORT_KEY else self._sort_key
+        return None if self._sort_key is UNSET else self._sort_key
 
     @classmethod
     def create_default_arguments(cls):
@@ -113,7 +109,7 @@ class Group:
         """
         count = next(_sort_key_counter)
         if sort_key is None:
-            sort_key = (NO_USER_SORT_KEY, count)
+            sort_key = (UNSET, count)
         elif is_iterable(sort_key):
             sort_key = (tuple(sort_key), count)
         else:
@@ -149,9 +145,9 @@ def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group]
 
     for sort_key, (group, attribute) in sort_key__group_attributes:
         value = (group, attribute)
-        if sort_key in (NO_USER_SORT_KEY, None):
+        if sort_key in (UNSET, None):
             no_user_sort_key_panels.append(((group.name,), value))
-        elif is_iterable(sort_key) and sort_key[0] in (NO_USER_SORT_KEY, None):
+        elif is_iterable(sort_key) and sort_key[0] in (UNSET, None):
             ordered_no_user_sort_key_panels.append((sort_key[1:] + (group.name,), value))
         else:
             sort_key_panels.append(((sort_key, group.name), value))
