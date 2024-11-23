@@ -11,7 +11,7 @@ from typing import (
 
 from attrs import field, frozen
 
-from cyclopts.utils import UNSET, Sentinel, is_iterable, to_tuple_converter
+from cyclopts.utils import UNSET, is_iterable, resolve_callables, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -161,24 +161,3 @@ def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group]
     out_groups, out_attributes = zip(*[x[1] for x in combined])
 
     return list(out_groups), list(out_attributes)
-
-
-def resolve_callables(t, *args, **kwargs):
-    """Recursively resolves callable elements in a tuple."""
-    if isinstance(t, type(Sentinel)):
-        return t
-
-    if callable(t):
-        return t(*args, **kwargs)
-
-    resolved = []
-    for element in t:
-        if isinstance(element, type(Sentinel)):
-            resolved.append(element)
-        elif callable(element):
-            resolved.append(element(*args, **kwargs))
-        elif is_iterable(element):
-            resolved.append(resolve_callables(element, *args, **kwargs))
-        else:
-            resolved.append(element)
-    return tuple(resolved)

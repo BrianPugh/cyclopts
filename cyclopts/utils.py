@@ -431,3 +431,27 @@ def is_option_like(token: str) -> bool:
 
 def is_builtin(obj: Any) -> bool:
     return getattr(obj, "__module__", "").split(".")[0] in stdlib_module_names
+
+
+def resolve_callables(t, *args, **kwargs):
+    """Recursively resolves callable elements in a tuple.
+
+    Positional and keyword elements will be passed along to each invocation.
+    """
+    if isinstance(t, type(Sentinel)):
+        return t
+
+    if callable(t):
+        return t(*args, **kwargs)
+
+    resolved = []
+    for element in t:
+        if isinstance(element, type(Sentinel)):
+            resolved.append(element)
+        elif callable(element):
+            resolved.append(element(*args, **kwargs))
+        elif is_iterable(element):
+            resolved.append(resolve_callables(element, *args, **kwargs))
+        else:
+            resolved.append(element)
+    return tuple(resolved)
