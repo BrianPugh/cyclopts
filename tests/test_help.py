@@ -1093,7 +1093,7 @@ def test_help_print_commands(app, console):
     assert actual == expected
 
 
-def test_help_print_commands_sort_key(app, console):
+def test_help_print_commands_group_sort_key(app, console):
     @app.command(group=Group("4", sort_key=5))
     def cmd1():
         pass
@@ -1229,7 +1229,7 @@ def test_help_print_parameters_no_negative_from_default_parameter(app, console):
     assert actual == expected
 
 
-def test_help_print_commands_plus_meta(app, console):
+def test_help_print_commands_plus_meta(console):
     app = App(
         name="app",
         help_flags=[],
@@ -1282,6 +1282,42 @@ def test_help_print_commands_plus_meta(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
         │ *  --hostname  Hostname to connect to. [required]                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_print_commands_sort_key(app, console):
+    @app.command  # No user-specified sort_key; will go LAST (but before commands starting with --).
+    def alice():
+        pass
+
+    @app.command(sort_key=2)
+    def bob():
+        pass
+
+    @app.command(sort_key=1)  # Since 1 < 2 (from bob), should go first
+    def charlie():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ charlie                                                            │
+        │ bob                                                                │
+        │ alice                                                              │
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
