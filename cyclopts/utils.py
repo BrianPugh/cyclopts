@@ -1,9 +1,14 @@
+"""To prevent circular dependencies, this module should never import anything else from Cyclopts."""
+
 import functools
 import inspect
 import sys
 from collections.abc import Iterable, Iterator, MutableMapping
 from contextlib import suppress
+from operator import itemgetter
 from typing import Any, Literal, Optional, Sequence, Tuple, Union
+
+from attrs import field, frozen
 
 # fmt: off
 if sys.version_info >= (3, 10):  # pragma: no cover
@@ -431,3 +436,59 @@ def is_option_like(token: str) -> bool:
 
 def is_builtin(obj: Any) -> bool:
     return getattr(obj, "__module__", "").split(".")[0] in stdlib_module_names
+
+
+def resolve_callables(t, *args, **kwargs):
+    """Recursively resolves callable elements in a tuple.
+
+    Returns an object that "looks like" the input, but with all callable's invoked
+    and replaced with their return values. Positional and keyword elements will be
+    passed along to each invocation.
+    """
+    if isinstance(t, type(Sentinel)):
+        return t
+
+    if callable(t):
+        return t(*args, **kwargs)
+    elif is_iterable(t):
+        resolved = []
+        for element in t:
+            if isinstance(element, type(Sentinel)):
+                resolved.append(element)
+            elif callable(element):
+                resolved.append(element(*args, **kwargs))
+            elif is_iterable(element):
+                resolved.append(resolve_callables(element, *args, **kwargs))
+            else:
+                resolved.append(element)
+        return tuple(resolved)
+    else:
+        return t
+
+
+@frozen
+class SortHelper:
+    key: Any
+    fallback_key: Any = field(converter=to_tuple_converter)
+    value: Any
+
+    @staticmethod
+    def sort(entries: Sequence["SortHelper"]) -> list["SortHelper"]:
+        user_sort_key = []
+        ordered_no_user_sort_key = []
+        no_user_sort_key = []
+
+        for entry in entries:
+            if entry.key in (UNSET, None):
+                no_user_sort_key.append((entry.fallback_key, entry))
+            elif is_iterable(entry.key) and entry.key[0] in (UNSET, None):
+                ordered_no_user_sort_key.append((entry.key[1:] + entry.fallback_key, entry))
+            else:
+                user_sort_key.append(((entry.key, entry.fallback_key), entry))
+
+        user_sort_key.sort(key=itemgetter(0))
+        ordered_no_user_sort_key.sort(key=itemgetter(0))
+        no_user_sort_key.sort(key=itemgetter(0))
+
+        combined = user_sort_key + ordered_no_user_sort_key + no_user_sort_key
+        return [x[1] for x in combined]

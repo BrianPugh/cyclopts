@@ -139,6 +139,56 @@ API
          │ --version  Display application version.                    │
          ╰────────────────────────────────────────────────────────────╯
 
+   .. attribute:: sort_key
+      :type: Any
+      :value: None
+
+      Modifies command display order on the help-page.
+
+      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(app)`` and apply the returned value to (2) if :obj:`None`, (3) otherwise.
+
+      2. For all commands with ``sort_key==None`` (default value), sort them alphabetically.
+         These sorted commands will be displayed **after** ``sort_key != None`` list (see 3).
+
+      3. For all commands with ``sort_key!=None``, sort them by ``(sort_key, app.name)``.
+         It is the user's responsibility that ``sort_key`` s are comparable.
+
+      Example usage:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App()
+
+         @app.command  # sort_key not specified; will be sorted AFTER bob/charlie.
+         def alice():
+             """Alice help description."""
+
+         @app.command(sort_key=2)
+         def bob():
+             """Bob help description."""
+
+         @app.command(sort_key=1)
+         def charlie():
+             """Charlie help description."""
+
+         app()
+
+      Resulting help-page:
+
+      .. code-block:: text
+
+         Usage: demo.py COMMAND
+
+         ╭─ Commands ──────────────────────────────────────────────────╮
+         │ charlie    Charlie help description.                        │
+         │ bob        Bob help description.                            │
+         │ alice      Alice help description.                          │
+         │ --help -h  Display this message and exit.                   │
+         │ --version  Display application version.                     │
+         ╰─────────────────────────────────────────────────────────────╯
+
    .. attribute:: version
       :type: Union[None, str, Callable]
       :value: None
@@ -749,7 +799,7 @@ API
 
       Resulting help-page:
 
-      .. code-block:: bash
+      .. code-block:: text
 
         Usage: app COMMAND
 

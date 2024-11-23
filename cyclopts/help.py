@@ -7,6 +7,7 @@ from inspect import isclass
 from math import ceil
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Literal,
     Union,
@@ -19,6 +20,7 @@ from attrs import define, field, frozen
 import cyclopts.utils
 from cyclopts.annotations import is_union
 from cyclopts.group import Group
+from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
@@ -55,6 +57,7 @@ class HelpEntry:
     short: str
     description: "RenderableType"
     required: bool = False
+    sort_key: Any = None
 
 
 def _text_factory():
@@ -80,7 +83,20 @@ class HelpPanel:
         self.entries = out
 
     def sort(self):
-        self.entries.sort(key=lambda x: (x.name.startswith("-"), x.name))
+        """Sort entries in-place.
+
+        Callable sort_keys are provided with no argument?
+        """
+        if not self.entries:
+            return
+
+        if self.format == "command":
+            sorted_sort_helper = SortHelper.sort(
+                [SortHelper(entry.sort_key, (entry.name.startswith("-"), entry.name), entry) for entry in self.entries]
+            )
+            self.entries = [x.value for x in sorted_sort_helper]
+        else:
+            raise NotImplementedError
 
     def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
         if not self.entries:
@@ -403,6 +419,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list:
             name="\n".join(long_names),
             short=" ".join(short_names),
             description=format_str(docstring_parse(app.help).short_description or "", format=format),
+            sort_key=resolve_callables(app.sort_key, app),
         )
         if entry not in entries:
             entries.append(entry)

@@ -52,6 +52,7 @@ from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
 from cyclopts.utils import (
+    UNSET,
     default_name_transform,
     optional_to_tuple_converter,
     to_list_converter,
@@ -292,6 +293,13 @@ class App:
         kw_only=True,
     )
 
+    _sort_key: Any = field(
+        default=None,
+        alias="sort_key",
+        converter=lambda x: UNSET if x is None else x,
+        kw_only=True,
+    )
+
     ######################
     # Private Attributes #
     ######################
@@ -446,6 +454,10 @@ class App:
     @name_transform.setter
     def name_transform(self, value):
         self._name_transform = value
+
+    @property
+    def sort_key(self):
+        return None if self._sort_key is UNSET else self._sort_key
 
     def version_print(
         self,

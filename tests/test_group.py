@@ -125,7 +125,7 @@ def test_group_validator(app):
 
 def test_group_sort_key_property():
     assert Group().sort_key is None
-    assert Group()._sort_key is cyclopts.group.NO_USER_SORT_KEY
+    assert Group()._sort_key is cyclopts.group.UNSET
 
     g = Group(sort_key=1)
     assert g.sort_key == 1
@@ -144,8 +144,8 @@ def test_group_sorted_classmethod_basic(mock_sort_key_counter):
     g2 = Group.create_ordered("bar")
     g3 = Group.create_ordered("baz", sort_key="non-int value")
 
-    assert g1.sort_key == (cyclopts.group.NO_USER_SORT_KEY, 0)
-    assert g2.sort_key == (cyclopts.group.NO_USER_SORT_KEY, 1)
+    assert g1.sort_key == (cyclopts.group.UNSET, 0)
+    assert g2.sort_key == (cyclopts.group.UNSET, 1)
     assert g3.sort_key == ("non-int value", 2)
     assert g4.sort_key is None
 
