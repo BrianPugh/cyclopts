@@ -11,7 +11,7 @@ from typing import (
 
 from attrs import field, frozen
 
-from cyclopts.utils import UNSET, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import UNSET, SortHelper, is_iterable, resolve_callables, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -125,39 +125,20 @@ class Group:
 
 
 def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group], list[Any]]:
-    """Sort groups for the help-page."""
+    """Sort groups for the help-page.
+
+    Note, much logic is similar to here and ``HelpPanel.sort``, so any changes here should probably be reflected over there as well.
+    """
     assert len(groups) == len(attributes)
+
     if not groups:
         return groups, attributes
 
-    # Resolve callable ``sort_key``
-    sort_key__group_attributes = []
-    for group, attribute in zip(groups, attributes):
-        value = (group, attribute)
-        if callable(group._sort_key) or is_iterable(group._sort_key):
-            sort_key__group_attributes.append((resolve_callables(group._sort_key, group), value))
-        else:
-            sort_key__group_attributes.append((group._sort_key, value))
-
-    sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
-    ordered_no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
-    no_user_sort_key_panels: list[tuple[tuple, tuple[Group, Any]]] = []
-
-    for sort_key, (group, attribute) in sort_key__group_attributes:
-        value = (group, attribute)
-        if sort_key in (UNSET, None):
-            no_user_sort_key_panels.append(((group.name,), value))
-        elif is_iterable(sort_key) and sort_key[0] in (UNSET, None):
-            ordered_no_user_sort_key_panels.append((sort_key[1:] + (group.name,), value))
-        else:
-            sort_key_panels.append(((sort_key, group.name), value))
-
-    sort_key_panels.sort()
-    ordered_no_user_sort_key_panels.sort()
-    no_user_sort_key_panels.sort()
-
-    combined = sort_key_panels + ordered_no_user_sort_key_panels + no_user_sort_key_panels
-
-    out_groups, out_attributes = zip(*[x[1] for x in combined])
-
+    sorted_entries = SortHelper.sort(
+        [
+            SortHelper(resolve_callables(group._sort_key, group), group.name, (group, attribute))
+            for group, attribute in zip(groups, attributes)
+        ]
+    )
+    out_groups, out_attributes = zip(*[x.value for x in sorted_entries])
     return list(out_groups), list(out_attributes)
