@@ -96,6 +96,7 @@ def resolve(type_: Any) -> type:
         type_ = resolve_annotated(type_)
         type_ = resolve_optional(type_)
         type_ = resolve_required(type_)
+        type_ = resolve_new_type(type_)
     return type_
 
 
@@ -132,6 +133,13 @@ def resolve_required(type_: Any) -> type:
     if get_origin(type_) in (Required, NotRequired):
         type_ = get_args(type_)[0]
     return type_
+
+
+def resolve_new_type(type_: Any) -> type:
+    try:
+        return resolve_new_type(type_.__supertype__)
+    except AttributeError:
+        return type_
 
 
 def get_hint_name(hint) -> str:
