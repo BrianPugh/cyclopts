@@ -419,21 +419,21 @@ def token_count(type_: Any) -> tuple[int, bool]:
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    annotation = resolve(type_)
-    origin_type = get_origin(annotation)
+    type_ = resolve(type_)
+    origin_type = get_origin(type_)
 
-    if (origin_type or annotation) is tuple:
-        args = get_args(annotation)
+    if (origin_type or type_) is tuple:
+        args = get_args(type_)
         if args:
             return sum(token_count(x)[0] for x in args if x is not ...), ... in args
         else:
             return 1, True
-    elif (origin_type or annotation) is bool:
+    elif (origin_type or type_) is bool:
         return 0, False
-    elif annotation in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(annotation)) == 0):
+    elif type_ in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(type_)) == 0):
         return 1, True
-    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
-        return token_count(get_args(annotation)[0])[0], True
+    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(type_)):
+        return token_count(get_args(type_)[0])[0], True
     elif is_union(type_):
         sub_args = get_args(type_)
         token_count_target = token_count(sub_args[0])
