@@ -23,8 +23,8 @@ Much of Cyclopts's syntax is `Typer`_-inspired. Migrating from Typer should be p
      - :meth:`@app.command() <.App.command>`
      - In Cyclopts, ``@app.command`` :ref:`always results in a command. <Typer Default Command>` To define an action when no command is provided, see :meth:`@app.default <.App.default>`.
 
-   * - :meth:`@app.add_typer`
-     - :meth:`@app.command`
+   * - :meth:`app.add_typer(...)`
+     - :meth:`app.command(...)`
      - Sub applications and commands are registered the same way in Cyclopts.
 
    * - :meth:`@app.callback()`

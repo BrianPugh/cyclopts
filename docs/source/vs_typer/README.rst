@@ -29,6 +29,7 @@ This section was written about the current version of Typer: ``v0.9.0``.
    docstring/README.rst
    decorator_parentheses/README.rst
    optional_list/README.rst
+   keyword_multiple_values/README.rst
    flag_negation/README.rst
    help_defaults/README.rst
    validation/README.rst
