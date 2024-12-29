@@ -6,13 +6,11 @@ from typing import Annotated, Any, Optional, Union, get_args, get_origin
 import attrs
 
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
-_union_types = set()
-_union_types.add(Union)
 
 if sys.version_info >= (3, 10):  # pragma: no cover
     from types import UnionType
-
-    _union_types.add(UnionType)
+else:
+    UnionType = object()
 
 if sys.version_info < (3, 11):  # pragma: no cover
     from typing_extensions import NotRequired, Required
@@ -29,7 +27,12 @@ def is_nonetype(hint):
 
 
 def is_union(type_: Optional[type]) -> bool:
-    return type_ in _union_types or get_origin(type_) in _union_types
+    if type_ is None:
+        return False
+    if type_ is Union or type_ is UnionType:
+        return True
+    origin = get_origin(type_)
+    return origin is Union or origin is UnionType
 
 
 def is_pydantic(hint) -> bool:
@@ -105,7 +108,8 @@ def resolve_optional(type_: Any) -> type:
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.
 
-    if not is_union(get_origin(type_)):
+    origin = get_origin(type_)
+    if not is_union(origin):
         return type_
 
     non_none_types = [t for t in get_args(type_) if t is not NoneType]

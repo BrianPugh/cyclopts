@@ -262,14 +262,23 @@ class Parameter:
     def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
         """Resolve the immediate Parameter from a type hint."""
         cyclopts_parameters = []
-        if type_ is not inspect.Parameter.empty:
+        if type_ is inspect.Parameter.empty:
+            if default_parameters:
+                return cls.combine(*default_parameters)
+            else:
+                return EMPTY_PARAMETER
+        else:
             type_ = resolve_optional(type_)
 
             if is_annotated(type_):
                 annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-                cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
-
-        return cls.combine(*default_parameters, *cyclopts_parameters)
+                cyclopts_parameters = tuple(x for x in annotations if isinstance(x, Parameter))
+                return cls.combine(*default_parameters, *cyclopts_parameters)
+            else:
+                if default_parameters:
+                    return cls.combine(*default_parameters)
+                else:
+                    return EMPTY_PARAMETER
 
 
 _parameter_alias_to_name = {
@@ -277,6 +286,8 @@ _parameter_alias_to_name = {
     for p in Parameter.__attrs_attrs__  # pyright: ignore[reportAttributeAccessIssue]
     if p.init
 }
+
+EMPTY_PARAMETER = Parameter()
 
 
 def validate_command(f: Callable):
