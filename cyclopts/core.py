@@ -331,12 +331,14 @@ class App:
         """
         # Remove all the old version-flag commands.
         for command in commands:
-            with suppress(KeyError):
+            try:
                 if default:
                     if self[command].default == default:
                         del self[command]
                 else:
                     del self[command]
+            except KeyError:
+                pass
 
     @property
     def version_flags(self):
