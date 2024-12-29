@@ -279,6 +279,8 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
+    if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
+        return
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
         cparam = Parameter.from_annotation(iparam.annotation)
