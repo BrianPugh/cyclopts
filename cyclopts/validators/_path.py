@@ -1,7 +1,7 @@
 import pathlib
 from typing import Any, Sequence, Union
 
-from attrs import frozen
+from cyclopts.utils import frozen
 
 
 @frozen(kw_only=True)

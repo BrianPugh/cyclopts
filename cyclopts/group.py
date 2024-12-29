@@ -9,9 +9,9 @@ from typing import (
     cast,
 )
 
-from attrs import field, frozen
+from attrs import field
 
-from cyclopts.utils import UNSET, SortHelper, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import UNSET, SortHelper, frozen, is_iterable, resolve_callables, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection

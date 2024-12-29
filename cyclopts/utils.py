@@ -6,11 +6,20 @@ import sys
 from collections.abc import Iterable, Iterator, MutableMapping
 from contextlib import suppress
 from operator import itemgetter
-from typing import Any, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Union
 
 from attrs import field, frozen
 
 # fmt: off
+
+# https://threeofwands.com/attra-iv-zero-overhead-frozen-attrs-classes/
+if TYPE_CHECKING:
+    from attrs import frozen
+else:
+    from attrs import define
+
+    frozen = functools.partial(define, unsafe_hash=True)
+
 if sys.version_info >= (3, 10):  # pragma: no cover
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f, eval_str=True)

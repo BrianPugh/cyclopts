@@ -4,7 +4,7 @@ from functools import partial
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast, get_args, get_origin
 
 import attrs
-from attrs import field, frozen
+from attrs import field
 
 import cyclopts._env_var
 import cyclopts.utils
@@ -13,6 +13,7 @@ from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
+    frozen,
     optional_to_tuple_converter,
     record_init,
     to_tuple_converter,

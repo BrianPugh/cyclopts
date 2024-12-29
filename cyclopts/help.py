@@ -15,12 +15,12 @@ from typing import (
     get_origin,
 )
 
-from attrs import define, field, frozen
+from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.annotations import is_union
 from cyclopts.group import Group
-from cyclopts.utils import SortHelper, resolve_callables
+from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
