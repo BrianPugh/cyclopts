@@ -278,13 +278,13 @@ def record_init(target: str):
     def decorator(cls):
         original_init = cls.__init__
         function_signature = signature(original_init)
+        param_names = tuple(name for name in function_signature.parameters if name != "self")
 
         @functools.wraps(original_init)
         def new_init(self, *args, **kwargs):
-            bound = function_signature.bind(self, *args, **kwargs)
             original_init(self, *args, **kwargs)
             # Circumvent frozen protection.
-            object.__setattr__(self, target, tuple(k for k, v in bound.arguments.items() if v is not self))
+            object.__setattr__(self, target, tuple(param_names[i] for i in range(len(args))) + tuple(kwargs))
 
         cls.__init__ = new_init
         return cls
