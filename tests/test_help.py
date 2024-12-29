@@ -288,6 +288,36 @@ def test_help_empty(console):
     assert actual == "Usage: foo\n\n"
 
 
+def test_format_choices_rich_format(app, console, assert_parse_args):
+    app.help_format = "rich"
+
+    @app.default
+    def foo(region: Literal["us", "ca"]):
+        """Docstring for foo."""
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  REGION --region  [choices: us, ca] [required]                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 @pytest.fixture
 def capture_format_group_parameters(console, default_function_groups):
     def inner(cmd):
