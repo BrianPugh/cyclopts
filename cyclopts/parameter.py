@@ -237,12 +237,13 @@ class Parameter:
              Ordered from least-to-highest attribute priority.
         """
         kwargs = {}
-        for parameter in parameters:
-            if parameter is None:
-                continue
-            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportAttributeAccessIssue]
-                if a.init and a.alias in parameter._provided_args:
-                    kwargs[a.alias] = getattr(parameter, a.name)
+        filtered = [x for x in parameters if x is not None]
+        if len(filtered) == 1:  # Speed optimization
+            return filtered[0]
+
+        for parameter in filtered:
+            for alias in parameter._provided_args:
+                kwargs[alias] = getattr(parameter, _parameter_alias_to_name[alias])
 
         return cls(**kwargs)
 
@@ -269,6 +270,13 @@ class Parameter:
                 cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
 
         return cls.combine(*default_parameters, *cyclopts_parameters)
+
+
+_parameter_alias_to_name = {
+    p.alias: p.name
+    for p in Parameter.__attrs_attrs__  # pyright: ignore[reportAttributeAccessIssue]
+    if p.init
+}
 
 
 def validate_command(f: Callable):
