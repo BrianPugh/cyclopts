@@ -251,12 +251,20 @@ def format_doc(app: "App", format: str = "restructuredtext"):
     if parsed.long_description:
         if parsed.short_description:
             components.append("\n")
-        components.append((parsed.long_description + "\n", "info"))
+        components.append(parsed.long_description + "\n")
 
     return RichGroup(format_str(*components, format=format), NewLine())
 
 
-def format_str(*components: Union[str, tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
+def format_str(*components: Union[str, tuple[str, str]], format: str) -> "RenderableType":
+    """Format the sequence of components according to format.
+
+    Parameters
+    ----------
+    components: str | tuple[str, str]
+        Either a plain string, or a tuple of string and formatting style.
+        If formatting style is provided, the string-to-be-displayed WILL be escaped.
+    """
     format = format.lower()
 
     if format == "plaintext":
@@ -300,7 +308,7 @@ def format_str(*components: Union[str, tuple[str, str]], format: str = "restruct
                 if isinstance(component, str):
                     yield Text.from_markup(component.rstrip())
                 else:
-                    yield Text.from_markup(component[0].rstrip(), style=component[1])
+                    yield Text(component[0].rstrip(), style=component[1])
 
         return Text().join(walk_components())
     else:
