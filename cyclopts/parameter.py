@@ -302,6 +302,8 @@ def validate_command(f: Callable):
         return
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
+        if not is_annotated(iparam.annotation):  # Speed optimization
+            continue
         cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
