@@ -319,7 +319,7 @@ class App:
     ###########
     # Methods #
     ###########
-    def _delete_commands(self, commands: Iterable[str], default=None):
+    def _delete_commands(self, commands: Iterable[str]):
         """Safely delete commands.
 
         Will **not** raise an exception if command(s) do not exist.
@@ -332,11 +332,7 @@ class App:
         # Remove all the old version-flag commands.
         for command in commands:
             try:
-                if default:
-                    if self[command].default == default:
-                        del self[command]
-                else:
-                    del self[command]
+                del self[command]
             except KeyError:
                 pass
 
@@ -347,7 +343,7 @@ class App:
     @version_flags.setter
     def version_flags(self, value):
         self._version_flags = value
-        self._delete_commands(self._version_flags, default=self.version_print)
+        self._delete_commands(self._version_flags)
         if self._version_flags:
             self.command(
                 self.version_print,
@@ -365,7 +361,7 @@ class App:
     @help_flags.setter
     def help_flags(self, value):
         self._help_flags = value
-        self._delete_commands(self._help_flags, default=self.help_print)
+        self._delete_commands(self._help_flags)
         if self._help_flags:
             self.command(
                 self.help_print,
