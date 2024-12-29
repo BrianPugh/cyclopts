@@ -352,7 +352,9 @@ class ParameterDict(MutableMapping):
 
 
 def is_iterable(obj) -> bool:
-    return isinstance(obj, Iterable) and not isinstance(obj, str)
+    if isinstance(obj, (list, tuple, set, dict)):  # Fast path for common types
+        return True
+    return not isinstance(obj, str) and isinstance(obj, Iterable)
 
 
 def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:
