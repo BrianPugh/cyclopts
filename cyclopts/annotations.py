@@ -27,11 +27,13 @@ def is_nonetype(hint):
 
 
 def is_union(type_: Optional[type]) -> bool:
-    if type_ is None:
-        return False
     if type_ is Union or type_ is UnionType:
         return True
-    origin = get_origin(type_)
+    if (
+        type_ is str or type_ is int or type_ is float or type_ is bool or is_annotated(type_)
+    ):  # Shortcut for common types.
+        return False
+    origin = get_origin(type_)  # A relatively expensive call.
     return origin is Union or origin is UnionType
 
 
