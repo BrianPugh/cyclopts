@@ -22,3 +22,5 @@ def test_no_parse_invalid_kind(app):
         @app.default
         def foo(buzz: str, fizz: Annotated[str, Parameter(parse=False)]):
             pass
+
+        app()
