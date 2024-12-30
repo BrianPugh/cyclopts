@@ -6,11 +6,20 @@ import sys
 from collections.abc import Iterable, Iterator, MutableMapping
 from contextlib import suppress
 from operator import itemgetter
-from typing import Any, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Union
 
 from attrs import field, frozen
 
 # fmt: off
+
+# https://threeofwands.com/attra-iv-zero-overhead-frozen-attrs-classes/
+if TYPE_CHECKING:
+    from attrs import frozen
+else:
+    from attrs import define
+
+    frozen = functools.partial(define, unsafe_hash=True)
+
 if sys.version_info >= (3, 10):  # pragma: no cover
     def signature(f: Any) -> inspect.Signature:
         return inspect.signature(f, eval_str=True)
@@ -269,13 +278,13 @@ def record_init(target: str):
     def decorator(cls):
         original_init = cls.__init__
         function_signature = signature(original_init)
+        param_names = tuple(name for name in function_signature.parameters if name != "self")
 
         @functools.wraps(original_init)
         def new_init(self, *args, **kwargs):
-            bound = function_signature.bind(self, *args, **kwargs)
             original_init(self, *args, **kwargs)
             # Circumvent frozen protection.
-            object.__setattr__(self, target, tuple(k for k, v in bound.arguments.items() if v is not self))
+            object.__setattr__(self, target, tuple(param_names[i] for i in range(len(args))) + tuple(kwargs))
 
         cls.__init__ = new_init
         return cls
@@ -343,7 +352,9 @@ class ParameterDict(MutableMapping):
 
 
 def is_iterable(obj) -> bool:
-    return isinstance(obj, Iterable) and not isinstance(obj, str)
+    if isinstance(obj, (list, tuple, set, dict)):  # Fast path for common types
+        return True
+    return not isinstance(obj, str) and isinstance(obj, Iterable)
 
 
 def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:

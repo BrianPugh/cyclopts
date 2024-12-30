@@ -319,7 +319,7 @@ class App:
     ###########
     # Methods #
     ###########
-    def _delete_commands(self, commands: Iterable[str], default=None):
+    def _delete_commands(self, commands: Iterable[str]):
         """Safely delete commands.
 
         Will **not** raise an exception if command(s) do not exist.
@@ -331,12 +331,10 @@ class App:
         """
         # Remove all the old version-flag commands.
         for command in commands:
-            with suppress(KeyError):
-                if default:
-                    if self[command].default == default:
-                        del self[command]
-                else:
-                    del self[command]
+            try:
+                del self[command]
+            except KeyError:
+                pass
 
     @property
     def version_flags(self):
@@ -345,7 +343,7 @@ class App:
     @version_flags.setter
     def version_flags(self, value):
         self._version_flags = value
-        self._delete_commands(self._version_flags, default=self.version_print)
+        self._delete_commands(self._version_flags)
         if self._version_flags:
             self.command(
                 self.version_print,
@@ -363,7 +361,7 @@ class App:
     @help_flags.setter
     def help_flags(self, value):
         self._help_flags = value
-        self._delete_commands(self._help_flags, default=self.help_print)
+        self._delete_commands(self._help_flags)
         if self._help_flags:
             self.command(
                 self.help_print,
@@ -705,8 +703,6 @@ class App:
             if app._group_arguments is None:
                 app._group_arguments = copy(self._group_arguments)
         else:
-            validate_command(obj)
-
             kwargs.setdefault("help_flags", self.help_flags)
             kwargs.setdefault("version_flags", self.version_flags)
 
@@ -804,7 +800,6 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        validate_command(obj)
         self.default_command = obj
         if validator:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
@@ -946,6 +941,7 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
+                    validate_command(command)
                     argument_collection = command_app.assemble_argument_collection(apps=apps)
                     ignored: dict[str, Any] = {
                         argument.field_info.name: resolve_annotated(argument.field_info.annotation)

@@ -4,7 +4,7 @@ from functools import partial
 from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast, get_args, get_origin
 
 import attrs
-from attrs import field, frozen
+from attrs import field
 
 import cyclopts._env_var
 import cyclopts.utils
@@ -13,6 +13,7 @@ from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
+    frozen,
     optional_to_tuple_converter,
     record_init,
     to_tuple_converter,
@@ -236,12 +237,17 @@ class Parameter:
              Ordered from least-to-highest attribute priority.
         """
         kwargs = {}
-        for parameter in parameters:
-            if parameter is None:
-                continue
-            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportAttributeAccessIssue]
-                if a.init and a.alias in parameter._provided_args:
-                    kwargs[a.alias] = getattr(parameter, a.name)
+        filtered = [x for x in parameters if x is not None]
+        # In the common case of 0/1 parameters to combine, we can avoid
+        # instantiating a new Parameter object.
+        if len(filtered) == 1:
+            return filtered[0]
+        elif not filtered:
+            return EMPTY_PARAMETER
+
+        for parameter in filtered:
+            for alias in parameter._provided_args:
+                kwargs[alias] = getattr(parameter, _parameter_alias_to_name[alias])
 
         return cls(**kwargs)
 
@@ -260,14 +266,32 @@ class Parameter:
     def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
         """Resolve the immediate Parameter from a type hint."""
         cyclopts_parameters = []
-        if type_ is not inspect.Parameter.empty:
+        if type_ is inspect.Parameter.empty:
+            if default_parameters:
+                return cls.combine(*default_parameters)
+            else:
+                return EMPTY_PARAMETER
+        else:
             type_ = resolve_optional(type_)
 
             if is_annotated(type_):
                 annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-                cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+                cyclopts_parameters = tuple(x for x in annotations if isinstance(x, Parameter))
+                return cls.combine(*default_parameters, *cyclopts_parameters)
+            else:
+                if default_parameters:
+                    return cls.combine(*default_parameters)
+                else:
+                    return EMPTY_PARAMETER
 
-        return cls.combine(*default_parameters, *cyclopts_parameters)
+
+_parameter_alias_to_name = {
+    p.alias: p.name
+    for p in Parameter.__attrs_attrs__  # pyright: ignore[reportAttributeAccessIssue]
+    if p.init
+}
+
+EMPTY_PARAMETER = Parameter()
 
 
 def validate_command(f: Callable):
@@ -278,9 +302,15 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
+    if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
+        return
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
-        get_origin(iparam.annotation)
+        # Speed optimization: if an object is not annotated, then there's nothing
+        # to validate. Checking if there's an annotation is significantly faster
+        # than instantiating a cyclopts.Parameter object.
+        if not is_annotated(iparam.annotation):
+            continue
         cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")

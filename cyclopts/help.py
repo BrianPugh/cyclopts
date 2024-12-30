@@ -15,12 +15,12 @@ from typing import (
     get_origin,
 )
 
-from attrs import define, field, frozen
+from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.annotations import is_union
 from cyclopts.group import Group
-from cyclopts.utils import SortHelper, resolve_callables
+from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
@@ -310,7 +310,10 @@ def format_str(*components: Union[str, tuple[str, str]], format: str) -> "Render
                 else:
                     yield Text(component[0].rstrip(), style=component[1])
 
-        return Text().join(walk_components())
+        text = Text()
+        for component in walk_components():
+            text.append(component)
+        return text
     else:
         raise ValueError(f'Unknown help_format "{format}"')
 
