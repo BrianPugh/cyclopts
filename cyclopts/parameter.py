@@ -238,8 +238,12 @@ class Parameter:
         """
         kwargs = {}
         filtered = [x for x in parameters if x is not None]
-        if len(filtered) == 1:  # Speed optimization
+        # In the common case of 0/1 parameters to combine, we can avoid
+        # instantiating a new Parameter object.
+        if len(filtered) == 1:
             return filtered[0]
+        elif not filtered:
+            return EMPTY_PARAMETER
 
         for parameter in filtered:
             for alias in parameter._provided_args:
@@ -302,7 +306,10 @@ def validate_command(f: Callable):
         return
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
-        if not is_annotated(iparam.annotation):  # Speed optimization
+        # Speed optimization: if an object is not annotated, then there's nothing
+        # to validate. Checking if there's an annotation is significantly faster
+        # than instantiating a cyclopts.Parameter object.
+        if not is_annotated(iparam.annotation):
             continue
         cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:

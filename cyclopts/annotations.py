@@ -27,13 +27,16 @@ def is_nonetype(hint):
 
 
 def is_union(type_: Optional[type]) -> bool:
+    """Checks if a type is a union."""
+    # Direct checks are faster than checking if the type is in a set that contains the union-types.
     if type_ is Union or type_ is UnionType:
         return True
-    if (
-        type_ is str or type_ is int or type_ is float or type_ is bool or is_annotated(type_)
-    ):  # Shortcut for common types.
+
+    # The ``get_origin`` call is relatively expensive, so we'll check common types
+    # that are passed in here to see if we can avoid calling ``get_origin``.
+    if type_ is str or type_ is int or type_ is float or type_ is bool or is_annotated(type_):
         return False
-    origin = get_origin(type_)  # A relatively expensive call.
+    origin = get_origin(type_)
     return origin is Union or origin is UnionType
 
 
