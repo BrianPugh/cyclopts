@@ -193,6 +193,25 @@ def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
 
 
 @define
+class AppReference:
+    module_path: str
+    object_path: str
+
+    def resolve(self):
+        import importlib
+
+        obj = importlib.import_module(self.module_path)
+        for part in self.object_path.split("."):
+            obj = getattr(obj, part)
+        return obj
+
+    @classmethod
+    def from_entry_point(cls, entry_point: str):
+        module_path, object_path = entry_point.split(":", 1)
+        return cls(module_path, object_path)
+
+
+@define
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
