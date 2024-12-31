@@ -1349,6 +1349,16 @@ class App:
             except Exception:
                 print(traceback.format_exc())
 
+    def update(self, app: "App"):
+        """Copy over all commands from another :class:`App`.
+
+        Parameters
+        ----------
+        app: cyclopts.App
+            All commands from this application will be copied over.
+        """
+        self._commands.update(app._commands)
+
     def __repr__(self):
         """Only shows non-default values."""
         non_defaults = {}
