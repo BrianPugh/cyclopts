@@ -1352,6 +1352,8 @@ class App:
     def update(self, app: "App"):
         """Copy over all commands from another :class:`App`.
 
+        Commands from the meta app will **not** be copied over.
+
         Parameters
         ----------
         app: cyclopts.App
