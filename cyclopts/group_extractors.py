@@ -46,7 +46,7 @@ def groups_from_app(app: "App") -> list[tuple[Group, list["App"]]]:
     ]
 
     # This does NOT include app._meta commands
-    subapps = list(app._commands.values())
+    subapps = list(app._command_values())
 
     # 2 iterations need to be performed:
     # 1. Extract out all Group objects as they may have additional configuration.

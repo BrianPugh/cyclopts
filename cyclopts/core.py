@@ -323,7 +323,7 @@ class App:
     # Private Attributes #
     ######################
     # Maps CLI-name of a command to a function handle.
-    _commands: dict[str, "App"] = field(init=False, factory=dict)
+    _commands: dict[str, Union["App", AppReference]] = field(init=False, factory=dict)
 
     _parents: list["App"] = field(init=False, factory=list)
 
@@ -526,7 +526,9 @@ class App:
         if self._meta:
             with suppress(KeyError):
                 return self.meta[key]
-        return self._commands[key]
+        out = self._commands[key]
+        # TODO: resolve lazy here.
+        return out
 
     def __delitem__(self, key: str):
         del self._commands[key]
@@ -570,6 +572,10 @@ class App:
             for command in self._meta_parent:
                 if command not in commands:
                     yield command
+
+    def _command_values(self):
+        for command_name in self._commands:
+            yield self[command_name]
 
     @property
     def meta(self) -> "App":

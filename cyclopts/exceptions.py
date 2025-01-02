@@ -247,12 +247,14 @@ class InvalidCommandError(CycloptsError):
         token = self.unused_tokens[0]
         response = f'Unknown command "{token}".'
 
-        if self.app and self.app._commands:
-            import difflib
+        if self.app:
+            command_names = list(self.app)
+            if command_names:
+                import difflib
 
-            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.6)
-            if close_matches:
-                response += f' Did you mean "{close_matches[0]}"?'
+                close_matches = difflib.get_close_matches(token, command_names, n=1, cutoff=0.6)
+                if close_matches:
+                    response += f' Did you mean "{close_matches[0]}"?'
 
         return super().__str__() + response
 
