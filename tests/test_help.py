@@ -1,4 +1,5 @@
 import sys
+from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Annotated, List, Literal, Optional, Set, Tuple, Union
@@ -1726,3 +1727,51 @@ def test_help_consistent_formatting(app, console):
     actual_cmd_help = actual_cmd_help.strip()
 
     assert actual_help == actual_cmd_help
+
+
+def test_auto_group_help(app, console):
+    @dataclass
+    class Enneagram:
+        reformer: float
+        helper: float
+        achiever: float
+
+    @dataclass
+    class Person:
+        name: str
+        enneagram: Enneagram
+
+    @app.default
+    def main(person: Annotated[Person, Parameter(name="*", auto_group=True)]):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Enneagram ────────────────────────────────────────────────────────╮
+        │ *  ENNEAGRAM.REFORMER      [required]                              │
+        │      --enneagram.reformer                                          │
+        │ *  ENNEAGRAM.HELPER        [required]                              │
+        │      --enneagram.helper                                            │
+        │ *  ENNEAGRAM.ACHIEVER      [required]                              │
+        │      --enneagram.achiever                                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  NAME --name  [required]                                         │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
