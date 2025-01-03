@@ -695,10 +695,10 @@ class App:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
 
             if app._group_commands is None:
-                app._group_arguments = copy(self._group_commands)
+                app._group_commands = copy(self._group_commands)
 
             if app._group_parameters is None:
-                app._group_arguments = copy(self._group_parameters)
+                app._group_parameters = copy(self._group_parameters)
 
             if app._group_arguments is None:
                 app._group_arguments = copy(self._group_arguments)
