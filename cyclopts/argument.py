@@ -55,6 +55,7 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     negative=None,
     accepts_keys=None,
     consume_multiple=None,
+    env_var=None,
 )
 
 _SHOW_DEFAULT_BLOCKLIST = (
