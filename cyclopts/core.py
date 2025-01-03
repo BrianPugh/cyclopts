@@ -195,6 +195,7 @@ class AppReference:
 
     module_path: str
     object_path: str
+    defining_file: Path
     backup: dict[str, Any] = field(factory=dict, kw_only=True)
     name: str | tuple[str] = field(default="", kw_only=True, init=False)
     _parents: list["App"] = field(factory=list, kw_only=True)
@@ -203,9 +204,22 @@ class AppReference:
         import importlib
 
         if self.module_path.startswith("."):
-            raise NotImplementedError
+            # Walk up to find package root
+            current = self.defining_file.parent
+            parts = []
+            while current.exists():
+                if (current / "__init__.py").exists():
+                    parts.append(current.name)
+                    current = current.parent
+                else:
+                    break
+            if not parts:
+                raise ImportError("No package found for relative import")
+            package = ".".join(reversed(parts))
+            obj = importlib.import_module(self.module_path, package=package)
         else:
             obj = importlib.import_module(self.module_path)
+
         for part in self.object_path.split("."):
             obj = getattr(obj, part)
 
@@ -226,8 +240,14 @@ class AppReference:
     def from_entry_point(cls, entry_point: str, **kwargs):
         if kwargs is None:
             kwargs = {}
+        module = _get_root_module()
         module_path, object_path = entry_point.split(":", 1)
-        return cls(module_path, object_path, **kwargs)
+        return cls(
+            module_path,
+            object_path,
+            defining_file=Path(module.__loader__.get_filename()),  # pyright: ignore
+            **kwargs,
+        )
 
     @property
     def object_name(self) -> str:
