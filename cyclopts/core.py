@@ -75,7 +75,7 @@ class _CannotDeriveCallingModuleNameError(Exception):
     pass
 
 
-def _get_root_module_name():
+def _get_root_module():
     """Get the calling package name from the call-stack."""
     for elem in inspect.stack():
         module = inspect.getmodule(elem.frame)
@@ -84,9 +84,16 @@ def _get_root_module_name():
         root_module_name = module.__name__.split(".")[0]
         if root_module_name == "cyclopts":
             continue
-        return root_module_name
+        return module
 
     raise _CannotDeriveCallingModuleNameError  # pragma: no cover
+
+
+def _get_root_module_name():
+    """Get the calling package name from the call-stack."""
+    module = _get_root_module()
+    root_module_name = module.__name__.split(".")[0]
+    return root_module_name
 
 
 def _default_version(default="0.0.0") -> str:
@@ -134,16 +141,6 @@ def _validate_default_command(x):
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
     return x
-
-
-def _combined_meta_command_mapping(app: Optional["App"]) -> dict[str, "App"]:
-    """Return a copied and combined mapping containing app and meta-app commands."""
-    if app is None:
-        return {}
-    command_mapping = copy(app._commands)
-    while (app := app._meta) and app._commands:
-        command_mapping.update(app._commands)
-    return command_mapping
 
 
 def _get_command_groups(parent_app: "App", child_app: "App"):
@@ -194,21 +191,51 @@ def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
 
 @define
 class AppReference:
+    """Reference to a not-yet-imported App."""
+
     module_path: str
     object_path: str
+    backup: dict[str, Any] = field(factory=dict, kw_only=True)
+    name: str | tuple[str] = field(default="", kw_only=True, init=False)
+    _parents: list["App"] = field(factory=list, kw_only=True)
 
     def resolve(self):
         import importlib
 
-        obj = importlib.import_module(self.module_path)
+        if self.module_path.startswith("."):
+            raise NotImplementedError
+        else:
+            obj = importlib.import_module(self.module_path)
         for part in self.object_path.split("."):
             obj = getattr(obj, part)
+
+        if not isinstance(obj, App):
+            # TODO: we probably don't have to enforce this.
+            raise TypeError(f"Referenced object {self.entry_point} must be a Cyclopts App; got {type(obj)}.")
+        if obj._name:
+            # TODO: better error message.
+            raise ValueError("Do not give referenced app a name.")
+        obj._name = self.name
+        obj._parents = self._parents
+        for key, value in self.backup.items():
+            if getattr(obj, key, None) is None:
+                setattr(obj, key, value)
         return obj
 
     @classmethod
-    def from_entry_point(cls, entry_point: str):
+    def from_entry_point(cls, entry_point: str, **kwargs):
+        if kwargs is None:
+            kwargs = {}
         module_path, object_path = entry_point.split(":", 1)
-        return cls(module_path, object_path)
+        return cls(module_path, object_path, **kwargs)
+
+    @property
+    def object_name(self) -> str:
+        return self.object_path.split(".")[-1]
+
+    @property
+    def entry_point(self) -> str:
+        return f"{self.module_path}:{self.object_path}"
 
 
 @define
@@ -527,7 +554,8 @@ class App:
             with suppress(KeyError):
                 return self.meta[key]
         out = self._commands[key]
-        # TODO: resolve lazy here.
+        if isinstance(out, AppReference):
+            self._commands[key] = out = out.resolve()
         return out
 
     def __delitem__(self, key: str):
@@ -620,17 +648,23 @@ class App:
         apps: list[App] = [app]
         unused_tokens = tokens
 
-        command_mapping = _combined_meta_command_mapping(app)
-
         for i, token in enumerate(tokens):
             try:
-                app = command_mapping[token]
-                apps.append(app)
-                unused_tokens = tokens[i + 1 :]
+                app = app[token]
             except KeyError:
-                break
+                # Try searching the meta app hierarchy.
+                while app := app._meta:
+                    try:
+                        app = app[token]
+                    except KeyError:
+                        continue
+                    break
+                if app is None:
+                    # Exhaustively, no subapp was found.
+                    break
+            apps.append(app)
             command_chain.append(token)
-            command_mapping = _combined_meta_command_mapping(app)
+            unused_tokens = tokens[i + 1 :]
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -660,9 +694,20 @@ class App:
         **kwargs: object,
     ) -> Callable[[T], T]: ...
 
+    # This overload is used in code like:
+    #
+    # @app.command("my_app.cli:my_obj")
+    @overload
+    def command(  # pragma: no cover
+        self,
+        obj: str,
+        name: Union[None, str, Iterable[str]] = None,
+        **kwargs: object,
+    ) -> Callable[[T], T]: ...
+
     def command(
         self,
-        obj: Optional[T] = None,
+        obj: Optional[T] | str = None,
         name: Union[None, str, Iterable[str]] = None,
         **kwargs: object,
     ) -> Union[T, Callable[[T], T]]:
@@ -698,6 +743,8 @@ class App:
         ----------
         obj: Optional[Callable]
             Function or :class:`App` to be registered as a command.
+            May also be a string that references an :class:`App` or function
+            that should be lazily imported.
         name: Union[None, str, Iterable[str]]
             Name(s) to register the command to.
             If not provided, defaults to:
@@ -720,14 +767,34 @@ class App:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
 
             if app._group_commands is None:
-                app._group_arguments = copy(self._group_commands)
+                app._group_commands = copy(self._group_commands)
 
             if app._group_parameters is None:
-                app._group_arguments = copy(self._group_parameters)
+                app._group_parameters = copy(self._group_parameters)
 
             if app._group_arguments is None:
                 app._group_arguments = copy(self._group_arguments)
+        elif isinstance(obj, str):
+            # Construct an AppReference object that can later be resolved to an App object.
+            if kwargs:
+                raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
+
+            # TODO: handle relative references to calling module.
+            # root_module = _get_root_module()
+            app = AppReference.from_entry_point(
+                obj,
+                backup={
+                    "_group_commands": copy(self._group_commands),
+                    "_group_parameters": copy(self._group_parameters),
+                    "_group_arguments": copy(self._group_arguments),
+                    "_name_transform": self.name_transform,
+                },
+            )
+            if name is None:
+                name = self.name_transform(app.object_name)
+            app.name = name  # pyright: ignore[reportAttributeAccessIssue]
         else:
+            # Construct an App object from decorated function.
             kwargs.setdefault("help_flags", self.help_flags)
             kwargs.setdefault("version_flags", self.version_flags)
 
@@ -742,13 +809,15 @@ class App:
             for flag in chain(kwargs["help_flags"], kwargs["version_flags"]):  # pyright: ignore
                 app[flag].show = False
 
-        if app._name_transform is None:
-            app.name_transform = self.name_transform
+        if not isinstance(app, AppReference):
+            # Set name_transform before attempting to get name.
+            if app._name_transform is None:
+                app.name_transform = self.name_transform
 
-        if name is None:
-            name = app.name
-        else:
-            app._name = name  # pyright: ignore[reportAttributeAccessIssue]
+            if name is None:
+                name = app.name
+            else:
+                app._name = name  # pyright: ignore[reportAttributeAccessIssue]
 
         for n in to_tuple_converter(name):
             if n in self:
@@ -821,6 +890,7 @@ class App:
 
         if isinstance(obj, App):  # Registering a sub-App
             raise TypeError("Cannot register a sub-App to default.")
+        # TODO: Handle AppReference here?
 
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
