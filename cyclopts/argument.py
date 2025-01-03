@@ -1,5 +1,6 @@
 import inspect
 import itertools
+import json
 from contextlib import suppress
 from functools import partial
 from typing import Any, Callable, Optional, Union, get_args, get_origin
@@ -961,10 +962,28 @@ class Argument:
                 converter = partial(
                     convert, converter=_identity_converter, name_transform=self.parameter.name_transform
                 )
+
+            if self.tokens:
+                # Dictionary-like structures may have incoming json data from an environment variable.
+                for token in self.tokens:
+                    try:
+                        data.update(json.loads(token.value))
+                    except json.JSONDecodeError as e:
+                        raise CoercionError(token=token, target_type=self.hint, msg=e.msg) from None
+
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
-                if child.has_tokens:
+                if child.has_tokens:  # Either the child directly has tokens, or a nested child has tokens.
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
+                elif child.required:
+                    # Check if the required fields are already populated.
+                    obj = data
+                    for k in child.keys:
+                        try:
+                            obj = obj[k]
+                        except Exception:
+                            raise MissingArgumentError(argument=child) from None
+                    child._marked = True
 
             if self._missing_keys_checker and (self.required or data):
                 if missing_keys := self._missing_keys_checker(self, data):
