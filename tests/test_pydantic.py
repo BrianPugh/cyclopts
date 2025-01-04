@@ -1,12 +1,13 @@
+import json
 from datetime import datetime
 from textwrap import dedent
-from typing import Dict, Optional, Union
+from typing import Annotated, Dict, Optional, Union
 
 import pytest
 from pydantic import BaseModel, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 
-from cyclopts import MissingArgumentError
+from cyclopts import MissingArgumentError, Parameter
 
 
 def test_pydantic_error_msg(app, console):
@@ -74,6 +75,36 @@ def test_bind_pydantic_basemodel(app, assert_parse_args):
             "has_socks": True,
         },
     }
+
+    assert_parse_args(
+        foo,
+        'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap --user.outfit.has-socks',
+        User(**external_data),
+    )
+
+
+def test_bind_pydantic_basemodel_from_json(app, assert_parse_args, monkeypatch):
+    @app.command
+    def foo(user: Annotated[User, Parameter(env_var="USER")]):
+        pass
+
+    external_data = {
+        "id": 123,
+        "signup_ts": "2019-06-01 12:22",
+        "tastes": {
+            "wine": 9,
+            "cheese": 7,
+            "cabbage": "1",
+        },
+        "outfit": {
+            "body": "t-shirt",
+            "head": "baseball-cap",
+            "has_socks": True,
+        },
+    }
+
+    monkeypatch.setenv("USER", json.dumps(external_data))
+
     assert_parse_args(
         foo,
         'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap --user.outfit.has-socks',
