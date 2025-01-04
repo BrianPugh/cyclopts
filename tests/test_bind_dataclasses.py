@@ -1,3 +1,4 @@
+import json
 import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
@@ -37,6 +38,29 @@ def test_bind_dataclass(app, assert_parse_args):
     assert_parse_args(
         foo,
         "foo 100 --user.id=123 --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1",
+        100,
+        User(**external_data),
+    )
+
+
+def test_bind_dataclass_from_json(app, assert_parse_args, monkeypatch):
+    @app.command
+    def foo(some_number: int, user: Annotated[User, Parameter(env_var="USER")]):
+        pass
+
+    external_data = {
+        "id": 123,
+        # "name" is purposely missing.
+        "tastes": {
+            "wine": 9,
+            "cheese": 7,
+            "cabbage": 1,
+        },
+    }
+    monkeypatch.setenv("USER", json.dumps(external_data))
+    assert_parse_args(
+        foo,
+        "foo 100",
         100,
         User(**external_data),
     )
