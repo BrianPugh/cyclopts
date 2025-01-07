@@ -8,6 +8,7 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts._convert import (
+    ITERABLE_TYPES,
     convert,
     token_count,
 )
@@ -112,6 +113,16 @@ def _identity_converter(type_, token):
     return token
 
 
+def _get_parameters(hint: Any) -> tuple[Any, list[Parameter]]:
+    """At root level, checks for cyclopts.Parameter annotations."""
+    if is_annotated(hint):
+        inner = get_args(hint)
+        hint = inner[0]
+        return hint, [x for x in inner[1:] if isinstance(x, Parameter)]
+    else:
+        return hint, []
+
+
 class ArgumentCollection(list["Argument"]):
     """A list-like container for :class:`Argument`."""
 
@@ -206,10 +217,23 @@ class ArgumentCollection(list["Argument"]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
-        if is_annotated(hint):
-            annotations = hint.__metadata__  # pyright: ignore
-            hint = get_args(hint)[0]
-            cyclopts_parameters_no_group.extend(x for x in annotations if isinstance(x, Parameter))
+        hint, hint_parameters = _get_parameters(hint)
+        cyclopts_parameters_no_group.extend(hint_parameters)
+
+        # Handle annotations where ``Annotated`` is not at the root level; e.g. ``list[Annotated[...]]``.
+        # Multiple inner Parameter Annotations only make sense if providing specific converter/validators.
+        origin = get_origin(hint)
+        if origin is tuple:
+            # handled in _convert.py
+            pass
+        elif origin in ITERABLE_TYPES:
+            inner_hints = get_args(hint)
+            if len(inner_hints) > 1:
+                raise NotImplementedError(f"Did not expect multiple inner type arguments: {inner_hints}.")
+            elif len(inner_hints) == 1:
+                inner_hint = inner_hints[0]
+                _, hint_parameters = _get_parameters(inner_hint)
+                cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:  # root hint annotation
             if field_info.kind is field_info.VAR_KEYWORD:
@@ -245,6 +269,7 @@ class ArgumentCollection(list["Argument"]):
         # if not immediate_parameter.parse:
         #    return out
 
+        # resolve/derive the parameter name
         if keys:
             cparam = Parameter.combine(
                 upstream_parameter,

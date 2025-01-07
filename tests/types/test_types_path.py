@@ -28,6 +28,28 @@ def test_types_existing_file(convert, tmp_file):
     assert tmp_file == convert(ct.ExistingFile, tmp_file)
 
 
+def test_types_existing_file_app(app):
+    """https://github.com/BrianPugh/cyclopts/issues/287"""
+
+    @app.default
+    def main(f: ct.ExistingFile):
+        pass
+
+    with pytest.raises(ValidationError):
+        app(["this-file-does-not-exist"], exit_on_error=False)
+
+
+def test_types_existing_file_app_list(app):
+    """https://github.com/BrianPugh/cyclopts/issues/287"""
+
+    @app.default
+    def main(f: list[ct.ExistingFile]):
+        pass
+
+    with pytest.raises(ValidationError):
+        app(["this-file-does-not-exist"], exit_on_error=False)
+
+
 def test_types_existing_file_validation_error(convert, tmp_path):
     with pytest.raises(ValidationError):
         convert(ct.ExistingFile, tmp_path)
