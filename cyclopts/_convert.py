@@ -216,7 +216,8 @@ def _convert(
             out = convert_tuple(type_, token, converter=converter)
         else:
             out = convert_tuple(type_, *token, converter=converter)
-    elif origin_type in ITERABLE_TYPES:  # NOT including tuple
+    elif origin_type in ITERABLE_TYPES:
+        # NOT including tuple; handled in ``origin_type is tuple`` body above.
         count, _ = token_count(inner_types[0])
         if not isinstance(token, Sequence):
             raise ValueError
