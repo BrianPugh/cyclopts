@@ -136,13 +136,15 @@ def _validate_default_command(x):
     return x
 
 
-def _combined_meta_command_mapping(app: Optional["App"]) -> dict[str, "App"]:
+def _combined_meta_command_mapping(app: Optional["App"], recurse_meta=True) -> dict[str, "App"]:
     """Return a copied and combined mapping containing app and meta-app commands."""
     if app is None:
         return {}
     command_mapping = copy(app._commands)
-    while (app := app._meta) and app._commands:
-        command_mapping.update(app._commands)
+    if recurse_meta:
+        command_mapping.update(_combined_meta_command_mapping(app._meta))
+    if app._meta_parent:
+        command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
     return command_mapping
 
 
@@ -159,7 +161,7 @@ def resolve_default_parameter_from_apps(apps: Optional[Sequence["App"]]) -> Para
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
         # child_app could be a command of parent_app.meta
-        if parent_app._meta and child_app in parent_app._meta._commands.values():
+        if parent_app._meta and child_app in parent_app._meta.subapps:
             cparams = []  # meta-apps do NOT inherit from their parenting app.
             parent_app = parent_app._meta
 
@@ -481,6 +483,11 @@ class App:
         version_formatted = format_str(version_raw, format=version_format)
         console.print(version_formatted)
 
+    @property
+    def subapps(self):
+        for k in self:
+            yield self[k]
+
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.
 
@@ -504,9 +511,15 @@ class App:
 
             app()
         """
-        if self._meta:
+        return self._get_item(key)
+
+    def _get_item(self, key, recurse_meta=True) -> "App":
+        if recurse_meta and self._meta:
             with suppress(KeyError):
                 return self.meta[key]
+        if self._meta_parent:
+            with suppress(KeyError):
+                return self._meta_parent._get_item(key, recurse_meta=False)
         return self._commands[key]
 
     def __delitem__(self, key: str):
