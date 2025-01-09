@@ -136,14 +136,16 @@ def _validate_default_command(x):
     return x
 
 
-def _combined_meta_command_mapping(app: Optional["App"], recurse_meta=True) -> dict[str, "App"]:
+def _combined_meta_command_mapping(
+    app: Optional["App"], recurse_meta=True, recurse_parent_meta=True
+) -> dict[str, "App"]:
     """Return a copied and combined mapping containing app and meta-app commands."""
     if app is None:
         return {}
     command_mapping = copy(app._commands)
     if recurse_meta:
         command_mapping.update(_combined_meta_command_mapping(app._meta))
-    if app._meta_parent:
+    if recurse_parent_meta and app._meta_parent:
         command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
     return command_mapping
 
@@ -581,6 +583,8 @@ class App:
     def parse_commands(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
+        *,
+        include_parent_meta=True,
     ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
         """Extract out the command tokens from a command.
 
@@ -608,7 +612,7 @@ class App:
         apps: list[App] = [app]
         unused_tokens = tokens
 
-        command_mapping = _combined_meta_command_mapping(app)
+        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
         for i, token in enumerate(tokens):
             try:
@@ -618,7 +622,7 @@ class App:
             except KeyError:
                 break
             command_chain.append(token)
-            command_mapping = _combined_meta_command_mapping(app)
+            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -898,7 +902,7 @@ class App:
 
         meta_parent = self
 
-        command_chain, apps, unused_tokens = self.parse_commands(tokens)
+        command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
         command_app = apps[-1]
 
         ignored: dict[str, Any] = {}
