@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Tuple
 
 import pytest
@@ -91,6 +92,15 @@ def test_types_resolved_existing_path(convert, tmp_path, action):
     src = tmp_path / ".." / tmp_path.name / "foo"
     getattr(src, action)()
     assert src.resolve() == convert(ct.ResolvedExistingPath, src)
+
+
+def test_types_resolved_existing_path_list(app, assert_parse_args):
+    @app.default
+    def main(f: list[ct.ResolvedFile]):
+        pass
+
+    expected = Path("foo.bin").resolve()
+    assert_parse_args(main, "foo.bin", [expected])
 
 
 def test_types_resolved_existing_path_validation_error(convert, tmp_path):

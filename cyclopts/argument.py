@@ -8,7 +8,6 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts._convert import (
-    ITERABLE_TYPES,
     convert,
     token_count,
 )
@@ -219,21 +218,6 @@ class ArgumentCollection(list["Argument"]):
         hint = field_info.hint
         hint, hint_parameters = _get_parameters(hint)
         cyclopts_parameters_no_group.extend(hint_parameters)
-
-        # Handle annotations where ``Annotated`` is not at the root level; e.g. ``list[Annotated[...]]``.
-        # Multiple inner Parameter Annotations only make sense if providing specific converter/validators.
-        origin = get_origin(hint)
-        if origin is tuple:
-            # handled in _convert.py
-            pass
-        elif origin in ITERABLE_TYPES:
-            inner_hints = get_args(hint)
-            if len(inner_hints) > 1:
-                raise NotImplementedError(f"Did not expect multiple inner type arguments: {inner_hints}.")
-            elif len(inner_hints) == 1:
-                inner_hint = inner_hints[0]
-                _, hint_parameters = _get_parameters(inner_hint)
-                cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:  # root hint annotation
             if field_info.kind is field_info.VAR_KEYWORD:
