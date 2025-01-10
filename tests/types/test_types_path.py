@@ -100,7 +100,7 @@ def test_types_resolved_existing_path_list(app, assert_parse_args):
         pass
 
     expected = Path("foo.bin").resolve()
-    assert_parse_args(main, "foo.bin", expected)
+    assert_parse_args(main, "foo.bin", [expected])
 
 
 def test_types_resolved_existing_path_validation_error(convert, tmp_path):

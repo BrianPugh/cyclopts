@@ -168,7 +168,8 @@ def _convert(
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
 
     origin_type = get_origin(type_)
-    inner_types = [resolve(x) for x in get_args(type_)]
+    # Inner types **may** be ``Annotated``
+    inner_types = get_args(type_)
 
     if type_ is dict:
         out = convert(dict[str, str], token)
@@ -285,6 +286,10 @@ def _convert(
         out = type_(*pos_values)
 
     if cparam:
+        # An inner type may have an independent Parameter annotation;
+        # e.g.:
+        #    Uint8 = Annotated[int, ...]
+        #    rgb: tuple[Uint8, Uint8, Uint8]
         try:
             for validator in cparam.validator:  # pyright: ignore
                 validator(type_, out)
