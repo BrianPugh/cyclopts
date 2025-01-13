@@ -113,13 +113,18 @@ def _identity_converter(type_, token):
 
 
 def _get_parameters(hint: Any) -> tuple[Any, list[Parameter]]:
-    """At root level, checks for cyclopts.Parameter annotations."""
+    """At root level, checks for cyclopts.Parameter annotations.
+
+    Includes checking the ``__cyclopts__`` attribute.
+    """
+    parameters = []
+    if cyclopts_config := getattr(hint, "__cyclopts__", None):
+        parameters.extend(cyclopts_config.parameters)
     if is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
-        return hint, [x for x in inner[1:] if isinstance(x, Parameter)]
-    else:
-        return hint, []
+        parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
+    return hint, parameters
 
 
 class ArgumentCollection(list["Argument"]):

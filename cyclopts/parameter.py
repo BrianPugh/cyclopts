@@ -1,10 +1,11 @@
 import inspect
 from collections.abc import Iterable
+from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast, get_args, get_origin
+from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar, Union, cast, get_args, get_origin
 
 import attrs
-from attrs import field
+from attrs import define, field
 
 import cyclopts._env_var
 import cyclopts.utils
@@ -30,6 +31,8 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
     }
 )
 
+
+T = TypeVar("T")
 
 _NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES, *ITERATIVE_BOOL_IMPLICIT_VALUE])
 
@@ -284,6 +287,24 @@ class Parameter:
                 else:
                     return EMPTY_PARAMETER
 
+    def __call__(self, obj: T) -> T:
+        """Decorator interface for annotating a function/class with a Parameter.
+
+        Most commonly used for directly configuring a class
+
+        .. code-block:: python
+
+            @Parameter(...)
+            class Foo: ...
+        """
+        if not hasattr(obj, "__cyclopts__"):
+            obj.__cyclopts__ = CycloptsConfig(obj=obj)  # pyright: ignore[reportAttributeAccessIssue]
+        elif obj.__cyclopts__.obj != self:  # pyright: ignore[reportAttributeAccessIssue]
+            # Create a copy so that children class Parameter decorators don't impact the parent.
+            obj.__cyclopts__ = deepcopy(obj.__cyclopts__)  # pyright: ignore[reportAttributeAccessIssue]
+        obj.__cyclopts__.parameters.append(self)  # pyright: ignore[reportAttributeAccessIssue]
+        return obj
+
 
 _parameter_alias_to_name = {
     p.alias: p.name
@@ -314,3 +335,13 @@ def validate_command(f: Callable):
         cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+
+
+@define
+class CycloptsConfig:
+    """
+    Intended for storing additional data to a ``__cyclopts__`` attribute via decoration.
+    """
+
+    obj: Any = None
+    parameters: list[Parameter] = field(factory=list, init=False)
