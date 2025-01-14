@@ -320,6 +320,7 @@ API
 
 
 .. autoclass:: cyclopts.Parameter
+   :special-members: __call__
 
    .. attribute:: name
       :type: Union[None, str, Iterable[str]]

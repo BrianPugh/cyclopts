@@ -46,6 +46,8 @@ As an example, lets consider using the builtin :obj:`~dataclasses.dataclass` to 
    $ movie-maintainer add --movie.title 'Furiosa: A Mad Max Saga' --movie.year 2024
    Adding movie: Movie(title='Furiosa: A Mad Max Saga', year=2024)
 
+.. _Namespace Flattening:
+
 --------------------
 Namespace Flattening
 --------------------
@@ -81,6 +83,29 @@ It is likely that the actual movie class/object is not important to the CLI user
    │ *  YEAR --year    [required]                                │
    ╰─────────────────────────────────────────────────────────────╯
 
+An alternative way of supplying the :class:`.Parameter` configuration is via a decorator.
+This way can be cleaner and terser in many scenarios.
+The :class:`.Parameter` configuration will also be inherited by subclasses.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from dataclasses import dataclass
+
+   app = App(name="movie-maintainer")
+
+   @Parameter(name="*")
+   @dataclass
+   class Movie:
+      title: str
+      year: int
+
+   @app.command
+   def add(movie: Movie):
+      print(f"Adding movie: {movie}")
+
+   app()
+
 .. _Sharing Parameters:
 
 ------------------
@@ -92,16 +117,14 @@ A flattened dataclass provides a natural way of easily sharing a set of paramete
 
    from cyclopts import App, Parameter
    from dataclasses import dataclass
-   from typing import Annotated
 
    app = App(name="movie-maintainer")
 
+   @Parameter(name="*")
    @dataclass
-   class _Config:
+   class Config:
       user: str
       server: str = "media.sqlite"
-
-   Config = Annotated[_Config, Parameter(name="*")]
 
    @dataclass
    class Movie:
@@ -134,7 +157,7 @@ A flattened dataclass provides a natural way of easily sharing a set of paramete
    ╰─────────────────────────────────────────────────────────────╯
 
    $ movie-maintainer remove 'Mad Max: Fury Road' 2015 --user Guido
-   Config: _Config(user='Guido', server='media.sqlite')
+   Config: Config(user='Guido', server='media.sqlite')
    Removing movie: Movie(title='Mad Max: Fury Road', year=2015)
 
 
@@ -164,12 +187,11 @@ We can update our app to fill in missing CLI parameters from this file:
       config=config.Toml("config.toml", use_commands_as_keys=False),
    )
 
+   @Parameter(name="*")
    @dataclass
-   class _Config:
+   class Config:
       user: str
       server: str = "media.sqlite"
-
-   Config = Annotated[_Config, Parameter(name="*")]
 
    @dataclass
    class Movie:
@@ -186,5 +208,5 @@ We can update our app to fill in missing CLI parameters from this file:
 .. code-block:: console
 
    $ movie-maintainer add 'Mad Max: Fury Road' 2015
-   Config: _Config(user='Guido', server='media.sqlite')
+   Config: Config(user='Guido', server='media.sqlite')
    Adding movie: Movie(title='Mad Max: Fury Road', year=2015)

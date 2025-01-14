@@ -12,7 +12,6 @@ from cyclopts._convert import (
     token_count,
 )
 from cyclopts.annotations import (
-    is_annotated,
     is_attrs,
     is_dataclass,
     is_namedtuple,
@@ -43,7 +42,7 @@ from cyclopts.field_info import (
     get_field_infos,
 )
 from cyclopts.group import Group
-from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
+from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, ParameterDict, grouper, is_builtin
 
@@ -110,16 +109,6 @@ def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]])
 
 def _identity_converter(type_, token):
     return token
-
-
-def _get_parameters(hint: Any) -> tuple[Any, list[Parameter]]:
-    """At root level, checks for cyclopts.Parameter annotations."""
-    if is_annotated(hint):
-        inner = get_args(hint)
-        hint = inner[0]
-        return hint, [x for x in inner[1:] if isinstance(x, Parameter)]
-    else:
-        return hint, []
 
 
 class ArgumentCollection(list["Argument"]):
@@ -216,7 +205,7 @@ class ArgumentCollection(list["Argument"]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
-        hint, hint_parameters = _get_parameters(hint)
+        hint, hint_parameters = get_parameters(hint)
         cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:  # root hint annotation
