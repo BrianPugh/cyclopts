@@ -268,7 +268,6 @@ class Parameter:
     @classmethod
     def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
         """Resolve the immediate Parameter from a type hint."""
-        cyclopts_parameters = []
         if type_ is inspect.Parameter.empty:
             if default_parameters:
                 return cls.combine(*default_parameters)
@@ -276,16 +275,7 @@ class Parameter:
                 return EMPTY_PARAMETER
         else:
             type_ = resolve_optional(type_)
-
-            if is_annotated(type_):
-                annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-                cyclopts_parameters = tuple(x for x in annotations if isinstance(x, Parameter))
-                return cls.combine(*default_parameters, *cyclopts_parameters)
-            else:
-                if default_parameters:
-                    return cls.combine(*default_parameters)
-                else:
-                    return EMPTY_PARAMETER
+            return cls.combine(*default_parameters, *get_parameters(type_)[1])
 
     def __call__(self, obj: T) -> T:
         """Decorator interface for annotating a function/class with a :class:`Parameter`.
@@ -335,6 +325,21 @@ def validate_command(f: Callable):
         cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+
+
+def get_parameters(hint: Any) -> tuple[Any, list[Parameter]]:
+    """At root level, checks for cyclopts.Parameter annotations.
+
+    Includes checking the ``__cyclopts__`` attribute.
+    """
+    parameters = []
+    if cyclopts_config := getattr(hint, "__cyclopts__", None):
+        parameters.extend(cyclopts_config.parameters)
+    if is_annotated(hint):
+        inner = get_args(hint)
+        hint = inner[0]
+        parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
+    return hint, parameters
 
 
 @define
