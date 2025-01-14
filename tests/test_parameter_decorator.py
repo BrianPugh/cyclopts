@@ -2,14 +2,16 @@ from dataclasses import dataclass
 from typing import Optional
 
 import pytest
+from attrs import define
 
 from cyclopts import Parameter
 from cyclopts.exceptions import UnknownOptionError
 
 
-def test_parameter_decorator_dataclass(app, assert_parse_args):
+@pytest.mark.parametrize("decorator", [dataclass, define])
+def test_parameter_decorator_dataclass(app, assert_parse_args, decorator):
     @Parameter(name="*")  # Flatten namespace.
-    @dataclass
+    @decorator
     class User:
         name: str
         age: int
@@ -19,7 +21,7 @@ def test_parameter_decorator_dataclass(app, assert_parse_args):
         pass
 
     assert_parse_args(create, "create")
-    assert_parse_args(create, "create --name=Bob --age=100", user=User("Bob", 100))
+    assert_parse_args(create, "create --name=Bob --age=100", user=User("Bob", 100))  # pyright: ignore[reportCallIssue]
 
 
 def test_parameter_decorator_dataclass_inheritance(app, assert_parse_args):
