@@ -1,6 +1,6 @@
 from typing import Any, Optional, Sequence, Union
 
-from attrs import frozen
+from cyclopts.utils import frozen
 
 Numeric = Union[int, float]
 NumericSequence = Sequence[Union[Numeric, "NumericSequence"]]

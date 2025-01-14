@@ -1,8 +1,8 @@
 from typing import Any, Optional
 
-from attrs import field, frozen
+from attrs import field
 
-from cyclopts.utils import UNSET
+from cyclopts.utils import UNSET, frozen
 
 
 @frozen(kw_only=True)

@@ -1,10 +1,11 @@
 import inspect
 from collections.abc import Iterable
+from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Union, cast, get_args, get_origin
+from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar, Union, cast, get_args, get_origin
 
 import attrs
-from attrs import field, frozen
+from attrs import define, field
 
 import cyclopts._env_var
 import cyclopts.utils
@@ -14,6 +15,7 @@ from cyclopts.group import Group
 from cyclopts.utils import (
     default_auto_group,
     default_name_transform,
+    frozen,
     optional_to_tuple_converter,
     record_init,
     to_tuple_converter,
@@ -30,6 +32,8 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
     }
 )
 
+
+T = TypeVar("T")
 
 _NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES, *ITERATIVE_BOOL_IMPLICIT_VALUE])
 
@@ -239,7 +243,7 @@ class Parameter:
 
     @classmethod
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
-        """Returns a new Parameter with values of ``parameters``.
+        """Returns a new Parameter with combined values of all provided ``parameters``.
 
         Parameters
         ----------
@@ -248,12 +252,17 @@ class Parameter:
              Ordered from least-to-highest attribute priority.
         """
         kwargs = {}
-        for parameter in parameters:
-            if parameter is None:
-                continue
-            for a in parameter.__attrs_attrs__:  # pyright: ignore[reportAttributeAccessIssue]
-                if a.init and a.alias in parameter._provided_args:
-                    kwargs[a.alias] = getattr(parameter, a.name)
+        filtered = [x for x in parameters if x is not None]
+        # In the common case of 0/1 parameters to combine, we can avoid
+        # instantiating a new Parameter object.
+        if len(filtered) == 1:
+            return filtered[0]
+        elif not filtered:
+            return EMPTY_PARAMETER
+
+        for parameter in filtered:
+            for alias in parameter._provided_args:
+                kwargs[alias] = getattr(parameter, _parameter_alias_to_name[alias])
 
         return cls(**kwargs)
 
@@ -271,15 +280,41 @@ class Parameter:
     @classmethod
     def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
         """Resolve the immediate Parameter from a type hint."""
-        cyclopts_parameters = []
-        if type_ is not inspect.Parameter.empty:
+        if type_ is inspect.Parameter.empty:
+            if default_parameters:
+                return cls.combine(*default_parameters)
+            else:
+                return EMPTY_PARAMETER
+        else:
             type_ = resolve_optional(type_)
+            return cls.combine(*default_parameters, *get_parameters(type_)[1])
 
-            if is_annotated(type_):
-                annotations = type_.__metadata__  # pyright: ignore[reportGeneralTypeIssues]
-                cyclopts_parameters = [x for x in annotations if isinstance(x, Parameter)]
+    def __call__(self, obj: T) -> T:
+        """Decorator interface for annotating a function/class with a :class:`Parameter`.
 
-        return cls.combine(*default_parameters, *cyclopts_parameters)
+        Most commonly used for directly configuring a class:
+
+        .. code-block:: python
+
+            @Parameter(...)
+            class Foo: ...
+        """
+        if not hasattr(obj, "__cyclopts__"):
+            obj.__cyclopts__ = CycloptsConfig(obj=obj)  # pyright: ignore[reportAttributeAccessIssue]
+        elif obj.__cyclopts__.obj != self:  # pyright: ignore[reportAttributeAccessIssue]
+            # Create a copy so that children class Parameter decorators don't impact the parent.
+            obj.__cyclopts__ = deepcopy(obj.__cyclopts__)  # pyright: ignore[reportAttributeAccessIssue]
+        obj.__cyclopts__.parameters.append(self)  # pyright: ignore[reportAttributeAccessIssue]
+        return obj
+
+
+_parameter_alias_to_name = {
+    p.alias: p.name
+    for p in Parameter.__attrs_attrs__  # pyright: ignore[reportAttributeAccessIssue]
+    if p.init
+}
+
+EMPTY_PARAMETER = Parameter()
 
 
 def validate_command(f: Callable):
@@ -290,9 +325,40 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
+    if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
+        return
     signature = cyclopts.utils.signature(f)
     for iparam in signature.parameters.values():
-        get_origin(iparam.annotation)
+        # Speed optimization: if an object is not annotated, then there's nothing
+        # to validate. Checking if there's an annotation is significantly faster
+        # than instantiating a cyclopts.Parameter object.
+        if not is_annotated(iparam.annotation):
+            continue
         cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+
+
+def get_parameters(hint: Any) -> tuple[Any, list[Parameter]]:
+    """At root level, checks for cyclopts.Parameter annotations.
+
+    Includes checking the ``__cyclopts__`` attribute.
+    """
+    parameters = []
+    if cyclopts_config := getattr(hint, "__cyclopts__", None):
+        parameters.extend(cyclopts_config.parameters)
+    if is_annotated(hint):
+        inner = get_args(hint)
+        hint = inner[0]
+        parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
+    return hint, parameters
+
+
+@define
+class CycloptsConfig:
+    """
+    Intended for storing additional data to a ``__cyclopts__`` attribute via decoration.
+    """
+
+    obj: Any = None
+    parameters: list[Parameter] = field(factory=list, init=False)

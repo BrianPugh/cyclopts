@@ -15,12 +15,12 @@ from typing import (
     get_origin,
 )
 
-from attrs import define, field, frozen
+from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.annotations import is_union
 from cyclopts.group import Group
-from cyclopts.utils import SortHelper, resolve_callables
+from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
@@ -218,7 +218,7 @@ def format_usage(
     for command in command_chain:
         app = app[command]
 
-    if any(x.show for x in app._commands.values()):
+    if any(x.show for x in app.subapps):
         usage.append("COMMAND")
 
     if app.default_command:
@@ -251,12 +251,20 @@ def format_doc(app: "App", format: str = "restructuredtext"):
     if parsed.long_description:
         if parsed.short_description:
             components.append("\n")
-        components.append((parsed.long_description + "\n", "info"))
+        components.append(parsed.long_description + "\n")
 
     return RichGroup(format_str(*components, format=format), NewLine())
 
 
-def format_str(*components: Union[str, tuple[str, str]], format: str = "restructuredtext") -> "RenderableType":
+def format_str(*components: Union[str, tuple[str, str]], format: str) -> "RenderableType":
+    """Format the sequence of components according to format.
+
+    Parameters
+    ----------
+    components: str | tuple[str, str]
+        Either a plain string, or a tuple of string and formatting style.
+        If formatting style is provided, the string-to-be-displayed WILL be escaped.
+    """
     format = format.lower()
 
     if format == "plaintext":
@@ -300,9 +308,12 @@ def format_str(*components: Union[str, tuple[str, str]], format: str = "restruct
                 if isinstance(component, str):
                     yield Text.from_markup(component.rstrip())
                 else:
-                    yield Text.from_markup(component[0].rstrip(), style=component[1])
+                    yield Text(component[0].rstrip(), style=component[1])
 
-        return Text().join(walk_components())
+        text = Text()
+        for component in walk_components():
+            text.append(component)
+        return text
     else:
         raise ValueError(f'Unknown help_format "{format}"')
 

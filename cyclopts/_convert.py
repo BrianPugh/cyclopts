@@ -168,7 +168,8 @@ def _convert(
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
 
     origin_type = get_origin(type_)
-    inner_types = [resolve(x) for x in get_args(type_)]
+    # Inner types **may** be ``Annotated``
+    inner_types = get_args(type_)
 
     if type_ is dict:
         out = convert(dict[str, str], token)
@@ -216,7 +217,8 @@ def _convert(
             out = convert_tuple(type_, token, converter=converter)
         else:
             out = convert_tuple(type_, *token, converter=converter)
-    elif origin_type in ITERABLE_TYPES:  # NOT including tuple
+    elif origin_type in ITERABLE_TYPES:
+        # NOT including tuple; handled in ``origin_type is tuple`` body above.
         count, _ = token_count(inner_types[0])
         if not isinstance(token, Sequence):
             raise ValueError
@@ -284,6 +286,10 @@ def _convert(
         out = type_(*pos_values)
 
     if cparam:
+        # An inner type may have an independent Parameter annotation;
+        # e.g.:
+        #    Uint8 = Annotated[int, ...]
+        #    rgb: tuple[Uint8, Uint8, Uint8]
         try:
             for validator in cparam.validator:  # pyright: ignore
                 validator(type_, out)
@@ -419,21 +425,21 @@ def token_count(type_: Any) -> tuple[int, bool]:
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    annotation = resolve(type_)
-    origin_type = get_origin(annotation)
+    type_ = resolve(type_)
+    origin_type = get_origin(type_)
 
-    if (origin_type or annotation) is tuple:
-        args = get_args(annotation)
+    if (origin_type or type_) is tuple:
+        args = get_args(type_)
         if args:
             return sum(token_count(x)[0] for x in args if x is not ...), ... in args
         else:
             return 1, True
-    elif (origin_type or annotation) is bool:
+    elif (origin_type or type_) is bool:
         return 0, False
-    elif annotation in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(annotation)) == 0):
+    elif type_ in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(type_)) == 0):
         return 1, True
-    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(annotation)):
-        return token_count(get_args(annotation)[0])[0], True
+    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(type_)):
+        return token_count(get_args(type_)[0])[0], True
     elif is_union(type_):
         sub_args = get_args(type_)
         token_count_target = token_count(sub_args[0])

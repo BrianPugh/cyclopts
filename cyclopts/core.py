@@ -136,13 +136,17 @@ def _validate_default_command(x):
     return x
 
 
-def _combined_meta_command_mapping(app: Optional["App"]) -> dict[str, "App"]:
+def _combined_meta_command_mapping(
+    app: Optional["App"], recurse_meta=True, recurse_parent_meta=True
+) -> dict[str, "App"]:
     """Return a copied and combined mapping containing app and meta-app commands."""
     if app is None:
         return {}
     command_mapping = copy(app._commands)
-    while (app := app._meta) and app._commands:
-        command_mapping.update(app._commands)
+    if recurse_meta:
+        command_mapping.update(_combined_meta_command_mapping(app._meta))
+    if recurse_parent_meta and app._meta_parent:
+        command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
     return command_mapping
 
 
@@ -159,7 +163,7 @@ def resolve_default_parameter_from_apps(apps: Optional[Sequence["App"]]) -> Para
     cparams = []
     for parent_app, child_app in zip(apps[:-1], apps[1:]):
         # child_app could be a command of parent_app.meta
-        if parent_app._meta and child_app in parent_app._meta._commands.values():
+        if parent_app._meta and child_app in parent_app._meta.subapps:
             cparams = []  # meta-apps do NOT inherit from their parenting app.
             parent_app = parent_app._meta
 
@@ -319,7 +323,7 @@ class App:
     ###########
     # Methods #
     ###########
-    def _delete_commands(self, commands: Iterable[str], default=None):
+    def _delete_commands(self, commands: Iterable[str]):
         """Safely delete commands.
 
         Will **not** raise an exception if command(s) do not exist.
@@ -331,12 +335,10 @@ class App:
         """
         # Remove all the old version-flag commands.
         for command in commands:
-            with suppress(KeyError):
-                if default:
-                    if self[command].default == default:
-                        del self[command]
-                else:
-                    del self[command]
+            try:
+                del self[command]
+            except KeyError:
+                pass
 
     @property
     def version_flags(self):
@@ -345,7 +347,7 @@ class App:
     @version_flags.setter
     def version_flags(self, value):
         self._version_flags = value
-        self._delete_commands(self._version_flags, default=self.version_print)
+        self._delete_commands(self._version_flags)
         if self._version_flags:
             self.command(
                 self.version_print,
@@ -363,7 +365,7 @@ class App:
     @help_flags.setter
     def help_flags(self, value):
         self._help_flags = value
-        self._delete_commands(self._help_flags, default=self.help_print)
+        self._delete_commands(self._help_flags)
         if self._help_flags:
             self.command(
                 self.help_print,
@@ -483,6 +485,11 @@ class App:
         version_formatted = format_str(version_raw, format=version_format)
         console.print(version_formatted)
 
+    @property
+    def subapps(self):
+        for k in self:
+            yield self[k]
+
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.
 
@@ -506,9 +513,15 @@ class App:
 
             app()
         """
-        if self._meta:
+        return self._get_item(key)
+
+    def _get_item(self, key, recurse_meta=True) -> "App":
+        if recurse_meta and self._meta:
             with suppress(KeyError):
                 return self.meta[key]
+        if self._meta_parent:
+            with suppress(KeyError):
+                return self._meta_parent._get_item(key, recurse_meta=False)
         return self._commands[key]
 
     def __delitem__(self, key: str):
@@ -570,6 +583,8 @@ class App:
     def parse_commands(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
+        *,
+        include_parent_meta=True,
     ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
         """Extract out the command tokens from a command.
 
@@ -597,7 +612,7 @@ class App:
         apps: list[App] = [app]
         unused_tokens = tokens
 
-        command_mapping = _combined_meta_command_mapping(app)
+        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
         for i, token in enumerate(tokens):
             try:
@@ -607,7 +622,7 @@ class App:
             except KeyError:
                 break
             command_chain.append(token)
-            command_mapping = _combined_meta_command_mapping(app)
+            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -697,16 +712,14 @@ class App:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
 
             if app._group_commands is None:
-                app._group_arguments = copy(self._group_commands)
+                app._group_commands = copy(self._group_commands)
 
             if app._group_parameters is None:
-                app._group_arguments = copy(self._group_parameters)
+                app._group_parameters = copy(self._group_parameters)
 
             if app._group_arguments is None:
                 app._group_arguments = copy(self._group_arguments)
         else:
-            validate_command(obj)
-
             kwargs.setdefault("help_flags", self.help_flags)
             kwargs.setdefault("version_flags", self.version_flags)
 
@@ -804,7 +817,6 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
-        validate_command(obj)
         self.default_command = obj
         if validator:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
@@ -890,7 +902,7 @@ class App:
 
         meta_parent = self
 
-        command_chain, apps, unused_tokens = self.parse_commands(tokens)
+        command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
         command_app = apps[-1]
 
         ignored: dict[str, Any] = {}
@@ -946,6 +958,7 @@ class App:
             try:
                 if command_app.default_command:
                     command = command_app.default_command
+                    validate_command(command)
                     argument_collection = command_app.assemble_argument_collection(apps=apps)
                     ignored: dict[str, Any] = {
                         argument.field_info.name: resolve_annotated(argument.field_info.annotation)
@@ -1352,6 +1365,18 @@ class App:
                 pass
             except Exception:
                 print(traceback.format_exc())
+
+    def update(self, app: "App"):
+        """Copy over all commands from another :class:`App`.
+
+        Commands from the meta app will **not** be copied over.
+
+        Parameters
+        ----------
+        app: cyclopts.App
+            All commands from this application will be copied over.
+        """
+        self._commands.update(app._commands)
 
     def __repr__(self):
         """Only shows non-default values."""

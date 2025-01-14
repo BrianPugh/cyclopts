@@ -12,7 +12,6 @@ from cyclopts._convert import (
     token_count,
 )
 from cyclopts.annotations import (
-    is_annotated,
     is_attrs,
     is_dataclass,
     is_namedtuple,
@@ -43,7 +42,7 @@ from cyclopts.field_info import (
     get_field_infos,
 )
 from cyclopts.group import Group
-from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
+from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, ParameterDict, grouper, is_builtin
 
@@ -207,10 +206,8 @@ class ArgumentCollection(list["Argument"]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
-        if is_annotated(hint):
-            annotations = hint.__metadata__  # pyright: ignore
-            hint = get_args(hint)[0]
-            cyclopts_parameters_no_group.extend(x for x in annotations if isinstance(x, Parameter))
+        hint, hint_parameters = get_parameters(hint)
+        cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:  # root hint annotation
             if field_info.kind is field_info.VAR_KEYWORD:
@@ -243,6 +240,7 @@ class ArgumentCollection(list["Argument"]):
         )
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
 
+        # resolve/derive the parameter name
         if keys:
             cparam = Parameter.combine(
                 upstream_parameter,

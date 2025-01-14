@@ -6,13 +6,11 @@ from typing import Annotated, Any, Optional, Union, get_args, get_origin
 import attrs
 
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
-_union_types = set()
-_union_types.add(Union)
 
 if sys.version_info >= (3, 10):  # pragma: no cover
     from types import UnionType
-
-    _union_types.add(UnionType)
+else:
+    UnionType = object()
 
 if sys.version_info < (3, 11):  # pragma: no cover
     from typing_extensions import NotRequired, Required
@@ -29,7 +27,17 @@ def is_nonetype(hint):
 
 
 def is_union(type_: Optional[type]) -> bool:
-    return type_ in _union_types or get_origin(type_) in _union_types
+    """Checks if a type is a union."""
+    # Direct checks are faster than checking if the type is in a set that contains the union-types.
+    if type_ is Union or type_ is UnionType:
+        return True
+
+    # The ``get_origin`` call is relatively expensive, so we'll check common types
+    # that are passed in here to see if we can avoid calling ``get_origin``.
+    if type_ is str or type_ is int or type_ is float or type_ is bool or is_annotated(type_):
+        return False
+    origin = get_origin(type_)
+    return origin is Union or origin is UnionType
 
 
 def is_pydantic(hint) -> bool:
@@ -96,6 +104,7 @@ def resolve(type_: Any) -> type:
         type_ = resolve_annotated(type_)
         type_ = resolve_optional(type_)
         type_ = resolve_required(type_)
+        type_ = resolve_new_type(type_)
     return type_
 
 
@@ -103,8 +112,7 @@ def resolve_optional(type_: Any) -> type:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.
-
-    if not is_union(get_origin(type_)):
+    if not is_union(type_):
         return type_
 
     non_none_types = [t for t in get_args(type_) if t is not NoneType]
@@ -132,6 +140,13 @@ def resolve_required(type_: Any) -> type:
     if get_origin(type_) in (Required, NotRequired):
         type_ = get_args(type_)[0]
     return type_
+
+
+def resolve_new_type(type_: Any) -> type:
+    try:
+        return resolve_new_type(type_.__supertype__)
+    except AttributeError:
+        return type_
 
 
 def get_hint_name(hint) -> str:
