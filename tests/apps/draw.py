@@ -34,17 +34,15 @@ class Coordinate(NamedTuple):
     "Y coordinate."
 
 
+@Parameter(name="*")
 @dataclass
-class _Config:
+class Config:
     _: KW_ONLY
     units: Literal["meters", "feet"] = "meters"
     "Drawing units."
 
     color: tuple[UInt8, UInt8, UInt8] = (0x00, 0x00, 0x00)
     "RGB uint8 triple."
-
-
-Config = Annotated[_Config, Parameter(name="*")]
 
 
 @app.command

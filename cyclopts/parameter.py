@@ -231,7 +231,7 @@ class Parameter:
 
     @classmethod
     def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
-        """Returns a new Parameter with values of ``parameters``.
+        """Returns a new Parameter with combined values of all provided ``parameters``.
 
         Parameters
         ----------
@@ -288,9 +288,9 @@ class Parameter:
                     return EMPTY_PARAMETER
 
     def __call__(self, obj: T) -> T:
-        """Decorator interface for annotating a function/class with a Parameter.
+        """Decorator interface for annotating a function/class with a :class:`Parameter`.
 
-        Most commonly used for directly configuring a class
+        Most commonly used for directly configuring a class:
 
         .. code-block:: python
 

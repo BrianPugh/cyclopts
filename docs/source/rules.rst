@@ -615,7 +615,7 @@ Cyclopts supports classically defined user classes, as well as classes defined b
 * `pydantic <https://docs.pydantic.dev/latest/>`_
 * `TypedDict <https://docs.python.org/3/library/typing.html#typing.TypedDict>`_
 
-.. note:
+.. note::
    For ``pydantic`` classes, Cyclopts will *not* internally perform type conversions and instead relies on pydantic's coercion engine.
 
 Subkey parsing allows for assigning values positionally and by keyword with a dot-separator.

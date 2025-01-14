@@ -167,7 +167,7 @@ We can add application-level help documentation when creating our ``app``:
    │ *  COUNT --count  [required]                                        │
    ╰─────────────────────────────────────────────────────────────────────╯
 
-.. note:
+.. note::
    Help flags can be changed with :attr:`~cyclopts.App.help_flags`.
 
 Let's add some help documentation for our parameters.
@@ -212,7 +212,7 @@ Cyclopts uses the function's docstring and can interpret ReST, Google, Numpydoc-
    │ *  COUNT --count  Number of times to greet. [required]              │
    ╰─────────────────────────────────────────────────────────────────────╯
 
-.. note:
+.. note::
    If :attr:`.App.help` is not explicitly set, Cyclopts will fallback to the first line
    (short description) of the registered ``@app.default`` function's docstring.
 

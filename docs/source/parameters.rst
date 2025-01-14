@@ -22,6 +22,8 @@ Typically, Cyclopts gets all the information it needs from object names, type hi
 
    app()
 
+Running the example:
+
 .. code-block:: console
 
    $ my-script --help
@@ -63,6 +65,10 @@ However, if more control is required, we can provide additional information by `
 :class:`.Parameter` gives complete control on how Cyclopts processes the annotated parameter.
 See the :ref:`API` page for all configurable options.
 This page will investigate some of the more common use-cases.
+
+.. note::
+   :class:`.Parameter` can also be used as a decorator.
+   This is :ref:`particularly useful for class definitions <Namespace Flattening>`.
 
 ------
 Naming
@@ -152,7 +158,7 @@ The name transform function that converts the python variable name to it's CLI c
 
 Notice how the parameter is now ``--FOO`` instead of the standard ``--foo``.
 
-.. note:
+.. note::
    The returned string is **before** the standard ``--`` is prepended.
 
 Generally, it is not very useful to set the name transform on **individual** parameters; it would be easier/clearer :ref:`to manually specify the name <Parameters - Naming - Manual Naming>`.
