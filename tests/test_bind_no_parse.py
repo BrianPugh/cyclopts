@@ -23,4 +23,4 @@ def test_no_parse_invalid_kind(app):
         def foo(buzz: str, fizz: Annotated[str, Parameter(parse=False)]):
             pass
 
-        app()
+        app([])
