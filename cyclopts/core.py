@@ -5,7 +5,8 @@ import traceback
 from collections.abc import Iterable, Iterator
 from contextlib import suppress
 from copy import copy
-from functools import partial
+from enum import Enum
+from functools import lru_cache, partial
 from itertools import chain
 from pathlib import Path
 from typing import (
@@ -898,6 +899,9 @@ class App:
         *,
         console: Optional["Console"] = None,
     ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
+        if tokens is None:
+            _log_framework_warning(_detect_test_framework())
+
         tokens = normalize_tokens(tokens)
 
         meta_parent = self
@@ -1059,6 +1063,9 @@ class App:
             :obj:`~typing.Annotated` will be resolved.
             Intended to simplify :ref:`meta apps <Meta App>`.
         """
+        if tokens is None:
+            _log_framework_warning(_detect_test_framework())
+
         tokens = normalize_tokens(tokens)
 
         # Normal parsing
@@ -1127,6 +1134,9 @@ class App:
         return_value: Any
             The value the command function returns.
         """
+        if tokens is None:
+            _log_framework_warning(_detect_test_framework())
+
         tokens = normalize_tokens(tokens)
         command, bound, _ = self.parse_args(
             tokens,
@@ -1402,3 +1412,51 @@ def _get_help_flag_index(tokens, help_flags) -> Optional[int]:
         index = None
 
     return index
+
+
+class TestFramework(str, Enum):
+    UNKNOWN = ""
+    PYTEST = "pytest"
+
+
+@lru_cache  # Will always be the same for a given session.
+def _detect_test_framework() -> TestFramework:
+    """Detects if we are currently being ran in a test framework.
+
+    Returns
+    -------
+    TestFramework
+        Name of the testing framework. Returns an empty string if not testing
+        framework discovered.
+    """
+    if os.environ.get("PYTEST_VERSION") is not None:
+        # Available as of pytest v8.2.0 (Apr 27, 2024)
+        return TestFramework.PYTEST
+    else:
+        return TestFramework.UNKNOWN
+
+
+@lru_cache  # Prevent logging of multiple warnings
+def _log_framework_warning(framework: TestFramework) -> None:
+    """Log a warning message for a given testing framework.
+
+    Intended to catch developers invoking their app during unit-tests
+    without providing commands and erroneously reading from :obj:`sys.argv`.
+    """
+    if framework == TestFramework.UNKNOWN:
+        return
+    import warnings
+
+    for elem in inspect.stack():
+        frame = elem.frame
+        f_back = frame.f_back
+        calling_module = inspect.getmodule(f_back)
+        if calling_module is None or f_back is None:
+            continue
+        calling_module_name = calling_module.__name__.split(".")[0]
+        if calling_module_name == "cyclopts":
+            continue
+        message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{f_back.f_code.co_names[0]}([])"?'
+
+        warnings.warn(UserWarning(message), stacklevel=3)
+        break
