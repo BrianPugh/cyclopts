@@ -93,9 +93,12 @@ Extending the example, lets add more arguments and type hints:
    app = App()
 
    @app.default
-   def main(name: str, count: int):
+   def main(name: str, count: int, formal: bool = False):
        for _ in range(count):
-           print(f"Hello {name}!")
+          if formal:
+             print(f"Hello {name}!")
+          else:
+             print(f"Hey {name}!")
 
    if __name__ == "__main__":
        app()
@@ -103,11 +106,18 @@ Extending the example, lets add more arguments and type hints:
 .. code-block:: console
 
    $ python main.py Alice 3
+   Hey Alice!
+   Hey Alice!
+   Hey Alice!
+
+   $ python main.py Alice 3 --formal
    Hello Alice!
    Hello Alice!
    Hello Alice!
 
+
 The command line input ``"3"`` is converted to an integer because the parameter ``count`` has the type hint :obj:`int`.
+Boolean ( here, ``--formal``) parameters are interpreted as flags.
 Cyclopts natively handles all python builtin types (:ref:`and more! <Coercion Rules>`).
 Cyclopts adheres to Python's argument binding rules, allowing for both positional and keyword arguments.
 All of the following CLI invocations are equivalent:
