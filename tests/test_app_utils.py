@@ -77,12 +77,17 @@ def test_log_framework_warning_unknown():
         _log_framework_warning(cyclopts.core.TestFramework.UNKNOWN)  # Should not raise
 
 
-def test_log_framework_warning_pytest():
+def test_log_framework_warning_pytest(app):
     # Should generate a warning when called from non-cyclopts module
     with pytest.warns(UserWarning) as warning_records:
-        _log_framework_warning(cyclopts.core.TestFramework.PYTEST)
+        try:
+            app(exit_on_error=False)
+        except Exception:
+            pass
 
     assert len(warning_records) == 1
     warning_msg = str(warning_records[0].message)
-    assert 'unit-test framework "pytest"' in warning_msg
-    assert "Did you mean" in warning_msg
+    assert (
+        warning_msg
+        == 'Cyclopts application invoked without tokens under unit-test framework "pytest". Did you mean "app([])"?'
+    )
