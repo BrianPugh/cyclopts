@@ -5,19 +5,22 @@ from typing import Sequence, Union
 
 
 class EditorError(Exception):
-    """Root editor-related error."""
+    """Root editor-related error.
+
+    Root exception raised by all exceptions in :func:`.edit`.
+    """
 
 
-class DidNotSaveError(EditorError):
-    """User did not save upon exiting."""
+class EditorDidNotSaveError(EditorError):
+    """User did not save upon exiting :func:`.edit`."""
 
 
-class DidNotChangeError(EditorError):
-    """User did not edit file contents."""
+class EditorDidNotChangeError(EditorError):
+    """User did not edit file contents in :func:`.edit`."""
 
 
 class EditorNotFoundError(EditorError):
-    """Could not find a valid text editor."""
+    """Could not find a valid text editor for :func`.edit`."""
 
 
 def edit(
@@ -30,7 +33,7 @@ def edit(
     save: bool = True,
     required: bool = True,
 ) -> str:
-    """Get text input from a user via their default editor.
+    """Get text input from a user by launching their default text editor.
 
     Parameters
     ----------
@@ -43,13 +46,13 @@ def edit(
     path: Union[str, Path]
         If specified, the path to the file that should be opened.
         Text editors typically display this, so a custom path may result in a better user-interface.
-        Otherwiser, defaults to a temporary text file.
+        Defaults to a temporary text file.
     encoding: str
         File encoding to use.
     save: bool
-        Require the user to save before exiting the editor.
+        **Require** the user to save before exiting the editor. Otherwise raises :exc:`EditorDidNotSaveError`.
     required: bool
-        Require for the saved text to be different from ``initial_text``.
+        **Require** for the saved text to be different from ``initial_text``. Otherwise raises :exc:`EditorDidNotChangeError`.
 
     Raises
     ------
@@ -58,15 +61,15 @@ def edit(
         returned a non-zero exit code.
     EditorNotFoundError
         A suitable text editor could not be found.
-    DidNotSaveError
+    EditorDidNotSaveError
         The user exited the text-editor without saving and ``save=True``.
-    DidNotChangeError
+    EditorDidNotChangeError
         The user did not change the file contents and ``required=True``.
 
     Returns
     -------
     str
-        The resulting text that was saved to the text editor.
+        The resulting text that was saved by the text editor.
     """
     import shutil
     import subprocess
@@ -87,10 +90,10 @@ def edit(
     start_mtime = path.stat().st_mtime
 
     try:
-        subprocess.check_output([editor, path, *editor_args])
+        subprocess.check_call([editor, path, *editor_args])
         end_mtime = path.stat().st_mtime
         if save and end_mtime <= start_mtime:
-            raise DidNotSaveError
+            raise EditorDidNotSaveError
         edited_text = path.read_text(encoding=encoding)
     except subprocess.CalledProcessError as e:
         raise EditorError(f"{editor} exited with status {e.returncode}") from e
@@ -98,6 +101,6 @@ def edit(
         path.unlink(missing_ok=True)
 
     if required and edited_text == initial_text:
-        raise DidNotChangeError
+        raise EditorDidNotChangeError
 
     return edited_text

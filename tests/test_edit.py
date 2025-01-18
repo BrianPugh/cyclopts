@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from cyclopts._edit import (
-    DidNotChangeError,
-    DidNotSaveError,
+    EditorDidNotChangeError,
+    EditorDidNotSaveError,
     EditorError,
     EditorNotFoundError,
     edit,
@@ -27,7 +27,7 @@ def test_basic_edit(mocker, mock_editor, monkeypatch):
     """Test basic editing functionality."""
     monkeypatch.setenv("EDITOR", "test_editor")
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=mock_editor)
+    mocker.patch("subprocess.check_call", side_effect=mock_editor)
 
     result = edit("initial text")
     assert result == "edited content"
@@ -38,7 +38,7 @@ def test_custom_path(mocker, mock_editor, tmp_path, monkeypatch):
     custom_path = tmp_path / "custom.txt"
     monkeypatch.setenv("EDITOR", "test_editor")
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=mock_editor)
+    mocker.patch("subprocess.check_call", side_effect=mock_editor)
 
     result = edit("initial text", path=custom_path)
     assert result == "edited content"
@@ -61,9 +61,9 @@ def test_did_not_save(mocker, monkeypatch):
         return 0
 
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=fake_editor)
+    mocker.patch("subprocess.check_call", side_effect=fake_editor)
 
-    with pytest.raises(DidNotSaveError):
+    with pytest.raises(EditorDidNotSaveError):
         edit("initial text", save=True)
 
 
@@ -78,9 +78,9 @@ def test_did_not_change(mocker, monkeypatch):
         return 0
 
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=fake_editor)
+    mocker.patch("subprocess.check_call", side_effect=fake_editor)
 
-    with pytest.raises(DidNotChangeError):
+    with pytest.raises(EditorDidNotChangeError):
         edit(initial_text, required=True)
 
 
@@ -88,7 +88,7 @@ def test_editor_error(mocker, monkeypatch):
     """Test handling of editor errors."""
     monkeypatch.setenv("EDITOR", "test_editor")
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "test_editor"))
+    mocker.patch("subprocess.check_call", side_effect=subprocess.CalledProcessError(1, "test_editor"))
 
     with pytest.raises(EditorError) as exc_info:
         edit("test")
@@ -106,7 +106,7 @@ def test_custom_encoding(mocker, tmp_path, monkeypatch):
         return 0
 
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=fake_editor_with_encoding)
+    mocker.patch("subprocess.check_call", side_effect=fake_editor_with_encoding)
 
     result = edit("initial", path=test_path, encoding="utf-16")
     assert result == "текст"
@@ -120,11 +120,11 @@ def test_fallback_editors(mocker, mock_editor, monkeypatch):
         return editor_name == "vim"
 
     mocker.patch("shutil.which", side_effect=mock_which)
-    mock_check_output = mocker.patch("subprocess.check_output", side_effect=mock_editor)
+    mock_check_call = mocker.patch("subprocess.check_call", side_effect=mock_editor)
 
     result = edit("test", fallback_editors=["emacs", "vim", "nano"])
     assert result == "edited content"
-    assert mock_check_output.call_args_list[0].args[0][0] == "vim"
+    assert mock_check_call.call_args_list[0].args[0][0] == "vim"
 
 
 def test_editor_args(mocker, monkeypatch):
@@ -138,7 +138,7 @@ def test_editor_args(mocker, monkeypatch):
         return 0
 
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=check_editor_args)
+    mocker.patch("subprocess.check_call", side_effect=check_editor_args)
 
     result = edit("test", editor_args=["--no-splash"])
     assert result == "edited with args"
@@ -155,7 +155,7 @@ def test_optional_change(mocker, monkeypatch):
         return 0
 
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=fake_editor)
+    mocker.patch("subprocess.check_call", side_effect=fake_editor)
 
     # Should not raise DidNotChangeError
     result = edit(initial_text, required=False)
@@ -168,7 +168,7 @@ def test_file_cleanup(mocker, tmp_path, monkeypatch, mock_editor):
     monkeypatch.setenv("EDITOR", "test_editor")
 
     mocker.patch("shutil.which", return_value=True)
-    mocker.patch("subprocess.check_output", side_effect=mock_editor)
+    mocker.patch("subprocess.check_call", side_effect=mock_editor)
 
     edit("test", path=test_path)
     assert not test_path.exists()

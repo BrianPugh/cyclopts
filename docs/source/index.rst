@@ -23,6 +23,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    help.rst
    version.rst
    rules.rst
+   text_editor.rst
    api
 
 

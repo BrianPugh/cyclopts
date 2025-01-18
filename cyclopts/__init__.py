@@ -14,8 +14,8 @@ __all__ = [
     "DocstringError",
     "EditorError",
     "EditorNotFoundError",
-    "DidNotSaveError",
-    "DidNotChangeError",
+    "EditorDidNotSaveError",
+    "EditorDidNotChangeError",
     "Group",
     "InvalidCommandError",
     "MissingArgumentError",
@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 from cyclopts._convert import convert
-from cyclopts._edit import DidNotChangeError, DidNotSaveError, EditorError, EditorNotFoundError, edit
+from cyclopts._edit import EditorDidNotChangeError, EditorDidNotSaveError, EditorError, EditorNotFoundError, edit
 from cyclopts._env_var import env_var_split
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App

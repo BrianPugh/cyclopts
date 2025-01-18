@@ -903,6 +903,8 @@ API
 
 .. autofunction:: cyclopts.env_var_split
 
+.. autofunction:: cyclopts.edit
+
 .. _API Validators:
 
 ----------
@@ -1289,3 +1291,21 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.CommandCollisionError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.EditorError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.EditorNotFoundError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.EditorDidNotSaveError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.EditorDidNotChangeError
+   :show-inheritance:
+   :members:
