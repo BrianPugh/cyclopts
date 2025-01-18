@@ -198,6 +198,32 @@ We will use :meth:`.App.parse_args`, which performs all the parsing, but doesn't
        assert command == pypi_checker
        assert bound.arguments['name'] == "foo"
 
+.. warning::
+
+   A common mistake is accidentally calling ``app()`` or ``app.parse_args()`` with the **intent of providing no arguments**.
+   Calling these methods with no arguments will read from :obj:`sys.argv`, the same as in a typical application.
+   This is basically never the intention in a unit-test, and Cyclopts will produce a warning.
+   For example, this code in a unit test:
+
+   .. code-block:: python
+
+      app()  # Wrong: will produce a warning
+
+   Will generate this warning:
+
+   .. code-block:: text
+
+      =============================== warnings summary ================================
+      test.py::test_no_args
+        /my_project/test.py:64: UserWarning: Cyclopts application invoked without tokens under unit-test framework "pytest". Did you mean "app([])"?
+          app()
+
+   The proper way to specify no CLI arguments is to provide an empty string or list:
+
+   .. code-block:: python
+
+      app([])
+
 ---------
 Help Page
 ---------
