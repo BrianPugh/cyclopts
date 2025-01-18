@@ -1442,6 +1442,8 @@ def _log_framework_warning(framework: TestFramework) -> None:
 
     Intended to catch developers invoking their app during unit-tests
     without providing commands and erroneously reading from :obj:`sys.argv`.
+
+    TO ONLY BE CALLED WITHIN A CYCLOPTS.APP METHOD.
     """
     if framework == TestFramework.UNKNOWN:
         return
@@ -1456,7 +1458,22 @@ def _log_framework_warning(framework: TestFramework) -> None:
         calling_module_name = calling_module.__name__.split(".")[0]
         if calling_module_name == "cyclopts":
             continue
-        message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{f_back.f_code.co_names[0]}([])"?'
 
+        # The "self" is within the Cyclopts codebase App.ANY_METHOD_HERE,
+        # so this is a safe lookup.
+        called_cyclopts_app_instance = frame.f_locals["self"]
+        # Find the variable name in the previous frame that references this object
+        candidate_variables = {**f_back.f_globals, **f_back.f_locals}
+        matched_app_variables = []
+        for var_name, var_instance in candidate_variables.items():
+            if var_instance is called_cyclopts_app_instance:
+                matched_app_variables.append(var_name)
+        if len(matched_app_variables) != 1:
+            # We could not determine the exact variable name; just call it app
+            var_name = "app"
+        else:
+            var_name = matched_app_variables[0]
+
+        message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{var_name}([])"?'
         warnings.warn(UserWarning(message), stacklevel=3)
         break
