@@ -12,6 +12,10 @@ __all__ = [
     "CycloptsError",
     "Dispatcher",
     "DocstringError",
+    "EditorError",
+    "EditorNotFoundError",
+    "DidNotSaveError",
+    "DidNotChangeError",
     "Group",
     "InvalidCommandError",
     "MissingArgumentError",
@@ -25,12 +29,14 @@ __all__ = [
     "config",
     "convert",
     "default_name_transform",
+    "edit",
     "env_var_split",
     "types",
     "validators",
 ]
 
 from cyclopts._convert import convert
+from cyclopts._edit import DidNotChangeError, DidNotSaveError, EditorError, EditorNotFoundError, edit
 from cyclopts._env_var import env_var_split
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App
