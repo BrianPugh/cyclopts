@@ -39,6 +39,6 @@ Here is an example application that mimics ``git commit`` functionality.
    if __name__ == "__main__":
        app()
 
-Running ``python git.py commit`` will bring up a text editor with the pre-defined text, and then return the contents of the file.
+Running ``python git.py commit`` will bring up a text editor with the pre-defined text, and then return the contents of the file. For more interactive CLI prompting, we recommend using the questionary_ package. See :func:`.edit` API page for more advanced usage.
 
-See :func:`.edit` API page for more advanced usage.
+.. _questionary: https://github.com/tmbo/questionary
