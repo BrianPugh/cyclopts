@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Sequence, Union
 
@@ -86,13 +87,14 @@ def edit(
     else:
         path = Path(tempfile.NamedTemporaryFile(suffix=".txt", mode="w", delete=False).name)
     path.write_text(initial_text, encoding=encoding)
-
-    start_mtime = path.stat().st_mtime
+    past_time = time.time() - 5  # arbitrarily set time to 5 seconds ago; some systems only have 1 second precision.
+    os.utime(path, (past_time, past_time))  # Set access and modification time
+    start_stat = path.stat()
 
     try:
         subprocess.check_call([editor, path, *editor_args])
-        end_mtime = path.stat().st_mtime
-        if save and end_mtime <= start_mtime:
+        end_stat = path.stat()
+        if save and end_stat.st_mtime <= start_stat.st_mtime:
             raise EditorDidNotSaveError
         edited_text = path.read_text(encoding=encoding)
     except subprocess.CalledProcessError as e:
