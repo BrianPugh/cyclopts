@@ -29,7 +29,7 @@ def test_pydantic_error_msg(app, console):
     expected_prefix = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ 1 validation error for foo                                         │
+        │ 1 validation error for test_pydantic_error_msg.<locals>.foo        │
         │ 0                                                                  │
         │   Input should be greater than 0 [type=greater_than,               │
         │ input_value=-1, input_type=int]                                    │
