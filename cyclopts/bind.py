@@ -19,9 +19,9 @@ from cyclopts.exceptions import (
     UnknownOptionError,
     ValidationError,
 )
-from cyclopts.field_info import POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD, VAR_KEYWORD, VAR_POSITIONAL
+from cyclopts.field_info import POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD
 from cyclopts.token import Token
-from cyclopts.utils import ParameterDict, is_option_like
+from cyclopts.utils import UNSET, is_option_like
 
 if TYPE_CHECKING:
     from cyclopts.group import Group
@@ -257,35 +257,15 @@ def _parse_env(argument_collection: ArgumentCollection):
 
 
 def _bind(
+    argument_collection: ArgumentCollection,
     func: Callable,
-    mapping: ParameterDict,
 ):
     """Bind the mapping to the function signature."""
-    f_pos, f_kwargs = [], {}
-    use_pos = True
-
-    def f_pos_append(p):
-        nonlocal use_pos
-        assert use_pos
-        try:
-            f_pos.append(mapping[p])
-        except KeyError:
-            use_pos = False
-
     signature = cyclopts.utils.signature(func)
-    for iparam in signature.parameters.values():
-        if use_pos and iparam.kind in (POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD):
-            f_pos_append(iparam)
-        elif use_pos and iparam.kind is VAR_POSITIONAL:
-            f_pos.extend(mapping.get(iparam, []))
-            use_pos = False
-        elif iparam.kind is VAR_KEYWORD:
-            f_kwargs.update(mapping.get(iparam, {}))
-        else:
-            with suppress(KeyError):
-                f_kwargs[iparam.name] = mapping[iparam]
-
-    bound = signature.bind_partial(*f_pos, **f_kwargs)
+    bound = signature.bind_partial()
+    for argument in argument_collection._root_arguments:
+        if argument.value is not UNSET:
+            bound.arguments[argument.field_info.name] = argument.value
     return bound
 
 
@@ -364,7 +344,7 @@ def create_bound_arguments(
             if not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)
 
-        bound = _bind(func, argument_collection._field_info_to_value())
+        bound = _bind(argument_collection, func)
     except CycloptsError as e:
         e.root_input_tokens = tokens
         e.unused_tokens = unused_tokens

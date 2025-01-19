@@ -44,7 +44,7 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, ParameterDict, grouper, is_builtin
+from cyclopts.utils import UNSET, grouper, is_builtin
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -271,19 +271,21 @@ class ArgumentCollection(list["Argument"]):
             else:
                 if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
                     # Name is only used for help-string
-                    cparam = Parameter.combine(cparam, Parameter(name=(field_info.name.upper(),)))
+                    cparam = Parameter.combine(cparam, Parameter(name=(name.upper() for name in field_info.names)))
                 elif field_info.kind is field_info.VAR_KEYWORD:
                     cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:
                     # cparam.name_transform cannot be None due to:
                     #     attrs.converters.default_if_none(default_name_transform)
                     assert cparam.name_transform is not None
-                    cparam = Parameter.combine(cparam, Parameter(name=["--" + cparam.name_transform(field_info.name)]))
+                    cparam = Parameter.combine(
+                        cparam, Parameter(name=("--" + cparam.name_transform(name) for name in field_info.names))
+                    )
 
         if field_info.is_keyword_only:
             positional_index = None
 
-        argument = Argument(field_info=FieldInfo.from_iparam(field_info), parameter=cparam, keys=keys, hint=hint)
+        argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
         if argument._assignable and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
@@ -447,17 +449,6 @@ class ArgumentCollection(list["Argument"]):
     @property
     def _max_index(self) -> Optional[int]:
         return max((x.index for x in self if x.index is not None), default=None)
-
-    def _field_info_to_value(self) -> ParameterDict:
-        """Mapping :class:`.FieldInfo` to converted values.
-
-        Assumes that :meth:`convert` has already been called.
-        """
-        out = ParameterDict()
-        for argument in self._root_arguments:
-            if argument.value is not UNSET:
-                out[argument.field_info] = argument.value
-        return out
 
     def filter_by(
         self,
@@ -975,7 +966,7 @@ class Argument:
                     if missing_arguments:
                         raise MissingArgumentError(argument=missing_arguments[0])
                     else:
-                        missing_description = self.field_info.name + "->" + "->".join(keys)
+                        missing_description = self.field_info.names[0] + "->" + "->".join(keys)
                         raise ValueError(
                             f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
                         )
