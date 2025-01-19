@@ -33,13 +33,14 @@ __all__ = [
     "env_var_split",
     "types",
     "validators",
+    "run",
 ]
 
 from cyclopts._convert import convert
 from cyclopts._edit import EditorDidNotChangeError, EditorDidNotSaveError, EditorError, EditorNotFoundError, edit
 from cyclopts._env_var import env_var_split
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.core import App
+from cyclopts.core import App, run
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
