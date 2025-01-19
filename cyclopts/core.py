@@ -61,6 +61,7 @@ from cyclopts.utils import (
 )
 
 T = TypeVar("T", bound=Callable)
+V = TypeVar("V")
 
 
 with suppress(ImportError):
@@ -1477,3 +1478,26 @@ def _log_framework_warning(framework: TestFramework) -> None:
         message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{var_name}([])"?'
         warnings.warn(UserWarning(message), stacklevel=3)
         break
+
+
+@overload
+def run(__name__: str, /) -> Callable[[T], T]: ...
+
+
+@overload
+def run(function: Callable[..., V], /) -> V: ...
+
+
+def run(function_or_name: Callable[..., V] | str, /) -> Callable[[T], T] | V:
+    if isinstance(function_or_name, str):
+        if function_or_name != "__main__":
+            return lambda function: function
+
+        def inner(function: T) -> T:
+            run(function)
+            return function
+
+        return inner
+    app = App()
+    app.default(function_or_name)
+    return app()
