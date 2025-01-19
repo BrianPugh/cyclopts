@@ -254,7 +254,7 @@ class ArgumentCollection(list["Argument"]):
                 Parameter(
                     name=_resolve_parameter_name(
                         upstream_parameter.name,  # pyright: ignore
-                        immediate_parameter.name or (cparam.name_transform(keys[-1]),),  # pyright: ignore
+                        immediate_parameter.name or tuple(cparam.name_transform(x) for x in field_info.names),  # pyright: ignore
                     )
                 ),
             )

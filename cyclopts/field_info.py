@@ -145,8 +145,15 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
 
     out = {}
     for python_name, pydantic_field in model.model_fields.items():
+        names = []
+        if pydantic_field.alias:
+            if model.model_config.get("populate_by_name", False):
+                names.append(python_name)
+            names.append(pydantic_field.alias)
+        else:
+            names.append(python_name)
         out[python_name] = FieldInfo(
-            names=(python_name,),
+            names=tuple(names),
             kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
             annotation=pydantic_field.annotation,
             default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
