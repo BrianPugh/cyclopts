@@ -136,9 +136,9 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
     from pydantic_core import PydanticUndefined
 
     out = {}
-    for name, pydantic_field in model.model_fields.items():
-        out[name] = FieldInfo(
-            name=name,
+    for python_name, pydantic_field in model.model_fields.items():
+        out[python_name] = FieldInfo(
+            name=python_name,
             kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
             annotation=pydantic_field.annotation,
             default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
