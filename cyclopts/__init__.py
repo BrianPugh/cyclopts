@@ -28,6 +28,7 @@ __all__ = [
     "ValidationError",
     "config",
     "convert",
+    "default_auto_group",
     "default_name_transform",
     "edit",
     "env_var_split",
@@ -58,6 +59,6 @@ from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, default_name_transform
+from cyclopts.utils import UNSET, default_auto_group, default_name_transform
 
 from . import config, types, validators

@@ -238,6 +238,66 @@ API
 
       * If :class:`Group`, directly use it.
 
+   .. attribute:: auto_group
+      :type: Union[None, bool, Callable[[str], str]]
+
+      Automatically create/assign nested subfields of a parameter to their own :class:`.Group`.
+      If a subfield is already explicitly assigned to a Group, :attr:`.auto_group` will **not** override.
+
+      * If :obj:`False`, do not automatically create groups (default).
+
+      * If :obj:`True`, automatically create groups using Cyclopts' builtin :func:`.default_auto_group`.
+
+      * If a callable, is a function that consumes a string (the CLI keyword specifier), and returns the name of the group.
+
+      Example usage:
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from dataclasses import dataclass
+         from typing import Annotated
+
+         app = App()
+
+         @dataclass
+         class Engine:
+            cylinders: int
+            hp: int
+
+         @dataclass
+         class Car:
+            year: int
+            seats: int
+            engine: Engine
+
+         @app.default
+         def main(car: Annotated[Car, Parameter(auto_group=True)]):
+            print(car)
+
+         app()
+
+      Resulting help page:
+
+      .. code-block:: text
+
+         Usage: main COMMAND [ARGS] [OPTIONS]
+
+         ╭─ Car Engine ──────────────────────────────────────────────────────╮
+         │ *  CAR.ENGINE.CYLINDERS      [required]                           │
+         │      --car.engine.cylinders                                       │
+         │ *  CAR.ENGINE.HP             [required]                           │
+         │      --car.engine.hp                                              │
+         ╰───────────────────────────────────────────────────────────────────╯
+         ╭─ Commands ────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                         │
+         │ --version  Display application version.                           │
+         ╰───────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ──────────────────────────────────────────────────────╮
+         │ *  CAR.YEAR --car.year    [required]                              │
+         │ *  CAR.SEATS --car.seats  [required]                              │
+         ╰───────────────────────────────────────────────────────────────────╯
+
    .. attribute:: group_commands
       :type: Group
       :value: Group("Commands")
@@ -898,6 +958,8 @@ API
    :members:
 
 .. autoclass:: cyclopts.UNSET
+
+.. autofunction:: cyclopts.default_auto_group
 
 .. autofunction:: cyclopts.default_name_transform
 

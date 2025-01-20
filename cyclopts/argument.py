@@ -196,8 +196,9 @@ class ArgumentCollection(list["Argument"]):
         docstring_lookup: Optional[dict[tuple[str, ...], Parameter]] = None,
         positional_index: Optional[int] = None,
         _resolve_groups: bool = True,
+        _auto_group=None,  # TODO: type
     ):
-        out = cls()  # groups=list(group_lookup.values()))
+        out = cls()
 
         if docstring_lookup is None:
             docstring_lookup = {}
@@ -238,9 +239,6 @@ class ArgumentCollection(list["Argument"]):
             *default_parameters,
         )
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
-
-        # if not immediate_parameter.parse:
-        #    return out
 
         # resolve/derive the parameter name
         if keys:
@@ -283,7 +281,20 @@ class ArgumentCollection(list["Argument"]):
         if field_info.is_keyword_only:
             positional_index = None
 
-        argument = Argument(field_info=FieldInfo.from_iparam(field_info), parameter=cparam, keys=keys, hint=hint)
+        argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
+
+        if (
+            _auto_group
+            and argument._accepts_keywords
+            and not argument._accepts_arbitrary_keywords
+            and not immediate_parameter.group
+        ):
+            assert isinstance(cparam.name, tuple)
+            group_name = _auto_group(cparam.name[0])
+            if not (auto_group_group := group_lookup.get(group_name)):
+                auto_group_group = group_lookup[group_name] = Group(group_name)
+            argument.parameter = cparam = Parameter.combine(argument.parameter, Parameter(group=auto_group_group))
+
         if argument._assignable and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
@@ -319,6 +330,7 @@ class ArgumentCollection(list["Argument"]):
                     docstring_lookup=subkey_docstring_lookup,
                     positional_index=positional_index,
                     _resolve_groups=_resolve_groups,
+                    _auto_group=cparam.auto_group,
                 )
                 if subkey_argument_collection:
                     argument.children.append(subkey_argument_collection[0])

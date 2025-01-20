@@ -13,6 +13,7 @@ from cyclopts._convert import ITERABLE_TYPES, convert
 from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
 from cyclopts.utils import (
+    default_auto_group,
     default_name_transform,
     frozen,
     optional_to_tuple_converter,
@@ -51,6 +52,15 @@ def _negative_converter(default: tuple[str, ...]):
             return to_tuple_converter(value)
 
     return converter
+
+
+def _auto_group_converter(value: Union[Callable[[str], str], bool, None]) -> Union[None, Callable[[str], str]]:
+    if callable(value):
+        return value  # pyright: ignore
+    elif value:
+        return default_auto_group
+    else:
+        return None
 
 
 @record_init("_provided_args")
@@ -108,6 +118,8 @@ class Parameter:
     group: Union[None, Group, str, Iterable[Union[Group, str]]] = field(
         default=None, converter=to_tuple_converter, hash=False
     )
+
+    auto_group: Union[Callable[[str], str], bool, None] = field(default=None, converter=_auto_group_converter)
 
     parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 

@@ -399,7 +399,7 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
     return to_tuple_converter(value)
 
 
-def default_name_transform(s: str):
+def default_name_transform(s: str) -> str:
     """Converts a python identifier into a CLI token.
 
     Performs the following operations (in order):
@@ -421,6 +421,28 @@ def default_name_transform(s: str):
         Transformed name.
     """
     return s.lower().replace("_", "-").strip("-")
+
+
+def default_auto_group(s: str) -> str:
+    """Converts a CLI option into a :class:`.Group` title.
+
+    Performs the following operations (in order):
+
+    1. Replace ``_`` or ``-`` or ``.`` with whitespace.
+    2. Remove any leading/trailing whitespace.
+    3. Call :func:`str.title`.
+
+    Parameters
+    ----------
+    s: str
+        Input python identifier string.
+
+    Returns
+    -------
+    str
+        Transformed name.
+    """
+    return s.replace("_", " ").replace("-", " ").replace(".", " ").strip().title()
 
 
 def grouper(iterable: Sequence, n: int) -> Iterator[Tuple[Any, ...]]:
