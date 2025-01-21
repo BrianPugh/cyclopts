@@ -3,7 +3,7 @@
 import functools
 import inspect
 import sys
-from collections.abc import Iterable, Iterator, MutableMapping
+from collections.abc import Iterable, Iterator
 from contextlib import suppress
 from operator import itemgetter
 from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Union
@@ -290,65 +290,6 @@ def record_init(target: str):
         return cls
 
     return decorator
-
-
-class ParameterDict(MutableMapping):
-    """A dictionary implementation that can handle mutable ``inspect.Parameter`` as keys."""
-
-    def __init__(self):
-        self.store = {}
-        self.reverse_mapping = {}
-
-    def _param_key(self, param: inspect.Parameter) -> tuple:
-        if not isinstance(param, inspect.Parameter):
-            raise TypeError(f"Key must be an inspect.Parameter; got {type(param)}.")
-        return (param.name, param.kind, param.annotation)
-
-    def __getitem__(self, key: inspect.Parameter) -> Any:
-        return self.store[self._param_key(key)]
-
-    def __setitem__(self, key: inspect.Parameter, value: Any) -> None:
-        processed_key = self._param_key(key)
-        self.store[processed_key] = value
-        self.reverse_mapping[processed_key] = key
-
-    def __delitem__(self, key: inspect.Parameter) -> None:
-        processed_key = self._param_key(key)
-        del self.store[processed_key]
-        del self.reverse_mapping[processed_key]
-
-    def __iter__(self) -> Iterator[inspect.Parameter]:
-        return iter(self.reverse_mapping.values())
-
-    def __len__(self) -> int:
-        return len(self.store)
-
-    def __repr__(self) -> str:
-        inner = []
-        for key, value in self.store.items():
-            inner.append(f"Parameter(name={key[0]!r}, kind={key[1]}, annotation={key[2]}): {value}")
-        return "{" + ", ".join(inner) + "}"
-
-    def __contains__(self, key: object) -> bool:
-        if not isinstance(key, inspect.Parameter):
-            raise TypeError(f"Key must be an inspect.Parameter; got {type(key)}.")
-        return self._param_key(key) in self.store
-
-    def setdefault(self, key: inspect.Parameter, default: Any = None) -> Any:
-        processed_key = self._param_key(key)
-        if processed_key not in self.store:
-            self.reverse_mapping[processed_key] = key
-        return self.store.setdefault(processed_key, default)
-
-    def get(self, key: inspect.Parameter, default: Any = None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def clear(self):
-        self.store.clear()
-        self.reverse_mapping.clear()
 
 
 def is_iterable(obj) -> bool:

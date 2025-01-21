@@ -290,10 +290,10 @@ class MissingArgumentError(CycloptsError):
 
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.names[0]}" {required_string}.{only_got_string}'
+                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.name}" {required_string}.{only_got_string}'
             )
         else:
-            strings.append(f'Parameter "{self.argument.names[0]}" {required_string}.{only_got_string}')
+            strings.append(f'Parameter "{self.argument.name}" {required_string}.{only_got_string}')
 
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")
