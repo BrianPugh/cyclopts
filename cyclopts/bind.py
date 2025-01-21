@@ -199,11 +199,17 @@ def _parse_pos(
                 # Continue in case we hit a VAR_POSITIONAL argument.
                 continue
             if prior_positional_or_keyword_supplied_as_keyword_arguments:
-                raise ArgumentOrderError(
-                    argument=argument,
-                    prior_positional_or_keyword_supplied_as_keyword_arguments=prior_positional_or_keyword_supplied_as_keyword_arguments,
-                    token=tokens_and_force_positional[0][0],
-                )
+                token = tokens[0]
+                if not argument.parameter.allow_leading_hyphen and is_option_like(token):
+                    # It's more meaningful to interpret the token as an intended option,
+                    # rather than an intended positional value for ``argument``.
+                    raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
+                else:
+                    raise ArgumentOrderError(
+                        argument=argument,
+                        prior_positional_or_keyword_supplied_as_keyword_arguments=prior_positional_or_keyword_supplied_as_keyword_arguments,
+                        token=tokens_and_force_positional[0][0],
+                    )
 
         tokens_per_element, consume_all = argument.token_count()
         tokens_per_element = max(1, tokens_per_element)

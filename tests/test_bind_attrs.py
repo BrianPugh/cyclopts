@@ -5,7 +5,7 @@ import pytest
 from attrs import define, field
 
 from cyclopts import Parameter
-from cyclopts.exceptions import MissingArgumentError
+from cyclopts.exceptions import MissingArgumentError, UnknownOptionError
 
 
 @define
@@ -153,3 +153,17 @@ def test_bind_attrs_kw_only(app, assert_parse_args):
     assert_parse_args(default, "4 --power=200 100", Engine(4, 100, power=200))
     with pytest.raises(MissingArgumentError):
         app.parse_args("4 100 200", exit_on_error=False)
+
+
+def test_bind_attrs_unknown_option(app, assert_parse_args):
+    @define
+    class Engine:
+        cylinders: int
+        volume: float
+
+    @app.default
+    def default(engine: Engine):
+        pass
+
+    with pytest.raises(UnknownOptionError):
+        app("--engine.cylinders 4 --this-parameter-does-not-exist 100", exit_on_error=False)
