@@ -1480,24 +1480,20 @@ def _log_framework_warning(framework: TestFramework) -> None:
         break
 
 
-@overload
-def run(__name__: str, /) -> Callable[[T], T]: ...
+def run(callable: Callable[..., V], /) -> V:
+    """Run the given callable as a CLI command and return its result.
 
+    The callable may also be a coroutine function.
+    This function is syntax sugar for very simple use cases, and is roughly equivalent to:
 
-@overload
-def run(function: Callable[..., V], /) -> V: ...
+    .. code-block:: python
 
+        from cyclopts import App
 
-def run(function_or_name: Callable[..., V] | str, /) -> Callable[[T], T] | V:
-    if isinstance(function_or_name, str):
-        if function_or_name != "__main__":
-            return lambda function: function
-
-        def inner(function: T) -> T:
-            run(function)
-            return function
-
-        return inner
+        app = App()
+        app.default(callable)
+        app()
+    """
     app = App()
-    app.default(function_or_name)
+    app.default(callable)
     return app()
