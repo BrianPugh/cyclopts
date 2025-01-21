@@ -180,7 +180,10 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
     signature = cyclopts.utils.signature(hint.__init__)
     iparams = signature.parameters
     for attribute in hint.__attrs_attrs__:
-        iparam = iparams[attribute.name]
+        if not attribute.init:
+            continue
+
+        iparam = iparams[attribute.alias]
 
         if isinstance(attribute.default, attrs.Factory):  # pyright: ignore
             required = False

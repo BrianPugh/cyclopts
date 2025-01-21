@@ -167,3 +167,19 @@ def test_bind_attrs_unknown_option(app, assert_parse_args):
 
     with pytest.raises(UnknownOptionError):
         app("--engine.cylinders 4 --this-parameter-does-not-exist 100", exit_on_error=False)
+
+
+def test_bind_attrs_alias(app, assert_parse_args):
+    @define
+    class Engine:
+        cylinders: int
+        volume: float = field(alias="cc")
+
+    @app.default
+    def default(engine: Engine):
+        pass
+
+    assert_parse_args(default, "--engine.cylinders 4 --engine.cc 100", Engine(cylinders=4, cc=100.0))
+
+    with pytest.raises(UnknownOptionError):
+        app("--engine.cylinders 4 --engine.volume 100", exit_on_error=False)
