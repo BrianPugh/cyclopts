@@ -15,4 +15,4 @@ def _load_yaml(path: Path):
 
 class Yaml(ConfigFromFile):
     def _load_config(self, path: Path) -> dict[str, Any]:
-        return _load_yaml(path)
+        return _load_yaml(path.absolute())

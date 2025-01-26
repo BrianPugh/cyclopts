@@ -15,4 +15,4 @@ def _load_json(path: Path):
 
 class Json(ConfigFromFile):
     def _load_config(self, path: Path) -> dict[str, Any]:
-        return _load_json(path)
+        return _load_json(path.absolute())

@@ -20,4 +20,4 @@ def _load_toml(path: Path):
 
 class Toml(ConfigFromFile):
     def _load_config(self, path: Path) -> dict[str, Any]:
-        return _load_toml(path)
+        return _load_toml(path.absolute())
