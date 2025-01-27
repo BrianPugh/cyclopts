@@ -905,6 +905,8 @@ API
 
 .. autofunction:: cyclopts.edit
 
+.. autofunction:: cyclopts.run
+
 .. _API Validators:
 
 ----------
