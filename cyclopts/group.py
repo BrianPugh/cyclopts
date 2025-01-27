@@ -37,11 +37,10 @@ class Group:
     help: str = ""
 
     # All below parameters are keyword-only
-    _show: Optional[bool] = field(default=None, alias="show", kw_only=True)
+    _show: Optional[bool] = field(default=None, kw_only=True)
 
     _sort_key: Any = field(
         default=None,
-        alias="sort_key",
         converter=lambda x: UNSET if x is None else x,
         kw_only=True,
     )

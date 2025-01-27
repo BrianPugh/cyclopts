@@ -583,11 +583,10 @@ class Argument:
         name: --fullname       hint: <class 'str'>    keys: ('name',)
     """
 
-    # Converted value; may be stale.
-    _value: Any = field(alias="value", default=UNSET)
+    _value: Any = field(default=UNSET)
     """
     Converted value from last :meth:`convert` call.
-    This value may be stale if fields have changed since last :meth:`convert` call.
+    This value **may** be stale if fields have changed since last :meth:`convert` call.
     :class:`.UNSET` if :meth:`convert` has not yet been called with tokens.
     """
 

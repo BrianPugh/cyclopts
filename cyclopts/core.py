@@ -202,9 +202,9 @@ def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    _name: Union[None, str, tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
+    _name: Union[None, str, tuple[str, ...]] = field(default=None, converter=optional_to_tuple_converter)
 
-    _help: Optional[str] = field(default=None, alias="help")
+    _help: Optional[str] = field(default=None)
 
     usage: Optional[str] = field(default=None)
 
@@ -216,7 +216,6 @@ class App:
     # This can ONLY ever be None or Tuple[Callable, ...]
     _config: Union[None, Callable, Iterable[Callable]] = field(
         default=None,
-        alias="config",
         converter=optional_to_tuple_converter,
         kw_only=True,
     )
@@ -226,7 +225,6 @@ class App:
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
         converter=to_tuple_converter,
-        alias="version_flags",
         kw_only=True,
     )
 
@@ -238,7 +236,6 @@ class App:
     _help_flags: Union[str, Iterable[str]] = field(
         default=["--help", "-h"],
         converter=to_tuple_converter,
-        alias="help_flags",
         kw_only=True,
     )
     help_format: Optional[
@@ -271,21 +268,18 @@ class App:
 
     # This can ONLY ever be a Group or None
     _group_arguments: Union[Group, str, None] = field(
-        alias="group_arguments",
         default=None,
         converter=_group_converter,
         kw_only=True,
     )
     # This can ONLY ever be a Group or None
     _group_parameters: Union[Group, str, None] = field(
-        alias="group_parameters",
         default=None,
         converter=_group_converter,
         kw_only=True,
     )
     # This can ONLY ever be a Group or None
     _group_commands: Union[Group, str, None] = field(
-        alias="group_commands",
         default=None,
         converter=_group_converter,
         kw_only=True,
@@ -295,13 +289,11 @@ class App:
 
     _name_transform: Optional[Callable[[str], str]] = field(
         default=None,
-        alias="name_transform",
         kw_only=True,
     )
 
     _sort_key: Any = field(
         default=None,
-        alias="sort_key",
         converter=lambda x: UNSET if x is None else x,
         kw_only=True,
     )

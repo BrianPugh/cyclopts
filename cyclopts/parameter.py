@@ -93,7 +93,7 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    _converter: Callable = field(default=None, alias="converter")
+    _converter: Callable = field(default=None)
 
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
@@ -111,7 +111,7 @@ class Parameter:
 
     parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
-    _show: Optional[bool] = field(default=None, alias="show")
+    _show: Optional[bool] = field(default=None)
 
     show_default: Optional[bool] = field(default=None)
 
@@ -148,7 +148,6 @@ class Parameter:
     allow_leading_hyphen: bool = field(default=False)
 
     _name_transform: Optional[Callable[[str], str]] = field(
-        alias="name_transform",
         default=None,
         kw_only=True,
     )
@@ -250,7 +249,7 @@ class Parameter:
 
         for parameter in filtered:
             for alias in parameter._provided_args:
-                kwargs[alias] = getattr(parameter, _parameter_alias_to_name[alias])
+                kwargs[alias] = getattr(parameter, _PARAMETER_ALIAS_TO_NAME[alias])
 
         return cls(**kwargs)
 
@@ -296,7 +295,7 @@ class Parameter:
         return obj
 
 
-_parameter_alias_to_name = {
+_PARAMETER_ALIAS_TO_NAME = {
     p.alias: p.name
     for p in Parameter.__attrs_attrs__  # pyright: ignore[reportAttributeAccessIssue]
     if p.init
