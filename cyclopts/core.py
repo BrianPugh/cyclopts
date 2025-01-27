@@ -1493,6 +1493,19 @@ def run(callable: Callable[..., V], /) -> V:
         app = App()
         app.default(callable)
         app()
+
+    Example usage:
+
+    .. code-block:: python
+
+        import cyclopts
+
+
+        def main(name: str, age: int):
+            print(f"Hello {name}, you are {age} years old.")
+
+
+        cyclopts.run(main)
     """
     app = App()
     app.default(callable)
