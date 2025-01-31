@@ -46,6 +46,30 @@ def _meta_arguments(apps: list["App"]) -> "ArgumentCollection":
     return argument_collection
 
 
+class CacheKey:
+    """Abstraction to quickly check if a file needs to be read again.
+
+    If a newly instantiated ``CacheKey`` doesn't equal a previously instantiated ``CacheKey``,
+    then the file needs to be re-read.
+    """
+
+    def __init__(self, path: Union[str, Path]):
+        self.path = Path(path).absolute()
+        if self.path.exists():
+            stat = self.path.stat()
+            self._mtime = stat.st_mtime
+            self._size = stat.st_size
+        else:
+            self._mtime = None
+            self._size = None
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            return False
+
+        return self._mtime == other._mtime and self._size == other._size and self.path == other.path
+
+
 @define
 class ConfigFromFile(ABC):
     path: Union[str, Path] = field(converter=Path)
@@ -59,9 +83,14 @@ class ConfigFromFile(ABC):
     _config: Optional[dict[str, Any]] = field(default=None, init=False, repr=False)
     "Loaded configuration structure (to be loaded by subclassed ``_load_config`` method)."
 
+    _config_cache_key: Optional[CacheKey] = field(default=None, init=False, repr=False)
+    "Conditions under which ``_config`` was loaded."
+
     @abstractmethod
     def _load_config(self, path: Path) -> dict[str, Any]:
         """Load the config dictionary from path.
+
+        Do **not** do any downstream caching; ``ConfigFromFile`` handles caching.
 
         Parameters
         ----------
@@ -77,15 +106,17 @@ class ConfigFromFile(ABC):
 
     @property
     def config(self) -> dict[str, Any]:
-        if self._config is not None:
-            return self._config
-
         assert isinstance(self.path, Path)
         for parent in self.path.parents:
             candidate = parent / self.path.name
             if candidate.exists():
+                cache_key = CacheKey(candidate)
+                if self._config_cache_key == cache_key:
+                    return self._config or {}
+
                 try:
                     self._config = self._load_config(candidate)
+                    self._config_cache_key = cache_key
                 except Exception as e:
                     msg = getattr(type(e), "__name__", "")
                     with suppress(IndexError):

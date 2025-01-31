@@ -23,7 +23,12 @@ Lets make a small application that checks PyPI_ if a library name is available:
                return True  # Package does not exist (name is available)
        return False  # Package exists (name is not available)
 
-   app = cyclopts.App(config=cyclopts.config.Env("PYPI_CHECKER_"))
+   app = cyclopts.App(
+         config=[
+            cyclopts.config.Env("PYPI_CHECKER_"),
+            cyclopts.config.Json("config.json"),
+         ],
+   )
 
    @app.default
    def pypi_checker(name: str, *, silent: bool = False):
@@ -202,7 +207,7 @@ We will use :meth:`.App.parse_args`, which performs all the parsing, but doesn't
 
    A common mistake is accidentally calling ``app()`` or ``app.parse_args()`` with the **intent of providing no arguments**.
    Calling these methods with no arguments will read from :obj:`sys.argv`, the same as in a typical application.
-   This is basically never the intention in a unit-test, and Cyclopts will produce a warning.
+   This is rarely the intention in a unit-test, and Cyclopts **will produce a warning.**
    For example, this code in a unit test:
 
    .. code-block:: python
@@ -215,7 +220,8 @@ We will use :meth:`.App.parse_args`, which performs all the parsing, but doesn't
 
       =============================== warnings summary ================================
       test.py::test_no_args
-        /my_project/test.py:64: UserWarning: Cyclopts application invoked without tokens under unit-test framework "pytest". Did you mean "app([])"?
+        /my_project/test.py:64: UserWarning: Cyclopts application invoked without tokens
+        under unit-test framework "pytest". Did you mean "app([])"?
           app()
 
    The proper way to specify no CLI arguments is to provide an empty string or list:
@@ -223,6 +229,33 @@ We will use :meth:`.App.parse_args`, which performs all the parsing, but doesn't
    .. code-block:: python
 
       app([])
+
+-----------
+File Config
+-----------
+To explicitly test that configurations from the :ref:`Cyclopts configuration system <Config Files>` are loading properly, we can create a configuration file in a temporary directory and change our current-working-directory (cwd) to that temporary directory. The pytest built-in ``tmp_path`` fixture gives us a temporary directory, and the ``monkeypatch`` fixture allows us to change the cwd. We have to change the cwd because typically configuration files are discovered relative to the directory where the CLI was invoked. If your CLI searches other locations (such as the home directory), you will need to modify this example appropriately.
+
+.. code-block:: python
+
+   # test.py
+   import json
+
+   @pytest.fixture(autouse=True)
+   def chdir_to_tmp_path(tmp_path, monkeypatch):
+       "Automatically change current directory to tmp_path"
+       monkeypatch.chdir(tmp_path)
+
+   @pytest.fixture
+   def config_path(tmp_path):
+       "Path to JSON configuration file in tmp_path"
+       return tmp_path / "config.json"  # same name that was provided to cyclopts.config.Json
+
+   def test_config(config_path):
+       with config_path.open("w") as f:
+          json.dump({"name": "bar"}, f)
+       command, bound, _ = app.parse_args([])  # An empty list - no CLI arguments passed in.
+       assert command == pypi_checker
+       assert bound.arguments['name'] == "foo"
 
 ---------
 Help Page
