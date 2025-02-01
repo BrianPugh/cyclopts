@@ -251,6 +251,7 @@ class App:
             "rich",
         ]
     ] = field(default=None, kw_only=True)
+    help_on_error: Optional[bool] = field(default=None, kw_only=True)
 
     version_format: Optional[
         Literal[
@@ -1019,6 +1020,7 @@ class App:
         console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
+        help_on_error: Optional[bool] = None,
         verbose: bool = False,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
@@ -1038,14 +1040,17 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
             Print a rich-formatted error on error.
-            Defaults to ``True``.
+            Defaults to :obj:`True`.
         exit_on_error: bool
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
-            Defaults to ``True``.
+            Defaults to :obj:`True`.
+        help_on_error: bool
+            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
+            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
         verbose: bool
             Populate exception strings with more information intended for developers.
-            Defaults to ``False``.
+            Defaults to :obj:`False`.
 
         Returns
         -------
@@ -1064,6 +1069,7 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
+        help_on_error = self._resolve(tokens, help_on_error, "help_on_error") or False
 
         # Normal parsing
         try:
@@ -1087,6 +1093,9 @@ class App:
 
             if e.console is None:
                 e.console = self._resolve_console(tokens, console)
+            if help_on_error:
+                assert e.console
+                self.help_print(tokens, console=e.console)
             if print_error:
                 assert e.console
                 e.console.print(format_cyclopts_error(e))
@@ -1103,6 +1112,7 @@ class App:
         console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
+        help_on_error: Optional[bool] = None,
         verbose: bool = False,
     ):
         """Interprets and executes a command.
@@ -1117,14 +1127,17 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
             Print a rich-formatted error on error.
-            Defaults to ``True``.
+            Defaults to :obj:`True`.
         exit_on_error: bool
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
             Defaults to ``True``.
+        help_on_error: bool
+            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
+            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
         verbose: bool
             Populate exception strings with more information intended for developers.
-            Defaults to ``False``.
+            Defaults to :obj:`False`.
 
         Returns
         -------
@@ -1140,6 +1153,7 @@ class App:
             console=console,
             print_error=print_error,
             exit_on_error=exit_on_error,
+            help_on_error=help_on_error,
             verbose=verbose,
         )
         try:
