@@ -923,11 +923,7 @@ class App:
         except IndexError:
             parent_app = None
 
-        config: tuple[Callable, ...] = ()
-        for app in reversed(apps):
-            if app.config:
-                config = app.config  # pyright: ignore[reportAssignmentType]
-                break
+        config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
         config = tuple(partial(x, apps, command_chain) for x in config)
 
         # Special flags (help/version) get intercepted by the root app.
@@ -1168,15 +1164,35 @@ class App:
                     sys.exit(1)
             raise
 
-    def _resolve_console(
-        self, tokens: Union[None, str, Iterable[str]], console: Optional["Console"] = None
-    ) -> "Console":
-        if console is not None:
-            return console
-        _, apps, _ = self.parse_commands(tokens)
+    def _resolve(self, tokens_or_apps: Optional[Sequence], immediate, attribute: str):
+        if immediate is not None:
+            return immediate
+
+        if not tokens_or_apps:
+            apps = (self,)
+        elif isinstance(tokens_or_apps[0], App):
+            apps = tokens_or_apps
+        else:
+            _, apps, _ = self.parse_commands(tokens_or_apps)
+
         for app in reversed(apps):
-            if app.console:
-                return app.console
+            result = getattr(app, attribute)
+            if result is not None:
+                return result
+
+            # Check parenting meta app(s)
+            meta_app = app
+            while (meta_app := meta_app._meta_parent) is not None:
+                result = getattr(meta_app, attribute)
+                if result is not None:
+                    return result
+
+        return None
+
+    def _resolve_console(self, tokens_or_apps: Optional[Sequence], console: Optional["Console"] = None) -> "Console":
+        result = self._resolve(tokens_or_apps, console, "console")
+        if result is not None:
+            return result
         from rich.console import Console
 
         return Console()
