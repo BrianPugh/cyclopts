@@ -7,7 +7,7 @@ import pytest
 
 from cyclopts import App, Group, Parameter
 from cyclopts.argument import ArgumentCollection
-from cyclopts.exceptions import MissingArgumentError
+from cyclopts.exceptions import CoercionError, MissingArgumentError
 from cyclopts.help import (
     HelpPanel,
     create_parameter_help_panel,
@@ -1726,3 +1726,33 @@ def test_help_consistent_formatting(app, console):
     actual_cmd_help = actual_cmd_help.strip()
 
     assert actual_help == actual_cmd_help
+
+
+def test_help_help_on_error(app, console):
+    app.help = "This is the App's Help."
+    app.help_on_error = True
+
+    @app.command
+    def foo(count: int):
+        """This is Foo's Help."""
+        pass
+
+    with console.capture() as capture, pytest.raises(CoercionError):
+        app(["foo", "bar"], console=console, exit_on_error=False)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app foo [ARGS] [OPTIONS]
+
+        This is Foo's Help.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  COUNT --count  [required]                                       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Invalid value for "COUNT": unable to convert "bar" into int.       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

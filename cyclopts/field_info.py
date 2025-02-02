@@ -1,7 +1,8 @@
 import inspect
-from typing import Annotated, Any, Optional, get_args, get_origin  # noqa: F401
+from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_origin  # noqa: F401
 
 import attrs
+from attrs import field
 
 import cyclopts.utils
 from cyclopts.annotations import (
@@ -30,29 +31,31 @@ def _replace_annotated_type(src_type, dst_type):
     return Annotated[(dst_type,) + get_args(src_type)[1:]]  # pyright: ignore
 
 
-class FieldInfo(inspect.Parameter):
+@attrs.define
+class FieldInfo:
     """Extension of :class:`inspect.Parameter`."""
 
-    POSITIONAL = frozenset({POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY, VAR_POSITIONAL})
-    KEYWORD = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
+    names: tuple[str, ...]
+    kind: inspect._ParameterKind
 
-    def __init__(self, *args, required: bool, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.required = required
-        self._mutable_kind = super().kind
+    required: bool = field(kw_only=True)
+    default: Any = field(default=inspect.Parameter.empty, kw_only=True)
+    annotation: Any = field(default=inspect.Parameter.empty, kw_only=True)
 
-    @property
-    def kind(self):
-        return self._mutable_kind
-
-    @kind.setter
-    def kind(self, value):
-        if not isinstance(value, inspect._ParameterKind):
-            raise TypeError("'kind' must be an instance of _ParameterKind")
-        self._mutable_kind = value
+    ###################
+    # Class Variables #
+    ###################
+    empty: ClassVar = inspect.Parameter.empty
+    POSITIONAL_OR_KEYWORD: ClassVar = inspect.Parameter.POSITIONAL_OR_KEYWORD
+    POSITIONAL_ONLY: ClassVar = inspect.Parameter.POSITIONAL_ONLY
+    KEYWORD_ONLY: ClassVar = inspect.Parameter.KEYWORD_ONLY
+    VAR_POSITIONAL: ClassVar = inspect.Parameter.VAR_POSITIONAL
+    VAR_KEYWORD: ClassVar = inspect.Parameter.VAR_KEYWORD
+    POSITIONAL: ClassVar[frozenset] = frozenset({POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY, VAR_POSITIONAL})
+    KEYWORD: ClassVar[frozenset] = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
 
     @classmethod
-    def from_iparam(cls, iparam, *, required: Optional[bool] = None):
+    def from_iparam(cls, iparam: inspect.Parameter, *, required: Optional[bool] = None):
         if required is None:
             required = (
                 iparam.default is iparam.empty
@@ -61,7 +64,7 @@ class FieldInfo(inspect.Parameter):
             )
 
         return cls(
-            name=iparam.name,
+            names=(iparam.name,),
             annotation=iparam.annotation,
             kind=iparam.kind,
             default=iparam.default,
@@ -78,6 +81,11 @@ class FieldInfo(inspect.Parameter):
             )
         hint = resolve_optional(hint)
         return hint
+
+    @property
+    def name(self):
+        """The **first** provided name."""
+        return self.names[0]
 
     @property
     def is_positional(self) -> bool:
@@ -110,7 +118,7 @@ def _typed_dict_field_infos(typeddict) -> dict[str, FieldInfo]:
             required = True
         else:  # Fields are OPTIONAL by default
             required = False
-        out[name] = FieldInfo(name, FieldInfo.KEYWORD_ONLY, annotation=annotation, required=required)
+        out[name] = FieldInfo((name,), FieldInfo.KEYWORD_ONLY, annotation=annotation, required=required)
     return out
 
 
@@ -136,9 +144,16 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
     from pydantic_core import PydanticUndefined
 
     out = {}
-    for name, pydantic_field in model.model_fields.items():
-        out[name] = FieldInfo(
-            name=name,
+    for python_name, pydantic_field in model.model_fields.items():
+        names = []
+        if pydantic_field.alias:
+            if model.model_config.get("populate_by_name", False):
+                names.append(python_name)
+            names.append(pydantic_field.alias)
+        else:
+            names.append(python_name)
+        out[python_name] = FieldInfo(
+            names=tuple(names),
             kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
             annotation=pydantic_field.annotation,
             default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
@@ -151,7 +166,7 @@ def _namedtuple_field_infos(hint) -> dict[str, FieldInfo]:
     out = {}
     for name in hint._fields:
         out[name] = FieldInfo(
-            name=name,
+            names=(name,),
             kind=FieldInfo.POSITIONAL_OR_KEYWORD,
             annotation=hint.__annotations__.get(name, str),
             default=hint._field_defaults.get(name, FieldInfo.empty),
@@ -165,7 +180,10 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
     signature = cyclopts.utils.signature(hint.__init__)
     iparams = signature.parameters
     for attribute in hint.__attrs_attrs__:
-        iparam = iparams[attribute.name]
+        if not attribute.init:
+            continue
+
+        iparam = iparams[attribute.alias]
 
         if isinstance(attribute.default, attrs.Factory):  # pyright: ignore
             required = False
@@ -178,7 +196,7 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
             default = attribute.default
 
         out[iparam.name] = FieldInfo(
-            name=attribute.alias,
+            names=(attribute.alias,),
             annotation=attribute.type,
             kind=iparam.kind,
             default=default,

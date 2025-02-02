@@ -40,6 +40,29 @@ pip install cyclopts
 ```
 
 # Quick Start
+- Import `cyclopts.run()` and give it a function to run.
+
+```python
+from cyclopts import run
+
+def foo(loops: int):
+    for i in range(loops):
+        print(f"Looping! {i}")
+
+run(foo)
+```
+
+Execute the script from the command line:
+
+```console
+$ python start.py 3
+Looping! 0
+Looping! 1
+Looping! 2
+```
+
+When you need more control:
+
 - Create an application using `cyclopts.App`.
 - Register commands with the `command` decorator.
 - Register a default function with the `default` decorator.

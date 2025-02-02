@@ -61,6 +61,7 @@ from cyclopts.utils import (
 )
 
 T = TypeVar("T", bound=Callable)
+V = TypeVar("V")
 
 
 with suppress(ImportError):
@@ -250,6 +251,7 @@ class App:
             "rich",
         ]
     ] = field(default=None, kw_only=True)
+    help_on_error: Optional[bool] = field(default=None, kw_only=True)
 
     version_format: Optional[
         Literal[
@@ -422,10 +424,7 @@ class App:
 
     @property
     def config(self) -> tuple[str, ...]:
-        if self._config is None and self._meta_parent is not None:
-            return self._meta_parent.config
-        else:
-            return self._config or ()  # pyright: ignore[reportReturnType]
+        return self._resolve(None, None, "_config")  # pyright: ignore[reportReturnType]
 
     @config.setter
     def config(self, value):
@@ -922,11 +921,7 @@ class App:
         except IndexError:
             parent_app = None
 
-        config: tuple[Callable, ...] = ()
-        for app in reversed(apps):
-            if app.config:
-                config = app.config  # pyright: ignore[reportAssignmentType]
-                break
+        config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
         config = tuple(partial(x, apps, command_chain) for x in config)
 
         # Special flags (help/version) get intercepted by the root app.
@@ -1022,6 +1017,7 @@ class App:
         console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
+        help_on_error: Optional[bool] = None,
         verbose: bool = False,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
@@ -1041,14 +1037,17 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
             Print a rich-formatted error on error.
-            Defaults to ``True``.
+            Defaults to :obj:`True`.
         exit_on_error: bool
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
-            Defaults to ``True``.
+            Defaults to :obj:`True`.
+        help_on_error: bool
+            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
+            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
         verbose: bool
             Populate exception strings with more information intended for developers.
-            Defaults to ``False``.
+            Defaults to :obj:`False`.
 
         Returns
         -------
@@ -1067,6 +1066,7 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
+        help_on_error = self._resolve(tokens, help_on_error, "help_on_error") or False
 
         # Normal parsing
         try:
@@ -1090,6 +1090,9 @@ class App:
 
             if e.console is None:
                 e.console = self._resolve_console(tokens, console)
+            if help_on_error:
+                assert e.console
+                self.help_print(tokens, console=e.console)
             if print_error:
                 assert e.console
                 e.console.print(format_cyclopts_error(e))
@@ -1106,6 +1109,7 @@ class App:
         console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
+        help_on_error: Optional[bool] = None,
         verbose: bool = False,
     ):
         """Interprets and executes a command.
@@ -1120,14 +1124,17 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
             Print a rich-formatted error on error.
-            Defaults to ``True``.
+            Defaults to :obj:`True`.
         exit_on_error: bool
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
             Defaults to ``True``.
+        help_on_error: bool
+            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
+            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
         verbose: bool
             Populate exception strings with more information intended for developers.
-            Defaults to ``False``.
+            Defaults to :obj:`False`.
 
         Returns
         -------
@@ -1143,6 +1150,7 @@ class App:
             console=console,
             print_error=print_error,
             exit_on_error=exit_on_error,
+            help_on_error=help_on_error,
             verbose=verbose,
         )
         try:
@@ -1167,15 +1175,35 @@ class App:
                     sys.exit(1)
             raise
 
-    def _resolve_console(
-        self, tokens: Union[None, str, Iterable[str]], console: Optional["Console"] = None
-    ) -> "Console":
-        if console is not None:
-            return console
-        _, apps, _ = self.parse_commands(tokens)
+    def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
+        if override is not None:
+            return override
+
+        if not tokens_or_apps:
+            apps = (self,)
+        elif isinstance(tokens_or_apps[0], App):
+            apps = tokens_or_apps
+        else:
+            _, apps, _ = self.parse_commands(tokens_or_apps)
+
         for app in reversed(apps):
-            if app.console:
-                return app.console
+            result = getattr(app, attribute)
+            if result is not None:
+                return result
+
+            # Check parenting meta app(s)
+            meta_app = app
+            while (meta_app := meta_app._meta_parent) is not None:
+                result = getattr(meta_app, attribute)
+                if result is not None:
+                    return result
+
+        return None
+
+    def _resolve_console(self, tokens_or_apps: Optional[Sequence], override: Optional["Console"] = None) -> "Console":
+        result = self._resolve(tokens_or_apps, override, "console")
+        if result is not None:
+            return result
         from rich.console import Console
 
         return Console()
@@ -1477,3 +1505,35 @@ def _log_framework_warning(framework: TestFramework) -> None:
         message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{var_name}([])"?'
         warnings.warn(UserWarning(message), stacklevel=3)
         break
+
+
+def run(callable: Callable[..., V], /) -> V:
+    """Run the given callable as a CLI command and return its result.
+
+    The callable may also be a coroutine function.
+    This function is syntax sugar for very simple use cases, and is roughly equivalent to:
+
+    .. code-block:: python
+
+        from cyclopts import App
+
+        app = App()
+        app.default(callable)
+        app()
+
+    Example usage:
+
+    .. code-block:: python
+
+        import cyclopts
+
+
+        def main(name: str, age: int):
+            print(f"Hello {name}, you are {age} years old.")
+
+
+        cyclopts.run(main)
+    """
+    app = App()
+    app.default(callable)
+    return app()

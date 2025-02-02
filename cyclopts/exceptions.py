@@ -8,6 +8,7 @@ import cyclopts.utils
 from cyclopts.annotations import get_hint_name
 from cyclopts.group import Group
 from cyclopts.token import Token
+from cyclopts.utils import is_option_like
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -288,12 +289,25 @@ class MissingArgumentError(CycloptsError):
             received_count = len(self.tokens_so_far) % count
             only_got_string = f" Only got {received_count}." if received_count else ""
 
+        close_match_string = ""
+        if self.unused_tokens and self.argument.field_info.is_keyword:
+            import difflib
+
+            candidates = [x for x in self.unused_tokens if is_option_like(x)]
+
+            close_matches = difflib.get_close_matches(self.argument.name, candidates, n=1, cutoff=0.6)
+            if close_matches:
+                close_match_string = f'Did you mean "{self.argument.name}" instead of "{close_matches[0]}"?'
+
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.names[0]}" {required_string}.{only_got_string}'
+                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.name}" {required_string}.{only_got_string}'
             )
         else:
-            strings.append(f'Parameter "{self.argument.names[0]}" {required_string}.{only_got_string}')
+            strings.append(f'Parameter "{self.argument.name}" {required_string}.{only_got_string}')
+
+        if close_match_string:
+            strings.append(close_match_string)
 
         if self.verbose:
             strings.append(f" Parsed: {self.tokens_so_far}.")

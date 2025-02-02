@@ -226,4 +226,25 @@ Cyclopts uses the function's docstring and can interpret ReST, Google, Numpydoc-
    If :attr:`.App.help` is not explicitly set, Cyclopts will fallback to the first line
    (short description) of the registered ``@app.default`` function's docstring.
 
+---
+Run
+---
+An alternative, terser API is available for simple applications with a single command.
+The :func:`.run` function takes in a single callable (usually a function) and runs it
+as a Cyclopts application.
+
+.. code-block:: python
+
+   import cyclopts
+
+   def main(name: str, count: int):
+       for _ in range(count):
+           print(f"Hello {name}!")
+
+   if __name__ == "__main__":
+       cyclopts.run(main)
+
+The :func:`.run` function is intentionally simple. If greater control is required, then use the
+conventional :class:`.App` interface.
+
 .. _checkout the mypy cheatsheet: https://mypy.readthedocs.io/en/latest/cheat_sheet_py3.html

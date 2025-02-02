@@ -4,8 +4,9 @@ from textwrap import dedent
 from typing import Annotated, Dict, Optional, Union
 
 import pytest
-from pydantic import BaseModel, Field, PositiveInt, validate_call
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
+from pydantic.alias_generators import to_camel
 
 from cyclopts import MissingArgumentError, Parameter
 
@@ -173,3 +174,54 @@ def test_bind_pydantic_basemodel_missing_arg(app, console):
     )
 
     assert actual == expected
+
+
+def test_pydantic_alias(app, console, assert_parse_args):
+    class User(BaseModel):
+        model_config = ConfigDict(
+            # A callable that takes a field name and returns an alias for it.
+            alias_generator=to_camel,
+            # Whether an aliased field may be populated by its name as given by the model attribute, as well as the alias.
+            # e.g. for this model, both "user_name=" and "userName=" should work.
+            populate_by_name=True,
+            # Whether to build models and look up discriminators of tagged unions using python object attributes.
+            from_attributes=True,
+        )
+
+        user_name: str
+        "Name of user."
+
+        age_in_years: int
+        "Age of user in years."
+
+    @app.command
+    def foo(user: User):
+        pass
+
+    with console.capture() as capture:
+        app("foo --help", console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_pydantic foo [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  USER.USER-NAME         Name of user. [required]                 │
+        │      --user.user-name                                              │
+        │      --user.username                                               │
+        │ *  USER.AGE-IN-YEARS      Age of user in years. [required]         │
+        │      --user.age-in-years                                           │
+        │      --user.ageinyears                                             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+    assert_parse_args(
+        foo,
+        "foo --user.username='Bob Smith' --user.age_in_years=100",
+        user=User(user_name="Bob Smith", age_in_years=100),
+    )
