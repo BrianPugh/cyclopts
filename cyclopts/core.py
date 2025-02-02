@@ -424,10 +424,7 @@ class App:
 
     @property
     def config(self) -> tuple[str, ...]:
-        if self._config is None and self._meta_parent is not None:
-            return self._meta_parent.config
-        else:
-            return self._config or ()  # pyright: ignore[reportReturnType]
+        return self._resolve(None, None, "_config")  # pyright: ignore[reportReturnType]
 
     @config.setter
     def config(self, value):
@@ -1178,9 +1175,9 @@ class App:
                     sys.exit(1)
             raise
 
-    def _resolve(self, tokens_or_apps: Optional[Sequence], immediate, attribute: str):
-        if immediate is not None:
-            return immediate
+    def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
+        if override is not None:
+            return override
 
         if not tokens_or_apps:
             apps = (self,)
@@ -1203,8 +1200,8 @@ class App:
 
         return None
 
-    def _resolve_console(self, tokens_or_apps: Optional[Sequence], console: Optional["Console"] = None) -> "Console":
-        result = self._resolve(tokens_or_apps, console, "console")
+    def _resolve_console(self, tokens_or_apps: Optional[Sequence], override: Optional["Console"] = None) -> "Console":
+        result = self._resolve(tokens_or_apps, override, "console")
         if result is not None:
             return result
         from rich.console import Console
