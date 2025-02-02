@@ -4,6 +4,7 @@ from typing import Tuple
 import pytest
 
 from cyclopts import CycloptsError
+from cyclopts.exceptions import MissingArgumentError
 
 
 @pytest.fixture
@@ -85,6 +86,25 @@ def test_runtime_exception_bad_command_recommend(app, console):
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
         '│ Unknown command "bad-command". Did you mean "mad-command"?         │\n'
         "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
+
+
+def test_runtime_exception_bad_parameter_recommend(app, console):
+    @app.command
+    def some_command(*, foo: int):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(["some-command", "--boo", "123"], exit_on_error=False, console=console)
+
+    actual = capture.get()
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "some-command" parameter "--foo" requires an argument. Did │
+        │ you mean "--foo" instead of "--boo"?                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
     )
 
 
