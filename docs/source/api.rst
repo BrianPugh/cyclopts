@@ -85,6 +85,13 @@ API
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
 
+   .. attribute:: help_on_error
+      :type: Optional[bool]
+      :value: None
+
+      Prints the help-page before printing an error.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
+
    .. attribute:: version_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
