@@ -885,6 +885,14 @@ class Argument:
         """This argument, or a child argument, has at least 1 parsed token."""  # noqa: D404
         return bool(self.tokens) or any(x.has_tokens for x in self.children)
 
+    @property
+    def children_recursive(self) -> "ArgumentCollection":
+        out = ArgumentCollection()
+        for child in self.children:
+            out.append(child)
+            out.extend(child.children_recursive)
+        return out
+
     def _convert(self, converter: Optional[Callable] = None):
         if converter is None:
             converter = self.parameter.converter
@@ -968,7 +976,7 @@ class Argument:
                     update_argument_collection(
                         {self.name.lstrip("-"): parsed_json},
                         token.source,
-                        self.children,
+                        self.children_recursive,
                         root_keys=(),
                         allow_unknown=False,
                     )
