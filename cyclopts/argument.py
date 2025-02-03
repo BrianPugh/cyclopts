@@ -957,11 +957,21 @@ class Argument:
 
             if self.tokens:
                 # Dictionary-like structures may have incoming json data from an environment variable.
+                # Pass these values along as Tokens to children.
+                from cyclopts.config._common import update_argument_collection
+
                 for token in self.tokens:
                     try:
-                        data.update(json.loads(token.value))
+                        parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
                         raise CoercionError(token=token, target_type=self.hint, msg=e.msg) from None
+                    update_argument_collection(
+                        {self.name.lstrip("-"): parsed_json},
+                        token.source,
+                        self.children,
+                        root_keys=(),
+                        allow_unknown=False,
+                    )
 
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
