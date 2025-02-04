@@ -25,6 +25,7 @@ def test_parameter_decorator_dataclass(app, assert_parse_args, decorator):
 
 
 def test_parameter_decorator_dataclass_inheritance(app, assert_parse_args):
+    @Parameter(name="person")  # Should override the name="u" below.
     @Parameter(name="u", negative_bool=[])
     @dataclass
     class User:
@@ -41,9 +42,9 @@ def test_parameter_decorator_dataclass_inheritance(app, assert_parse_args):
     def create(*, user: Optional[User] = None, admin: Optional[Admin] = None):
         pass
 
-    assert_parse_args(create, "create --u.name=Bob --u.age=100", user=User("Bob", 100))
+    assert_parse_args(create, "create --person.name=Bob --person.age=100", user=User("Bob", 100))
     with pytest.raises(UnknownOptionError):
-        app("create --u.no-privileged", exit_on_error=False)
+        app("create --person.no-privileged", exit_on_error=False)
 
     assert_parse_args(create, "create --a.name=Bob --a.age=100", admin=Admin("Bob", 100))
     assert_parse_args(
