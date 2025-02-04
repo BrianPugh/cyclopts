@@ -1,13 +1,13 @@
 from datetime import datetime
 from textwrap import dedent
-from typing import Dict, Optional, Union
+from typing import Annotated, Dict, Optional, Union
 
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
-from cyclopts import MissingArgumentError
+from cyclopts import MissingArgumentError, Parameter
 
 
 def test_pydantic_error_msg(app, console):
@@ -207,12 +207,12 @@ def test_parameter_decorator_pydantic_nested_1(app, console):
 
     class S3Path(BaseModel):
         bucket: Annotated[str, Parameter()]
-        key: Annotated[str, Parameter()]
+        key: str
 
     @Parameter(name="*")  # Flatten namespace.
     class S3CliParams(BaseModel):
         path: Annotated[S3Path, Parameter(name="*")]
-        region: Annotated[str, Parameter(name="region")]
+        region: Annotated[str, Parameter(name="area")]
 
     @app.command
     def action(*, s3_path: S3CliParams):
@@ -224,12 +224,12 @@ def test_parameter_decorator_pydantic_nested_1(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_parameter_decorator action [OPTIONS]
+        Usage: test_pydantic action [OPTIONS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --bucket  [required]                                            │
         │ *  --key     [required]                                            │
-        │ *  --region  [required]                                            │
+        │ *  --area    [required]                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
