@@ -289,7 +289,7 @@ class Parameter:
         """
         if not hasattr(obj, "__cyclopts__"):
             obj.__cyclopts__ = CycloptsConfig(obj=obj)  # pyright: ignore[reportAttributeAccessIssue]
-        elif obj.__cyclopts__.obj != self:  # pyright: ignore[reportAttributeAccessIssue]
+        elif obj.__cyclopts__.obj != obj:  # pyright: ignore[reportAttributeAccessIssue]
             # Create a copy so that children class Parameter decorators don't impact the parent.
             obj.__cyclopts__ = deepcopy(obj.__cyclopts__)  # pyright: ignore[reportAttributeAccessIssue]
         obj.__cyclopts__.parameters.append(self)  # pyright: ignore[reportAttributeAccessIssue]
