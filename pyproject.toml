@@ -98,6 +98,9 @@ exclude_lines = [
     "if sys.version_info >= (3, 10):",
     "from typing import Annotated",
     "except ImportError:",
+
+    # Overloads can't have coverage:
+    "@overload",
 ]
 
 omit = [
