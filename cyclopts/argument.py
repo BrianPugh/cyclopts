@@ -463,7 +463,6 @@ class ArgumentCollection(list["Argument"]):
         parse: Optional[bool] = None,
         show: Optional[bool] = None,
         value_set: Optional[bool] = None,
-        assignable: Optional[bool] = None,
     ) -> "ArgumentCollection":
         """Filter the :class:`ArgumentCollection`.
 
@@ -505,8 +504,6 @@ class ArgumentCollection(list["Argument"]):
             ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
         if parse is not None:
             ac = cls(x for x in ac if not (x.parameter.parse ^ parse))
-        if assignable is not None:
-            ac = cls(x for x in ac if not (x._assignable ^ assignable))
 
         return ac
 
