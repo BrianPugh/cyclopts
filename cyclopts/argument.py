@@ -908,7 +908,7 @@ class Argument:
 
         if not self.parameter.parse:
             out = UNSET
-        elif self._assignable:
+        elif not self.children:
             positional: list[Token] = []
             keyword = {}
             for token in self.tokens:
