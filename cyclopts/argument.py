@@ -595,12 +595,6 @@ class Argument:
     _default: Any = field(default=None, init=False, repr=False)
     _lookup: dict[str, FieldInfo] = field(factory=dict, init=False, repr=False)
 
-    _assignable: bool = field(default=False, init=False, repr=False)
-    """
-    Can assign values directly to this argument
-    If _assignable is ``False``, it's a non-visible node used only for the conversion process.
-    """
-
     children: "ArgumentCollection" = field(factory=ArgumentCollection, init=False, repr=False)
     """
     Collection of other :class:`Argument` that eventually culminate into the python variable represented by :attr:`field_info`.
@@ -623,7 +617,6 @@ class Argument:
             return
 
         if self.parameter.accepts_keys is False:  # ``None`` means to infer.
-            self._assignable = True
             return
 
         for hint in hints:
@@ -634,7 +627,6 @@ class Argument:
             # Classes that ALWAYS takes keywords (accepts_keys=None)
             field_infos = get_field_infos(hint)
             if dict in hint_origin:
-                self._assignable = True
                 self._accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
@@ -676,7 +668,6 @@ class Argument:
                 self._lookup.update(field_infos)
             elif self.parameter.accepts_keys is None:
                 # Typical builtin hint
-                self._assignable = True
                 continue
 
             if self.parameter.accepts_keys is None:
