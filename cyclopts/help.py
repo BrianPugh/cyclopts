@@ -355,8 +355,6 @@ def create_parameter_help_panel(
 
     entries_positional, entries_kw = [], []
     for argument in argument_collection.filter_by(show=True):
-        if not argument._assignable:
-            continue
         assert argument.parameter.name_transform
 
         help_components = []
