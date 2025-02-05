@@ -134,15 +134,12 @@ def test_bind_pydantic_basemodel_help(app, console):
         │    USER.NAME --user.name      [default: John Doe]                  │
         │ *  USER.SIGNUP-TS             [required]                           │
         │      --user.signup-ts                                              │
-        │ *  USER.TASTES --user.tastes  [required]                           │
-        │    USER.OUTFIT.BODY                                                │
-        │      --user.outfit.body                                            │
-        │    USER.OUTFIT.HEAD                                                │
-        │      --user.outfit.head                                            │
-        │    USER.OUTFIT.HAS-SOCKS                                           │
-        │      --user.outfit.has-socks                                       │
-        │      --user.outfit.no-has-so                                       │
-        │      cks                                                           │
+        │ *  --user.tastes              [required]                           │
+        │    --user.outfit.body                                              │
+        │    --user.outfit.head                                              │
+        │    --user.outfit.has-socks -                                       │
+        │      -user.outfit.no-has-soc                                       │
+        │      ks                                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

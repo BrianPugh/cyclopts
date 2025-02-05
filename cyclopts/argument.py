@@ -288,7 +288,7 @@ class ArgumentCollection(list["Argument"]):
             positional_index = None
 
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
-        if argument._assignable and positional_index is not None:
+        if not argument._accepts_keywords and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
 
