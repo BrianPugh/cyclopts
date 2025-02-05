@@ -623,7 +623,6 @@ class Argument:
         hints = get_args(hint) if is_union(hint) else (hint,)
 
         if not self.parameter.parse:
-            self._assignable = False
             return
 
         if self.parameter.accepts_keys is False:  # ``None`` means to infer.
@@ -727,8 +726,6 @@ class Argument:
 
     @property
     def _accepts_arbitrary_keywords(self) -> bool:
-        if not self._assignable:
-            return False
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
@@ -771,7 +768,7 @@ class Argument:
             Implicit value.
             :obj:`None` if no implicit value is applicable.
         """
-        if not self._assignable or not self.parameter.parse:
+        if not self.parameter.parse:
             raise ValueError
         return (
             self._match_index(term)
@@ -868,7 +865,7 @@ class Argument:
 
     def append(self, token: Token):
         """Safely add a :class:`Token`."""
-        if not self._assignable:
+        if not self.parameter.parse:
             raise ValueError
         if (
             any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
@@ -1146,8 +1143,11 @@ class Argument:
 
     @property
     def show(self) -> bool:
-        """Show this argument on the help page."""
-        return self._assignable and self.parameter.show
+        """Show this argument on the help page.
+
+        If an argument has child arguments, don't show it on the help-page.
+        """
+        return not self.children and self.parameter.show
 
     @property
     def required(self) -> bool:

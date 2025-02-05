@@ -215,7 +215,16 @@ def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console):
     actual = capture.get()
 
     # No arguments/parameters
-    assert actual == "Usage: test_bind_generic_class foo [OPTIONS]\n\n"
+    expected = dedent(
+        """\
+        Usage: test_bind_generic_class foo [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --user  [required]                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
     with pytest.raises(ValueError):
         app("foo --user.name=Bob --user.age=100")
