@@ -21,7 +21,7 @@ class User:
     tastes: Dict[str, int] = field(default_factory=dict)
 
 
-def test_bind_dataclass(app, assert_parse_args):
+def test_bind_dataclass(app, assert_parse_args, console):
     @app.command
     def foo(some_number: int, user: User):
         pass
@@ -41,6 +41,30 @@ def test_bind_dataclass(app, assert_parse_args):
         100,
         User(**external_data),
     )
+
+
+def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
+    """We expect to see the first subargument (--user.id) in the error message,
+    not the root "--user".
+    """
+
+    @app.default
+    def default(some_number: int, user: User):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app("123", console=console, exit_on_error=False)
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Parameter "--user.id" requires an argument.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
 
 
 def test_bind_dataclass_from_json(app, assert_parse_args, monkeypatch):

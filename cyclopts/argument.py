@@ -241,8 +241,8 @@ class ArgumentCollection(list["Argument"]):
         )
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
 
-        # if not immediate_parameter.parse:
-        #    return out
+        # We do NOT want to skip parse=False arguments here.
+        # This makes it easier to assemble ignored arguments downstrea.
 
         # resolve/derive the parameter name
         if keys:

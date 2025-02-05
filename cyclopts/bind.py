@@ -345,7 +345,9 @@ def create_bound_arguments(
             raise ValidationError(exception_message=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
 
         for argument in argument_collection:
-            if not argument.field_info.required or argument.keys or not argument._assignable:
+            # if a dict-like argument is missing, raise a MissingArgumentError on the first
+            # required child (as opposed generically to the root dict-like object).
+            if not argument.parameter.parse or not argument.field_info.required or argument.keys:
                 continue
             if not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)
