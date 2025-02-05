@@ -182,7 +182,7 @@ class UnknownOptionError(CycloptsError):
         if keyword := self.token.keyword or self.token.value:
             import difflib
 
-            candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x._assignable))
+            candidates = list(chain.from_iterable(x.names for x in self.argument_collection))
 
             close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.6)
             if close_matches:
