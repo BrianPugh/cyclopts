@@ -285,7 +285,7 @@ class MissingArgumentError(CycloptsError):
             required_string = "requires an argument"
             only_got_string = ""
         else:
-            required_string = f"requires {count} arguments"
+            required_string = f"requires {count} positional arguments"
             received_count = len(self.tokens_so_far) % count
             only_got_string = f" Only got {received_count}." if received_count else ""
 

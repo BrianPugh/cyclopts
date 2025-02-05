@@ -23,7 +23,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
     actual = capture.get()
     assert actual == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Parameter "--a" requires 3 arguments. Only got 2.                  │\n'
+        '│ Parameter "--a" requires 3 positional arguments. Only got 2.       │\n'
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
@@ -33,15 +33,15 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
     actual = capture.get()
     assert actual == dedent(
         """\
-    ╭─ Error ────────────────────────────────────────────────────────────╮
-    │ MissingArgumentError                                               │
-    │ Function defined in file "FILENAME", line 100:                     │
-    │     foo(a: Tuple[int, int, int])                                   │
-    │ Root Input Tokens: ['1', '2']                                      │
-    │ Parameter "--a" requires 3 arguments. Only got 2.  Parsed: ['1',   │
-    │ '2'].                                                              │
-    ╰────────────────────────────────────────────────────────────────────╯
-    """
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ MissingArgumentError                                               │
+        │ Function defined in file "FILENAME", line 100:                     │
+        │     foo(a: Tuple[int, int, int])                                   │
+        │ Root Input Tokens: ['1', '2']                                      │
+        │ Parameter "--a" requires 3 positional arguments. Only got 2.       │
+        │ Parsed: ['1', '2'].                                                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
     )
 
 
