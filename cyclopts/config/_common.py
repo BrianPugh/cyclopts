@@ -126,7 +126,8 @@ def update_argument_collection(
             value = tuple(str(x) for x in value)
 
             for i, v in enumerate(value):
-                argument.append(Token(keyword=complete_keyword, value=v, source=source, index=i, keys=remaining_keys))
+                token = Token(keyword=complete_keyword, value=v, source=source, index=i, keys=remaining_keys)
+                argument.append(token)
 
 
 @define

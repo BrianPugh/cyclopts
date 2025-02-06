@@ -855,11 +855,12 @@ class Argument:
         """Safely add a :class:`Token`."""
         if not self.parameter.parse:
             raise ValueError
-        if (
-            any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
-            and not self.token_count(token.keys)[1]
-        ):
-            raise RepeatArgumentError(token=token)
+
+        if any(x.address == token.address for x in self.tokens):
+            _, consume_all = self.token_count(token.keys)
+            if not consume_all:
+                raise RepeatArgumentError(token=token)
+
         if self.tokens:
             if bool(token.keys) ^ any(x.keys for x in self.tokens):
                 raise MixedArgumentError(argument=self)
