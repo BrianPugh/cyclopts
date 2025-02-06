@@ -117,7 +117,7 @@ def update_argument_collection(
                     token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
                 ) from None
 
-            if do_not_update.setdefault((option_key, subkeys), bool(argument.tokens)):
+            if do_not_update.setdefault(id(argument), bool(argument.tokens)):
                 # If this argument already has tokens on **first** access, then skip it.
                 # Allows us to add multiple tokens to an argument from a **single** source (config file).
                 continue

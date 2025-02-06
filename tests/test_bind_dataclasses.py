@@ -67,7 +67,7 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
     assert actual == expected
 
 
-def test_bind_dataclass_from_json(app, assert_parse_args, monkeypatch):
+def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
     @app.command
     def foo(some_number: int, user: Annotated[User, Parameter(env_var="USER")]):
         pass
