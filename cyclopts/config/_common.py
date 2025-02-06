@@ -105,6 +105,11 @@ def update_argument_collection(
             except ValueError:
                 if allow_unknown:
                     continue
+                if apps and apps[-1]._meta_parent:
+                    # We're currently in the meta-app portion of the launch process,
+                    # so MOST supplied options will be unmatched, as we haven't gotten
+                    # to the actual command processing yet.
+                    continue
                 raise UnknownOptionError(
                     token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
                 ) from None

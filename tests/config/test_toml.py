@@ -62,7 +62,7 @@ def test_config_toml_with_meta(config_path):
     def meta(
         *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
     ):
-        app(tokens)
+        return app(tokens)
 
     @app.default
     def main(name: str):
