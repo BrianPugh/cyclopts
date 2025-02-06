@@ -88,6 +88,9 @@ def update_argument_collection(
     Note: it feels bad that we're passing in ``apps`` here.
     """
     meta_arguments = _meta_arguments(apps or ())
+
+    do_not_update = {}
+
     for option_key, option_value in config.items():
         for subkeys, value in _walk_leaves(option_value):
             cli_option_name = to_cli_option_name(option_key, *subkeys)
@@ -114,9 +117,9 @@ def update_argument_collection(
                     token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
                 ) from None
 
-            # If the argument already has tokens from a different source,
-            # don't add more data from this configuration.
-            if any(x.source != source for x in argument.tokens):
+            if do_not_update.setdefault((option_key, subkeys), bool(argument.tokens)):
+                # If this argument already has tokens on **first** access, then skip it.
+                # Allows us to add multiple tokens to an argument from a **single** source (config file).
                 continue
 
             # Convert all values to strings, so that the Cyclopts engine can process them.
@@ -126,6 +129,7 @@ def update_argument_collection(
             value = tuple(str(x) for x in value)
 
             for i, v in enumerate(value):
+                # TODO: is this index correct? If the source value is a list, it should probably be different
                 token = Token(keyword=complete_keyword, value=v, source=source, index=i, keys=remaining_keys)
                 argument.append(token)
 
