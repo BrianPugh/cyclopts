@@ -47,7 +47,7 @@ def config_path(tmp_path):
     return tmp_path / "config.toml"  # same name that was provided to cyclopts.config.Json
 
 
-def test_config_toml_with_meta(config_path):
+def test_duplicate_config_toml_with_meta(config_path):
     config_path.write_text(
         dedent(
             """\
@@ -56,13 +56,18 @@ def test_config_toml_with_meta(config_path):
             """
         )
     )
-    app = App(config=Toml("config.toml", root_keys=("this-test",)))
+    app = App(
+        config=(
+            Toml("config.toml", root_keys=("this-test",)),
+            Toml("config.toml", root_keys=("this-test",)),  # Duplicate configs should still work.
+        ),
+    )
 
     @app.meta.default
     def meta(
         *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
     ):
-        return app(tokens)
+        return app(tokens, exit_on_error=False)
 
     @app.default
     def main(name: str):
