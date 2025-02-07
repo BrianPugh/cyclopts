@@ -46,6 +46,19 @@ As an example, lets consider using the builtin :obj:`~dataclasses.dataclass` to 
    $ movie-maintainer add --movie.title 'Furiosa: A Mad Max Saga' --movie.year 2024
    Adding movie: Movie(title='Furiosa: A Mad Max Saga', year=2024)
 
+In most circumstances\*, Cyclopts will also parse a json-string for a dataclass-like parameter:
+
+.. code-block:: console
+
+   $ movie-maintainer add --movie='{"title": "Mad Max: Fury Road", "year": 2024}'
+   Adding movie: Movie(title='Mad Max: Fury Road', year=2024)
+
+Json parsing will be performed when:
+1. The parameter has to be specified as a keyword option; e.g. ``--movie``.
+2. The referenced parameter must be dataclass-like.
+3. The referenced parameter **cannot** be union'd with a ``str``.
+4. The first character must be a ``{``.
+
 .. _Namespace Flattening:
 
 --------------------
