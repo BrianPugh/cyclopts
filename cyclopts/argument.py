@@ -12,6 +12,7 @@ from cyclopts._convert import (
     token_count,
 )
 from cyclopts.annotations import (
+    contains_hint,
     is_attrs,
     is_dataclass,
     is_namedtuple,
@@ -948,7 +949,7 @@ class Argument:
                     convert, converter=_identity_converter, name_transform=self.parameter.name_transform
                 )
 
-            if self.tokens:
+            if self.tokens and not contains_hint(self.field_info.annotation, str):
                 # Dictionary-like structures may have incoming json data from an environment variable.
                 # Pass these values along as Tokens to children.
                 import json
