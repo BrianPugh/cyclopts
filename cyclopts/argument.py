@@ -12,6 +12,7 @@ from cyclopts._convert import (
     token_count,
 )
 from cyclopts.annotations import (
+    contains_hint,
     is_attrs,
     is_dataclass,
     is_namedtuple,
@@ -54,6 +55,7 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     negative=None,
     accepts_keys=None,
     consume_multiple=None,
+    env_var=None,
 )
 
 _SHOW_DEFAULT_BLOCKLIST = (
@@ -239,8 +241,8 @@ class ArgumentCollection(list["Argument"]):
         )
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
 
-        # if not immediate_parameter.parse:
-        #    return out
+        # We do NOT want to skip parse=False arguments here.
+        # This makes it easier to assemble ignored arguments downstrea.
 
         # resolve/derive the parameter name
         if keys:
@@ -286,7 +288,7 @@ class ArgumentCollection(list["Argument"]):
             positional_index = None
 
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
-        if argument._assignable and positional_index is not None:
+        if not argument._accepts_keywords and positional_index is not None:
             argument.index = positional_index
             positional_index += 1
 
@@ -461,7 +463,6 @@ class ArgumentCollection(list["Argument"]):
         parse: Optional[bool] = None,
         show: Optional[bool] = None,
         value_set: Optional[bool] = None,
-        assignable: Optional[bool] = None,
     ) -> "ArgumentCollection":
         """Filter the :class:`ArgumentCollection`.
 
@@ -503,8 +504,6 @@ class ArgumentCollection(list["Argument"]):
             ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
         if parse is not None:
             ac = cls(x for x in ac if not (x.parameter.parse ^ parse))
-        if assignable is not None:
-            ac = cls(x for x in ac if not (x._assignable ^ assignable))
 
         return ac
 
@@ -596,12 +595,6 @@ class Argument:
     _default: Any = field(default=None, init=False, repr=False)
     _lookup: dict[str, FieldInfo] = field(factory=dict, init=False, repr=False)
 
-    _assignable: bool = field(default=False, init=False, repr=False)
-    """
-    Can assign values directly to this argument
-    If _assignable is ``False``, it's a non-visible node used only for the conversion process.
-    """
-
     children: "ArgumentCollection" = field(factory=ArgumentCollection, init=False, repr=False)
     """
     Collection of other :class:`Argument` that eventually culminate into the python variable represented by :attr:`field_info`.
@@ -621,11 +614,9 @@ class Argument:
         hints = get_args(hint) if is_union(hint) else (hint,)
 
         if not self.parameter.parse:
-            self._assignable = False
             return
 
         if self.parameter.accepts_keys is False:  # ``None`` means to infer.
-            self._assignable = True
             return
 
         for hint in hints:
@@ -636,7 +627,6 @@ class Argument:
             # Classes that ALWAYS takes keywords (accepts_keys=None)
             field_infos = get_field_infos(hint)
             if dict in hint_origin:
-                self._assignable = True
                 self._accepts_keywords = True
                 key_type, val_type = str, str
                 args = get_args(hint)
@@ -678,7 +668,6 @@ class Argument:
                 self._lookup.update(field_infos)
             elif self.parameter.accepts_keys is None:
                 # Typical builtin hint
-                self._assignable = True
                 continue
 
             if self.parameter.accepts_keys is None:
@@ -725,8 +714,6 @@ class Argument:
 
     @property
     def _accepts_arbitrary_keywords(self) -> bool:
-        if not self._assignable:
-            return False
         args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
@@ -769,7 +756,7 @@ class Argument:
             Implicit value.
             :obj:`None` if no implicit value is applicable.
         """
-        if not self._assignable or not self.parameter.parse:
+        if not self.parameter.parse:
             raise ValueError
         return (
             self._match_index(term)
@@ -866,13 +853,14 @@ class Argument:
 
     def append(self, token: Token):
         """Safely add a :class:`Token`."""
-        if not self._assignable:
+        if not self.parameter.parse:
             raise ValueError
-        if (
-            any((x.keys, x.index) == (token.keys, token.index) for x in self.tokens)
-            and not self.token_count(token.keys)[1]
-        ):
-            raise RepeatArgumentError(token=token)
+
+        if any(x.address == token.address for x in self.tokens):
+            _, consume_all = self.token_count(token.keys)
+            if not consume_all:
+                raise RepeatArgumentError(token=token)
+
         if self.tokens:
             if bool(token.keys) ^ any(x.keys for x in self.tokens):
                 raise MixedArgumentError(argument=self)
@@ -882,6 +870,14 @@ class Argument:
     def has_tokens(self) -> bool:
         """This argument, or a child argument, has at least 1 parsed token."""  # noqa: D404
         return bool(self.tokens) or any(x.has_tokens for x in self.children)
+
+    @property
+    def children_recursive(self) -> "ArgumentCollection":
+        out = ArgumentCollection()
+        for child in self.children:
+            out.append(child)
+            out.extend(child.children_recursive)
+        return out
 
     def _convert(self, converter: Optional[Callable] = None):
         if converter is None:
@@ -904,7 +900,7 @@ class Argument:
 
         if not self.parameter.parse:
             out = UNSET
-        elif self._assignable:
+        elif not self.children:
             positional: list[Token] = []
             keyword = {}
             for token in self.tokens:
@@ -952,10 +948,40 @@ class Argument:
                 converter = partial(
                     convert, converter=_identity_converter, name_transform=self.parameter.name_transform
                 )
+
+            if self.tokens and not contains_hint(self.field_info.annotation, str):
+                # Dictionary-like structures may have incoming json data from an environment variable.
+                # Pass these values along as Tokens to children.
+                import json
+
+                from cyclopts.config._common import update_argument_collection
+
+                for token in self.tokens:
+                    try:
+                        parsed_json = json.loads(token.value)
+                    except json.JSONDecodeError as e:
+                        raise CoercionError(token=token, target_type=self.hint) from e
+                    update_argument_collection(
+                        {self.name.lstrip("-"): parsed_json},
+                        token.source,
+                        self.children_recursive,
+                        root_keys=(),
+                        allow_unknown=False,
+                    )
+
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
-                if child.has_tokens:
+                if child.has_tokens:  # Either the child directly has tokens, or a nested child has tokens.
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
+                elif child.required:
+                    # Check if the required fields are already populated.
+                    obj = data
+                    for k in child.keys:
+                        try:
+                            obj = obj[k]
+                        except Exception:
+                            raise MissingArgumentError(argument=child) from None
+                    child._marked = True
 
             if self._missing_keys_checker and (self.required or data):
                 if missing_keys := self._missing_keys_checker(self, data):
@@ -1108,8 +1134,11 @@ class Argument:
 
     @property
     def show(self) -> bool:
-        """Show this argument on the help page."""
-        return self._assignable and self.parameter.show
+        """Show this argument on the help page.
+
+        If an argument has child arguments, don't show it on the help-page.
+        """
+        return not self.children and self.parameter.show
 
     @property
     def required(self) -> bool:

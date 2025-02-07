@@ -2,7 +2,9 @@ import inspect
 from collections import namedtuple
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from cyclopts.annotations import get_hint_name, resolve
+import pytest
+
+from cyclopts.annotations import contains_hint, get_hint_name, resolve
 
 
 def test_resolve_annotated():
@@ -67,3 +69,22 @@ def test_get_hint_name_fallback_str():
             return "NoNameClass"
 
     assert get_hint_name(NoNameClass()) == "NoNameClass"
+
+
+class CustomStr(str):
+    """Dummy subclass of ``str``."""
+
+
+@pytest.mark.parametrize(
+    "hint,target_type,expected",
+    [
+        (str, str, True),
+        (CustomStr, str, True),
+        (Union[int, str], str, True),
+        (Annotated[Union[int, str], 1], str, True),
+        (Annotated[Union[Annotated[int, 1], Annotated[str, 1]], 1], str, True),
+        (int, str, False),
+    ],
+)
+def test_contains_hint(hint, target_type, expected):
+    assert contains_hint(hint, target_type) == expected

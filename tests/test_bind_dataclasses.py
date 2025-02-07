@@ -1,3 +1,4 @@
+import json
 import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
@@ -20,7 +21,7 @@ class User:
     tastes: Dict[str, int] = field(default_factory=dict)
 
 
-def test_bind_dataclass(app, assert_parse_args):
+def test_bind_dataclass(app, assert_parse_args, console):
     @app.command
     def foo(some_number: int, user: User):
         pass
@@ -40,6 +41,73 @@ def test_bind_dataclass(app, assert_parse_args):
         100,
         User(**external_data),
     )
+
+
+def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
+    """We expect to see the first subargument (--user.id) in the error message,
+    not the root "--user".
+    """
+
+    @app.default
+    def default(some_number: int, user: User):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app("123", console=console, exit_on_error=False)
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Parameter "--user.id" requires an argument.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
+    @app.command
+    def foo(some_number: int, user: Annotated[User, Parameter(env_var="USER")]):
+        pass
+
+    external_data = {
+        "id": 123,
+        # "name" is purposely missing.
+        "tastes": {
+            "wine": 9,
+            "cheese": 7,
+            "cabbage": 1,
+        },
+    }
+    monkeypatch.setenv("USER", json.dumps(external_data))
+    assert_parse_args(
+        foo,
+        "foo 100",
+        100,
+        User(**external_data),
+    )
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        """--origin='{"x": 1, "y": 2}'""",
+        """--origin '{"x": 1, "y": 2}'""",
+    ],
+)
+def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
+    @dataclass
+    class Coordinate:
+        x: int
+        y: int
+
+    @app.default
+    def main(origin: Coordinate):
+        pass
+
+    assert_parse_args(main, cmd_str, Coordinate(1, 2))
 
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")

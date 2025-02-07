@@ -128,6 +128,9 @@ Json = Annotated[Any, Parameter(converter=_json_converter)]
 """
 Parse a json-string from the CLI.
 
+Note: Since Cyclopts v3.6.0, all dataclass-like classes now natively attempt
+to parse json-strings, so practical use-case of this annotation is limited.
+
 Usage example:
 
 .. code-block:: python

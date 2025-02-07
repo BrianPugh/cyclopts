@@ -15,6 +15,12 @@ def pytest_ignore_collect(collection_path):
             return True
 
 
+@pytest.fixture(autouse=True)
+def chdir_to_tmp_path(tmp_path, monkeypatch):
+    """Automatically change current directory to tmp_path"""
+    monkeypatch.chdir(tmp_path)
+
+
 @pytest.fixture
 def app():
     return cyclopts.App()

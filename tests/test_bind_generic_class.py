@@ -4,6 +4,7 @@ from typing import Annotated, Dict, Literal, Optional
 import pytest
 
 from cyclopts import Parameter
+from cyclopts.exceptions import MissingArgumentError
 
 
 class Outfit:
@@ -192,7 +193,7 @@ def test_bind_generic_class_accepts_false_multiple_args(app, assert_parse_args, 
     assert actual == expected
 
 
-def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console):
+def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console, assert_parse_args):
     """This test has a keyword-only parameter that has position-only subkeys, which are skipped."""
 
     class User:
@@ -209,13 +210,24 @@ def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console):
     def foo(*, user: User):
         pass
 
+    assert_parse_args(foo, "foo --user Bob 30", user=User("Bob", 30))
+
     with console.capture() as capture:
         app("foo --help", console=console)
 
     actual = capture.get()
 
     # No arguments/parameters
-    assert actual == "Usage: test_bind_generic_class foo [OPTIONS]\n\n"
+    expected = dedent(
+        """\
+        Usage: test_bind_generic_class foo [OPTIONS]
 
-    with pytest.raises(ValueError):
-        app("foo --user.name=Bob --user.age=100")
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --user  [required]                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+    with pytest.raises(MissingArgumentError):
+        app("foo --user.name=Bob --user.age=100", exit_on_error=False)

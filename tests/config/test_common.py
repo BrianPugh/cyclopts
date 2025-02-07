@@ -194,7 +194,9 @@ def test_config_common_kwargs(apps, config):
     config(apps, (), argument_collection)
 
     # Don't parse ``kwargs`` from config.
-    assert len(argument_collection[-1].tokens) == 0
+    assert argument_collection[-1].tokens == [
+        Token(keyword="[key2]", value="foo2", source=str(config.path.absolute()), index=0, keys=("key2",)),
+    ]
 
 
 def test_config_common_subkeys(apps, config_sub_keys):

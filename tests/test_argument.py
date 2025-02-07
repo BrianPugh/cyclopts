@@ -134,28 +134,28 @@ def test_argument_collection_typeddict():
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0]._assignable is False
+    assert collection[0].children
 
     assert collection[1].field_info.name == "foo"
     assert collection[1].parameter.name == ("--a.foo",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
-    assert collection[1]._assignable is True
+    assert not collection[1].children
 
     assert collection[2].field_info.name == "bar"
     assert collection[2].parameter.name == ("--a.bar",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
-    assert collection[2]._assignable is True
+    assert not collection[2].children
 
     assert collection[3].field_info.name == "b"
     assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
-    assert collection[3]._assignable is True
+    assert not collection[3].children
 
 
 def test_argument_collection_typeddict_nested():
@@ -179,42 +179,42 @@ def test_argument_collection_typeddict_nested():
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0]._assignable is False
+    assert collection[0].children
 
     assert collection[1].field_info.name == "foo"
     assert collection[1].parameter.name == ("--a.foo",)
     assert collection[1].hint is Inner
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is True
-    assert collection[1]._assignable is False
+    assert collection[1].children
 
     assert collection[2].field_info.name == "fizz"
     assert collection[2].parameter.name == ("--a.foo.fizz",)
     assert collection[2].hint is float
     assert collection[2].keys == ("foo", "fizz")
     assert collection[2]._accepts_keywords is False
-    assert collection[2]._assignable is True
+    assert not collection[2].children
 
     assert collection[3].field_info.name == "buzz"
     assert collection[3].parameter.name == ("--a.foo.bazz",)
     assert collection[3].hint is complex
     assert collection[3].keys == ("foo", "buzz")
     assert collection[3]._accepts_keywords is False
-    assert collection[3]._assignable is True
+    assert not collection[3].children
 
     assert collection[4].field_info.name == "bar"
     assert collection[4].parameter.name == ("--a.bar",)
     assert collection[4].hint is int
     assert collection[4].keys == ("bar",)
     assert collection[4]._accepts_keywords is False
-    assert collection[4]._assignable is True
+    assert not collection[4].children
 
     assert collection[5].field_info.name == "b"
     assert collection[5].parameter.name == ("--b",)
     assert collection[5].hint is int
     assert collection[5].keys == ()
     assert collection[5]._accepts_keywords is False
-    assert collection[5]._assignable is True
+    assert not collection[5].children
 
 
 def test_argument_collection_typeddict_annotated_keys_name_change():
@@ -234,28 +234,28 @@ def test_argument_collection_typeddict_annotated_keys_name_change():
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0]._assignable is False
+    assert collection[0].children
 
     assert collection[1].field_info.name == "foo"
     assert collection[1].parameter.name == ("--a.fizz",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
-    assert collection[1]._assignable is True
+    assert not collection[1].children
 
     assert collection[2].field_info.name == "bar"
     assert collection[2].parameter.name == ("--a.buzz",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
-    assert collection[2]._assignable is True
+    assert not collection[2].children
 
     assert collection[3].field_info.name == "b"
     assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
-    assert collection[3]._assignable is True
+    assert not collection[3].children
 
 
 def test_argument_collection_typeddict_annotated_keys_name_override():
@@ -275,28 +275,28 @@ def test_argument_collection_typeddict_annotated_keys_name_override():
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0]._assignable is False
+    assert collection[0].children
 
     assert collection[1].field_info.name == "foo"
     assert collection[1].parameter.name == ("--fizz",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
-    assert collection[1]._assignable is True
+    assert not collection[1].children
 
     assert collection[2].field_info.name == "bar"
     assert collection[2].parameter.name == ("--buzz",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
-    assert collection[2]._assignable is True
+    assert not collection[2].children
 
     assert collection[3].field_info.name == "b"
     assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
-    assert collection[3]._assignable is True
+    assert not collection[3].children
 
 
 def test_argument_collection_typeddict_flatten_root():
@@ -314,28 +314,28 @@ def test_argument_collection_typeddict_flatten_root():
     assert collection[0].hint is ExampleTypedDict
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
-    assert collection[0]._assignable is False
+    assert collection[0].children
 
     assert collection[1].field_info.name == "foo"
     assert collection[1].parameter.name == ("--foo",)
     assert collection[1].hint is str
     assert collection[1].keys == ("foo",)
     assert collection[1]._accepts_keywords is False
-    assert collection[1]._assignable is True
+    assert not collection[1].children
 
     assert collection[2].field_info.name == "bar"
     assert collection[2].parameter.name == ("--bar",)
     assert collection[2].hint is int
     assert collection[2].keys == ("bar",)
     assert collection[2]._accepts_keywords is False
-    assert collection[2]._assignable is True
+    assert not collection[2].children
 
     assert collection[3].field_info.name == "b"
     assert collection[3].parameter.name == ("--b",)
     assert collection[3].hint is int
     assert collection[3].keys == ()
     assert collection[3]._accepts_keywords is False
-    assert collection[3]._assignable is True
+    assert not collection[3].children
 
 
 def test_argument_collection_var_positional():

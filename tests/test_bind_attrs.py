@@ -51,17 +51,14 @@ def test_bind_attrs(app, assert_parse_args, console):
         Usage: test_bind_attrs foo [ARGS] [OPTIONS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  USER.ID --user.id          [required]                           │
-        │    USER.NAME --user.name      [default: John Doe]                  │
-        │    USER.TASTES --user.tastes                                       │
-        │    USER.OUTFIT.BODY                                                │
-        │      --user.outfit.body                                            │
-        │    USER.OUTFIT.HEAD                                                │
-        │      --user.outfit.head                                            │
-        │    USER.ADMIN --user.admin    [default: False]                     │
+        │ *  USER.ID --user.id      [required]                               │
+        │    USER.NAME --user.name  [default: John Doe]                      │
+        │    --user.tastes                                                   │
+        │    --user.outfit.body                                              │
+        │    --user.outfit.head                                              │
+        │    --user.admin           [default: False]                         │
         │      --user.not-admin                                              │
-        │    USER.VIP --user.vip        [default: False]                     │
-        │      --not-vip                                                     │
+        │    --user.vip --not-vip   [default: False]                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -94,13 +91,13 @@ def test_bind_attrs_flatten(app, assert_parse_args, console):
         Usage: test_bind_attrs foo [ARGS] [OPTIONS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  ID --id                    [required]                           │
-        │    NAME --name                [default: John Doe]                  │
-        │    TASTES --tastes                                                 │
-        │    OUTFIT.BODY --outfit.body                                       │
-        │    OUTFIT.HEAD --outfit.head                                       │
-        │    ADMIN --admin --not-admin  [default: False]                     │
-        │    VIP --vip --not-vip        [default: False]                     │
+        │ *  ID --id              [required]                                 │
+        │    NAME --name          [default: John Doe]                        │
+        │    --tastes                                                        │
+        │    --outfit.body                                                   │
+        │    --outfit.head                                                   │
+        │    --admin --not-admin  [default: False]                           │
+        │    --vip --not-vip      [default: False]                           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

@@ -14,6 +14,8 @@ from attrs import field, frozen
 
 # https://threeofwands.com/attra-iv-zero-overhead-frozen-attrs-classes/
 if TYPE_CHECKING:
+    from json import JSONDecodeError
+
     from attrs import frozen
 else:
     from attrs import define
@@ -444,3 +446,40 @@ class SortHelper:
 
         combined = user_sort_key + ordered_no_user_sort_key + no_user_sort_key
         return [x[1] for x in combined]
+
+
+def json_decode_error_verbosifier(decode_error: "JSONDecodeError", context: int = 20) -> str:
+    """Not intended to be a super robust implementation, but robust enough to be helpful.
+
+    Parameters
+    ----------
+    context: int
+        Number of surrounding-character context
+    """
+    lines = decode_error.doc.splitlines()
+    line = lines[decode_error.lineno - 1]
+
+    error_index = decode_error.colno - 1  # colno is 1-indexed
+    start = error_index - context
+    if start <= 0:
+        start = 0
+        prefix_ellipsis = ""
+        segment_error_index = error_index
+    else:
+        prefix_ellipsis = "... "
+        segment_error_index = error_index - start
+
+    end = error_index + context
+    if end >= len(line):
+        end = len(line) + 1
+        suffix_ellipsis = ""
+    else:
+        suffix_ellipsis = " ..."
+
+    segment = line[start:end]
+    carat_pointer = " " * (len(prefix_ellipsis) + segment_error_index) + "^"
+
+    response = (
+        f"JSONDecodeError:\n    {prefix_ellipsis}{segment}{suffix_ellipsis}\n    {carat_pointer}\n{str(decode_error)}"
+    )
+    return response

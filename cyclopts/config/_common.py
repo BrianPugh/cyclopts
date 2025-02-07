@@ -6,7 +6,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import suppress
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 from attrs import define, field
 
@@ -37,7 +37,7 @@ def _walk_leaves(
         yield (), d
 
 
-def _meta_arguments(apps: list["App"]) -> "ArgumentCollection":
+def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
     argument_collection = ArgumentCollection()
     for i, app in enumerate(apps):
         if app._meta is None:
@@ -68,6 +68,70 @@ class CacheKey:
             return False
 
         return self._mtime == other._mtime and self._size == other._size and self.path == other.path
+
+
+def to_cli_option_name(*keys: str) -> str:
+    return "--" + ".".join(keys)
+
+
+def update_argument_collection(
+    config: dict,
+    source: str,
+    arguments: ArgumentCollection,
+    apps: Optional[Sequence["App"]] = None,
+    *,
+    root_keys: Iterable[str],
+    allow_unknown: bool,
+):
+    """Updates an argument collection if it doesn't already have tokens.
+
+    Note: it feels bad that we're passing in ``apps`` here.
+    """
+    meta_arguments = _meta_arguments(apps or ())
+
+    do_not_update = {}
+
+    for option_key, option_value in config.items():
+        for subkeys, value in _walk_leaves(option_value):
+            cli_option_name = to_cli_option_name(option_key, *subkeys)
+            complete_keyword = "".join(f"[{k}]" for k in itertools.chain(root_keys, (option_key,), subkeys))
+
+            try:
+                meta_arguments.match(cli_option_name)
+            except ValueError:
+                pass
+            else:
+                continue
+
+            try:
+                argument, remaining_keys, _ = arguments.match(cli_option_name)
+            except ValueError:
+                if allow_unknown:
+                    continue
+                if apps and apps[-1]._meta_parent:
+                    # We're currently in the meta-app portion of the launch process,
+                    # so MOST supplied options will be unmatched, as we haven't gotten
+                    # to the actual command processing yet.
+                    continue
+                raise UnknownOptionError(
+                    token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
+                ) from None
+
+            if do_not_update.setdefault(id(argument), bool(argument.tokens)):
+                # If this argument already has tokens on **first** access, then skip it.
+                # Allows us to add multiple tokens to an argument from a **single** source (config file).
+                continue
+
+            # Convert all values to strings, so that the Cyclopts engine can process them.
+            # This may (eventually) result in converting back to the original dtype.
+            if not isinstance(value, list):
+                value = (value,)
+            value = tuple(str(x) for x in value)
+
+            for i, v in enumerate(value):
+                # TODO: is this index correct? If the source value is a list, it should probably be different
+                token = Token(keyword=complete_keyword, value=v, source=source, index=i, keys=remaining_keys)
+                argument.append(token)
 
 
 @define
@@ -117,6 +181,8 @@ class ConfigFromFile(ABC):
                 try:
                     self._config = self._load_config(candidate)
                     self._config_cache_key = cache_key
+                except CycloptsError:
+                    raise
                 except Exception as e:
                     msg = getattr(type(e), "__name__", "")
                     with suppress(IndexError):
@@ -143,60 +209,21 @@ class ConfigFromFile(ABC):
     def source(self) -> str:
         return str(self.path)
 
-    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
-        config: dict[str, Any] = self.config
+    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: ArgumentCollection):
+        config: dict[str, Any] = self.config.copy()
         try:
             for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
                 config = config[key]
         except KeyError:
             return
 
-        to_add = []
-        for option_key, option_value in config.items():
-            if self.use_commands_as_keys:
-                if option_key in apps[-1]:  # Check if it's a command.
-                    continue
-            else:
-                if option_key in apps[0]:
-                    continue
+        # Ignore keys that represent subcommands
+        command_app = apps[-1] if self.use_commands_as_keys else apps[0]
+        config = {k: v for k, v in config.items() if k not in command_app}
 
-            for subkeys, value in _walk_leaves(option_value):
-                cli_option_name = "--" + ".".join(chain((option_key,), subkeys))
-                complete_keyword = "".join(f"[{k}]" for k in itertools.chain(self.root_keys, (option_key,), subkeys))
+        assert isinstance(self.path, Path)
+        source = str(self.path.absolute())
 
-                try:
-                    argument, remaining_keys, _ = arguments.match(cli_option_name)
-                except ValueError:
-                    if self.allow_unknown or apps[-1]._meta_parent:
-                        continue
-                    else:
-                        meta_arguments = _meta_arguments(apps)
-                        try:
-                            meta_arguments.match(cli_option_name)
-                        except ValueError:
-                            raise UnknownOptionError(
-                                token=Token(keyword=complete_keyword, source=self.source), argument_collection=arguments
-                            ) from None
-                        else:
-                            continue
-
-                if argument.tokens or argument.field_info.kind is argument.field_info.VAR_KEYWORD:
-                    continue
-
-                if any(x.source != str(self.path) for x in argument.tokens):
-                    continue
-
-                if not isinstance(value, list):
-                    value = (value,)
-                value = tuple(str(x) for x in value)
-
-                for i, v in enumerate(value):
-                    to_add.append(
-                        (
-                            argument,
-                            Token(keyword=complete_keyword, value=v, source=self.source, index=i, keys=remaining_keys),
-                        )
-                    )
-
-        for argument, token in to_add:
-            argument.append(token)
+        update_argument_collection(
+            config, source, arguments, apps, root_keys=self.root_keys, allow_unknown=self.allow_unknown
+        )

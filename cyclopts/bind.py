@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable, Sequence, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
+from cyclopts.annotations import contains_hint
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -132,6 +133,17 @@ def _parse_kw_and_flags(
                 else:
                     consume_count += tokens_per_element
                     for j in range(consume_count):
+                        if (
+                            argument._accepts_keywords
+                            and len(cli_values) == 1
+                            and cli_values[0].strip().startswith("{")
+                            and not contains_hint(argument.field_info.annotation, str)
+                        ):
+                            # Assume that the contents are json and that we shouldn't
+                            # consume any additional tokens.
+                            tokens_per_element = 1
+                            break
+
                         token = tokens[i + 1 + j]
                         if not argument.parameter.allow_leading_hyphen and is_option_like(token):
                             raise MissingArgumentError(
@@ -345,7 +357,9 @@ def create_bound_arguments(
             raise ValidationError(exception_message=e.args[0] if e.args else "", group=group) from e  # pyright: ignore
 
         for argument in argument_collection:
-            if not argument.field_info.required or argument.keys or not argument._assignable:
+            # if a dict-like argument is missing, raise a MissingArgumentError on the first
+            # required child (as opposed generically to the root dict-like object).
+            if not argument.parameter.parse or not argument.field_info.required or argument.keys:
                 continue
             if not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)

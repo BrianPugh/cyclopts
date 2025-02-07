@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from textwrap import dedent
 from typing import Annotated, Dict, Optional, Union
@@ -75,6 +76,36 @@ def test_bind_pydantic_basemodel(app, assert_parse_args):
             "has_socks": True,
         },
     }
+
+    assert_parse_args(
+        foo,
+        'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap --user.outfit.has-socks',
+        User(**external_data),
+    )
+
+
+def test_bind_pydantic_basemodel_from_json(app, assert_parse_args, monkeypatch):
+    @app.command
+    def foo(user: Annotated[User, Parameter(env_var="USER")]):
+        pass
+
+    external_data = {
+        "id": 123,
+        "signup_ts": "2019-06-01 12:22",
+        "tastes": {
+            "wine": 9,
+            "cheese": 7,
+            "cabbage": "1",
+        },
+        "outfit": {
+            "body": "t-shirt",
+            "head": "baseball-cap",
+            "has_socks": True,
+        },
+    }
+
+    monkeypatch.setenv("USER", json.dumps(external_data))
+
     assert_parse_args(
         foo,
         'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt --user.outfit.head=baseball-cap --user.outfit.has-socks',
@@ -103,15 +134,12 @@ def test_bind_pydantic_basemodel_help(app, console):
         │    USER.NAME --user.name      [default: John Doe]                  │
         │ *  USER.SIGNUP-TS             [required]                           │
         │      --user.signup-ts                                              │
-        │ *  USER.TASTES --user.tastes  [required]                           │
-        │    USER.OUTFIT.BODY                                                │
-        │      --user.outfit.body                                            │
-        │    USER.OUTFIT.HEAD                                                │
-        │      --user.outfit.head                                            │
-        │    USER.OUTFIT.HAS-SOCKS                                           │
-        │      --user.outfit.has-socks                                       │
-        │      --user.outfit.no-has-so                                       │
-        │      cks                                                           │
+        │ *  --user.tastes              [required]                           │
+        │    --user.outfit.body                                              │
+        │    --user.outfit.head                                              │
+        │    --user.outfit.has-socks -                                       │
+        │      -user.outfit.no-has-soc                                       │
+        │      ks                                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
