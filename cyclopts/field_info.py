@@ -152,10 +152,19 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
             names.append(pydantic_field.alias)
         else:
             names.append(python_name)
+
+        # Pydantic places ``Annotated`` data into pydantic.FieldInfo.metadata, while
+        # pydantic.FieldInfo.annotation contains the "real" resolved type-hint.
+        # We have to re-combine them into a single Annotated hint.
+        if pydantic_field.metadata:
+            annotation = Annotated[(pydantic_field.annotation,) + tuple(pydantic_field.metadata)]  # pyright: ignore
+        else:
+            annotation = pydantic_field.annotation
+
         out[python_name] = FieldInfo(
             names=tuple(names),
             kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=pydantic_field.annotation,
+            annotation=annotation,
             default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
             required=pydantic_field.is_required(),
         )

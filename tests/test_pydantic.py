@@ -222,3 +222,43 @@ def test_pydantic_alias(app, console, assert_parse_args):
         "foo --user.username='Bob Smith' --user.age_in_years=100",
         user=User(user_name="Bob Smith", age_in_years=100),
     )
+
+
+def test_parameter_decorator_pydantic_nested_1(app, console):
+    """
+    https://github.com/BrianPugh/cyclopts/issues/320
+
+    See Also
+    --------
+        test_parameter_decorator_dataclass_nested_1
+    """
+
+    class S3Path(BaseModel):
+        bucket: Annotated[str, Parameter()]
+        key: str
+
+    @Parameter(name="*")  # Flatten namespace.
+    class S3CliParams(BaseModel):
+        path: Annotated[S3Path, Parameter(name="*")]
+        region: Annotated[str, Parameter(name="area")]
+
+    @app.command
+    def action(*, s3_path: S3CliParams):
+        pass
+
+    with console.capture() as capture:
+        app("action --help", console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: test_pydantic action [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --bucket  [required]                                            │
+        │ *  --key     [required]                                            │
+        │ *  --area    [required]                                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

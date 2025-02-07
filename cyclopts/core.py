@@ -2,7 +2,7 @@ import inspect
 import os
 import sys
 import traceback
-from collections.abc import Iterable, Iterator
+from collections.abc import Coroutine, Iterable, Iterator
 from contextlib import suppress
 from copy import copy
 from enum import Enum
@@ -1507,7 +1507,15 @@ def _log_framework_warning(framework: TestFramework) -> None:
         break
 
 
-def run(callable: Callable[..., V], /) -> V:
+@overload
+def run(callable: Callable[..., Coroutine[None, None, V]], /) -> V: ...
+
+
+@overload
+def run(callable: Callable[..., V], /) -> V: ...
+
+
+def run(callable, /):
     """Run the given callable as a CLI command and return its result.
 
     The callable may also be a coroutine function.
