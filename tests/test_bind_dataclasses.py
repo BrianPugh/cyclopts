@@ -90,6 +90,26 @@ def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
     )
 
 
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        """--origin='{"x": 1, "y": 2}'""",
+        """--origin '{"x": 1, "y": 2}'""",
+    ],
+)
+def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
+    @dataclass
+    class Coordinate:
+        x: int
+        y: int
+
+    @app.default
+    def main(origin: Coordinate):
+        pass
+
+    assert_parse_args(main, cmd_str, Coordinate(1, 2))
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_recursive(app, assert_parse_args, console):
     @dataclass

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Callable, Sequence, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
+from cyclopts.annotations import contains_hint
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -132,6 +133,17 @@ def _parse_kw_and_flags(
                 else:
                     consume_count += tokens_per_element
                     for j in range(consume_count):
+                        if (
+                            argument._accepts_keywords
+                            and len(cli_values) == 1
+                            and cli_values[0].strip().startswith("{")
+                            and not contains_hint(argument.field_info.annotation, str)
+                        ):
+                            # Assume that the contents are json and that we shouldn't
+                            # consume any additional tokens.
+                            tokens_per_element = 1
+                            break
+
                         token = tokens[i + 1 + j]
                         if not argument.parameter.allow_leading_hyphen and is_option_like(token):
                             raise MissingArgumentError(
