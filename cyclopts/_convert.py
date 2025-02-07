@@ -267,7 +267,7 @@ def _convert(
         hint = type_
         for field_info in get_field_infos(type_, include_var_positional=True).values():
             hint = field_info.hint
-            if hint is str:  # Avoids infinite recursion
+            if issubclass(hint, str):  # Avoids infinite recursion
                 pos_values.append(token[i].value)
                 i += 1
             else:

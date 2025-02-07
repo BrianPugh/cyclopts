@@ -60,6 +60,18 @@ def is_annotated(hint) -> bool:
     return type(hint) is AnnotatedType
 
 
+def contains_hint(hint, target_type) -> bool:
+    """Indicates if ``target_type`` is in a possibly annotated/unioned ``hint``.
+
+    E.g. ``contains_hint(Union[int, str], str) == True``
+    """
+    hint = resolve(hint)
+    if is_union(hint):
+        return any(contains_hint(x, target_type) for x in get_args(hint))
+    else:
+        return issubclass(hint, target_type)
+
+
 def is_typeddict(hint) -> bool:
     """Determine if a type annotation is a TypedDict.
 
@@ -68,7 +80,7 @@ def is_typeddict(hint) -> bool:
         https://github.com/beartype/beartype/blob/main/beartype/_util/hint/pep/proposal/utilpep589.py
     """
     hint = resolve(hint)
-    if is_union(get_origin(hint)):
+    if is_union(hint):
         return any(is_typeddict(x) for x in get_args(hint))
 
     if not (isinstance(hint, type) and issubclass(hint, dict)):
