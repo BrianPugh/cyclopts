@@ -69,7 +69,7 @@ def contains_hint(hint, target_type) -> bool:
     if is_union(hint):
         return any(contains_hint(x, target_type) for x in get_args(hint))
     else:
-        return issubclass(hint, target_type)
+        return isclass(hint) and issubclass(hint, target_type)
 
 
 def is_typeddict(hint) -> bool:
@@ -83,7 +83,7 @@ def is_typeddict(hint) -> bool:
     if is_union(hint):
         return any(is_typeddict(x) for x in get_args(hint))
 
-    if not (isinstance(hint, type) and issubclass(hint, dict)):
+    if not (isclass(hint) and issubclass(hint, dict)):
         return False
 
     return (
