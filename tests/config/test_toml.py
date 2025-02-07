@@ -35,12 +35,6 @@ def test_config_toml(tmp_path):
     }
 
 
-@pytest.fixture(autouse=True)
-def chdir_to_tmp_path(tmp_path, monkeypatch):
-    """Automatically change current directory to tmp_path"""
-    monkeypatch.chdir(tmp_path)
-
-
 @pytest.fixture
 def config_path(tmp_path):
     """Path to JSON configuration file in tmp_path"""

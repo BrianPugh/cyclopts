@@ -1,9 +1,10 @@
 import json
+from pathlib import Path
 from textwrap import dedent
 
 import pytest
 
-from cyclopts import App
+from cyclopts import App, CycloptsError
 from cyclopts.config._json import Json
 
 
@@ -91,3 +92,23 @@ def test_config_2(config_path, capsys):
 
     app("create")
     assert capsys.readouterr().out == "Bob is 40 years old.\n"
+
+
+def test_config_invalid_json(tmp_path, console):
+    Path("config.json").write_text('{"this is": broken}')
+
+    with pytest.raises(CycloptsError), console.capture() as capture:
+        app("create", console=console, exit_on_error=False)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ JSONDecodeError:                                                   │
+        │     {"this is": broken}                                            │
+        │                 ^                                                  │
+        │ Expecting value: line 1 column 13 (char 12)                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

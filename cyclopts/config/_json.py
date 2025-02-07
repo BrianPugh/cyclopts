@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from cyclopts.config._common import ConfigFromFile
+from cyclopts.exceptions import CoercionError
 
 
 class Json(ConfigFromFile):
@@ -9,4 +10,7 @@ class Json(ConfigFromFile):
         import json
 
         with path.open() as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError as e:
+                raise CoercionError from e

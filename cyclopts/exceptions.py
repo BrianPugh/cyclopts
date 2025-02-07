@@ -8,7 +8,7 @@ import cyclopts.utils
 from cyclopts.annotations import get_hint_name
 from cyclopts.group import Group
 from cyclopts.token import Token
-from cyclopts.utils import is_option_like
+from cyclopts.utils import is_option_like, json_decode_error_verbosifier
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -206,14 +206,24 @@ class CoercionError(CycloptsError):
     """
 
     def __str__(self):
-        assert self.argument is not None
-        assert self.target_type is not None
-
         if self.msg is not None:
             if not self.token or self.token.keyword is None:
                 return self.msg
             else:
                 return f"Invalid value for {self.token.keyword}: {self.msg}"
+        else:
+            import json
+
+            # If a JsonDecodeError, try and verbosify it.
+            if isinstance(self.__cause__, json.JSONDecodeError):
+                msg = json_decode_error_verbosifier(self.__cause__)  # pyright: ignore[reportArgumentType]
+                if not self.token or self.token.keyword is None:
+                    return msg
+                else:
+                    return f"Invalid value for {self.token.keyword}: {msg}"
+
+        assert self.argument is not None
+        assert self.target_type is not None
 
         msg = super().__str__()
 

@@ -1,6 +1,5 @@
 import inspect
 import itertools
-import json
 from contextlib import suppress
 from functools import partial
 from typing import Any, Callable, Optional, Union, get_args, get_origin
@@ -952,13 +951,15 @@ class Argument:
             if self.tokens:
                 # Dictionary-like structures may have incoming json data from an environment variable.
                 # Pass these values along as Tokens to children.
+                import json
+
                 from cyclopts.config._common import update_argument_collection
 
                 for token in self.tokens:
                     try:
                         parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
-                        raise CoercionError(token=token, target_type=self.hint, msg=e.msg) from None
+                        raise CoercionError(token=token, target_type=self.hint) from e
                     update_argument_collection(
                         {self.name.lstrip("-"): parsed_json},
                         token.source,

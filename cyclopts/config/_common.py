@@ -181,6 +181,8 @@ class ConfigFromFile(ABC):
                 try:
                     self._config = self._load_config(candidate)
                     self._config_cache_key = cache_key
+                except CycloptsError:
+                    raise
                 except Exception as e:
                     msg = getattr(type(e), "__name__", "")
                     with suppress(IndexError):
