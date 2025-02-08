@@ -19,7 +19,7 @@ LIST_STR_LIKE_TYPES = [list, list[str], Sequence, Sequence[str], Iterable, Itera
     ],
 )
 @pytest.mark.parametrize("json_list", [None, True])
-def test_test_json_list_cli_str(app, assert_parse_args, cmd_str, json_list):
+def test_json_list_cli_str(app, assert_parse_args, cmd_str, json_list):
     @app.default
     def main(values: Annotated[list[int], Parameter(json_list=json_list)]):
         pass
@@ -28,7 +28,7 @@ def test_test_json_list_cli_str(app, assert_parse_args, cmd_str, json_list):
 
 
 @pytest.mark.parametrize("annotation", LIST_STR_LIKE_TYPES)
-def test_test_json_list_str_none(app, assert_parse_args, annotation):
+def test_json_list_str_none(app, assert_parse_args, annotation):
     """A ``list`` or ``list[str]`` annotation should **not** be set-able via json-string by default.
 
     May change in v4.
@@ -42,7 +42,7 @@ def test_test_json_list_str_none(app, assert_parse_args, annotation):
 
 
 @pytest.mark.parametrize("annotation", LIST_STR_LIKE_TYPES)
-def test_test_json_list_str_cli_str_true(app, assert_parse_args, annotation):
+def test_json_list_str_cli_str_true(app, assert_parse_args, annotation):
     @app.default
     def main(values: Annotated[annotation, Parameter(json_list=True)]):  # pyright: ignore
         pass
@@ -51,7 +51,7 @@ def test_test_json_list_str_cli_str_true(app, assert_parse_args, annotation):
 
 
 @pytest.mark.parametrize("annotation", [list, list[str]])
-def test_test_json_list_str_cli_str_false(app, assert_parse_args, annotation):
+def test_json_list_str_cli_str_false(app, assert_parse_args, annotation):
     @app.default
     def main(values: Annotated[annotation, Parameter(json_list=False)]):  # pyright: ignore
         pass
@@ -67,7 +67,7 @@ def test_test_json_list_str_cli_str_false(app, assert_parse_args, annotation):
     ],
 )
 @pytest.mark.parametrize("json_list", [None, True])
-def test_test_json_list_env_str(app, assert_parse_args, env_str, monkeypatch, json_list):
+def test_json_list_env_str(app, assert_parse_args, env_str, monkeypatch, json_list):
     monkeypatch.setenv("VALUES", env_str)
 
     @app.default
