@@ -753,7 +753,7 @@ class Argument:
     def _should_attempt_json_list(
         self, tokens: Union[Sequence[Union[Token, str]], Token, str, None] = None, keys: tuple[str, ...] = ()
     ) -> bool:
-        """When parsing, should attempt to parse the token(s) as json dict data."""
+        """When parsing, should attempt to parse the token(s) as json list data."""
         if tokens is None:
             tokens = self.tokens
         if not tokens:
