@@ -750,14 +750,12 @@ API
       :value: None
 
       Allow for the parsing of json-list-strings as data.
-      If :obj:`None` (default behavior), acts like :obj:`True`, **unless** the annotated type is union'd with :obj:`str`.
+      If :obj:`None` (default behavior), acts like :obj:`True`, **unless** the annotated type has each element type :obj:`str`.
       When :obj:`True`, data will be parsed as json if the following conditions are met:
 
-      1. The parameter is specified as a keyword option; e.g. ``--movie``.
+      1. The referenced parameter is iterable (not including :obj:`str`).
 
-      2. The referenced parameter is iterable (not including :obj:`str`).
-
-      3. The first character of the token is a ``[``.
+      2. The first character of the token is a ``[``.
 
    .. automethod:: combine
 
