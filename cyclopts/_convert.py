@@ -1,5 +1,6 @@
 import collections.abc
 import sys
+import typing
 from collections.abc import Sequence
 from enum import Enum
 from functools import partial
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
 _implicit_iterable_type_mapping: dict[type, type] = {
     Iterable: list[str],
+    typing.Sequence: list[str],
     Sequence: list[str],
     frozenset: frozenset[str],
     list: list[str],
@@ -41,6 +43,7 @@ _implicit_iterable_type_mapping: dict[type, type] = {
 
 ITERABLE_TYPES = {
     Iterable,
+    typing.Sequence,
     Sequence,
     frozenset,
     list,

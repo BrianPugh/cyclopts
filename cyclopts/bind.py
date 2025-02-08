@@ -133,8 +133,9 @@ def _parse_kw_and_flags(
                 else:
                     consume_count += tokens_per_element
                     for j in range(consume_count):
-                        if argument._should_attempt_json_dict(cli_values) or argument._should_attempt_json_list(
-                            leftover_keys
+                        if len(cli_values) == 1 and (
+                            argument._should_attempt_json_dict(cli_values)
+                            or argument._should_attempt_json_list(leftover_keys)
                         ):
                             tokens_per_element = 1
                             # Assume that the contents are json and that we shouldn't
