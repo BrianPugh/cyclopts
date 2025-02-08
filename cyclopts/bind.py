@@ -122,6 +122,21 @@ def _parse_kw_and_flags(
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
+            # Interpret whether or not we should **maybe** attempt to parse cli_values as json.
+            if argument.parameter.json_dict is None:
+                parse_json_dict = not contains_hint(argument.field_info.annotation, str)
+            else:
+                parse_json_dict = argument.parameter.json_dict
+            parse_json_dict &= argument._accepts_keywords
+
+            parse_json_list = consume_all
+            if parse_json_list:
+                if argument.parameter.json_list is None:
+                    parse_json_list &= not contains_hint(argument.field_info.annotation, str)
+                else:
+                    parse_json_list &= argument.parameter.json_list
+
+            # Consume the appropriate number of tokens
             with suppress(IndexError):
                 if consume_all and argument.parameter.consume_multiple:
                     for j in itertools.count():
@@ -133,16 +148,15 @@ def _parse_kw_and_flags(
                 else:
                     consume_count += tokens_per_element
                     for j in range(consume_count):
-                        if (
-                            argument._accepts_keywords
-                            and len(cli_values) == 1
-                            and cli_values[0].strip().startswith("{")
-                            and not contains_hint(argument.field_info.annotation, str)
-                        ):
-                            # Assume that the contents are json and that we shouldn't
-                            # consume any additional tokens.
-                            tokens_per_element = 1
-                            break
+                        if len(cli_values) == 1 and (parse_json_dict or parse_json_list):
+                            candidate_json_str = cli_values[0].strip()
+                            if (parse_json_dict and candidate_json_str.startswith("{")) or (
+                                parse_json_list and candidate_json_str.startswith("[")
+                            ):
+                                tokens_per_element = 1
+                                # Assume that the contents are json and that we shouldn't
+                                # consume any additional tokens.
+                                break
 
                         token = tokens[i + 1 + j]
                         if not argument.parameter.allow_leading_hyphen and is_option_like(token):
