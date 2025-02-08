@@ -53,6 +53,7 @@ def _negative_converter(default: tuple[str, ...]):
     return converter
 
 
+# TODO: Breaking change; all fields after ``name`` should be ``kw_only=True``.
 @record_init("_provided_args")
 @frozen
 class Parameter:
@@ -158,6 +159,10 @@ class Parameter:
 
     # Should not get inherited
     consume_multiple: bool = field(default=None, converter=attrs.converters.default_if_none(False))
+
+    json_dict: Optional[bool] = field(default=None, kw_only=True)
+
+    json_list: Optional[bool] = field(default=None, kw_only=True)
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)

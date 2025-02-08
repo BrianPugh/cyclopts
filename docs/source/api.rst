@@ -731,6 +731,34 @@ API
 
          $ cmd --ext .pdf --ext .html foo.md bar.md
 
+   .. attribute:: json_dict
+      :type: Optional[bool]
+      :value: None
+
+      Allow for the parsing of json-dict-strings as data.
+      If :obj:`None` (default behavior), acts like :obj:`True`, **unless** the annotated type is union'd with :obj:`str`.
+      When :obj:`True`, data will be parsed as json if the following conditions are met:
+
+      1. The parameter is specified as a keyword option; e.g. ``--movie``.
+
+      2. The referenced parameter is dataclass-like.
+
+      3. The first character of the token is a ``{``.
+
+   .. attribute:: json_list
+      :type: Optional[bool]
+      :value: None
+
+      Allow for the parsing of json-list-strings as data.
+      If :obj:`None` (default behavior), acts like :obj:`True`, **unless** the annotated type is union'd with :obj:`str`.
+      When :obj:`True`, data will be parsed as json if the following conditions are met:
+
+      1. The parameter is specified as a keyword option; e.g. ``--movie``.
+
+      2. The referenced parameter is iterable (not including :obj:`str`).
+
+      3. The first character of the token is a ``[``.
+
    .. automethod:: combine
 
    .. automethod:: default
