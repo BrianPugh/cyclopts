@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Annotated, Iterable, Sequence
 
 import pytest
@@ -5,6 +6,12 @@ import pytest
 from cyclopts import Parameter
 
 LIST_STR_LIKE_TYPES = [list, list[str], Sequence, Sequence[str], Iterable, Iterable[str]]
+
+
+@dataclass
+class User:
+    name: str
+    age: int
 
 
 @pytest.mark.parametrize(
@@ -75,3 +82,16 @@ def test_json_list_env_str(app, assert_parse_args, env_str, monkeypatch, json_li
         pass
 
     assert_parse_args(main, "", [1, 2, 3])
+
+
+@pytest.mark.skip(reason="Need to implement token exploding.")
+def test_json_list_of_dataclass_cli(app, assert_parse_args):
+    @app.default
+    def main(values: list[User]):
+        pass
+
+    assert_parse_args(
+        main,
+        ["--values", '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 40}]'],
+        [User("Alice", 30), User("Bob", 40)],
+    )
