@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Callable, Sequence, Union
 
 import cyclopts.utils
 from cyclopts._convert import _bool
-from cyclopts.annotations import contains_hint
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -122,6 +121,7 @@ def _parse_kw_and_flags(
         else:
             tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
+            # Consume the appropriate number of tokens
             with suppress(IndexError):
                 if consume_all and argument.parameter.consume_multiple:
                     for j in itertools.count():
@@ -133,15 +133,13 @@ def _parse_kw_and_flags(
                 else:
                     consume_count += tokens_per_element
                     for j in range(consume_count):
-                        if (
-                            argument._accepts_keywords
-                            and len(cli_values) == 1
-                            and cli_values[0].strip().startswith("{")
-                            and not contains_hint(argument.field_info.annotation, str)
+                        if len(cli_values) == 1 and (
+                            argument._should_attempt_json_dict(cli_values)
+                            or argument._should_attempt_json_list(cli_values, leftover_keys)
                         ):
+                            tokens_per_element = 1
                             # Assume that the contents are json and that we shouldn't
                             # consume any additional tokens.
-                            tokens_per_element = 1
                             break
 
                         token = tokens[i + 1 + j]

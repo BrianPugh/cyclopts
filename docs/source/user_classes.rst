@@ -59,6 +59,8 @@ Json parsing will be performed when:
 3. The referenced parameter **cannot** be union'd with a ``str``.
 4. The first character must be a ``{``.
 
+This behavior can be further configured via :class:`.Parameter`
+
 .. _Namespace Flattening:
 
 --------------------

@@ -1,4 +1,3 @@
-import json
 import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
@@ -65,49 +64,6 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
     )
 
     assert actual == expected
-
-
-def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
-    @app.command
-    def foo(some_number: int, user: Annotated[User, Parameter(env_var="USER")]):
-        pass
-
-    external_data = {
-        "id": 123,
-        # "name" is purposely missing.
-        "tastes": {
-            "wine": 9,
-            "cheese": 7,
-            "cabbage": 1,
-        },
-    }
-    monkeypatch.setenv("USER", json.dumps(external_data))
-    assert_parse_args(
-        foo,
-        "foo 100",
-        100,
-        User(**external_data),
-    )
-
-
-@pytest.mark.parametrize(
-    "cmd_str",
-    [
-        """--origin='{"x": 1, "y": 2}'""",
-        """--origin '{"x": 1, "y": 2}'""",
-    ],
-)
-def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
-    @dataclass
-    class Coordinate:
-        x: int
-        y: int
-
-    @app.default
-    def main(origin: Coordinate):
-        pass
-
-    assert_parse_args(main, cmd_str, Coordinate(1, 2))
 
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")

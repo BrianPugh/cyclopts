@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from attrs import field
+from attrs import evolve, field
 
 from cyclopts.utils import UNSET, frozen
 
@@ -20,3 +20,7 @@ class Token:
     def address(self) -> tuple[tuple[str, ...], int]:
         """Hashable subkey destination address for this token."""
         return (self.keys, self.index)
+
+    def evolve(self, **kwargs) -> "Token":
+        # TODO: replace return-hint with Self cp311
+        return evolve(self, **kwargs)

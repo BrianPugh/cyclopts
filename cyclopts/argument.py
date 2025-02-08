@@ -2,7 +2,7 @@ import inspect
 import itertools
 from contextlib import suppress
 from functools import partial
-from typing import Any, Callable, Optional, Union, get_args, get_origin
+from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
 
@@ -733,6 +733,49 @@ class Argument:
                 raise
             return self._default
 
+    def _should_attempt_json_dict(self, tokens: Optional[Sequence[Union[Token, str]]] = None) -> bool:
+        """When parsing, should attempt to parse the token(s) as json dict data."""
+        if tokens is None:
+            tokens = self.tokens
+        if not tokens:
+            return False
+        if not self._accepts_keywords:
+            return False
+        value = tokens[0].value if isinstance(tokens[0], Token) else tokens[0]
+        if not value.strip().startswith("{"):
+            return False
+        if self.parameter.json_dict is not None:
+            return self.parameter.json_dict
+        if contains_hint(self.field_info.annotation, str):
+            return False
+        return True
+
+    def _should_attempt_json_list(
+        self, tokens: Union[Sequence[Union[Token, str]], Token, str, None] = None, keys: tuple[str, ...] = ()
+    ) -> bool:
+        """When parsing, should attempt to parse the token(s) as json list data."""
+        if tokens is None:
+            tokens = self.tokens
+        if not tokens:
+            return False
+        _, consume_all = self.token_count(keys)
+        if not consume_all:
+            return False
+        if isinstance(tokens, Token):
+            value = tokens.value
+        elif isinstance(tokens, str):
+            value = tokens
+        else:
+            value = tokens[0].value if isinstance(tokens[0], Token) else tokens[0]
+        if not value.strip().startswith("["):
+            return False
+        if self.parameter.json_list is not None:
+            return self.parameter.json_list
+        for arg in get_args(self.field_info.annotation) or (str,):
+            if contains_hint(arg, str):
+                return False
+        return True
+
     def match(
         self,
         term: Union[str, int],
@@ -903,7 +946,24 @@ class Argument:
         elif not self.children:
             positional: list[Token] = []
             keyword = {}
-            for token in self.tokens:
+
+            def iter_tokens(tokens):
+                for token in tokens:
+                    if self._should_attempt_json_list(token):
+                        import json
+
+                        try:
+                            parsed_json = json.loads(token.value)
+                        except json.JSONDecodeError as e:
+                            raise CoercionError(token=token, target_type=self.hint) from e
+                        if not isinstance(parsed_json, list):
+                            raise CoercionError(token=token, target_type=self.hint)
+                        for element in parsed_json:
+                            yield token.evolve(value=str(element))
+                    else:
+                        yield token
+
+            for token in iter_tokens(self.tokens):
                 if token.implicit_value is not UNSET:
                     if self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
                         return get_origin(self.hint)(x.implicit_value for x in self.tokens)
@@ -949,8 +1009,8 @@ class Argument:
                     convert, converter=_identity_converter, name_transform=self.parameter.name_transform
                 )
 
-            if self.tokens and not contains_hint(self.field_info.annotation, str):
-                # Dictionary-like structures may have incoming json data from an environment variable.
+            if self._should_attempt_json_dict():
+                # Dict-like structures may have incoming json data from an environment variable.
                 # Pass these values along as Tokens to children.
                 import json
 
