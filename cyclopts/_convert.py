@@ -151,14 +151,14 @@ def _convert(
     name_transform: Callable
     """
     from cyclopts.argument import Token
+    from cyclopts.parameter import Parameter
 
     converter_needs_token = False
     if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
-        args = get_args(type_)
-        type_ = args[0]
-        cparam = Parameter.combine(*(x for x in args[1:] if isinstance(x, Parameter)))
+        cparam = Parameter.from_annotation(type_)
+        type_ = get_args(type_)[0]
         if cparam._converter:
             converter_needs_token = True
             converter = lambda t_, value: cparam._converter(t_, (value,))  # noqa: E731
