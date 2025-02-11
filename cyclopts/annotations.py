@@ -120,7 +120,7 @@ def resolve(type_: Any) -> type:
     return type_
 
 
-def resolve_optional(type_: Any) -> type:
+def resolve_optional(type_: Any) -> Any:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.

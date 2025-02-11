@@ -2,7 +2,21 @@ import inspect
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar, Union, cast, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    overload,
+)
 
 import attrs
 from attrs import define, field
@@ -271,16 +285,16 @@ class Parameter:
         )
 
     @classmethod
-    def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> "Parameter":
+    def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> tuple[Any, "Parameter"]:
         """Resolve the immediate Parameter from a type hint."""
         if type_ is inspect.Parameter.empty:
             if default_parameters:
-                return cls.combine(*default_parameters)
+                return type_, cls.combine(*default_parameters)
             else:
-                return EMPTY_PARAMETER
+                return type_, EMPTY_PARAMETER
         else:
-            type_ = resolve_optional(type_)
-            return cls.combine(*default_parameters, *get_parameters(type_)[1])
+            type_, parameters = get_parameters(type_)
+            return type_, cls.combine(*default_parameters, *parameters)
 
     def __call__(self, obj: T) -> T:
         """Decorator interface for annotating a function/class with a :class:`Parameter`.
@@ -327,24 +341,44 @@ def validate_command(f: Callable):
         # than instantiating a cyclopts.Parameter object.
         if not is_annotated(iparam.annotation):
             continue
-        cparam = Parameter.from_annotation(iparam.annotation)
+        _, cparam = Parameter.from_annotation(iparam.annotation)
         if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
 
 
-def get_parameters(hint: Any) -> tuple[Any, list[Parameter]]:
+@overload
+def get_parameters(hint: T, combine: Literal[False] = False) -> tuple[T, list[Parameter]]: ...
+
+
+@overload
+def get_parameters(hint: T, combine: Literal[True]) -> tuple[T, Parameter]: ...
+
+
+def get_parameters(hint: T, combine: bool = False) -> Union[tuple[T, list[Parameter]], tuple[T, Parameter]]:
     """At root level, checks for cyclopts.Parameter annotations.
 
     Includes checking the ``__cyclopts__`` attribute.
+
+    Returns
+    -------
+    hint
+        Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
+    list[Parameter]
+        List of parameters discovered.
     """
     parameters = []
+    hint = resolve_optional(hint)
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
         parameters.extend(cyclopts_config.parameters)
     if is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
         parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
-    return hint, parameters
+
+    if combine:
+        return hint, Parameter.combine(*parameters)
+    else:
+        return hint, parameters
 
 
 @define
