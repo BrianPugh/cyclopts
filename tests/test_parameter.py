@@ -73,7 +73,7 @@ def test_parameter_from_annotation_basic():
         help="Display this message and exit.",
     )
 
-    assert Parameter.from_annotation(Annotated[bool, expected_cparam], Parameter()) == expected_cparam
+    assert (bool, expected_cparam) == Parameter.from_annotation(Annotated[bool, expected_cparam], Parameter())
 
 
 def test_parameter_from_annotation_optional_annotated():
@@ -84,11 +84,11 @@ def test_parameter_from_annotation_optional_annotated():
         help="Display this message and exit.",
     )
 
-    assert Parameter.from_annotation(Optional[Annotated[bool, expected_cparam]], Parameter()) == expected_cparam
+    assert (bool, expected_cparam) == Parameter.from_annotation(Optional[Annotated[bool, expected_cparam]], Parameter())
 
 
 def test_parameter_from_annotation_empty_annotation():
-    assert Parameter.from_annotation(inspect.Parameter.empty, Parameter()) == Parameter()
+    assert (inspect.Parameter.empty, Parameter()) == Parameter.from_annotation(inspect.Parameter.empty, Parameter())
 
 
 def test_parameter_combine():

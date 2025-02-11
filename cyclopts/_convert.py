@@ -157,8 +157,7 @@ def _convert(
     if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
-        cparam = Parameter.from_annotation(type_)
-        type_ = get_args(type_)[0]
+        type_, cparam = Parameter.from_annotation(type_)
         if cparam._converter:
             converter_needs_token = True
             converter = lambda t_, value: cparam._converter(t_, (value,))  # noqa: E731
