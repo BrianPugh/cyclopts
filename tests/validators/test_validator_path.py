@@ -57,3 +57,49 @@ def test_path_dir_okay(tmp_path):
 def test_path_invalid_values():
     with pytest.raises(ValueError):
         validators.Path(exists=True, dir_okay=False, file_okay=False)
+
+
+@pytest.mark.parametrize(
+    "ext",
+    ["mp4", ".mp4", "Mp4", ".Mp4"],
+)
+def test_path_extension_match_single(ext):
+    validator = validators.Path(ext=ext)
+    validator(Path, Path("foo.mp4"))
+
+
+@pytest.mark.parametrize(
+    "ext",
+    ["png", ".png"],
+)
+def test_path_extension_not_match_single(ext):
+    validator = validators.Path(ext=ext)
+    with pytest.raises(ValueError) as e:
+        validator(Path, Path("foo.mp4"))
+    assert str(e.value) == '"foo.mp4" must have extension "png".'
+
+
+@pytest.mark.parametrize(
+    "ext",
+    [
+        ("mp4", "avi"),
+        (".mp4", ".avi"),
+        ("Mp4", ".AVI"),
+        (".Mp4", ".avi"),
+    ],
+)
+def test_path_extension_match_multiple(ext):
+    validator = validators.Path(ext=ext)
+    validator(Path, Path("foo.mp4"))
+    validator(Path, Path("foo.avi"))
+
+
+@pytest.mark.parametrize(
+    "ext",
+    [(".png", ".jpg"), ("png", "jPG")],
+)
+def test_path_extension_not_match_multi(ext):
+    validator = validators.Path(ext=ext)
+    with pytest.raises(ValueError) as e:
+        validator(Path, Path("foo.mp4"))
+    assert str(e.value) == '"foo.mp4" does not match one of supported extensions {"png", "jpg"}.'
