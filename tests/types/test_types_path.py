@@ -167,3 +167,69 @@ def test_types_path_resolve_converter(convert, tmp_path):
 
     actual = convert(Tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [dir1.as_posix(), dir2.as_posix()])
     assert (dir1, dir2) == actual
+
+
+# File extensions
+@pytest.mark.parametrize(
+    "annotation, ext",
+    [
+        (ct.BinPath, "bin"),
+        (ct.CsvPath, "csv"),
+        (ct.TxtPath, "txt"),
+        (ct.ImagePath, "jpg"),
+        (ct.ImagePath, "jpeg"),
+        (ct.ImagePath, "png"),
+        (ct.Mp4Path, "mp4"),
+        (ct.JsonPath, "json"),
+        (ct.TomlPath, "toml"),
+        (ct.YamlPath, "yaml"),
+    ],
+)
+def test_types_file_extensions_good(annotation, ext, convert, tmp_path):
+    path = tmp_path / f"foo.{ext}"
+    convert(annotation, path)
+
+
+# File extensions
+@pytest.mark.parametrize(
+    "annotation, ext",
+    [
+        (ct.ExistingBinPath, "bin"),
+        (ct.ExistingCsvPath, "csv"),
+        (ct.ExistingTxtPath, "txt"),
+        (ct.ExistingImagePath, "jpg"),
+        (ct.ExistingImagePath, "jpeg"),
+        (ct.ExistingImagePath, "png"),
+        (ct.ExistingMp4Path, "mp4"),
+        (ct.ExistingJsonPath, "json"),
+        (ct.ExistingTomlPath, "toml"),
+        (ct.ExistingYamlPath, "yaml"),
+    ],
+)
+def test_types_file_extensions_exist_good(annotation, ext, convert, tmp_path):
+    path = tmp_path / f"foo.{ext}"
+    with pytest.raises(ValidationError):
+        # File has not been created yet
+        convert(annotation, path)
+
+    path.touch()
+    convert(annotation, path)
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        ct.BinPath,
+        ct.CsvPath,
+        ct.TxtPath,
+        ct.ImagePath,
+        ct.Mp4Path,
+        ct.JsonPath,
+        ct.TomlPath,
+        ct.YamlPath,
+    ],
+)
+def test_types_file_extensions_bad(annotation, convert, tmp_path):
+    path = tmp_path / "foo.bar"
+    with pytest.raises(ValidationError):
+        convert(annotation, path)
