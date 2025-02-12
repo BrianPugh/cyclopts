@@ -1008,6 +1008,38 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 
 .. autodata:: cyclopts.types.ResolvedExistingFile
 
+.. autodata:: cyclopts.types.BinPath
+
+.. autodata:: cyclopts.types.ExistingBinPath
+
+.. autodata:: cyclopts.types.CsvPath
+
+.. autodata:: cyclopts.types.ExistingCsvPath
+
+.. autodata:: cyclopts.types.TxtPath
+
+.. autodata:: cyclopts.types.ExistingTxtPath
+
+.. autodata:: cyclopts.types.ImagePath
+
+.. autodata:: cyclopts.types.ExistingImagePath
+
+.. autodata:: cyclopts.types.Mp4Path
+
+.. autodata:: cyclopts.types.ExistingMp4Path
+
+.. autodata:: cyclopts.types.JsonPath
+
+.. autodata:: cyclopts.types.ExistingJsonPath
+
+.. autodata:: cyclopts.types.TomlPath
+
+.. autodata:: cyclopts.types.ExistingTomlPath
+
+.. autodata:: cyclopts.types.YamlPath
+
+.. autodata:: cyclopts.types.ExistingYamlPath
+
 .. _Annotated Number Types:
 
 ^^^^^^

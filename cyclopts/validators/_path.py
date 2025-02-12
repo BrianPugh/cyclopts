@@ -1,7 +1,13 @@
 import pathlib
-from typing import Any, Sequence, Union
+from typing import Any, Iterable, Sequence, Union
 
-from cyclopts.utils import frozen
+from attrs import field
+
+from cyclopts.utils import frozen, to_tuple_converter
+
+
+def ext_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[str, ...]:
+    return tuple(e.lower().lstrip(".") for e in to_tuple_converter(value))
 
 
 @frozen(kw_only=True)
@@ -70,6 +76,13 @@ class Path:
     Defaults to :obj:`True`.
     """
 
+    # Can only ever really be a tuple[str, ...]
+    ext: Union[str, Sequence[str]] = field(default=None, converter=ext_converter)
+    """
+    Supplied path must have this extension (case insensitive).
+    May or may not include the ".".
+    """
+
     def __attrs_post_init__(self):
         if self.exists and not self.file_okay and not self.dir_okay:
             raise ValueError("(exists=True, file_okay=False, dir_okay=False) is an invalid configuration.")
@@ -84,6 +97,13 @@ class Path:
         else:
             if not isinstance(path, pathlib.Path):
                 raise TypeError
+
+            if self.ext and path.suffix.lower().lstrip(".") not in self.ext:
+                if len(self.ext) == 1:
+                    raise ValueError(f'"{path}" must have extension "{self.ext[0]}".')
+                else:
+                    pretty_ext = "{" + ", ".join(f'"{x}"' for x in self.ext) + "}"
+                    raise ValueError(f'"{path}" does not match one of supported extensions {pretty_ext}.')
 
             if path.exists():
                 if not self.file_okay and path.is_file():
