@@ -124,6 +124,30 @@ def test_multiple_names(app, cmd_str, assert_parse_args):
 @pytest.mark.parametrize(
     "cmd_str",
     [
+        "--job-name foo",
+        "-j foo",
+    ],
+)
+def test_short_name_j(app, cmd_str, assert_parse_args):
+    """
+    "-j" previously didn't work as a short-name because it's a valid complex value.
+
+    https://github.com/BrianPugh/cyclopts/issues/328
+    """
+
+    @app.default
+    def main(
+        *,
+        job_name: Annotated[str, Parameter(name=["--job-name", "-j"], negative=False)],
+    ):
+        pass
+
+    assert_parse_args(main, cmd_str, job_name="foo")
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
         "foo --age 10",
         "foo --duration 10",
         "foo -a 10",
