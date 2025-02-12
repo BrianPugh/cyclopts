@@ -6,7 +6,6 @@ from typing import (
     Any,
     Callable,
     List,
-    Literal,
     Optional,
     Sequence,
     Tuple,
@@ -15,7 +14,6 @@ from typing import (
     cast,
     get_args,
     get_origin,
-    overload,
 )
 
 import attrs
@@ -346,15 +344,7 @@ def validate_command(f: Callable):
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
 
 
-@overload
-def get_parameters(hint: T, combine: Literal[False] = False) -> tuple[T, list[Parameter]]: ...
-
-
-@overload
-def get_parameters(hint: T, combine: Literal[True]) -> tuple[T, Parameter]: ...
-
-
-def get_parameters(hint: T, combine: bool = False) -> Union[tuple[T, list[Parameter]], tuple[T, Parameter]]:
+def get_parameters(hint: T) -> tuple[T, list[Parameter]]:
     """At root level, checks for cyclopts.Parameter annotations.
 
     Includes checking the ``__cyclopts__`` attribute.
@@ -375,10 +365,7 @@ def get_parameters(hint: T, combine: bool = False) -> Union[tuple[T, list[Parame
         hint = inner[0]
         parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
 
-    if combine:
-        return hint, Parameter.combine(*parameters)
-    else:
-        return hint, parameters
+    return hint, parameters
 
 
 @define
