@@ -61,19 +61,14 @@ def assert_parse_args_partial(app):
 
 
 @pytest.fixture
-def convert(app):
+def convert():
     """Function that performs a conversion for a given type/cmd pair.
 
     Goes through the whole app stack.
-    Can only be called once per test.
     """
-    n_times_called = 0
 
     def inner(type_, cmd):
-        nonlocal n_times_called
-        if n_times_called:
-            raise pytest.UsageError("convert fixture can only be called once per test.")
-        n_times_called += 1
+        app = cyclopts.App()
 
         if isinstance(cmd, Path):
             cmd = cmd.as_posix()
