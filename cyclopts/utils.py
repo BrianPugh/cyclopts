@@ -384,6 +384,11 @@ def is_option_like(token: str) -> bool:
     """
     with suppress(ValueError):
         complex(token)
+        if token.lower() == "-j":
+            # ``complex("-j")`` is a valid imaginary number, but more than likely
+            # the caller meant it as a short flag.
+            # https://github.com/BrianPugh/cyclopts/issues/328
+            return True
         return False
     return token.startswith("-")
 

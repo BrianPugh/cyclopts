@@ -128,8 +128,10 @@ def test_multiple_names(app, cmd_str, assert_parse_args):
         "-j foo",
     ],
 )
-def test_short_name(app, cmd_str, assert_parse_args):
+def test_short_name_j(app, cmd_str, assert_parse_args):
     """
+    "-j" previously didn't work as a short-name because it's a valid complex value.
+
     https://github.com/BrianPugh/cyclopts/issues/328
     """
 
