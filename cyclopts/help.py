@@ -18,6 +18,7 @@ from typing import (
 from attrs import define, field
 
 import cyclopts.utils
+from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union
 from cyclopts.group import Group
 from cyclopts.utils import SortHelper, frozen, resolve_callables
@@ -329,7 +330,7 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
         choices = ", ".join(x for x in inner_choices if x)
     elif _origin is Literal:
         choices = ", ".join(str(x) for x in get_args(type_))
-    elif _origin in (list, set, tuple):
+    elif _origin in ITERABLE_TYPES:
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices = get_choices(args[0])

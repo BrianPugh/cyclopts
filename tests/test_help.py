@@ -1,7 +1,7 @@
 import sys
 from enum import Enum
 from textwrap import dedent
-from typing import Annotated, List, Literal, Optional, Set, Tuple, Union
+from typing import Annotated, List, Literal, Optional, Sequence, Set, Tuple, Union
 
 import pytest
 
@@ -646,6 +646,52 @@ def test_help_format_group_parameters_choices_enum_list_typing(capture_format_gr
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_enum_sequence(capture_format_group_parameters):
+    class CompSciProblem(Enum):
+        fizz = "bleep bloop blop"
+        buzz = "blop bleep bloop"
+
+    def cmd(
+        foo: Annotated[
+            Optional[Sequence[CompSciProblem]],  # pyright: ignore
+            Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz]                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_choices_literal_sequence(capture_format_group_parameters):
+    def cmd(
+        steps_to_skip: Annotated[
+            Optional[Sequence[Literal["build", "deploy"]]],  # pyright: ignore
+            Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
+        ] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ STEPS-TO-SKIP      Docstring for steps_to_skip. [choices: build,   │
+        │   --steps-to-skip  deploy]                                         │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    print(expected)
     assert actual == expected
 
 
