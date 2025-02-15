@@ -453,9 +453,47 @@ def test_missing_keyword_argument(app, cmd_str_e):
         "--c 3 4 -- 1 --2",
     ],
 )
-def test_double_hyphen_positional_only(app, cmd_str, assert_parse_args):
+def test_default_double_hyphen_end_of_options_delimiter(app, cmd_str, assert_parse_args):
     @app.default
     def foo(a: int, b: str, c: tuple[int, int]):
         pass
 
     assert_parse_args(foo, cmd_str, 1, "--2", (3, 4))
+
+
+def test_disabled_double_hyphen_end_of_options_delimiter_from_app(app, assert_parse_args):
+    app.end_of_options_delimiter = ""
+
+    @app.default
+    def foo(a: int, b: Annotated[str, Parameter(allow_leading_hyphen=True)], c: tuple[int, int]):
+        pass
+
+    assert_parse_args(foo, "1 -- 3 4", 1, "--", (3, 4))
+
+
+def test_disabled_double_hyphen_end_of_options_delimiter_from_parse_args(app, assert_parse_args_config):
+    @app.default
+    def foo(a: int, b: Annotated[str, Parameter(allow_leading_hyphen=True)], c: tuple[int, int]):
+        pass
+
+    assert_parse_args_config({"end_of_options_delimiter": ""}, foo, "1 -- 3 4", 1, "--", (3, 4))
+
+
+def test_end_of_options_delimiter_from_parse_args(app, assert_parse_args):
+    app.end_of_options_delimiter = "AND"
+
+    @app.default
+    def foo(a: int, b: str, c: tuple[int, int]):
+        pass
+
+    assert_parse_args(foo, "1 AND --2 3 4", 1, "--2", (3, 4))
+
+
+def test_end_of_options_delimiter_override(app, assert_parse_args_config):
+    app.end_of_options_delimiter = "AND"  # This gets overridden
+
+    @app.default
+    def foo(a: int, b: str, c: tuple[int, int]):
+        pass
+
+    assert_parse_args_config({"end_of_options_delimiter": "DELIMIT"}, foo, "1 DELIMIT --2 3 4", 1, "--2", (3, 4))

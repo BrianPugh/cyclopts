@@ -49,6 +49,18 @@ def assert_parse_args(app):
 
 
 @pytest.fixture
+def assert_parse_args_config(app):
+    def inner(config: dict, f, cmd: str, *args, **kwargs):
+        signature = cyclopts.utils.signature(f)
+        expected_bind = signature.bind(*args, **kwargs)
+        actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False, **config)
+        assert actual_command == f
+        assert actual_bind == expected_bind
+
+    return inner
+
+
+@pytest.fixture
 def assert_parse_args_partial(app):
     def inner(f, cmd: str, *args, **kwargs):
         signature = cyclopts.utils.signature(f)
