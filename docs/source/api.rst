@@ -331,6 +331,7 @@ API
 
       All tokens after this delimiter will be force-interpreted as positional arguments.
       If no ``end_of_options_delimiter`` is set, it will default to POSIX-standard ``"--"``.
+      Set to an empty string to disable.
 
 
 .. autoclass:: cyclopts.Parameter
