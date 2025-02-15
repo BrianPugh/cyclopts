@@ -325,6 +325,13 @@ API
       The intended use-case of this feature is to allow users to specify functions that can load defaults from some external configuration.
       See :ref:`cyclopts.config <API Config>` for useful builtins and :ref:`Config Files` for examples.
 
+   .. attribute:: end_of_options_delimiter
+      :type: Optional[str]
+      :value: None
+
+      All tokens after this delimiter will be force-interpreted as positional arguments.
+      If no ``end_of_options_delimiter`` is set, it will default to POSIX-standard ``"--"``.
+
 
 .. autoclass:: cyclopts.Parameter
    :special-members: __call__

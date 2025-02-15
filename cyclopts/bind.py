@@ -61,17 +61,18 @@ def _parse_kw_and_flags(
     argument_collection: ArgumentCollection,
     tokens: Sequence[str],
     *,
-    delimiter: str = "--",
+    end_of_options_delimiter: str = "--",
 ):
-    unused_tokens = []
+    unused_tokens, positional_only_tokens = [], []
     skip_next_iterations = 0
-    try:
-        delimiter_index = tokens.index(delimiter)
-    except ValueError:
-        positional_only_tokens = []
-    else:
-        positional_only_tokens = tokens[delimiter_index:]
-        tokens = tokens[:delimiter_index]
+    if end_of_options_delimiter:
+        try:
+            delimiter_index = tokens.index(end_of_options_delimiter)
+        except ValueError:
+            pass  # end_of_options_delimiter not in token stream
+        else:
+            positional_only_tokens = tokens[delimiter_index:]
+            tokens = tokens[:delimiter_index]
     for i, token in enumerate(tokens):
         # If the previous argument was a keyword, then this is its value
         if skip_next_iterations > 0:
@@ -177,9 +178,9 @@ def _future_positional_only_token_count(argument_collection: ArgumentCollection,
     return n_tokens_to_leave
 
 
-def _preprocess_positional_tokens(tokens: Sequence[str], delimiter: str) -> list[tuple[str, bool]]:
+def _preprocess_positional_tokens(tokens: Sequence[str], end_of_options_delimiter: str) -> list[tuple[str, bool]]:
     try:
-        delimiter_index = tokens.index(delimiter)
+        delimiter_index = tokens.index(end_of_options_delimiter)
         return [(t, False) for t in tokens[:delimiter_index]] + [(t, True) for t in tokens[delimiter_index + 1 :]]
     except ValueError:  # delimiter not found
         return [(t, False) for t in tokens]
@@ -189,14 +190,14 @@ def _parse_pos(
     argument_collection: ArgumentCollection,
     tokens: list[str],
     *,
-    delimiter: str = "--",
+    end_of_options_delimiter: str = "--",
 ) -> list[str]:
     prior_positional_or_keyword_supplied_as_keyword_arguments = []
 
     if not tokens:
         return []
 
-    tokens_and_force_positional = _preprocess_positional_tokens(tokens, delimiter)
+    tokens_and_force_positional = _preprocess_positional_tokens(tokens, end_of_options_delimiter)
 
     for i in itertools.count():
         try:
@@ -313,7 +314,7 @@ def create_bound_arguments(
     tokens: list[str],
     configs: Iterable[Callable],
     *,
-    delimiter: str = "--",
+    end_of_options_delimiter: str = "--",
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -325,7 +326,7 @@ def create_bound_arguments(
     tokens: List[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
     configs: Iterable[Callable]
-    delimiter: str
+    end_of_options_delimiter: str
         Everything after this special token is forced to be supplied as a positional argument.
 
     Returns
@@ -339,8 +340,12 @@ def create_bound_arguments(
     unused_tokens = tokens
 
     try:
-        unused_tokens = _parse_kw_and_flags(argument_collection, unused_tokens, delimiter=delimiter)
-        unused_tokens = _parse_pos(argument_collection, unused_tokens, delimiter=delimiter)
+        unused_tokens = _parse_kw_and_flags(
+            argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
+        )
+        unused_tokens = _parse_pos(
+            argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
+        )
 
         _parse_env(argument_collection)
         _parse_configs(argument_collection, configs)

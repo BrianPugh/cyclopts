@@ -307,6 +307,8 @@ class App:
         kw_only=True,
     )
 
+    end_of_options_delimiter: Optional[str] = field(default=None, kw_only=True)
+
     ######################
     # Private Attributes #
     ######################
@@ -860,6 +862,7 @@ class App:
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
+        end_of_options_delimiter: Optional[str] = None,
     ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any]]:
         """Interpret arguments into a registered function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
@@ -871,6 +874,10 @@ class App:
         console: rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
+        end_of_options_delimiter: Optional[str]
+            All tokens after this delimiter will be force-interpreted as positional arguments.
+            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
+            If that is not set, it will default to POSIX-standard ``"--"``.
 
         Returns
         -------
@@ -889,14 +896,17 @@ class App:
             :obj:`~typing.Annotated` will be resolved.
             Intended to simplify :ref:`meta apps <Meta App>`.
         """
-        command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(tokens, console=console)
+        command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
+            tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
+        )
         return command, bound, unused_tokens, ignored
 
     def _parse_known_args(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
-        console: Optional["Console"] = None,
+        console: Optional["Console"],
+        end_of_options_delimiter: Optional[str],
     ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
@@ -923,6 +933,9 @@ class App:
 
         config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
         config = tuple(partial(x, apps, command_chain) for x in config)
+        end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
+        if end_of_options_delimiter is None:
+            end_of_options_delimiter = "--"
 
         # Special flags (help/version) get intercepted by the root app.
         # Special flags are allows to be **anywhere** in the token stream.
@@ -972,6 +985,7 @@ class App:
                         argument_collection,
                         unused_tokens,
                         config,
+                        end_of_options_delimiter=end_of_options_delimiter,
                     )
                     try:
                         for validator in command_app.validator:
@@ -1019,6 +1033,7 @@ class App:
         exit_on_error: bool = True,
         help_on_error: Optional[bool] = None,
         verbose: bool = False,
+        end_of_options_delimiter: Optional[str] = None,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
@@ -1048,6 +1063,10 @@ class App:
         verbose: bool
             Populate exception strings with more information intended for developers.
             Defaults to :obj:`False`.
+        end_of_options_delimiter: Optional[str]
+            All tokens after this delimiter will be force-interpreted as positional arguments.
+            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
+            If that is not set, it will default to POSIX-standard ``"--"``.
 
         Returns
         -------
@@ -1071,7 +1090,7 @@ class App:
         # Normal parsing
         try:
             command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
-                tokens, console=console
+                tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
             )
             if unused_tokens:
                 for token in unused_tokens:
@@ -1111,6 +1130,7 @@ class App:
         exit_on_error: bool = True,
         help_on_error: Optional[bool] = None,
         verbose: bool = False,
+        end_of_options_delimiter: Optional[str] = None,
     ):
         """Interprets and executes a command.
 
@@ -1135,6 +1155,10 @@ class App:
         verbose: bool
             Populate exception strings with more information intended for developers.
             Defaults to :obj:`False`.
+        end_of_options_delimiter: Optional[str]
+            All tokens after this delimiter will be force-interpreted as positional arguments.
+            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
+            If that is not set, it will default to POSIX-standard ``"--"``.
 
         Returns
         -------
@@ -1152,6 +1176,7 @@ class App:
             exit_on_error=exit_on_error,
             help_on_error=help_on_error,
             verbose=verbose,
+            end_of_options_delimiter=end_of_options_delimiter,
         )
         try:
             if inspect.iscoroutinefunction(command):
