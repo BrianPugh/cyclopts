@@ -242,7 +242,7 @@ class ArgumentCollection(list["Argument"]):
         immediate_parameter = Parameter.combine(*cyclopts_parameters)
 
         # We do NOT want to skip parse=False arguments here.
-        # This makes it easier to assemble ignored arguments downstrea.
+        # This makes it easier to assemble ignored arguments downstream.
 
         # resolve/derive the parameter name
         if keys:
@@ -956,8 +956,10 @@ class Argument:
                             parsed_json = json.loads(token.value)
                         except json.JSONDecodeError as e:
                             raise CoercionError(token=token, target_type=self.hint) from e
+
                         if not isinstance(parsed_json, list):
                             raise CoercionError(token=token, target_type=self.hint)
+
                         for element in parsed_json:
                             yield token.evolve(value=str(element))
                     else:
