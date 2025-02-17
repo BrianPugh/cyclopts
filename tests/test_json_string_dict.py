@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, field
-from typing import Annotated, Dict
+from typing import Annotated, Dict, Optional
 
 import pytest
 
@@ -42,6 +42,7 @@ def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
     [
         """--origin='{"x": 1, "y": 2}'""",
         """--origin '{"x": 1, "y": 2}'""",
+        """--origin='{"x": 1, "y": 2, "label": null}'""",
     ],
 )
 def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
@@ -49,6 +50,7 @@ def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
     class Coordinate:
         x: int
         y: int
+        label: Optional[str] = None
 
     @app.default
     def main(origin: Coordinate):
