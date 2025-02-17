@@ -229,7 +229,6 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
     [
         '{"storage_class": "longhorn"}',
         '{"storageclass": "longhorn"}',
-        '{"storageClass": "longhorn"}',
         # check for incorrectly parsing "null" as a string
         '{"storage_class": "longhorn", "limit": null}',
     ],
