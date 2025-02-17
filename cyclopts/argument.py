@@ -947,7 +947,7 @@ class Argument:
             positional: list[Token] = []
             keyword = {}
 
-            def iter_tokens(tokens):
+            def expand_tokens(tokens):
                 for token in tokens:
                     if self._should_attempt_json_list(token):
                         import json
@@ -961,17 +961,20 @@ class Argument:
                             raise CoercionError(token=token, target_type=self.hint)
 
                         for element in parsed_json:
-                            yield token.evolve(value=str(element))
+                            if element is None:
+                                yield token.evolve(value="", implicit_value=element)
+                            else:
+                                yield token.evolve(value=str(element))
                     else:
                         yield token
 
-            for token in iter_tokens(self.tokens):
-                if token.implicit_value is not UNSET:
-                    if self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
-                        return get_origin(self.hint)(x.implicit_value for x in self.tokens)
-                    else:
-                        assert len(self.tokens) == 1
-                        return token.implicit_value
+            expanded_tokens = list(expand_tokens(self.tokens))
+            for token in expanded_tokens:
+                if token.implicit_value is not UNSET and isinstance(
+                    token.implicit_value, get_origin(self.hint) or self.hint
+                ):
+                    assert len(expanded_tokens) == 1
+                    return token.implicit_value
 
                 if token.keys:
                     lookup = keyword

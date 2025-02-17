@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated, Iterable, Sequence
+from typing import Annotated, Iterable, Optional, Sequence
 
 import pytest
 
@@ -46,6 +46,14 @@ def test_json_list_str_none(app, assert_parse_args, annotation):
         pass
 
     assert_parse_args(main, ['["foo", "bar"]'], ['["foo", "bar"]'])
+
+
+def test_json_list_optional_int(app, assert_parse_args):
+    @app.default
+    def main(values: list[Optional[int]]):  # pyright: ignore
+        pass
+
+    assert_parse_args(main, ["[1, null, 2]"], [1, None, 2])
 
 
 @pytest.mark.parametrize("annotation", LIST_STR_LIKE_TYPES)
