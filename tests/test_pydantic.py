@@ -173,7 +173,7 @@ def test_bind_pydantic_basemodel_missing_arg(app, console):
     assert actual == expected
 
 
-def test_pydantic_alias(app, console, assert_parse_args):
+def test_pydantic_alias_1(app, console, assert_parse_args):
     class User(BaseModel):
         model_config = ConfigDict(
             # A callable that takes a field name and returns an alias for it.
@@ -222,6 +222,39 @@ def test_pydantic_alias(app, console, assert_parse_args):
         "foo --user.username='Bob Smith' --user.age_in_years=100",
         user=User(user_name="Bob Smith", age_in_years=100),
     )
+
+
+@pytest.mark.parametrize(
+    "env_var",
+    [
+        '{"storage_class": "longhorn"}',
+        '{"storageclass": "longhorn"}',
+        # check for incorrectly parsing "null" as a string
+        '{"storage_class": "longhorn", "limit": null}',
+    ],
+)
+def test_pydantic_alias_env_var_json(app, assert_parse_args, monkeypatch, env_var):
+    """
+    https://github.com/BrianPugh/cyclopts/issues/332
+    """
+    monkeypatch.setenv("SPEC", env_var)
+
+    class BaseK8sModel(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            populate_by_name=True,
+            from_attributes=True,
+        )
+
+    class Spec(BaseK8sModel):
+        storage_class: str
+        limit: Optional[int] = None
+
+    @app.default
+    def run(spec: Annotated[Spec, Parameter(env_var="SPEC")]) -> None:
+        pass
+
+    assert_parse_args(run, "", Spec(storage_class="longhorn"))
 
 
 def test_parameter_decorator_pydantic_nested_1(app, console):

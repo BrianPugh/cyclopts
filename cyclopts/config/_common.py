@@ -13,7 +13,7 @@ from attrs import define, field
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError, UnknownOptionError
 from cyclopts.token import Token
-from cyclopts.utils import to_tuple_converter
+from cyclopts.utils import is_iterable, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -124,13 +124,18 @@ def update_argument_collection(
 
             # Convert all values to strings, so that the Cyclopts engine can process them.
             # This may (eventually) result in converting back to the original dtype.
-            if not isinstance(value, list):
+            if not is_iterable(value):
                 value = (value,)
-            value = tuple(str(x) for x in value)
-
             for i, v in enumerate(value):
                 # TODO: is this index correct? If the source value is a list, it should probably be different
-                token = Token(keyword=complete_keyword, value=v, source=source, index=i, keys=remaining_keys)
+                if v is None:
+                    # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
+                    token = Token(
+                        keyword=complete_keyword, implicit_value=None, source=source, index=i, keys=remaining_keys
+                    )
+                else:
+                    # Convert the value back into a string, so it can be re-converted.
+                    token = Token(keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys)
                 argument.append(token)
 
 

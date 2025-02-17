@@ -20,7 +20,7 @@ from typing import (
 from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_infos
-from cyclopts.utils import default_name_transform, grouper, is_builtin
+from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -246,7 +246,9 @@ def _convert(
     elif is_builtin(type_):
         assert isinstance(token, Token)
         try:
-            if converter is None:
+            if token.implicit_value is not UNSET:
+                out = token.implicit_value
+            elif converter is None:
                 out = _converters.get(type_, type_)(token.value)
             elif converter_needs_token:
                 out = converter(type_, token)  # pyright: ignore[reportArgumentType]
