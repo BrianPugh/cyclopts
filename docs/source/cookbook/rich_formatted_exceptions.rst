@@ -44,6 +44,7 @@ To create a more visually appealing and informative traceback, you can use the `
 
 .. code-block:: python
 
+    import sys
     from cyclopts import App
     from rich.console import Console
 
@@ -59,6 +60,7 @@ To create a more visually appealing and informative traceback, you can use the `
             app()
         except Exception:
             console.print_exception()
+            sys.exit(1)
 
 Now, running the updated script will display a rich-formatted traceback:
 
