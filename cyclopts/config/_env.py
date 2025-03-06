@@ -1,9 +1,8 @@
 import os
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from attrs import define, field
 
-from cyclopts._env_var import env_var_split
 from cyclopts.argument import ArgumentCollection, Token
 
 if TYPE_CHECKING:
@@ -14,7 +13,6 @@ if TYPE_CHECKING:
 class Env:
     prefix: str = ""
     command: bool = field(default=True, kw_only=True)
-    split: Callable = field(default=env_var_split, kw_only=True)
 
     def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
         prefix = self.prefix
