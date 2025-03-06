@@ -106,7 +106,7 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    _converter: Callable = field(default=None, alias="converter")
+    _converter: Optional[Callable] = field(default=None, alias="converter")
 
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable, Iterable[Callable]] = field(
