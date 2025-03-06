@@ -1319,12 +1319,6 @@ All Cyclopts builtins index into the configuration file with the following rules
 
       If :obj:`True`, add the command's name (uppercase) after :attr:`prefix`.
 
-   .. attribute:: split
-      :type: Callable
-      :value: cyclopts.env_var_split
-
-      Function that splits up the read-in :attr:`~cyclopts.Parameter.env_var` value.
-
 ----------
 Exceptions
 ----------
