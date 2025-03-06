@@ -101,7 +101,7 @@ def _startswith(string, prefix):
 
 
 def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
-    def inner(argument: "Argument", data: dict) -> list[str]:
+    def inner(argument: "Argument", data: dict[str, Any]) -> list[str]:
         provided_keys = set(data)
         field_info = get_field_info(argument.hint)
         return [k for k, v in field_info.items() if (v.required and k not in provided_keys)]
@@ -1215,7 +1215,7 @@ class Argument:
 
 
 def _resolve_groups_from_callable(
-    func: Callable,
+    func: Callable[..., Any],
     *default_parameters: Optional[Parameter],
     group_arguments: Optional[Group] = None,
     group_parameters: Optional[Group] = None,

@@ -417,7 +417,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry]:
     entries = []
     for app in apps:
         if not app.show:

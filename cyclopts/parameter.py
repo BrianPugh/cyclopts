@@ -24,6 +24,7 @@ import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES, convert
 from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.group import Group
+from cyclopts.token import Token
 from cyclopts.utils import (
     default_name_transform,
     frozen,
@@ -106,12 +107,12 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    _converter: Optional[Callable] = field(default=None, alias="converter")
+    _converter: Optional[Callable[[Any, Sequence[Token]], Any]] = field(default=None, alias="converter")
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable, Iterable[Callable]] = field(
+    validator: Union[None, Callable[[Any, Any], Any], Iterable[Callable[[Any, Any], Any]]] = field(
         default=(),
-        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+        converter=lambda x: cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(x)),
     )
 
     # This can ONLY ever be ``None`` or ``Tuple[str, ...]``

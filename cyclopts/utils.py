@@ -366,7 +366,7 @@ def default_name_transform(s: str) -> str:
     return s.lower().replace("_", "-").strip("-")
 
 
-def grouper(iterable: Sequence, n: int) -> Iterator[Tuple[Any, ...]]:
+def grouper(iterable: Sequence[Any], n: int) -> Iterator[Tuple[Any, ...]]:
     """Collect data into non-overlapping fixed-length chunks or blocks.
 
     https://docs.python.org/3/library/itertools.html#itertools-recipes
