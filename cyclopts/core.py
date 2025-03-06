@@ -60,7 +60,7 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-T = TypeVar("T", bound=Callable)
+T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
 
@@ -102,8 +102,8 @@ def _default_version(default="0.0.0") -> str:
     import importlib
 
     if sys.version_info < (3, 10):  # pragma: no cover
-        from importlib_metadata import PackageNotFoundError
-        from importlib_metadata import version as importlib_metadata_version
+        from importlib_metadata import PackageNotFoundError  # pyright: ignore[reportMissingImports]
+        from importlib_metadata import version as importlib_metadata_version  # pyright: ignore[reportMissingImports]
     else:  # pragma: no cover
         from importlib.metadata import PackageNotFoundError
         from importlib.metadata import version as importlib_metadata_version
@@ -210,11 +210,17 @@ class App:
 
     # Everything below must be kw_only
 
-    default_command: Optional[Callable] = field(default=None, converter=_validate_default_command, kw_only=True)
+    default_command: Optional[Callable[..., Any]] = field(
+        default=None, converter=_validate_default_command, kw_only=True
+    )
     default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
 
     # This can ONLY ever be None or Tuple[Callable, ...]
-    _config: Union[None, Callable, Iterable[Callable]] = field(
+    _config: Union[
+        None,
+        Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any],
+        Iterable[Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any]],
+    ] = field(
         default=None,
         alias="config",
         converter=optional_to_tuple_converter,
@@ -863,7 +869,7 @@ class App:
         *,
         console: Optional["Console"] = None,
         end_of_options_delimiter: Optional[str] = None,
-    ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any]]:
+    ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any]]:
         """Interpret arguments into a registered function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
         Parameters
@@ -908,7 +914,7 @@ class App:
         *,
         console: Optional["Console"],
         end_of_options_delimiter: Optional[str],
-    ) -> tuple[Callable, inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
+    ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
 

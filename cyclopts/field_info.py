@@ -51,8 +51,10 @@ class FieldInfo:
     KEYWORD_ONLY: ClassVar = inspect.Parameter.KEYWORD_ONLY
     VAR_POSITIONAL: ClassVar = inspect.Parameter.VAR_POSITIONAL
     VAR_KEYWORD: ClassVar = inspect.Parameter.VAR_KEYWORD
-    POSITIONAL: ClassVar[frozenset] = frozenset({POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY, VAR_POSITIONAL})
-    KEYWORD: ClassVar[frozenset] = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
+    POSITIONAL: ClassVar[frozenset[inspect._ParameterKind]] = frozenset(
+        {POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY, VAR_POSITIONAL}
+    )
+    KEYWORD: ClassVar[frozenset[inspect._ParameterKind]] = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
 
     @classmethod
     def from_iparam(cls, iparam: inspect.Parameter, *, required: Optional[bool] = None):
