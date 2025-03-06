@@ -160,7 +160,13 @@ def _convert(
         type_, cparam = Parameter.from_annotation(type_)
         if cparam._converter:
             converter_needs_token = True
-            converter = lambda t_, value: cparam._converter(t_, (value,))  # noqa: E731
+
+            def converter_with_token(t_, value):
+                assert cparam._converter
+                return cparam._converter(t_, (value,))
+
+            converter = converter_with_token
+
         if cparam.name_transform:
             name_transform = cparam.name_transform
     else:
