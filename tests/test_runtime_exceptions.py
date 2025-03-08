@@ -4,7 +4,7 @@ from typing import Tuple
 import pytest
 
 from cyclopts import CycloptsError
-from cyclopts.exceptions import MissingArgumentError
+from cyclopts.exceptions import InvalidCommandError, MissingArgumentError
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_runtime_exception_missing_parameter(app, console):
 
 
 def test_runtime_exception_bad_command(app, console):
-    with console.capture() as capture, pytest.raises(CycloptsError):
+    with console.capture() as capture, pytest.raises(InvalidCommandError):
         app(["bad-command", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()
@@ -78,14 +78,17 @@ def test_runtime_exception_bad_command_recommend(app, console):
     def mad_command():
         pass
 
-    with console.capture() as capture, pytest.raises(CycloptsError):
+    with console.capture() as capture, pytest.raises(InvalidCommandError):
         app(["bad-command", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()
-    assert actual == (
-        "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Unknown command "bad-command". Did you mean "mad-command"?         │\n'
-        "╰────────────────────────────────────────────────────────────────────╯\n"
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown command "bad-command". Did you mean "mad-command"?         │
+        │ Available commands: mad-command.                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
     )
 
 

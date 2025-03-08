@@ -276,7 +276,7 @@ def test_exceptions_unknown_command(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Unknown command "bar".                                             │
+        │ Unknown command "bar". Available commands: foo.                    │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
