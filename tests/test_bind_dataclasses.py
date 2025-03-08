@@ -281,6 +281,36 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     assert actual == expected
 
 
+def test_bind_dataclass_default_factory_help(app, console):
+    @dataclass
+    class Config:
+        a: int = field(default_factory=lambda: 5)
+        """Docstring for a."""
+
+    @app.default
+    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+        print(f"{config=}")
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: my-default-command COMMAND [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ A --a  Docstring for a. [default: 5]                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app, assert_parse_args):
     @dataclass
