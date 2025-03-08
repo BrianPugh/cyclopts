@@ -275,7 +275,7 @@ def _convert(
         i = 0
         pos_values = []
         hint = type_
-        for field_info in get_field_infos(type_, include_var_positional=True).values():
+        for field_info in get_field_infos(type_).values():
             hint = field_info.hint
             if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
                 pos_values.append(token[i].value)
@@ -465,7 +465,7 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 1, False
     else:
         # This is usually/always a custom user-defined class.
-        field_infos = get_field_infos(type_, include_var_positional=True)
+        field_infos = get_field_infos(type_)
         count, consume_all = 0, False
         for value in field_infos.values():
             if value.kind is value.VAR_POSITIONAL:
