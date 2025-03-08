@@ -265,6 +265,16 @@ class InvalidCommandError(CycloptsError):
             if close_matches:
                 response += f' Did you mean "{close_matches[0]}"?'
 
+            # The following is a heuristic to be "maximally helpful" to someone who may have
+            # forgotten a command in their CLI call.
+            max_commands = 8
+            available_commands = [name for name in self.app if not name.startswith("-")]
+            if available_commands:
+                if len(available_commands) > max_commands:
+                    response += f" Available commands: {', '.join(available_commands[:max_commands])}, ..."
+                else:
+                    response += f" Available commands: {', '.join(available_commands)}."
+
         return super().__str__() + response
 
 

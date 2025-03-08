@@ -4,7 +4,7 @@ from typing import Tuple
 import pytest
 
 from cyclopts import CycloptsError
-from cyclopts.exceptions import MissingArgumentError
+from cyclopts.exceptions import InvalidCommandError, MissingArgumentError
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_runtime_exception_missing_parameter(app, console):
 
 
 def test_runtime_exception_bad_command(app, console):
-    with console.capture() as capture, pytest.raises(CycloptsError):
+    with console.capture() as capture, pytest.raises(InvalidCommandError):
         app(["bad-command", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()
@@ -78,14 +78,45 @@ def test_runtime_exception_bad_command_recommend(app, console):
     def mad_command():
         pass
 
-    with console.capture() as capture, pytest.raises(CycloptsError):
+    with console.capture() as capture, pytest.raises(InvalidCommandError):
         app(["bad-command", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()
-    assert actual == (
-        "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Unknown command "bad-command". Did you mean "mad-command"?         │\n'
-        "╰────────────────────────────────────────────────────────────────────╯\n"
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown command "bad-command". Did you mean "mad-command"?         │
+        │ Available commands: mad-command.                                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+
+def test_runtime_exception_bad_command_list_ellipsis(app, console):
+    def cmd():
+        pass
+
+    app.command(name="cmd1")(cmd)
+    app.command(name="cmd2")(cmd)
+    app.command(name="cmd3")(cmd)
+    app.command(name="cmd4")(cmd)
+    app.command(name="cmd5")(cmd)
+    app.command(name="cmd6")(cmd)
+    app.command(name="cmd7")(cmd)
+    app.command(name="cmd8")(cmd)
+    app.command(name="cmd9")(cmd)
+
+    with console.capture() as capture, pytest.raises(InvalidCommandError):
+        app(["cmd", "123"], exit_on_error=False, console=console)
+
+    actual = capture.get()
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown command "cmd". Did you mean "cmd9"? Available commands:    │
+        │ cmd1, cmd2, cmd3, cmd4, cmd5, cmd6, cmd7, cmd8, ...                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
     )
 
 

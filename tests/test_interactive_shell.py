@@ -32,6 +32,6 @@ def test_interactive_shell(app, mocker, console):
 
     assert actual == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Unknown command "bad-command".                                     │\n'
+        '│ Unknown command "bad-command". Available commands: foo, bar.       │\n'
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
