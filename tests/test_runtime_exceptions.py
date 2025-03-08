@@ -92,6 +92,34 @@ def test_runtime_exception_bad_command_recommend(app, console):
     )
 
 
+def test_runtime_exception_bad_command_list_ellipsis(app, console):
+    def cmd():
+        pass
+
+    app.command(name="cmd1")(cmd)
+    app.command(name="cmd2")(cmd)
+    app.command(name="cmd3")(cmd)
+    app.command(name="cmd4")(cmd)
+    app.command(name="cmd5")(cmd)
+    app.command(name="cmd6")(cmd)
+    app.command(name="cmd7")(cmd)
+    app.command(name="cmd8")(cmd)
+    app.command(name="cmd9")(cmd)
+
+    with console.capture() as capture, pytest.raises(InvalidCommandError):
+        app(["cmd", "123"], exit_on_error=False, console=console)
+
+    actual = capture.get()
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown command "cmd". Did you mean "cmd9"? Available commands:    │
+        │ cmd1, cmd2, cmd3, cmd4, cmd5, cmd6, cmd7, cmd8, ...                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+
 def test_runtime_exception_bad_parameter_recommend(app, console):
     @app.command
     def some_command(*, foo: int):
