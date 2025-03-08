@@ -1,4 +1,5 @@
 import inspect
+import sys
 from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_origin  # noqa: F401
 
 import attrs
@@ -234,7 +235,12 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
             required = True
 
         annotation = f.type if f.type else FieldInfo.empty
-        kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
+
+        if sys.version_info < (3, 10):  # pragma: no cover
+            # Python3.9 does not have Field.kw_only attribute.
+            kind = FieldInfo.POSITIONAL_OR_KEYWORD
+        else:
+            kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
 
         out[f.name] = FieldInfo(
             names=(f.name,),
