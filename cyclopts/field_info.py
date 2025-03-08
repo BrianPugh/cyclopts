@@ -1,4 +1,5 @@
 import inspect
+import sys
 from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_origin  # noqa: F401
 
 import attrs
@@ -10,6 +11,7 @@ from cyclopts.annotations import (
     Required,
     is_annotated,
     is_attrs,
+    is_dataclass,
     is_namedtuple,
     is_pydantic,
     is_typeddict,
@@ -216,12 +218,41 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
     return out
 
 
-def get_field_infos(
-    hint,
-    *,
-    include_var_positional=False,
-    include_var_keyword=False,
-) -> dict[str, FieldInfo]:
+def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
+    import dataclasses
+
+    out = {}
+    fields = dataclasses.fields(hint)
+    for f in fields:
+        if f.default_factory is not dataclasses.MISSING:
+            default = f.default_factory()
+            required = False
+        elif f.default is not dataclasses.MISSING:
+            default = f.default
+            required = False
+        else:
+            default = FieldInfo.empty
+            required = True
+
+        annotation = f.type if f.type else FieldInfo.empty
+
+        if sys.version_info < (3, 10):  # pragma: no cover
+            # Python3.9 does not have Field.kw_only attribute.
+            kind = FieldInfo.POSITIONAL_OR_KEYWORD
+        else:
+            kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
+
+        out[f.name] = FieldInfo(
+            names=(f.name,),
+            kind=kind,
+            required=required,
+            annotation=annotation,
+            default=default,
+        )
+    return out
+
+
+def get_field_infos(hint) -> dict[str, FieldInfo]:
     if is_pydantic(hint):
         return _pydantic_field_infos(hint)
     elif is_namedtuple(hint):
@@ -230,5 +261,7 @@ def get_field_infos(
         return _typed_dict_field_infos(hint)
     elif is_attrs(hint):
         return _attrs_field_infos(hint)
+    elif is_dataclass(hint):
+        return _dataclass_field_infos(hint)
     else:
         return _generic_class_field_infos(hint)
