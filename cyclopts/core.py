@@ -950,32 +950,32 @@ class App:
 
         help_flag_index = _get_help_flag_index(tokens, command_app.help_flags)
 
-        if help_flag_index is not None:
-            tokens.pop(help_flag_index)
-
-            help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+        try:
             if help_flag_index is not None:
-                unused_tokens.pop(help_flag_index)
+                tokens.pop(help_flag_index)
 
-            if unused_tokens and not command_app.default_command:
-                raise InvalidCommandError(unused_tokens=unused_tokens)
+                help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+                if help_flag_index is not None:
+                    unused_tokens.pop(help_flag_index)
 
-            command = self.help_print
-            while meta_parent := meta_parent._meta_parent:
-                command = meta_parent.help_print
-            bound = inspect.signature(command).bind(tokens, console=console)
-            unused_tokens = []
-            argument_collection = ArgumentCollection()
-        elif any(flag in tokens for flag in command_app.version_flags):
-            # Version
-            command = self.version_print
-            while meta_parent := meta_parent._meta_parent:
-                command = meta_parent.version_print
-            bound = inspect.signature(command).bind()
-            unused_tokens = []
-            argument_collection = ArgumentCollection()
-        else:
-            try:
+                if unused_tokens and not command_app.default_command:
+                    raise InvalidCommandError(unused_tokens=unused_tokens)
+
+                command = self.help_print
+                while meta_parent := meta_parent._meta_parent:
+                    command = meta_parent.help_print
+                bound = inspect.signature(command).bind(tokens, console=console)
+                unused_tokens = []
+                argument_collection = ArgumentCollection()
+            elif any(flag in tokens for flag in command_app.version_flags):
+                # Version
+                command = self.version_print
+                while meta_parent := meta_parent._meta_parent:
+                    command = meta_parent.version_print
+                bound = inspect.signature(command).bind()
+                unused_tokens = []
+                argument_collection = ArgumentCollection()
+            else:
                 if command_app.default_command:
                     command = command_app.default_command
                     validate_command(command)
@@ -1021,14 +1021,14 @@ class App:
                         bound = inspect.signature(command).bind(tokens=tokens, console=console)
                         unused_tokens = []
                         argument_collection = ArgumentCollection()
-            except CycloptsError as e:
-                e.target = command_app.default_command
-                e.app = command_app
-                if command_chain:
-                    e.command_chain = command_chain
-                if e.console is None:
-                    e.console = self._resolve_console(tokens, console)
-                raise
+        except CycloptsError as e:
+            e.target = command_app.default_command
+            e.app = command_app
+            if command_chain:
+                e.command_chain = command_chain
+            if e.console is None:
+                e.console = self._resolve_console(tokens, console)
+            raise
 
         return command, bound, unused_tokens, ignored, argument_collection
 
