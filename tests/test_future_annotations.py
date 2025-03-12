@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, TypedDict
+
+import attrs
 
 from cyclopts import Parameter
 
@@ -17,7 +19,7 @@ def test_future_annotations_basic(app, assert_parse_args):
 # TODO: Resolving stringified type-hinted class with closure/local scope
 # is really hard.
 @dataclass
-class Movie:
+class DataclassMovie:
     title: str
     year: int
 
@@ -28,10 +30,10 @@ def test_future_annotations_dataclass(app, assert_parse_args):
     """
 
     @app.command
-    def add(movie: Movie):
+    def add(movie: DataclassMovie):
         print(f"Adding movie: {movie}")
 
-    assert_parse_args(add, "add BladeRunner 1982", Movie("BladeRunner", 1982))
+    assert_parse_args(add, "add BladeRunner 1982", DataclassMovie("BladeRunner", 1982))
 
 
 # This is unrelated to "from __future__ import annotations", but it's a very similar problem
@@ -47,12 +49,37 @@ class GenericMovie:
 
 
 def test_future_annotations_generic_class(app, assert_parse_args):
-    """
-    https://github.com/BrianPugh/cyclopts/issues/352
-    """
-
     @app.command
     def add(movie: Annotated[GenericMovie, Parameter(accepts_keys=True)]):
         print(f"Adding movie: {movie}")
 
     assert_parse_args(add, "add BladeRunner 1982", GenericMovie("BladeRunner", 1982))
+
+
+@attrs.define
+class AttrsMovie:
+    title: str
+    year: int
+
+
+def test_future_annotations_attrs_movie(app, assert_parse_args):
+    @app.command
+    def add(movie: Annotated[AttrsMovie, Parameter(accepts_keys=True)]):
+        print(f"Adding movie: {movie}")
+
+    assert_parse_args(add, "add BladeRunner 1982", AttrsMovie("BladeRunner", 1982))
+
+
+class TypedDictMovie(TypedDict):
+    title: str
+    year: int
+
+
+def test_future_annotations_typed_dict_movie(app, assert_parse_args):
+    @app.command
+    def add(movie: Annotated[TypedDictMovie, Parameter(accepts_keys=True)]):
+        print(f"Adding movie: {movie}")
+
+    assert_parse_args(
+        add, "add --movie.title=BladeRunner --movie.year=1982", TypedDictMovie(title="BladeRunner", year=1982)
+    )
