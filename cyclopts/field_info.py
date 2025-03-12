@@ -1,6 +1,6 @@
 import inspect
 import sys
-from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_origin  # noqa: F401
+from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_origin, get_type_hints  # noqa: F401
 
 import attrs
 from attrs import field
@@ -19,6 +19,7 @@ from cyclopts.annotations import (
     resolve_annotated,
     resolve_optional,
 )
+from cyclopts.utils import UNSET
 
 POSITIONAL_OR_KEYWORD = inspect.Parameter.POSITIONAL_OR_KEYWORD
 POSITIONAL_ONLY = inspect.Parameter.POSITIONAL_ONLY
@@ -59,7 +60,7 @@ class FieldInfo:
     KEYWORD: ClassVar[frozenset[inspect._ParameterKind]] = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
 
     @classmethod
-    def from_iparam(cls, iparam: inspect.Parameter, *, required: Optional[bool] = None):
+    def from_iparam(cls, iparam: inspect.Parameter, *, annotation: Any = UNSET, required: Optional[bool] = None):
         if required is None:
             required = (
                 iparam.default is iparam.empty
@@ -69,7 +70,7 @@ class FieldInfo:
 
         return cls(
             names=(iparam.name,),
-            annotation=iparam.annotation,
+            annotation=iparam.annotation if annotation is UNSET else annotation,
             kind=iparam.kind,
             default=iparam.default,
             required=required,
@@ -111,8 +112,7 @@ class FieldInfo:
 def _typed_dict_field_infos(typeddict) -> dict[str, FieldInfo]:
     # The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11.
     out = {}
-    # Don't use get_type_hints because it resolves Annotated automatically.
-    for name, annotation in typeddict.__annotations__.items():
+    for name, annotation in get_type_hints(typeddict, include_extras=True).items():
         origin = get_origin(resolve_annotated(annotation))
         if origin is Required:
             required = True
@@ -223,6 +223,7 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
     out = {}
     fields = dataclasses.fields(hint)
+    type_hints = get_type_hints(hint, include_extras=True)  # resolves stringified type hints
     for f in fields:
         if f.default_factory is not dataclasses.MISSING:
             default = f.default_factory()
@@ -234,7 +235,7 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
             default = FieldInfo.empty
             required = True
 
-        annotation = f.type if f.type else FieldInfo.empty
+        annotation = type_hints.get(f.name, FieldInfo.empty)
 
         if sys.version_info < (3, 10):  # pragma: no cover
             # Python3.9 does not have Field.kw_only attribute.

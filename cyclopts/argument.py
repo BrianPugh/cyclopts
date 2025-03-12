@@ -2,7 +2,7 @@ import inspect
 import itertools
 from contextlib import suppress
 from functools import partial
-from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin
+from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin, get_type_hints
 
 from attrs import define, field
 
@@ -336,43 +336,6 @@ class ArgumentCollection(list["Argument"]):
         return out
 
     @classmethod
-    def _from_iparam(
-        cls,
-        iparam: inspect.Parameter,
-        *default_parameters: Optional[Parameter],
-        group_lookup: Optional[dict[str, Group]] = None,
-        group_arguments: Optional[Group] = None,
-        group_parameters: Optional[Group] = None,
-        positional_index: Optional[int] = None,
-        parse_docstring: bool = True,
-        docstring_lookup: Optional[dict[tuple[str, ...], Parameter]] = None,
-        _resolve_groups: bool = True,
-    ):
-        # The responsibility of this function is to extract out the root type
-        # and annotation. The rest of the functionality goes into _from_type.
-        if group_lookup is None:
-            group_lookup = {}
-        if group_arguments is None:
-            group_arguments = Group.create_default_arguments()
-        if group_parameters is None:
-            group_parameters = Group.create_default_parameters()
-        group_lookup[group_arguments.name] = group_arguments
-        group_lookup[group_parameters.name] = group_parameters
-
-        return cls._from_type(
-            FieldInfo.from_iparam(iparam),
-            (),
-            *default_parameters,
-            group_lookup=group_lookup,
-            group_arguments=group_arguments,
-            group_parameters=group_parameters,
-            positional_index=positional_index,
-            docstring_lookup=docstring_lookup,
-            parse_docstring=parse_docstring,
-            _resolve_groups=_resolve_groups,
-        )
-
-    @classmethod
     def _from_callable(
         cls,
         func: Callable,
@@ -402,9 +365,12 @@ class ArgumentCollection(list["Argument"]):
                     group_parameters=group_parameters,
                 )
             }
+        else:
+            group_lookup = {}
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
+        type_hints = get_type_hints(func, include_extras=True)
         for iparam in cyclopts.utils.signature(func).parameters.values():
             if parse_docstring:
                 subkey_docstring_lookup = {
@@ -412,8 +378,9 @@ class ArgumentCollection(list["Argument"]):
                 }
             else:
                 subkey_docstring_lookup = None
-            iparam_argument_collection = cls._from_iparam(
-                iparam,
+            iparam_argument_collection = cls._from_type(
+                FieldInfo.from_iparam(iparam, annotation=type_hints.get(iparam.name, iparam.annotation)),
+                (),
                 *default_parameters,
                 docstring_lookup.get((iparam.name,)),
                 group_lookup=group_lookup,
