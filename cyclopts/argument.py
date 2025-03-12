@@ -2,11 +2,10 @@ import inspect
 import itertools
 from contextlib import suppress
 from functools import partial
-from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
 
-import cyclopts.utils
 from cyclopts._convert import (
     convert,
     token_count,
@@ -41,6 +40,7 @@ from cyclopts.field_info import (
     _pydantic_field_infos,
     _typed_dict_field_infos,
     get_field_infos,
+    signature_parameters,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
@@ -346,8 +346,6 @@ class ArgumentCollection(list["Argument"]):
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
     ):
-        import cyclopts.utils
-
         out = cls()
 
         if group_arguments is None:
@@ -370,19 +368,18 @@ class ArgumentCollection(list["Argument"]):
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
-        type_hints = get_type_hints(func, include_extras=True)
-        for iparam in cyclopts.utils.signature(func).parameters.values():
+        for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
-                    k[1:]: v for k, v in docstring_lookup.items() if k[0] == iparam.name and len(k) > 1
+                    k[1:]: v for k, v in docstring_lookup.items() if k[0] == field_info.name and len(k) > 1
                 }
             else:
                 subkey_docstring_lookup = None
             iparam_argument_collection = cls._from_type(
-                FieldInfo.from_iparam(iparam, annotation=type_hints.get(iparam.name, iparam.annotation)),
+                field_info,
                 (),
                 *default_parameters,
-                docstring_lookup.get((iparam.name,)),
+                docstring_lookup.get((field_info.name,)),
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
@@ -646,15 +643,13 @@ class Argument:
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
             self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
-            type_hints = get_type_hints(hint.__init__)
-            for i, iparam in enumerate(cyclopts.utils.signature(hint.__init__).parameters.values()):
-                if i == 0 and iparam.name == "self":
+            for i, field_info in enumerate(signature_parameters(hint.__init__).values()):
+                if i == 0 and field_info.name == "self":
                     continue
-                annotation = type_hints.get(iparam.name, iparam.annotation)
-                if iparam.kind is iparam.VAR_KEYWORD:
-                    self._default = annotation
+                if field_info.kind is field_info.VAR_KEYWORD:
+                    self._default = field_info.annotation
                 else:
-                    self._lookup[iparam.name] = FieldInfo.from_iparam(iparam, annotation=annotation)
+                    self._lookup[field_info.name] = field_info
 
     @property
     def value(self):

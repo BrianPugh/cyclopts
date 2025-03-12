@@ -5,7 +5,6 @@ from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_o
 import attrs
 from attrs import field
 
-import cyclopts.utils
 from cyclopts.annotations import (
     NotRequired,
     Required,
@@ -108,6 +107,9 @@ class FieldInfo:
     def is_keyword_only(self) -> bool:
         return self.kind in (KEYWORD_ONLY, VAR_KEYWORD)
 
+    def evolve(self, **kwargs):
+        return attrs.evolve(self, **kwargs)
+
 
 def _typed_dict_field_infos(typeddict) -> dict[str, FieldInfo]:
     # The ``__required_keys__`` and ``__optional_keys__`` attributes of TypedDict are kind of broken in <cp3.11.
@@ -131,16 +133,15 @@ def _generic_class_field_infos(
     include_var_positional=False,
     include_var_keyword=False,
 ) -> dict[str, FieldInfo]:
-    signature = cyclopts.utils.signature(f.__init__)
     out = {}
-    for name, iparam in signature.parameters.items():
-        if iparam.name == "self":
+    for name, field_info in signature_parameters(f.__init__).items():
+        if field_info.name == "self":
             continue
-        if not include_var_positional and iparam.kind is iparam.VAR_POSITIONAL:
+        if not include_var_positional and field_info.kind is field_info.VAR_POSITIONAL:
             continue
-        if not include_var_keyword and iparam.kind is iparam.VAR_KEYWORD:
+        if not include_var_keyword and field_info.kind is field_info.VAR_KEYWORD:
             continue
-        out[name] = FieldInfo.from_iparam(iparam)
+        out[name] = field_info
     return out
 
 
@@ -190,13 +191,12 @@ def _namedtuple_field_infos(hint) -> dict[str, FieldInfo]:
 
 def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
     out = {}
-    signature = cyclopts.utils.signature(hint.__init__)
-    iparams = signature.parameters
+    field_infos = signature_parameters(hint.__init__)
     for attribute in hint.__attrs_attrs__:
         if not attribute.init:
             continue
 
-        iparam = iparams[attribute.alias]
+        field_info = field_infos[attribute.alias]
 
         if isinstance(attribute.default, attrs.Factory):  # pyright: ignore
             required = False
@@ -208,13 +208,7 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
             required = False
             default = attribute.default
 
-        out[iparam.name] = FieldInfo(
-            names=(attribute.alias,),
-            annotation=attribute.type,
-            kind=iparam.kind,
-            default=default,
-            required=required,
-        )
+        out[field_info.name] = field_info.evolve(names=(attribute.alias,), required=required, default=default)
     return out
 
 
@@ -266,3 +260,12 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return _dataclass_field_infos(hint)
     else:
         return _generic_class_field_infos(hint)
+
+
+def signature_parameters(f: Any) -> dict[str, FieldInfo]:
+    type_hints = get_type_hints(f, include_extras=True)
+    out = {}
+    for name, iparam in inspect.signature(f).parameters.items():
+        annotation = type_hints.get(name, iparam.annotation)
+        out[name] = FieldInfo.from_iparam(iparam, annotation=annotation)
+    return out
