@@ -646,13 +646,15 @@ class Argument:
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
             self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
+            type_hints = get_type_hints(hint.__init__)
             for i, iparam in enumerate(cyclopts.utils.signature(hint.__init__).parameters.values()):
                 if i == 0 and iparam.name == "self":
                     continue
+                annotation = type_hints.get(iparam.name, iparam.annotation)
                 if iparam.kind is iparam.VAR_KEYWORD:
-                    self._default = iparam.annotation
+                    self._default = annotation
                 else:
-                    self._lookup[iparam.name] = FieldInfo.from_iparam(iparam)
+                    self._lookup[iparam.name] = FieldInfo.from_iparam(iparam, annotation=annotation)
 
     @property
     def value(self):
