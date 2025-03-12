@@ -17,9 +17,9 @@ from typing import (
 
 from attrs import define, field
 
-import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union
+from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import SortHelper, frozen, resolve_callables
 
@@ -224,10 +224,14 @@ def format_usage(
 
     if app.default_command:
         to_show = set()
-        for parameter in cyclopts.utils.signature(app.default_command).parameters.values():
-            if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.VAR_POSITIONAL, parameter.POSITIONAL_OR_KEYWORD):
+        for field_info in signature_parameters(app.default_command).values():
+            if field_info.kind in (
+                field_info.POSITIONAL_ONLY,
+                field_info.VAR_POSITIONAL,
+                field_info.POSITIONAL_OR_KEYWORD,
+            ):
                 to_show.add("[ARGS]")
-            if parameter.kind in (parameter.KEYWORD_ONLY, parameter.VAR_KEYWORD, parameter.POSITIONAL_OR_KEYWORD):
+            if field_info.kind in (field_info.KEYWORD_ONLY, field_info.VAR_KEYWORD, field_info.POSITIONAL_OR_KEYWORD):
                 to_show.add("[OPTIONS]")
         usage.extend(sorted(to_show))
 

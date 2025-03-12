@@ -1,3 +1,4 @@
+import inspect
 import sys
 from pathlib import Path
 
@@ -5,7 +6,6 @@ import pytest
 from rich.console import Console
 
 import cyclopts
-import cyclopts.utils
 from cyclopts import Group, Parameter
 
 
@@ -39,7 +39,7 @@ def default_function_groups():
 @pytest.fixture
 def assert_parse_args(app):
     def inner(f, cmd: str, *args, **kwargs):
-        signature = cyclopts.utils.signature(f)
+        signature = inspect.signature(f)
         expected_bind = signature.bind(*args, **kwargs)
         actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f
@@ -51,7 +51,7 @@ def assert_parse_args(app):
 @pytest.fixture
 def assert_parse_args_config(app):
     def inner(config: dict, f, cmd: str, *args, **kwargs):
-        signature = cyclopts.utils.signature(f)
+        signature = inspect.signature(f)
         expected_bind = signature.bind(*args, **kwargs)
         actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False, **config)
         assert actual_command == f
@@ -63,7 +63,7 @@ def assert_parse_args_config(app):
 @pytest.fixture
 def assert_parse_args_partial(app):
     def inner(f, cmd: str, *args, **kwargs):
-        signature = cyclopts.utils.signature(f)
+        signature = inspect.signature(f)
         expected_bind = signature.bind_partial(*args, **kwargs)
         actual_command, actual_bind, _ = app.parse_args(cmd, print_error=False, exit_on_error=False)
         assert actual_command == f

@@ -10,8 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Union
 
 from attrs import field, frozen
 
-# fmt: off
-
 # https://threeofwands.com/attra-iv-zero-overhead-frozen-attrs-classes/
 if TYPE_CHECKING:
     from json import JSONDecodeError
@@ -21,14 +19,6 @@ else:
     from attrs import define
 
     frozen = functools.partial(define, unsafe_hash=True)
-
-if sys.version_info >= (3, 10):  # pragma: no cover
-    def signature(f: Any) -> inspect.Signature:
-        return inspect.signature(f, eval_str=True)
-else:  # pragma: no cover
-    def signature(f: Any) -> inspect.Signature:
-        return inspect.signature(f)
-# fmt: on
 
 if sys.version_info >= (3, 10):  # pragma: no cover
     from sys import stdlib_module_names
@@ -279,7 +269,7 @@ def record_init(target: str):
 
     def decorator(cls):
         original_init = cls.__init__
-        function_signature = signature(original_init)
+        function_signature = inspect.signature(original_init)
         param_names = tuple(name for name in function_signature.parameters if name != "self")
 
         @functools.wraps(original_init)

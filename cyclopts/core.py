@@ -24,7 +24,6 @@ from typing import (
 
 from attrs import define, field
 
-import cyclopts.utils
 from cyclopts.annotations import resolve_annotated
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
@@ -737,7 +736,9 @@ class App:
                 kwargs["group_parameters"] = copy(self._group_parameters)
             if "group_arguments" not in kwargs:
                 kwargs["group_arguments"] = copy(self._group_arguments)
-            app = App(default_command=obj, **kwargs)  # pyright: ignore
+            app = App(**kwargs)  # pyright: ignore
+            # directly call the default decorator, in case we do additional processing there.
+            app.default(obj)
 
             for flag in chain(kwargs["help_flags"], kwargs["version_flags"]):  # pyright: ignore
                 app[flag].show = False
@@ -962,7 +963,7 @@ class App:
             command = self.help_print
             while meta_parent := meta_parent._meta_parent:
                 command = meta_parent.help_print
-            bound = cyclopts.utils.signature(command).bind(tokens, console=console)
+            bound = inspect.signature(command).bind(tokens, console=console)
             unused_tokens = []
             argument_collection = ArgumentCollection()
         elif any(flag in tokens for flag in command_app.version_flags):
@@ -970,7 +971,7 @@ class App:
             command = self.version_print
             while meta_parent := meta_parent._meta_parent:
                 command = meta_parent.version_print
-            bound = cyclopts.utils.signature(command).bind()
+            bound = inspect.signature(command).bind()
             unused_tokens = []
             argument_collection = ArgumentCollection()
         else:
@@ -1017,7 +1018,7 @@ class App:
                         # Running the application with no arguments and no registered
                         # ``default_command`` will default to ``help_print``.
                         command = self.help_print
-                        bound = cyclopts.utils.signature(command).bind(tokens=tokens, console=console)
+                        bound = inspect.signature(command).bind(tokens=tokens, console=console)
                         unused_tokens = []
                         argument_collection = ArgumentCollection()
             except CycloptsError as e:

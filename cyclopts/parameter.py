@@ -23,6 +23,7 @@ import cyclopts._env_var
 import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES, convert
 from cyclopts.annotations import is_annotated, is_union, resolve_optional
+from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.token import Token
 from cyclopts.utils import (
@@ -333,15 +334,14 @@ def validate_command(f: Callable):
     """
     if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
         return
-    signature = cyclopts.utils.signature(f)
-    for iparam in signature.parameters.values():
+    for field_info in signature_parameters(f).values():
         # Speed optimization: if an object is not annotated, then there's nothing
         # to validate. Checking if there's an annotation is significantly faster
         # than instantiating a cyclopts.Parameter object.
-        if not is_annotated(iparam.annotation):
+        if not is_annotated(field_info.annotation):
             continue
-        _, cparam = Parameter.from_annotation(iparam.annotation)
-        if not cparam.parse and iparam.kind is not iparam.KEYWORD_ONLY:
+        _, cparam = Parameter.from_annotation(field_info.annotation)
+        if not cparam.parse and field_info.kind is not field_info.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
 
 

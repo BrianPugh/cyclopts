@@ -6,7 +6,6 @@ from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origi
 
 from attrs import define, field
 
-import cyclopts.utils
 from cyclopts._convert import (
     convert,
     token_count,
@@ -41,6 +40,7 @@ from cyclopts.field_info import (
     _pydantic_field_infos,
     _typed_dict_field_infos,
     get_field_infos,
+    signature_parameters,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
@@ -336,43 +336,6 @@ class ArgumentCollection(list["Argument"]):
         return out
 
     @classmethod
-    def _from_iparam(
-        cls,
-        iparam: inspect.Parameter,
-        *default_parameters: Optional[Parameter],
-        group_lookup: Optional[dict[str, Group]] = None,
-        group_arguments: Optional[Group] = None,
-        group_parameters: Optional[Group] = None,
-        positional_index: Optional[int] = None,
-        parse_docstring: bool = True,
-        docstring_lookup: Optional[dict[tuple[str, ...], Parameter]] = None,
-        _resolve_groups: bool = True,
-    ):
-        # The responsibility of this function is to extract out the root type
-        # and annotation. The rest of the functionality goes into _from_type.
-        if group_lookup is None:
-            group_lookup = {}
-        if group_arguments is None:
-            group_arguments = Group.create_default_arguments()
-        if group_parameters is None:
-            group_parameters = Group.create_default_parameters()
-        group_lookup[group_arguments.name] = group_arguments
-        group_lookup[group_parameters.name] = group_parameters
-
-        return cls._from_type(
-            FieldInfo.from_iparam(iparam),
-            (),
-            *default_parameters,
-            group_lookup=group_lookup,
-            group_arguments=group_arguments,
-            group_parameters=group_parameters,
-            positional_index=positional_index,
-            docstring_lookup=docstring_lookup,
-            parse_docstring=parse_docstring,
-            _resolve_groups=_resolve_groups,
-        )
-
-    @classmethod
     def _from_callable(
         cls,
         func: Callable,
@@ -383,8 +346,6 @@ class ArgumentCollection(list["Argument"]):
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
     ):
-        import cyclopts.utils
-
         out = cls()
 
         if group_arguments is None:
@@ -402,20 +363,23 @@ class ArgumentCollection(list["Argument"]):
                     group_parameters=group_parameters,
                 )
             }
+        else:
+            group_lookup = {}
 
         docstring_lookup = _extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
-        for iparam in cyclopts.utils.signature(func).parameters.values():
+        for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
-                    k[1:]: v for k, v in docstring_lookup.items() if k[0] == iparam.name and len(k) > 1
+                    k[1:]: v for k, v in docstring_lookup.items() if k[0] == field_info.name and len(k) > 1
                 }
             else:
                 subkey_docstring_lookup = None
-            iparam_argument_collection = cls._from_iparam(
-                iparam,
+            iparam_argument_collection = cls._from_type(
+                field_info,
+                (),
                 *default_parameters,
-                docstring_lookup.get((iparam.name,)),
+                docstring_lookup.get((field_info.name,)),
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
@@ -679,13 +643,13 @@ class Argument:
             # providing a single positional argument is what we want.
             self._accepts_keywords = True
             self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
-            for i, iparam in enumerate(cyclopts.utils.signature(hint.__init__).parameters.values()):
-                if i == 0 and iparam.name == "self":
+            for i, field_info in enumerate(signature_parameters(hint.__init__).values()):
+                if i == 0 and field_info.name == "self":
                     continue
-                if iparam.kind is iparam.VAR_KEYWORD:
-                    self._default = iparam.annotation
+                if field_info.kind is field_info.VAR_KEYWORD:
+                    self._default = field_info.annotation
                 else:
-                    self._lookup[iparam.name] = FieldInfo.from_iparam(iparam)
+                    self._lookup[field_info.name] = field_info
 
     @property
     def value(self):

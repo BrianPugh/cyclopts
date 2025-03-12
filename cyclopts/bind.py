@@ -8,7 +8,6 @@ from contextlib import suppress
 from functools import partial
 from typing import TYPE_CHECKING, Callable, Sequence, Union
 
-import cyclopts.utils
 from cyclopts._convert import _bool
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
@@ -278,8 +277,7 @@ def _bind(
     func: Callable,
 ):
     """Bind the mapping to the function signature."""
-    signature = cyclopts.utils.signature(func)
-    bound = signature.bind_partial()
+    bound = inspect.signature(func).bind_partial()
     for argument in argument_collection._root_arguments:
         if argument.value is not UNSET:
             bound.arguments[argument.field_info.name] = argument.value
