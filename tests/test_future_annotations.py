@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, TypedDict
+from typing import Annotated, NamedTuple, TypedDict
 
 import attrs
+from pydantic import BaseModel
 
 from cyclopts import Parameter
 
@@ -83,3 +84,29 @@ def test_future_annotations_typed_dict_movie(app, assert_parse_args):
     assert_parse_args(
         add, "add --movie.title=BladeRunner --movie.year=1982", TypedDictMovie(title="BladeRunner", year=1982)
     )
+
+
+class NamedTupleMovie(NamedTuple):
+    title: str
+    year: int
+
+
+def test_future_annotations_named_tuple_movie(app, assert_parse_args):
+    @app.command
+    def add(movie: Annotated[NamedTupleMovie, Parameter(accepts_keys=True)]):
+        print(f"Adding movie: {movie}")
+
+    assert_parse_args(add, "add BladeRunner 1982", NamedTupleMovie(title="BladeRunner", year=1982))
+
+
+class PydanticMovie(BaseModel):
+    title: str
+    year: int
+
+
+def test_future_annotations_pydantic_movie(app, assert_parse_args):
+    @app.command
+    def add(movie: Annotated[PydanticMovie, Parameter(accepts_keys=True)]):
+        print(f"Adding movie: {movie}")
+
+    assert_parse_args(add, "add BladeRunner 1982", PydanticMovie(title="BladeRunner", year=1982))

@@ -178,11 +178,12 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
 
 def _namedtuple_field_infos(hint) -> dict[str, FieldInfo]:
     out = {}
+    type_hints = get_type_hints(hint)
     for name in hint._fields:
         out[name] = FieldInfo(
             names=(name,),
             kind=FieldInfo.POSITIONAL_OR_KEYWORD,
-            annotation=hint.__annotations__.get(name, str),
+            annotation=type_hints.get(name, str),
             default=hint._field_defaults.get(name, FieldInfo.empty),
             required=name not in hint._field_defaults,
         )
