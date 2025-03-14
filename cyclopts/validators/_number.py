@@ -1,9 +1,6 @@
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Sequence, Union
 
 from cyclopts.utils import frozen
-
-Numeric = Union[int, float]
-NumericSequence = Sequence[Union[Numeric, "NumericSequence"]]
 
 
 @frozen(kw_only=True)
@@ -43,19 +40,19 @@ class Number:
         ╰───────────────────────────────────────────────────────────────╯
     """
 
-    lt: Optional[Numeric] = None
+    lt: Union[int, float, None] = None
     """Input value must be **less than** this value."""
 
-    lte: Optional[Numeric] = None
+    lte: Union[int, float, None] = None
     """Input value must be **less than or equal** this value."""
 
-    gt: Optional[Numeric] = None
+    gt: Union[int, float, None] = None
     """Input value must be **greater than** this value."""
 
-    gte: Optional[Numeric] = None
+    gte: Union[int, float, None] = None
     """Input value must be **greater than or equal** this value."""
 
-    modulo: Optional[Numeric] = None
+    modulo: Union[int, float, None] = None
     """Input value must be a multiple of this value."""
 
     def __call__(self, type_: Any, value: Any):
@@ -65,7 +62,7 @@ class Number:
             for v in value:
                 self(type_, v)
         else:
-            if not isinstance(value, Numeric):
+            if not isinstance(value, (int, float)):
                 return
 
             if self.lt is not None and value >= self.lt:
