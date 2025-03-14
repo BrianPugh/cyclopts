@@ -740,8 +740,8 @@ class App:
             # directly call the default decorator, in case we do additional processing there.
             app.default(obj)
 
-            for flag in chain(kwargs["help_flags"], kwargs["version_flags"]):  # pyright: ignore
-                app[flag].show = False
+        for flag in chain(app.help_flags, app.version_flags):
+            app[flag].show = False
 
         if app._name_transform is None:
             app.name_transform = self.name_transform
@@ -1296,11 +1296,11 @@ class App:
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
         for subapp in _walk_metas(apps[-1]):
-            # Handle Commands
-            for group, elements in groups_from_app(subapp):
+            for group, subapps in groups_from_app(subapp):
                 if not group.show:
                     continue
 
+                # Fetch a group's help-panel, or create it if it does not yet exist.
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
@@ -1318,7 +1318,8 @@ class App:
                     else:
                         command_panel.description = group_help
 
-                command_panel.entries.extend(format_command_entries(elements, format=help_format))
+                # Add the command to the group's help panel.
+                command_panel.entries.extend(format_command_entries(subapps, format=help_format))
 
         # Handle Arguments/Parameters
         for subapp in _walk_metas(apps[-1]):
