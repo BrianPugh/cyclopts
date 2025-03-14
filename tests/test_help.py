@@ -87,6 +87,7 @@ def test_help_custom_usage(app, console):
 
 
 def test_help_custom_usage_subapp(app, console):
+    """Intentionally do not print --help/--version flags in subapp help."""
     app.command(App(name="foo", usage="My custom usage."))
 
     with console.capture() as capture:
@@ -97,10 +98,6 @@ def test_help_custom_usage_subapp(app, console):
         """\
         My custom usage.
 
-        ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
-        ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected

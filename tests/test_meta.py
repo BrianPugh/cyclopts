@@ -106,9 +106,7 @@ def test_meta_app_nested_subapp_help(nested_meta_app, console, queue):
         This is subapp's help.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        Subapp foo help string.                                 │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo  Subapp foo help string.                                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
