@@ -165,6 +165,15 @@ def test_custom_converter_and_validator(app, assert_parse_args, validator):
     validator.assert_called_once_with(int, 10)
 
 
+def test_custom_validator_on_default_signature_value(app, validator):
+    @app.default
+    def foo(age: Annotated[int, Parameter(validator=validator)] = -1):
+        pass
+
+    app.parse_args("", print_error=False, exit_on_error=False)
+    validator.assert_called_once_with(int, -1)
+
+
 def test_custom_command_validator(app, assert_parse_args):
     validator = Mock()
 

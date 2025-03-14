@@ -1113,6 +1113,8 @@ class Argument:
         val = self.convert(converter=converter)
         if val is not UNSET:
             self.validate(val)
+        elif self.field_info.default is not FieldInfo.empty:
+            self.validate(self.field_info.default)
         return val
 
     def token_count(self, keys: tuple[str, ...] = ()):

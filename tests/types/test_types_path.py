@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import pytest
 
@@ -38,6 +38,32 @@ def test_types_existing_file_app(app):
 
     with pytest.raises(ValidationError):
         app(["this-file-does-not-exist"], exit_on_error=False)
+
+
+def test_types_existing_file_app_signature_default(app):
+    @app.default
+    def main(f: ct.ExistingFile = Path("this-file-does-not-exist")):
+        pass
+
+    with pytest.raises(ValidationError):
+        app([""], exit_on_error=False)
+
+
+def test_types_optional_existing_file_app_signature_default(app):
+    @app.default
+    def main(f: Optional[ct.ExistingFile] = Path("this-file-does-not-exist")):
+        pass
+
+    with pytest.raises(ValidationError):
+        app([""], exit_on_error=False)
+
+
+def test_types_optional_existing_file_app_signature_default_none(app, assert_parse_args):
+    @app.default
+    def main(f: Optional[ct.ExistingFile] = None):
+        pass
+
+    assert_parse_args(main, "")
 
 
 def test_types_existing_file_app_list(app):

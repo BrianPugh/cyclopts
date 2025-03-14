@@ -96,7 +96,7 @@ class Path:
                 self(type_, p)
         else:
             if not isinstance(path, pathlib.Path):
-                raise TypeError
+                return
 
             if self.ext and path.suffix.lower().lstrip(".") not in self.ext:
                 if len(self.ext) == 1:

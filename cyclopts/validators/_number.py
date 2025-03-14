@@ -58,13 +58,16 @@ class Number:
     modulo: Optional[Numeric] = None
     """Input value must be a multiple of this value."""
 
-    def __call__(self, type_: Any, value: Union[Numeric, NumericSequence]):
+    def __call__(self, type_: Any, value: Any):
         if isinstance(value, Sequence):
             if isinstance(value, str):
                 raise TypeError
             for v in value:
                 self(type_, v)
         else:
+            if not isinstance(value, Numeric):
+                return
+
             if self.lt is not None and value >= self.lt:
                 raise ValueError(f"Must be < {self.lt}.")
 
