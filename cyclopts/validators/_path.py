@@ -87,7 +87,7 @@ class Path:
         if self.exists and not self.file_okay and not self.dir_okay:
             raise ValueError("(exists=True, file_okay=False, dir_okay=False) is an invalid configuration.")
 
-    def __call__(self, type_: Any, path: Union[pathlib.Path, Sequence[pathlib.Path]]):
+    def __call__(self, type_: Any, path: Any):
         if isinstance(path, Sequence):
             if isinstance(path, str):
                 raise TypeError
@@ -96,7 +96,7 @@ class Path:
                 self(type_, p)
         else:
             if not isinstance(path, pathlib.Path):
-                raise TypeError
+                return
 
             if self.ext and path.suffix.lower().lstrip(".") not in self.ext:
                 if len(self.ext) == 1:
