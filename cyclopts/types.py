@@ -58,6 +58,7 @@ __all__ = [
     "Json",
     # Web
     "Email",
+    "URL",
 ]
 
 
@@ -242,3 +243,29 @@ def _email_validator(type_: Any, value: Any):
 _email_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
 
 Email = Annotated[str, Parameter(validator=_email_validator)]
+
+
+def _url_validator(type_: Any, value: Any):
+    """Simplified email validation; probably good enough for CLI usage."""
+    if not isinstance(value, str):
+        return
+    if _url_validator.regex is None:  # pyright: ignore[reportFunctionMemberAccess]
+        import re
+
+        _url_validator.regex = re.compile(  # pyright: ignore[reportFunctionMemberAccess]
+            r"^(?:(?:https?|ftp):\/\/)?"  # protocol
+            r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"  # domain
+            r"localhost|"  # localhost
+            r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # IP
+            r"(?::\d+)?"  # port
+            r"(?:\/\S*)?$",  # path, query string, fragment
+            re.IGNORECASE,
+        )
+
+    if not _url_validator.regex.match(value):  # pyright: ignore[reportFunctionMemberAccess]
+        raise ValueError(f"Invalid URL: {value}")
+
+
+_url_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
+
+URL = Annotated[str, Parameter(validator=_url_validator)]
