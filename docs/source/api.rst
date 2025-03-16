@@ -1105,7 +1105,9 @@ Annotated types for common web-related values.
 
 .. autodata:: cyclopts.types.Email
 
-.. autodate:: cyclopts.types.URL
+.. autodata:: cyclopts.types.Port
+
+.. autodata:: cyclopts.types.URL
 
 ------
 Config
