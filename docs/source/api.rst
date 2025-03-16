@@ -1084,6 +1084,10 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.Int32
 
+.. autodata:: cyclopts.types.UInt64
+
+.. autodata:: cyclopts.types.Int64
+
 ^^^^
 Json
 ^^^^

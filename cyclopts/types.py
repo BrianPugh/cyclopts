@@ -52,6 +52,8 @@ __all__ = [
     "Int16",
     "UInt32",
     "Int32",
+    "UInt64",
+    "Int64",
     # Json,
     "Json",
 ]
@@ -167,10 +169,15 @@ UInt16 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535))
 Int16 = Annotated[int, Parameter(validator=validators.Number(gte=-32768, lte=32767))]
 "A signed 16-bit integer."
 
-UInt32 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=4294967295))]
+UInt32 = Annotated[int, Parameter(validator=validators.Number(gte=0, lt=1 << 32))]
 "An unsigned 32-bit integer."
-Int32 = Annotated[int, Parameter(validator=validators.Number(gte=-2147483648, lte=2147483647))]
+Int32 = Annotated[int, Parameter(validator=validators.Number(gte=(-1 << 31), lt=(1 << 31)))]
 "A signed 32-bit integer."
+
+UInt64 = Annotated[int, Parameter(validator=validators.Number(gte=0, lt=1 << 64))]
+"An unsigned 64-bit integer."
+Int64 = Annotated[int, Parameter(validator=validators.Number(gte=(-1 << 63), lt=(1 << 63)))]
+"A signed 64-bit integer."
 
 
 ########
