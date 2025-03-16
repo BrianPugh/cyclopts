@@ -10,7 +10,7 @@ from typing import (
     Any,
     Callable,
     Literal,
-    Union,
+    Optional,
     get_args,
     get_origin,
 )
@@ -25,6 +25,7 @@ from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
+    from rich.text import Text
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
@@ -65,6 +66,119 @@ def _text_factory():
     from rich.text import Text
 
     return Text()
+
+
+class InlineText:
+    def __init__(self, primary_renderable: "RenderableType", *, force_empty_end=False):
+        self.primary_renderable = primary_renderable
+        self.texts = []
+        self.force_empty_end = force_empty_end
+
+    @classmethod
+    def from_format(cls, content: Optional[str], format: str, *, force_empty_end=False):
+        if content is None:
+            from rich.text import Text
+
+            primary_renderable = Text(end="")
+        elif format == "plaintext":
+            from rich.text import Text
+
+            primary_renderable = Text(content.rstrip())
+        elif format in ("markdown", "md"):
+            from rich.markdown import Markdown
+
+            primary_renderable = Markdown(content)
+        elif format in ("restructuredtext", "rst"):
+            from rich_rst import RestructuredText
+
+            primary_renderable = RestructuredText(content)
+        elif format == "rich":
+            from rich.text import Text
+
+            primary_renderable = Text.from_markup(content)
+        else:
+            raise ValueError(f'Unknown help_format "{format}"')
+
+        return cls(primary_renderable, force_empty_end=force_empty_end)
+
+    def append(self, text: "Text"):
+        self.texts.append(text)
+
+    def __rich_console__(self, console, options):
+        from rich.segment import Segment
+        from rich.text import Text
+
+        if not self.primary_renderable and not self.texts:
+            return
+
+        # Group segments by line
+        lines_of_segments, current_line = [], []
+        for segment in console.render(self.primary_renderable, options):
+            if segment.text == "\n":
+                lines_of_segments.append(current_line + [segment])
+                current_line = []
+            else:
+                current_line.append(segment)
+
+        if current_line:
+            lines_of_segments.append(current_line)
+
+        # If no content, just yield the additional texts
+        if not lines_of_segments:
+            if self.texts:
+                combined_text = Text.assemble(*self.texts)
+                yield from console.render(combined_text, options)
+            return
+
+        # Yield all but the last line unchanged
+        for line in lines_of_segments[:-1]:
+            for segment in line:
+                yield segment
+
+        # For the last line, concatenate all of our additional texts;
+        # We have to re-render to properly handle textwrapping.
+        if lines_of_segments:
+            last_line = lines_of_segments[-1]
+
+            # Check for newline at end
+            has_newline = last_line and last_line[-1].text == "\n"
+            newline_segment = last_line.pop() if has_newline else None
+
+            # rstrip the last segment
+            if last_line:
+                last_segment = last_line[-1]
+                last_segment = Segment(
+                    last_segment.text.rstrip(),
+                    style=last_segment.style,
+                    control=last_segment.control,
+                )
+                last_line[-1] = last_segment
+
+            # Convert last line segments to text and combine with additional text
+            last_line_text = Text("", end="")
+            for segment in last_line:
+                if segment.text:
+                    last_line_text.append(segment.text, segment.style)
+
+            separator = Text(" ")
+            for text in self.texts:
+                if last_line_text:
+                    last_line_text += separator
+                last_line_text += text
+
+            # Re-render with proper wrapping
+            wrapped_segments = list(console.render(last_line_text, options))
+
+            if self.force_empty_end:
+                last_segment = wrapped_segments[-1]
+                if last_segment and not last_segment.text.endswith("\n"):
+                    wrapped_segments.append(Segment("\n"))
+
+            # Add back newline if it was present
+            if newline_segment:
+                wrapped_segments.append(newline_segment)
+
+            yield from wrapped_segments
 
 
 @define
@@ -127,10 +241,6 @@ class HelpPanel:
 
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
-        else:
-            # Should be either a RST or Markdown object
-            if panel_description.markup:  # pyright: ignore[reportAttributeAccessIssue]
-                panel_description = RichGroup(panel_description, NewLine(1))
 
         panel = Panel(
             RichGroup(panel_description, table),
@@ -239,9 +349,6 @@ def format_usage(
 
 
 def format_doc(app: "App", format: str = "restructuredtext"):
-    from rich.console import Group as RichGroup
-    from rich.console import NewLine
-
     raw_doc_string = app.help
 
     if not raw_doc_string:
@@ -249,7 +356,7 @@ def format_doc(app: "App", format: str = "restructuredtext"):
 
     parsed = docstring_parse(raw_doc_string)
 
-    components: list[Union[str, tuple[str, str]]] = []
+    components: list[str] = []
     if parsed.short_description:
         components.append(parsed.short_description + "\n")
 
@@ -257,70 +364,7 @@ def format_doc(app: "App", format: str = "restructuredtext"):
         if parsed.short_description:
             components.append("\n")
         components.append(parsed.long_description + "\n")
-
-    return RichGroup(format_str(*components, format=format), NewLine())
-
-
-def format_str(*components: Union[str, tuple[str, str]], format: str) -> "RenderableType":
-    """Format the sequence of components according to format.
-
-    Parameters
-    ----------
-    components: str | tuple[str, str]
-        Either a plain string, or a tuple of string and formatting style.
-        If formatting style is provided, the string-to-be-displayed WILL be escaped.
-    """
-    format = format.lower()
-
-    if format == "plaintext":
-        from rich.text import Text
-
-        aggregate = []
-        for component in components:
-            if isinstance(component, str):
-                aggregate.append(component)
-            else:
-                aggregate.append(component[0])
-        return Text.assemble("".join(aggregate).rstrip())
-    elif format in ("markdown", "md"):
-        from rich.markdown import Markdown
-
-        aggregate = []
-        for component in components:
-            if isinstance(component, str):
-                aggregate.append(component)
-            else:
-                # Ignore style for now :(
-                aggregate.append(component[0])
-
-        return Markdown("".join(aggregate))
-    elif format in ("restructuredtext", "rst"):
-        from rich_rst import RestructuredText
-
-        aggregate = []
-        for component in components:
-            if isinstance(component, str):
-                aggregate.append(component)
-            else:
-                # Ignore style for now :(
-                aggregate.append(component[0])
-        return RestructuredText("".join(aggregate))
-    elif format == "rich":
-        from rich.text import Text
-
-        def walk_components():
-            for component in components:
-                if isinstance(component, str):
-                    yield Text.from_markup(component.rstrip())
-                else:
-                    yield Text(component[0].rstrip(), style=component[1])
-
-        text = Text()
-        for component in walk_components():
-            text.append(component)
-        return text
-    else:
-        raise ValueError(f'Unknown help_format "{format}"')
+    return InlineText.from_format(" ".join(components), format=format, force_empty_end=True)
 
 
 def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
@@ -348,9 +392,15 @@ def create_parameter_help_panel(
     argument_collection: "ArgumentCollection",
     format: str,
 ) -> HelpPanel:
-    help_panel = HelpPanel(format="parameter", title=group.name, description=format_str(group.help, format=format))
+    from rich.text import Text
 
-    def help_append(text, style=""):
+    help_panel = HelpPanel(
+        format="parameter",
+        title=group.name,
+        description=InlineText.from_format(group.help, format=format, force_empty_end=True),
+    )
+
+    def help_append(text, style):
         if help_components:
             text = " " + text
         if style:
@@ -378,17 +428,16 @@ def create_parameter_help_panel(
             else:
                 long_options.append(option)
 
-        if argument.parameter.help:
-            help_append(argument.parameter.help)
+        help_description = InlineText.from_format(argument.parameter.help, format=format)
 
         if argument.parameter.show_choices:
             choices = _get_choices(argument.hint, argument.parameter.name_transform)
             if choices:
-                help_append(rf"[choices: {choices}]", "dim")
+                help_description.append(Text(rf"[choices: {choices}]", "dim"))
 
         if argument.parameter.show_env_var and argument.parameter.env_var:
             env_vars = ", ".join(argument.parameter.env_var)
-            help_append(rf"[env var: {env_vars}]", "dim")
+            help_description.append(Text(rf"[env var: {env_vars}]", "dim"))
 
         if argument.show_default:
             default = ""
@@ -397,15 +446,15 @@ def create_parameter_help_panel(
             else:
                 default = argument.field_info.default
 
-            help_append(rf"[default: {default}]", "dim")
+            help_description.append(Text(rf"[default: {default}]", "dim"))
 
         if argument.required:
-            help_append(r"[required]", "dim red")
+            help_description.append(Text(r"[required]", "dim red"))
 
         # populate row
         entry = HelpEntry(
             name=" ".join(long_options),
-            description=format_str(*help_components, format=format),
+            description=help_description,
             short=" ".join(short_options),
             required=argument.required,
         )
@@ -432,7 +481,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry
         entry = HelpEntry(
             name="\n".join(long_names),
             short=" ".join(short_names),
-            description=format_str(docstring_parse(app.help).short_description or "", format=format),
+            description=InlineText.from_format(docstring_parse(app.help).short_description, format=format),
             sort_key=resolve_callables(app.sort_key, app),
         )
         if entry not in entries:

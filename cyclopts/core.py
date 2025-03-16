@@ -40,10 +40,10 @@ from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
     HelpPanel,
+    InlineText,
     create_parameter_help_panel,
     format_command_entries,
     format_doc,
-    format_str,
     format_usage,
     resolve_help_format,
     resolve_version_format,
@@ -489,7 +489,7 @@ class App:
         if version_raw is None:
             version_raw = "0.0.0"
 
-        version_formatted = format_str(version_raw, format=version_format)
+        version_formatted = InlineText.from_format(version_raw, format=version_format)
         console.print(version_formatted)
 
     @property
@@ -1311,7 +1311,7 @@ class App:
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
-                    group_help = format_str(group.help, format=help_format)
+                    group_help = InlineText.from_format(group.help, format=help_format, force_empty_end=True)
 
                     if command_panel.description:
                         command_panel.description = RichGroup(command_panel.description, NewLine(), group_help)
