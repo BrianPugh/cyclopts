@@ -1097,6 +1097,14 @@ Annotated types for parsing a json-string from the CLI.
 
 .. _API Config:
 
+
+^^^
+Web
+^^^
+Annotated types for common web-related values.
+
+.. autodata:: cyclopts.types.Email
+
 ------
 Config
 ------

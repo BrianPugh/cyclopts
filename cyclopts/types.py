@@ -56,6 +56,8 @@ __all__ = [
     "Int64",
     # Json,
     "Json",
+    # Web
+    "Email",
 ]
 
 
@@ -217,3 +219,26 @@ Usage example:
     $ my-script '{"foo": 1, "bar": 2}'
     {'foo': 1, 'bar': 2}
 """
+
+#######
+# Web #
+#######
+
+
+def _email_validator(type_: Any, value: Any):
+    """Simplified email validation; probably good enough for CLI usage."""
+    if not isinstance(value, str):
+        return
+
+    if _email_validator.regex is None:  # pyright: ignore[reportFunctionMemberAccess]
+        import re
+
+        _email_validator.regex = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")  # pyright: ignore[reportFunctionMemberAccess]
+
+    if not _email_validator.regex.match(value):  # pyright: ignore[reportFunctionMemberAccess]
+        raise ValueError(f"Invalid email: {value}")
+
+
+_email_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
+
+Email = Annotated[str, Parameter(validator=_email_validator)]
