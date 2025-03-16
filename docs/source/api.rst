@@ -1084,6 +1084,10 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.Int32
 
+.. autodata:: cyclopts.types.UInt64
+
+.. autodata:: cyclopts.types.Int64
+
 ^^^^
 Json
 ^^^^
@@ -1092,6 +1096,18 @@ Annotated types for parsing a json-string from the CLI.
 .. autodata:: cyclopts.types.Json
 
 .. _API Config:
+
+
+^^^
+Web
+^^^
+Annotated types for common web-related values.
+
+.. autodata:: cyclopts.types.Email
+
+.. autodata:: cyclopts.types.Port
+
+.. autodata:: cyclopts.types.URL
 
 ------
 Config

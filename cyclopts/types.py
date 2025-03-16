@@ -52,8 +52,14 @@ __all__ = [
     "Int16",
     "UInt32",
     "Int32",
+    "UInt64",
+    "Int64",
     # Json,
     "Json",
+    # Web
+    "Email",
+    "Port",
+    "URL",
 ]
 
 
@@ -167,10 +173,15 @@ UInt16 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535))
 Int16 = Annotated[int, Parameter(validator=validators.Number(gte=-32768, lte=32767))]
 "A signed 16-bit integer."
 
-UInt32 = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=4294967295))]
+UInt32 = Annotated[int, Parameter(validator=validators.Number(gte=0, lt=1 << 32))]
 "An unsigned 32-bit integer."
-Int32 = Annotated[int, Parameter(validator=validators.Number(gte=-2147483648, lte=2147483647))]
+Int32 = Annotated[int, Parameter(validator=validators.Number(gte=(-1 << 31), lt=(1 << 31)))]
 "A signed 32-bit integer."
+
+UInt64 = Annotated[int, Parameter(validator=validators.Number(gte=0, lt=1 << 64))]
+"An unsigned 64-bit integer."
+Int64 = Annotated[int, Parameter(validator=validators.Number(gte=(-1 << 63), lt=(1 << 63)))]
+"A signed 64-bit integer."
 
 
 ########
@@ -210,3 +221,57 @@ Usage example:
     $ my-script '{"foo": 1, "bar": 2}'
     {'foo': 1, 'bar': 2}
 """
+
+#######
+# Web #
+#######
+
+
+def _email_validator(type_: Any, value: Any):
+    """Simplified email validation; probably good enough for CLI usage."""
+    if not isinstance(value, str):
+        return
+
+    if _email_validator.regex is None:  # pyright: ignore[reportFunctionMemberAccess]
+        import re
+
+        _email_validator.regex = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")  # pyright: ignore[reportFunctionMemberAccess]
+
+    if not _email_validator.regex.match(value):  # pyright: ignore[reportFunctionMemberAccess]
+        raise ValueError(f"Invalid email: {value}")
+
+
+_email_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
+
+Email = Annotated[str, Parameter(validator=_email_validator)]
+"An email address string with simple validation."
+
+
+def _url_validator(type_: Any, value: Any):
+    """Simplified URL validation; probably good enough for CLI usage."""
+    if not isinstance(value, str):
+        return
+    if _url_validator.regex is None:  # pyright: ignore[reportFunctionMemberAccess]
+        import re
+
+        _url_validator.regex = re.compile(  # pyright: ignore[reportFunctionMemberAccess]
+            r"^(?:(?:https?|ftp):\/\/)?"  # protocol
+            r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"  # domain
+            r"localhost|"  # localhost
+            r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # IP
+            r"(?::\d+)?"  # port
+            r"(?:\/\S*)?$",  # path, query string, fragment
+            re.IGNORECASE,
+        )
+
+    if not _url_validator.regex.match(value):  # pyright: ignore[reportFunctionMemberAccess]
+        raise ValueError(f"Invalid URL: {value}")
+
+
+_url_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
+
+URL = Annotated[str, Parameter(validator=_url_validator)]
+"A :class:`str` URL string with some simple validation."
+
+Port = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535))]
+"An :class:`int` limited to range ``[0, 65535]``."
