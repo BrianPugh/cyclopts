@@ -176,7 +176,7 @@ class ConfigFromFile(ABC):
     @property
     def config(self) -> dict[str, Any]:
         assert isinstance(self.path, Path)
-        for parent in self.path.parents:
+        for parent in self.path.expanduser().resolve().absolute().parents:
             candidate = parent / self.path.name
             if candidate.exists():
                 cache_key = CacheKey(candidate)

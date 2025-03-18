@@ -142,8 +142,8 @@ def test_config_common_must_exist_true(config):
 
 
 @pytest.mark.parametrize("must_exist", [True, False])
-def test_config_common_search_parents_true_exists(tmp_path, must_exist, config, mocker):
-    """Tests finding an existing parent."""
+def test_config_common_search_parents_absolute_true_exists(tmp_path, must_exist, config, mocker):
+    """Tests finding an existing parent if path is absolute."""
     spy_load_config = mocker.spy(config, "_load_config")
 
     original_path = config.path
@@ -155,6 +155,22 @@ def test_config_common_search_parents_true_exists(tmp_path, must_exist, config, 
     _ = config.config
 
     spy_load_config.assert_called_once_with(original_path)
+
+
+def test_config_common_search_parents_relative_true_exists(tmp_path, mocker, monkeypatch):
+    """Tests finding an existing parent if path is relative."""
+    config_path = tmp_path / "cyclopts-config-test-file.dummy"
+    config_path.touch()
+    config = Dummy("cyclopts-config-test-file.dummy", search_parents=True)
+    spy_load_config = mocker.spy(config, "_load_config")
+
+    deep_dir = tmp_path / "foo" / "bar" / "baz"
+    deep_dir.mkdir(parents=True)
+    monkeypatch.chdir(deep_dir)
+
+    _ = config.config
+
+    spy_load_config.assert_called_once_with(config_path.resolve())
 
 
 def test_config_common_must_exist_true_search_parents_true_missing(tmp_path, config, mocker):
