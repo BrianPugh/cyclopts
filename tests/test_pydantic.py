@@ -295,3 +295,48 @@ def test_parameter_decorator_pydantic_nested_1(app, console):
         """
     )
     assert actual == expected
+
+
+def test_pydantic_field_description(app, console):
+    """Test that pydantic Field.description is used for help text."""
+
+    class UserModel(BaseModel):
+        # Simple case - Field.description should be used
+        name: str = Field(description="User name.")
+
+        # Parameter(help=...) takes precedence over Field
+        name_with_param: Annotated[
+            str,
+            Parameter(help="User name with Parameter help."),
+        ] = "Jane Doe"
+
+        # Field description in Annotated should be used
+        name_with_field_in_annotated: Annotated[
+            str,
+            Field(description="Description from Field in Annotated."),
+        ] = "John Doe"
+
+        # Another simple case
+        age: int = Field(description="User age in years.")
+
+    @app.default
+    def main(user: UserModel):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+    print(f"\nActual help content:\n{actual}")
+
+    # Verify that Field.description is used for help text
+    assert "User name." in actual
+
+    # Verify that Parameter(help=...) takes precedence
+    assert "User name with Parameter help." in actual
+
+    # Verify that Field.description is used from Annotated as well
+    assert "Description from Field in Annotated." in actual
+
+    # Verify the other description is present
+    assert "User age in years." in actual
