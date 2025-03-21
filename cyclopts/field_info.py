@@ -53,6 +53,9 @@ class FieldInfo:
     default: Any = field(default=inspect.Parameter.empty, kw_only=True)
     annotation: Any = field(default=inspect.Parameter.empty, kw_only=True)
 
+    help: Optional[str] = field(default=None, kw_only=True)
+    """Can be populated by additional metadata from another library; e.g. ``pydantic.FieldInfo.description``."""
+
     ###################
     # Class Variables #
     ###################
@@ -167,53 +170,19 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
         else:
             names.append(python_name)
 
+        # Extract Field with description from metadata
+        help = pydantic_field.description or None
+        for meta in pydantic_field.metadata:
+            if hasattr(meta, "description") and meta.description:
+                help = meta.description
+
         # Pydantic places ``Annotated`` data into pydantic.FieldInfo.metadata, while
         # pydantic.FieldInfo.annotation contains the "real" resolved type-hint.
-        metadata_list = list(pydantic_field.metadata) if pydantic_field.metadata else []
-
-        # First check for a Parameter with help in the metadata
-        parameter_with_help = None
-        field_with_description = None
-
-        # Extract Parameter with help
-        for meta in metadata_list:
-            if (
-                hasattr(meta, "__cyclopts__")
-                and meta.__cyclopts__.parameters
-                and any(param.help is not None for param in meta.__cyclopts__.parameters)
-            ):
-                parameter_with_help = meta
-                break
-
-        # Extract Field with description from metadata
-        for meta in metadata_list:
-            if hasattr(meta, "description") and meta.description:
-                field_with_description = meta
-                break
-
-        # Now build the annotation with the right help information
-        if parameter_with_help:
-            # Parameter(help=...) takes precedence
-            annotation = Annotated[(pydantic_field.annotation,) + tuple(metadata_list)]  # pyright: ignore
-        elif field_with_description:
-            # Field from Annotated
-            annotation = Annotated[(pydantic_field.annotation,) + tuple(metadata_list)]  # pyright: ignore
-        elif pydantic_field.description:
-            # Field.description outside Annotated, add it as a Parameter
-            from cyclopts.parameter import Parameter
-
-            if metadata_list:
-                metadata_list.append(Parameter(help=pydantic_field.description))
-                annotation = Annotated[(pydantic_field.annotation,) + tuple(metadata_list)]  # pyright: ignore
-            else:
-                annotation = Annotated[pydantic_field.annotation, Parameter(help=pydantic_field.description)]  # pyright: ignore
+        # We have to re-combine them into a single Annotated hint.
+        if pydantic_field.metadata:
+            annotation = Annotated[(pydantic_field.annotation,) + tuple(pydantic_field.metadata)]  # pyright: ignore
         else:
-            # No help information available
-            annotation = (
-                Annotated[(pydantic_field.annotation,) + tuple(metadata_list)]  # pyright: ignore
-                if metadata_list
-                else pydantic_field.annotation
-            )
+            annotation = pydantic_field.annotation
 
         out[python_name] = FieldInfo(
             names=tuple(names),
@@ -221,6 +190,7 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
             annotation=annotation,
             default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
             required=pydantic_field.is_required(),
+            help=help,
         )
     return out
 

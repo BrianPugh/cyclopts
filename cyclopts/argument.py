@@ -190,7 +190,7 @@ class ArgumentCollection(list["Argument"]):
         cls,
         field_info: FieldInfo,
         keys: tuple[str, ...],
-        *default_parameters,
+        *default_parameters: Optional[Parameter],
         group_lookup: dict[str, Group],
         group_arguments: Group,
         group_parameters: Group,
@@ -314,7 +314,9 @@ class ArgumentCollection(list["Argument"]):
                     sub_field_info,
                     keys + (sub_field_name,),
                     cparam,
-                    hint_docstring_lookup.get((sub_field_name,)),
+                    Parameter(help=sub_field_info.help)
+                    if sub_field_info.help
+                    else hint_docstring_lookup.get((sub_field_name,)),
                     Parameter(required=argument.required & sub_field_info.required),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
@@ -379,7 +381,7 @@ class ArgumentCollection(list["Argument"]):
                 field_info,
                 (),
                 *default_parameters,
-                docstring_lookup.get((field_info.name,)),
+                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
