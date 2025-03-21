@@ -11,6 +11,21 @@ from pydantic.alias_generators import to_camel
 from cyclopts import MissingArgumentError, Parameter
 
 
+# Modified from https://docs.pydantic.dev/latest/#pydantic-examples
+class Outfit(BaseModel):
+    body: str
+    head: str
+    has_socks: bool
+
+
+class User(BaseModel):
+    id: PositiveInt
+    name: str = Field(default="John Doe")
+    signup_ts: Union[datetime, None]
+    tastes: Dict[str, PositiveInt]
+    outfit: Optional[Outfit] = None
+
+
 def test_pydantic_error_msg(app, console):
     @app.command
     @validate_call
@@ -19,7 +34,7 @@ def test_pydantic_error_msg(app, console):
 
     assert app["foo"].default_command == foo
 
-    foo(1)
+    # foo(1)
     with pytest.raises(PydanticValidationError):
         foo(-1)
 
@@ -42,19 +57,14 @@ def test_pydantic_error_msg(app, console):
     assert actual.startswith(expected_prefix)
 
 
-# Modified from https://docs.pydantic.dev/latest/#pydantic-examples
-class Outfit(BaseModel):
-    body: str
-    head: str
-    has_socks: bool
+def test_pydantic_error_from_function_body(app):
+    @app.command
+    def foo(value: int):
+        # id=-1 is not a valid PositiveError
+        User(id=-1, signup_ts=None, tastes={})
 
-
-class User(BaseModel):
-    id: int
-    name: str = Field(default="John Doe")
-    signup_ts: Union[datetime, None]
-    tastes: Dict[str, PositiveInt]
-    outfit: Optional[Outfit] = None
+    with pytest.raises(PydanticValidationError):
+        app(["foo", "-1"])
 
 
 def test_bind_pydantic_basemodel(app, assert_parse_args):
