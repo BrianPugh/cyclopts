@@ -327,7 +327,8 @@ def test_pydantic_field_description(app, console):
         app("--help", console=console)
 
     actual = capture.get()
-    print(f"\nActual help content:\n{actual}")
+    # Debugging output removed to avoid cluttering test outputs
+    # If needed, use: logging.debug(f"Actual help content: {actual}")
 
     # Verify that Field.description is used for help text
     assert "User name." in actual
