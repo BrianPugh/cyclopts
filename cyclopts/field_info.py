@@ -1,6 +1,15 @@
 import inspect
 import sys
-from typing import Annotated, Any, ClassVar, Optional, Sequence, get_args, get_origin, get_type_hints  # noqa: F401
+from typing import (  # noqa: F401
+    Annotated,
+    Any,
+    ClassVar,
+    Optional,
+    Sequence,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 import attrs
 from attrs import field
@@ -43,6 +52,9 @@ class FieldInfo:
     required: bool = field(kw_only=True)
     default: Any = field(default=inspect.Parameter.empty, kw_only=True)
     annotation: Any = field(default=inspect.Parameter.empty, kw_only=True)
+
+    help: Optional[str] = field(default=None, kw_only=True)
+    """Can be populated by additional metadata from another library; e.g. ``pydantic.FieldInfo.description``."""
 
     ###################
     # Class Variables #
@@ -158,6 +170,12 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
         else:
             names.append(python_name)
 
+        # Extract Field with description from metadata
+        help = pydantic_field.description or None
+        for meta in pydantic_field.metadata:
+            if hasattr(meta, "description") and meta.description:
+                help = meta.description
+
         # Pydantic places ``Annotated`` data into pydantic.FieldInfo.metadata, while
         # pydantic.FieldInfo.annotation contains the "real" resolved type-hint.
         # We have to re-combine them into a single Annotated hint.
@@ -172,6 +190,7 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
             annotation=annotation,
             default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
             required=pydantic_field.is_required(),
+            help=help,
         )
     return out
 
