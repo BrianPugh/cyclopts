@@ -26,6 +26,9 @@ class User(BaseModel):
     outfit: Optional[Outfit] = None
 
 
+@pytest.mark.skip(
+    reason="We disabled catching pydantic.ValidationError exceptions from @pydantic.validate_call because we would also erroneously catch exceptions from the command's body."
+)
 def test_pydantic_error_msg(app, console):
     @app.command
     @validate_call
