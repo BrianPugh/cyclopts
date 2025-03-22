@@ -1,8 +1,10 @@
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Annotated, Dict, Optional, Union
+from typing import Annotated, Dict, Literal, Optional, Union
 
+import pydantic
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
@@ -341,3 +343,41 @@ def test_pydantic_field_description(app, console):
 
     # Verify the other description is present
     assert "User age in years." in actual
+
+
+def test_pydantic_annotatedfield_discriminator(app, assert_parse_args):
+    """From https://github.com/BrianPugh/cyclopts/issues/377"""
+
+    class DatasetImage(pydantic.BaseModel):
+        type: Literal["image"] = "image"
+        path: str
+        resolution: tuple[int, int]
+
+    class DatasetVideo(pydantic.BaseModel):
+        type: Literal["video"] = "video"
+        path: str
+        resolution: tuple[int, int]
+        fps: int
+
+    Dataset = Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
+
+    @dataclass
+    class Config:
+        dataset: Dataset  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.default
+    def main(
+        config: Annotated[Config | None, Parameter(name="*")] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        "--dataset.type=image --dataset.path foo.png --dataset.resolution 640 480",
+        Config(DatasetImage(path="foo.png", resolution=(640, 480))),
+    )
+    assert_parse_args(
+        main,
+        "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
+        Config(DatasetVideo(path="foo.mp4", resolution=(640, 480), fps=30)),
+    )

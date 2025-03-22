@@ -189,6 +189,7 @@ convention = "numpy"
     "D205",
     "D400",
     "D404",
+    "N806",  # Variable in function should be lowercase
     "S102",  # use of "exec"
     "S106",  # possible hardcoded password.
     "PGH001",  # use of "eval"
