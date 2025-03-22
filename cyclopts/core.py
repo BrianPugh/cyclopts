@@ -1187,27 +1187,13 @@ class App:
             verbose=verbose,
             end_of_options_delimiter=end_of_options_delimiter,
         )
-        try:
-            if inspect.iscoroutinefunction(command):
-                import asyncio
 
-                return asyncio.run(command(*bound.args, **bound.kwargs))
-            else:
-                return command(*bound.args, **bound.kwargs)
-        except Exception as e:
-            try:
-                from pydantic import ValidationError as PydanticValidationError
-            except ImportError:
-                PydanticValidationError = None  # noqa: N806
+        if inspect.iscoroutinefunction(command):
+            import asyncio
 
-            if PydanticValidationError is not None and isinstance(e, PydanticValidationError):
-                if print_error:
-                    console = self._resolve_console(tokens, console)
-                    console.print(format_cyclopts_error(e))
-
-                if exit_on_error:
-                    sys.exit(1)
-            raise
+            return asyncio.run(command(*bound.args, **bound.kwargs))
+        else:
+            return command(*bound.args, **bound.kwargs)
 
     def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
         if override is not None:
