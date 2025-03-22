@@ -1,13 +1,12 @@
 import inspect
 import itertools
 from contextlib import suppress
-from functools import partial
 from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
 
 from cyclopts._convert import (
-    convert,
+    ITERABLE_TYPES,
     token_count,
 )
 from cyclopts.annotations import (
@@ -314,9 +313,11 @@ class ArgumentCollection(list["Argument"]):
                     sub_field_info,
                     keys + (sub_field_name,),
                     cparam,
-                    Parameter(help=sub_field_info.help)
-                    if sub_field_info.help
-                    else hint_docstring_lookup.get((sub_field_name,)),
+                    (
+                        Parameter(help=sub_field_info.help)
+                        if sub_field_info.help
+                        else hint_docstring_lookup.get((sub_field_name,))
+                    ),
                     Parameter(required=argument.required & sub_field_info.required),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
@@ -974,11 +975,6 @@ class Argument:
                 return UNSET
         else:  # A dictionary-like structure.
             data = {}
-            if is_pydantic(self.hint):
-                # Don't convert any subkeys, let pydantic handle them.
-                converter = partial(
-                    convert, converter=_identity_converter, name_transform=self.parameter.name_transform
-                )
 
             if self._should_attempt_json_dict():
                 # Dict-like structures may have incoming json data from an environment variable.
@@ -987,7 +983,8 @@ class Argument:
 
                 from cyclopts.config._common import update_argument_collection
 
-                for token in self.tokens:
+                while self.tokens:
+                    token = self.tokens.pop(0)
                     try:
                         parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
@@ -999,6 +996,15 @@ class Argument:
                         root_keys=(),
                         allow_unknown=False,
                     )
+
+            if is_pydantic(self.hint) or (is_union(self.hint) and all(is_pydantic(x) for x in get_args(self.hint))):
+                if self.has_tokens:
+                    import pydantic
+
+                    unstructured_data = self._json()
+                    return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
+                else:
+                    return UNSET
 
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
@@ -1180,6 +1186,36 @@ class Argument:
             return self.field_info.required
         else:
             return self.parameter.required
+
+    def _json(self) -> dict:
+        """Convert argument to be json-like for pydantic.
+
+        All values will be str/list/dict.
+        """
+        out = {}
+        if self._accepts_keywords:
+            for token in self.tokens:
+                node = out
+                for key in token.keys[:-1]:
+                    node = node.setdefault(key, {})
+                node[token.keys[-1]] = token.value if token.implicit_value is UNSET else token.implicit_value
+        for child in self.children:
+            child._marked = True
+            if not child.has_tokens:
+                continue
+            keys = child.keys[len(self.keys) :]
+            if child._accepts_keywords:
+                out[keys[0]] = child._json()
+            elif child.children:
+                result = child._json()
+                if result:
+                    out[keys[0]] = result
+            elif (get_origin(child.hint) or child.hint) in ITERABLE_TYPES:
+                out.setdefault(keys[-1], []).extend([token.value for token in child.tokens])
+            else:
+                token = child.tokens[0]
+                out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value
+        return out
 
 
 def _resolve_groups_from_callable(

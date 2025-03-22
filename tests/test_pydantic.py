@@ -345,7 +345,7 @@ def test_pydantic_field_description(app, console):
     assert "User age in years." in actual
 
 
-def test_pydantic_annotatedfield_discriminator(app, assert_parse_args):
+def test_pydantic_annotated_field_discriminator(app, assert_parse_args):
     """From https://github.com/BrianPugh/cyclopts/issues/377"""
 
     class DatasetImage(pydantic.BaseModel):
