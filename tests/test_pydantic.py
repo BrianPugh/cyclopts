@@ -410,16 +410,23 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     assert actual == expected
 
 
-def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args):
+@pytest.mark.parametrize(
+    "dataclass_decorator",
+    [
+        dataclass,
+        # pydantic.dataclasses.dataclass,  # Currently it seems like pydantic loses the "Annotated" portion of the type hint.
+    ],
+)
+def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args, dataclass_decorator):
     """Pydantic discriminator should work, even if the union'd types are not pydantic.BaseModel."""
 
-    @dataclass
+    @dataclass_decorator
     class DatasetImage:
         type: Literal["image"]
         path: str
         resolution: tuple[int, int]
 
-    @dataclass
+    @dataclass_decorator
     class DatasetVideo:
         type: Literal["video"]
         path: str
@@ -428,7 +435,7 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
 
     Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
 
-    @dataclass
+    @dataclass_decorator
     class Config:
         dataset: Dataset  # pyright: ignore[reportInvalidTypeForm]
 
@@ -441,10 +448,10 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
     assert_parse_args(
         main,
         "--dataset.type=image --dataset.path foo.png --dataset.resolution 640 480",
-        Config(DatasetImage(type="image", path="foo.png", resolution=(640, 480))),
+        Config(DatasetImage(type="image", path="foo.png", resolution=(640, 480))),  # pyright: ignore
     )
     assert_parse_args(
         main,
         "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
-        Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),
+        Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),  # pyright: ignore
     )

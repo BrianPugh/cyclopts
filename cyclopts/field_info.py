@@ -161,7 +161,9 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
     from pydantic_core import PydanticUndefined
 
     out = {}
-    for python_name, pydantic_field in model.model_fields.items():
+    # __pydantic_fields__ is used instead of model_fields because it's
+    # present in both pydantic BaseModel as well as pydantic dataclass.
+    for python_name, pydantic_field in model.__pydantic_fields__.items():
         names = []
         if pydantic_field.alias:
             if model.model_config.get("populate_by_name", False):
