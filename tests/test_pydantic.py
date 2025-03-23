@@ -359,7 +359,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args):
         resolution: tuple[int, int]
         fps: int
 
-    Dataset = Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
+    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
 
     @dataclass
     class Config:
