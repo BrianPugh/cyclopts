@@ -395,7 +395,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ DATASET.TYPE               [choices: image, video] [default: video]│
+        │ DATASET.TYPE               [choices: image, video]                 │
         │   --dataset.type                                                   │
         │ DATASET.PATH                                                       │
         │   --dataset.path                                                   │

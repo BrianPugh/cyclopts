@@ -1,7 +1,7 @@
 import inspect
 import itertools
 from contextlib import suppress
-from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin
+from typing import Any, Callable, Literal, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
 
@@ -110,6 +110,15 @@ def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]])
 
 def _identity_converter(type_, token):
     return token
+
+
+def _get_annotated_discriminator(annotation):
+    for meta in get_args(annotation)[1:]:
+        try:
+            return meta.discriminator
+        except AttributeError:
+            pass
+    return None
 
 
 class ArgumentCollection(list["Argument"]):
@@ -295,6 +304,7 @@ class ArgumentCollection(list["Argument"]):
         if argument._accepts_keywords:
             hint_docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
+
             for sub_field_name, sub_field_info in argument._lookup.items():
                 updated_kind = _kind_parent_child_reassignment[(argument.field_info.kind, sub_field_info.kind)]  # pyright: ignore
                 if updated_kind is None:
@@ -488,7 +498,7 @@ class Argument:
     Do not directly mutate; see :meth:`append`.
     """
 
-    field_info: FieldInfo = field(default=None)
+    field_info: FieldInfo = field(factory=FieldInfo)
     """
     Additional information about the parameter from surrounding python syntax.
     """
@@ -606,33 +616,33 @@ class Argument:
             elif is_typeddict(hint):
                 self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_attrs_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_pydantic(hint):
                 self._missing_keys_checker = _missing_keys_factory(_pydantic_field_infos)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif not is_builtin(hint) and field_infos:
                 # Some classic user class.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif self.parameter.accepts_keys is None:
                 # Typical builtin hint
                 continue
@@ -652,7 +662,22 @@ class Argument:
                 if field_info.kind is field_info.VAR_KEYWORD:
                     self._default = field_info.annotation
                 else:
-                    self._lookup[field_info.name] = field_info
+                    self._update_lookup({field_info.name: field_info})
+
+    def _update_lookup(self, field_infos: dict[str, FieldInfo]):
+        discriminator = _get_annotated_discriminator(self.field_info.annotation)
+
+        for key, field_info in field_infos.items():
+            if existing_field_info := self._lookup.get(key):
+                if existing_field_info == field_info:
+                    pass
+                elif discriminator and discriminator in field_info.names and discriminator in existing_field_info.names:
+                    existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]  # pyright: ignore
+                    existing_field_info.default = FieldInfo.empty
+                else:
+                    raise NotImplementedError
+            else:
+                self._lookup[key] = field_info
 
     @property
     def value(self):
@@ -694,23 +719,16 @@ class Argument:
 
     @property
     def _use_pydantic_type_adapter(self) -> bool:
-        use_pydantic_type_adapter = False
-        if is_union(self.hint):
-            try:
-                import pydantic
-            except ImportError:
-                pass
-            else:
-                if any(is_pydantic(x) for x in get_args(self.hint)):
-                    use_pydantic_type_adapter = True
-                else:
-                    for meta in get_args(self.field_info.annotation)[1:]:
-                        if isinstance(meta, pydantic.fields.FieldInfo):
-                            use_pydantic_type_adapter = True
-                            break
-        elif is_pydantic(self.hint):
-            use_pydantic_type_adapter = True
-        return use_pydantic_type_adapter
+        return bool(
+            is_pydantic(self.hint)
+            or (
+                is_union(self.hint)
+                and (
+                    any(is_pydantic(x) for x in get_args(self.hint))
+                    or _get_annotated_discriminator(self.field_info.annotation)
+                )
+            )
+        )
 
     def _type_hint_for_key(self, key: str):
         try:

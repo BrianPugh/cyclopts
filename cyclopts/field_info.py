@@ -46,10 +46,10 @@ def _replace_annotated_type(src_type, dst_type):
 class FieldInfo:
     """Extension of :class:`inspect.Parameter`."""
 
-    names: tuple[str, ...]
-    kind: inspect._ParameterKind
+    names: tuple[str, ...] = ()
+    kind: inspect._ParameterKind = inspect.Parameter.POSITIONAL_OR_KEYWORD
 
-    required: bool = field(kw_only=True)
+    required: bool = field(kw_only=True, default=False)
     default: Any = field(default=inspect.Parameter.empty, kw_only=True)
     annotation: Any = field(default=inspect.Parameter.empty, kw_only=True)
 
