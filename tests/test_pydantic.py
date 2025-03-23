@@ -414,7 +414,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     "dataclass_decorator",
     [
         dataclass,
-        # pydantic.dataclasses.dataclass,  # Currently it seems like pydantic loses the "Annotated" portion of the type hint.
+        pydantic.dataclasses.dataclass,
     ],
 )
 def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args, dataclass_decorator):

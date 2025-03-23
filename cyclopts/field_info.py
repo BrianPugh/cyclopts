@@ -161,9 +161,7 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
     from pydantic_core import PydanticUndefined
 
     out = {}
-    # __pydantic_fields__ is used instead of model_fields because it's
-    # present in both pydantic BaseModel as well as pydantic dataclass.
-    for python_name, pydantic_field in model.__pydantic_fields__.items():
+    for python_name, pydantic_field in model.model_fields.items():
         names = []
         if pydantic_field.alias:
             if model.model_config.get("populate_by_name", False):
@@ -270,7 +268,11 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
 
 def get_field_infos(hint) -> dict[str, FieldInfo]:
-    if is_pydantic(hint):
+    if is_dataclass(hint):
+        # This must be before ``is_pydantic`` check so that we
+        # can handle pydantic dataclasses as vanilla dataclasses.
+        return _dataclass_field_infos(hint)
+    elif is_pydantic(hint):
         return _pydantic_field_infos(hint)
     elif is_namedtuple(hint):
         return _namedtuple_field_infos(hint)
@@ -278,8 +280,6 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return _typed_dict_field_infos(hint)
     elif is_attrs(hint):
         return _attrs_field_infos(hint)
-    elif is_dataclass(hint):
-        return _dataclass_field_infos(hint)
     else:
         return _generic_class_field_infos(hint)
 
