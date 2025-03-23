@@ -345,7 +345,7 @@ def test_pydantic_field_description(app, console):
     assert "User age in years." in actual
 
 
-def test_pydantic_annotated_field_discriminator(app, assert_parse_args):
+def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console):
     """From https://github.com/BrianPugh/cyclopts/issues/377"""
 
     class DatasetImage(pydantic.BaseModel):
@@ -381,3 +381,30 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args):
         "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
         Config(DatasetVideo(path="foo.mp4", resolution=(640, 480), fps=30)),
     )
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: main COMMAND [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ DATASET.TYPE               [choices: image, video] [default: video]│
+        │   --dataset.type                                                   │
+        │ DATASET.PATH                                                       │
+        │   --dataset.path                                                   │
+        │ DATASET.RESOLUTION                                                 │
+        │   --dataset.resolution --                                          │
+        │   dataset.empty-resolutio                                          │
+        │   n                                                                │
+        │ DATASET.FPS --dataset.fps                                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
