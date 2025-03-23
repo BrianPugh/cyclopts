@@ -1799,3 +1799,38 @@ def test_help_help_on_error(app, console):
         """
     )
     assert actual == expected
+
+
+def test_issue_373_help_space_with_meta_app(app, console):
+    @app.default
+    def default(value: str):
+        print(f"{value=}")
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        meta_value: int = 3,
+    ):
+        app(tokens)
+
+    with console.capture() as capture:
+        app("--help", console=console, exit_on_error=False)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  VALUE --value  [required]                                       │
+        │    --meta-value   [default: 3]                                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
