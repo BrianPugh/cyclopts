@@ -1002,7 +1002,10 @@ class Argument:
                     import pydantic
 
                     unstructured_data = self._json()
-                    return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
+                    try:
+                        return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
+                    except pydantic.ValidationError as e:
+                        self._handle_pydantic_validation_error(e)
                 else:
                     return UNSET
 
@@ -1020,19 +1023,7 @@ class Argument:
                             raise MissingArgumentError(argument=child) from None
                     child._marked = True
 
-            if self._missing_keys_checker and (self.required or data):
-                if missing_keys := self._missing_keys_checker(self, data):
-                    # Report the first missing argument.
-                    missing_key = missing_keys[0]
-                    keys = self.keys + (missing_key,)
-                    missing_arguments = self.children.filter_by(keys_prefix=keys)
-                    if missing_arguments:
-                        raise MissingArgumentError(argument=missing_arguments[0])
-                    else:
-                        missing_description = self.field_info.names[0] + "->" + "->".join(keys)
-                        raise ValueError(
-                            f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
-                        )
+            self._run_missing_keys_checker(data)
 
             if data:
                 out = self.hint(**data)
@@ -1216,6 +1207,31 @@ class Argument:
                 token = child.tokens[0]
                 out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value
         return out
+
+    def _run_missing_keys_checker(self, data):
+        if not self._missing_keys_checker or (not self.required and not data):
+            return
+        if not (missing_keys := self._missing_keys_checker(self, data)):
+            return
+        # Report the first missing argument.
+        missing_key = missing_keys[0]
+        keys = self.keys + (missing_key,)
+        missing_arguments = self.children.filter_by(keys_prefix=keys)
+        if missing_arguments:
+            raise MissingArgumentError(argument=missing_arguments[0])
+        else:
+            missing_description = self.field_info.names[0] + "->" + "->".join(keys)
+            raise ValueError(
+                f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
+            )
+
+    def _handle_pydantic_validation_error(self, exc):
+        error = exc.errors()[0]
+        if error["type"] == "missing":
+            missing_argument = self.children_recursive.filter_by(keys_prefix=self.keys + error["loc"])[0]
+            raise MissingArgumentError(argument=missing_argument) from exc
+        else:
+            raise exc
 
 
 def _resolve_groups_from_callable(
