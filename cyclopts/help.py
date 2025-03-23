@@ -397,7 +397,7 @@ def create_parameter_help_panel(
     help_panel = HelpPanel(
         format="parameter",
         title=group.name,
-        description=InlineText.from_format(group.help, format=format, force_empty_end=True),
+        description=InlineText.from_format(group.help, format=format, force_empty_end=True) if group.help else Text(),
     )
 
     def help_append(text, style):
