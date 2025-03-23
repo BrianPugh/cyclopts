@@ -408,3 +408,43 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         """
     )
     assert actual == expected
+
+
+def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args):
+    """Pydantic discriminator should work, even if the union'd types are not pydantic.BaseModel."""
+
+    @dataclass
+    class DatasetImage:
+        type: Literal["image"]
+        path: str
+        resolution: tuple[int, int]
+
+    @dataclass
+    class DatasetVideo:
+        type: Literal["video"]
+        path: str
+        resolution: tuple[int, int]
+        fps: int
+
+    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+
+    @dataclass
+    class Config:
+        dataset: Dataset  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.default
+    def main(
+        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        "--dataset.type=image --dataset.path foo.png --dataset.resolution 640 480",
+        Config(DatasetImage(type="image", path="foo.png", resolution=(640, 480))),
+    )
+    assert_parse_args(
+        main,
+        "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
+        Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),
+    )

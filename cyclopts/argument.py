@@ -692,6 +692,26 @@ class Argument:
         else:
             return self.parameter.show_default
 
+    @property
+    def _use_pydantic_type_adapter(self) -> bool:
+        use_pydantic_type_adapter = False
+        if is_union(self.hint):
+            try:
+                import pydantic
+            except ImportError:
+                pass
+            else:
+                if any(is_pydantic(x) for x in get_args(self.hint)):
+                    use_pydantic_type_adapter = True
+                else:
+                    for meta in get_args(self.field_info.annotation)[1:]:
+                        if isinstance(meta, pydantic.fields.FieldInfo):
+                            use_pydantic_type_adapter = True
+                            break
+        elif is_pydantic(self.hint):
+            use_pydantic_type_adapter = True
+        return use_pydantic_type_adapter
+
     def _type_hint_for_key(self, key: str):
         try:
             return self._lookup[key].annotation
@@ -889,6 +909,18 @@ class Argument:
             out.extend(child.children_recursive)
         return out
 
+    def _convert_pydantic(self):
+        if self.has_tokens:
+            import pydantic
+
+            unstructured_data = self._json()
+            try:
+                return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
+            except pydantic.ValidationError as e:
+                self._handle_pydantic_validation_error(e)
+        else:
+            return UNSET
+
     def _convert(self, converter: Optional[Callable] = None):
         if converter is None:
             converter = self.parameter.converter
@@ -997,17 +1029,8 @@ class Argument:
                         allow_unknown=False,
                     )
 
-            if is_pydantic(self.hint) or (is_union(self.hint) and all(is_pydantic(x) for x in get_args(self.hint))):
-                if self.has_tokens:
-                    import pydantic
-
-                    unstructured_data = self._json()
-                    try:
-                        return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
-                    except pydantic.ValidationError as e:
-                        self._handle_pydantic_validation_error(e)
-                else:
-                    return UNSET
+            if self._use_pydantic_type_adapter:
+                return self._convert_pydantic()
 
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
