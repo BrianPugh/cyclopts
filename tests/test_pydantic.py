@@ -367,7 +367,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args):
 
     @app.default
     def main(
-        config: Annotated[Config | None, Parameter(name="*")] = None,
+        config: Annotated[Optional[Config], Parameter(name="*")] = None,
     ):
         pass
 
