@@ -1,13 +1,13 @@
 import inspect
 import itertools
+import sys
 from contextlib import suppress
-from functools import partial
-from typing import Any, Callable, Optional, Sequence, Union, get_args, get_origin
+from typing import Any, Callable, Literal, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
 
 from cyclopts._convert import (
-    convert,
+    ITERABLE_TYPES,
     token_count,
 )
 from cyclopts.annotations import (
@@ -111,6 +111,15 @@ def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]])
 
 def _identity_converter(type_, token):
     return token
+
+
+def _get_annotated_discriminator(annotation):
+    for meta in get_args(annotation)[1:]:
+        try:
+            return meta.discriminator
+        except AttributeError:
+            pass
+    return None
 
 
 class ArgumentCollection(list["Argument"]):
@@ -296,6 +305,7 @@ class ArgumentCollection(list["Argument"]):
         if argument._accepts_keywords:
             hint_docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
+
             for sub_field_name, sub_field_info in argument._lookup.items():
                 updated_kind = _kind_parent_child_reassignment[(argument.field_info.kind, sub_field_info.kind)]  # pyright: ignore
                 if updated_kind is None:
@@ -314,9 +324,11 @@ class ArgumentCollection(list["Argument"]):
                     sub_field_info,
                     keys + (sub_field_name,),
                     cparam,
-                    Parameter(help=sub_field_info.help)
-                    if sub_field_info.help
-                    else hint_docstring_lookup.get((sub_field_name,)),
+                    (
+                        Parameter(help=sub_field_info.help)
+                        if sub_field_info.help
+                        else hint_docstring_lookup.get((sub_field_name,))
+                    ),
                     Parameter(required=argument.required & sub_field_info.required),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
@@ -487,7 +499,7 @@ class Argument:
     Do not directly mutate; see :meth:`append`.
     """
 
-    field_info: FieldInfo = field(default=None)
+    field_info: FieldInfo = field(factory=FieldInfo)
     """
     Additional information about the parameter from surrounding python syntax.
     """
@@ -605,33 +617,33 @@ class Argument:
             elif is_typeddict(hint):
                 self._missing_keys_checker = _missing_keys_factory(_typed_dict_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_dataclass(hint):  # Typical usecase of a dataclass will have more than 1 field.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_namedtuple(hint):
                 # collections.namedtuple does not have type hints, assume "str" for everything.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
                     raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_attrs_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif is_pydantic(hint):
                 self._missing_keys_checker = _missing_keys_factory(_pydantic_field_infos)
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif not is_builtin(hint) and field_infos:
                 # Some classic user class.
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
-                self._lookup.update(field_infos)
+                self._update_lookup(field_infos)
             elif self.parameter.accepts_keys is None:
                 # Typical builtin hint
                 continue
@@ -651,7 +663,22 @@ class Argument:
                 if field_info.kind is field_info.VAR_KEYWORD:
                     self._default = field_info.annotation
                 else:
-                    self._lookup[field_info.name] = field_info
+                    self._update_lookup({field_info.name: field_info})
+
+    def _update_lookup(self, field_infos: dict[str, FieldInfo]):
+        discriminator = _get_annotated_discriminator(self.field_info.annotation)
+
+        for key, field_info in field_infos.items():
+            if existing_field_info := self._lookup.get(key):
+                if existing_field_info == field_info:
+                    pass
+                elif discriminator and discriminator in field_info.names and discriminator in existing_field_info.names:
+                    existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]  # pyright: ignore
+                    existing_field_info.default = FieldInfo.empty
+                else:
+                    raise NotImplementedError
+            else:
+                self._lookup[key] = field_info
 
     @property
     def value(self):
@@ -690,6 +717,19 @@ class Argument:
             return not self.required and self.field_info.default not in _SHOW_DEFAULT_BLOCKLIST
         else:
             return self.parameter.show_default
+
+    @property
+    def _use_pydantic_type_adapter(self) -> bool:
+        return bool(
+            is_pydantic(self.hint)
+            or (
+                is_union(self.hint)
+                and (
+                    any(is_pydantic(x) for x in get_args(self.hint))
+                    or _get_annotated_discriminator(self.field_info.annotation)
+                )
+            )
+        )
 
     def _type_hint_for_key(self, key: str):
         try:
@@ -888,6 +928,18 @@ class Argument:
             out.extend(child.children_recursive)
         return out
 
+    def _convert_pydantic(self):
+        if self.has_tokens:
+            import pydantic
+
+            unstructured_data = self._json()
+            try:
+                return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
+            except pydantic.ValidationError as e:
+                self._handle_pydantic_validation_error(e)
+        else:
+            return UNSET
+
     def _convert(self, converter: Optional[Callable] = None):
         if converter is None:
             converter = self.parameter.converter
@@ -974,11 +1026,6 @@ class Argument:
                 return UNSET
         else:  # A dictionary-like structure.
             data = {}
-            if is_pydantic(self.hint):
-                # Don't convert any subkeys, let pydantic handle them.
-                converter = partial(
-                    convert, converter=_identity_converter, name_transform=self.parameter.name_transform
-                )
 
             if self._should_attempt_json_dict():
                 # Dict-like structures may have incoming json data from an environment variable.
@@ -987,7 +1034,8 @@ class Argument:
 
                 from cyclopts.config._common import update_argument_collection
 
-                for token in self.tokens:
+                while self.tokens:
+                    token = self.tokens.pop(0)
                     try:
                         parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
@@ -999,6 +1047,9 @@ class Argument:
                         root_keys=(),
                         allow_unknown=False,
                     )
+
+            if self._use_pydantic_type_adapter:
+                return self._convert_pydantic()
 
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
@@ -1014,19 +1065,7 @@ class Argument:
                             raise MissingArgumentError(argument=child) from None
                     child._marked = True
 
-            if self._missing_keys_checker and (self.required or data):
-                if missing_keys := self._missing_keys_checker(self, data):
-                    # Report the first missing argument.
-                    missing_key = missing_keys[0]
-                    keys = self.keys + (missing_key,)
-                    missing_arguments = self.children.filter_by(keys_prefix=keys)
-                    if missing_arguments:
-                        raise MissingArgumentError(argument=missing_arguments[0])
-                    else:
-                        missing_description = self.field_info.names[0] + "->" + "->".join(keys)
-                        raise ValueError(
-                            f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
-                        )
+            self._run_missing_keys_checker(data)
 
             if data:
                 out = self.hint(**data)
@@ -1082,20 +1121,40 @@ class Argument:
         """
         assert isinstance(self.parameter.validator, tuple)
 
+        if "pydantic" in sys.modules:
+            import pydantic
+        else:
+            pydantic = None
+
+        def validate_pydantic(hint, val):
+            if not pydantic:
+                return
+
+            try:
+                pydantic.TypeAdapter(hint).validate_python(val)
+            except pydantic.ValidationError as e:
+                self._handle_pydantic_validation_error(e)
+            except pydantic.PydanticUserError:
+                # Pydantic couldn't generate a schema for this type hint.
+                pass
+
         try:
             if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.parameter.validator:
                     for val in value.values():
                         validator(hint, val)
+                validate_pydantic(dict[str, self.field_info.annotation], value)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.parameter.validator:
                     for val in value:
                         validator(hint, val)
+                validate_pydantic(tuple[self.field_info.annotation, ...], value)
             else:
                 for validator in self.parameter.validator:
                     validator(self.hint, value)
+                validate_pydantic(self.field_info.annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
 
@@ -1180,6 +1239,63 @@ class Argument:
             return self.field_info.required
         else:
             return self.parameter.required
+
+    def _json(self) -> dict:
+        """Convert argument to be json-like for pydantic.
+
+        All values will be str/list/dict.
+        """
+        out = {}
+        if self._accepts_keywords:
+            for token in self.tokens:
+                node = out
+                for key in token.keys[:-1]:
+                    node = node.setdefault(key, {})
+                node[token.keys[-1]] = token.value if token.implicit_value is UNSET else token.implicit_value
+        for child in self.children:
+            child._marked = True
+            if not child.has_tokens:
+                continue
+            keys = child.keys[len(self.keys) :]
+            if child._accepts_keywords:
+                result = child._json()
+                if result:
+                    out[keys[0]] = result
+            elif (get_origin(child.hint) or child.hint) in ITERABLE_TYPES:
+                out.setdefault(keys[-1], []).extend([token.value for token in child.tokens])
+            else:
+                token = child.tokens[0]
+                out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value
+        return out
+
+    def _run_missing_keys_checker(self, data):
+        if not self._missing_keys_checker or (not self.required and not data):
+            return
+        if not (missing_keys := self._missing_keys_checker(self, data)):
+            return
+        # Report the first missing argument.
+        missing_key = missing_keys[0]
+        keys = self.keys + (missing_key,)
+        missing_arguments = self.children.filter_by(keys_prefix=keys)
+        if missing_arguments:
+            raise MissingArgumentError(argument=missing_arguments[0])
+        else:
+            missing_description = self.field_info.names[0] + "->" + "->".join(keys)
+            raise ValueError(
+                f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'
+            )
+
+    def _handle_pydantic_validation_error(self, exc):
+        import pydantic
+
+        error = exc.errors()[0]
+        if error["type"] == "missing":
+            missing_argument = self.children_recursive.filter_by(keys_prefix=self.keys + error["loc"])[0]
+            raise MissingArgumentError(argument=missing_argument) from exc
+        elif isinstance(exc, pydantic.ValidationError):
+            raise ValidationError(exception_message=str(exc), argument=self) from exc
+        else:
+            raise exc
 
 
 def _resolve_groups_from_callable(

@@ -1,14 +1,16 @@
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Annotated, Dict, Optional, Union
+from typing import Annotated, Dict, Literal, Optional, Union
 
+import pydantic
 import pytest
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
-from cyclopts import MissingArgumentError, Parameter
+from cyclopts import MissingArgumentError, Parameter, ValidationError
 
 
 # Modified from https://docs.pydantic.dev/latest/#pydantic-examples
@@ -26,9 +28,6 @@ class User(BaseModel):
     outfit: Optional[Outfit] = None
 
 
-@pytest.mark.skip(
-    reason="We disabled catching pydantic.ValidationError exceptions from @pydantic.validate_call because we would also erroneously catch exceptions from the command's body."
-)
 def test_pydantic_error_msg(app, console):
     @app.command
     @validate_call
@@ -41,7 +40,7 @@ def test_pydantic_error_msg(app, console):
     with pytest.raises(PydanticValidationError):
         foo(-1)
 
-    with console.capture() as capture, pytest.raises(PydanticValidationError):
+    with console.capture() as capture, pytest.raises(ValidationError):
         app(["foo", "-1"], console=console, exit_on_error=False, print_error=True)
 
     actual = capture.get()
@@ -49,8 +48,8 @@ def test_pydantic_error_msg(app, console):
     expected_prefix = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ 1 validation error for test_pydantic_error_msg.<locals>.foo        │
-        │ 0                                                                  │
+        │ Invalid value "-1" for "VALUE". 1 validation error for             │
+        │ constrained-int                                                    │
         │   Input should be greater than 0 [type=greater_than,               │
         │ input_value=-1, input_type=int]                                    │
         │     For further information visit                                  │
@@ -354,3 +353,115 @@ def test_pydantic_field_description(app, console):
 
     # Verify the other description is present
     assert "User age in years." in actual
+
+
+def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console):
+    """From https://github.com/BrianPugh/cyclopts/issues/377"""
+
+    class DatasetImage(pydantic.BaseModel):
+        type: Literal["image"] = "image"
+        path: str
+        resolution: tuple[int, int]
+
+    class DatasetVideo(pydantic.BaseModel):
+        type: Literal["video"] = "video"
+        path: str
+        resolution: tuple[int, int]
+        fps: int
+
+    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+
+    @dataclass
+    class Config:
+        dataset: Dataset  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.default
+    def main(
+        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        "--dataset.type=image --dataset.path foo.png --dataset.resolution 640 480",
+        Config(DatasetImage(path="foo.png", resolution=(640, 480))),
+    )
+    assert_parse_args(
+        main,
+        "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
+        Config(DatasetVideo(path="foo.mp4", resolution=(640, 480), fps=30)),
+    )
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: main COMMAND [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ DATASET.TYPE               [choices: image, video]                 │
+        │   --dataset.type                                                   │
+        │ DATASET.PATH                                                       │
+        │   --dataset.path                                                   │
+        │ DATASET.RESOLUTION                                                 │
+        │   --dataset.resolution --                                          │
+        │   dataset.empty-resolutio                                          │
+        │   n                                                                │
+        │ DATASET.FPS --dataset.fps                                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "dataclass_decorator",
+    [
+        dataclass,
+        pydantic.dataclasses.dataclass,
+    ],
+)
+def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args, dataclass_decorator):
+    """Pydantic discriminator should work, even if the union'd types are not pydantic.BaseModel."""
+
+    @dataclass_decorator
+    class DatasetImage:
+        type: Literal["image"]
+        path: str
+        resolution: tuple[int, int]
+
+    @dataclass_decorator
+    class DatasetVideo:
+        type: Literal["video"]
+        path: str
+        resolution: tuple[int, int]
+        fps: int
+
+    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+
+    @dataclass_decorator
+    class Config:
+        dataset: Dataset  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.default
+    def main(
+        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        "--dataset.type=image --dataset.path foo.png --dataset.resolution 640 480",
+        Config(DatasetImage(type="image", path="foo.png", resolution=(640, 480))),  # pyright: ignore
+    )
+    assert_parse_args(
+        main,
+        "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
+        Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),  # pyright: ignore
+    )

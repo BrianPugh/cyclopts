@@ -46,10 +46,10 @@ def _replace_annotated_type(src_type, dst_type):
 class FieldInfo:
     """Extension of :class:`inspect.Parameter`."""
 
-    names: tuple[str, ...]
-    kind: inspect._ParameterKind
+    names: tuple[str, ...] = ()
+    kind: inspect._ParameterKind = inspect.Parameter.POSITIONAL_OR_KEYWORD
 
-    required: bool = field(kw_only=True)
+    required: bool = field(kw_only=True, default=False)
     default: Any = field(default=inspect.Parameter.empty, kw_only=True)
     annotation: Any = field(default=inspect.Parameter.empty, kw_only=True)
 
@@ -268,7 +268,11 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
 
 def get_field_infos(hint) -> dict[str, FieldInfo]:
-    if is_pydantic(hint):
+    if is_dataclass(hint):
+        # This must be before ``is_pydantic`` check so that we
+        # can handle pydantic dataclasses as vanilla dataclasses.
+        return _dataclass_field_infos(hint)
+    elif is_pydantic(hint):
         return _pydantic_field_infos(hint)
     elif is_namedtuple(hint):
         return _namedtuple_field_infos(hint)
@@ -276,8 +280,6 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return _typed_dict_field_infos(hint)
     elif is_attrs(hint):
         return _attrs_field_infos(hint)
-    elif is_dataclass(hint):
-        return _dataclass_field_infos(hint)
     else:
         return _generic_class_field_infos(hint)
 

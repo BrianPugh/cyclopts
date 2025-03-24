@@ -462,6 +462,8 @@ API
            }
 
       If not provided, defaults to Cyclopts's internal coercion engine.
+      If a pydantic type-hint is provided, Cyclopts will disable it's internal coercion
+      engine (including this `converter` argument) and leave the coercion to pydantic.
 
    .. attribute:: validator
       :type: Union[None, Callable, Iterable[Callable]]
