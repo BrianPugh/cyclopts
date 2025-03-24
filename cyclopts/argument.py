@@ -1,5 +1,6 @@
 import inspect
 import itertools
+import sys
 from contextlib import suppress
 from typing import Any, Callable, Literal, Optional, Sequence, Union, get_args, get_origin
 
@@ -1120,20 +1121,40 @@ class Argument:
         """
         assert isinstance(self.parameter.validator, tuple)
 
+        if "pydantic" in sys.modules:
+            import pydantic
+        else:
+            pydantic = None
+
+        def validate_pydantic(hint, val):
+            if not pydantic:
+                return
+
+            try:
+                pydantic.TypeAdapter(hint).validate_python(val)
+            except pydantic.ValidationError as e:
+                raise ValidationError(exception_message=str(e), argument=self) from e
+            except pydantic.PydanticUserError:
+                # Pydantic couldn't generate a schema for this type hint.
+                pass
+
         try:
             if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.parameter.validator:
                     for val in value.values():
                         validator(hint, val)
+                validate_pydantic(dict[str, self.field_info.annotation], value)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.parameter.validator:
                     for val in value:
                         validator(hint, val)
+                validate_pydantic(tuple[self.field_info.annotation, ...], value)
             else:
                 for validator in self.parameter.validator:
                     validator(self.hint, value)
+                validate_pydantic(self.field_info.annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
 

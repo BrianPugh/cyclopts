@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validate_call
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
-from cyclopts import MissingArgumentError, Parameter
+from cyclopts import MissingArgumentError, Parameter, ValidationError
 
 
 # Modified from https://docs.pydantic.dev/latest/#pydantic-examples
@@ -28,9 +28,6 @@ class User(BaseModel):
     outfit: Optional[Outfit] = None
 
 
-@pytest.mark.skip(
-    reason="We disabled catching pydantic.ValidationError exceptions from @pydantic.validate_call because we would also erroneously catch exceptions from the command's body."
-)
 def test_pydantic_error_msg(app, console):
     @app.command
     @validate_call
@@ -43,7 +40,7 @@ def test_pydantic_error_msg(app, console):
     with pytest.raises(PydanticValidationError):
         foo(-1)
 
-    with console.capture() as capture, pytest.raises(PydanticValidationError):
+    with console.capture() as capture, pytest.raises(ValidationError):
         app(["foo", "-1"], console=console, exit_on_error=False, print_error=True)
 
     actual = capture.get()
@@ -51,8 +48,8 @@ def test_pydantic_error_msg(app, console):
     expected_prefix = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ 1 validation error for test_pydantic_error_msg.<locals>.foo        │
-        │ 0                                                                  │
+        │ Invalid value "-1" for "VALUE". 1 validation error for             │
+        │ constrained-int                                                    │
         │   Input should be greater than 0 [type=greater_than,               │
         │ input_value=-1, input_type=int]                                    │
         │     For further information visit                                  │
