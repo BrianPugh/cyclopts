@@ -1258,8 +1258,6 @@ class Argument:
                 continue
             keys = child.keys[len(self.keys) :]
             if child._accepts_keywords:
-                out[keys[0]] = child._json()
-            elif child.children:
                 result = child._json()
                 if result:
                     out[keys[0]] = result
