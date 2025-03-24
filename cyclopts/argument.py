@@ -1133,7 +1133,7 @@ class Argument:
             try:
                 pydantic.TypeAdapter(hint).validate_python(val)
             except pydantic.ValidationError as e:
-                raise ValidationError(exception_message=str(e), argument=self) from e
+                self._handle_pydantic_validation_error(e)
             except pydantic.PydanticUserError:
                 # Pydantic couldn't generate a schema for this type hint.
                 pass
@@ -1286,10 +1286,14 @@ class Argument:
             )
 
     def _handle_pydantic_validation_error(self, exc):
+        import pydantic
+
         error = exc.errors()[0]
         if error["type"] == "missing":
             missing_argument = self.children_recursive.filter_by(keys_prefix=self.keys + error["loc"])[0]
             raise MissingArgumentError(argument=missing_argument) from exc
+        elif isinstance(exc, pydantic.ValidationError):
+            raise ValidationError(exception_message=str(exc), argument=self) from exc
         else:
             raise exc
 
