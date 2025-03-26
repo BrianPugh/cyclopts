@@ -736,7 +736,7 @@ class App:
                 kwargs["group_parameters"] = copy(self._group_parameters)
             if "group_arguments" not in kwargs:
                 kwargs["group_arguments"] = copy(self._group_arguments)
-            app = App(**kwargs)  # pyright: ignore
+            app = type(self)(**kwargs)  # pyright: ignore
             # directly call the default decorator, in case we do additional processing there.
             app.default(obj)
 
