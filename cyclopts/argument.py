@@ -2,12 +2,14 @@ import inspect
 import itertools
 import sys
 from contextlib import suppress
+from functools import partial
 from typing import Any, Callable, Literal, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
 
 from cyclopts._convert import (
     ITERABLE_TYPES,
+    convert,
     token_count,
 )
 from cyclopts.annotations import (
@@ -941,8 +943,10 @@ class Argument:
             return UNSET
 
     def _convert(self, converter: Optional[Callable] = None):
-        if converter is None:
+        if self.parameter.converter:
             converter = self.parameter.converter
+        elif converter is None:
+            converter = partial(convert, name_transform=self.parameter.name_transform)
 
         def safe_converter(hint, tokens):
             if isinstance(tokens, dict):

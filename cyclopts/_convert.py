@@ -158,12 +158,12 @@ def _convert(
         from cyclopts.parameter import Parameter
 
         type_, cparam = Parameter.from_annotation(type_)
-        if cparam._converter:
+        if cparam.converter:
             converter_needs_token = True
 
             def converter_with_token(t_, value):
-                assert cparam._converter
-                return cparam._converter(t_, (value,))
+                assert cparam.converter
+                return cparam.converter(t_, (value,))
 
             converter = converter_with_token
 
