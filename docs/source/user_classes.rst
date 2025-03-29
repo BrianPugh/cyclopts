@@ -5,8 +5,8 @@ Cyclopts supports classically defined user classes, as well as classes defined b
 
 * `attrs <https://www.attrs.org/en/stable/>`_
 * `dataclass <https://docs.python.org/3/library/dataclasses.html>`_
-* `NamedTuple <https://docs.python.org/3/library/typing.html#typing.NamedTuple>`_
 * `pydantic <https://docs.pydantic.dev/latest/>`_
+* `NamedTuple <https://docs.python.org/3/library/typing.html#typing.NamedTuple>`_
 * `TypedDict <https://docs.python.org/3/library/typing.html#typing.TypedDict>`_
 
 As an example, lets consider using the builtin :obj:`~dataclasses.dataclass` to make a CLI that manages a movie collection.
@@ -54,6 +54,7 @@ In most circumstances\*, Cyclopts will also parse a json-string for a dataclass-
    Adding movie: Movie(title='Mad Max: Fury Road', year=2024)
 
 Json parsing will be performed when:
+
 1. The parameter has to be specified as a keyword option; e.g. ``--movie``.
 2. The referenced parameter must be dataclass-like.
 3. The referenced parameter **cannot** be union'd with a ``str``.
