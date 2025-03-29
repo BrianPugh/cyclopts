@@ -1,7 +1,6 @@
 import inspect
 from collections.abc import Iterable
 from copy import deepcopy
-from functools import partial
 from typing import (
     Any,
     Callable,
@@ -21,7 +20,7 @@ from attrs import define, field
 
 import cyclopts._env_var
 import cyclopts.utils
-from cyclopts._convert import ITERABLE_TYPES, convert
+from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_annotated, is_union, resolve_optional
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
@@ -108,7 +107,7 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    _converter: Optional[Callable[[Any, Sequence[Token]], Any]] = field(default=None, alias="converter")
+    converter: Optional[Callable[[Any, Sequence[Token]], Any]] = field(default=None)
 
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: Union[None, Callable[[Any, Any], Any], Iterable[Callable[[Any, Any], Any]]] = field(
@@ -184,10 +183,6 @@ class Parameter:
     @property
     def show(self) -> bool:
         return self._show if self._show is not None else self.parse
-
-    @property
-    def converter(self):
-        return self._converter if self._converter else partial(convert, name_transform=self.name_transform)
 
     @property
     def name_transform(self):

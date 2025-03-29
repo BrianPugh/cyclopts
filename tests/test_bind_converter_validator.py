@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Annotated
 from unittest.mock import Mock
 
@@ -5,6 +6,7 @@ import pytest
 
 from cyclopts import Parameter, ValidationError
 from cyclopts.exceptions import CoercionError
+from cyclopts.token import Token
 
 
 @pytest.fixture
@@ -183,3 +185,20 @@ def test_custom_command_validator(app, assert_parse_args):
 
     assert_parse_args(foo, "1 2 3", 1, 2, 3)
     validator.assert_called_once_with(a=1, b=2, c=3)
+
+
+def test_custom_converter_inside_class(app, mocker):
+    converter = mocker.Mock(return_value=5)
+
+    @Parameter(name="*")
+    @dataclass
+    class Config:
+        foo: Annotated[int, Parameter(converter=converter)]
+
+    @app.default
+    def default(config: Config):
+        pass
+
+    app("bar")
+
+    converter.assert_called_once_with(int, (Token(value="bar", source="cli"),))
