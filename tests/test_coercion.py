@@ -1,5 +1,6 @@
 import inspect
 import sys
+from datetime import datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
 from typing import Annotated, Any, Iterable, List, Literal, Optional, Sequence, Set, Tuple, Union
@@ -321,3 +322,72 @@ def test_coerce_bytearray():
 
 def test_coerce_parameter_kind_empty():
     assert "foo" == convert(inspect.Parameter.empty, ["foo"])
+
+
+def test_coerce_datetime():
+    expected = datetime.strptime("1956-01-31T10:00:00", "%Y-%m-%dT%H:%M:%S")
+    assert expected == convert(datetime, ["1956-01-31T10:00:00"])
+
+
+@pytest.mark.parametrize(
+    "input_string, expected_output",
+    [
+        # Basic single unit tests
+        ("30s", timedelta(seconds=30)),
+        ("5m", timedelta(minutes=5)),
+        ("2h", timedelta(hours=2)),
+        ("1d", timedelta(days=1)),
+        ("3w", timedelta(weeks=3)),
+        ("6M", timedelta(days=30 * 6)),  # Approximation: 1 month = 30 days
+        ("1y", timedelta(days=365)),  # Approximation: 1 year = 365 days
+        # Combined duration tests
+        ("1h30m", timedelta(hours=1, minutes=30)),
+        ("1d12h", timedelta(days=1, hours=12)),
+        ("2d5h30m", timedelta(days=2, hours=5, minutes=30)),
+        ("1w2d", timedelta(weeks=1, days=2)),
+        ("3h45m20s", timedelta(hours=3, minutes=45, seconds=20)),
+        # Zero and small values
+        ("0s", timedelta(seconds=0)),
+        ("1s", timedelta(seconds=1)),
+        # Large values
+        ("100d", timedelta(days=100)),
+        ("10000s", timedelta(seconds=10000)),
+        # Mixed order (should still work)
+        ("30m1h", timedelta(hours=1, minutes=30)),
+        ("45s2h", timedelta(hours=2, seconds=45)),
+        # Repeated units (should add them)
+        ("1h1h", timedelta(hours=2)),
+        ("1d1d1d", timedelta(days=3)),
+        # Negative duration
+        ("-1h", timedelta(hours=-1)),
+        # Decimal duration
+        ("1.5h", timedelta(hours=1.5)),
+    ],
+)
+def test_parse_timedelta_valid(input_string, expected_output):
+    """Test that valid duration strings are parsed correctly."""
+    assert convert(timedelta, [input_string]) == expected_output
+
+
+@pytest.mark.parametrize(
+    "invalid_input",
+    [
+        "",  # Empty string
+        "abc",  # No numbers or units
+        "1",  # Number without unit
+        "1x",  # Invalid unit
+        "h1",  # Unit before number
+        "3 days",  # Full unit names with spaces not supported
+    ],
+)
+def test_parse_timedelta_invalid(invalid_input):
+    with pytest.raises(CoercionError):
+        convert(timedelta, [invalid_input])
+
+
+def test_parse_timedelta_equivalence():
+    assert convert(timedelta, ["1h"]) == convert(timedelta, ["60m"])
+    assert convert(timedelta, ["1d"]) == convert(timedelta, ["24h"])
+    assert convert(timedelta, ["1w"]) == convert(timedelta, ["7d"])
+    assert convert(timedelta, ["1h30m"]) == convert(timedelta, ["90m"])
+    assert convert(timedelta, ["1d12h"]) == convert(timedelta, ["36h"])

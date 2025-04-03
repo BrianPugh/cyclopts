@@ -604,6 +604,38 @@ As a real-world example, the PNG image format supports `5 different color-types 
 
 .. _Coercion Rules - Dataclasses:
 
+********
+datetime
+********
+
+Cyclopts supports parsing timestamps into a :class:`~datetime.datetime` object. The supplied time must be in one of the following formats:
+
+- ``%Y-%m-%d`` (e.g. 1956-01-31)
+- ``%Y-%m-%dT%H:%M:%S`` (e.g. 1956-01-31T10:00:00)
+- ``%Y-%m-%d %H:%M:%S``  (e.g. 1956-01-31 10:00:00)
+- ``%Y-%m-%dT%H:%M:%S%z``  (e.g. 1956-01-31T10:00:00+0000)
+- ``%Y-%m-%dT%H:%M:%S.%f``  (e.g. 1956-01-31T10:00:00.123456)
+- ``%Y-%m-%dT%H:%M:%S.%f%z``  (e.g. 1956-01-31T10:00:00.123456+0000)
+
+
+*********
+timedelta
+*********
+Cyclopts supports parsing time durations into a :class:`~datetime.timedelta` object. The supplied time must be in one of the following formats:
+
+- ``30s`` - 30 seconds
+- ``5m`` - 5 minutes
+- ``2h`` - 2 hours
+- ``1d`` - 1 day
+- ``3w`` - 3 weeks
+- ``6M`` - 6 months (approximate)
+- ``1y`` - 1 year (approximate)
+
+Combining durations is also supported:
+
+- "1h30m" - 1 hour and 30 minutes
+- "1d12h" - 1 day and 12 hours
+
 ********************
 User-Defined Classes
 ********************

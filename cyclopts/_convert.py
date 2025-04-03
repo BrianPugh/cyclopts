@@ -2,6 +2,7 @@ import collections.abc
 import sys
 import typing
 from collections.abc import Sequence
+from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial
 from inspect import isclass
@@ -86,12 +87,79 @@ def _bytearray(s: str) -> bytearray:
     return bytearray(_bytes(s))
 
 
+def _datetime(s: str) -> datetime:
+    """Parse a datetime string.
+
+    Returns
+    -------
+    datetime.datetime
+    """
+    formats = [
+        # ISO 8601 formats (unambiguous internationally)
+        "%Y-%m-%d",  # 1956-01-31
+        "%Y-%m-%dT%H:%M:%S",  # 1956-01-31T10:00:00
+        "%Y-%m-%d %H:%M:%S",  # 1956-01-31 10:00:00
+        "%Y-%m-%dT%H:%M:%S%z",  # 1956-01-31T10:00:00+0000
+        "%Y-%m-%dT%H:%M:%S.%f",  # 1956-01-31T10:00:00.123456
+        "%Y-%m-%dT%H:%M:%S.%f%z",  # 1956-01-31T10:00:00.123456+0000
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+
+    raise ValueError
+
+
+def _timedelta(s: str) -> timedelta:
+    """Parse a timedelta string."""
+    import re
+
+    negative = False
+    if s.startswith("-"):
+        negative = True
+        s = s[1:]
+
+    matches = re.findall(r"((\d+\.\d+|\d+)([smhdwMy]))", s)
+
+    if not matches:
+        raise ValueError(f"Could not parse duration string: {s}")
+
+    seconds = 0
+    for _, value, unit in matches:
+        value = float(value)
+        if unit == "s":
+            seconds += value
+        elif unit == "m":
+            seconds += value * 60
+        elif unit == "h":
+            seconds += value * 3600
+        elif unit == "d":
+            seconds += value * 86400
+        elif unit == "w":
+            seconds += value * 604800
+        elif unit == "M":
+            # Approximation: 1 month = 30 days
+            seconds += value * 2592000
+        elif unit == "y":
+            # Approximation: 1 year = 365 days
+            seconds += value * 31536000
+
+    if negative:
+        seconds = -seconds
+    return timedelta(seconds=seconds)
+
+
 # For types that need more logic than just invoking their type
 _converters: dict[Any, Callable] = {
     bool: _bool,
     int: _int,
     bytes: _bytes,
     bytearray: _bytearray,
+    datetime: _datetime,
+    timedelta: _timedelta,
 }
 
 
