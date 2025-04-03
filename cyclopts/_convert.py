@@ -90,11 +90,6 @@ def _bytearray(s: str) -> bytearray:
 def _datetime(s: str) -> datetime:
     """Parse a datetime string.
 
-    String must be in one of the following formats:
-    - %Y-%m-%d (e.g., "1956-01-31")
-    - %Y-%m-%dT%H:%M:%S (e.g., "1956-01-31T10:00:00")
-    - %Y-%m-%d %H:%M:%S (e.g., "1956-01-31 10:00:00")
-
     Returns
     -------
     datetime.datetime
