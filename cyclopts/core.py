@@ -397,7 +397,12 @@ class App:
                 name = _get_root_module_name()
             return (name,)
         else:
-            return (self.name_transform(self.default_command.__name__),)
+            try:
+                func_name = self.default_command.__name__
+            except AttributeError:
+                # This could happen if default_command is wrapped in a functools.partial
+                func_name = self.default_command.func.__name__  # pyright: ignore[reportFunctionMemberAccess]
+            return (self.name_transform(func_name),)
 
     @property
     def group_arguments(self):
