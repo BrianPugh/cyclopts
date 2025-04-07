@@ -327,7 +327,9 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
-    if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
+    # python3.9 functools.partial does not have "__module__" attribute.
+    # TODO: simplify to (f.__module__ or "") once cp3.9 is dropped.
+    if (getattr(f, "__module__", "") or "").startswith("cyclopts"):  # Speed optimization.
         return
     for field_info in signature_parameters(f).values():
         # Speed optimization: if an object is not annotated, then there's nothing
