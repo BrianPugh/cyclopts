@@ -1356,6 +1356,10 @@ def _resolve_groups_from_callable(
 def _extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
     from docstring_parser import parse_from_object
 
+    # Handle functools.partial
+    with suppress(AttributeError):
+        f = f.func  # pyright: ignore[reportFunctionMemberAccess]
+
     try:
         return {
             tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)

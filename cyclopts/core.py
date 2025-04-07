@@ -452,10 +452,22 @@ class App:
                 return ""
             else:
                 return self.meta.help
-        elif self.default_command.__doc__ is None:
-            return ""
         else:
-            return self.default_command.__doc__
+            # Try to handle a potential partial function
+            if "functools" in sys.modules:
+                from functools import partial
+
+                if isinstance(self.default_command, partial):
+                    doc = self.default_command.func.__doc__
+                else:
+                    doc = self.default_command.__doc__
+            else:
+                doc = self.default_command.__doc__
+
+            if doc is None:
+                return ""
+            else:
+                return doc
 
     @help.setter
     def help(self, value):
