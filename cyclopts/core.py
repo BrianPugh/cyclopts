@@ -397,7 +397,12 @@ class App:
                 name = _get_root_module_name()
             return (name,)
         else:
-            return (self.name_transform(self.default_command.__name__),)
+            try:
+                func_name = self.default_command.__name__
+            except AttributeError:
+                # This could happen if default_command is wrapped in a functools.partial
+                func_name = self.default_command.func.__name__  # pyright: ignore[reportFunctionMemberAccess]
+            return (self.name_transform(func_name),)
 
     @property
     def group_arguments(self):
@@ -447,10 +452,22 @@ class App:
                 return ""
             else:
                 return self.meta.help
-        elif self.default_command.__doc__ is None:
-            return ""
         else:
-            return self.default_command.__doc__
+            # Try to handle a potential partial function
+            if "functools" in sys.modules:
+                from functools import partial
+
+                if isinstance(self.default_command, partial):
+                    doc = self.default_command.func.__doc__
+                else:
+                    doc = self.default_command.__doc__
+            else:
+                doc = self.default_command.__doc__
+
+            if doc is None:
+                return ""
+            else:
+                return doc
 
     @help.setter
     def help(self, value):

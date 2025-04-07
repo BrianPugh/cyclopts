@@ -285,7 +285,15 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
 
 
 def signature_parameters(f: Any) -> dict[str, FieldInfo]:
-    type_hints = get_type_hints(f, include_extras=True)
+    if "functools" in sys.modules:
+        from functools import partial
+
+        func = f.func if isinstance(f, partial) else f
+    else:
+        func = f
+
+    type_hints = get_type_hints(func, include_extras=True)
+
     out = {}
     for name, iparam in inspect.signature(f).parameters.items():
         annotation = type_hints.get(name, iparam.annotation)

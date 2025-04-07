@@ -1,4 +1,5 @@
 import sys
+from functools import partial
 from typing import Annotated, Any, Optional
 
 import pytest
@@ -57,6 +58,26 @@ def test_basic_2(app, cmd_str, assert_parse_args):
         pass
 
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
+
+
+def test_functools_partial_default(app, assert_parse_args):
+    def foo(a: int, b: int, c: int):
+        pass
+
+    foo_partial = partial(foo, c=3)
+    app.default(foo_partial)
+
+    assert_parse_args(foo_partial, "1 2", a=1, b=2)
+
+
+def test_functools_partial_command(app, assert_parse_args):
+    def foo(a: int, b: int, c: int):
+        pass
+
+    foo_partial = partial(foo, c=3)
+    app.command(foo_partial)
+
+    assert_parse_args(foo_partial, "foo 1 2", a=1, b=2)
 
 
 def test_basic_allow_hyphen_or_underscore(app, assert_parse_args):
