@@ -1686,6 +1686,8 @@ def test_help_plaintext(app, console):
     """Tests that plaintext documents don't get interpreted otherwise."""
     description = dedent(
         """\
+        This is the short description.
+
         This is a long sentence that
         is spread across
         three lines.
@@ -1714,6 +1716,8 @@ def test_help_plaintext(app, console):
     expected = dedent(
         """\
         Usage: test_help COMMAND
+
+        This is the short description.
 
         This is a long sentence that
         is spread across

@@ -11,6 +11,7 @@ from typing import (
     Callable,
     Literal,
     Optional,
+    Sequence,
     get_args,
     get_origin,
 )
@@ -37,19 +38,19 @@ else:  # pragma: no cover
 
 
 @lru_cache(maxsize=16)
-def docstring_parse(doc: str):
-    """Addon to :func:`docstring_parser.parse` that double checks the `short_description`."""
+def docstring_parse(doc: str, format: str):
+    """Addon to :func:`docstring_parser.parse` that supports multi-line `short_description`."""
     import docstring_parser
 
-    res = docstring_parser.parse(doc)
     cleaned_doc = inspect.cleandoc(doc)
-    short = cleaned_doc.split("\n\n")[0]
-    if res.short_description != short:
-        if res.long_description is None:
-            res.long_description = res.short_description
-        elif res.short_description is not None:
-            res.long_description = res.short_description + "\n" + res.long_description
-        res.short_description = None
+    if format != "plaintext":
+        if len(short_description_and_remainder := cleaned_doc.split("\n\n", 1)) == 2:
+            # Place multi-line summary into a single line.
+            # This kind of goes against PEP-0257, but any reasonable CLI command will
+            # have either no description, or it will have both a short and long description.
+            short = short_description_and_remainder[0].replace("\n", " ")
+            cleaned_doc = short + "\n\n" + short_description_and_remainder[1]
+    res = docstring_parser.parse(cleaned_doc)
     return res
 
 
@@ -348,13 +349,28 @@ def format_usage(
     return Text(" ".join(usage) + "\n", style="bold")
 
 
+def _smart_join(strings: Sequence[str]) -> str:
+    """Joins strings with a space, unless the previous string ended in a newline."""
+    if not strings:
+        return ""
+
+    result = [strings[0]]
+    for s in strings[1:]:
+        if result[-1].endswith("\n"):
+            result.append(s)
+        else:
+            result.append(" " + s)
+
+    return "".join(result)
+
+
 def format_doc(app: "App", format: str = "restructuredtext"):
     raw_doc_string = app.help
 
     if not raw_doc_string:
         return _silent
 
-    parsed = docstring_parse(raw_doc_string)
+    parsed = docstring_parse(raw_doc_string, format)
 
     components: list[str] = []
     if parsed.short_description:
@@ -364,7 +380,7 @@ def format_doc(app: "App", format: str = "restructuredtext"):
         if parsed.short_description:
             components.append("\n")
         components.append(parsed.long_description + "\n")
-    return InlineText.from_format(" ".join(components), format=format, force_empty_end=True)
+    return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
 def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
@@ -481,7 +497,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry
         entry = HelpEntry(
             name="\n".join(long_names),
             short=" ".join(short_names),
-            description=InlineText.from_format(docstring_parse(app.help).short_description, format=format),
+            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
             sort_key=resolve_callables(app.sort_key, app),
         )
         if entry not in entries:
