@@ -1478,7 +1478,7 @@ def _detect_test_framework() -> TestFramework:
         Name of the testing framework. Returns an empty string if not testing
         framework discovered.
     """
-    if os.environ.get("PYTEST_VERSION") is not None:
+    if "pytest" in sys.modules and os.environ.get("PYTEST_VERSION") is not None:
         # Available as of pytest v8.2.0 (Apr 27, 2024)
         return TestFramework.PYTEST
     else:
