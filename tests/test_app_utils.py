@@ -1,4 +1,6 @@
+import subprocess
 import warnings
+from pathlib import Path
 
 import pytest
 
@@ -91,3 +93,19 @@ def test_log_framework_warning_pytest(app):
         warning_msg
         == 'Cyclopts application invoked without tokens under unit-test framework "pytest". Did you mean "app([])"?'
     )
+
+
+def test_log_framework_warning_pytest_subprocess():
+    current_dir = Path(__file__).parent
+
+    # Construct the path to the script relative to the test file
+    script_path = current_dir / "empty_app.py"
+
+    # Run the script using the constructed path
+    result = subprocess.run(
+        ["python", str(script_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Cyclopts application invoked without tokens under unit-test framework" not in result.stderr
