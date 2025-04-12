@@ -71,6 +71,7 @@ branch = true
 omit = [
     "tests/*",
 ]
+source = ["cyclopts"]
 
 [tool.coverage.report]
 exclude_lines = [
