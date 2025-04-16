@@ -1127,6 +1127,11 @@ class Argument:
 
         if "pydantic" in sys.modules:
             import pydantic
+
+            pydantic_version = tuple(int(x) for x in pydantic.__version__.split("."))
+            if pydantic_version < (2,):
+                # Cyclopts does NOT support/use pydantic v1.
+                pydantic = None
         else:
             pydantic = None
 
