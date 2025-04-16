@@ -95,6 +95,7 @@ def test_log_framework_warning_pytest(app):
     )
 
 
+@pytest.mark.skip(reason="code-coverage injects pytest into subprocess. Otherwise works.")
 def test_log_framework_warning_pytest_subprocess():
     current_dir = Path(__file__).parent
 
