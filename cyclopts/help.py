@@ -43,14 +43,22 @@ def docstring_parse(doc: str, format: str):
     import docstring_parser
 
     cleaned_doc = inspect.cleandoc(doc)
-    if format != "plaintext":
-        if len(short_description_and_remainder := cleaned_doc.split("\n\n", 1)) == 2:
-            # Place multi-line summary into a single line.
-            # This kind of goes against PEP-0257, but any reasonable CLI command will
-            # have either no description, or it will have both a short and long description.
-            short = short_description_and_remainder[0].replace("\n", " ")
-            cleaned_doc = short + "\n\n" + short_description_and_remainder[1]
+    short_description_and_maybe_remainder = cleaned_doc.split("\n\n", 1)
+
+    # Place multi-line summary into a single line.
+    # This kind of goes against PEP-0257, but any reasonable CLI command will
+    # have either no description, or it will have both a short and long description.
+    short = short_description_and_maybe_remainder[0].replace("\n", " ")
+    if len(short_description_and_maybe_remainder) == 1:
+        cleaned_doc = short
+    else:
+        cleaned_doc = short + "\n\n" + short_description_and_maybe_remainder[1]
+
     res = docstring_parser.parse(cleaned_doc)
+
+    # Ensure a short description exists if there's a long description
+    assert not res.long_description or res.short_description
+
     return res
 
 

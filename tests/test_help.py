@@ -172,19 +172,24 @@ def test_format_commands_docstring(app, console):
     )
 
 
-def test_format_commands_docstring_long_only(app, console):
+def test_format_commands_docstring_multi_line_pep0257(app, console):
     """
     PEP-0257 says that the short_description and long_description should be separated by an empty newline.
-    We hijack the docstring parsing a little bit to enforce this.
+    We hijack the docstring parsing a little bit to have the following properties:
+        * The first block of text is ALWAYS the short-description.
+        * There cannot be a long-description without a short-description.
 
-    See https://github.com/BrianPugh/cyclopts/issues/74
+    See:
+        * https://github.com/BrianPugh/cyclopts/issues/74
+        * https://github.com/BrianPugh/cyclopts/issues/393
+        * https://github.com/BrianPugh/cyclopts/issues/402
     """
 
     @app.command
     def foo():
         """
-        This function doesn't have a short description.
-        This is a continuation of the long description.
+        This function doesn't have a
+        long description.
         """  # noqa: D404
 
     panel = HelpPanel(title="Commands", format="command")
@@ -193,10 +198,12 @@ def test_format_commands_docstring_long_only(app, console):
         console.print(panel)
 
     actual = capture.get()
-    assert actual == (
-        "╭─ Commands ─────────────────────────────────────────────────────────╮\n"
-        "│ foo                                                                │\n"
-        "╰────────────────────────────────────────────────────────────────────╯\n"
+    assert actual == dedent(
+        """\
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo  This function doesn't have a long description.                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
     )
 
 
@@ -1639,11 +1646,11 @@ def test_help_rich(app, console):
     """Newlines actually get interpreted with rich."""
     description = dedent(
         """\
-        This is a long sentence that
+        This is a short-description that
         is spread across
-        three lines.
+        three lines (against PEP0257).
 
-        This is a new paragraph.
+        This is the first sentence of the long-description.
         This is another sentence of that paragraph.
         [red]This text is red.[/red]
         """
@@ -1663,11 +1670,10 @@ def test_help_rich(app, console):
         """\
         Usage: test_help COMMAND
 
-        This is a long sentence that
-        is spread across
-        three lines.
+        This is a short-description that is spread across three lines (against
+        PEP0257).
 
-        This is a new paragraph.
+        This is the first sentence of the long-description.
         This is another sentence of that paragraph.
         This text is red.
 
