@@ -91,6 +91,17 @@ Cyclopts mostly respects `PEP-0257`_, but has some slight differences for develo
 
 1. The "summary line" (AKA short-description) may actually be multiple lines. Cyclopts will unwrap the first block of text and interpret it as the short description. The first block of text ends at the first double-newline (i.e. a single blank line) is reached.
 
+   .. code-block:: python
+
+      def my_command():
+          """
+          This entire sentence
+          is part of the short description and will
+          have all the newlines removed.
+
+          This is the beginning of the long description.
+          """
+
 2. If a docstring is provided with a long description, it **must** also have a short description.
 
 By default, Cyclopts parses docstring descriptions as restructuredtext and renders it appropriately.
