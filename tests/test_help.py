@@ -1,5 +1,6 @@
 import sys
 from enum import Enum
+from functools import partial
 from textwrap import dedent
 from typing import Annotated, List, Literal, Optional, Sequence, Set, Tuple, Union
 
@@ -273,6 +274,75 @@ def test_format_commands_explicit_name(app, console):
         "│ bar  Docstring for bar.                                            │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
+
+
+def test_help_functools_partial_1(app, console):
+    def foo(a: int, b: int, c: int):
+        """Docstring for foo."""
+
+    partial_foo = partial(foo, c=3)
+    app.command(partial_foo)
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ foo        Docstring for foo.                                      │
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_functools_partial_2(app, console):
+    """Test help docstring resolution for :class:`functools.partial` functions.
+
+    The argument ``c`` with ``parse=False`` should not be shown in the help page.
+
+    The argument ``b`` should be shown with its :class:`functools.partial` default value.
+    """
+
+    def foo(a: int, b: int, c: Annotated[int, Parameter(parse=False)]):
+        """Docstring for foo.
+
+        Parameters
+        ----------
+        a: int
+            Docstring for a.
+        b: int
+            Docstring for b.
+        c: int
+            Docstring for c.
+        """
+
+    partial_foo = partial(foo, b=2, c=3)
+    app.command(partial_foo)
+
+    with console.capture() as capture:
+        app.help_print("foo", console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app foo [ARGS] [OPTIONS]
+
+        Docstring for foo.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  A --a  Docstring for a. [required]                              │
+        │    --b    Docstring for b. [default: 2]                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
 
 
 def test_help_empty(console):
