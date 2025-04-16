@@ -87,8 +87,25 @@ The source resolution order is as follows (as applicable):
 Markup Format
 -------------
 The standard markup language for docstrings in python is reStructuredText (see `PEP-0287`_).
+Cyclopts mostly respects `PEP-0257`_, but has some slight differences for developer ergonomics:
+
+1. The "summary line" (AKA short-description) may actually be multiple lines. Cyclopts will unwrap the first block of text and interpret it as the short description. The first block of text ends at the first double-newline (i.e. a single blank line) is reached.
+
+   .. code-block:: python
+
+      def my_command():
+          """
+          This entire sentence
+          is part of the short description and will
+          have all the newlines removed.
+
+          This is the beginning of the long description.
+          """
+
+2. If a docstring is provided with a long description, it **must** also have a short description.
+
 By default, Cyclopts parses docstring descriptions as restructuredtext and renders it appropriately.
-To change the markup format, set the :attr:`.App.help_format` field accordingly.
+To change the markup format, set the :attr:`.App.help_format` field accordingly. The different options are described below.
 
 Subapps inherit their parent's :attr:`.App.help_format` unless explicitly overridden. I.e. you only need
 to set :attr:`.App.help_format` in your main root application for all docstrings to be parsed appropriately.
