@@ -575,7 +575,7 @@ API
       Defaults to :attr:`parse` value (default: :obj:`True`).
 
    .. attribute:: show_default
-      :type: Union[None, bool, Callable[[Any], str]]
+      :type: Union[None, bool, Callable[[Any], Any]]
       :value: None
 
       If a variable has a default, display the default on the help page.
@@ -585,10 +585,10 @@ API
 
       .. code-block:: python
 
-         def formatter(value: Any) -> str:
+         def formatter(value: Any) -> Any:
              ...
 
-      Then the function will be called with the default value, and the returned string will be used as the displayed default value.
+      Then the function will be called with the default value, and the returned value will be used as the displayed default value.
 
       Example formatting function:
 
