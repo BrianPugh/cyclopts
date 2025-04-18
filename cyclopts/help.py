@@ -391,23 +391,25 @@ def format_doc(app: "App", format: str = "restructuredtext"):
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
-def _get_choices(type_: type, name_transform: Callable[[str], str]) -> str:
+def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]:
     get_choices = partial(_get_choices, name_transform=name_transform)
-    choices: str = ""
+    choices = []
     _origin = get_origin(type_)
     if isclass(type_) and issubclass(type_, Enum):
-        choices = ", ".join(name_transform(x.name) for x in type_)
+        choices.extend(name_transform(x.name) for x in type_)
     elif is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
-        choices = ", ".join(x for x in inner_choices if x)
+        for x in inner_choices:
+            if x:
+                choices.extend(x)
     elif _origin is Literal:
-        choices = ", ".join(str(x) for x in get_args(type_))
+        choices.extend(str(x) for x in get_args(type_))
     elif _origin in ITERABLE_TYPES:
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
-            choices = get_choices(args[0])
+            choices.extend(get_choices(args[0]))
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
-        choices = get_choices(type_.__value__)
+        choices.extend(get_choices(type_.__value__))
     return choices
 
 
@@ -456,6 +458,7 @@ def create_parameter_help_panel(
 
         if argument.parameter.show_choices:
             choices = _get_choices(argument.hint, argument.parameter.name_transform)
+            choices = ", ".join(choices)
             if choices:
                 help_description.append(Text(rf"[choices: {choices}]", "dim"))
 
