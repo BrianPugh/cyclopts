@@ -1338,6 +1338,21 @@ docutils = "*"
 rich = ">=12.0.0"
 
 [[package]]
+name = "shtab"
+version = "1.7.2"
+description = "Automagic shell tab completion for Python CLI applications"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "shtab-1.7.2-py3-none-any.whl", hash = "sha256:858a5805f6c137bb0cda4f282d27d08fd44ca487ab4a6a36d2a400263cd0b5c1"},
+    {file = "shtab-1.7.2.tar.gz", hash = "sha256:8c16673ade76a2d42417f03e57acf239bfb5968e842204c17990cae357d07d6f"},
+]
+
+[package.extras]
+dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout"]
+
+[[package]]
 name = "smmap"
 version = "5.0.2"
 description = "A pure Python implementation of a sliding window memory map manager"
@@ -1800,4 +1815,4 @@ yaml = ["pyyaml"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9"
-content-hash = "25a938c040fbdd176658e55ef7e9aecbcf14dee803f0f6a6555951e28ed6c3df"
+content-hash = "8ef29feeab82a1403a95654e9fe518a7d43a2914d21963e443d0e3d4fce97567"
