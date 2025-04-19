@@ -1,6 +1,6 @@
 import subprocess
-from argparse import ArgumentParser
 from textwrap import dedent
+from typing import Literal
 
 import shtab
 
@@ -52,10 +52,24 @@ class Bash:
         )
 
 
-def test_completion_positional_choices():
-    parser = ArgumentParser(prog="test")
-    parser.add_argument("posA", choices=["one", "two"])
+def test_completion_literal_choices(app):
+    @app.default
+    def main(color: Literal["red", "green"]):
+        pass
+
+    parser = app._to_argparse()
     completion = shtab.complete(parser, shell="bash")
     shell = Bash(completion)
-    shell.compgen('-W "${_shtab_test_pos_0_choices[*]}"', "o", "one")
-    shell.compgen('-W "${_shtab_test_pos_0_choices[*]}"', "t", "two")
+
+    stdout, _, _ = shell.run("declare -p | grep _shtab_main_")
+    print(f"Available shtab variables:\n{stdout}")
+    # Positional
+    shell.compgen('-W "${_shtab_main_pos_0_choices[*]}"', "r", "red")
+    shell.compgen('-W "${_shtab_main_pos_0_choices[*]}"', "g", "green")
+
+    # Keyword
+    shell.compgen('-W "${_shtab_main_option_strings[*]}"', "--c", "--color")
+
+    # Keyword Value
+    shell.compgen('-W "${_shtab_main___color_choices[*]}"', "r", "red")
+    shell.compgen('-W "${_shtab_main___color_choices[*]}"', "green", "green")

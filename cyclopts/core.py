@@ -69,6 +69,8 @@ with suppress(ImportError):
     import readline  # noqa: F401
 
 if TYPE_CHECKING:
+    import argparse
+
     from rich.console import Console
 
 
@@ -1467,6 +1469,63 @@ class App:
 
         signature = ", ".join(f"{k}={v!r}" for k, v in non_defaults.items())
         return f"{type(self).__name__}({signature})"
+
+    def _to_argparse(
+        self,
+        *,
+        parser: Optional["argparse.ArgumentParser"] = None,
+        apps: Optional[Sequence["App"]] = None,
+        command_chain: Optional[Sequence[str]] = None,
+    ) -> "argparse.ArgumentParser":
+        """Create an :class:`argparse.ArgumentParser` that is "good enough" for shtab.
+
+        NOT intended to create an argparse equivalent good enough for actual CLI parsing!
+        """
+        import argparse
+
+        apps = tuple(apps) if apps else ()
+        command_chain = tuple(command_chain) if command_chain else ()
+
+        if parser is None:
+            parser = argparse.ArgumentParser(prog=self.name[0])
+
+        if self.default_command:
+            # Goal: need to get an ArgumentCollection. For that we need:
+            #     1. apps: Sequence["app"]
+            #     2. parse_docstring=True
+            argument_collection = self.assemble_argument_collection(apps=apps + (self,), parse_docstring=True)
+            for argument in argument_collection:
+                from .help import _get_choices
+
+                choices = _get_choices(argument.hint, argument.parameter.name_transform)
+                kwargs = {}
+                if choices:
+                    kwargs["choices"] = choices
+                kwargs["help"] = argument.parameter.help or "EMPTY HELP"
+
+                if argument.field_info.is_positional:
+                    parser.add_argument(argument.names[0].lstrip("-"), **kwargs)
+                if argument.field_info.is_keyword:
+                    parser.add_argument(*argument.names, **kwargs)
+                # TODO: need to add:
+                # * `nargs`
+                # * `type` might not be required?
+                # * `action` for flags
+
+                # # file & directory tab complete
+                # parser.add_argument("file", nargs="?").complete = shtab.FILE
+                # parser.add_argument("--dir", default=".").complete = shtab.DIRECTORY
+
+        subparsers = None
+        for command in self:
+            if command.startswith("-"):  # I think shtab doesn't like this.
+                continue
+            if subparsers is None:
+                subparsers = parser.add_subparsers(help="EMPTY SUBPARSER HELP.")
+            subparser = subparsers.add_parser(command)
+            self[command]._to_argparse(parser=subparser, apps=apps + (self,), command_chain=command_chain + (command,))
+
+        return parser
 
 
 def _get_help_flag_index(tokens, help_flags) -> Optional[int]:
