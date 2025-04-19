@@ -43,3 +43,19 @@ FontPixelFormat: TypeAlias = Literal["bmp"]
 )
 def test_py312_type_alias_type_help_get_choices(type_, expected):
     assert expected == _get_choices(type_, lambda x: x)
+
+
+type Numbers = tuple[int, str]
+
+
+def test_py312_type_alias_type_tuple_token_count(app, assert_parse_args):
+    """Ensure that TypeAliasType can handle multi-token types.
+
+    https://github.com/BrianPugh/cyclopts/issues/413
+    """
+
+    @app.default
+    def main(foo: Numbers):
+        pass
+
+    assert_parse_args(main, "1 one", (1, "one"))
