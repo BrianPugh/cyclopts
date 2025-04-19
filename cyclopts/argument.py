@@ -713,7 +713,7 @@ class Argument:
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
     @property
-    def show_default(self) -> bool:
+    def show_default(self) -> Union[bool, Callable[[Any], str]]:
         """Show the default value on the help page."""
         if self.parameter.show_default is None:
             return not self.required and self.field_info.default not in _SHOW_DEFAULT_BLOCKLIST

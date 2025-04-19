@@ -3,7 +3,7 @@ from typing import Optional
 import pytest
 
 from cyclopts.exceptions import ValidationError
-from cyclopts.types import UInt8
+from cyclopts.types import HexUInt, HexUInt8, HexUInt16, HexUInt32, HexUInt64, UInt8
 
 
 def test_nested_annotated_validator(app, assert_parse_args):
@@ -40,3 +40,26 @@ def test_nested_list_annotated_validator(app, assert_parse_args):
     with pytest.raises(ValidationError) as e:
         app.parse_args("--color 100 200 300", exit_on_error=False)
     assert str(e.value) == 'Invalid value "300" for "--color". Must be <= 255.'
+
+
+@pytest.mark.parametrize(
+    "type_hint, expected",
+    [
+        (HexUInt, "0xAF"),
+        (HexUInt8, "0xAF"),
+        (HexUInt16, "0x00AF"),
+        (HexUInt32, "0x000000AF"),
+        (HexUInt64, "0x00000000000000AF"),
+    ],
+)
+def test_hexuint_help(app, console, type_hint, expected):
+    @app.command
+    def foo(a: type_hint = 0xAF):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    with console.capture() as capture:
+        app.help_print("foo", console=console)
+
+    actual = capture.get()
+
+    assert expected in actual

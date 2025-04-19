@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Sequence
 
@@ -54,6 +55,11 @@ __all__ = [
     "Int32",
     "UInt64",
     "Int64",
+    "HexUInt",
+    "HexUInt8",
+    "HexUInt16",
+    "HexUInt32",
+    "HexUInt64",
     # Json,
     "Json",
     # Web
@@ -182,6 +188,26 @@ UInt64 = Annotated[int, Parameter(validator=validators.Number(gte=0, lt=1 << 64)
 "An unsigned 64-bit integer."
 Int64 = Annotated[int, Parameter(validator=validators.Number(gte=(-1 << 63), lt=(1 << 63)))]
 "A signed 64-bit integer."
+
+
+def _hex_formatter(value: int, digits=0) -> str:
+    return f"0x{value:X}" if digits <= 0 else f"0x{value:0{digits}X}"
+
+
+HexUInt = Annotated[NonNegativeInt, Parameter(show_default=_hex_formatter)]
+"A non-negative integer who's default value will be displayed as hexadecimal in the help-page."
+
+HexUInt8 = Annotated[UInt8, Parameter(show_default=partial(_hex_formatter, digits=2))]
+"An unsigned 8-bit integer who's default value will be displayed as hexadecimal in the help-page."
+
+HexUInt16 = Annotated[UInt16, Parameter(show_default=partial(_hex_formatter, digits=4))]
+"An unsigned 16-bit integer who's default value will be displayed as hexadecimal in the help-page."
+
+HexUInt32 = Annotated[UInt32, Parameter(show_default=partial(_hex_formatter, digits=8))]
+"An unsigned 32-bit integer who's default value will be displayed as hexadecimal in the help-page."
+
+HexUInt64 = Annotated[UInt64, Parameter(show_default=partial(_hex_formatter, digits=16))]
+"An unsigned 64-bit integer who's default value will be displayed as hexadecimal in the help-page."
 
 
 ########

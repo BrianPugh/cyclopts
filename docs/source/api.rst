@@ -575,11 +575,28 @@ API
       Defaults to :attr:`parse` value (default: :obj:`True`).
 
    .. attribute:: show_default
-      :type: Optional[bool]
+      :type: Union[None, bool, Callable[[Any], Any]]
       :value: None
 
       If a variable has a default, display the default on the help page.
-      Defaults to :obj:`None`, similar to :obj:`True`, but will not display the default if it's :obj:`None`.
+      Defaults to :obj:`None`, similar to :obj:`True`, but will **not** display the default if it is :obj:`None`.
+
+      If set to a function with signature:
+
+      .. code-block:: python
+
+         def formatter(value: Any) -> Any:
+             ...
+
+      Then the function will be called with the default value, and the returned value will be used as the displayed default value.
+
+      Example formatting function:
+
+      .. code-block:: python
+
+         def hex_formatter(value: int) -> str
+            """Will result in something like "[default: 0xFF]" instead of "[default: 255]"."""
+            return f"0x{value:X}"
 
    .. attribute:: show_choices
       :type: Optional[bool]
@@ -1076,17 +1093,25 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.UInt8
 
+.. autodata:: cyclopts.types.HexUInt8
+
 .. autodata:: cyclopts.types.Int8
 
 .. autodata:: cyclopts.types.UInt16
+
+.. autodata:: cyclopts.types.HexUInt16
 
 .. autodata:: cyclopts.types.Int16
 
 .. autodata:: cyclopts.types.UInt32
 
+.. autodata:: cyclopts.types.HexUInt32
+
 .. autodata:: cyclopts.types.Int32
 
 .. autodata:: cyclopts.types.UInt64
+
+.. autodata:: cyclopts.types.HexUInt64
 
 .. autodata:: cyclopts.types.Int64
 

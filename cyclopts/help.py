@@ -467,11 +467,12 @@ def create_parameter_help_panel(
             help_description.append(Text(rf"[env var: {env_vars}]", "dim"))
 
         if argument.show_default:
-            default = ""
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
                 default = argument.parameter.name_transform(argument.field_info.default.name)
             else:
                 default = argument.field_info.default
+            if callable(argument.show_default):
+                default = argument.show_default(default)
 
             help_description.append(Text(rf"[default: {default}]", "dim"))
 

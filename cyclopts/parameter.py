@@ -127,7 +127,7 @@ class Parameter:
 
     _show: Optional[bool] = field(default=None, alias="show")
 
-    show_default: Optional[bool] = field(default=None)
+    show_default: Union[None, bool, Callable[[Any], Any]] = field(default=None)
 
     show_choices: bool = field(default=None, converter=attrs.converters.default_if_none(True))
 
