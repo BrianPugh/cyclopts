@@ -18,6 +18,11 @@ from typing import (
     get_origin,
 )
 
+if sys.version_info >= (3, 12):
+    from typing import TypeAliasType
+else:
+    TypeAliasType = None
+
 from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_infos
@@ -518,6 +523,8 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 1, True
     elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(type_)):
         return token_count(get_args(type_)[0])[0], True
+    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
+        return token_count(type_.__value__)
     elif is_union(type_):
         sub_args = get_args(type_)
         token_count_target = token_count(sub_args[0])
