@@ -2,74 +2,54 @@ import subprocess
 from textwrap import dedent
 from typing import Literal
 
+import pytest
 import shtab
 
 
-class Bash:
-    """Modified from shtab.
+@pytest.fixture
+def bash_completion_tester(tmp_path):
+    def inner(app, partial_command):
+        script_path = tmp_path / "completion_script"
+        parser = app._to_argparse()
+        completion = shtab.complete(parser, shell="bash")
+        script_path.write_text(completion)
 
-    https://github.com/iterative/shtab/blob/main/tests/test_shtab.py
-    """
+        # Set up COMP variables to simulate bash completion environment
+        command_parts = partial_command.split()
 
-    def __init__(self, init_script=""):
-        self.init = init_script
+        # Build the command to source the script and test completion
+        cmd = dedent(f"""\
+        source {script_path}
+        COMP_WORDS=({app.name[0]} {partial_command})
+        COMP_CWORD={len(command_parts)}
+        COMP_LINE="{app.name[0]} {partial_command}"
+        COMP_POINT={len(f"{app.name[0]} {partial_command}")}
+        _shtab_main  # Call the actual completion function
+        echo "${{COMPREPLY[*]}}"  # Print the completion results
+        """)
 
-    def run(self, cmd):
-        """Run a bash command and return stdout, stderr and return code."""
-        init = self.init + "\n" if self.init else ""
-        full_cmd = f"{init}{cmd}"
-        proc = subprocess.Popen(["bash", "-c", full_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = proc.communicate()
-        return_code = proc.wait()
-        return stdout.strip(), stderr.strip(), return_code
+        result = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True)
 
-    def compgen(self, compgen_cmd, word, expected_completions, failure_message=""):
-        """Test bash completion and compare results in Python."""
-        # Run compgen command and get actual completions
-        cmd = f'compgen {compgen_cmd} -- "{word}"'
-        actual_completions, stderr, return_code = self.run(cmd)
+        result.check_returncode()
 
-        # Debug output
-        print(f"\nTesting completion for '{word}':")
-        print(f"Command: {cmd}")
-        print(f"Actual completions: '{actual_completions}'")
-        print(f"Expected completions: '{expected_completions}'")
-        print(f"Return code: {return_code}")
+        stdout = result.stdout.strip()
+        if not stdout:
+            stderr = result.stderr.strip()
+            print(stderr)
+            raise ValueError
+        options = set(stdout.split(" "))
+        return options
 
-        if stderr:
-            print(f"Error: {stderr}")
-
-        # Compare in Python
-        assert actual_completions == expected_completions, dedent(
-            f"""\
-                {failure_message}
-                Command: {cmd}
-                Expected: '{expected_completions}'
-                Actual: '{actual_completions}'
-                === stderr ===
-                {stderr or ""}
-                """
-        )
+    return inner
 
 
-def test_completion_literal_choices(app):
+def test_completion_literal_choices(app, bash_completion_tester):
     @app.default
     def main(color: Literal["red", "green"]):
         pass
 
-    parser = app._to_argparse()
-    completion = shtab.complete(parser, shell="bash")
-    shell = Bash(completion)
-
-    stdout, _, _ = shell.run("declare -p | grep _shtab_main_")
-    print(f"Available shtab variables:\n{stdout}")
-    # Positional
-    shell.compgen('-W "${_shtab_main_pos_0_choices[*]}"', "r", "red")
-    shell.compgen('-W "${_shtab_main_pos_0_choices[*]}"', "g", "green")
-
-    # Keyword
-    shell.compgen('-W "${_shtab_main_option_strings[*]}"', "--c", "--color")
-
-    # Keyword Value
-    shell.compgen('-W "${_shtab_main___color_choices[*]}"', "r", "red")
-    shell.compgen('-W "${_shtab_main___color_choices[*]}"', "green", "green")
+    assert {"red"} == bash_completion_tester(app, "r")
+    assert {"green"} == bash_completion_tester(app, "g")
+    assert {"--color"} == bash_completion_tester(app, "--c")
+    assert {"red"} == bash_completion_tester(app, "--color r")
+    assert {"green"} == bash_completion_tester(app, "--color g")
