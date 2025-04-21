@@ -1521,8 +1521,8 @@ class App:
             if command.startswith("-"):  # I think shtab doesn't like this.
                 continue
             if subparsers is None:
-                subparsers = parser.add_subparsers(help="EMPTY SUBPARSER HELP.")
-            subparser = subparsers.add_parser(command)
+                subparsers = parser.add_subparsers()
+            subparser = subparsers.add_parser(command, help=self[command].help)
             self[command]._to_argparse(parser=subparser, apps=apps + (self,), command_chain=command_chain + (command,))
 
         return parser
