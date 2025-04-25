@@ -15,6 +15,8 @@ class Env:
     command: bool = field(default=True, kw_only=True)
 
     def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
+        added_tokens = set()
+
         prefix = self.prefix
         if self.command and commands:
             prefix += "_".join(x.upper() for x in commands) + "_"
@@ -30,10 +32,11 @@ class Env:
                 )
             except ValueError:
                 continue
-            if any(x.source != "env" for x in argument.tokens):
+            if set(argument.tokens) - added_tokens:
+                # Skip if there are any tokens from another source.
                 continue
             remaining_keys = tuple(x.lower() for x in remaining_keys)
             for i, value in enumerate(argument.env_var_split(os.environ[candidate_env_key])):
-                argument.append(
-                    Token(keyword=candidate_env_key, value=value, source="env", index=i, keys=remaining_keys)
-                )
+                token = Token(keyword=candidate_env_key, value=value, source="env", index=i, keys=remaining_keys)
+                argument.append(token)
+                added_tokens.add(token)
