@@ -1,6 +1,8 @@
 from textwrap import dedent
+from typing import Annotated
 
-from cyclopts.config import Toml
+from cyclopts import Parameter
+from cyclopts.config import Env, Toml
 
 
 def test_config_end2end(app, tmp_path, assert_parse_args):
@@ -32,3 +34,15 @@ def test_config_end2end(app, tmp_path, assert_parse_args):
 
     assert_parse_args(default, "foo", key1="foo", key2="foo2")
     assert_parse_args(function1, "function1 --key4=fizz", key3="bar1", key4="fizz")
+
+
+def test_config_env_repeated(app, monkeypatch, assert_parse_args):
+    monkeypatch.setenv("FOO", "bar")
+
+    app.config = Env()
+
+    @app.default
+    def default(foo: Annotated[str, Parameter(env_var="FOO")]):
+        pass
+
+    assert_parse_args(default, "", "bar")
