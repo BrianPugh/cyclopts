@@ -46,3 +46,31 @@ def test_config_env_repeated(app, monkeypatch, assert_parse_args):
         pass
 
     assert_parse_args(default, "", "bar")
+
+
+def test_config_env_help(app, assert_parse_args, console):
+    """Special-case for :class:`.config.Env` to get added to help-page."""
+    app.config = Env()
+
+    @app.default
+    def default(foo: Annotated[str, Parameter(env_var="BAR")]):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: default COMMAND [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  [env var: FOO, BAR] [required]                       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

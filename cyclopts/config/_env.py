@@ -9,6 +9,10 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
+def _transform(s: str) -> str:
+    return s.upper().replace("-", "_").replace(".", "_").lstrip("_")
+
+
 @define
 class Env:
     prefix: str = ""
@@ -27,7 +31,7 @@ class Env:
             try:
                 argument, remaining_keys, _ = arguments.match(
                     candidate_env_key[len(prefix) :],
-                    transform=lambda s: s.upper().replace("-", "_").replace(".", "_").lstrip("_"),
+                    transform=_transform,
                     delimiter="_",
                 )
             except ValueError:
