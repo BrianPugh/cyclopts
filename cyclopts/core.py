@@ -486,6 +486,10 @@ class App:
     def sort_key(self):
         return None if self._sort_key is UNSET else self._sort_key
 
+    @sort_key.setter
+    def sort_key(self, value):
+        self._sort_key = value
+
     def version_print(
         self,
         console: Optional["Console"] = None,
