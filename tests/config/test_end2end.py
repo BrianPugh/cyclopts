@@ -69,7 +69,7 @@ def test_config_env_help(app, assert_parse_args, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO --foo  [env var: FOO, BAR] [required]                       │
+        │ *  FOO --foo  [env var: BAR, FOO] [required]                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
