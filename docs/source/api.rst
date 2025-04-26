@@ -1337,6 +1337,13 @@ All Cyclopts builtins index into the configuration file with the following rules
 
       If :obj:`True`, add the command's name (uppercase) after :attr:`prefix`.
 
+   .. attribute:: show
+      :type: bool
+      :value: True
+
+      If :obj:`True`, then show the environment variables on the help-page.
+
+
 ----------
 Exceptions
 ----------
