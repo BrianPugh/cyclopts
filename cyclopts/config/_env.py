@@ -17,6 +17,7 @@ def _transform(s: str) -> str:
 class Env:
     prefix: str = ""
     command: bool = field(default=True, kw_only=True)
+    show: bool = True
 
     def _prefix(self, commands: tuple[str, ...]) -> str:
         prefix = self.prefix

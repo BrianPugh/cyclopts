@@ -1334,7 +1334,7 @@ class App:
 
             # Special-case: add config.Env values to Parameter(env_var=)
             configs: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
-            env_configs = tuple(x for x in configs if isinstance(x, Env))
+            env_configs = tuple(x for x in configs if isinstance(x, Env) and x.show)
             for argument in argument_collection:
                 for env_config in env_configs:
                     env_var = env_config._convert_argument(command_chain, argument)
