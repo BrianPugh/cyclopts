@@ -1443,9 +1443,11 @@ def test_help_print_commands_sort_key(app, console):
     def alice():
         pass
 
-    @app.command(sort_key=2)
+    @app.command
     def bob():
         pass
+
+    app["bob"].sort_key = 2
 
     @app.command(sort_key=1)  # Since 1 < 2 (from bob), should go first
     def charlie():
