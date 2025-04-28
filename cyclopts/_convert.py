@@ -322,51 +322,56 @@ def _convert(
                 raise CoercionError(token=token, target_type=type_)
         else:
             out = converter(type_, token.value)
-    elif is_builtin(type_):
-        assert isinstance(token, Token)
-        try:
-            if token.implicit_value is not UNSET:
-                out = token.implicit_value
-            elif converter is None:
-                out = _converters.get(type_, type_)(token.value)
-            elif converter_needs_token:
-                out = converter(type_, token)  # pyright: ignore[reportArgumentType]
-            else:
-                out = converter(type_, token.value)
-        except CoercionError as e:
-            if e.target_type is None:
-                e.target_type = type_
-            if e.token is None:
-                e.token = token
-            raise
-        except ValueError:
-            raise CoercionError(token=token, target_type=type_) from None
     else:
-        # Convert it into a user-supplied class.
-        if not isinstance(token, Sequence):
-            token = [token]
-        i = 0
-        pos_values = []
-        hint = type_
-        for field_info in get_field_infos(type_).values():
-            hint = field_info.hint
-            if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
-                pos_values.append(token[i].value)
-                i += 1
-            else:
-                tokens_per_element, consume_all = token_count(hint)
-                if tokens_per_element == 1:
-                    pos_values.append(convert(hint, token[i]))
+        field_infos = get_field_infos(type_)
+        # Hope that if there is no field_info, that it takes `*args` and would be happy with a single ``str`` input.
+        # This is common for many types, such as libraries that try to mimic pathlib.Path interface.
+        # TODO: This doesn't respect the type-annotation of ``*args``.
+        if is_builtin(type_) or not field_infos:
+            assert isinstance(token, Token)
+            try:
+                if token.implicit_value is not UNSET:
+                    out = token.implicit_value
+                elif converter is None:
+                    out = _converters.get(type_, type_)(token.value)
+                elif converter_needs_token:
+                    out = converter(type_, token)  # pyright: ignore[reportArgumentType]
+                else:
+                    out = converter(type_, token.value)
+            except CoercionError as e:
+                if e.target_type is None:
+                    e.target_type = type_
+                if e.token is None:
+                    e.token = token
+                raise
+            except ValueError:
+                raise CoercionError(token=token, target_type=type_) from None
+        else:
+            # Convert it into a user-supplied class.
+            if not isinstance(token, Sequence):
+                token = [token]
+            i = 0
+            pos_values = []
+            hint = type_
+            for field_info in field_infos.values():
+                hint = field_info.hint
+                if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
+                    pos_values.append(token[i].value)
                     i += 1
                 else:
-                    pos_values.append(convert(hint, token[i : i + tokens_per_element]))
-                    i += tokens_per_element
-                if consume_all:
+                    tokens_per_element, consume_all = token_count(hint)
+                    if tokens_per_element == 1:
+                        pos_values.append(convert(hint, token[i]))
+                        i += 1
+                    else:
+                        pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                        i += tokens_per_element
+                    if consume_all:
+                        break
+                if i == len(token):
                     break
-            if i == len(token):
-                break
-        assert i == len(token)
-        out = type_(*pos_values)
+            assert i == len(token)
+            out = type_(*pos_values)
 
     if cparam:
         # An inner type may have an independent Parameter annotation;
