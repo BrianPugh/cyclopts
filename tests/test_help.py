@@ -680,6 +680,8 @@ def test_help_format_group_parameters_choices_enum_list(capture_format_group_par
         fizz = "bleep bloop blop"
         buzz = "blop bleep bloop"
 
+        fizz_alias = fizz
+
     def cmd(
         foo: Annotated[
             Optional[list[CompSciProblem]],  # pyright: ignore
@@ -692,7 +694,7 @@ def test_help_format_group_parameters_choices_enum_list(capture_format_group_par
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ FOO --foo  Docstring for foo. [choices: fizz, buzz]                │
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz, fizz-alias]    │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

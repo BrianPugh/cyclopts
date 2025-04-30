@@ -145,7 +145,11 @@ def test_coerce_enum():
         DEV = auto()
         STAGING = auto()
         PROD = auto()
-        _PROD_OLD = auto()
+        _PROD_OLD = (
+            auto()
+        )  # test that leading underscores are stripped and then hyphens can be used instead of underscores.
+
+        DEVELOPMENT = DEV  # Tests that aliases resolve
 
     # tests case-insensitivity
     assert SoftwareEnvironment.STAGING == convert(SoftwareEnvironment, ["staging"])
@@ -153,6 +157,9 @@ def test_coerce_enum():
     # tests underscore/hyphen support
     assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, ["prod_old"])
     assert SoftwareEnvironment._PROD_OLD == convert(SoftwareEnvironment, ["prod-old"])
+
+    # Test aliases
+    assert SoftwareEnvironment.DEV == convert(SoftwareEnvironment, ["development"])
 
     with pytest.raises(CoercionError):
         convert(SoftwareEnvironment, ["invalid-choice"])

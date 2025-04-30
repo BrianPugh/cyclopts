@@ -314,8 +314,8 @@ def _convert(
 
         if converter is None:
             element_transformed = name_transform(token.value)
-            for member in type_:
-                if name_transform(member.name) == element_transformed:
+            for name, member in type_.__members__.items():
+                if name_transform(name) == element_transformed:
                     out = member
                     break
             else:
