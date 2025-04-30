@@ -396,7 +396,7 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]
     choices = []
     _origin = get_origin(type_)
     if isclass(type_) and issubclass(type_, Enum):
-        choices.extend(name_transform(x.name) for x in type_)
+        choices.extend(name_transform(x) for x in type_.__members__)
     elif is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
         for x in inner_choices:
