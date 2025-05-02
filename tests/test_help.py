@@ -1,4 +1,5 @@
 import sys
+from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 from textwrap import dedent
@@ -567,6 +568,72 @@ def test_help_format_group_parameters_defaults_no_show(capture_format_group_para
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ FOO --foo  Docstring for foo.                                      │
         │ BAR --bar  Docstring for bar. [default: buzz]                      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_dataclass_default_parameter_negative_propagation(app, console):
+    app.default_parameter = Parameter(negative=())
+
+    @Parameter(name="*")
+    @dataclass
+    class Common:
+        force: bool
+
+    @app.default
+    def default(common: Common):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FORCE --force  [required]                                       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_dataclass_decorated_parameter_negative_propagation(app, console):
+    @Parameter(name="*", negative=())
+    @dataclass
+    class Common:
+        force: bool
+
+    @app.default
+    def default(common: Common):
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND [ARGS] [OPTIONS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FORCE --force  [required]                                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
