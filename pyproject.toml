@@ -13,7 +13,7 @@ version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
 homepage = "https://github.com/BrianPugh/cyclopts"
 repository = "https://github.com/BrianPugh/cyclopts"
 license = "Apache-2.0"
-description = ""
+description = "Intuitive, easy CLIs based on type hints."
 authors = ["Brian Pugh"]
 readme = "README.md"
 packages = [{include = "cyclopts"}]
