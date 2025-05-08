@@ -60,6 +60,11 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
+if sys.version_info < (3, 11):  # pragma: no cover
+    from typing_extensions import assert_never
+else:  # pragma: no cover
+    from typing import assert_never
+
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
@@ -1162,6 +1167,7 @@ class App:
         help_on_error: Optional[bool] = None,
         verbose: bool = False,
         end_of_options_delimiter: Optional[str] = None,
+        backend: Literal["asyncio", "trio"] = "asyncio",
     ):
         """Interprets and executes a command.
 
@@ -1190,6 +1196,10 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
+        backend: Literal["asyncio", "trio"]
+            The async backend to use (if an async command is invoked).
+            Defaults to asyncio.
+            If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
 
         Returns
         -------
@@ -1211,9 +1221,19 @@ class App:
         )
 
         if inspect.iscoroutinefunction(command):
-            import asyncio
+            # We don't use anyio to avoid the dependency for non-async users.
+            # anyio can auto-select the backend when you're already in an async context,
+            # but here we're creating the top-level event loop & must select ourselves.
+            if backend == "asyncio":
+                import asyncio
 
-            return asyncio.run(command(*bound.args, **bound.kwargs))
+                return asyncio.run(command(*bound.args, **bound.kwargs))
+            elif backend == "trio":
+                import trio
+
+                return trio.run(partial(command, *bound.args, **bound.kwargs))
+            else:  # pragma: no cover
+                assert_never(backend)
         else:
             return command(*bound.args, **bound.kwargs)
 
