@@ -118,7 +118,7 @@ def test_exceptions_validation_error_class(app, console):
     """
 
     def v(type_, value):
-        raise ValueError("buh")
+        raise ValueError("My custom message.")
 
     @Parameter(validator=v)
     @dataclass
@@ -133,12 +133,7 @@ def test_exceptions_validation_error_class(app, console):
     with pytest.raises(ValidationError) as e:
         app("add foo 2020", exit_on_error=False)
 
-    expected = dedent(
-        """
-        ValidationError
-        TODO
-        """
-    ).strip()
+    expected = """Invalid value "test_exceptions_validation_error_class.<locals>.Movie(title=\'foo\', year=2020)" for "--movie". My custom message."""
     assert str(e.value) == expected
 
 

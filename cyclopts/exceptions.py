@@ -141,10 +141,14 @@ class ValidationError(CycloptsError):
         message = ""
         if self.argument:
             value = self.argument.value if self.value is cyclopts.utils.UNSET else self.value
-            token = self.argument.tokens[0]
-            provided_by = "" if not token.source or token.source == "cli" else f' provided by "{token.source}"'
-            name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
-            message = f'Invalid value "{value}" for "{name}"{provided_by}.'
+            try:
+                token = self.argument.tokens[0]
+            except IndexError:
+                message = f'Invalid value "{value}" for "{self.argument.name}".'
+            else:
+                provided_by = "" if not token.source or token.source == "cli" else f' provided by "{token.source}"'
+                name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
+                message = f'Invalid value "{value}" for "{name}"{provided_by}.'
         elif self.group:
             if self.group.name:
                 message = f'Invalid values for group "{self.group.name}".'
