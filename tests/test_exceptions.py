@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import Annotated, Union
 
@@ -107,6 +108,32 @@ def test_exceptions_validation_error_cli_single_keyword(app, console):
         Invalid value "-2" for "--bar". Value must be positive.
         """
     ).strip()
+    assert str(e.value) == expected
+
+
+def test_exceptions_validation_error_class(app, console):
+    """Double checks that error message is appropriately handled for class validators.
+
+    https://github.com/BrianPugh/cyclopts/issues/432
+    """
+
+    def v(type_, value):
+        raise ValueError("My custom message.")
+
+    @Parameter(validator=v)
+    @dataclass
+    class Movie:
+        title: str
+        year: int
+
+    @app.command
+    def add(movie: Movie):
+        pass
+
+    with pytest.raises(ValidationError) as e:
+        app("add foo 2020", exit_on_error=False)
+
+    expected = """My custom message."""
     assert str(e.value) == expected
 
 
