@@ -29,7 +29,6 @@ __all__ = [
     "UnknownOptionError",
     "UnusedCliTokensError",
     "ValidationError",
-    "format_cyclopts_error",
 ]
 
 
@@ -53,7 +52,6 @@ class CycloptsError(Exception):
     """Root exception for runtime errors.
 
     As CycloptsErrors bubble up the Cyclopts call-stack, more information is added to it.
-    Finally, :meth:`format_cyclopts_error` formats the message nicely for the user.
     """
 
     msg: Optional[str] = None
@@ -385,19 +383,3 @@ class MixedArgumentError(CycloptsError):
         assert self.argument is not None
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
         return super().__str__() + f'Cannot supply keyword & non-keyword arguments to "{display_name}".'
-
-
-def format_cyclopts_error(e: Any):
-    from rich import box
-    from rich.panel import Panel
-    from rich.text import Text
-
-    panel = Panel(
-        Text(str(e), "default"),
-        title="Error",
-        box=box.ROUNDED,
-        expand=True,
-        title_align="left",
-        style="red",
-    )
-    return panel

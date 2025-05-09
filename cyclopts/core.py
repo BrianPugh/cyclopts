@@ -35,11 +35,11 @@ from cyclopts.exceptions import (
     UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
-    format_cyclopts_error,
 )
 from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
+    CycloptsPanel,
     HelpPanel,
     InlineText,
     create_parameter_help_panel,
@@ -1150,7 +1150,7 @@ class App:
                 self.help_print(tokens, console=e.console)
             if print_error:
                 assert e.console
-                e.console.print(format_cyclopts_error(e))
+                e.console.print(CycloptsPanel(e))
             if exit_on_error:
                 sys.exit(1)
             raise

@@ -967,6 +967,8 @@ API
 
 .. autofunction:: cyclopts.run
 
+.. autoclass:: cyclopts.CycloptsPanel
+
 .. _API Validators:
 
 ----------
