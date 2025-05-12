@@ -1,3 +1,4 @@
+from textwrap import dedent
 from typing import Optional
 
 import pytest
@@ -63,3 +64,32 @@ def test_hexuint_help(app, console, type_hint, expected):
     actual = capture.get()
 
     assert expected in actual
+
+
+def test_hexuint_help_no_default(app, console):
+    """Do not show the default, do not error out.
+
+    Checks for bug identified in:
+        https://github.com/BrianPugh/cyclopts/issues/437
+    """
+
+    @app.command
+    def foo(a: HexUInt32):
+        pass
+
+    with console.capture() as capture:
+        app.help_print("foo", console=console)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_types_number foo [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  A --a  [required]                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert expected == actual
