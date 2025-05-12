@@ -59,12 +59,6 @@ _PARAMETER_SUBKEY_BLOCKER = Parameter(
     env_var=None,
 )
 
-_SHOW_DEFAULT_BLOCKLIST = (
-    None,
-    inspect.Parameter.empty,
-)
-
-
 _kind_parent_child_reassignment = {
     (POSITIONAL_OR_KEYWORD, POSITIONAL_OR_KEYWORD): POSITIONAL_OR_KEYWORD,
     (POSITIONAL_OR_KEYWORD, POSITIONAL_ONLY): POSITIONAL_ONLY,
@@ -714,8 +708,13 @@ class Argument:
     @property
     def show_default(self) -> Union[bool, Callable[[Any], str]]:
         """Show the default value on the help page."""
-        if self.parameter.show_default is None:
-            return not self.required and self.field_info.default not in _SHOW_DEFAULT_BLOCKLIST
+        if self.required:  # By definition, a required parameter cannot have a default.
+            return False
+        elif self.parameter.show_default is None:
+            # Showing a default ``None`` value is typically not helpful to the end-user.
+            return self.field_info.default not in (None, self.field_info.empty)
+        elif (self.field_info.default is self.field_info.empty) or not self.parameter.show_default:
+            return False
         else:
             return self.parameter.show_default
 
