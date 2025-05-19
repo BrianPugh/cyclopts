@@ -339,7 +339,7 @@ def format_usage(
     for command in command_chain:
         app = app[command]
 
-    if any(x.show for x in app.subapps):
+    if any(app[x].show for x in app._registered_commands):
         usage.append("COMMAND")
 
     if app.default_command:

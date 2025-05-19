@@ -495,6 +495,16 @@ class App:
     def sort_key(self, value):
         self._sort_key = value
 
+    @property
+    def _registered_commands(self) -> dict[str, "App"]:
+        """Commands that are not help or version commands."""
+        out = {}
+        for x in self:
+            if x in self.help_flags or x in self.version_flags:
+                continue
+            out[x] = self[x]
+        return out
+
     def version_print(
         self,
         console: Optional["Console"] = None,
