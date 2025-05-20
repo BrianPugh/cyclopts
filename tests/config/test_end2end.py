@@ -62,7 +62,7 @@ def test_config_env_help(app, assert_parse_args, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: default COMMAND [ARGS] [OPTIONS]
+        Usage: default [ARGS] [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │

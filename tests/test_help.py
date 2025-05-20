@@ -54,7 +54,7 @@ def test_help_default_action(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND
+        Usage: app
 
         App Help String Line 1.
 
@@ -114,7 +114,7 @@ def test_help_default_help_flags(console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND
+        Usage: app
 
         App Help String Line 1.
 
@@ -377,7 +377,7 @@ def test_format_choices_rich_format(app, console, assert_parse_args):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app [ARGS] [OPTIONS]
 
         App Help String Line 1.
 
@@ -592,7 +592,7 @@ def test_help_format_dataclass_default_parameter_negative_propagation(app, conso
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app [ARGS] [OPTIONS]
 
         App Help String Line 1.
 
@@ -624,7 +624,7 @@ def test_help_format_dataclass_decorated_parameter_negative_propagation(app, con
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app [ARGS] [OPTIONS]
 
         App Help String Line 1.
 
@@ -1265,7 +1265,7 @@ def test_help_print_combined_parameter_command_group(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app [ARGS] [OPTIONS]
 
         App Help String Line 1.
 
@@ -1410,7 +1410,7 @@ def test_help_print_commands_special_flag_reassign(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND
+        Usage: app
 
         App Help String Line 1.
 
@@ -1970,7 +1970,7 @@ def test_issue_373_help_space_with_meta_app(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app [ARGS] [OPTIONS]
 
         App Help String Line 1.
 

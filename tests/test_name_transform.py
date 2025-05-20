@@ -149,7 +149,7 @@ def test_parameter_name_transform_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: foo COMMAND [OPTIONS]
+        Usage: foo [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
