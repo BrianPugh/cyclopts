@@ -1,5 +1,6 @@
 import inspect
 import sys
+from contextlib import suppress
 from typing import (  # noqa: F401
     Annotated,
     Any,
@@ -284,6 +285,13 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return _generic_class_field_infos(hint)
 
 
+def _resolve_class_from_method(meth):
+    try:
+        return vars(sys.modules[meth.__module__])[meth.__qualname__.split(".")[0]]
+    except AttributeError:
+        return None
+
+
 def signature_parameters(f: Any) -> dict[str, FieldInfo]:
     if "functools" in sys.modules:
         from functools import partial
@@ -292,7 +300,24 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
     else:
         func = f
 
-    type_hints = get_type_hints(func, include_extras=True)
+    cls = _resolve_class_from_method(func)
+    mro = None
+    if cls is not None:
+        with suppress(AttributeError):
+            mro = cls.__mro__
+
+    if mro is None:
+        try:
+            globalns = sys.modules[func.__module__].__dict__
+        except AttributeError:
+            # Builtins will not have a __module__ attribute
+            globalns = None
+    else:
+        globalns = {}
+        for c in reversed(mro):
+            globalns.update(sys.modules[c.__module__].__dict__)
+
+    type_hints = get_type_hints(func, globalns=globalns, include_extras=True)
 
     out = {}
     for name, iparam in inspect.signature(f).parameters.items():
