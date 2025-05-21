@@ -1,6 +1,5 @@
 import inspect
 import sys
-from contextlib import suppress
 from typing import (  # noqa: F401
     Annotated,
     Any,
@@ -147,7 +146,7 @@ def _generic_class_field_infos(
     include_var_keyword=False,
 ) -> dict[str, FieldInfo]:
     out = {}
-    for name, field_info in signature_parameters(f.__init__).items():
+    for name, field_info in signature_parameters(f).items():
         if field_info.name == "self":
             continue
         if not include_var_positional and field_info.kind is field_info.VAR_POSITIONAL:
@@ -212,7 +211,7 @@ def _namedtuple_field_infos(hint) -> dict[str, FieldInfo]:
 
 def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
     out = {}
-    field_infos = signature_parameters(hint.__init__)
+    field_infos = signature_parameters(hint)
     for attribute in hint.__attrs_attrs__:
         if not attribute.init:
             continue
@@ -300,27 +299,18 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
     else:
         func = f
 
-    cls = _resolve_class_from_method(func)
-    mro = None
-    if cls is not None:
-        with suppress(AttributeError):
-            mro = cls.__mro__
-
-    if mro is None:
-        try:
-            globalns = sys.modules[func.__module__].__dict__
-        except AttributeError:
-            # Builtins will not have a __module__ attribute
-            globalns = None
-    else:
-        globalns = {}
-        for c in reversed(mro):
-            globalns.update(sys.modules[c.__module__].__dict__)
-
-    type_hints = get_type_hints(func, globalns=globalns, include_extras=True)
+    try:
+        type_hints = get_type_hints(func, include_extras=True)
+    except (TypeError, ValueError):
+        type_hints = get_type_hints(func.__init__, include_extras=True)
 
     out = {}
-    for name, iparam in inspect.signature(f).parameters.items():
+    try:
+        sig = inspect.signature(f)
+    except (TypeError, ValueError):
+        sig = inspect.signature(f.__init__)
+
+    for name, iparam in sig.parameters.items():
         annotation = type_hints.get(name, iparam.annotation)
         out[name] = FieldInfo.from_iparam(iparam, annotation=annotation)
     return out

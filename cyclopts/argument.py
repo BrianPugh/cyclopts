@@ -671,7 +671,7 @@ class Argument:
                     existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]  # pyright: ignore
                     existing_field_info.default = FieldInfo.empty
                 else:
-                    raise NotImplementedError
+                    self._lookup[key] = field_info
             else:
                 self._lookup[key] = field_info
 
