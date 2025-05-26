@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Tuple
+from typing import Optional, Tuple
 
 import pytest
 
@@ -152,4 +152,33 @@ def test_runtime_exception_repeat_arguments(app, console):
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
         "│ Parameter --a specified multiple times.                            │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
+
+
+def test_runtime_exception_missing_tuple(app, console):
+    """
+    A bug was found where the "Did you mean" would be inappropriately displayed
+    when insufficient tokens were supplied to a tuple type.
+
+    https://github.com/BrianPugh/cyclopts/issues/443
+    """
+
+    @app.default
+    def main(
+        *,
+        network_delay: Optional[Tuple[int, int]] = None,
+    ):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app(["--network-delay", "1"], exit_on_error=False, console=console)
+
+    actual = capture.get()
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Parameter "--network-delay" requires 2 positional arguments. Only  │
+        │ got 1.                                                             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
     )
