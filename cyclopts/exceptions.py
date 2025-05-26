@@ -322,7 +322,7 @@ class MissingArgumentError(CycloptsError):
             candidates = [x for x in self.unused_tokens if is_option_like(x)]
 
             close_matches = difflib.get_close_matches(self.argument.name, candidates, n=1, cutoff=0.6)
-            if close_matches:
+            if close_matches and close_matches[0] not in self.argument.names:
                 close_match_string = f'Did you mean "{self.argument.name}" instead of "{close_matches[0]}"?'
 
         if self.command_chain:
