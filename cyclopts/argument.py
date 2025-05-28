@@ -17,10 +17,12 @@ from cyclopts.annotations import (
     is_attrs,
     is_dataclass,
     is_namedtuple,
+    is_nonetype,
     is_pydantic,
     is_typeddict,
     is_union,
     resolve,
+    resolve_annotated,
 )
 from cyclopts.exceptions import (
     CoercionError,
@@ -157,9 +159,9 @@ class ArgumentCollection(list["Argument"]):
         Tuple[str, ...]
             Python keys into Argument. Non-empty iff Argument accepts keys.
         Any
-            Implicit value (if a flag). :obj:`None` otherwise.
+            Implicit value (if a flag). :obj:`~.UNSET` otherwise.
         """
-        best_match_argument, best_match_keys, best_implicit_value = None, None, None
+        best_match_argument, best_match_keys, best_implicit_value = None, None, UNSET
         for argument in self:
             try:
                 match_keys, implicit_value = argument.match(term, transform=transform, delimiter=delimiter)
@@ -803,7 +805,7 @@ class Argument:
             Used if this argument accepts_arbitrary_keywords.
         Any
             Implicit value.
-            :obj:`None` if no implicit value is applicable.
+            :obj:`~.UNSET` if no implicit value is applicable.
         """
         if not self.parameter.parse:
             raise ValueError
@@ -844,7 +846,10 @@ class Argument:
             Implicit value.
         """
         if self.field_info.kind is self.field_info.VAR_KEYWORD:
-            return tuple(term.lstrip("-").split(delimiter)), None
+            return tuple(term.lstrip("-").split(delimiter)), UNSET
+
+        trailing = term
+        implicit_value = UNSET
 
         assert self.parameter.name
         for name in self.parameter.name:
@@ -852,7 +857,7 @@ class Argument:
                 name = transform(name)
             if _startswith(term, name):
                 trailing = term[len(name) :]
-                implicit_value = True if self.hint is bool or self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE else None
+                implicit_value = True if self.hint is bool or self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE else UNSET
                 if trailing:
                     if trailing[0] == delimiter:
                         trailing = trailing[1:]
@@ -863,23 +868,35 @@ class Argument:
                     return (), implicit_value
         else:
             # No positive-name matches found.
-            for name in self.negatives:
-                if transform:
-                    name = transform(name)
-                if term.startswith(name):
-                    trailing = term[len(name) :]
-                    if self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
-                        implicit_value = False
-                    else:
-                        implicit_value = (get_origin(self.hint) or self.hint)()
-                    if trailing:
-                        if trailing[0] == delimiter:
-                            trailing = trailing[1:]
-                            break
-                        # Otherwise, it's not an actual match.
-                    else:
-                        # exact match
-                        return (), implicit_value
+            hint = resolve_annotated(self.field_info.annotation)
+            if is_union(hint):
+                hints = get_args(hint)
+            else:
+                hints = [hint]
+            for hint in hints:
+                double_break = False
+                for name in self.parameter.get_negatives(hint):
+                    if transform:
+                        name = transform(name)
+                    if term.startswith(name):
+                        trailing = term[len(name) :]
+                        if hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
+                            implicit_value = False
+                        elif is_nonetype(hint) or hint is None:
+                            implicit_value = None
+                        else:
+                            implicit_value = (get_origin(hint) or hint)()  # pyright: ignore[reportAbstractUsage]
+                        if trailing:
+                            if trailing[0] == delimiter:
+                                trailing = trailing[1:]
+                                double_break = True
+                                break
+                            # Otherwise, it's not an actual match.
+                        else:
+                            # exact match
+                            return (), implicit_value
+                if double_break:
+                    break
             else:
                 # No negative-name matches found.
                 raise ValueError
@@ -898,7 +915,7 @@ class Argument:
                 raise ValueError
         elif index != self.index:
             raise ValueError
-        return (), None
+        return (), UNSET
 
     def append(self, token: Token):
         """Safely add a :class:`Token`."""
@@ -1214,7 +1231,7 @@ class Argument:
     @property
     def negatives(self):
         """Negative flags from :meth:`.Parameter.get_negatives`."""
-        return self.parameter.get_negatives(self.hint)
+        return self.parameter.get_negatives(resolve_annotated(self.field_info.annotation))
 
     @property
     def name(self) -> str:

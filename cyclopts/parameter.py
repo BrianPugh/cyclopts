@@ -21,7 +21,7 @@ from attrs import define, field
 import cyclopts._env_var
 import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import is_annotated, is_union, resolve_optional
+from cyclopts.annotations import NoneType, is_annotated, is_nonetype, is_union, resolve_optional
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.token import Token
@@ -47,7 +47,7 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
 
 T = TypeVar("T")
 
-_NEGATIVE_FLAG_TYPES = frozenset([bool, *ITERABLE_TYPES, *ITERATIVE_BOOL_IMPLICIT_VALUE])
+_NEGATIVE_FLAG_TYPES = frozenset([bool, None, NoneType, *ITERABLE_TYPES, *ITERATIVE_BOOL_IMPLICIT_VALUE])
 
 
 def _not_hyphen_validator(instance, attribute, values):
@@ -141,13 +141,17 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    env_var_split: Callable = cyclopts._env_var.env_var_split
+    env_var_split: Callable = field(
+        default=cyclopts._env_var.env_var_split,
+        kw_only=True,
+    )
 
     # This can ONLY ever be a Tuple[str, ...]
     negative_bool: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=_negative_converter(("no-",)),
         validator=_not_hyphen_validator,
+        kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
@@ -155,11 +159,26 @@ class Parameter:
         default=None,
         converter=_negative_converter(("empty-",)),
         validator=_not_hyphen_validator,
+        kw_only=True,
     )
 
-    required: Optional[bool] = field(default=None)
+    # This can ONLY ever be a Tuple[str, ...]
+    negative_none: Union[None, str, Iterable[str]] = field(
+        default=None,
+        converter=_negative_converter(()),
+        validator=_not_hyphen_validator,
+        kw_only=True,
+    )
 
-    allow_leading_hyphen: bool = field(default=False)
+    required: Optional[bool] = field(
+        default=None,
+        kw_only=True,
+    )
+
+    allow_leading_hyphen: bool = field(
+        default=False,
+        kw_only=True,
+    )
 
     _name_transform: Optional[Callable[[str], str]] = field(
         alias="name_transform",
@@ -167,11 +186,16 @@ class Parameter:
         kw_only=True,
     )
 
-    # Should not get inherited
-    accepts_keys: Optional[bool] = field(default=None)
+    accepts_keys: Optional[bool] = field(
+        default=None,
+        kw_only=True,
+    )
 
-    # Should not get inherited
-    consume_multiple: bool = field(default=None, converter=attrs.converters.default_if_none(False))
+    consume_multiple: bool = field(
+        default=None,
+        converter=attrs.converters.default_if_none(False),
+        kw_only=True,
+    )
 
     json_dict: Optional[bool] = field(default=None, kw_only=True)
 
@@ -190,7 +214,10 @@ class Parameter:
 
     def get_negatives(self, type_) -> tuple[str, ...]:
         if is_union(type_):
-            type_ = next(x for x in get_args(type_) if x is not None)
+            out = []
+            for x in get_args(type_):
+                out.extend(self.get_negatives(x))
+            return tuple(out)
 
         origin = get_origin(type_)
 
@@ -218,6 +245,8 @@ class Parameter:
 
             if type_ is bool or type_ in ITERATIVE_BOOL_IMPLICIT_VALUE:
                 negative_prefixes = self.negative_bool
+            elif is_nonetype(type_) or type_ is None:
+                negative_prefixes = self.negative_none
             else:
                 negative_prefixes = self.negative_iterable
             name_prefix = ".".join(name_components[:-1])

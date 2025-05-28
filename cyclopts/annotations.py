@@ -105,7 +105,9 @@ def is_typeddict(hint) -> bool:
     )
 
 
-def resolve(type_: Any) -> type:
+def resolve(
+    type_: Any,
+) -> type:
     """Perform all simplifying resolutions."""
     if type_ is inspect.Parameter.empty:
         return str
