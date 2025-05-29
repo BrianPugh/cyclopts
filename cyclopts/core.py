@@ -1230,22 +1230,25 @@ class App:
             end_of_options_delimiter=end_of_options_delimiter,
         )
 
-        if inspect.iscoroutinefunction(command):
-            # We don't use anyio to avoid the dependency for non-async users.
-            # anyio can auto-select the backend when you're already in an async context,
-            # but here we're creating the top-level event loop & must select ourselves.
-            if backend == "asyncio":
-                import asyncio
+        try:
+            if inspect.iscoroutinefunction(command):
+                # We don't use anyio to avoid the dependency for non-async users.
+                # anyio can auto-select the backend when you're already in an async context,
+                # but here we're creating the top-level event loop & must select ourselves.
+                if backend == "asyncio":
+                    import asyncio
 
-                return asyncio.run(command(*bound.args, **bound.kwargs))
-            elif backend == "trio":
-                import trio
+                    return asyncio.run(command(*bound.args, **bound.kwargs))
+                elif backend == "trio":
+                    import trio
 
-                return trio.run(partial(command, *bound.args, **bound.kwargs))
-            else:  # pragma: no cover
-                assert_never(backend)
-        else:
-            return command(*bound.args, **bound.kwargs)
+                    return trio.run(partial(command, *bound.args, **bound.kwargs))
+                else:  # pragma: no cover
+                    assert_never(backend)
+            else:
+                return command(*bound.args, **bound.kwargs)
+        except KeyboardInterrupt:
+            sys.exit(130) # Use the same exit code as Python's default KeyboardInterrupt handling.
 
     def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
         if override is not None:
