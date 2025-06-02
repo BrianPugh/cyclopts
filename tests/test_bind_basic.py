@@ -166,6 +166,18 @@ def test_short_name_j(app, cmd_str, assert_parse_args):
     assert_parse_args(main, cmd_str, job_name="foo")
 
 
+def test_short_flag_combining(app, assert_parse_args):
+    @app.default
+    def main(
+        foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
+        bar: Annotated[bool, Parameter(name=("--bar", "-b"))] = False,
+        empty_list: Annotated[Optional[list], Parameter(name=("--empty-list", "-e"))] = None,
+    ):
+        pass
+
+    assert_parse_args(main, "-bfe", foo=True, bar=True, empty_list=[])
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [
