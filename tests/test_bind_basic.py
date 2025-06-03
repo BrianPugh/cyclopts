@@ -171,11 +171,12 @@ def test_short_flag_combining(app, assert_parse_args):
     def main(
         foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
         bar: Annotated[bool, Parameter(name=("--bar", "-b"))] = False,
-        empty_list: Annotated[Optional[list], Parameter(name=("--empty-list", "-e"))] = None,
+        my_list: Annotated[Optional[list], Parameter(negative=("--empty-my-list", "-e"))] = None,
     ):
         pass
 
-    assert_parse_args(main, "-bfe", foo=True, bar=True, empty_list=[])
+    # Note: ``my_list`` is explicitly getting an empty list.
+    assert_parse_args(main, "-bfe", foo=True, bar=True, my_list=[])
 
 
 @pytest.mark.parametrize(
