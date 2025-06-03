@@ -29,6 +29,12 @@ def test_parameter_get_negatives_iterable_custom_prefix_list(type_):
     assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(p.get_negatives(type_))
 
 
+@pytest.mark.parametrize("type_", [type(None), None])
+def test_parameter_get_negatives_none_custom_prefix_list(type_):
+    p = Parameter(negative_none=["vacant-", "blank-"], name=("--foo", "--bar"))
+    assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(p.get_negatives(type_))
+
+
 def test_parameter_negative_iterable_invalid_name(app, assert_parse_args):
     Parameter(negative_iterable=())  # Valid
     with pytest.raises(ValueError):

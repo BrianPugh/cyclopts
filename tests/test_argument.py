@@ -13,6 +13,7 @@ from cyclopts.argument import (
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
 from cyclopts.token import Token
+from cyclopts.utils import UNSET
 
 Case = namedtuple("TestCase", ["args", "expected"])
 
@@ -473,7 +474,7 @@ def test_argument_convert_dict():
     argument = collection[0]
 
     # Sanity check the match method
-    assert argument.match("--bar.buzz") == (("buzz",), None)
+    assert argument.match("--bar.buzz") == (("buzz",), UNSET)
 
     argument.append(Token(value="7", source="test", keys=("fizz",)))
     argument.append(Token(value="12", source="test", keys=("buzz",)))
@@ -491,7 +492,7 @@ def test_argument_convert_var_keyword():
     argument = collection[0]
 
     # Sanity check the match method
-    assert argument.match("--fizz") == (("fizz",), None)
+    assert argument.match("--fizz") == (("fizz",), UNSET)
 
     argument.append(Token(value="7", source="test", keys=("fizz",)))
     argument.append(Token(value="12", source="test", keys=("buzz",)))

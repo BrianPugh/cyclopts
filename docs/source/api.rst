@@ -545,6 +545,43 @@ API
 
       Prefix for empty iterables (like lists and sets) flags. Defaults to ``"empty-"``.
 
+   .. attribute:: negative_none
+      :type: Optional[str]
+      :value: None
+
+      Prefix for setting optional parameters to :obj:`None`.
+      Not enabled by default (no prefixes set).
+
+      Example:
+
+      .. code-block:: python
+
+         from pathlib import Path
+         from typing import Annotated
+
+         from cyclopts import App, Parameter
+
+         app = App(
+            default_parameter=Parameter(negative_none="none-")
+         )
+
+         @app.default
+         def default(path: Path | None = Path("data.bin")):
+             print(f"{path=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script
+         path=PosixPath('data.bin')
+
+         $ my-script --path=cat.jpeg
+         path=PosixPath('cat.jpeg')
+
+         $ my-script --none-path
+         path=None
+
    .. attribute:: allow_leading_hyphen
       :type: bool
       :value: False

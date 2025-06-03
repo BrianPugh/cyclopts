@@ -98,7 +98,7 @@ def _parse_kw_and_flags(
             unused_tokens.append(token)
             continue
 
-        if implicit_value is not None:
+        if implicit_value is not UNSET:
             # A flag was parsed
             if cli_values:
                 try:
