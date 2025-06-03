@@ -23,6 +23,7 @@ from cyclopts.annotations import (
     is_union,
     resolve,
     resolve_annotated,
+    resolve_optional,
 )
 from cyclopts.exceptions import (
     CoercionError,
@@ -874,6 +875,7 @@ class Argument:
             else:
                 hints = [hint]
             for hint in hints:
+                hint = resolve_annotated(hint)
                 double_break = False
                 for name in self.parameter.get_negatives(hint):
                     if transform:
@@ -885,6 +887,7 @@ class Argument:
                         elif is_nonetype(hint) or hint is None:
                             implicit_value = None
                         else:
+                            hint = resolve_optional(hint)
                             implicit_value = (get_origin(hint) or hint)()  # pyright: ignore[reportAbstractUsage]
                         if trailing:
                             if trailing[0] == delimiter:

@@ -21,7 +21,7 @@ from attrs import define, field
 import cyclopts._env_var
 import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import NoneType, is_annotated, is_nonetype, is_union, resolve_optional
+from cyclopts.annotations import NoneType, is_annotated, is_nonetype, is_union, resolve_annotated, resolve_optional
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.token import Token
@@ -213,6 +213,7 @@ class Parameter:
         return self._name_transform if self._name_transform else default_name_transform
 
     def get_negatives(self, type_) -> tuple[str, ...]:
+        type_ = resolve_annotated(type_)
         if is_union(type_):
             out = []
             for x in get_args(type_):
