@@ -8,6 +8,7 @@ from cyclopts import Parameter
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
+    CombinedShortOptionError,
     InvalidCommandError,
     MissingArgumentError,
     RepeatArgumentError,
@@ -191,6 +192,20 @@ def test_short_flag_combining_unknown_flag(app, assert_parse_args):
     with pytest.raises(UnknownOptionError):
         # The flag "-e" is unknown
         app("-be", exit_on_error=False)
+
+
+def test_short_flag_combining_with_short_option(app, assert_parse_args):
+    @app.default
+    def main(
+        *,
+        foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
+        bar: Annotated[str, Parameter(name=("--bar", "-b"))],
+    ):
+        pass
+
+    with pytest.raises(CombinedShortOptionError):
+        # The flag "-e" is unknown
+        app("-fb", exit_on_error=False)
 
 
 @pytest.mark.parametrize(

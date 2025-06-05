@@ -13,6 +13,7 @@ from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
+    CombinedShortOptionError,
     CycloptsError,
     MissingArgumentError,
     UnknownOptionError,
@@ -145,7 +146,7 @@ def _parse_kw_and_flags(
                     argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
             elif len(matches) != 1:
                 # TODO: more specific exception?
-                raise CycloptsError(msg=f"Cannot combine flags and short-options in token {cli_option}")
+                raise CombinedShortOptionError(msg=f"Cannot combine flags and short-options in token {cli_option}")
             else:
                 tokens_per_element, consume_all = argument.token_count(leftover_keys)
 
