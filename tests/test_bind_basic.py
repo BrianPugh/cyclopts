@@ -11,6 +11,7 @@ from cyclopts.exceptions import (
     InvalidCommandError,
     MissingArgumentError,
     RepeatArgumentError,
+    UnknownOptionError,
     UnusedCliTokensError,
 )
 from cyclopts.group import Group
@@ -177,6 +178,19 @@ def test_short_flag_combining(app, assert_parse_args):
 
     # Note: ``my_list`` is explicitly getting an empty list.
     assert_parse_args(main, "-bfe", foo=True, bar=True, my_list=[])
+
+
+def test_short_flag_combining_unknown_flag(app, assert_parse_args):
+    @app.default
+    def main(
+        foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
+        bar: Annotated[bool, Parameter(name=("--bar", "-b"))] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError):
+        # The flag "-e" is unknown
+        app("-be", exit_on_error=False)
 
 
 @pytest.mark.parametrize(
