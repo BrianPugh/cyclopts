@@ -873,7 +873,7 @@ class Argument:
             if is_union(hint):
                 hints = get_args(hint)
             else:
-                hints = [hint]
+                hints = (hint,)
             for hint in hints:
                 hint = resolve_annotated(hint)
                 double_break = False

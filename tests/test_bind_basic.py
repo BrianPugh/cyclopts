@@ -8,9 +8,11 @@ from cyclopts import Parameter
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
+    CombinedShortOptionError,
     InvalidCommandError,
     MissingArgumentError,
     RepeatArgumentError,
+    UnknownOptionError,
     UnusedCliTokensError,
 )
 from cyclopts.group import Group
@@ -164,6 +166,46 @@ def test_short_name_j(app, cmd_str, assert_parse_args):
         pass
 
     assert_parse_args(main, cmd_str, job_name="foo")
+
+
+def test_short_flag_combining(app, assert_parse_args):
+    @app.default
+    def main(
+        foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
+        bar: Annotated[bool, Parameter(name=("--bar", "-b"))] = False,
+        my_list: Annotated[Optional[list], Parameter(negative=("--empty-my-list", "-e"))] = None,
+    ):
+        pass
+
+    # Note: ``my_list`` is explicitly getting an empty list.
+    assert_parse_args(main, "-bfe", foo=True, bar=True, my_list=[])
+
+
+def test_short_flag_combining_unknown_flag(app, assert_parse_args):
+    @app.default
+    def main(
+        foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
+        bar: Annotated[bool, Parameter(name=("--bar", "-b"))] = False,
+    ):
+        pass
+
+    with pytest.raises(UnknownOptionError):
+        # The flag "-e" is unknown
+        app("-be", exit_on_error=False)
+
+
+def test_short_flag_combining_with_short_option(app, assert_parse_args):
+    @app.default
+    def main(
+        *,
+        foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
+        bar: Annotated[str, Parameter(name=("--bar", "-b"))],
+    ):
+        pass
+
+    with pytest.raises(CombinedShortOptionError):
+        # The flag "-e" is unknown
+        app("-fb", exit_on_error=False)
 
 
 @pytest.mark.parametrize(

@@ -29,6 +29,7 @@ __all__ = [
     "UnknownOptionError",
     "UnusedCliTokensError",
     "ValidationError",
+    "CombinedShortOptionError",
 ]
 
 
@@ -120,6 +121,11 @@ class CycloptsError(Exception):
             return "\n".join(strings) + "\n"
         else:
             return ""
+
+
+@define(kw_only=True)
+class CombinedShortOptionError(CycloptsError):
+    """Cannot combine short, token-consuming options with short flags."""
 
 
 @define(kw_only=True)

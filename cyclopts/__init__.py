@@ -8,6 +8,7 @@ __all__ = [
     "ArgumentOrderError",
     "Token",
     "CoercionError",
+    "CombinedShortOptionError",
     "CommandCollisionError",
     "CycloptsError",
     "CycloptsPanel",
@@ -45,6 +46,7 @@ from cyclopts.core import App, run
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
+    CombinedShortOptionError,
     CommandCollisionError,
     CycloptsError,
     DocstringError,

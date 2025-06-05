@@ -1452,6 +1452,10 @@ Exceptions
    :show-inheritance:
    :members:
 
+.. autoexception:: cyclopts.CombinedShortOptionError
+   :show-inheritance:
+   :members:
+
 .. autoexception:: cyclopts.EditorError
    :show-inheritance:
    :members:
