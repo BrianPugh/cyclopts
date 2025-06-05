@@ -1251,7 +1251,7 @@ class App:
                 return command(*bound.args, **bound.kwargs)
         except KeyboardInterrupt:
             if self.suppress_keyboard_interrupt:
-                sys.exit(130) # Use the same exit code as Python's default KeyboardInterrupt handling.
+                sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
             else:
                 raise
 
