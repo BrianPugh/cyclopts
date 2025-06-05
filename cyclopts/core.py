@@ -320,6 +320,8 @@ class App:
 
     end_of_options_delimiter: Optional[str] = field(default=None, kw_only=True)
 
+    suppress_keyboard_interrupt: bool = field(default=True, kw_only=True)
+
     ######################
     # Private Attributes #
     ######################
@@ -1248,7 +1250,10 @@ class App:
             else:
                 return command(*bound.args, **bound.kwargs)
         except KeyboardInterrupt:
-            sys.exit(130) # Use the same exit code as Python's default KeyboardInterrupt handling.
+            if self.suppress_keyboard_interrupt:
+                sys.exit(130) # Use the same exit code as Python's default KeyboardInterrupt handling.
+            else:
+                raise
 
     def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
         if override is not None:

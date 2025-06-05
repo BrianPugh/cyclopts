@@ -333,6 +333,12 @@ API
       If no ``end_of_options_delimiter`` is set, it will default to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
+   .. attribute:: suppress_keyboard_interrupt
+      :type: bool
+      :value: True
+
+      If the application receives a keyboard interrupt (Ctrl-C), suppress the error message and exit gracefully.
+      Set to :obj:`False` to let :class:`KeyboardInterrupt` propagate normally.
 
 .. autoclass:: cyclopts.Parameter
    :special-members: __call__
