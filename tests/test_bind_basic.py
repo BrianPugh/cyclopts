@@ -208,6 +208,18 @@ def test_short_flag_combining_with_short_option(app, assert_parse_args):
         app("-fb", exit_on_error=False)
 
 
+def test_short_integer_flag(app, assert_parse_args):
+    @app.default
+    def main(
+        foo: Annotated[int, Parameter(name=("--foo", "-f"))],
+        *,
+        bar: Annotated[bool, Parameter(name=("--bar", "-1"))],
+    ):
+        pass
+
+    assert_parse_args(main, "-1 -2", -2, bar=True)
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [
