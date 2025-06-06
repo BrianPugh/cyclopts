@@ -85,7 +85,7 @@ def _parse_kw_and_flags(
             skip_next_iterations -= 1
             continue
 
-        if not is_option_like(token):
+        if not is_option_like(token, allow_numbers=True):
             unused_tokens.append(token)
             continue
 
@@ -109,7 +109,8 @@ def _parse_kw_and_flags(
         try:
             matches.append(argument_collection.match(cli_option))
         except ValueError:
-            if allow_combined_flags:
+            # Length has to be greater than 2 (hyphen + character) to be exploded.
+            if allow_combined_flags and len(token) > 2:
                 # since no direct match was found, try to see if this was a combination of short flags.
                 flags = [f"-{x}" for x in cli_option.lstrip("-")]
                 for flag in flags:
