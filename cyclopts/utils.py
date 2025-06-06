@@ -367,19 +367,34 @@ def grouper(iterable: Sequence[Any], n: int) -> Iterator[Tuple[Any, ...]]:
     return zip(*iterators)
 
 
-def is_option_like(token: str) -> bool:
+def is_option_like(token: str, *, allow_numbers=False) -> bool:
     """Checks if a token looks like an option.
 
     Namely, negative numbers are not options, but a token like ``--foo`` is.
+
+    Parameters
+    ----------
+    token: str
+        String to interpret.
+    allow_numbers: bool
+        If :obj:`True`, then negative numbers (e.g. ``"-2"``) will return :obj:`True`.
+        Otherwise, numbers will be interpreted as non-option-like (:obj:`False`).
+        Note: ``-j`` **is option-like**, even though it can represent an imaginary number.
+
+    Returns
+    -------
+    bool
+        Whether or not the ``token`` is option-like.
     """
-    with suppress(ValueError):
-        complex(token)
-        if token.lower() == "-j":
-            # ``complex("-j")`` is a valid imaginary number, but more than likely
-            # the caller meant it as a short flag.
-            # https://github.com/BrianPugh/cyclopts/issues/328
-            return True
-        return False
+    if not allow_numbers:
+        with suppress(ValueError):
+            complex(token)
+            if token.lower() == "-j":
+                # ``complex("-j")`` is a valid imaginary number, but more than likely
+                # the caller meant it as a short flag.
+                # https://github.com/BrianPugh/cyclopts/issues/328
+                return True
+            return False
     return token.startswith("-")
 
 
