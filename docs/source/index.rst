@@ -25,6 +25,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    rules.rst
    text_editor.rst
    api
+   known_issues.rst
 
 
 .. toctree::
