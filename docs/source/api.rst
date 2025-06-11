@@ -421,8 +421,8 @@ API
       :value: None
 
       Additional name(s) to expose to the CLI.
-      Gets appended to :attr:`.name`.
-      Typically useful for adding additional names to the default Cyclopts-generated names.
+      Unlike :attr:`.name`, this does not override Cyclopts-derived names.
+
       The following two examples are functionally equivalent:
 
       .. code-block:: python
