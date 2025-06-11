@@ -147,6 +147,40 @@ def test_multiple_names(app, cmd_str, assert_parse_args):
 @pytest.mark.parametrize(
     "cmd_str",
     [
+        "foo --age 10",
+        "foo --duration 10",
+        "foo -a 10",
+    ],
+)
+def test_alias(app, cmd_str, assert_parse_args):
+    @app.command
+    def foo(age: Annotated[int, Parameter(alias=["--duration", "-a"])]):
+        pass
+
+    assert_parse_args(foo, cmd_str, age=10)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
+        "foo --age 10",
+        "foo --duration 10",
+        "foo -a 10",
+    ],
+)
+def test_name_and_alias(app, cmd_str, assert_parse_args):
+    """Weird use-case, but should be handled."""
+
+    @app.command
+    def foo(age: Annotated[int, Parameter(name="--age", alias=["--duration", "-a"])]):
+        pass
+
+    assert_parse_args(foo, cmd_str, age=10)
+
+
+@pytest.mark.parametrize(
+    "cmd_str",
+    [
         "--job-name foo",
         "-j foo",
     ],

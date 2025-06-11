@@ -102,9 +102,8 @@ class Parameter:
 
     # This can ONLY ever be a Tuple[str, ...]
     # Usually starts with "--" or "-"
-    _name: Union[None, str, Iterable[str]] = field(
+    name: Union[None, str, Iterable[str]] = field(
         default=None,
-        alias="name",
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
@@ -237,10 +236,6 @@ class Parameter:
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
-
-    @property
-    def name(self) -> tuple[str, ...]:
-        return self._name + self.alias  # pyright: ignore
 
     @property
     def show(self) -> bool:
