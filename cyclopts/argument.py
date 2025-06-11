@@ -954,6 +954,7 @@ class Argument:
 
             unstructured_data = self._json()
             try:
+                # This inherently also invokes pydantic validators
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
             except pydantic.ValidationError as e:
                 self._handle_pydantic_validation_error(e)
@@ -1155,6 +1156,9 @@ class Argument:
 
         def validate_pydantic(hint, val):
             if not pydantic:
+                return
+            if self._use_pydantic_type_adapter:
+                # Pydantic already called the validators
                 return
 
             try:

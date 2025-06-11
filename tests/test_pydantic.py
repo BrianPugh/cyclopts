@@ -6,7 +6,7 @@ from typing import Annotated, Dict, Literal, Optional, Union
 
 import pydantic
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, validate_call
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator, validate_call
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
@@ -57,6 +57,24 @@ def test_pydantic_error_msg(app, console):
     )
 
     assert actual.startswith(expected_prefix)
+
+
+def test_pydantic_validator_called_once(app):
+    class M(BaseModel):
+        x: list = Field(default_factory=list)
+
+        @model_validator(mode="after")
+        def fill(self):
+            self.x.append("validator called")
+            return self
+
+    @app.default
+    def default(
+        m: Annotated[M, Field(default_factory=M)],
+    ):
+        assert m.x == ["foo", "validator called"]
+
+    app(["foo"])
 
 
 def test_pydantic_error_from_function_body(app):
