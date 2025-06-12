@@ -416,6 +416,27 @@ API
          │      --user.password                                           │
          ╰────────────────────────────────────────────────────────────────╯
 
+   .. attribute:: alias
+      :type: Union[None, str, Iterable[str]]
+      :value: None
+
+      Additional name(s) to expose to the CLI.
+      Unlike :attr:`.name`, this does not override Cyclopts-derived names.
+
+      The following two examples are functionally equivalent:
+
+      .. code-block:: python
+
+         @app.default
+         def main(foo: Annotated[int, Parameter(name=["--foo", "-f"])]):
+             pass
+
+      .. code-block:: python
+
+         @app.default
+         def main(foo: Annotated[int, Parameter(alias="-f")]):
+             pass
+
    .. attribute:: converter
       :type: Optional[Callable]
       :value: None

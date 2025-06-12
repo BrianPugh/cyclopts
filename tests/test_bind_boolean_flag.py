@@ -27,6 +27,26 @@ def test_boolean_flag_default(app, cmd_str, expected, assert_parse_args):
     assert_parse_args(foo, cmd_str, expected)
 
 
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("--my-flag", True),
+        ("--my-flag=true", True),
+        ("--my-flag=false", False),
+        ("--no-my-flag", False),
+        ("--your-flag", True),
+        ("--no-your-flag", False),
+        ("-m", True),
+    ],
+)
+def test_boolean_flag_alias(app, cmd_str, expected, assert_parse_args):
+    @app.default
+    def foo(my_flag: Annotated[bool, Parameter(alias=["--your-flag", "-m"])] = True):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
+
+
 def test_boolean_flag_app_parameter_default(app, assert_parse_args):
     app.default_parameter = Parameter(negative="")
 

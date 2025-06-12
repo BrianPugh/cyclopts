@@ -115,30 +115,63 @@ class Parameter:
         converter=lambda x: cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(x)),
     )
 
+    # This can ONLY ever be a Tuple[str, ...]
+    alias: Union[None, str, Iterable[str]] = field(
+        default=None,
+        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
+    )
+
     # This can ONLY ever be ``None`` or ``Tuple[str, ...]``
-    negative: Union[None, str, Iterable[str]] = field(default=None, converter=optional_to_tuple_converter)
+    negative: Union[None, str, Iterable[str]] = field(
+        default=None,
+        converter=optional_to_tuple_converter,
+        kw_only=True,
+    )
 
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
     group: Union[None, Group, str, Iterable[Union[Group, str]]] = field(
-        default=None, converter=to_tuple_converter, hash=False
+        default=None,
+        converter=to_tuple_converter,
+        kw_only=True,
+        hash=False,
     )
 
-    parse: bool = field(default=None, converter=attrs.converters.default_if_none(True))
+    parse: bool = field(
+        default=None,
+        converter=attrs.converters.default_if_none(True),
+        kw_only=True,
+    )
 
-    _show: Optional[bool] = field(default=None, alias="show")
+    _show: Optional[bool] = field(
+        default=None,
+        alias="show",
+        kw_only=True,
+    )
 
-    show_default: Union[None, bool, Callable[[Any], Any]] = field(default=None)
+    show_default: Union[None, bool, Callable[[Any], Any]] = field(
+        default=None,
+        kw_only=True,
+    )
 
-    show_choices: bool = field(default=None, converter=attrs.converters.default_if_none(True))
+    show_choices: bool = field(
+        default=None,
+        converter=attrs.converters.default_if_none(True),
+        kw_only=True,
+    )
 
-    help: Optional[str] = field(default=None)
+    help: Optional[str] = field(default=None, kw_only=True)
 
-    show_env_var: bool = field(default=None, converter=attrs.converters.default_if_none(True))
+    show_env_var: bool = field(
+        default=None,
+        converter=attrs.converters.default_if_none(True),
+        kw_only=True,
+    )
 
     # This can ONLY ever be a Tuple[str, ...]
     env_var: Union[None, str, Iterable[str]] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
+        kw_only=True,
     )
 
     env_var_split: Callable = field(

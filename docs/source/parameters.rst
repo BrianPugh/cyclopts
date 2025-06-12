@@ -94,6 +94,7 @@ Parameter names (and their short forms) can be manually specified:
    def main(
        *,
        foo: Annotated[str, Parameter(name=["--foo", "-f"])],  # Adding a short-form
+       # Equivalently, you could have done Parameter(alias="-f")
        bar: Annotated[str, Parameter(name="--something-else")],
    ):
        pass
@@ -115,6 +116,7 @@ Parameter names (and their short forms) can be manually specified:
    ╰─────────────────────────────────────────────────────────╯
 
 Manually set names via :attr:`Parameter.name <cyclopts.Parameter.name>` are not subject to :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`.
+Alternatively, additional names can be added to the Cyclopts-derived names (instead of completely overriding them) with :attr:`Parameter.alias <cyclopts.Parameter.alias>`.
 
 
 ^^^^^^^^^^^^^^
