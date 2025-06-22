@@ -4,6 +4,14 @@
 Group Validators
 ================
 Group validators operate on a set of parameters, :ref:`ensuring that their values are mutually compatible <Parameter Groups>`.
+Validator(s) for a group can be set via the :attr:`.Group.validator` attribute. An individual validator is a callable object/function with signature:
+
+.. code-block:: python
+
+    def validator(argument_collection: ArgumentCollection):
+        "Raise an exception if something is invalid."
+
+
 Cyclopts has some builtin common group validators in the :ref:`cyclopts.validators <API Validators>` module.
 
 .. _Group Validators - LimitedChoice:

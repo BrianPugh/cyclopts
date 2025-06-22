@@ -965,6 +965,9 @@ API
          def validator(argument_collection: ArgumentCollection):
              "Raise an exception if something is invalid."
 
+      The :class:`.ArgumentCollection` will contain all arguments that belong to that group.
+      The validator(s) will **always be invoked**, regardless if any argument within the collection has token(s).
+
       Validators are **not** invoked for command groups.
 
 .. autoclass:: cyclopts.Token
