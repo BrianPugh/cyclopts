@@ -124,3 +124,14 @@ def test_config_env_dataclass(apps, monkeypatch):
     assert ac[2].tokens[0].source == "env"
     assert ac[2].tokens[0].index == 0
     assert ac[2].tokens[0].keys == ()
+
+
+def test_config_env_kwargs(app, assert_parse_args, monkeypatch):
+    @app.default
+    def default(a: str, **kwargs):
+        pass
+
+    monkeypatch.setenv("CYCLOPTS_TEST_APP_TWO_WORDS", "test value")
+    app.config = Env("CYCLOPTS_TEST_APP_")
+
+    assert_parse_args(default, "a_value", a="a_value", two_words="test value")
