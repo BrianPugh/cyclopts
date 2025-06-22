@@ -40,18 +40,27 @@ class Env:
 
         candidate_env_keys = [x for x in os.environ if x.startswith(prefix)]
         candidate_env_keys.sort()
+        delimiter = "_"
         for candidate_env_key in candidate_env_keys:
             try:
                 argument, remaining_keys, _ = arguments.match(
                     candidate_env_key[len(prefix) :],
                     transform=_transform,
-                    delimiter="_",
+                    delimiter=delimiter,
                 )
             except ValueError:
                 continue
             if set(argument.tokens) - added_tokens:
                 # Skip if there are any tokens from another source.
                 continue
+
+            # There's inherently an ambiguity because we use "_" as the key-delimiter.
+            # However, we can somewhat resolve this ambiguity by checking if the argument
+            # accepts subkeys. If there are no children arguments, then just re-combine the
+            # remaining_keys.
+            if not argument.children and remaining_keys:
+                remaining_keys = (delimiter.join(remaining_keys),)
+
             remaining_keys = tuple(x.lower() for x in remaining_keys)
             for i, value in enumerate(argument.env_var_split(os.environ[candidate_env_key])):
                 token = Token(keyword=candidate_env_key, value=value, source="env", index=i, keys=remaining_keys)
