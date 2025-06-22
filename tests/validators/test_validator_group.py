@@ -144,3 +144,22 @@ def test_bind_group_validator_limited_choice_name_override(app):
         app("foo --car --bike", exit_on_error=False)
 
     assert str(e.value) == 'Invalid values for group "Vehicle". Mutually exclusive arguments: {--car, --bike}'
+
+
+def test_group_validator_complete_argument_collection(app, mocker):
+    custom_validator = mocker.MagicMock()
+    group = Group("Vehicle", validator=(custom_validator,))
+
+    @app.default
+    def default(
+        *,
+        car: Annotated[bool, Parameter(group=group)] = False,
+        motorcycle: Annotated[bool, Parameter(group=group)] = False,
+    ):
+        pass
+
+    app([])
+
+    custom_validator.assert_called_once()
+    argument_collection_names = [x.name for x in custom_validator.call_args_list[0][0][0]]
+    assert argument_collection_names == ["--car", "--motorcycle"]

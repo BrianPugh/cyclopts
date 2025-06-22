@@ -328,7 +328,7 @@ def _sort_group(argument_collection) -> list[tuple["Group", ArgumentCollection]]
     out = {}
     # Sort alphabetically by group-name to enfroce some determinism.
     for i, group in enumerate(sorted(argument_collection.groups, key=lambda x: x.name)):
-        if not (group_arguments := argument_collection.filter_by(group=group, has_tree_tokens=True)):
+        if not (group_arguments := argument_collection.filter_by(group=group)):
             continue
         common_root_keys = _common_root_keys(group_arguments)
         # Add i to key so that we don't get collisions.
