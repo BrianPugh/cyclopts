@@ -432,20 +432,50 @@ def resolve_callables(t, *args, **kwargs):
 
 @frozen
 class SortHelper:
+    """Sort a list of objects by an external key and retrieve the objects in-order."""
+
     key: Any
+    """Primary key to sort by.
+
+    SortHelpers with ``key`` :obj:`None` or :obj:`.UNSET` go last (alphabetically).
+    """
+
     fallback_key: Any = field(converter=to_tuple_converter)
+    """Secondary key to sort by.
+    """
+
     value: Any
+    """Actual object that caller wants to retrieve in the sorted order."""
 
     @staticmethod
     def sort(entries: Sequence["SortHelper"]) -> list["SortHelper"]:
+        """Sorts a sequence of :class:`SortHelper`."""
+        from cyclopts.group import (
+            DEFAULT_ARGUMENTS_GROUP_SORT_MARKER,
+            DEFAULT_COMMANDS_GROUP_SORT_MARKER,
+            DEFAULT_PARAMETERS_GROUP_SORT_MARKER,
+        )
+
+        default_commands_group = []
+        default_arguments_group = []
+        default_parameters_group = []
+
         user_sort_key = []
         ordered_no_user_sort_key = []
         no_user_sort_key = []
 
         for entry in entries:
-            if entry.key in (UNSET, None):
+            if entry.key is DEFAULT_COMMANDS_GROUP_SORT_MARKER:
+                default_commands_group.append((None, entry))
+            elif entry.key is DEFAULT_ARGUMENTS_GROUP_SORT_MARKER:
+                default_arguments_group.append((None, entry))
+            elif entry.key is DEFAULT_PARAMETERS_GROUP_SORT_MARKER:
+                default_parameters_group.append((None, entry))
+            elif entry.key in (UNSET, None):
                 no_user_sort_key.append((entry.fallback_key, entry))
             elif is_iterable(entry.key) and entry.key[0] in (UNSET, None):
+                # Items that are ordered internal to Cyclopts, but have lower order than user-provided sort_keys.
+                # Primarily to handle :meth:`Group.create_ordered`.
                 ordered_no_user_sort_key.append((entry.key[1:] + entry.fallback_key, entry))
             else:
                 user_sort_key.append(((entry.key, entry.fallback_key), entry))
@@ -454,7 +484,14 @@ class SortHelper:
         ordered_no_user_sort_key.sort(key=itemgetter(0))
         no_user_sort_key.sort(key=itemgetter(0))
 
-        combined = user_sort_key + ordered_no_user_sort_key + no_user_sort_key
+        combined = (
+            default_commands_group
+            + default_arguments_group
+            + default_parameters_group
+            + user_sort_key
+            + ordered_no_user_sort_key
+            + no_user_sort_key
+        )
         return [x[1] for x in combined]
 
 

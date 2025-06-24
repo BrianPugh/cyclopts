@@ -885,13 +885,51 @@ API
 
       Modifies group-panel display order on the help-page.
 
-      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the returned value to (2) if :obj:`None`, (3) otherwise.
+      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
 
-      2. For all groups with ``sort_key==None`` (default value), sort them alphabetically.
-         These sorted groups will be displayed **after** ``sort_key != None`` list (see 3).
+      2. The :class:`App` default groups (:attr:`App.group_command`, :attr:`App.group_arguments`, :attr:`App.group_parameters`) will be displayed first.
+         If you want to further customize the ordering of these default groups, you can define custom values and they will be treated like any other group:
 
-      3. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
-         It is the user's responsibility that ``sort_key`` s are comparable.
+         .. code-block:: python
+
+            from cyclopts import App, Group
+
+            app = App(
+                group_parameters=Group("Parameters", sort_key=1),
+                group_arguments=Group("Arguments", sort_key=2),
+                group_commands=Group("Commands", sort_key=3),
+            )
+
+
+            @app.default
+            def main(foo, /, bar):
+                pass
+
+
+            if __name__ == "__main__":
+                app()
+
+        .. code-block:: console
+
+            $ python main.py --help
+            Usage: main [ARGS] [OPTIONS]
+
+            ╭─ Parameters ──────────────────────────────────────────────────────────╮
+            │ *  BAR --bar  [required]                                              │
+            ╰───────────────────────────────────────────────────────────────────────╯
+            ╭─ Arguments ───────────────────────────────────────────────────────────╮
+            │ *  FOO  [required]                                                    │
+            ╰───────────────────────────────────────────────────────────────────────╯
+            ╭─ Commands ────────────────────────────────────────────────────────────╮
+            │ --help -h  Display this message and exit.                             │
+            │ --version  Display application version.                               │
+            ╰───────────────────────────────────────────────────────────────────────╯
+
+      2. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
+         That is, sort them by their ``sort_key``, and then break ties alphabetically.
+         It is the user's responsibility that ``sort_key`` are comparable.
+
+      3. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (2), :attr:`App.group_commands`, :attr:`App.group_arguments`, and :attr:`.App.group_parameters`.
 
       Example usage:
 
