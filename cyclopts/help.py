@@ -208,10 +208,7 @@ class HelpPanel:
         self.entries = out
 
     def sort(self):
-        """Sort entries in-place.
-
-        Callable sort_keys are provided with no argument?
-        """
+        """Sort entries in-place."""
         if not self.entries:
             return
 

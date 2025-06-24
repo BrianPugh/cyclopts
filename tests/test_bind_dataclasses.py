@@ -136,14 +136,6 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
 
         Build a car.
 
-        ╭─ Engine ───────────────────────────────────────────────────────────╮
-        │ *  --car.cylinders           Number of cylinders the engine has.   │
-        │                              [required]                            │
-        │ *  --car.horsepower --car.p  Amount of horsepower the engine can   │
-        │                              generate. [required]                  │
-        │    --car.diesel              If this engine consumes diesel,       │
-        │      --car.no-diesel         instead of gasoline. [default: False] │
-        ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --license-plate       License plate identifier to give to car.  │
         │                          [required]                                │
@@ -152,6 +144,14 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         │                          [required]                                │
         │ *  --car.wheel.diameter  Diameter of wheel in inches. [required]   │
         │    --car.n-axles         Number of axles the car has. [default: 2] │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Engine ───────────────────────────────────────────────────────────╮
+        │ *  --car.cylinders           Number of cylinders the engine has.   │
+        │                              [required]                            │
+        │ *  --car.horsepower --car.p  Amount of horsepower the engine can   │
+        │                              generate. [required]                  │
+        │    --car.diesel              If this engine consumes diesel,       │
+        │      --car.no-diesel         instead of gasoline. [default: False] │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

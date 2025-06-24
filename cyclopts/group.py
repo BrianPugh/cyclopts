@@ -11,7 +11,7 @@ from typing import (
 
 from attrs import field
 
-from cyclopts.utils import UNSET, SortHelper, frozen, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import UNSET, Sentinel, SortHelper, frozen, is_iterable, resolve_callables, to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -28,6 +28,19 @@ def _group_default_parameter_must_be_none(instance, attribute, value: Optional["
 
 # Used for Group.sorted
 _sort_key_counter = itertools.count()
+
+
+# Special sort markers that get specially handled by :meth:`SortHelper.sort`
+class DEFAULT_COMMANDS_GROUP_SORT_MARKER(Sentinel):  # noqa: N801
+    pass
+
+
+class DEFAULT_ARGUMENTS_GROUP_SORT_MARKER(Sentinel):  # noqa: N801
+    pass
+
+
+class DEFAULT_PARAMETERS_GROUP_SORT_MARKER(Sentinel):  # noqa: N801
+    pass
 
 
 @frozen
@@ -70,16 +83,16 @@ class Group:
         return None if self._sort_key is UNSET else self._sort_key
 
     @classmethod
-    def create_default_arguments(cls):
-        return cls("Arguments")
+    def create_default_arguments(cls, name="Arguments"):
+        return cls(name, sort_key=DEFAULT_ARGUMENTS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_default_parameters(cls):
-        return cls("Parameters")
+    def create_default_parameters(cls, name="Parameters"):
+        return cls(name, sort_key=DEFAULT_PARAMETERS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_default_commands(cls):
-        return cls("Commands")
+    def create_default_commands(cls, name="Commands"):
+        return cls(name, sort_key=DEFAULT_COMMANDS_GROUP_SORT_MARKER)
 
     @classmethod
     def create_ordered(cls, name="", help="", *, show=None, sort_key=None, validator=None, default_parameter=None):
@@ -128,6 +141,14 @@ def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group]
     """Sort groups for the help-page.
 
     Note, much logic is similar to here and ``HelpPanel.sort``, so any changes here should probably be reflected over there as well.
+
+    Parameters
+    ----------
+    groups: list[Group]
+        List of groups to sort by their ``sort_key``.
+    attributes: list[Any]
+        A list of equal length to ``groups``.
+        Remains consistent with ``groups`` via argsort.
     """
     assert len(groups) == len(attributes)
 

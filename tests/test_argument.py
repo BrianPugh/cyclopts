@@ -450,7 +450,12 @@ def test_resolve_groups_from_callable():
         pass
 
     actual = _resolve_groups_from_callable(build)
-    assert actual == [Group("Parameters"), Group("Flags"), Group("Other Flags"), Group("Inside Typed Dict")]
+    assert actual == [
+        Group.create_default_parameters(),
+        Group("Flags"),
+        Group("Other Flags"),
+        Group("Inside Typed Dict"),
+    ]
 
 
 def test_argument_convert():
