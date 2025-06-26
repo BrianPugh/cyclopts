@@ -43,9 +43,22 @@ class DEFAULT_PARAMETERS_GROUP_SORT_MARKER(Sentinel):  # noqa: N801
     pass
 
 
+def _group_name_converter(val: str):
+    return val if val else object()
+
+
 @frozen
 class Group:
-    name: str = ""
+    _name: str = field(default="", alias="name", converter=_group_name_converter)  # pyright: ignore reportAssignmentType
+    """
+    Name of the group.
+
+    For anonymous groups (groups with no name that shouldn't appear on the help-page),
+    we create a unique sentinel object.
+
+    We cannot just use a static default value like :obj:`None` because python will
+    resolve multiple independent, identically configured anonymous groups to the same underlying object.
+    """
 
     help: str = ""
 
@@ -73,6 +86,10 @@ class Group:
         validator=_group_default_parameter_must_be_none,
         kw_only=True,
     )
+
+    @property
+    def name(self) -> str:
+        return "" if type(self._name) is object else self._name
 
     @property
     def show(self):
