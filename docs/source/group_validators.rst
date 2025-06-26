@@ -79,3 +79,4 @@ MutuallyExclusive
 -----------------
 Alias for :class:`.LimitedChoice` with default arguments.
 Exists primarily because the usage/implication will be more directly obvious and searchable to developers than :class:`.LimitedChoice`.
+Since this class takes no arguments, an already instantiated version :obj:`.mutually_exclusive` is also provided for convenience.

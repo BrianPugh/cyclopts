@@ -1087,6 +1087,18 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.MutuallyExclusive
    :members:
 
+.. autodata:: cyclopts.validators.mutually_exclusive
+
+   Instantiated version of :class:`~.validators.MutuallyExclusive`.
+   Can be used directly in group validators:
+
+   .. code-block:: python
+
+       import cyclopts
+       from cyclopts import Group
+
+       mutually_exclusive_group = Group(validator=cyclopts.validators.mutually_exclusive)
+
 .. autoclass:: cyclopts.validators.Number
    :members:
 
