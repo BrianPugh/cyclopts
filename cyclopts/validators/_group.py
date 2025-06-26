@@ -46,3 +46,6 @@ class MutuallyExclusive(LimitedChoice):
         Only 1 argument in the group can be supplied a value.
         """
         super().__init__()
+
+
+mutually_exclusive = MutuallyExclusive()
