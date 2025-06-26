@@ -1357,24 +1357,27 @@ def _resolve_groups_from_callable(
     if group_parameters is not None:
         resolved_groups.append(group_parameters)
 
+    # Iteration 1: Collect all explicitly instantiated groups
     for argument in argument_collection:
         for group in argument.parameter.group:  # pyright: ignore
             if not isinstance(group, Group):
                 continue
 
             # Ensure a different, but same-named group doesn't already exist
-            if any(group != x and x.name == group.name for x in resolved_groups):
+            if any(group != x and x._name == group._name for x in resolved_groups):
                 raise ValueError("Cannot register 2 distinct Group objects with same name.")
 
             if group.default_parameter is not None and group.default_parameter.group:
                 # This shouldn't be possible due to ``Group`` internal checks.
                 raise ValueError("Group.default_parameter cannot have a specified group.")  # pragma: no cover
 
+            # Add the group to resolved_groups if it hasn't been added yet.
             try:
-                next(x for x in resolved_groups if x.name == group.name)
+                next(x for x in resolved_groups if x._name == group._name)
             except StopIteration:
                 resolved_groups.append(group)
 
+    # Iteration 2: Create all implicitly defined Group from strings.
     for argument in argument_collection:
         for group in argument.parameter.group:  # pyright: ignore
             if not isinstance(group, str):

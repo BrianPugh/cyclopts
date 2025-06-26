@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 import cyclopts.group
-from cyclopts import App, Group, Parameter, Token
+from cyclopts import App, ArgumentCollection, Group, Parameter, Token
 from cyclopts.exceptions import ValidationError
 from cyclopts.group import sort_groups
 
@@ -165,3 +165,51 @@ def test_group_sorted_classmethod_tuple(mock_sort_key_counter):
 
     res = sort_groups([g1, g2, g3, g4], ["a", "b", "c", "d"])
     assert ([g3, g4, g2, g1], ["c", "d", "b", "a"]) == res
+
+
+def test_multiple_anonymous_groups(app, assert_parse_args):
+    """Test to ensure that multiple anonymous Groups do not get combined.
+
+    https://github.com/BrianPugh/cyclopts/issues/479
+    """
+
+    def require_all_or_none(args: ArgumentCollection) -> None:
+        got_args = args.filter_by(has_tokens=True)
+        if len(got_args) == 0 or len(got_args) == len(args):
+            return
+        got_str = ", ".join(a.name for a in got_args)
+        wanted_str = ", ".join(a.name for a in args)
+        error_msg = f"Needs all of: {wanted_str}. Now only got: {got_str}."
+        raise ValueError(error_msg)
+
+    group1 = Group(validator=require_all_or_none)
+    group2 = Group(validator=require_all_or_none)
+
+    @app.default
+    def default(
+        *,
+        foo: Annotated[str, Parameter(group=group1)] = "",
+        bar: Annotated[str, Parameter(group=group1)] = "",
+        fizz: Annotated[str, Parameter(group=group2)] = "",
+        buzz: Annotated[str, Parameter(group=group2)] = "",
+    ):
+        pass
+
+    with pytest.raises(ValidationError):
+        app("--foo foo", exit_on_error=False)
+
+    with pytest.raises(ValidationError):
+        app("--fizz fizz", exit_on_error=False)
+
+    with pytest.raises(ValidationError):
+        app("--foo foo --bar bar --fizz fizz", exit_on_error=False)
+
+    assert_parse_args(default, "--foo foo --bar bar", foo="foo", bar="bar")
+    assert_parse_args(
+        default,
+        "--foo foo --bar bar --fizz fizz --buzz buzz",
+        foo="foo",
+        bar="bar",
+        fizz="fizz",
+        buzz="buzz",
+    )
