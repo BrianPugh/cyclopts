@@ -25,6 +25,8 @@ For more complicated CLI applications, it is common to have an external user con
 
 The provided ``config`` does not have to be a function; all the Cyclopts builtin configs are classes that implement the ``__call__`` method. The Cyclopts builtins offer good standard functionality for common configuration files like yaml or toml.
 
+.. _TOML Example:
+
 ------------
 TOML Example
 ------------
@@ -34,9 +36,10 @@ In this example, we create a small CLI tool that counts the number of times a gi
 
    # character-counter.py
    import cyclopts
+   from cyclopts import App
    from pathlib import Path
 
-   app = cyclopts.App(
+   app = App(
        name="character-counter",
        config=cyclopts.config.Toml(
            "pyproject.toml",  # Name of the TOML File
@@ -51,7 +54,8 @@ In this example, we create a small CLI tool that counts the number of times a gi
    def count(filename: Path, *, character="-"):
        print(filename.read_text().count(character))
 
-   app()
+   if __name__ == "__main__":
+       app()
 
 Running this code without a ``pyproject.toml`` present:
 
@@ -75,6 +79,43 @@ Rerunning the app without a specified ``--character`` will result in using the t
 
    $ python character-counter.py count README.md
    380
+
+--------------------------
+User-Specified Config File
+--------------------------
+Extending the above :ref:`TOML Example`, what if we want to allow the user to specify the toml configuration file?
+This can be accomplished via a :ref:`Meta App`.
+
+.. code-block:: python
+
+    # character-counter.py
+    from pathlib import Path
+    from typing import Annotated
+
+    import cyclopts
+    from cyclopts import App, Parameter
+
+    app = App(name="character-counter")
+
+    @app.command
+    def count(filename: Path, *, character="-"):
+        print(filename.read_text().count(character))
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        config: Path = Path("pyproject.toml"),
+    ):
+        app.config = cyclopts.config.Toml(
+            config,
+            root_keys=["tool", "character-counter"],
+            search_parents=True,
+        )
+
+        app(tokens)
+
+    if __name__ == "__main__":
+        app.meta()
 
 ----------------------------
 Environment Variable Example
