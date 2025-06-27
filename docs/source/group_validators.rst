@@ -80,3 +80,62 @@ MutuallyExclusive
 Alias for :class:`.LimitedChoice` with default arguments.
 Exists primarily because the usage/implication will be more directly obvious and searchable to developers than :class:`.LimitedChoice`.
 Since this class takes no arguments, an already instantiated version :obj:`.mutually_exclusive` is also provided for convenience.
+
+-----------
+all_or_none
+-----------
+Group validator that enforces that either **all** parameters in the group must be supplied an argument, or **none** of them.
+
+.. code-block:: python
+
+   from typing import Annotated
+
+   from cyclopts import App, Group, Parameter
+   from cyclopts.validators import all_or_none
+
+   app = App()
+
+   group_1 = Group(validator=all_or_none)
+   group_2 = Group(validator=all_or_none)
+
+
+   @app.default
+   def default(
+       foo: Annotated[bool, Parameter(group=group_1)] = False,
+       bar: Annotated[bool, Parameter(group=group_1)] = False,
+       fizz: Annotated[bool, Parameter(group=group_2)] = False,
+       buzz: Annotated[bool, Parameter(group=group_2)] = False,
+   ):
+       print(f"{foo=} {bar=}")
+       print(f"{fizz=} {buzz=}")
+
+
+   if __name__ == "__main__":
+       app()
+
+.. code-block:: console
+
+   $ python all_or_none.py
+   foo=False bar=False
+   fizz=False buzz=False
+
+   $ python all_or_none.py --foo
+   ╭─ Error ──────────────────────────────────────────────────────────╮
+   │ Missing argument: --bar                                          │
+   ╰──────────────────────────────────────────────────────────────────╯
+
+   $ python all_or_none.py --foo --bar
+   foo=True bar=True
+   fizz=False buzz=False
+
+   $ python all_or_none.py --foo --bar --fizz
+   ╭─ Error ────────────────────────────────────────────────────────────╮
+   │ Missing argument: --buzz                                           │
+   ╰────────────────────────────────────────────────────────────────────╯
+
+   $ python all_or_none.py --foo --bar --fizz --buzz
+   foo=True bar=True
+   fizz=True buzz=True
+
+
+See the :obj:`.all_or_none` docs for more info.
