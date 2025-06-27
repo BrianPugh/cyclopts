@@ -5,7 +5,7 @@ import pytest
 from cyclopts import Argument, Group, Parameter, Token
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import ValidationError
-from cyclopts.validators import LimitedChoice
+from cyclopts.validators import LimitedChoice, all_or_none
 
 
 @pytest.fixture
@@ -76,23 +76,32 @@ def argument_collection_3():
     )
 
 
-def test_limited_choice_default_success(argument_collection_0, argument_collection_1):
-    """Mutually-exclusive functionality."""
-    validator = LimitedChoice()
+def test_limited_choice_default_success(argument_collection_0, argument_collection_1, argument_collection_2):
+    validator = LimitedChoice()  # Mutually-exclusive functionality.
+    validator(argument_collection_0)  # no tokens
+    validator(argument_collection_1)  # 1 token
+
+    validator = LimitedChoice(2)
+    validator(argument_collection_2)  # 2 tokens
+    with pytest.raises(ValueError):
+        validator(argument_collection_0)
+
+    validator = LimitedChoice(2, allow_none=True)
     validator(argument_collection_0)
-    validator(argument_collection_1)
 
 
-@pytest.mark.parametrize("min", [None, 1])
-def test_limited_choice_default_failure(min, argument_collection_2):
-    """Mutually-exclusive functionality."""
-    if min is None:
-        validator = LimitedChoice()
-    else:
-        validator = LimitedChoice(min)
+def test_limited_choice_failure_1(argument_collection_2):
     validator = LimitedChoice()
     with pytest.raises(ValueError):
+        # 2 supplied tokens, but we only allow 1
         validator(argument_collection_2)
+
+
+def test_limited_choice_failure_2(argument_collection_2, argument_collection_3):
+    validator = LimitedChoice(2)
+    validator(argument_collection_2)
+    with pytest.raises(ValueError):
+        validator(argument_collection_3)
 
 
 def test_limited_choice_default_min_max(
@@ -108,8 +117,18 @@ def test_limited_choice_default_min_max(
 
 
 def test_limited_choice_invalid_min_max():
+    """Minimum value must be less than maximum value."""
     with pytest.raises(ValueError):
         LimitedChoice(2, 1)
+
+
+def test_limited_choice_all_or_none(argument_collection_0, argument_collection_1, argument_collection_3):
+    """All arguments in the group must be supplied."""
+    all_or_none(argument_collection_0)  # none
+    all_or_none(argument_collection_3)  # all
+
+    with pytest.raises(ValueError):
+        all_or_none(argument_collection_1)  # 1 out of 3
 
 
 def test_bind_group_validator_limited_choice(app):
