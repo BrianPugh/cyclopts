@@ -215,6 +215,12 @@ class App:
 
     # Everything below must be kw_only
 
+    alias: Union[None, str, tuple[str, ...]] = field(
+        default=None,
+        converter=to_tuple_converter,
+        kw_only=True,
+    )
+
     default_command: Optional[Callable[..., Any]] = field(
         default=None, converter=_validate_default_command, kw_only=True
     )
@@ -398,19 +404,19 @@ class App:
     def name(self) -> tuple[str, ...]:
         """Application name(s). Dynamically derived if not previously set."""
         if self._name:
-            return self._name  # pyright: ignore[reportReturnType]
+            return self._name + self.alias  # pyright: ignore
         elif self.default_command is None:
             name = Path(sys.argv[0]).name
             if name == "__main__.py":
                 name = _get_root_module_name()
-            return (name,)
+            return (name,) + self.alias  # pyright: ignore
         else:
             try:
                 func_name = self.default_command.__name__
             except AttributeError:
                 # This could happen if default_command is wrapped in a functools.partial
                 func_name = self.default_command.func.__name__  # pyright: ignore[reportFunctionMemberAccess]
-            return (self.name_transform(func_name),)
+            return (self.name_transform(func_name),) + self.alias  # pyright: ignore
 
     @property
     def group_arguments(self):

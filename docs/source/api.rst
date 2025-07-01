@@ -43,6 +43,33 @@ API
          $ my-script foo bar
          Running bar.
 
+   .. attribute:: alias
+      :type: Optional[Union[str, Iterable[str]]]
+      :value: None
+
+      Extends :attr:`.name` with additional names.
+      Unlike :attr:`.name`, this does not override Cyclopts-derived names.
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App()
+
+         @app.command(alias="bar")
+         def foo():
+             print("Running foo.")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script foo
+         Running bar.
+
+         $ my-script bar
+         Running bar.
+
    .. attribute:: help
       :type: Optional[str]
       :value: None
