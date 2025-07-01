@@ -67,3 +67,12 @@ def test_resolve_default_parameter_2():
 
     actual_parameter = resolve_default_parameter_from_apps([parent_app_1, sub_app])
     assert actual_parameter == Parameter("bar")
+
+
+def test_subapp_name_alias(app, assert_parse_args):
+    @app.command(alias="bar")
+    def foo(a):
+        pass
+
+    assert_parse_args(foo, "foo 5", "5")
+    assert_parse_args(foo, "bar 5", "5")

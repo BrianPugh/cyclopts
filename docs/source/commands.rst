@@ -144,6 +144,28 @@ Manually set names are **not** subject to :attr:`App.name_transform <cyclopts.Ap
    $ my-script bar
    Hello World!
 
+Finally, if you would like to register an **additional** name to the Cyclopts-derived names, you can set an :attr:`~.App.alias`:
+
+.. code-block:: python
+
+    from cyclopts import App
+
+    app = App()
+
+    @app.command(alias="bar")
+    def foo():  # both "foo" and "bar" will trigger this function.
+        print("Running foo.")
+
+    app()
+
+.. code-block:: console
+
+    $ my-script foo
+    Running bar.
+
+    $ my-script bar
+    Running bar.
+
 -----------
 Adding Help
 -----------
