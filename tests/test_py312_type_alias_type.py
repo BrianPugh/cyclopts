@@ -1,7 +1,9 @@
-from typing import Annotated, Literal, TypeAlias
+from enum import Enum
+from typing import Annotated, Literal, Optional, TypeAlias
 
 import pytest
 
+from cyclopts import Parameter
 from cyclopts.help import _get_choices
 
 FontSize: TypeAlias = Literal[10, 12, 16]
@@ -25,6 +27,14 @@ def test_py312_type_alias_type(app, assert_parse_args):
     assert_parse_args(main, "10 12 16", 10, 12, 16)
 
 
+class CompSciProblem(Enum):
+    fizz = "bleep bloop blop"
+    buzz = "blop bleep bloop"
+
+
+type AnnotatedEnum = Annotated[CompSciProblem, Parameter(name="foo")]
+type AnnotatedOptionalEnum = Annotated[Optional[CompSciProblem], Parameter(name="foo")]
+
 type FontSingleFormat = Literal["otf", "woff2", "ttf", "bdf", "pcf"]
 type FontCollectionFormat = Literal["otc", "ttc"]
 FontPixelFormat: TypeAlias = Literal["bmp"]
@@ -33,6 +43,8 @@ FontPixelFormat: TypeAlias = Literal["bmp"]
 @pytest.mark.parametrize(
     "type_, expected",
     [
+        (AnnotatedEnum, ["fizz", "buzz"]),
+        (AnnotatedOptionalEnum, ["fizz", "buzz"]),
         (FontPixelFormat, ["bmp"]),
         (FontSingleFormat, ["otf", "woff2", "ttf", "bdf", "pcf"]),
         (FontSingleFormat | FontPixelFormat, ["otf", "woff2", "ttf", "bdf", "pcf", "bmp"]),
