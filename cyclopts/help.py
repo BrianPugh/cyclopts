@@ -7,6 +7,7 @@ from inspect import isclass
 from math import ceil
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Callable,
     Literal,
@@ -19,7 +20,7 @@ from typing import (
 from attrs import define, field
 
 from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import is_union
+from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import SortHelper, frozen, resolve_callables
@@ -406,6 +407,8 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
             choices.extend(get_choices(args[0]))
+    elif _origin is Annotated:
+        choices.extend(get_choices(resolve_annotated(type_)))
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         choices.extend(get_choices(type_.__value__))
     return choices
