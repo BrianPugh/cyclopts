@@ -126,16 +126,26 @@ def update_argument_collection(
             # This may (eventually) result in converting back to the original dtype.
             if not is_iterable(value):
                 value = (value,)
-            for i, v in enumerate(value):
-                # TODO: is this index correct? If the source value is a list, it should probably be different
-                if v is None:
-                    # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
-                    token = Token(
-                        keyword=complete_keyword, implicit_value=None, source=source, index=i, keys=remaining_keys
-                    )
-                else:
-                    # Convert the value back into a string, so it can be re-converted.
-                    token = Token(keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys)
+
+            if value:
+                for i, v in enumerate(value):
+                    # TODO: is this index correct? If the source value is a list, it should probably be different
+                    if v is None:
+                        # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
+                        token = Token(
+                            keyword=complete_keyword, implicit_value=None, source=source, index=i, keys=remaining_keys
+                        )
+                    else:
+                        # Convert the value back into a string, so it can be re-converted.
+                        token = Token(
+                            keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys
+                        )
+                    argument.append(token)
+            else:
+                # E.g. an empty list.
+                token = Token(
+                    keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys
+                )
                 argument.append(token)
 
 
