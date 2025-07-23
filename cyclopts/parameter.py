@@ -1,3 +1,4 @@
+import collections.abc
 import inspect
 from collections.abc import Iterable
 from copy import deepcopy
@@ -37,6 +38,7 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
     {
         Iterable[bool],
         Sequence[bool],
+        collections.abc.Sequence[bool],
         List[bool],
         list[bool],
         Tuple[bool, ...],
