@@ -1,3 +1,4 @@
+import importlib
 import inspect
 import os
 import sys
@@ -9,6 +10,7 @@ from enum import Enum
 from functools import lru_cache, partial
 from itertools import chain
 from pathlib import Path
+from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -65,6 +67,13 @@ if sys.version_info < (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     from typing import assert_never
 
+if sys.version_info < (3, 10):  # pragma: no cover
+    from importlib_metadata import PackageNotFoundError  # pyright: ignore[reportMissingImports]
+    from importlib_metadata import version as importlib_metadata_version  # pyright: ignore[reportMissingImports]
+else:  # pragma: no cover
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as importlib_metadata_version
+
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
@@ -104,15 +113,6 @@ def _default_version(default="0.0.0") -> str:
     version: str
         ``default`` if it cannot determine version.
     """
-    import importlib
-
-    if sys.version_info < (3, 10):  # pragma: no cover
-        from importlib_metadata import PackageNotFoundError  # pyright: ignore[reportMissingImports]
-        from importlib_metadata import version as importlib_metadata_version  # pyright: ignore[reportMissingImports]
-    else:  # pragma: no cover
-        from importlib.metadata import PackageNotFoundError
-        from importlib.metadata import version as importlib_metadata_version
-
     try:
         root_module_name = _get_root_module_name()
     except _CannotDeriveCallingModuleNameError:  # pragma: no cover
@@ -238,7 +238,7 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str]] = field(default=_default_version, kw_only=True)
+    version: Union[None, str, Callable[..., str]] = field(default=None, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -339,10 +339,25 @@ class App:
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
+    # We will populate this attribute ourselves after initialization
+    # `init=False` tells attrs not to include it in the generated __init__
+    _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
+
     def __attrs_post_init__(self):
         # Trigger the setters
         self.help_flags = self._help_flags
         self.version_flags = self._version_flags
+
+        # inspect.stack()[2] is needed in attrs class because the call stack is deeper:
+        # [0]: __attrs_post_init__
+        # [1]: the attrs-generated __init__
+        # [2]: the caller who created the instance
+        try:
+            # self._instantiating_module = inspect.getmodule(inspect.stack()[2])
+            self._instantiating_module = inspect.getmodule(sys._getframe(2))
+        except IndexError:
+            # Fallback in case the stack is not as deep as expected
+            self._instantiating_module = None
 
     ###########
     # Methods #
@@ -529,10 +544,20 @@ class App:
         console = self._resolve_console(None, console)
         version_format = resolve_version_format([self])
 
-        version_raw = self.version() if callable(self.version) else self.version
+        version_raw = None
+        if self.version is None:
+            if self._instantiating_module is not None:
+                full_module_name = self._instantiating_module.__name__
+                root_module_name = full_module_name.split(".")[0]
+                try:
+                    version_raw = importlib_metadata_version(root_module_name)
+                except PackageNotFoundError:
+                    pass
+        else:
+            version_raw = self.version() if callable(self.version) else self.version
 
-        if version_raw is None:
-            version_raw = "0.0.0"
+        if not version_raw:
+            version_raw = _default_version()
 
         version_formatted = InlineText.from_format(version_raw, format=version_format)
         console.print(version_formatted)
