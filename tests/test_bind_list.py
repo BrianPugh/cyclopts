@@ -1,3 +1,4 @@
+import collections.abc
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
@@ -109,11 +110,12 @@ def test_keyword_tuple_of_bool(app, assert_parse_args, cmd_expected):
         ("--verbose --verbose=True", [True, True]),
     ],
 )
-def test_keyword_sequence_of_bool(app, assert_parse_args, cmd_expected):
+@pytest.mark.parametrize("hint", [Sequence[bool], collections.abc.Sequence[bool]])
+def test_keyword_sequence_of_bool(app, assert_parse_args, cmd_expected, hint):
     cmd, expected = cmd_expected
 
     @app.default
-    def foo(*, verbose: Optional[Sequence[bool]] = None):
+    def foo(*, verbose: Optional[hint] = None):  # pyright: ignore[reportInvalidTypeForm]
         pass
 
     if expected is None:
