@@ -360,6 +360,13 @@ def grouper(iterable: Sequence[Any], n: int) -> Iterator[Tuple[Any, ...]]:
     """Collect data into non-overlapping fixed-length chunks or blocks.
 
     https://docs.python.org/3/library/itertools.html#itertools-recipes
+
+    Parameters
+    ----------
+    iterable: Sequence[Any]
+        Some iterable sequence to group.
+    n: int
+        Number of elements to put in each group.
     """
     if len(iterable) % n:
         raise ValueError(f"{iterable!r} is not divisible by {n}.")
