@@ -349,13 +349,13 @@ class App:
         self.help_flags = self._help_flags
         self.version_flags = self._version_flags
 
-        # inspect.stack()[2] is needed now because the call stack is deeper:
+        # inspect.stack()[2] is needed in attrs class because the call stack is deeper:
         # [0]: __attrs_post_init__
         # [1]: the attrs-generated __init__
         # [2]: the caller who created the instance
         try:
-            caller_frame = inspect.stack()[2]
-            self._instantiating_module = inspect.getmodule(caller_frame.frame)
+            # self._instantiating_module = inspect.getmodule(inspect.stack()[2])
+            self._instantiating_module = inspect.getmodule(sys._getframe(2))
         except IndexError:
             # Fallback in case the stack is not as deep as expected
             self._instantiating_module = None
