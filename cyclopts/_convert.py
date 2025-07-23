@@ -177,6 +177,8 @@ def _convert_tuple(
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     inner_types = tuple(x for x in get_args(type_) if x is not ...)
     inner_token_count, consume_all = token_count(type_)
+    # Elements like boolean-flags will have an inner_token_count of 0.
+    inner_token_count = max(inner_token_count, 1)
     if consume_all:
         # variable-length tuple (list-like)
         remainder = len(tokens) % inner_token_count
