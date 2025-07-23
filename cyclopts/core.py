@@ -341,7 +341,7 @@ class App:
 
     # We will populate this attribute ourselves after initialization
     # `init=False` tells attrs not to include it in the generated __init__
-    _instantiating_module: ModuleType | None = field(init=False, default=None)
+    _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
 
     def __attrs_post_init__(self):
         # Trigger the setters
