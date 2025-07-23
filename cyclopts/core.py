@@ -339,7 +339,6 @@ class App:
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
-
     # We will populate this attribute ourselves after initialization
     # `init=False` tells attrs not to include it in the generated __init__
     _instantiating_module: ModuleType | None = field(init=False, default=None)
@@ -551,7 +550,7 @@ class App:
             version_raw = "0.0.0"
             if self._instantiating_module is not None:
                 full_module_name = self._instantiating_module.__name__
-                root_module_name = full_module_name.split('.')[0]
+                root_module_name = full_module_name.split(".")[0]
                 try:
                     version_raw = importlib_metadata_version(root_module_name)
                 except PackageNotFoundError:
