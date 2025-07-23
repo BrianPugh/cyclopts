@@ -238,7 +238,7 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str]] = field(default=_default_version, kw_only=True)
+    version: Union[None, str, Callable[..., str]] = field(default=None, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -544,10 +544,8 @@ class App:
         console = self._resolve_console(None, console)
         version_format = resolve_version_format([self])
 
-        version_raw = self.version() if callable(self.version) else self.version
-
-        if version_raw is None or version_raw == "0.0.0":
-            version_raw = "0.0.0"
+        version_raw = None
+        if self.version is None:
             if self._instantiating_module is not None:
                 full_module_name = self._instantiating_module.__name__
                 root_module_name = full_module_name.split(".")[0]
@@ -555,6 +553,11 @@ class App:
                     version_raw = importlib_metadata_version(root_module_name)
                 except PackageNotFoundError:
                     pass
+        else:
+            version_raw = self.version() if callable(self.version) else self.version
+
+        if not version_raw:
+            version_raw = _default_version()
 
         version_formatted = InlineText.from_format(version_raw, format=version_format)
         console.print(version_formatted)
