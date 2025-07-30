@@ -1,7 +1,7 @@
 import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import Annotated, Dict
+from typing import Annotated, Dict, Optional
 
 import pytest
 
@@ -390,7 +390,7 @@ def test_bind_dataclass_with_alias_attribute(app, assert_parse_args):
         ] = False
 
     @app.default
-    def main(*, params: DataclassParameters | None = None) -> None:
+    def main(*, params: Optional[DataclassParameters] = None) -> None:
         pass
 
     assert_parse_args(main, "-a", params=DataclassParameters(with_alias=True, with_iterable=False))
