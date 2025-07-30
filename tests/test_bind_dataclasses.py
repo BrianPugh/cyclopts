@@ -369,3 +369,29 @@ def test_bind_dataclass_tuple_in_var_args(app, assert_parse_args):
         pass
 
     assert_parse_args(my_default_command, "10 20 30", Square(center=(10.0, 20.0), side_length=30.0))
+
+
+def test_bind_dataclass_with_alias_attribute(app, assert_parse_args):
+    """https://github.com/BrianPugh/cyclopts/issues/505"""
+
+    @Parameter(name="*", negative=False)
+    @dataclass
+    class DataclassParameters:
+        with_alias: Annotated[
+            bool,
+            Parameter(
+                alias="-a",
+                help="Parameter that uses alias.",
+            ),
+        ] = False
+
+        with_iterable: Annotated[
+            bool, Parameter(["--with-iterable", "-i"], help="Parameter that uses an iterable as name.")
+        ] = False
+
+    @app.default
+    def main(*, params: DataclassParameters | None = None) -> None:
+        pass
+
+    assert_parse_args(main, "-a", params=DataclassParameters(with_alias=True, with_iterable=False))
+    assert_parse_args(main, "--with-alias", params=DataclassParameters(with_alias=True, with_iterable=False))
