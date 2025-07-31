@@ -713,6 +713,8 @@ class App:
         self,
         obj: T,
         name: Union[None, str, Iterable[str]] = None,
+        *,
+        alias: Union[None, str, Iterable[str]] = None,
         **kwargs: object,
     ) -> T: ...
 
@@ -726,6 +728,8 @@ class App:
         self,
         obj: None = None,
         name: Union[None, str, Iterable[str]] = None,
+        *,
+        alias: Union[None, str, Iterable[str]] = None,
         **kwargs: object,
     ) -> Callable[[T], T]: ...
 
@@ -733,6 +737,8 @@ class App:
         self,
         obj: Optional[T] = None,
         name: Union[None, str, Iterable[str]] = None,
+        *,
+        alias: Union[None, str, Iterable[str]] = None,
         **kwargs: object,
     ) -> Union[T, Callable[[T], T]]:
         """Decorator to register a function as a CLI command.
@@ -777,7 +783,7 @@ class App:
             Any argument that :class:`App` can take.
         """
         if obj is None:  # Called ``@app.command(...)``
-            return partial(self.command, name=name, **kwargs)  # pyright: ignore[reportReturnType]
+            return partial(self.command, name=name, alias=alias, **kwargs)  # pyright: ignore[reportReturnType]
 
         if isinstance(obj, App):
             app = obj
@@ -819,9 +825,14 @@ class App:
         if name is None:
             name = app.name
         else:
-            app._name = name  # pyright: ignore[reportAttributeAccessIssue]
+            name = app._name = to_tuple_converter(name)
 
-        for n in to_tuple_converter(name):
+        if alias is None:
+            alias = ()
+        else:
+            app.alias = alias = to_tuple_converter(alias)
+
+        for n in name + alias:  # pyright: ignore[reportOperatorIssue]
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
 
