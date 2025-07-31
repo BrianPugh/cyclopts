@@ -76,3 +76,15 @@ def test_subapp_name_alias(app, assert_parse_args):
 
     assert_parse_args(foo, "foo 5", "5")
     assert_parse_args(foo, "bar 5", "5")
+
+
+def test_subapp_name_and_alias(app, assert_parse_args):
+    """https://github.com/BrianPugh/cyclopts/issues/508"""
+
+    @app.command(name=["fizz", "buzz"], alias="bar")
+    def foo(a):
+        pass
+
+    assert_parse_args(foo, "fizz 5", "5")
+    assert_parse_args(foo, "buzz 5", "5")
+    assert_parse_args(foo, "bar 5", "5")
