@@ -92,8 +92,8 @@ of the formatted exception.
    #   File "/cyclopts/cyclopts/core.py", line 1037, in parse_args
    #     command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
    #   File "/cyclopts/cyclopts/core.py", line 966, in _parse_known_args
-   #     raise InvalidCommandError(unused_tokens=unused_tokens)
-   # cyclopts.exceptions.InvalidCommandError: Unknown command "this-is-not-a-registered-command".
+   #     raise UnknownCommandError(unused_tokens=unused_tokens)
+   # cyclopts.exceptions.UnknownCommandError: Unknown command "this-is-not-a-registered-command".
 
    try:
        app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
@@ -101,4 +101,4 @@ of the formatted exception.
        pass
    print("Execution continues since we caught the exception.")
 
-With ``exit_on_error=False``, the ``InvalidCommandError`` is raised the same as a normal python exception.
+With ``exit_on_error=False``, the ``UnknownCommandError`` is raised the same as a normal python exception.

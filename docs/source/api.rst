@@ -1539,7 +1539,7 @@ Exceptions
    :show-inheritance:
    :members:
 
-.. autoexception:: cyclopts.InvalidCommandError
+.. autoexception:: cyclopts.UnknownCommandError
    :show-inheritance:
    :members:
 
