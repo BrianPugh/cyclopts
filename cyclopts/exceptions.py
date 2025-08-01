@@ -22,7 +22,7 @@ __all__ = [
     "CommandCollisionError",
     "CycloptsError",
     "DocstringError",
-    "InvalidCommandError",
+    "UnknownCommandError",
     "MissingArgumentError",
     "MixedArgumentError",
     "RepeatArgumentError",
@@ -262,7 +262,7 @@ class CoercionError(CycloptsError):
         return msg
 
 
-class InvalidCommandError(CycloptsError):
+class UnknownCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
 
     def __str__(self):
