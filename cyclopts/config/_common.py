@@ -122,6 +122,11 @@ def update_argument_collection(
                 # Allows us to add multiple tokens to an argument from a **single** source (config file).
                 continue
 
+            if is_iterable(value) and value and isinstance(value[0], dict):
+                raise CycloptsError(
+                    f"list[dicts] not allowed at key: {complete_keyword} to populate {argument.name} from the config file {source}."
+                )
+
             # Convert all values to strings, so that the Cyclopts engine can process them.
             # This may (eventually) result in converting back to the original dtype.
             if not is_iterable(value):
