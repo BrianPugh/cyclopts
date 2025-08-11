@@ -117,7 +117,7 @@ Extending the example, lets add more arguments and type hints:
 
 
 The command line input ``"3"`` is converted to an integer because the parameter ``count`` has the type hint :obj:`int`.
-Boolean ( here, ``--formal``) parameters are interpreted as flags.
+Boolean parameters (e.g., ``--formal`` in this example) are interpreted as flags.
 Cyclopts natively handles all python builtin types (:ref:`and more! <Coercion Rules>`).
 Cyclopts adheres to Python's argument binding rules, allowing for both positional and keyword arguments.
 All of the following CLI invocations are equivalent:
