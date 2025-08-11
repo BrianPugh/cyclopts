@@ -84,7 +84,7 @@ API
          app = App(help="This is my help string.")
          app()
 
-      .. code-block::
+      .. code-block:: console
 
          $ my-script --help
          Usage: scratch.py COMMAND
@@ -1151,7 +1151,7 @@ All definitions in this section are simply predefined annotations for convenienc
 
 Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated to further configure behavior. E.g:
 
-.. code-block::
+.. code-block:: python
 
    Annotated[PositiveInt, Parameter(...)]
 

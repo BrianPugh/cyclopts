@@ -339,7 +339,7 @@ We do this because mutable defaults is a `common unexpected source of bugs in py
 However, sometimes we actually want to specify an empty list.
 To get an empty list pass in the flag ``--empty-MY-LIST-NAME``.
 
-.. code-block::
+.. code-block:: python
 
    from cyclopts import App
 
