@@ -749,7 +749,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      If ``False``, treat the user-defined class annotation similar to a tuple.
+      If :obj:`False`, treat the user-defined class annotation similar to a tuple.
       Individual class sub-parameters will not be addressable by CLI keywords.
       The class will consume enough tokens to populate all required positional parameters.
 
@@ -828,9 +828,27 @@ API
       :type: Optional[bool]
       :value: None
 
-      When a parameter is **specified by keyword**, consume multiple elements worth of CLI tokens.
-      Will consume tokens until the stream is exhausted, or an and :attr:`.allow_leading_hyphen` is False
-      If ``False`` (default behavior), then only a single element worth of CLI tokens will be consumed.
+      If :obj:`True`, consume multiple elements worth of CLI tokens until the stream is exhausted (or, if :attr:`Parameter.allow_leading_hyphen` is :obj:`False`, until an option-like token is reached).
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def print_extensions(ext: Annotated[list[str], Parameter(consume_multiple=True)] = []):
+            print(ext)
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --ext .pdf .html
+         [".pdf", ".html"]
+
+      If :obj:`False` (default behavior), then only a single element worth of CLI tokens will be consumed.
 
       .. code-block:: python
 
@@ -840,14 +858,15 @@ API
          app = App()
 
          @app.default
-         def rules(files: list[Path], ext: list[str] = []):
-            pass
+         def print_extensions(ext: list[str] = []):
+            print(ext)
 
          app()
 
       .. code-block:: console
 
-         $ cmd --ext .pdf --ext .html foo.md bar.md
+         $ my-program --ext .pdf --ext .html
+         [".pdf", ".html"]
 
    .. attribute:: json_dict
       :type: Optional[bool]
