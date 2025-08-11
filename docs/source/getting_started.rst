@@ -128,8 +128,9 @@ All of the following CLI invocations are equivalent:
    $ python main.py --name Alice --count 3   # Supplying arguments via keywords.
    $ python main.py --name=Alice --count=3   # Using = for matching keywords to values is allowed.
    $ python main.py --count 3 --name=Alice   # Keyword order does not matter.
-   $ python main.py Alice --count 3          # positional followed by keyword
+   $ python main.py Alice --count 3          # Positional followed by keyword
    $ python main.py --count 3 Alice          # Keywords can come before positional if the keyword is later in the function signature.
+   $ python main.py --count 3 -- Alice       # Using the POSIX convention to indicate the end of keywords
 
 Like calling functions in python, positional arguments cannot be specified after a **prior** argument in the function signature was specified via keyword.
 For example, you cannot supply the count value ``"3"`` positionally while the value for ``name`` is specified via keyword:
