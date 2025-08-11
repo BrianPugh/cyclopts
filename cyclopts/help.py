@@ -1,3 +1,8 @@
+"""
+Splitting of gathering
+and drawing!
+"""
+
 import inspect
 import sys
 from collections.abc import Iterable
@@ -17,13 +22,14 @@ from typing import (
     get_origin,
 )
 
-from attrs import define, field
+from attrs import define, field, Factory, evolve
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import SortHelper, frozen, resolve_callables
+
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
@@ -37,6 +43,7 @@ if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
 else:  # pragma: no cover
     TypeAliasType = None
+
 
 
 @lru_cache(maxsize=16)
@@ -64,13 +71,8 @@ def docstring_parse(doc: str, format: str):
     return res
 
 
-@frozen
-class HelpEntry:
-    name: str
-    short: str
-    description: "RenderableType"
-    required: bool = False
-    sort_key: Any = None
+
+
 
 
 def _text_factory():
@@ -192,17 +194,359 @@ class InlineText:
             yield from wrapped_segments
 
 
+
+
+
+from typing import TypeAlias
+from rich.console import RenderableType
+
+Cell: TypeAlias = RenderableType #| None
+ValueOrCallable: TypeAlias = Cell | Callable[["AbstractTableEntry"], Cell]
+
+# TODO: I am ONLY talking about the rich console implementation
+#   here so far
 @define
-class HelpPanel:
+class AbstractTableEntry:
+    """Adjust the Format on an entry level basis!
+
+    Include a dictionary of data, that all evalaute to
+    RenderableType. Mapping column names -> Data
+
+    Then pull any of the request data at rendertime
+    """
+
+    # TODO: ValueOrCallable allows a lazy (or in other terms a smart) look up.
+    # The Callable must return a RenderableType, but could 
+    # allow for a smart look up like..
+
+
+    # [*] --max-memory   The maximum memory allowed (your 
+    #   system has XX total) 
+    # 
+    # ^^ Wouldn't that be kinda nifty!
+
+    # ValueOrCallable is RenderAbleType | Callable->RenderableType | None
+    data:dict[str, ValueOrCallable] = field(factory=lambda:{
+        "name" : None,
+        "short" : None,
+        "description" : None,
+        "required": False,
+    })
+
+    sort_key: Any = None
+
+    def put(self, key: str, value: ValueOrCallable):
+        self.data[key] = value
+        return self
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.data.get(key, default)
+
+    #TODO: This is sketch maybe
+    def __getattr__(self, name: str)->ValueOrCallable:
+        try:
+            return self.data[name]
+        except KeyError:
+            return None
+            #Jraise AttributeError(name)
+
+
+from typing import Optional, Union
+from rich.table import Table
+from rich.style import Style
+
+StyleType = Union[str, Style]
+PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
+
+
+@define(frozen=True)
+class ColumnSpec:
+    key: str
+
+    formatter:  Callable[[RenderableType, AbstractTableEntry, "ColumnSpec"], Cell] | None = None
+    converters: Callable[[AbstractTableEntry], Cell] | None | list[Callable[[AbstractTableEntry], Cell] | None] = None
+
+    header: str = ""
+    footer: str = ""
+    header_style: StyleType | None = None
+    footer_style: StyleType | None = None
+    style: StyleType | None = None
+    justify: str = "left"
+    vertical: str = "top"
+    overflow: str = "ellipsis"
+    width: int | None = None
+    min_width: int | None = None
+    max_width: int | None = None
+    ratio: int | None = None
+    no_wrap: bool = False
+
+    def add_to(self, table: Table) -> None:
+        table.add_column(
+            self.header,
+            footer=self.footer,
+            header_style=self.header_style,
+            footer_style=self.footer_style,
+            style=self.style,
+            justify=self.justify,
+            vertical=self.vertical,
+            overflow=self.overflow,
+            width=self.width,
+            min_width=self.min_width,
+            max_width=self.max_width,
+            ratio=self.ratio,
+            no_wrap=self.no_wrap,
+        )
+
+    def render_cell(self, entry: AbstractTableEntry) -> RenderableType:
+        """Render the cell.
+        """
+        raw = entry.get(self.key, None)
+
+        #print(f"RENDER COL KEY: {self.key}" )
+
+        # If it's lazy eval it now
+        if callable(raw):
+            raw = raw(entry)
+            entry.put(self.key, raw)
+
+        # Apply the converter  - takes the whole entry
+        if self.converters:
+            converters = [self.converters] if  not isinstance(self.converters,list) else self.converters
+
+            for converter in converters:
+                out = converter(entry)
+                entry.put(self.key, out)
+        else:
+            out = raw
+
+        # Apply the formatter - takes the current string
+        if self.formatter:
+            out = self.formatter(out, entry, self)
+
+        #return "" if raw is None else raw
+        return "" if out is None else out
+
+    def with_(self, **kw):
+        return evolve(self, **kw)
+
+
+
+@define(frozen=True)
+class TableSpec:
+    from rich.box import Box
+
+    # Intrinsic table styling/config
+    title: str | None = None
+    caption: str | None = None
+    style: StyleType | None = None
+    border_style: StyleType | None = None
+    header_style: StyleType | None = None
+    footer_style: StyleType | None = None
+    box: Box | None = None
+    show_header: bool = False
+    show_footer: bool = False
+    show_lines: bool = False
+    expand: bool = False
+    pad_edge: bool = False
+    #padding: PaddingType = (0, 2, 0, 0)
+    padding: PaddingType = (0, 2, 0, 0)
+    collapse_padding: bool = False
+
+    columns: list[ColumnSpec] = field(factory=list)
+
+    def build(self, **overrides) -> Table:
+        """Construct a rich.Table, allowing per-render overrides, e.g. build(padding=0)."""
+        opts = {
+            "title": self.title,
+            "caption": self.caption,
+            "style": self.style,
+            "border_style": self.border_style,
+            "header_style": self.header_style,
+            "footer_style": self.footer_style,
+            "box": self.box,
+            "show_header": self.show_header,
+            "show_footer": self.show_footer,
+            "show_lines": self.show_lines,
+            "expand": self.expand,
+            "pad_edge": self.pad_edge,
+            "padding": self.padding,
+            "collapse_padding": self.collapse_padding,
+        }
+        opts.update(overrides)
+        table = Table(**opts)
+        for col in self.columns:
+            col.add_to(table)
+        return table
+
+    def add_entries(self, table: Table, entries:Iterable[AbstractTableEntry]) -> None:
+        """Insert the entries into the table."""
+        #print(f"Render cols: {[x.key for x in self.columns]}")
+        for e in entries:
+            cells = [col.render_cell(e) for col in self.columns]
+            #print(f"For entry: {e.name} adding row: {cells}")
+            table.add_row(*cells)
+
+    # To help with padding...
+    def with_padding(self, padding: PaddingType) -> "TableSpec":
+        """Immutable helper to tweak padding."""
+        return evolve(self, padding=padding)
+
+
+    def with_(self, **kw):
+        return evolve(self, **kw)
+
+
+
+@define(frozen=True)
+class PanelSpec:
+    from rich.box import Box, ROUNDED
+    from rich.panel import Panel
+
+    # Content-independent panel chrome
+    title: RenderableType  = ""
+    subtitle: RenderableType  = ""
+    title_align: Literal["left", "center", "right"] = "left"
+    subtitle_align: Literal["left", "center", "right"] = "center"
+    style: StyleType | None = "none"
+    border_style: StyleType | None = "none"
+    box: Box = ROUNDED
+    padding: PaddingType = (0, 1)
+    expand: bool = True
+    width: int | None = None
+    height: int | None = None
+    safe_box: bool | None = None
+
+    def build(self, renderable: RenderableType, **overrides) -> Panel:
+        """Create a Panel around `renderable`. Use kwargs to override spec per render."""
+        from rich.panel import Panel
+
+        opts = {
+            "title": self.title,
+            "subtitle": self.subtitle,
+            "title_align": self.title_align,
+            "subtitle_align": self.subtitle_align,
+            "style": self.style,
+            "border_style": self.border_style,
+            "box": self.box,
+            "padding": self.padding,
+            "expand": self.expand,
+            "width": self.width,
+            "height": self.height,
+            "safe_box": self.safe_box,
+        }
+        opts.update(overrides)
+        return Panel(renderable, **opts)
+
+    # Handy immutable helpers
+    def with_box(self, box: Box) -> "PanelSpec":
+        return evolve(self, box=box)
+
+    def with_padding(self, padding: PaddingType) -> "PanelSpec":
+        return evolve(self, padding=padding)
+
+    def with_border_style(self, style: StyleType) -> "PanelSpec":
+        return evolve(self, border_style=style)
+
+
+
+# Define some default column specs
+def wrap_formatter(inp: RenderableType, entry: AbstractTableEntry, col_spec:ColumnSpec )->RenderableType:
+
+    import textwrap
+    wrap = partial(
+            textwrap.wrap,
+            subsequent_indent="  ",
+            break_on_hyphens=False,
+            tabsize=4,
+        )
+
+    if col_spec.max_width:
+        new =  "\n".join(wrap(inp, col_spec.max_width))
+    else:
+        new =  "\n".join(wrap(inp))
+    return new
+
+def asterisk_converter(inp: AbstractTableEntry)->RenderableType:
+    if inp.required:
+        return "*"
+    return ""
+
+def stretch_name_converter(inp:AbstractTableEntry)->RenderableType:
+    """Split name into two parts based on --.
+
+    Example
+    -------
+        '--foo--no-foo'  to '--foo --no-foo'.
+    """
+
+    out = " --".join(inp.name.split("--"))
+    return out[1:] if out[0] == " " else out
+
+
+def combine_long_short_converter(inp:AbstractTableEntry)->RenderableType:
+    """Concatenate a name and its short version.
+
+    Examples
+    --------
+        name = "--help"
+        short = "-h"
+        return: "--help -h"
+    """
+    return inp.name + " " + inp.short
+
+
+
+# For Parameters:
+AsteriskColumn = ColumnSpec(key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_converter)
+NameColumn = ColumnSpec(key="name", header="", justify="left",  style="cyan", formatter=wrap_formatter, converters=[stretch_name_converter, combine_long_short_converter])
+DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
+
+
+# For Commands:
+CommandColumn = ColumnSpec(key="name", header="", justify="left", style="cyan", formatter=wrap_formatter, converters=[stretch_name_converter, combine_long_short_converter] )
+
+
+
+
+# TODO: I am ONLY talking about the rich console implementation
+#   here so far
+
+@define
+class AbstractRichHelpPanel:
+    """Adjust the Format for the help panel!."""
+
+    import textwrap
+    from rich.box import Box, ROUNDED
+    from rich.console import Group as RichGroup
+    from rich.console import NewLine
+    from rich.panel import Panel
+    from rich.table import Table, Column
+    from rich.text import Text
+
     format: Literal["command", "parameter"]
-    title: str
-    description: "RenderableType" = field(factory=_text_factory)
-    entries: list[HelpEntry] = field(factory=list)
+    title: RenderableType
+    description: RenderableType = field(factory=_text_factory)
+
+    entries: list[AbstractTableEntry] = field(factory=list)
+
+
+    column_specs: list[ColumnSpec] = field(
+        default=Factory(
+            lambda self: [CommandColumn, DescriptionColumn]
+            if self.format == "command"
+            else [NameColumn, DescriptionColumn]
+        ,takes_self=True)
+    )
+
+    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(columns=self.column_specs), takes_self=True))
+
+    panel_spec: PanelSpec = field(default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
 
     def remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            hashable = (item.name, item.short)
+            hashable = (item.data.get("name"),
+                        item.data.get("short"))
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
@@ -225,84 +569,73 @@ class HelpPanel:
         if not self.entries:
             return _silent
 
-        import textwrap
 
-        from rich.box import ROUNDED
         from rich.console import Group as RichGroup
         from rich.console import NewLine
-        from rich.panel import Panel
-        from rich.table import Table
         from rich.text import Text
+        commands_width = ceil(console.width * 0.35)
 
-        wrap = partial(
-            textwrap.wrap,
-            subsequent_indent="  ",
-            break_on_hyphens=False,
-            tabsize=4,
-        )
-        # (top, right, bottom, left)
-        table = Table.grid(padding=(0, 2, 0, 0), pad_edge=False)
         panel_description = self.description
-
         if isinstance(panel_description, Text):
             panel_description.end = ""
 
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        panel = Panel(
-            RichGroup(panel_description, table),
-            box=ROUNDED,
-            expand=True,
-            title_align="left",
-            title=self.title,
-        )
-
+        # 1. Adjust the format (need to keep default behavior...)
+        # TODO: Ideally I can do this is instanciation time
+        # of all the default columns... which would require the
+        # import of rich earlier
         if self.format == "command":
+            #Jkjprint('making command')
             commands_width = ceil(console.width * 0.35)
-            table.add_column("Commands", justify="left", max_width=commands_width, style="cyan")
-            table.add_column("Description", justify="left")
 
-            for entry in self.entries:
-                name = entry.name
-                if entry.short:
-                    name += " " + entry.short
-                name = "\n".join(wrap(name, commands_width))
-                table.add_row(name, entry.description)
+            # Adjsut the max_width of the command cell
+            for i in range(len(self.column_specs)):
+                spec = self.column_specs[i]
+                if spec.key == "name":
+                    spec = spec.with_(max_width=commands_width)
+                self.column_specs[i] = spec
+
         elif self.format == "parameter":
-            options_width = ceil(console.width * 0.35)
+
+            #IF NO PARAMETERS ARE REQUIRED ALL PARAMETERS SLIDE ALL THE 
+            # WAY TO THE LEFT... I.E) Remove the asterisk column
+
+            add_asterisk = any([x.get('required', False) for x in self.entries])
+
+            #Jkjprint('making parameter')
+            #print(f"Default cols are: {[x.key for x in self.column_specs]}")
+
+            if add_asterisk:
+                col_specs = [AsteriskColumn]
+                col_specs.extend(self.column_specs)
+                self.column_specs = col_specs
+
+            name_width = ceil(console.width * 0.35)
             short_width = ceil(console.width * 0.1)
 
-            has_short = any(entry.short for entry in self.entries)
-            has_required = any(entry.required for entry in self.entries)
+            #for i, spec in enumerate(self.column_specs):
+            for i in range(len(self.column_specs)):
+                spec = self.column_specs[i]
+                if spec.key == "name":
+                    spec = spec.with_(max_width=name_width)
+                elif spec.key == "short":
+                    spec = spec.with_(max_width=short_width)
 
-            if has_required:
-                table.add_column("Asterisk", justify="left", width=1, style="red bold")
-            table.add_column("Options", justify="left", overflow="fold", max_width=options_width, style="cyan")
-            if has_short:
-                table.add_column("Short", justify="left", overflow="fold", max_width=short_width, style="green")
-            table.add_column("Description", justify="left", overflow="fold")
+                self.column_specs[i] = spec
 
-            lookup = {col.header: (i, col.max_width) for i, col in enumerate(table.columns)}
-            for entry in self.entries:
-                row = [""] * len(table.columns)
 
-                def add(key, value, custom_wrap=False):
-                    try:
-                        index, max_width = lookup[key]
-                    except KeyError:
-                        return
-                    if custom_wrap and max_width:
-                        value = "\n".join(wrap(value, max_width))
-                    row[index] = value  # noqa: B023
+        # 2.Build table and Add Etnries
+        #print(f"Pre build, with self.column_specs: {[x.key for x in self.column_specs]}")
+        #print(f"Pre build, with table.columns: {[x.key for x in self.table_spec.columns]}")
+        self.table_spec = self.table_spec.with_(columns = self.column_specs)
 
-                add("Asterisk", "*" if entry.required else "")
-                add("Options", entry.name, custom_wrap=True)
-                add("Short", entry.short)
-                add("Description", entry.description)
-                table.add_row(*row)
-        else:
-            raise NotImplementedError
+        table = self.table_spec.build()
+        self.table_spec.add_entries(table, self.entries)
+
+        # 3. Final make the panel
+        panel = self.panel_spec.build(RichGroup(panel_description, table))
 
         yield panel
 
@@ -418,10 +751,10 @@ def create_parameter_help_panel(
     group: "Group",
     argument_collection: "ArgumentCollection",
     format: str,
-) -> HelpPanel:
+) -> AbstractRichHelpPanel:
     from rich.text import Text
 
-    help_panel = HelpPanel(
+    help_panel = AbstractRichHelpPanel(
         format="parameter",
         title=group.name,
         description=InlineText.from_format(group.help, format=format, force_empty_end=True) if group.help else Text(),
@@ -481,11 +814,13 @@ def create_parameter_help_panel(
             help_description.append(Text(r"[required]", "dim red"))
 
         # populate row
-        entry = HelpEntry(
-            name=" ".join(long_options),
-            description=help_description,
-            short=" ".join(short_options),
-            required=argument.required,
+        entry = AbstractTableEntry(
+            data = {
+                "name" : "".join(long_options),
+                "description" : help_description,
+                "short" :" ".join(short_options),
+                "required":argument.required,
+            }
         )
 
         if argument.field_info.is_positional:
@@ -499,7 +834,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry]:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractTableEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -507,11 +842,15 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry
         short_names, long_names = [], []
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
-        entry = HelpEntry(
-            name="\n".join(long_names),
-            short=" ".join(short_names),
-            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
-            sort_key=resolve_callables(app.sort_key, app),
+
+        #print(f"The SHORTS ARE: {short_names} the LONGS ARE: {long_names}")
+        entry = AbstractTableEntry(
+            data = {
+            "name":"\n".join(long_names),
+            "short":" ".join(short_names),
+            "description":InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
+            "sort_key":resolve_callables(app.sort_key, app),
+            }
         )
         if entry not in entries:
             entries.append(entry)
