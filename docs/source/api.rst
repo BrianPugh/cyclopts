@@ -828,7 +828,9 @@ API
       :type: Optional[bool]
       :value: None
 
-      If :obj:`True`, consume multiple elements worth of CLI tokens until the stream is exhausted (or, if :attr:`Parameter.allow_leading_hyphen` is :obj:`False`, until an option-like token is reached).
+      Lists use `different parsing rules <rules.html#list>`__ depending on whether the values are provided positionally or by keyword. If the parameter is specified **positionally**, :attr:`Parameter.consume_multiple` is ignored.
+
+      If the parameter is specified **by keyword** and ``consume_multiple=True``, all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token (typically a keyword) is reached (unless :attr:`Parameter.allow_leading_hyphen` is :obj:`True`, in which case it will also be consumed).
 
       .. code-block:: python
 
@@ -837,18 +839,27 @@ API
 
          app = App()
 
-         @app.default
-         def print_extensions(ext: Annotated[list[str], Parameter(consume_multiple=True)] = []):
-            print(ext)
+         @app.command
+         def name_ext(
+             name: str,
+             ext: Annotated[list[str], Parameter(consume_multiple=True)],
+         ):
+             for extension in ext:
+                 print(f"{name}.{extension}")
 
          app()
 
       .. code-block:: console
 
-         $ my-program --ext .pdf .html
-         [".pdf", ".html"]
+         $ my-program --name "my_file" --ext "txt" "pdf"  # stream is exhausted
+         my_file.txt
+         my_file.pdf
 
-      If :obj:`False` (default behavior), then only a single element worth of CLI tokens will be consumed.
+         $ my-program --ext "txt" "pdf" --name "my_file"  # a keyword is reached
+         my_file.txt
+         my_file.pdf
+
+      If the parameter is specified **by keyword** and ``consume_multiple=False`` (the default), only a single element worth of CLI tokens will be consumed.
 
       .. code-block:: python
 
@@ -858,15 +869,18 @@ API
          app = App()
 
          @app.default
-         def print_extensions(ext: list[str] = []):
-            print(ext)
+         def name_ext(name: str, ext: list[str]): # same as `ext: Annotated[list[str], Parameter(consume_multiple=False)]``
+             for extension in ext:
+                 print(f"{name}.{extension}")
 
          app()
 
       .. code-block:: console
 
-         $ my-program --ext .pdf --ext .html
-         [".pdf", ".html"]
+         $ my-program --name "my_file" --ext "txt" "pdf"
+         ╭─ Error ────────────────────────────────────────────╮
+         │ Unused Tokens: ['pdf'].                            │
+         ╰────────────────────────────────────────────────────╯
 
    .. attribute:: json_dict
       :type: Optional[bool]

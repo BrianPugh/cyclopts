@@ -185,7 +185,7 @@ Bool
 ****
 List
 ****
-Unlike more simple types like :obj:`str` and :obj:`int`, lists use different parsing rules depending on if the values are provided positionally or by keyword.
+Unlike more simple types like :obj:`str` and :obj:`int`, lists use different parsing rules depending on whether the values are provided positionally or by keyword.
 
 ^^^^^^^^^^
 Positional
