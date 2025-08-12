@@ -9,6 +9,13 @@ We want our application to look like the following:
 
    $ my-program output.bin --input input1.bin input2.bin input3.bin
 
+Interpreted as:
+
+.. code-block:: python
+
+   output=PosixPath('output.bin')
+   input=[PosixPath('input1.bin'), PosixPath('input2.bin'), PosixPath('input3.bin')]
+
 In Typer, `it is impossible to accomplish this <https://github.com/pallets/click/issues/484>`_.
 With Typer, the keyword must be specified before each value:
 
@@ -39,16 +46,11 @@ All of the following invocations are equivalent:
 
 .. code-block:: console
 
-   $ my-program out.bin input1.bin input2.bin input3.bin
-   input=[PosixPath('input1.bin'), PosixPath('input2.bin'), PosixPath('input3.bin')] output=PosixPath('out.bin')
-
-   $ my-program out.bin --input input1.bin --input input2.bin --input input3.bin
-
-   $ my-program out.bin --input input1.bin input2.bin input3.bin
-
-   $ my-program --input input1.bin input2.bin input3.bin --output out.bin
-
-   $ my-program --input input1.bin input2.bin input3.bin -- output.bin
+   $ my-program output.bin input1.bin input2.bin input3.bin                         # Supplying arguments positionally.
+   $ my-program output.bin --input input1.bin --input input2.bin --input input3.bin # Supplying input arguments via multiple keywords.
+   $ my-program output.bin --input input1.bin input2.bin input3.bin                 # Supplying input arguments via a single keyword.
+   $ my-program --input input1.bin input2.bin input3.bin --output output.bin        # Supplying all arguments via keywords.
+   $ my-program --input input1.bin input2.bin input3.bin -- output.bin              # Using the POSIX convention to indicate the end of keywords
 
 To set this configuration for your entire application, supply it to your root :attr:`.App.default_parameter`:
 

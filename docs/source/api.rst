@@ -84,7 +84,7 @@ API
          app = App(help="This is my help string.")
          app()
 
-      .. code-block::
+      .. code-block:: console
 
          $ my-script --help
          Usage: scratch.py COMMAND
@@ -749,7 +749,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      If ``False``, treat the user-defined class annotation similar to a tuple.
+      If :obj:`False`, treat the user-defined class annotation similar to a tuple.
       Individual class sub-parameters will not be addressable by CLI keywords.
       The class will consume enough tokens to populate all required positional parameters.
 
@@ -828,9 +828,38 @@ API
       :type: Optional[bool]
       :value: None
 
-      When a parameter is **specified by keyword**, consume multiple elements worth of CLI tokens.
-      Will consume tokens until the stream is exhausted, or an and :attr:`.allow_leading_hyphen` is False
-      If ``False`` (default behavior), then only a single element worth of CLI tokens will be consumed.
+      Lists use `different parsing rules <rules.html#list>`__ depending on whether the values are provided positionally or by keyword. If the parameter is specified **positionally**, :attr:`Parameter.consume_multiple` is ignored.
+
+      If the parameter is specified **by keyword** and ``consume_multiple=True``, all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token (typically a keyword) is reached (unless :attr:`Parameter.allow_leading_hyphen` is :obj:`True`, in which case it will also be consumed).
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.command
+         def name_ext(
+             name: str,
+             ext: Annotated[list[str], Parameter(consume_multiple=True)],
+         ):
+             for extension in ext:
+                 print(f"{name}.{extension}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --name "my_file" --ext "txt" "pdf"  # stream is exhausted
+         my_file.txt
+         my_file.pdf
+
+         $ my-program --ext "txt" "pdf" --name "my_file"  # a keyword is reached
+         my_file.txt
+         my_file.pdf
+
+      If the parameter is specified **by keyword** and ``consume_multiple=False`` (the default), only a single element worth of CLI tokens will be consumed.
 
       .. code-block:: python
 
@@ -840,14 +869,18 @@ API
          app = App()
 
          @app.default
-         def rules(files: list[Path], ext: list[str] = []):
-            pass
+         def name_ext(name: str, ext: list[str]): # same as `ext: Annotated[list[str], Parameter(consume_multiple=False)]``
+             for extension in ext:
+                 print(f"{name}.{extension}")
 
          app()
 
       .. code-block:: console
 
-         $ cmd --ext .pdf --ext .html foo.md bar.md
+         $ my-program --name "my_file" --ext "txt" "pdf"
+         ╭─ Error ────────────────────────────────────────────╮
+         │ Unused Tokens: ['pdf'].                            │
+         ╰────────────────────────────────────────────────────╯
 
    .. attribute:: json_dict
       :type: Optional[bool]
@@ -1151,7 +1184,7 @@ All definitions in this section are simply predefined annotations for convenienc
 
 Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated to further configure behavior. E.g:
 
-.. code-block::
+.. code-block:: python
 
    Annotated[PositiveInt, Parameter(...)]
 
