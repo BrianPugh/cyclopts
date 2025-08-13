@@ -20,6 +20,7 @@ from typing import (
     Sequence,
     get_args,
     get_origin,
+    MutableMapping,
 )
 
 from attrs import define, field, Factory, evolve
@@ -203,11 +204,24 @@ from rich.console import RenderableType
 Cell: TypeAlias = RenderableType #| None
 ValueOrCallable: TypeAlias = Cell | Callable[["AbstractTableEntry"], Cell]
 
-# TODO: I am ONLY talking about the rich console implementation
-#   here so far
-@define
+@define(slots=True)
+class TableData:
+    """Intentionally empty dataclass.
+
+    Users can inherit from this and declore concrete fields and then pass
+    the object to AbstractTableEntry
+    """
+
+    pass
+
+def _resolve(v: Optional[ValueOrCallable]) -> Optional[RenderableType]:
+    if v is None:
+        return None
+    return v() if callable(v) else v
+
+@define(slots=True)
 class AbstractTableEntry:
-    """Adjust the Format on an entry level basis!
+    """Adjust the Format on an entry level basis.
 
     Include a dictionary of data, that all evalaute to
     RenderableType. Mapping column names -> Data
@@ -215,43 +229,84 @@ class AbstractTableEntry:
     Then pull any of the request data at rendertime
     """
 
-    # TODO: ValueOrCallable allows a lazy (or in other terms a smart) look up.
-    # The Callable must return a RenderableType, but could 
-    # allow for a smart look up like..
-
-
-    # [*] --max-memory   The maximum memory allowed (your 
-    #   system has XX total) 
-    # 
-    # ^^ Wouldn't that be kinda nifty!
-
-    # ValueOrCallable is RenderAbleType | Callable->RenderableType | None
-    data:dict[str, ValueOrCallable] = field(factory=lambda:{
-        "name" : None,
-        "short" : None,
-        "description" : None,
-        "required": False,
-    })
-
+    #TODO: Force all members to have a name, short, description and if
+    #       its required or not seems sane. Therefore they are members
+    name: RenderableType | None = None
+    short: RenderableType | None = None
+    description: RenderableType | None = None
+    required: bool = False
     sort_key: Any = None
 
-    def put(self, key: str, value: ValueOrCallable):
-        self.data[key] = value
+    # ValueOrCallable is RenderAbleType | Callable->RenderableType | None
+    extras: TableData = field(factory=TableData, repr=False)
+
+
+    def try_put(self, key: str, value: ValueOrCallable):
+        """Put a attr to the dataclass. 
+
+
+        """
+
+        if hasattr(self, key):
+            setattr(self, key, value)
+        elif hasattr(self.extras, key):
+            setattr(self.extras, key, value)
         return self
 
-    def get(self, key: str, default: Any = None) -> Any:
-        return self.data.get(key, default)
+
+
+
+    def put(self, key: str, value: ValueOrCallable):
+        """Put a attr to the dataclass. 
+
+
+        """
+
+        if hasattr(self, key):
+            setattr(self, key, value)
+        elif hasattr(self.extras, key):
+            setattr(self.extras, key, value)
+        else:
+            raise AttributeError(f"'{type(self.extras).__name__}' has no field {key}")
+        return self
+
+    def get(self, key: str, default: Any = None, resolve: bool = False) -> Any:
+        if hasattr(self, key):
+            val = getattr(self, key)
+            return _resolve(val) if resolve else val
+        if hasattr(self.extras, key):
+            val = getattr(self.extras, key)
+            return _resolve(val) if resolve else val
+        return default
 
     #TODO: This is sketch maybe
     def __getattr__(self, name: str)->ValueOrCallable:
+        """Access extra values as if they were members.
+        """
+        extras = object.__getattribute__(self, "extras")
         try:
-            return self.data[name]
-        except KeyError:
-            return None
-            #Jraise AttributeError(name)
+            return getattr(extras, name)
+        except AttributeError:
+            raise AttributeError
+        #if hasattr(self, name):
+        #    return getattr(self, name)
+        #elif hasattr(self.extras, name):
+        #    return getattr(self.extras, name)
+        #else:
+        #    #TODO: Most objects would raise Attribute Error
+        #    #return None
+        #    raise AttributeError(name)
+
+        #try:
+        #    return self.extra[name]
+        #except KeyError:
+        #    return None
+
+    def with_(self, **kw):
+        return evolve(self, **kw)
 
 
-from typing import Optional, Union
+from typing import Optional, Union 
 from rich.table import Table
 from rich.style import Style
 
@@ -304,26 +359,31 @@ class ColumnSpec:
 
         #print(f"RENDER COL KEY: {self.key}" )
 
-        # If it's lazy eval it now
+        # If it's a callable, eval the callable 
         if callable(raw):
-            raw = raw(entry)
-            entry.put(self.key, raw)
+            out = raw(entry)
+            entry.try_put(self.key, out)
+        else:
+            # If its a renderable type just keep that or None
+            out = raw
 
         # Apply the converter  - takes the whole entry
-        if self.converters:
+        # The converter requires that the current out 
+        # not be None. If it is, just return "" 
+        if self.converters: #and out is not None:
             converters = [self.converters] if  not isinstance(self.converters,list) else self.converters
 
             for converter in converters:
-                out = converter(entry)
-                entry.put(self.key, out)
-        else:
-            out = raw
+                out = converter(out, entry)
+                entry.try_put(self.key, out)
+                #entry = entry.with_(self.key=out)
+                #entry.put(self.key, out)
 
         # Apply the formatter - takes the current string
         if self.formatter:
             out = self.formatter(out, entry, self)
+            entry.try_put(self.key, out)
 
-        #return "" if raw is None else raw
         return "" if out is None else out
 
     def with_(self, **kw):
@@ -466,24 +526,23 @@ def wrap_formatter(inp: RenderableType, entry: AbstractTableEntry, col_spec:Colu
         new =  "\n".join(wrap(inp))
     return new
 
-def asterisk_converter(inp: AbstractTableEntry)->RenderableType:
+def asterisk_converter(out: RenderableType, inp: AbstractTableEntry)->RenderableType:
     if inp.required:
         return "*"
     return ""
 
-def stretch_name_converter(inp:AbstractTableEntry)->RenderableType:
+def stretch_name_converter(out: RenderableType, inp:AbstractTableEntry)->RenderableType:
     """Split name into two parts based on --.
 
     Example
     -------
         '--foo--no-foo'  to '--foo --no-foo'.
     """
-
     out = " --".join(inp.name.split("--"))
     return out[1:] if out[0] == " " else out
 
 
-def combine_long_short_converter(inp:AbstractTableEntry)->RenderableType:
+def combine_long_short_converter(out: RenderableType, inp:AbstractTableEntry)->RenderableType:
     """Concatenate a name and its short version.
 
     Examples
@@ -500,16 +559,9 @@ def combine_long_short_converter(inp:AbstractTableEntry)->RenderableType:
 AsteriskColumn = ColumnSpec(key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_converter)
 NameColumn = ColumnSpec(key="name", header="", justify="left",  style="cyan", formatter=wrap_formatter, converters=[stretch_name_converter, combine_long_short_converter])
 DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
-
-
 # For Commands:
 CommandColumn = ColumnSpec(key="name", header="", justify="left", style="cyan", formatter=wrap_formatter, converters=[stretch_name_converter, combine_long_short_converter] )
 
-
-
-
-# TODO: I am ONLY talking about the rich console implementation
-#   here so far
 
 @define
 class AbstractRichHelpPanel:
@@ -526,9 +578,7 @@ class AbstractRichHelpPanel:
     format: Literal["command", "parameter"]
     title: RenderableType
     description: RenderableType = field(factory=_text_factory)
-
     entries: list[AbstractTableEntry] = field(factory=list)
-
 
     column_specs: list[ColumnSpec] = field(
         default=Factory(
@@ -538,15 +588,17 @@ class AbstractRichHelpPanel:
         ,takes_self=True)
     )
 
-    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(columns=self.column_specs), takes_self=True))
+    table_spec: TableSpec = field(
+        default=Factory(lambda self: TableSpec(columns=self.column_specs), takes_self=True))
 
-    panel_spec: PanelSpec = field(default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
+    panel_spec: PanelSpec = field(
+        default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
 
     def remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            hashable = (item.data.get("name"),
-                        item.data.get("short"))
+            hashable = (item.name,
+                        item.short)
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
@@ -582,15 +634,13 @@ class AbstractRichHelpPanel:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        # 1. Adjust the format (need to keep default behavior...)
-        # TODO: Ideally I can do this is instanciation time
-        # of all the default columns... which would require the
-        # import of rich earlier
-        if self.format == "command":
-            #Jkjprint('making command')
-            commands_width = ceil(console.width * 0.35)
+        #TODO: Do this at instaiation time so that if a user changes the 
+        # columns (or doesnt want asterisk column not matter what) their 
+        # changes are not overridding by this. 
 
-            # Adjsut the max_width of the command cell
+        # 1. Adjust the format (need to keep default behavior...)
+        if self.format == "command":
+            commands_width = ceil(console.width * 0.35)
             for i in range(len(self.column_specs)):
                 spec = self.column_specs[i]
                 if spec.key == "name":
@@ -599,23 +649,25 @@ class AbstractRichHelpPanel:
 
         elif self.format == "parameter":
 
-            #IF NO PARAMETERS ARE REQUIRED ALL PARAMETERS SLIDE ALL THE 
-            # WAY TO THE LEFT... I.E) Remove the asterisk column
+            #print(f"OUR ENTRIES: {self.entries} REQUI? {any(x.required for x in self.entries)}")
+            #for x in self.entries:
+            #    print(f"Entry: {x.name} is req: {x.required}")
+            #print(f"IS REG: {[x.required for x in self.entries]}")
 
-            add_asterisk = any([x.get('required', False) for x in self.entries])
-
-            #Jkjprint('making parameter')
-            #print(f"Default cols are: {[x.key for x in self.column_specs]}")
-
-            if add_asterisk:
+            # Add AsteriskColumn if any params are required
+            if any(x.required for x in self.entries):
                 col_specs = [AsteriskColumn]
                 col_specs.extend(self.column_specs)
                 self.column_specs = col_specs
+                #print(f"ADDING ASTERISK")
+            #else:
+                #print(f"NOOOOOOOOOOOOOOOOOOOOOOO ATERISCK")
+
+            #print(f"Columns are now: {self.column_specs}")
 
             name_width = ceil(console.width * 0.35)
             short_width = ceil(console.width * 0.1)
 
-            #for i, spec in enumerate(self.column_specs):
             for i in range(len(self.column_specs)):
                 spec = self.column_specs[i]
                 if spec.key == "name":
@@ -627,8 +679,6 @@ class AbstractRichHelpPanel:
 
 
         # 2.Build table and Add Etnries
-        #print(f"Pre build, with self.column_specs: {[x.key for x in self.column_specs]}")
-        #print(f"Pre build, with table.columns: {[x.key for x in self.table_spec.columns]}")
         self.table_spec = self.table_spec.with_(columns = self.column_specs)
 
         table = self.table_spec.build()
@@ -815,12 +865,10 @@ def create_parameter_help_panel(
 
         # populate row
         entry = AbstractTableEntry(
-            data = {
-                "name" : "".join(long_options),
-                "description" : help_description,
-                "short" :" ".join(short_options),
-                "required":argument.required,
-            }
+                name="".join(long_options),
+                description= help_description,
+                short= "".join(short_options),
+                required= argument.required,
         )
 
         if argument.field_info.is_positional:
@@ -845,12 +893,10 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractT
 
         #print(f"The SHORTS ARE: {short_names} the LONGS ARE: {long_names}")
         entry = AbstractTableEntry(
-            data = {
-            "name":"\n".join(long_names),
-            "short":" ".join(short_names),
-            "description":InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
-            "sort_key":resolve_callables(app.sort_key, app),
-            }
+            name= "\n".join(long_names),
+            short=" ".join(short_names),
+            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
+            sort_key=resolve_callables(app.sort_key, app),
         )
         if entry not in entries:
             entries.append(entry)
