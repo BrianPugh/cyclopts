@@ -20,7 +20,8 @@ from typing import (
     Sequence,
     get_args,
     get_origin,
-    MutableMapping,
+    Protocol,
+    runtime_checkable
 )
 
 from attrs import define, field, Factory, evolve
@@ -30,6 +31,8 @@ from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import SortHelper, frozen, resolve_callables
+
+
 
 
 if TYPE_CHECKING:
@@ -199,10 +202,9 @@ class InlineText:
 
 
 from typing import TypeAlias
-from rich.console import RenderableType
 
-Cell: TypeAlias = RenderableType #| None
-ValueOrCallable: TypeAlias = Cell | Callable[["AbstractTableEntry"], Cell]
+ValueOrCallable: TypeAlias = "RenderableType" | Callable[["AbstractTableEntry"], "RenderableType"]
+#ValueOrCallable: TypeAlias = str | Callable[["AbstractTableEntry"], str]
 
 @define(slots=True)
 class TableData:
@@ -214,7 +216,8 @@ class TableData:
 
     pass
 
-def _resolve(v: Optional[ValueOrCallable]) -> Optional[RenderableType]:
+#def _resolve(v: Optional[ValueOrCallable]) -> Optional[RenderableType]:
+def _resolve(v: Optional[ValueOrCallable]) -> str | None:
     if v is None:
         return None
     return v() if callable(v) else v
@@ -229,39 +232,33 @@ class AbstractTableEntry:
     Then pull any of the request data at rendertime
     """
 
-    #TODO: Force all members to have a name, short, description and if
-    #       its required or not seems sane. Therefore they are members
+    from rich.console import RenderableType
+
     name: RenderableType | None = None
     short: RenderableType | None = None
     description: RenderableType | None = None
     required: bool = False
     sort_key: Any = None
 
-    # ValueOrCallable is RenderAbleType | Callable->RenderableType | None
     extras: TableData = field(factory=TableData, repr=False)
 
 
     def try_put(self, key: str, value: ValueOrCallable):
-        """Put a attr to the dataclass. 
+        """Put a attr to the dataclass.
 
-
+        This is looser than put, and will not raise an Attribute Error if
+        the member does not exist. This is useful when the list of entries
+        do not have all the same members.
         """
-
         if hasattr(self, key):
             setattr(self, key, value)
         elif hasattr(self.extras, key):
             setattr(self.extras, key, value)
         return self
 
-
-
-
     def put(self, key: str, value: ValueOrCallable):
-        """Put a attr to the dataclass. 
-
-
+        """Put a attr to the dataclass.
         """
-
         if hasattr(self, key):
             setattr(self, key, value)
         elif hasattr(self.extras, key):
@@ -279,53 +276,41 @@ class AbstractTableEntry:
             return _resolve(val) if resolve else val
         return default
 
-    #TODO: This is sketch maybe
     def __getattr__(self, name: str)->ValueOrCallable:
         """Access extra values as if they were members.
+
+        This makes members in the `extra` dataclass feel like
+        members of the `AbstractTableEntry` instance. Thus, psuedo
+        adding members is easy, and table generation is simplified.
         """
         extras = object.__getattribute__(self, "extras")
         try:
             return getattr(extras, name)
         except AttributeError:
             raise AttributeError
-        #if hasattr(self, name):
-        #    return getattr(self, name)
-        #elif hasattr(self.extras, name):
-        #    return getattr(self.extras, name)
-        #else:
-        #    #TODO: Most objects would raise Attribute Error
-        #    #return None
-        #    raise AttributeError(name)
-
-        #try:
-        #    return self.extra[name]
-        #except KeyError:
-        #    return None
-
     def with_(self, **kw):
         return evolve(self, **kw)
 
 
-from typing import Optional, Union 
-from rich.table import Table
-from rich.style import Style
-
-StyleType = Union[str, Style]
-PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
-
 
 @define(frozen=True)
 class ColumnSpec:
+    from rich.console import RenderableType
+    from rich.table import Table
+    from rich.style import Style
+
+    PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
+
     key: str
 
-    formatter:  Callable[[RenderableType, AbstractTableEntry, "ColumnSpec"], Cell] | None = None
-    converters: Callable[[AbstractTableEntry], Cell] | None | list[Callable[[AbstractTableEntry], Cell] | None] = None
+    formatter:  Callable[[RenderableType, AbstractTableEntry, "ColumnSpec"], RenderableType] | None = None
+    converters: Callable[[AbstractTableEntry], RenderableType] | None | list[Callable[[AbstractTableEntry], RenderableType] | None] = None
 
     header: str = ""
     footer: str = ""
-    header_style: StyleType | None = None
-    footer_style: StyleType | None = None
-    style: StyleType | None = None
+    header_style: Style | str | None = None
+    footer_style: Style | str | None = None
+    style: Style | str | None = None
     justify: str = "left"
     vertical: str = "top"
     overflow: str = "ellipsis"
@@ -357,7 +342,7 @@ class ColumnSpec:
         """
         raw = entry.get(self.key, None)
 
-        #print(f"RENDER COL KEY: {self.key}" )
+        print(f"RENDER COL KEY: {self.key}" )
 
         # If it's a callable, eval the callable 
         if callable(raw):
@@ -395,6 +380,12 @@ class ColumnSpec:
 class TableSpec:
     from rich.box import Box
 
+    from rich.table import Table
+    from rich.style import Style
+
+    StyleType = Style | str
+    PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
+
     # Intrinsic table styling/config
     title: str | None = None
     caption: str | None = None
@@ -408,13 +399,13 @@ class TableSpec:
     show_lines: bool = False
     expand: bool = False
     pad_edge: bool = False
-    #padding: PaddingType = (0, 2, 0, 0)
     padding: PaddingType = (0, 2, 0, 0)
     collapse_padding: bool = False
 
     columns: list[ColumnSpec] = field(factory=list)
 
     def build(self, **overrides) -> Table:
+        from rich.table import Table
         """Construct a rich.Table, allowing per-render overrides, e.g. build(padding=0)."""
         opts = {
             "title": self.title,
@@ -440,10 +431,10 @@ class TableSpec:
 
     def add_entries(self, table: Table, entries:Iterable[AbstractTableEntry]) -> None:
         """Insert the entries into the table."""
-        #print(f"Render cols: {[x.key for x in self.columns]}")
+        print(f"Render cols: {[x.key for x in self.columns]}")
         for e in entries:
             cells = [col.render_cell(e) for col in self.columns]
-            #print(f"For entry: {e.name} adding row: {cells}")
+            print(f"For entry: {e.name} adding row: {cells}")
             table.add_row(*cells)
 
     # To help with padding...
@@ -461,6 +452,13 @@ class TableSpec:
 class PanelSpec:
     from rich.box import Box, ROUNDED
     from rich.panel import Panel
+    from rich.console import RenderableType
+
+    from rich.style import Style
+
+    PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
+    StyleType = Style | str
+
 
     # Content-independent panel chrome
     title: RenderableType  = ""
@@ -510,7 +508,7 @@ class PanelSpec:
 
 
 # Define some default column specs
-def wrap_formatter(inp: RenderableType, entry: AbstractTableEntry, col_spec:ColumnSpec )->RenderableType:
+def wrap_formatter(inp: "RenderableType", entry: AbstractTableEntry, col_spec:ColumnSpec )->"RenderableType":
 
     import textwrap
     wrap = partial(
@@ -526,12 +524,12 @@ def wrap_formatter(inp: RenderableType, entry: AbstractTableEntry, col_spec:Colu
         new =  "\n".join(wrap(inp))
     return new
 
-def asterisk_converter(out: RenderableType, inp: AbstractTableEntry)->RenderableType:
+def asterisk_converter(out: "RenderableType", inp: AbstractTableEntry)->"RenderableType":
     if inp.required:
         return "*"
     return ""
 
-def stretch_name_converter(out: RenderableType, inp:AbstractTableEntry)->RenderableType:
+def stretch_name_converter(out: "RenderableType", inp:AbstractTableEntry)->"RenderableType":
     """Split name into two parts based on --.
 
     Example
@@ -542,7 +540,7 @@ def stretch_name_converter(out: RenderableType, inp:AbstractTableEntry)->Rendera
     return out[1:] if out[0] == " " else out
 
 
-def combine_long_short_converter(out: RenderableType, inp:AbstractTableEntry)->RenderableType:
+def combine_long_short_converter(out: "RenderableType", inp:AbstractTableEntry)->"RenderableType":
     """Concatenate a name and its short version.
 
     Examples
@@ -570,7 +568,7 @@ class AbstractRichHelpPanel:
     import textwrap
     from rich.box import Box, ROUNDED
     from rich.console import Group as RichGroup
-    from rich.console import NewLine
+    from rich.console import NewLine, RenderableType
     from rich.panel import Panel
     from rich.table import Table, Column
     from rich.text import Text
@@ -649,21 +647,11 @@ class AbstractRichHelpPanel:
 
         elif self.format == "parameter":
 
-            #print(f"OUR ENTRIES: {self.entries} REQUI? {any(x.required for x in self.entries)}")
-            #for x in self.entries:
-            #    print(f"Entry: {x.name} is req: {x.required}")
-            #print(f"IS REG: {[x.required for x in self.entries]}")
-
             # Add AsteriskColumn if any params are required
             if any(x.required for x in self.entries):
                 col_specs = [AsteriskColumn]
                 col_specs.extend(self.column_specs)
                 self.column_specs = col_specs
-                #print(f"ADDING ASTERISK")
-            #else:
-                #print(f"NOOOOOOOOOOOOOOOOOOOOOOO ATERISCK")
-
-            #print(f"Columns are now: {self.column_specs}")
 
             name_width = ceil(console.width * 0.35)
             short_width = ceil(console.width * 0.1)
@@ -891,7 +879,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractT
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
-        #print(f"The SHORTS ARE: {short_names} the LONGS ARE: {long_names}")
+        print(f"The SHORTS ARE: {short_names} the LONGS ARE: {long_names}")
         entry = AbstractTableEntry(
             name= "\n".join(long_names),
             short=" ".join(short_names),
