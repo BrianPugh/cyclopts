@@ -40,7 +40,7 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
-from cyclopts.help import (
+from cyclopts.autodecorate.help import (
     CycloptsPanel,
     AbstractRichHelpPanel,
     InlineText,
