@@ -1,6 +1,6 @@
 from typing import Iterable, Literal
 from attrs import define, field, Factory, evolve
-from cyclopts.autodecorate.help.protocols import Formatter, Converter, LazyData
+from cyclopts.help.protocols import Formatter, Converter, LazyData
 
 
 @define(frozen=True)

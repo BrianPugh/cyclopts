@@ -1,6 +1,5 @@
-"""
-Splitting of gathering
-and drawing!
+"""Generate help panels.
+
 """
 
 import inspect
@@ -29,10 +28,10 @@ from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import SortHelper, frozen, resolve_callables
-from cyclopts.autodecorate.help.protocols import Formatter, Converter, LazyData
-from cyclopts.autodecorate.help.formatters import wrap_formatter
-from cyclopts.autodecorate.help.converters import combine_long_short_converter, stretch_name_converter, asterisk_converter
-from cyclopts.autodecorate.help.specs import ColumnSpec, TableSpec, PanelSpec
+from cyclopts.help.protocols import Formatter, Converter, LazyData
+from cyclopts.help.formatters import wrap_formatter
+from cyclopts.help.converters import combine_long_short_converter, stretch_name_converter, asterisk_converter
+from cyclopts.help.specs import ColumnSpec, TableSpec, PanelSpec
 
 
 if TYPE_CHECKING:
