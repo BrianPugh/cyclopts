@@ -1,7 +1,7 @@
 __all__ = [
-
     "Converter",
     "Formatter",
+    "LazyData",
     "AbstractTableEntry",
     "TableData",
     "TableSpec",
@@ -19,20 +19,21 @@ __all__ = [
 ]
 
 from .help import (
-    Converter,
-    Formatter,
-    AbstractTableEntry,
-    TableData,
-    TableSpec,
-    PanelSpec,
-    ColumnSpec,
     AbstractRichHelpPanel,
+    AbstractTableEntry,
+    CycloptsPanel,
+    InlineText,
+    TableData,
     create_parameter_help_panel,
     format_command_entries,
-    resolve_help_format,
-    resolve_version_format,
-    CycloptsPanel,
     format_doc,
     format_usage,
-    InlineText,
+    resolve_help_format,
+    resolve_version_format,
+)
+from .protocols import Converter, Formatter, LazyData
+from .specs import (
+    ColumnSpec,
+    PanelSpec,
+    TableSpec,
 )

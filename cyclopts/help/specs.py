@@ -1,13 +1,19 @@
-from typing import Iterable, Literal
-from attrs import define, field, evolve
-from cyclopts.help.protocols import Formatter, Converter
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Iterable, Literal
+
+from attrs import define, evolve, field
+
+if TYPE_CHECKING:
+    from cyclopts.help import AbstractTableEntry
+    from cyclopts.help.protocols import Converter, Formatter
 
 
 @define(frozen=True)
 class ColumnSpec:
     from rich.console import RenderableType
-    from rich.table import Table
     from rich.style import Style
+    from rich.table import Table
 
     PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
 
@@ -47,7 +53,7 @@ class ColumnSpec:
             no_wrap=self.no_wrap,
         )
 
-    def render_cell(self, entry: "AbstractTableEntry") -> RenderableType:
+    def render_cell(self, entry: AbstractTableEntry) -> RenderableType:
         """Render the cell."""
         raw = entry.get(self.key, None)
         out = raw(entry) if callable(raw) else raw
@@ -74,8 +80,8 @@ class ColumnSpec:
 @define(frozen=True)
 class TableSpec:
     from rich.box import Box
-    from rich.table import Table
     from rich.style import Style
+    from rich.table import Table
 
     StyleType = Style | str
     PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
@@ -124,14 +130,14 @@ class TableSpec:
             col.add_to(table)
         return table
 
-    def add_entries(self, table: Table, entries: Iterable["AbstractTableEntry"]) -> None:
+    def add_entries(self, table: Table, entries: Iterable[AbstractTableEntry]) -> None:
         """Insert the entries into the table."""
         for e in entries:
             cells = [col.render_cell(e) for col in self.columns]
             table.add_row(*cells)
 
     # To help with padding...
-    def with_padding(self, padding: PaddingType) -> "TableSpec":
+    def with_padding(self, padding: PaddingType) -> TableSpec:
         """Immutable helper to tweak padding."""
         return evolve(self, padding=padding)
 
@@ -141,10 +147,9 @@ class TableSpec:
 
 @define(frozen=True)
 class PanelSpec:
-    from rich.box import Box, ROUNDED
-    from rich.panel import Panel
+    from rich.box import ROUNDED, Box
     from rich.console import RenderableType
-
+    from rich.panel import Panel
     from rich.style import Style
 
     PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
@@ -186,13 +191,11 @@ class PanelSpec:
         return Panel(renderable, **opts)
 
     # Handy immutable helpers
-    def with_box(self, box: Box) -> "PanelSpec":
+    def with_box(self, box: Box) -> PanelSpec:
         return evolve(self, box=box)
 
-    def with_padding(self, padding: PaddingType) -> "PanelSpec":
+    def with_padding(self, padding: PaddingType) -> PanelSpec:
         return evolve(self, padding=padding)
 
-    def with_border_style(self, style: StyleType) -> "PanelSpec":
+    def with_border_style(self, style: StyleType) -> PanelSpec:
         return evolve(self, border_style=style)
-
-

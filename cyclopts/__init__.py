@@ -36,8 +36,6 @@ __all__ = [
     "types",
     "validators",
     "run",
-    "Converter",
-    "Formatter"
 ]
 
 from cyclopts._convert import convert
@@ -61,11 +59,12 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.group import Group
-#from cyclopts.help import CycloptsPanel
+from cyclopts.help import CycloptsPanel
+
+# from cyclopts.help import CycloptsPanel
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, default_name_transform
-from cyclopts.help import CycloptsPanel
 
 from . import config, types, validators

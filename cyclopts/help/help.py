@@ -1,10 +1,11 @@
-from attrs import define, field, Factory, evolve
-from collections.abc import Iterable
+from __future__ import annotations
+
+import inspect
 import sys
+from collections.abc import Iterable
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
-import inspect
 from math import ceil
 from typing import (
     TYPE_CHECKING,
@@ -12,23 +13,21 @@ from typing import (
     Any,
     Callable,
     Literal,
-    Optional,
     Sequence,
     get_args,
     get_origin,
-    TypeAlias,
 )
+
+from attrs import Factory, define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
-from cyclopts.utils import SortHelper, resolve_callables
-from cyclopts.help.protocols import LazyData
+from cyclopts.help.converters import asterisk_converter, combine_long_short_converter, stretch_name_converter
 from cyclopts.help.formatters import wrap_formatter
-from cyclopts.help.converters import combine_long_short_converter, stretch_name_converter, asterisk_converter
-from cyclopts.help.specs import ColumnSpec, TableSpec, PanelSpec
-
+from cyclopts.help.specs import ColumnSpec, PanelSpec, TableSpec
+from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
+    from cyclopts.help.protocols import LazyData
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -71,17 +71,18 @@ def docstring_parse(doc: str, format: str):
 
 def _text_factory():
     from rich.text import Text
+
     return Text()
 
 
 class InlineText:
-    def __init__(self, primary_renderable: "RenderableType", *, force_empty_end=False):
+    def __init__(self, primary_renderable: RenderableType, *, force_empty_end=False):
         self.primary_renderable = primary_renderable
         self.texts = []
         self.force_empty_end = force_empty_end
 
     @classmethod
-    def from_format(cls, content: Optional[str], format: str, *, force_empty_end=False):
+    def from_format(cls, content: str | None, format: str, *, force_empty_end=False):
         if content is None:
             from rich.text import Text
 
@@ -107,7 +108,7 @@ class InlineText:
 
         return cls(primary_renderable, force_empty_end=force_empty_end)
 
-    def append(self, text: "Text"):
+    def append(self, text: Text):
         self.texts.append(text)
 
     def __rich_console__(self, console, options):
@@ -187,16 +188,13 @@ class InlineText:
             yield from wrapped_segments
 
 
-
-ValueOrCallable: TypeAlias = str | LazyData
-
-def _resolve(v: ValueOrCallable | None) -> str | None:
+def _resolve(v: str | LazyData | None) -> str | None:
     if v is None:
         return None
     return v() if callable(v) else v
 
 
-#TODO: Is there a low cost runtime validator that all members in this 
+# TODO: Is there a low cost runtime validator that all members in this
 #       are renderable?
 @define(slots=True)
 class TableData:
@@ -208,13 +206,14 @@ class TableData:
 
     pass
 
+
 @define(slots=True)
 class AbstractTableEntry:
     """Abstract version of TableEntry.
 
     Member extras can be a user-defined dataclass. All members in `extras`
     will be treated as if they are members of `AbstractTableEntry` allowing
-    for arbitary data to be included in the Entry.
+    for arbitrary data to be included in the Entry.
     """
 
     from rich.console import RenderableType
@@ -227,12 +226,12 @@ class AbstractTableEntry:
 
     extras: TableData = field(factory=TableData, repr=False)
 
-    def try_put(self, key: str, value: ValueOrCallable):
+    def try_put(self, key: str, value: str | LazyData):
         """Put a attr to the dataclass.
 
         This is looser than put, and will not raise an Attribute Error if
         the member does not exist. This is useful when the list of entries
-        do not have all the same members. This was required for 
+        do not have all the same members. This was required for
         `ColeSpec.render_cell`
         """
         if hasattr(self, key):
@@ -241,7 +240,7 @@ class AbstractTableEntry:
             setattr(self.extras, key, value)
         return self
 
-    def put(self, key: str, value: ValueOrCallable):
+    def put(self, key: str, value: str | LazyData):
         """Put a attr to the dataclass."""
         if hasattr(self, key):
             setattr(self, key, value)
@@ -260,21 +259,22 @@ class AbstractTableEntry:
             return _resolve(val) if resolve else val
         return default
 
-    def __getattr__(self, name: str) -> ValueOrCallable:
+    def __getattr__(self, name: str) -> str | LazyData:
         """Access extra values as if they were members.
 
         This makes members in the `extra` dataclass feel like
-        members of the `AbstractTableEntry` instance. Thus, psuedo
+        members of the `AbstractTableEntry` instance. Thus, pseudo
         adding members is easy, and table generation is simplified.
         """
         extras = object.__getattribute__(self, "extras")
         try:
             return getattr(extras, name)
-        except AttributeError:
-            raise AttributeError
+        except AttributeError as err:
+            raise AttributeError(f"'{type(self)} nor {type(self.extras).__name__}' have field {name}") from err
 
     def with_(self, **kw):
         return evolve(self, **kw)
+
 
 # For Parameters:
 AsteriskColumn = ColumnSpec(
@@ -304,11 +304,11 @@ CommandColumn = ColumnSpec(
 class AbstractRichHelpPanel:
     """Adjust the Format for the help panel!."""
 
-    from rich.box import Box, ROUNDED
+    from rich.box import ROUNDED, Box
     from rich.console import Group as RichGroup
     from rich.console import NewLine, RenderableType
     from rich.panel import Panel
-    from rich.table import Table, Column
+    from rich.table import Column, Table
     from rich.text import Text
 
     format: Literal["command", "parameter"]
@@ -350,7 +350,7 @@ class AbstractRichHelpPanel:
         else:
             raise NotImplementedError
 
-    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         if not self.entries:
             return _silent
 
@@ -368,8 +368,8 @@ class AbstractRichHelpPanel:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
         # TODO: Do this at instaiation time so that if a user changes the
-        # columns (or doesnt want asterisk column not matter what) their
-        # changes are not overridding by this.
+        # columns (or does not want asterisk column not matter what) their
+        # changes are not overriding by this.
 
         # 1. Adjust the format (need to keep default behavior...)
         if self.format == "command":
@@ -414,7 +414,7 @@ class AbstractRichHelpPanel:
 class SilentRich:
     """Dummy object that causes nothing to be printed."""
 
-    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         # This generator yields nothing, so ``rich`` will print nothing for this object.
         if False:
             yield
@@ -475,7 +475,7 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
-def format_doc(app: "App", format: str = "restructuredtext"):
+def format_doc(app: App, format: str = "restructuredtext"):
     raw_doc_string = app.help
 
     if not raw_doc_string:
@@ -519,8 +519,8 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]
 
 
 def create_parameter_help_panel(
-    group: "Group",
-    argument_collection: "ArgumentCollection",
+    group: Group,
+    argument_collection: ArgumentCollection,
     format: str,
 ) -> AbstractRichHelpPanel:
     from rich.text import Text
@@ -603,7 +603,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractTableEntry]:
+def format_command_entries(apps: Iterable[App], format: str) -> list[AbstractTableEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -623,7 +623,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractT
     return entries
 
 
-def resolve_help_format(app_chain: Iterable["App"]) -> str:
+def resolve_help_format(app_chain: Iterable[App]) -> str:
     # Resolve help_format; None fallsback to parent; non-None overwrites parent.
     format_ = "restructuredtext"
     for app in app_chain:
@@ -632,7 +632,7 @@ def resolve_help_format(app_chain: Iterable["App"]) -> str:
     return format_
 
 
-def resolve_version_format(app_chain: Iterable["App"]) -> str:
+def resolve_version_format(app_chain: Iterable[App]) -> str:
     format_ = resolve_help_format(app_chain)
     for app in app_chain:
         if app.version_format is not None:
@@ -641,7 +641,7 @@ def resolve_version_format(app_chain: Iterable["App"]) -> str:
 
 
 # named like a class because it's just a very thin wrapper around a class.
-def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Panel":  # noqa: N802
+def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> Panel:  # noqa: N802
     """Create a :class:`~rich.panel.Panel` with a consistent style.
 
     The resulting panel can be displayed using a :class:`~rich.console.Console`.
