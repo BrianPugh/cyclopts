@@ -1,13 +1,10 @@
-"""Generate help panels.
-
-"""
-
-import inspect
-import sys
+from attrs import define, field, Factory, evolve
 from collections.abc import Iterable
+import sys
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
+import inspect
 from math import ceil
 from typing import (
     TYPE_CHECKING,
@@ -22,13 +19,12 @@ from typing import (
     TypeAlias,
 )
 
-from attrs import define, field, Factory, evolve
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
-from cyclopts.utils import SortHelper, frozen, resolve_callables
-from cyclopts.help.protocols import Formatter, Converter, LazyData
+from cyclopts.utils import SortHelper, resolve_callables
+from cyclopts.help.protocols import LazyData
 from cyclopts.help.formatters import wrap_formatter
 from cyclopts.help.converters import combine_long_short_converter, stretch_name_converter, asterisk_converter
 from cyclopts.help.specs import ColumnSpec, TableSpec, PanelSpec
@@ -200,6 +196,8 @@ def _resolve(v: ValueOrCallable | None) -> str | None:
     return v() if callable(v) else v
 
 
+#TODO: Is there a low cost runtime validator that all members in this 
+#       are renderable?
 @define(slots=True)
 class TableData:
     """Intentionally empty dataclass.
@@ -212,12 +210,11 @@ class TableData:
 
 @define(slots=True)
 class AbstractTableEntry:
-    """Adjust the Format on an entry level basis.
+    """Abstract version of TableEntry.
 
-    Include a dictionary of data, that all evalaute to
-    RenderableType. Mapping column names -> Data
-
-    Then pull any of the request data at rendertime
+    Member extras can be a user-defined dataclass. All members in `extras`
+    will be treated as if they are members of `AbstractTableEntry` allowing
+    for arbitary data to be included in the Entry.
     """
 
     from rich.console import RenderableType
@@ -235,7 +232,8 @@ class AbstractTableEntry:
 
         This is looser than put, and will not raise an Attribute Error if
         the member does not exist. This is useful when the list of entries
-        do not have all the same members.
+        do not have all the same members. This was required for 
+        `ColeSpec.render_cell`
         """
         if hasattr(self, key):
             setattr(self, key, value)

@@ -1,6 +1,6 @@
 from typing import Iterable, Literal
-from attrs import define, field, Factory, evolve
-from cyclopts.help.protocols import Formatter, Converter, LazyData
+from attrs import define, field, evolve
+from cyclopts.help.protocols import Formatter, Converter
 
 
 @define(frozen=True)
@@ -13,10 +13,8 @@ class ColumnSpec:
 
     key: str
 
-    # formatter:  Callable[[RenderableType, AbstractTableEntry, "ColumnSpec"], RenderableType] | None = None
     formatter: Formatter | None = None
     converters: Converter | list[Converter] | None = None
-    # Callable[[AbstractTableEntry], RenderableType] | None | list[Callable[[AbstractTableEntry], RenderableType] | None] = None
 
     header: str = ""
     footer: str = ""

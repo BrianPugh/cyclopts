@@ -1,11 +1,6 @@
-"""Default Formatters.
-
-"""
-from functools import  partial
-
-# Define some default column specs
 def wrap_formatter(inp: "RenderableType", _: "AbstractTableEntry", col_spec: "ColumnSpec") -> "RenderableType":
     import textwrap
+    from functools import partial
 
     wrap = partial(
         textwrap.wrap,
@@ -19,6 +14,3 @@ def wrap_formatter(inp: "RenderableType", _: "AbstractTableEntry", col_spec: "Co
     else:
         new = "\n".join(wrap(inp))
     return new
-
-
-

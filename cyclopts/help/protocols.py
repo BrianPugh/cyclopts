@@ -24,9 +24,9 @@ class Formatter(Protocol):
 class LazyData(Protocol):
     """Protocol for AbstractTableEntry LazyData.
 
-    A member of in a TableData instance can be a callable. This allows for some 
-    dyanic / lazy data gathering. Because the cell must be rendered, the callable's 
-    arguments need a protcol. That is, the current "out", and the whole entry 
+    A member of in a TableData instance can be a callable. This allows for some
+    dyanic / lazy data gathering. Because the cell must be rendered, the callable's
+    arguments need a protcol. That is, the current "out", and the whole entry
     """
 
     from rich.console import RenderableType
