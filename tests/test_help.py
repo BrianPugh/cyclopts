@@ -11,7 +11,7 @@ from cyclopts import App, Group, Parameter
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CoercionError, MissingArgumentError
 from cyclopts.help import (
-    HelpPanel,
+    AbstractRichHelpPanel,
     create_parameter_help_panel,
     format_command_entries,
     format_usage,
@@ -27,7 +27,7 @@ def app():
 
 
 def test_empty_help_panel_rich_silent(console):
-    help_panel = HelpPanel(format="command", title="test")
+    help_panel = AbstractRichHelpPanel(format="command", title="test")
 
     with console.capture() as capture:
         console.print(help_panel)
@@ -161,7 +161,7 @@ def test_format_commands_docstring(app, console):
         This should not be shown.
         """
 
-    panel = HelpPanel(title="Commands", format="command")
+    panel = AbstractRichHelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
@@ -194,7 +194,7 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
         long description.
         """  # noqa: D404
 
-    panel = HelpPanel(title="Commands", format="command")
+    panel = AbstractRichHelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
@@ -249,7 +249,7 @@ def test_format_commands_explicit_help(app, console):
         """Should not be shown."""
         pass
 
-    panel = HelpPanel(title="Commands", format="command")
+    panel = AbstractRichHelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
@@ -271,7 +271,7 @@ def test_format_commands_explicit_name(app, console):
         """
         pass
 
-    panel = HelpPanel(title="Commands", format="command")
+    panel = AbstractRichHelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
     with console.capture() as capture:
         console.print(panel)
@@ -452,7 +452,7 @@ def test_help_format_group_parameters_short_name(capture_format_group_parameters
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO --foo  -f  Docstring for foo. [required]                    │
+        │ *  FOO --foo -f  Docstring for foo. [required]                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -876,7 +876,7 @@ def test_help_parameter_string_annotation(capture_format_group_parameters):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  NUMBER --number  -n  A number to print. [required]              │
+        │ *  NUMBER --number -n  A number to print. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1273,8 +1273,8 @@ def test_help_print_combined_parameter_command_group(app, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
-        │ *  VALUE1 --value1      [required]                                 │
-        │    --help           -h  Display this message and exit.             │
+        │ *  VALUE1 --value1  [required]                                     │
+        │    --help -h        Display this message and exit.                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1602,7 +1602,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │ *  --hostname -n  Hostname to connect to. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1644,7 +1644,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │ *  --hostname -n  Hostname to connect to. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
