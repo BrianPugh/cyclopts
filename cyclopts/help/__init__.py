@@ -16,6 +16,7 @@ __all__ = [
     "format_doc",
     "format_usage",
     "InlineText",
+    "_get_choices",
 ]
 
 from .help import (
@@ -24,6 +25,7 @@ from .help import (
     CycloptsPanel,
     InlineText,
     TableData,
+    _get_choices,
     create_parameter_help_panel,
     format_command_entries,
     format_doc,
