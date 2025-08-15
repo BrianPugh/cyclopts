@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,26 +6,26 @@ if TYPE_CHECKING:
     from cyclopts.help import AbstractTableEntry
 
 
-def asterisk_converter(_: RenderableType, inp: AbstractTableEntry) -> RenderableType:
-    if inp.required:
+def asterisk_required_converter(out: "RenderableType", entry: "AbstractTableEntry") -> "RenderableType":
+    if entry.required:
         return "*"
     return ""
 
 
-def stretch_name_converter(_: RenderableType, inp: AbstractTableEntry) -> RenderableType:
+def stretch_name_converter(out: "RenderableType", entry: "AbstractTableEntry") -> "RenderableType":
     """Split name into two parts based on --.
 
     Example
     -------
         '--foo--no-foo'  to '--foo --no-foo'.
     """
-    if inp.name is None:
+    if entry.name is None:
         return ""
-    out = " --".join(inp.name.split("--"))
+    out = " --".join(entry.name.split("--"))
     return out[1:] if out[0] == " " else out
 
 
-def combine_long_short_converter(_: RenderableType, inp: AbstractTableEntry) -> RenderableType:
+def combine_long_short_converter(out: "RenderableType", entry: "AbstractTableEntry") -> "RenderableType":
     """Concatenate a name and its short version.
 
     Examples
@@ -36,4 +34,6 @@ def combine_long_short_converter(_: RenderableType, inp: AbstractTableEntry) -> 
         short = "-h"
         return: "--help -h"
     """
-    return inp.name + " " + inp.short
+    name = "" if entry.name is None else entry.name
+    short = "" if entry.short is None else entry.short
+    return name + " " + short

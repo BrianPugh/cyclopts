@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import inspect
 import sys
 from collections.abc import Iterable
@@ -13,7 +11,9 @@ from typing import (
     Any,
     Callable,
     Literal,
+    Optional,
     Sequence,
+    Union,
     get_args,
     get_origin,
 )
@@ -24,7 +24,7 @@ from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
-from cyclopts.help.converters import asterisk_converter, combine_long_short_converter, stretch_name_converter
+from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
 from cyclopts.help.formatters import wrap_formatter
 from cyclopts.help.specs import ColumnSpec, PanelSpec, TableSpec
 from cyclopts.utils import SortHelper, resolve_callables
@@ -76,13 +76,13 @@ def _text_factory():
 
 
 class InlineText:
-    def __init__(self, primary_renderable: RenderableType, *, force_empty_end=False):
+    def __init__(self, primary_renderable: "RenderableType", *, force_empty_end=False):
         self.primary_renderable = primary_renderable
         self.texts = []
         self.force_empty_end = force_empty_end
 
     @classmethod
-    def from_format(cls, content: str | None, format: str, *, force_empty_end=False):
+    def from_format(cls, content: Optional[str], format: str, *, force_empty_end=False):
         if content is None:
             from rich.text import Text
 
@@ -108,7 +108,7 @@ class InlineText:
 
         return cls(primary_renderable, force_empty_end=force_empty_end)
 
-    def append(self, text: Text):
+    def append(self, text: "Text"):
         self.texts.append(text)
 
     def __rich_console__(self, console, options):
@@ -188,10 +188,8 @@ class InlineText:
             yield from wrapped_segments
 
 
-def _resolve(v: str | LazyData | None) -> str | None:
-    if v is None:
-        return None
-    return v() if callable(v) else v
+def _resolve(v: Union["RenderableType", "LazyData"], entry: "AbstractTableEntry") -> "RenderableType":
+    return v(entry) if callable(v) else v
 
 
 # TODO: Is there a low cost runtime validator that all members in this
@@ -218,15 +216,15 @@ class AbstractTableEntry:
 
     from rich.console import RenderableType
 
-    name: str | None = None
-    short: str | None = None
-    description: RenderableType | None = None
+    name: Optional[str] = None
+    short: Optional[str] = None
+    description: Optional[RenderableType] = None
     required: bool = False
     sort_key: Any = None
 
     extras: TableData = field(factory=TableData, repr=False)
 
-    def try_put(self, key: str, value: str | LazyData):
+    def try_put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
         """Put a attr to the dataclass.
 
         This is looser than put, and will not raise an Attribute Error if
@@ -240,7 +238,7 @@ class AbstractTableEntry:
             setattr(self.extras, key, value)
         return self
 
-    def put(self, key: str, value: str | LazyData):
+    def put(self, key: str, value: Optional[Union[str, "LazyData"]]):
         """Put a attr to the dataclass."""
         if hasattr(self, key):
             setattr(self, key, value)
@@ -250,16 +248,16 @@ class AbstractTableEntry:
             raise AttributeError(f"'{type(self.extras).__name__}' has no field {key}")
         return self
 
-    def get(self, key: str, default: Any = None, resolve: bool = False) -> Any:
+    def get(self, key: str, default: Any = None, resolve: bool = False) -> Union["LazyData", "RenderableType"]:
         if hasattr(self, key):
             val = getattr(self, key)
-            return _resolve(val) if resolve else val
+            return _resolve(val, self) if resolve else val
         if hasattr(self.extras, key):
             val = getattr(self.extras, key)
-            return _resolve(val) if resolve else val
+            return _resolve(val, self) if resolve else val
         return default
 
-    def __getattr__(self, name: str) -> str | LazyData:
+    def __getattr__(self, name: str) -> Union[str, "LazyData"]:
         """Access extra values as if they were members.
 
         This makes members in the `extra` dataclass feel like
@@ -278,7 +276,7 @@ class AbstractTableEntry:
 
 # For Parameters:
 AsteriskColumn = ColumnSpec(
-    key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_converter
+    key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_required_converter
 )
 NameColumn = ColumnSpec(
     key="name",
@@ -344,13 +342,20 @@ class AbstractRichHelpPanel:
 
         if self.format == "command":
             sorted_sort_helper = SortHelper.sort(
-                [SortHelper(entry.sort_key, (entry.name.startswith("-"), entry.name), entry) for entry in self.entries]
+                [
+                    SortHelper(
+                        entry.sort_key,
+                        (entry.name.startswith("-") if entry.name is not None else False, entry.name),
+                        entry,
+                    )
+                    for entry in self.entries
+                ]
             )
             self.entries = [x.value for x in sorted_sort_helper]
         else:
             raise NotImplementedError
 
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
         if not self.entries:
             return _silent
 
@@ -414,7 +419,7 @@ class AbstractRichHelpPanel:
 class SilentRich:
     """Dummy object that causes nothing to be printed."""
 
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
         # This generator yields nothing, so ``rich`` will print nothing for this object.
         if False:
             yield
@@ -475,7 +480,7 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
-def format_doc(app: App, format: str = "restructuredtext"):
+def format_doc(app: "App", format: str = "restructuredtext"):
     raw_doc_string = app.help
 
     if not raw_doc_string:
@@ -519,8 +524,8 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]
 
 
 def create_parameter_help_panel(
-    group: Group,
-    argument_collection: ArgumentCollection,
+    group: "Group",
+    argument_collection: "ArgumentCollection",
     format: str,
 ) -> AbstractRichHelpPanel:
     from rich.text import Text
@@ -603,7 +608,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable[App], format: str) -> list[AbstractTableEntry]:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractTableEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -623,7 +628,7 @@ def format_command_entries(apps: Iterable[App], format: str) -> list[AbstractTab
     return entries
 
 
-def resolve_help_format(app_chain: Iterable[App]) -> str:
+def resolve_help_format(app_chain: Iterable["App"]) -> str:
     # Resolve help_format; None fallsback to parent; non-None overwrites parent.
     format_ = "restructuredtext"
     for app in app_chain:
@@ -632,7 +637,7 @@ def resolve_help_format(app_chain: Iterable[App]) -> str:
     return format_
 
 
-def resolve_version_format(app_chain: Iterable[App]) -> str:
+def resolve_version_format(app_chain: Iterable["App"]) -> str:
     format_ = resolve_help_format(app_chain)
     for app in app_chain:
         if app.version_format is not None:
@@ -641,7 +646,7 @@ def resolve_version_format(app_chain: Iterable[App]) -> str:
 
 
 # named like a class because it's just a very thin wrapper around a class.
-def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> Panel:  # noqa: N802
+def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Panel":  # noqa: N802
     """Create a :class:`~rich.panel.Panel` with a consistent style.
 
     The resulting panel can be displayed using a :class:`~rich.console.Console`.

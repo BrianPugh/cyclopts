@@ -1,27 +1,26 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from .specs import AbstractTableEntry, ColumnSpec
+    from rich.console import RenderableType
+
+    from .help import AbstractTableEntry
+    from .specs import ColumnSpec
 
 
 @runtime_checkable
 class Converter(Protocol):
     """Protocol for AbstractTableEntry converters."""
 
-    from rich.console import RenderableType
-
-    def __call__(self, out: RenderableType, entry: AbstractTableEntry) -> RenderableType: ...
+    def __call__(self, out: "RenderableType", entry: "AbstractTableEntry") -> "RenderableType": ...
 
 
 @runtime_checkable
 class Formatter(Protocol):
     """Protocol for AbstractTableEntry converters."""
 
-    from rich.console import RenderableType
-
-    def __call__(self, out: RenderableType, entry: AbstractTableEntry, col_specs: ColumnSpec) -> RenderableType: ...
+    def __call__(
+        self, out: "RenderableType", entry: "AbstractTableEntry", col_spec: "ColumnSpec"
+    ) -> "RenderableType": ...
 
 
 @runtime_checkable
@@ -33,6 +32,4 @@ class LazyData(Protocol):
     arguments need a protocol. That is, the current "out", and the whole entry
     """
 
-    from rich.console import RenderableType
-
-    def __call__(self, entry: AbstractTableEntry) -> RenderableType: ...
+    def __call__(self, entry: "AbstractTableEntry") -> "RenderableType": ...

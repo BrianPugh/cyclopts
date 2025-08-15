@@ -1,6 +1,5 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Iterable, Literal
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from attrs import define, evolve, field
 
@@ -15,25 +14,25 @@ class ColumnSpec:
     from rich.style import Style
     from rich.table import Table
 
-    PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
+    PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
     key: str
 
-    formatter: Formatter | None = None
-    converters: Converter | list[Converter] | None = None
+    formatter: Optional["Formatter"] = None
+    converters: Optional[Union["Converter", list["Converter"]]] = None
 
     header: str = ""
     footer: str = ""
-    header_style: Style | str | None = None
-    footer_style: Style | str | None = None
-    style: Style | str | None = None
-    justify: str = "left"
-    vertical: str = "top"
-    overflow: str = "ellipsis"
-    width: int | None = None
-    min_width: int | None = None
-    max_width: int | None = None
-    ratio: int | None = None
+    header_style: Optional[Union[Style, str]] = None
+    footer_style: Optional[Union[Style, str]] = None
+    style: Optional[Union[Style, str]] = None
+    justify: Literal["default", "left", "center", "right", "full"] = "left"
+    vertical: Literal["top", "middle", "bottom"] = "top"
+    overflow: Literal["fold", "crop", "ellipsis", "ignore"] = "ellipsis"
+    width: Optional[int] = None
+    min_width: Optional[int] = None
+    max_width: Optional[int] = None
+    ratio: Optional[int] = None
     no_wrap: bool = False
 
     def add_to(self, table: Table) -> None:
@@ -53,7 +52,7 @@ class ColumnSpec:
             no_wrap=self.no_wrap,
         )
 
-    def render_cell(self, entry: AbstractTableEntry) -> RenderableType:
+    def render_cell(self, entry: "AbstractTableEntry") -> RenderableType:
         """Render the cell."""
         raw = entry.get(self.key, None)
         out = raw(entry) if callable(raw) else raw
@@ -83,17 +82,17 @@ class TableSpec:
     from rich.style import Style
     from rich.table import Table
 
-    StyleType = Style | str
-    PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
+    StyleType = Union[Style, str]
+    PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
     # Intrinsic table styling/config
-    title: str | None = None
-    caption: str | None = None
-    style: StyleType | None = None
-    border_style: StyleType | None = None
-    header_style: StyleType | None = None
-    footer_style: StyleType | None = None
-    box: Box | None = None
+    title: Optional[str] = None
+    caption: Optional[str] = None
+    style: Optional[StyleType] = None
+    border_style: Optional[StyleType] = None
+    header_style: Optional[StyleType] = None
+    footer_style: Optional[StyleType] = None
+    box: Optional[Box] = None
     show_header: bool = False
     show_footer: bool = False
     show_lines: bool = False
@@ -130,14 +129,14 @@ class TableSpec:
             col.add_to(table)
         return table
 
-    def add_entries(self, table: Table, entries: Iterable[AbstractTableEntry]) -> None:
+    def add_entries(self, table: Table, entries: Iterable["AbstractTableEntry"]) -> None:
         """Insert the entries into the table."""
         for e in entries:
             cells = [col.render_cell(e) for col in self.columns]
             table.add_row(*cells)
 
     # To help with padding...
-    def with_padding(self, padding: PaddingType) -> TableSpec:
+    def with_padding(self, padding: PaddingType) -> "TableSpec":
         """Immutable helper to tweak padding."""
         return evolve(self, padding=padding)
 
@@ -152,22 +151,22 @@ class PanelSpec:
     from rich.panel import Panel
     from rich.style import Style
 
-    PaddingType = int | tuple[int, int] | tuple[int, int, int, int]
-    StyleType = Style | str
+    PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
+    StyleType = Union[Style, str]
 
     # Content-independent panel chrome
     title: RenderableType = ""
     subtitle: RenderableType = ""
     title_align: Literal["left", "center", "right"] = "left"
     subtitle_align: Literal["left", "center", "right"] = "center"
-    style: StyleType | None = "none"
-    border_style: StyleType | None = "none"
+    style: Optional[StyleType] = "none"
+    border_style: Optional[StyleType] = "none"
     box: Box = ROUNDED
     padding: PaddingType = (0, 1)
     expand: bool = True
-    width: int | None = None
-    height: int | None = None
-    safe_box: bool | None = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    safe_box: Optional[bool] = None
 
     def build(self, renderable: RenderableType, **overrides) -> Panel:
         """Create a Panel around `renderable`. Use kwargs to override spec per render."""
@@ -191,11 +190,11 @@ class PanelSpec:
         return Panel(renderable, **opts)
 
     # Handy immutable helpers
-    def with_box(self, box: Box) -> PanelSpec:
+    def with_box(self, box: Box) -> "PanelSpec":
         return evolve(self, box=box)
 
-    def with_padding(self, padding: PaddingType) -> PanelSpec:
+    def with_padding(self, padding: PaddingType) -> "PanelSpec":
         return evolve(self, padding=padding)
 
-    def with_border_style(self, style: StyleType) -> PanelSpec:
+    def with_border_style(self, style: StyleType) -> "PanelSpec":
         return evolve(self, border_style=style)
