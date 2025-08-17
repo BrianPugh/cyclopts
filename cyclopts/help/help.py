@@ -404,7 +404,7 @@ class AbstractRichHelpPanel:
 
                 self.column_specs[i] = spec
 
-        # 2.Build table and Add Etnries
+        # 2. Build table and Add Entries
         self.table_spec = self.table_spec.with_(columns=self.column_specs)
 
         table = self.table_spec.build()
