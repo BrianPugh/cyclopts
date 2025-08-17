@@ -227,7 +227,7 @@ class AbstractTableEntry:
     def try_put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
         """Put a attr to the dataclass.
 
-        This is looser than put, and will not raise an Attribute Error if
+        This is looser than put, and will not raise an AttributeError if
         the member does not exist. This is useful when the list of entries
         do not have all the same members. This was required for
         `ColeSpec.render_cell`
