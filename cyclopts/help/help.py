@@ -372,7 +372,7 @@ class AbstractRichHelpPanel:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        # TODO: Do this at instaiation time so that if a user changes the
+        # TODO: Do this at instantiation time so that if a user changes the
         # columns (or does not want asterisk column not matter what) their
         # changes are not overriding by this.
 
