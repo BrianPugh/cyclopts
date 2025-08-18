@@ -227,7 +227,7 @@ class AbstractTableEntry:
     def try_put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
         """Put a attr to the dataclass.
 
-        This is looser than put, and will not raise an Attribute Error if
+        This is looser than put, and will not raise an AttributeError if
         the member does not exist. This is useful when the list of entries
         do not have all the same members. This was required for
         `ColeSpec.render_cell`
@@ -372,7 +372,7 @@ class AbstractRichHelpPanel:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        # TODO: Do this at instaiation time so that if a user changes the
+        # TODO: Do this at instantiation time so that if a user changes the
         # columns (or does not want asterisk column not matter what) their
         # changes are not overriding by this.
 
@@ -404,7 +404,7 @@ class AbstractRichHelpPanel:
 
                 self.column_specs[i] = spec
 
-        # 2.Build table and Add Etnries
+        # 2. Build table and Add Entries
         self.table_spec = self.table_spec.with_(columns=self.column_specs)
 
         table = self.table_spec.build()
