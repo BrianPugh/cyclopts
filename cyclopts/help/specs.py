@@ -58,7 +58,7 @@ class ColumnSpec:
         out = raw(entry) if callable(raw) else raw
         entry.try_put(self.key, out)
 
-        if self.converters:  # and out is not None:
+        if self.converters:
             converters = [self.converters] if not isinstance(self.converters, list) else self.converters
 
             for converter in converters:
