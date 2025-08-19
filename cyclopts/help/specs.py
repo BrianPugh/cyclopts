@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal, Optional, Union
 from attrs import define, evolve, field
 
 if TYPE_CHECKING:
-    from cyclopts.help import AbstractTableEntry
+    from cyclopts.help import TableEntry
     from cyclopts.help.protocols import Converter, Formatter
 
 
@@ -52,7 +52,7 @@ class ColumnSpec:
             no_wrap=self.no_wrap,
         )
 
-    def render_cell(self, entry: "AbstractTableEntry") -> RenderableType:
+    def render_cell(self, entry: "TableEntry") -> RenderableType:
         """Render the cell."""
         raw = entry.get(self.key, None)
         out = raw(entry) if callable(raw) else raw
@@ -129,7 +129,7 @@ class TableSpec:
             col.add_to(table)
         return table
 
-    def add_entries(self, table: Table, entries: Iterable["AbstractTableEntry"]) -> None:
+    def add_entries(self, table: Table, entries: Iterable["TableEntry"]) -> None:
         """Insert the entries into the table."""
         for e in entries:
             cells = [col.render_cell(e) for col in self.columns]

@@ -41,8 +41,8 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
-    AbstractRichHelpPanel,
     CycloptsPanel,
+    HelpPanel,
     InlineText,
     create_parameter_help_panel,
     format_command_entries,
@@ -1372,7 +1372,7 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> list[AbstractRichHelpPanel]:
+    ) -> list[HelpPanel]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -1380,7 +1380,7 @@ class App:
 
         help_format = resolve_help_format(apps)
 
-        panels: dict[str, tuple[Group, AbstractRichHelpPanel]] = {}
+        panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
         for subapp in _walk_metas(apps[-1]):
@@ -1392,7 +1392,7 @@ class App:
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
-                    command_panel = AbstractRichHelpPanel(
+                    command_panel = HelpPanel(
                         format="command",
                         title=group.name,
                     )

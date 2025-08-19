@@ -2,12 +2,12 @@ __all__ = [
     "Converter",
     "Formatter",
     "LazyData",
-    "AbstractTableEntry",
+    "TableEntry",
     "TableData",
     "TableSpec",
     "PanelSpec",
     "ColumnSpec",
-    "AbstractRichHelpPanel",
+    "HelpPanel",
     "create_parameter_help_panel",
     "format_command_entries",
     "resolve_help_format",
@@ -20,11 +20,11 @@ __all__ = [
 ]
 
 from .help import (
-    AbstractRichHelpPanel,
-    AbstractTableEntry,
     CycloptsPanel,
+    HelpPanel,
     InlineText,
     TableData,
+    TableEntry,
     _get_choices,
     create_parameter_help_panel,
     format_command_entries,

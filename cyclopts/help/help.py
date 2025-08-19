@@ -188,7 +188,7 @@ class InlineText:
             yield from wrapped_segments
 
 
-def _resolve(v: Union["RenderableType", "LazyData"], entry: "AbstractTableEntry") -> "RenderableType":
+def _resolve(v: Union["RenderableType", "LazyData"], entry: "TableEntry") -> "RenderableType":
     return v(entry) if callable(v) else v
 
 
@@ -199,18 +199,18 @@ class TableData:
     """Intentionally empty dataclass.
 
     Users can inherit from this and declore concrete fields and then pass
-    the object to AbstractTableEntry
+    the object to TableEntry
     """
 
     pass
 
 
 @define(slots=True)
-class AbstractTableEntry:
+class TableEntry:
     """Abstract version of TableEntry.
 
     Member extras can be a user-defined dataclass. All members in `extras`
-    will be treated as if they are members of `AbstractTableEntry` allowing
+    will be treated as if they are members of `TableEntry` allowing
     for arbitrary data to be included in the Entry.
     """
 
@@ -261,7 +261,7 @@ class AbstractTableEntry:
         """Access extra values as if they were members.
 
         This makes members in the `extra` dataclass feel like
-        members of the `AbstractTableEntry` instance. Thus, pseudo
+        members of the `TableEntry` instance. Thus, pseudo
         adding members is easy, and table generation is simplified.
         """
         extras = object.__getattribute__(self, "extras")
@@ -299,7 +299,7 @@ CommandColumn = ColumnSpec(
 
 
 @define
-class AbstractRichHelpPanel:
+class HelpPanel:
     """Adjust the Format for the help panel!."""
 
     from rich.box import ROUNDED, Box
@@ -312,7 +312,7 @@ class AbstractRichHelpPanel:
     format: Literal["command", "parameter"]
     title: RenderableType
     description: RenderableType = field(factory=_text_factory)
-    entries: list[AbstractTableEntry] = field(factory=list)
+    entries: list[TableEntry] = field(factory=list)
 
     column_specs: list[ColumnSpec] = field(
         default=Factory(
@@ -527,10 +527,10 @@ def create_parameter_help_panel(
     group: "Group",
     argument_collection: "ArgumentCollection",
     format: str,
-) -> AbstractRichHelpPanel:
+) -> HelpPanel:
     from rich.text import Text
 
-    help_panel = AbstractRichHelpPanel(
+    help_panel = HelpPanel(
         format="parameter",
         title=group.name,
         description=InlineText.from_format(group.help, format=format, force_empty_end=True) if group.help else Text(),
@@ -590,7 +590,7 @@ def create_parameter_help_panel(
             help_description.append(Text(r"[required]", "dim red"))
 
         # populate row
-        entry = AbstractTableEntry(
+        entry = TableEntry(
             name="".join(long_options),
             description=help_description,
             short="".join(short_options),
@@ -608,7 +608,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractTableEntry]:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -617,7 +617,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[AbstractT
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
-        entry = AbstractTableEntry(
+        entry = TableEntry(
             name="\n".join(long_names),
             short=" ".join(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
