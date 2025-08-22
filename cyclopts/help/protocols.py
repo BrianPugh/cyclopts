@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from rich.console import RenderableType
+    from rich.console import Console, ConsoleOptions, RenderableType
 
     from .help import TableEntry
     from .specs import ColumnSpec
@@ -31,3 +31,17 @@ class LazyData(Protocol):
     """
 
     def __call__(self, entry: "TableEntry") -> "RenderableType": ...
+
+
+@runtime_checkable
+class ColumnSpecBuilder(Protocol):
+    """Protocol for ColumnSpecBuilders.
+
+    Some `ColumnSpecs` depends on rich.console.Console and
+    rich.console.ConsoleOptions. Thus, builder are enforced
+    to accept these arguments.
+    """
+
+    def __call__(
+        self, console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
+    ) -> list["ColumnSpec"]: ...

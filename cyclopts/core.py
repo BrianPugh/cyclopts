@@ -1435,26 +1435,25 @@ class App:
                 if not group_argument_collection:
                     continue
 
-                try:
-                    _, existing_panel = panels[group.name]
-                except KeyError:
-                    existing_panel = None
-
+                _, existing_panel = panels.get(group.name, (None, None))
                 new_panel = create_parameter_help_panel(group, group_argument_collection, help_format)
 
                 if existing_panel:
+                    # Patch the _new_ panel to include existing
+                    new_panel.entries = new_panel.entries + existing_panel.entries
+
                     # An imperfect merging process
                     existing_panel.format = "parameter"
-                    existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
+                    new_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
                     if new_panel.description:
                         if existing_panel.description:
-                            existing_panel.description = RichGroup(
+                            new_panel.description = RichGroup(
                                 existing_panel.description, NewLine(), new_panel.description
                             )
-                        else:
-                            existing_panel.description = new_panel.description
-                else:
-                    panels[group.name] = (group, new_panel)
+                    else:
+                        new_panel.description = existing_panel.description
+
+                panels[group.name] = (group, new_panel)
 
         groups = [x[0] for x in panels.values()]
         help_panels = [x[1] for x in panels.values()]

@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
-from math import ceil
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -24,9 +23,7 @@ from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
-from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
-from cyclopts.help.formatters import wrap_formatter
-from cyclopts.help.specs import ColumnSpec, PanelSpec, TableSpec
+from cyclopts.help.specs import PanelSpec, TableSpec
 from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
@@ -274,30 +271,6 @@ class TableEntry:
         return evolve(self, **kw)
 
 
-# For Parameters:
-AsteriskColumn = ColumnSpec(
-    key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_required_converter
-)
-NameColumn = ColumnSpec(
-    key="name",
-    header="",
-    justify="left",
-    style="cyan",
-    formatter=wrap_formatter,
-    converters=[stretch_name_converter, combine_long_short_converter],
-)
-DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
-# For Commands:
-CommandColumn = ColumnSpec(
-    key="name",
-    header="",
-    justify="left",
-    style="cyan",
-    formatter=wrap_formatter,
-    converters=[stretch_name_converter, combine_long_short_converter],
-)
-
-
 @define
 class HelpPanel:
     """Adjust the Format for the help panel!."""
@@ -309,21 +282,19 @@ class HelpPanel:
     from rich.table import Column, Table
     from rich.text import Text
 
-    format: Literal["command", "parameter"]
+    # TODO: This is _only_ here for convenience to be passed to table_spec
+    #       otherwise, we could instantiate this panel and then
+    #       instantiate the table_spec with the correct format.
+    #
+    # I.E) Without this, to make a HelpPanel we'll have to make and
+    #       pass a list of column specs.
+    format: str  # Literal["command", "parameter"]
+
     title: RenderableType
     description: RenderableType = field(factory=_text_factory)
     entries: list[TableEntry] = field(factory=list)
 
-    column_specs: list[ColumnSpec] = field(
-        default=Factory(
-            lambda self: [CommandColumn, DescriptionColumn]
-            if self.format == "command"
-            else [NameColumn, DescriptionColumn],
-            takes_self=True,
-        )
-    )
-
-    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(columns=self.column_specs), takes_self=True))
+    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(preset=self.format), takes_self=True))
     panel_spec: PanelSpec = field(default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
 
     def remove_duplicates(self):
@@ -363,8 +334,6 @@ class HelpPanel:
         from rich.console import NewLine
         from rich.text import Text
 
-        commands_width = ceil(console.width * 0.35)
-
         panel_description = self.description
         if isinstance(panel_description, Text):
             panel_description.end = ""
@@ -372,43 +341,10 @@ class HelpPanel:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        # TODO: Do this at instantiation time so that if a user changes the
-        # columns (or does not want asterisk column not matter what) their
-        # changes are not overriding by this.
-
-        # 1. Adjust the format (need to keep default behavior...)
-        if self.format == "command":
-            commands_width = ceil(console.width * 0.35)
-            for i in range(len(self.column_specs)):
-                spec = self.column_specs[i]
-                if spec.key == "name":
-                    spec = spec.with_(max_width=commands_width)
-                self.column_specs[i] = spec
-
-        elif self.format == "parameter":
-            # Add AsteriskColumn if any params are required
-            if any(x.required for x in self.entries):
-                col_specs = [AsteriskColumn]
-                col_specs.extend(self.column_specs)
-                self.column_specs = col_specs
-
-            name_width = ceil(console.width * 0.35)
-            short_width = ceil(console.width * 0.1)
-
-            for i in range(len(self.column_specs)):
-                spec = self.column_specs[i]
-                if spec.key == "name":
-                    spec = spec.with_(max_width=name_width)
-                elif spec.key == "short":
-                    spec = spec.with_(max_width=short_width)
-
-                self.column_specs[i] = spec
-
-        # 2. Build table and Add Entries
-        self.table_spec = self.table_spec.with_(columns=self.column_specs)
-
-        table = self.table_spec.build()
-        self.table_spec.add_entries(table, self.entries)
+        # 2. Realize spec, build table, and add entries
+        table_spec = self.table_spec.realize_columns(console, options, self.entries)
+        table = table_spec.build()
+        table_spec.add_entries(table, self.entries)
 
         # 3. Final make the panel
         panel = self.panel_spec.build(RichGroup(panel_description, table))

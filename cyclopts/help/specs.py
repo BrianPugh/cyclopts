@@ -1,11 +1,17 @@
+import math
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from attrs import define, evolve, field
+from attrs import Factory, define, evolve, field
+
+from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
+from cyclopts.help.formatters import wrap_formatter
 
 if TYPE_CHECKING:
+    from rich.console import Console, ConsoleOptions
+
     from cyclopts.help import TableEntry
-    from cyclopts.help.protocols import Converter, Formatter
+    from cyclopts.help.protocols import ColumnSpecBuilder, Converter, Formatter
 
 
 @define(frozen=True)
@@ -76,6 +82,83 @@ class ColumnSpec:
         return evolve(self, **kw)
 
 
+# For Parameters:
+AsteriskColumn = ColumnSpec(
+    key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_required_converter
+)
+
+NameColumn = ColumnSpec(
+    key="name",
+    header="",
+    justify="left",
+    style="cyan",
+    formatter=wrap_formatter,
+    converters=[stretch_name_converter, combine_long_short_converter],
+)
+
+DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
+
+
+def _command_column_spec_builder(
+    console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
+) -> list[ColumnSpec]:
+    """Builder for dfault command column_specs."""
+    command_column = ColumnSpec(
+        key="name",
+        header="",
+        justify="left",
+        style="cyan",
+        formatter=wrap_formatter,
+        converters=[stretch_name_converter, combine_long_short_converter],
+        max_width=math.ceil(console.width * 0.35),
+    )
+
+    return [
+        command_column,
+        DescriptionColumn,
+    ]
+
+
+def _parameter_column_spec_builder(
+    console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
+) -> list[ColumnSpec]:
+    """Builder for dfault command column_specs."""
+    name_column = ColumnSpec(
+        key="name",
+        header="",
+        justify="left",
+        style="cyan",
+        formatter=wrap_formatter,
+        converters=[stretch_name_converter, combine_long_short_converter],
+        max_width=math.ceil(console.width * 0.35),
+    )
+
+    if any(x.required for x in entries):
+        return [
+            AsteriskColumn,
+            name_column,
+            DescriptionColumn,
+        ]
+    else:
+        return [
+            name_column,
+            DescriptionColumn,
+        ]
+
+
+_COLUMN_SPEC_BUILDERS: dict[str, "ColumnSpecBuilder"] = {
+    "command": _command_column_spec_builder,
+    "parameter": _parameter_column_spec_builder,
+}
+
+
+def register_panel_columnbuilder(name: str, builder: "ColumnSpecBuilder", *, overwrite: bool = False) -> None:
+    """Register a columnbuilder."""
+    if not overwrite and name in _COLUMN_SPEC_BUILDERS:
+        raise KeyError(f"Preset '{name}' already exists.")
+    _COLUMN_SPEC_BUILDERS[name] = builder
+
+
 @define(frozen=True)
 class TableSpec:
     from rich.box import Box
@@ -84,6 +167,8 @@ class TableSpec:
 
     StyleType = Union[Style, str]
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
+
+    preset: str
 
     # Intrinsic table styling/config
     title: Optional[str] = None
@@ -101,7 +186,14 @@ class TableSpec:
     padding: PaddingType = (0, 2, 0, 0)
     collapse_padding: bool = False
 
-    columns: list[ColumnSpec] = field(factory=list)
+    # Use the preset it available.
+    columns: Union[list[ColumnSpec], "ColumnSpecBuilder"] = field(
+        default=Factory(lambda self: _COLUMN_SPEC_BUILDERS.get(self.preset, []), takes_self=True)
+    )
+
+    def realize_columns(self, console, options, entries) -> "TableSpec":
+        """Realize ColumnSpecBuilders."""
+        return self.with_(columns=self.columns(console, options, entries) if callable(self.columns) else self.columns)
 
     def build(self, **overrides) -> Table:
         from rich.table import Table
@@ -125,12 +217,19 @@ class TableSpec:
         }
         opts.update(overrides)
         table = Table(**opts)
+
+        if callable(self.columns):
+            raise TypeError("Columns must be realized before building table")
+
         for col in self.columns:
             col.add_to(table)
         return table
 
     def add_entries(self, table: Table, entries: Iterable["TableEntry"]) -> None:
         """Insert the entries into the table."""
+        if callable(self.columns):
+            raise TypeError("Columns must be realized before building table")
+
         for e in entries:
             cells = [col.render_cell(e) for col in self.columns]
             table.add_row(*cells)
