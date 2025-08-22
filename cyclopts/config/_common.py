@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 from attrs import define, field
 
+from cyclopts.appstack import app_stack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError, UnknownOptionError
 from cyclopts.token import Token
@@ -39,7 +40,7 @@ def _walk_leaves(
 
 def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
     argument_collection = ArgumentCollection()
-    for i, app in enumerate(apps):
+    for app in apps:
         if app._meta is None:
             continue
         argument_collection.extend(app._meta.assemble_argument_collection())  # apps=apps[:i]))
@@ -87,66 +88,71 @@ def update_argument_collection(
 
     Note: it feels bad that we're passing in ``apps`` here.
     """
-    meta_arguments = _meta_arguments(apps or ())
+    with app_stack(apps or []):
+        meta_arguments = _meta_arguments(apps or ())
 
-    do_not_update = {}
+        do_not_update = {}
 
-    for option_key, option_value in config.items():
-        for subkeys, value in _walk_leaves(option_value):
-            cli_option_name = to_cli_option_name(option_key, *subkeys)
-            complete_keyword = "".join(f"[{k}]" for k in itertools.chain(root_keys, (option_key,), subkeys))
+        for option_key, option_value in config.items():
+            for subkeys, value in _walk_leaves(option_value):
+                cli_option_name = to_cli_option_name(option_key, *subkeys)
+                complete_keyword = "".join(f"[{k}]" for k in itertools.chain(root_keys, (option_key,), subkeys))
 
-            try:
-                meta_arguments.match(cli_option_name)
-            except ValueError:
-                pass
-            else:
-                continue
-
-            try:
-                argument, remaining_keys, _ = arguments.match(cli_option_name)
-            except ValueError:
-                if allow_unknown:
+                try:
+                    meta_arguments.match(cli_option_name)
+                except ValueError:
+                    pass
+                else:
                     continue
-                if apps and apps[-1]._meta_parent:
-                    # We're currently in the meta-app portion of the launch process,
-                    # so MOST supplied options will be unmatched, as we haven't gotten
-                    # to the actual command processing yet.
+
+                try:
+                    argument, remaining_keys, _ = arguments.match(cli_option_name)
+                except ValueError:
+                    if allow_unknown:
+                        continue
+                    if apps and apps[-1]._meta_parent:
+                        # We're currently in the meta-app portion of the launch process,
+                        # so MOST supplied options will be unmatched, as we haven't gotten
+                        # to the actual command processing yet.
+                        continue
+                    raise UnknownOptionError(
+                        token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
+                    ) from None
+
+                if do_not_update.setdefault(id(argument), bool(argument.tokens)):
+                    # If this argument already has tokens on **first** access, then skip it.
+                    # Allows us to add multiple tokens to an argument from a **single** source (config file).
                     continue
-                raise UnknownOptionError(
-                    token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
-                ) from None
 
-            if do_not_update.setdefault(id(argument), bool(argument.tokens)):
-                # If this argument already has tokens on **first** access, then skip it.
-                # Allows us to add multiple tokens to an argument from a **single** source (config file).
-                continue
+                # Convert all values to strings, so that the Cyclopts engine can process them.
+                # This may (eventually) result in converting back to the original dtype.
+                if not is_iterable(value):
+                    value = (value,)
 
-            # Convert all values to strings, so that the Cyclopts engine can process them.
-            # This may (eventually) result in converting back to the original dtype.
-            if not is_iterable(value):
-                value = (value,)
-
-            if value:
-                for i, v in enumerate(value):
-                    # TODO: is this index correct? If the source value is a list, it should probably be different
-                    if v is None:
-                        # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
-                        token = Token(
-                            keyword=complete_keyword, implicit_value=None, source=source, index=i, keys=remaining_keys
-                        )
-                    else:
-                        # Convert the value back into a string, so it can be re-converted.
-                        token = Token(
-                            keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys
-                        )
+                if value:
+                    for i, v in enumerate(value):
+                        # TODO: is this index correct? If the source value is a list, it should probably be different
+                        if v is None:
+                            # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
+                            token = Token(
+                                keyword=complete_keyword,
+                                implicit_value=None,
+                                source=source,
+                                index=i,
+                                keys=remaining_keys,
+                            )
+                        else:
+                            # Convert the value back into a string, so it can be re-converted.
+                            token = Token(
+                                keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys
+                            )
+                        argument.append(token)
+                else:
+                    # E.g. an empty list.
+                    token = Token(
+                        keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys
+                    )
                     argument.append(token)
-            else:
-                # E.g. an empty list.
-                token = Token(
-                    keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys
-                )
-                argument.append(token)
 
 
 @define
