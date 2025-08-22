@@ -27,6 +27,7 @@ from typing import (
 from attrs import define, field
 
 from cyclopts.annotations import resolve_annotated
+from cyclopts.appstack import app_stack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.config._env import Env
@@ -157,33 +158,44 @@ def _combined_meta_command_mapping(
     return command_mapping
 
 
-def _get_command_groups(parent_app: "App", child_app: "App"):
-    """Extract out the command groups from the ``parent_app`` for a given ``child_app``."""
-    return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
+def _get_command_groups(parent_app: "App", child_app: "App") -> list[Group]:
+    """Extract out the command groups from the ``parent_app`` for a given ``child_app``.
+
+    We need the parent_app so that we can resolve stringified-command-group references.
+    E.g. one subcommand might reference the string "Admin", while another command might
+    reference the explicit `Group(name="Admin")` object.
+    """
+    current_app: Optional[App] = parent_app
+    while current_app is not None:
+        try:
+            return next(x for x in inverse_groups_from_app(current_app) if x[0] is child_app)[1]
+        except StopIteration:
+            current_app = current_app._meta_parent
+    return []
 
 
-def resolve_default_parameter_from_apps(apps: Optional[Sequence["App"]]) -> Parameter:
-    """The default_parameter resolution depends on the parent-child path traversed."""
-    if not apps:
-        return Parameter()
+def resolve_default_parameter_from_app(app: "App") -> Parameter:
+    if not app._app_stack:
+        raise ValueError("resolve_default_parameter_from_app must be called within app_stack context manager.")
 
+    apps = app._app_stack[-1]
     cparams = []
-    for parent_app, child_app in zip(apps[:-1], apps[1:]):
-        # child_app could be a command of parent_app.meta
-        if parent_app._meta and child_app in parent_app._meta.subapps:
-            cparams = []  # meta-apps do NOT inherit from their parenting app.
-            parent_app = parent_app._meta
-
-        groups = _get_command_groups(parent_app, child_app)
-        cparams.extend([group.default_parameter for group in groups])
-        cparams.append(parent_app.default_parameter)
-
-    cparams.append(apps[-1].default_parameter)
+    parent_app = None
+    for child_app in apps:
+        if child_app._meta_parent:
+            continue
+        # Resolve command-groups
+        if parent_app is not None:  # The previous app might not strictly be a direct parent; could be a meta app.
+            groups = _get_command_groups(parent_app, child_app)
+            cparams.extend([group.default_parameter for group in groups])
+        cparams.append(child_app.default_parameter)
+        parent_app = child_app
 
     return Parameter.combine(*cparams)
 
 
 def _walk_metas(app: "App"):
+    """Typically the result looks like [app] or [meta_app, app]."""
     # Iterates from deepest to shallowest meta-apps
     meta_list = [app]  # shallowest to deepest
     meta = app
@@ -331,17 +343,18 @@ class App:
     ######################
     # Private Attributes #
     ######################
+    # `init=False` tells attrs not to include it in the generated __init__
+
     # Maps CLI-name of a command to a function handle.
     _commands: dict[str, "App"] = field(init=False, factory=dict)
-
-    _parents: list["App"] = field(init=False, factory=list)
 
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
     # We will populate this attribute ourselves after initialization
-    # `init=False` tells attrs not to include it in the generated __init__
     _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
+
+    _app_stack: list = field(init=False, factory=list)
 
     def __attrs_post_init__(self):
         # Trigger the setters
@@ -657,7 +670,7 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
-    def parse_commands(
+    def parse_commands(  # TODO: v4; make this private?
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
@@ -686,20 +699,35 @@ class App:
 
         command_chain = []
         app = self
-        apps: list[App] = [app]
+        apps: list[App] = []
         unused_tokens = tokens
 
+        def add_parent_metas(app):
+            if not include_parent_meta:
+                return
+            meta_parents = []
+            meta_parent = app
+            while (meta_parent := meta_parent._meta_parent) is not None:
+                meta_parents.append(meta_parent)
+            # The "root" non-meta app gets highest priority (first)
+            apps.extend(meta_parents[::-1])
+
+        add_parent_metas(app)
+        apps.append(app)
         command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
         for i, token in enumerate(tokens):
             try:
                 app = command_mapping[token]
-                apps.append(app)
-                unused_tokens = tokens[i + 1 :]
             except KeyError:
                 break
-            command_chain.append(token)
+
+            add_parent_metas(app)
+            apps.append(app)
             command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+
+            unused_tokens = tokens[i + 1 :]
+            command_chain.append(token)
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -839,8 +867,6 @@ class App:
             # Warning: app._name may not align with command name
             self._commands[n] = app
 
-        app._parents.append(self)
-
         return obj  # pyright: ignore[reportReturnType]
 
     # This overload is used in code like:
@@ -915,7 +941,6 @@ class App:
     def assemble_argument_collection(
         self,
         *,
-        apps: Optional[Sequence["App"]] = None,
         default_parameter: Optional[Parameter] = None,
         parse_docstring: bool = False,
     ) -> ArgumentCollection:
@@ -937,9 +962,10 @@ class App:
         ArgumentCollection
             All arguments for this app.
         """
+        apps_default_parameter = Parameter.combine(resolve_default_parameter_from_app(self), default_parameter)
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
-            Parameter.combine(resolve_default_parameter_from_apps(apps), self.default_parameter, default_parameter),
+            apps_default_parameter,
             group_arguments=self._group_arguments,  # pyright: ignore
             group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
@@ -1004,112 +1030,118 @@ class App:
 
         meta_parent = self
 
+        # TODO: combine these 2 parse_command calls.
+        _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
+
         command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+        # if command_chain != command_chain_meta:
+        #    breakpoint()
         command_app = apps[-1]
 
         ignored: dict[str, Any] = {}
 
-        # We don't want the command_app to be the version/help handler.
-        with suppress(IndexError):
-            if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
-                apps = apps[:-1]
-                command_app = apps[-1]
+        with app_stack(apps_meta):
+            # We don't want the command_app to be the version/help handler.
+            with suppress(IndexError):
+                if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
+                    apps = apps[:-1]
+                    command_app = apps[-1]
 
-        try:
-            parent_app = apps[-2]
-        except IndexError:
-            parent_app = None
+            try:
+                parent_app = apps[-2]
+            except IndexError:
+                parent_app = None
 
-        config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
-        config = tuple(partial(x, apps, command_chain) for x in config)
-        end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
-        if end_of_options_delimiter is None:
-            end_of_options_delimiter = "--"
+            config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
+            config = tuple(partial(x, apps, command_chain) for x in config)
+            end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
+            if end_of_options_delimiter is None:
+                end_of_options_delimiter = "--"
 
-        # Special flags (help/version) get intercepted by the root app.
-        # Special flags are allows to be **anywhere** in the token stream.
+            # Special flags (help/version) get intercepted by the root app.
+            # Special flags are allows to be **anywhere** in the token stream.
 
-        help_flag_index = _get_help_flag_index(tokens, command_app.help_flags)
+            help_flag_index = _get_help_flag_index(tokens, command_app.help_flags)
 
-        try:
-            if help_flag_index is not None:
-                tokens.pop(help_flag_index)
-
-                help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+            try:
                 if help_flag_index is not None:
-                    unused_tokens.pop(help_flag_index)
+                    tokens.pop(help_flag_index)
 
-                if unused_tokens and not command_app.default_command:
-                    raise UnknownCommandError(unused_tokens=unused_tokens)
+                    help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+                    if help_flag_index is not None:
+                        unused_tokens.pop(help_flag_index)
 
-                command = self.help_print
-                while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.help_print
-                bound = inspect.signature(command).bind(tokens, console=console)
-                unused_tokens = []
-                argument_collection = ArgumentCollection()
-            elif any(flag in tokens for flag in command_app.version_flags):
-                # Version
-                command = self.version_print
-                while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.version_print
-                bound = inspect.signature(command).bind()
-                unused_tokens = []
-                argument_collection = ArgumentCollection()
-            else:
-                if command_app.default_command:
-                    command = command_app.default_command
-                    validate_command(command)
-                    argument_collection = command_app.assemble_argument_collection(apps=apps)
-                    ignored: dict[str, Any] = {
-                        argument.field_info.name: resolve_annotated(argument.field_info.annotation)
-                        for argument in argument_collection.filter_by(parse=False)
-                    }
-
-                    # We want the resolved group that ``app`` belongs to.
-                    command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
-
-                    bound, unused_tokens = create_bound_arguments(
-                        command_app.default_command,
-                        argument_collection,
-                        unused_tokens,
-                        config,
-                        end_of_options_delimiter=end_of_options_delimiter,
-                    )
-                    try:
-                        for validator in command_app.validator:
-                            validator(**bound.arguments)
-                    except (AssertionError, ValueError, TypeError) as e:
-                        raise ValidationError(exception_message=e.args[0] if e.args else "", app=command_app) from e
-
-                    try:
-                        for command_group in command_groups:
-                            for validator in command_group.validator:  # pyright: ignore
-                                validator(**bound.arguments)
-                    except (AssertionError, ValueError, TypeError) as e:
-                        raise ValidationError(
-                            exception_message=e.args[0] if e.args else "",
-                            group=command_group,  # pyright: ignore
-                        ) from e
-
-                else:
-                    if unused_tokens:
+                    if unused_tokens and not command_app.default_command:
                         raise UnknownCommandError(unused_tokens=unused_tokens)
+
+                    command = self.help_print
+                    while meta_parent := meta_parent._meta_parent:
+                        command = meta_parent.help_print
+                    bound = inspect.signature(command).bind(tokens, console=console)
+                    unused_tokens = []
+                    argument_collection = ArgumentCollection()
+                elif any(flag in tokens for flag in command_app.version_flags):
+                    # Version
+                    command = self.version_print
+                    while meta_parent := meta_parent._meta_parent:
+                        command = meta_parent.version_print
+                    bound = inspect.signature(command).bind()
+                    unused_tokens = []
+                    argument_collection = ArgumentCollection()
+                else:
+                    if command_app.default_command:
+                        command = command_app.default_command
+                        validate_command(command)
+                        argument_collection = command_app.assemble_argument_collection()
+                        ignored: dict[str, Any] = {
+                            argument.field_info.name: resolve_annotated(argument.field_info.annotation)
+                            for argument in argument_collection.filter_by(parse=False)
+                        }
+
+                        # We want the resolved group that ``app`` belongs to.
+                        command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
+
+                        bound, unused_tokens = create_bound_arguments(
+                            command_app.default_command,
+                            argument_collection,
+                            unused_tokens,
+                            config,
+                            end_of_options_delimiter=end_of_options_delimiter,
+                        )
+                        try:
+                            for validator in command_app.validator:
+                                validator(**bound.arguments)
+                        except (AssertionError, ValueError, TypeError) as e:
+                            raise ValidationError(exception_message=e.args[0] if e.args else "", app=command_app) from e
+
+                        try:
+                            for command_group in command_groups:
+                                for validator in command_group.validator:  # pyright: ignore
+                                    validator(**bound.arguments)
+                        except (AssertionError, ValueError, TypeError) as e:
+                            raise ValidationError(
+                                exception_message=e.args[0] if e.args else "",
+                                group=command_group,  # pyright: ignore
+                            ) from e
+
                     else:
-                        # Running the application with no arguments and no registered
-                        # ``default_command`` will default to ``help_print``.
-                        command = self.help_print
-                        bound = inspect.signature(command).bind(tokens=tokens, console=console)
-                        unused_tokens = []
-                        argument_collection = ArgumentCollection()
-        except CycloptsError as e:
-            e.target = command_app.default_command
-            e.app = command_app
-            if command_chain:
-                e.command_chain = command_chain
-            if e.console is None:
-                e.console = self._resolve_console(tokens, console)
-            raise
+                        if unused_tokens:
+                            raise UnknownCommandError(unused_tokens=unused_tokens)
+                        else:
+                            # Running the application with no arguments and no registered
+                            # ``default_command`` will default to ``help_print``.
+                            command = self.help_print
+                            bound = inspect.signature(command).bind(tokens=tokens, console=console)
+                            unused_tokens = []
+                            argument_collection = ArgumentCollection()
+            except CycloptsError as e:
+                e.target = command_app.default_command
+                e.app = command_app
+                if command_chain:
+                    e.command_chain = command_chain
+                if e.console is None:
+                    e.console = self._resolve_console(tokens, console)
+                raise
 
         return command, bound, unused_tokens, ignored, argument_collection
 
@@ -1349,24 +1381,26 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        command_chain, apps, _ = self.parse_commands(tokens)
-        executing_app = apps[-1]
+        _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
+        with app_stack(apps_meta):
+            command_chain, apps, _ = self.parse_commands(tokens)
+            executing_app = apps[-1]
 
-        console = self._resolve_console(tokens, console)
+            console = self._resolve_console(tokens, console)
 
-        # Print the:
-        #    my-app command COMMAND [ARGS] [OPTIONS]
-        if executing_app.usage is None:
-            console.print(format_usage(self, command_chain))
-        elif executing_app.usage:  # i.e. skip empty-string.
-            console.print(executing_app.usage + "\n")
+            # Print the:
+            #    my-app command COMMAND [ARGS] [OPTIONS]
+            if executing_app.usage is None:
+                console.print(format_usage(self, command_chain))
+            elif executing_app.usage:  # i.e. skip empty-string.
+                console.print(executing_app.usage + "\n")
 
-        # Print the App/Command's Doc String.
-        help_format = resolve_help_format(apps)
-        console.print(format_doc(executing_app, help_format))
+            # Print the App/Command's Doc String.
+            help_format = resolve_help_format(apps)
+            console.print(format_doc(executing_app, help_format))
 
-        for help_panel in self._assemble_help_panels(tokens, help_format):
-            console.print(help_panel)
+            for help_panel in self._assemble_help_panels(tokens, help_format):
+                console.print(help_panel)
 
     def _assemble_help_panels(
         self,
@@ -1414,7 +1448,7 @@ class App:
             if not subapp.default_command:
                 continue
 
-            argument_collection = subapp.assemble_argument_collection(apps=apps, parse_docstring=True)
+            argument_collection = subapp.assemble_argument_collection(parse_docstring=True)
 
             # Special-case: add config.Env values to Parameter(env_var=)
             configs: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()

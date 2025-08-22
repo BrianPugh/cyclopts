@@ -42,7 +42,7 @@ def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
     for i, app in enumerate(apps):
         if app._meta is None:
             continue
-        argument_collection.extend(app._meta.assemble_argument_collection(apps=apps[:i]))
+        argument_collection.extend(app._meta.assemble_argument_collection())  # apps=apps[:i]))
     return argument_collection
 
 
