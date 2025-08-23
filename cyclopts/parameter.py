@@ -20,10 +20,17 @@ import attrs
 from attrs import define, field
 
 import cyclopts._env_var
-import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import NoneType, is_annotated, is_nonetype, is_union, resolve_annotated, resolve_optional
-from cyclopts.field_info import signature_parameters
+from cyclopts.annotations import (
+    NoneType,
+    is_annotated,
+    is_nonetype,
+    is_union,
+    resolve,
+    resolve_annotated,
+    resolve_optional,
+)
+from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
 from cyclopts.token import Token
 from cyclopts.utils import (
@@ -397,14 +404,40 @@ def validate_command(f: Callable):
     if (getattr(f, "__module__", "") or "").startswith("cyclopts"):  # Speed optimization.
         return
     for field_info in signature_parameters(f).values():
-        # Speed optimization: if an object is not annotated, then there's nothing
-        # to validate. Checking if there's an annotation is significantly faster
-        # than instantiating a cyclopts.Parameter object.
-        if not is_annotated(field_info.annotation):
+        # Speed optimization: if no annotation and no cyclopts config, skip validation
+        field_info_is_annotated = is_annotated(field_info.annotation)
+        if not field_info_is_annotated and not getattr(field_info.annotation, "__cyclopts__", None):
+            # There is no annotation, so there is nothing to validate.
             continue
+
+        # Check both annotated parameters and classes with __cyclopts__ attribute
         _, cparam = Parameter.from_annotation(field_info.annotation)
+
         if not cparam.parse and field_info.kind is not field_info.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+
+        # Check for Parameter(name="*") without a default value when ALL class fields are optional
+        # This is confusing for CLI users who expect the dataclass to be instantiated automatically
+        if (
+            "*" in cparam.name  # pyright: ignore[reportOperatorIssue]
+            and field_info.default is field_info.empty
+        ):
+            # Get field info for the class to check if all fields have defaults
+            annotated = field_info.annotation
+            annotated = resolve(annotated)
+            class_field_infos = get_field_infos(annotated)
+            all_fields_optional = all(not field_info.required for field_info in class_field_infos.values())
+
+            if all_fields_optional:
+                param_name = field_info.names[0] if field_info.names else ""
+                if param_name:
+                    param_name = f'"{param_name}" '
+                raise ValueError(
+                    f'Parameter {param_name}in function {f} has all optional values, uses Parameter(name="*"), but itself has no default value. '
+                    "Consider either:\n"
+                    f'    1) providing a default value like "{param_name}: {field_info.annotation.__name__} = {field_info.annotation.__name__}()"\n'
+                    f'    2) making it optional like "{param_name}: {field_info.annotation.__name__} | None = None".'
+                )
 
 
 def get_parameters(hint: T) -> tuple[T, list[Parameter]]:

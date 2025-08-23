@@ -907,6 +907,8 @@ class App:
         if self.default_command is not None:
             raise CommandCollisionError(f"Default command previously set to {self.default_command}.")
 
+        validate_command(obj)
+
         self.default_command = obj
         if validator:
             self.validator = validator  # pyright: ignore[reportAttributeAccessIssue]
@@ -1059,7 +1061,6 @@ class App:
             else:
                 if command_app.default_command:
                     command = command_app.default_command
-                    validate_command(command)
                     argument_collection = command_app.assemble_argument_collection(apps=apps)
                     ignored: dict[str, Any] = {
                         argument.field_info.name: resolve_annotated(argument.field_info.annotation)
