@@ -288,7 +288,7 @@ def test_bind_dataclass_default_factory_help(app, console):
         """Docstring for a."""
 
     @app.default
-    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
+    def my_default_command(config: Annotated[Optional[Config], Parameter(name="*")] = None):
         print(f"{config=}")
 
     with console.capture() as capture:
@@ -351,7 +351,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(ap
         c: int = field(default=5, kw_only=True)  # pyright: ignore
 
     @app.default
-    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
+    def my_default_command(config: Annotated[Optional[Config], Parameter(name="*")] = None):
         print(f"{config=}")
 
     with pytest.raises(UnusedCliTokensError):
