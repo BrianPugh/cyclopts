@@ -247,7 +247,7 @@ def test_bind_dataclass_double_name_override_no_hyphen(app, assert_parse_args, c
 def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     @dataclass
     class Config:
-        a: int = 1
+        a: int = field()  # intentionally empty field to make sure stuff doesn't assume this field has a default.
         """Docstring for a."""
 
         b: Annotated[int, Parameter(name="bar")] = 2
@@ -272,9 +272,9 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ A --a      Docstring for a. [default: 1]                           │
-        │ BAR --bar  This is the docstring for python parameter "b".         │
-        │            [default: 2]                                            │
+        │ *  A --a      Docstring for a. [required]                          │
+        │    BAR --bar  This is the docstring for python parameter "b".      │
+        │               [default: 2]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -288,7 +288,7 @@ def test_bind_dataclass_default_factory_help(app, console):
         """Docstring for a."""
 
     @app.default
-    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
         print(f"{config=}")
 
     with console.capture() as capture:
@@ -351,7 +351,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(ap
         c: int = field(default=5, kw_only=True)  # pyright: ignore
 
     @app.default
-    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
         print(f"{config=}")
 
     with pytest.raises(UnusedCliTokensError):
@@ -395,3 +395,25 @@ def test_bind_dataclass_with_alias_attribute(app, assert_parse_args):
 
     assert_parse_args(main, "-a", params=DataclassParameters(with_alias=True, with_iterable=False))
     assert_parse_args(main, "--with-alias", params=DataclassParameters(with_alias=True, with_iterable=False))
+
+
+def test_bind_dataclass_star_parameter_better_error_message(app, console):
+    """Test that Parameter(name="*") raises ValueError at app setup time when parameter has no default."""
+
+    @Parameter(name="*")
+    @dataclass
+    class Foo:
+        bar: int = 12
+
+    def cmd(foo: Foo):
+        print(foo)
+
+    expected_message = (
+        r'Parameter "foo" in function .* has all optional values, uses Parameter\(name="\*"\), '
+        r"but itself has no default value\. Consider either:\n"
+        r'    1\) providing a default value like ""foo" : Foo = Foo\(\)"\n'
+        r'    2\) making it optional like ""foo" : Foo \| None = None"\.'
+    )
+
+    with pytest.raises(ValueError, match=expected_message):
+        app.default(cmd)
