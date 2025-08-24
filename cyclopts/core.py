@@ -40,7 +40,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.group import Group, sort_groups
-from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
+from cyclopts.group_extractors import groups_from_app
 from cyclopts.help import (
     CycloptsPanel,
     HelpPanel,
@@ -156,22 +156,6 @@ def _combined_meta_command_mapping(
     if recurse_parent_meta and app._meta_parent:
         command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
     return command_mapping
-
-
-def _get_command_groups(parent_app: "App", child_app: "App") -> list[Group]:
-    """Extract out the command groups from the ``parent_app`` for a given ``child_app``.
-
-    We need the parent_app so that we can resolve stringified-command-group references.
-    E.g. one subcommand might reference the string "Admin", while another command might
-    reference the explicit `Group(name="Admin")` object.
-    """
-    current_app: Optional[App] = parent_app
-    while current_app is not None:
-        try:
-            return next(x for x in inverse_groups_from_app(current_app) if x[0] is child_app)[1]
-        except StopIteration:
-            current_app = current_app._meta_parent
-    return []
 
 
 def _walk_metas(app: "App"):
@@ -1014,20 +998,14 @@ class App:
         # This represents the execution path
         command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
 
-        # We don't want the command_app to be the version/help handler.
+        # We don't want the command_app to be the version/help handler; we handle those specially
         command_app = apps[-1]
         with suppress(IndexError):
             if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
                 apps = apps[:-1]
 
         command_app = apps[-1]
-
-        try:
-            parent_app = apps[-2]
-        except IndexError:
-            parent_app = None
-
-        del apps
+        del apps  # Always use AppStack from here-on.
 
         ignored: dict[str, Any] = {}
 
@@ -1078,9 +1056,6 @@ class App:
                             for argument in argument_collection.filter_by(parse=False)
                         }
 
-                        # We want the resolved group that ``app`` belongs to.
-                        command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
-
                         bound, unused_tokens = create_bound_arguments(
                             command_app.default_command,
                             argument_collection,
@@ -1095,7 +1070,7 @@ class App:
                             raise ValidationError(exception_message=e.args[0] if e.args else "", app=command_app) from e
 
                         try:
-                            for command_group in command_groups:
+                            for command_group in command_app.app_stack.command_groups:
                                 for validator in command_group.validator:  # pyright: ignore
                                     validator(**bound.arguments)
                         except (AssertionError, ValueError, TypeError) as e:

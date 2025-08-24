@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Optional, Sequence, TypeVar
 
+from cyclopts.group_extractors import inverse_groups_from_app
 from cyclopts.parameter import Parameter
 
 if TYPE_CHECKING:
@@ -57,19 +58,12 @@ class AppStack:
     @property
     def default_parameter(self) -> Parameter:
         """default_parameter has special resolution since it needs to include the command groups in the derivation."""
-        from .core import _get_command_groups  # TODO: cleanup
-
         cparams = []
-        parent_app = None
         for child_app in self.current_frame:
             if child_app._meta_parent:
                 continue
-            # Resolve command-groups
-            if parent_app is not None:  # The previous app might not strictly be a direct parent; could be a meta app.
-                groups = _get_command_groups(parent_app, child_app)
-                cparams.extend([group.default_parameter for group in groups])
+            cparams.extend([group.default_parameter for group in child_app.app_stack.command_groups])
             cparams.append(child_app.default_parameter)
-            parent_app = child_app
 
         return Parameter.combine(*cparams)
 
@@ -99,3 +93,18 @@ class AppStack:
                     return result
 
         return None
+
+    @property
+    def command_groups(self) -> list:
+        command_app = self.current_frame[-1]
+        try:
+            current_app: Optional[App] = self.current_frame[-2]
+        except IndexError:
+            current_app = None
+
+        while current_app is not None:
+            try:
+                return next(x for x in inverse_groups_from_app(current_app) if x[0] is command_app)[1]
+            except StopIteration:
+                current_app = current_app._meta_parent
+        return []
