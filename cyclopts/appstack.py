@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Optional, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, overload
 
 from cyclopts.group_extractors import inverse_groups_from_app
 from cyclopts.parameter import Parameter
@@ -74,7 +74,16 @@ class AppStack:
 
         return self.stack[-1]
 
-    def resolve(self, attribute, override: Optional[V] = None) -> Optional[V]:
+    @overload
+    def resolve(self, attribute: str) -> Any: ...
+
+    @overload
+    def resolve(self, attribute: str, override: V, fallback: Optional[V] = None) -> V: ...
+
+    @overload
+    def resolve(self, attribute: str, override: Optional[V] = None, *, fallback: V) -> V: ...
+
+    def resolve(self, attribute: str, override: Optional[V] = None, fallback: Optional[V] = None) -> Optional[V]:
         """Resolve an attribute from the App hierarchy."""
         if override is not None:
             return override
@@ -92,7 +101,7 @@ class AppStack:
                 if result is not None:
                     return result
 
-        return None
+        return fallback
 
     @property
     def command_groups(self) -> list:

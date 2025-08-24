@@ -48,8 +48,6 @@ from cyclopts.help import (
     format_command_entries,
     format_doc,
     format_usage,
-    resolve_help_format,
-    resolve_version_format,
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -442,8 +440,8 @@ class App:
         self._group_commands = value
 
     @property
-    def config(self) -> tuple[str, ...]:
-        return self.app_stack.resolve("_config")  # pyright: ignore[reportReturnType]
+    def config(self):
+        return self.app_stack.resolve("_config")
 
     @config.setter
     def config(self, value):
@@ -520,7 +518,9 @@ class App:
 
         """
         console = self._resolve_console(console)
-        version_format = resolve_version_format([self])
+        version_format = self.app_stack.resolve("version_format")
+        if version_format is None:
+            version_format = self.app_stack.resolve("help_format", fallback="restructuredtext")
 
         version_raw = None
         if self.version is None:
@@ -1323,7 +1323,7 @@ class App:
                 console.print(executing_app.usage + "\n")
 
             # Print the App/Command's Doc String.
-            help_format = resolve_help_format(apps)
+            help_format = executing_app.app_stack.resolve("help_format", fallback="restructuredtext")
             console.print(format_doc(executing_app, help_format))
 
             for help_panel in self._assemble_help_panels(tokens, help_format):
@@ -1340,7 +1340,7 @@ class App:
         command_chain, apps, _ = self.parse_commands(tokens)
         command_app = apps[-1]
 
-        help_format = resolve_help_format(apps)
+        help_format = command_app.app_stack.resolve("help_format", help_format, "restructuredtext")
 
         panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
