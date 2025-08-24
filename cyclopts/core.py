@@ -458,7 +458,7 @@ class App:
 
     @property
     def config(self) -> tuple[str, ...]:
-        return self._resolve(None, None, "_config")  # pyright: ignore[reportReturnType]
+        return self.app_stack.resolve("_config")  # pyright: ignore[reportReturnType]
 
     @config.setter
     def config(self, value):
@@ -1388,13 +1388,14 @@ class App:
         from rich.console import NewLine
 
         command_chain, apps, _ = self.parse_commands(tokens)
+        command_app = apps[-1]
 
         help_format = resolve_help_format(apps)
 
         panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in _walk_metas(apps[-1]):
+        for subapp in _walk_metas(command_app):
             for group, subapps in groups_from_app(subapp):
                 if not group.show:
                     continue
@@ -1421,14 +1422,15 @@ class App:
                 command_panel.entries.extend(format_command_entries(subapps, format=help_format))
 
         # Handle Arguments/Parameters
-        for subapp in _walk_metas(apps[-1]):
+        # We have to combine all the help-pages of the command-app and it's meta apps.
+        for subapp in _walk_metas(command_app):
             if not subapp.default_command:
                 continue
 
             argument_collection = subapp.assemble_argument_collection(parse_docstring=True)
 
             # Special-case: add config.Env values to Parameter(env_var=)
-            configs: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
+            configs: tuple[Callable, ...] = subapp.app_stack.resolve("_config") or ()
             env_configs = tuple(x for x in configs if isinstance(x, Env) and x.show)
             for argument in argument_collection:
                 for env_config in env_configs:
