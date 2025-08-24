@@ -235,7 +235,8 @@ class TableEntry:
             setattr(self.extras, key, value)
         return self
 
-    def put(self, key: str, value: Optional[Union[str, "LazyData"]]):
+    # def put(self, key: str, value: Optional[Union[str, "LazyData"]]):
+    def put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
         """Put a attr to the dataclass."""
         if hasattr(self, key):
             setattr(self, key, value)
