@@ -175,8 +175,10 @@ def _get_command_groups(parent_app: "App", child_app: "App") -> list[Group]:
 
 
 def _walk_metas(app: "App"):
-    """Typically the result looks like [app] or [meta_app, app]."""
-    # Iterates from deepest to shallowest meta-apps
+    """Typically the result looks like [app] or [meta_app, app].
+
+    Iterates from deepest to shallowest meta-app (and app).
+    """
     meta_list = [app]  # shallowest to deepest
     meta = app
     while (meta := meta._meta) and meta.default_command:
@@ -928,9 +930,6 @@ class App:
 
         Parameters
         ----------
-        apps: Optional[Sequence[App]]
-            List of parenting apps that lead to this app.
-            If provided, will resolve ``default_parameter`` from the apps.
         default_parameter: Optional[Parameter]
             Default parameter with highest priority.
         parse_docstring: bool
@@ -942,10 +941,9 @@ class App:
         ArgumentCollection
             All arguments for this app.
         """
-        apps_default_parameter = Parameter.combine(self.app_stack.default_parameter, default_parameter)
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
-            apps_default_parameter,
+            Parameter.combine(self.app_stack.default_parameter, default_parameter),
             group_arguments=self._group_arguments,  # pyright: ignore
             group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
@@ -1031,8 +1029,7 @@ class App:
             except IndexError:
                 parent_app = None
 
-            # TODO: use app_stack
-            config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
+            config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
             if end_of_options_delimiter is None:
