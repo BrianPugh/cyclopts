@@ -18,7 +18,6 @@ from typing import (
     Callable,
     Literal,
     Optional,
-    Sequence,
     TypeVar,
     Union,
     overload,
@@ -1171,7 +1170,7 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
-        help_on_error = self._resolve(tokens, help_on_error, "help_on_error") or False
+        help_on_error = self.app_stack.resolve("help_on_error", help_on_error) or False
 
         # Normal parsing
         try:
@@ -1281,31 +1280,6 @@ class App:
                 sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
             else:
                 raise
-
-    def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
-        if override is not None:
-            return override
-
-        if not tokens_or_apps:
-            apps = (self,)
-        elif isinstance(tokens_or_apps[0], App):
-            apps = tokens_or_apps
-        else:
-            _, apps, _ = self.parse_commands(tokens_or_apps)
-
-        for app in reversed(apps):
-            result = getattr(app, attribute)
-            if result is not None:
-                return result
-
-            # Check parenting meta app(s)
-            meta_app = app
-            while (meta_app := meta_app._meta_parent) is not None:
-                result = getattr(meta_app, attribute)
-                if result is not None:
-                    return result
-
-        return None
 
     def _resolve_console(self, override: Optional["Console"] = None) -> "Console":
         result = self.app_stack.resolve("console", override)
