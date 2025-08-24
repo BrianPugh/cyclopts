@@ -1,6 +1,5 @@
 from contextlib import contextmanager
-from copy import copy
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence, TypeVar
 
 from cyclopts.parameter import Parameter
 
@@ -8,9 +7,13 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
+V = TypeVar("V")
+
+
 class AppStack:
-    def __init__(self):
-        self.stack = []
+    def __init__(self, app):
+        # the ``stack`` is guaranteed to have the self-referencing app at the top of the stack.
+        self.stack: list[list[App]] = [[app]]
 
     @contextmanager
     def __call__(self, apps: Sequence["App"]):
@@ -25,17 +28,24 @@ class AppStack:
 
         assert len(apps) >= 1
 
+        so_far = []
         app_ids = {id(app) for app in apps}
-        for i, app in enumerate(apps):
-            subapps = copy(apps[: i + 1])
-            app.app_stack.stack.append(subapps)
+        for app in apps:
+            if app._meta_parent is None:
+                # Do not include the prior meta-app.
+                while so_far and so_far[-1]._meta_parent is not None:
+                    so_far.pop()
+
+            so_far.append(app)
+            app.app_stack.stack.append(so_far.copy())
 
             # Also traverse the app's meta app
             meta_app = app
             while (meta_app := meta_app._meta) is not None:
                 if id(meta_app) in app_ids:
+                    # It will be handled conventionally
                     continue
-                meta_subapps = subapps.copy()
+                meta_subapps = so_far.copy()
                 meta_subapps.append(meta_app)
                 meta_app.app_stack.stack.append(meta_subapps)
         try:
@@ -46,15 +56,12 @@ class AppStack:
 
     @property
     def default_parameter(self) -> Parameter:
+        """default_parameter has special resolution since it needs to include the command groups in the derivation."""
         from .core import _get_command_groups  # TODO: cleanup
 
-        if not self.stack:
-            raise ValueError("AppStack.default_parameter must be accessed within app_stack context manager.")
-
-        apps = self.stack[-1]
         cparams = []
         parent_app = None
-        for child_app in apps:
+        for child_app in self.current_frame:
             if child_app._meta_parent:
                 continue
             # Resolve command-groups
@@ -65,3 +72,30 @@ class AppStack:
             parent_app = child_app
 
         return Parameter.combine(*cparams)
+
+    @property
+    def current_frame(self) -> list["App"]:
+        if not self.stack:
+            raise ValueError
+
+        return self.stack[-1]
+
+    def resolve(self, attribute, override: Optional[V] = None) -> Optional[V]:
+        """Resolve an attribute from the App hierarchy."""
+        if override is not None:
+            return override
+
+        # `reversed` so that "closer" apps have higher priority.
+        for app in reversed(self.current_frame):
+            result = getattr(app, attribute)
+            if result is not None:
+                return result
+
+            # Check parenting meta app(s)
+            meta_app = app
+            while (meta_app := meta_app._meta_parent) is not None:
+                result = getattr(meta_app, attribute)
+                if result is not None:
+                    return result
+
+        return None

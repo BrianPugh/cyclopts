@@ -24,7 +24,7 @@ from typing import (
     overload,
 )
 
-from attrs import define, field
+from attrs import Factory, define, field
 
 from cyclopts.annotations import resolve_annotated
 from cyclopts.appstack import AppStack
@@ -334,7 +334,7 @@ class App:
     # We will populate this attribute ourselves after initialization
     _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
 
-    app_stack: AppStack = field(init=False, factory=AppStack)
+    app_stack: AppStack = field(init=False, default=Factory(AppStack, takes_self=True))
 
     def __attrs_post_init__(self):
         # Trigger the setters
@@ -534,7 +534,7 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
         """
-        console = self._resolve_console(None, console)
+        console = self._resolve_console(console)
         version_format = resolve_version_format([self])
 
         version_raw = None
@@ -1002,6 +1002,7 @@ class App:
         *,
         console: Optional["Console"],
         end_of_options_delimiter: Optional[str],
+        raise_on_unused_tokens: bool = False,
     ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
@@ -1010,12 +1011,10 @@ class App:
 
         meta_parent = self
 
-        # TODO: combine these 2 parse_command calls.
+        # This represents the complete inheritance hierarchy (including if a meta-app is invoked)
         _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
-
+        # This represents the execution path
         command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
-        # if command_chain != command_chain_meta:
-        #    breakpoint()
         command_app = apps[-1]
 
         ignored: dict[str, Any] = {}
@@ -1115,13 +1114,22 @@ class App:
                             bound = inspect.signature(command).bind(tokens=tokens, console=console)
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
+                if raise_on_unused_tokens and unused_tokens:
+                    for token in unused_tokens:
+                        if is_option_like(token):
+                            token = token.split("=")[0]
+                            raise UnknownOptionError(
+                                token=Token(keyword=token, source="cli"),
+                                argument_collection=argument_collection,
+                            )
+                    raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
             except CycloptsError as e:
                 e.target = command_app.default_command
                 e.app = command_app
                 if command_chain:
                     e.command_chain = command_chain
                 if e.console is None:
-                    e.console = self._resolve_console(tokens, console)
+                    e.console = command_app._resolve_console(console)
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
@@ -1193,30 +1201,18 @@ class App:
         # Normal parsing
         try:
             command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
-                tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
+                tokens,
+                console=console,
+                end_of_options_delimiter=end_of_options_delimiter,
+                raise_on_unused_tokens=True,
             )
-            if unused_tokens:
-                for token in unused_tokens:
-                    if is_option_like(token):
-                        token = token.split("=")[0]
-                        raise UnknownOptionError(
-                            token=Token(keyword=token, source="cli"), argument_collection=argument_collection
-                        )
-                raise UnusedCliTokensError(
-                    target=command,
-                    unused_tokens=unused_tokens,
-                )
         except CycloptsError as e:
             e.verbose = verbose
             e.root_input_tokens = tokens
-
-            if e.console is None:
-                e.console = self._resolve_console(tokens, console)
+            assert e.console is not None
             if help_on_error:
-                assert e.console
                 self.help_print(tokens, console=e.console)
             if print_error:
-                assert e.console
                 e.console.print(CycloptsPanel(e))
             if exit_on_error:
                 sys.exit(1)
@@ -1335,8 +1331,8 @@ class App:
 
         return None
 
-    def _resolve_console(self, tokens_or_apps: Optional[Sequence], override: Optional["Console"] = None) -> "Console":
-        result = self._resolve(tokens_or_apps, override, "console")
+    def _resolve_console(self, override: Optional["Console"] = None) -> "Console":
+        result = self.app_stack.resolve("console", override)
         if result is not None:
             return result
         from rich.console import Console
@@ -1367,7 +1363,7 @@ class App:
             command_chain, apps, _ = self.parse_commands(tokens)
             executing_app = apps[-1]
 
-            console = self._resolve_console(tokens, console)
+            console = executing_app._resolve_console(console)
 
             # Print the:
             #    my-app command COMMAND [ARGS] [OPTIONS]
