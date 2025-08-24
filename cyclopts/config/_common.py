@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 from attrs import define, field
 
-from cyclopts.appstack import app_stack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError, UnknownOptionError
 from cyclopts.token import Token
@@ -88,6 +87,7 @@ def update_argument_collection(
 
     Note: it feels bad that we're passing in ``apps`` here.
     """
+    # TODO: we need to skip metas?
     meta_arguments = _meta_arguments(apps or ())
 
     do_not_update = {}
@@ -229,7 +229,7 @@ class ConfigFromFile(ABC):
     def source(self) -> str:
         return str(self.path)
 
-    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: ArgumentCollection):
+    def __call__(self, command_app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
         config: dict[str, Any] = self.config.copy()
         try:
             for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
@@ -238,13 +238,16 @@ class ConfigFromFile(ABC):
             return
 
         # Ignore keys that represent subcommands
-        command_app = apps[-1] if self.use_commands_as_keys else apps[0]
         config = {k: v for k, v in config.items() if k not in command_app}
 
         assert isinstance(self.path, Path)
         source = str(self.path.absolute())
 
-        with app_stack(apps or []):
-            update_argument_collection(
-                config, source, arguments, apps, root_keys=self.root_keys, allow_unknown=self.allow_unknown
-            )
+        update_argument_collection(
+            config,
+            source,
+            arguments,
+            command_app.app_stack.stack[-1],
+            root_keys=self.root_keys,
+            allow_unknown=self.allow_unknown,
+        )

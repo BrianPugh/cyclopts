@@ -27,7 +27,7 @@ from typing import (
 from attrs import define, field
 
 from cyclopts.annotations import resolve_annotated
-from cyclopts.appstack import app_stack
+from cyclopts.appstack import AppStack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.config._env import Env
@@ -172,26 +172,6 @@ def _get_command_groups(parent_app: "App", child_app: "App") -> list[Group]:
         except StopIteration:
             current_app = current_app._meta_parent
     return []
-
-
-def resolve_default_parameter_from_app(app: "App") -> Parameter:
-    if not app._app_stack:
-        raise ValueError("resolve_default_parameter_from_app must be called within app_stack context manager.")
-
-    apps = app._app_stack[-1]
-    cparams = []
-    parent_app = None
-    for child_app in apps:
-        if child_app._meta_parent:
-            continue
-        # Resolve command-groups
-        if parent_app is not None:  # The previous app might not strictly be a direct parent; could be a meta app.
-            groups = _get_command_groups(parent_app, child_app)
-            cparams.extend([group.default_parameter for group in groups])
-        cparams.append(child_app.default_parameter)
-        parent_app = child_app
-
-    return Parameter.combine(*cparams)
 
 
 def _walk_metas(app: "App"):
@@ -354,7 +334,7 @@ class App:
     # We will populate this attribute ourselves after initialization
     _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
 
-    _app_stack: list = field(init=False, factory=list)
+    app_stack: AppStack = field(init=False, factory=AppStack)
 
     def __attrs_post_init__(self):
         # Trigger the setters
@@ -962,7 +942,7 @@ class App:
         ArgumentCollection
             All arguments for this app.
         """
-        apps_default_parameter = Parameter.combine(resolve_default_parameter_from_app(self), default_parameter)
+        apps_default_parameter = Parameter.combine(self.app_stack.default_parameter, default_parameter)
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
             apps_default_parameter,
@@ -1040,7 +1020,7 @@ class App:
 
         ignored: dict[str, Any] = {}
 
-        with app_stack(apps_meta):
+        with self.app_stack(apps_meta):
             # We don't want the command_app to be the version/help handler.
             with suppress(IndexError):
                 if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
@@ -1052,8 +1032,9 @@ class App:
             except IndexError:
                 parent_app = None
 
+            # TODO: use app_stack
             config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
-            config = tuple(partial(x, apps, command_chain) for x in config)
+            config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
             if end_of_options_delimiter is None:
                 end_of_options_delimiter = "--"
@@ -1382,7 +1363,7 @@ class App:
         tokens = normalize_tokens(tokens)
 
         _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
-        with app_stack(apps_meta):
+        with self.app_stack(apps_meta):
             command_chain, apps, _ = self.parse_commands(tokens)
             executing_app = apps[-1]
 
