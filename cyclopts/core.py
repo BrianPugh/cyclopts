@@ -1013,25 +1013,28 @@ class App:
         _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
         # This represents the execution path
         command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+
+        # We don't want the command_app to be the version/help handler.
         command_app = apps[-1]
+        with suppress(IndexError):
+            if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
+                apps = apps[:-1]
+
+        command_app = apps[-1]
+
+        try:
+            parent_app = apps[-2]
+        except IndexError:
+            parent_app = None
+
+        del apps
 
         ignored: dict[str, Any] = {}
 
         with self.app_stack(apps_meta):
-            # We don't want the command_app to be the version/help handler.
-            with suppress(IndexError):
-                if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
-                    apps = apps[:-1]
-                    command_app = apps[-1]
-
-            try:
-                parent_app = apps[-2]
-            except IndexError:
-                parent_app = None
-
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
-            end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
+            end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", end_of_options_delimiter)
             if end_of_options_delimiter is None:
                 end_of_options_delimiter = "--"
 
