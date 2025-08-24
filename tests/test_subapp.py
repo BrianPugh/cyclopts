@@ -1,8 +1,7 @@
 import pytest
 
 from cyclopts import App, Parameter
-
-# from cyclopts.core import resolve_default_parameter_from_apps
+from cyclopts.exceptions import UnknownOptionError
 
 
 def test_subapp_basic(app):
@@ -50,26 +49,44 @@ def test_subapp_cannot_be_default(app):
         App(default_command=App(name="foo"))
 
 
-@pytest.mark.skip(reason="v4 refactor")
 def test_resolve_default_parameter_1():
-    parent_app_1 = App(default_parameter=Parameter("foo"))
+    """Test that sub-app inherits default_parameter from parent when it doesn't have its own."""
+    # Parent app sets negative_bool=() to disable --no- flags globally
+    parent_app = App(default_parameter=Parameter(negative_bool=()))
 
-    sub_app = App(name="bar")
-    parent_app_1.command(sub_app)
+    parent_app.command(sub_app := App(name="bar"))
 
-    actual_parameter = resolve_default_parameter_from_apps([parent_app_1, sub_app])
-    assert actual_parameter == Parameter("foo")
+    @sub_app.default
+    def sub_command(*, flag: bool = False):
+        return flag
+
+    result = parent_app("bar --flag")
+    assert result is True
+
+    # This should fail because --no-flag shouldn't exist due to negative_bool=()
+    with pytest.raises(UnknownOptionError):
+        parent_app("bar --no-flag", exit_on_error=False)
 
 
-@pytest.mark.skip(reason="v4 refactor")
 def test_resolve_default_parameter_2():
-    parent_app_1 = App(default_parameter=Parameter("foo"))
+    """Test that sub-app's default_parameter overrides parent's default_parameter."""
+    # Parent app disables --no- flags, but sub-app re-enables them with custom prefix
+    parent_app = App(default_parameter=Parameter(negative_bool=()))
 
-    sub_app = App(name="bar", default_parameter=Parameter("bar"))
-    parent_app_1.command(sub_app)
+    parent_app.command(sub_app := App(name="bar", default_parameter=Parameter(negative_bool="disable-")))
 
-    actual_parameter = resolve_default_parameter_from_apps([parent_app_1, sub_app])
-    assert actual_parameter == Parameter("bar")
+    @sub_app.default
+    def sub_command(*, flag: bool = False):
+        return flag
+
+    # Test through conventional calling interface - the sub-app's default_parameter should take precedence
+    # The sub-app should use --disable- prefix instead of --no-
+    result = parent_app("bar --disable-flag")
+    assert result is False
+
+    # The standard --no-flag shouldn't work
+    with pytest.raises(UnknownOptionError):
+        parent_app("bar --no-flag", exit_on_error=False)
 
 
 def test_subapp_name_alias(app, assert_parse_args):
