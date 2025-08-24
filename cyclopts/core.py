@@ -654,11 +654,11 @@ class App:
 
         Returns
         -------
-        List[str]
+        tuple[str, ...]
             Strings that are interpreted as a valid command chain.
-        List[App]
+        tuple[App, ...]
             The associated :class:`App` object for each element in the command chain.
-        List[str]
+        list[str]
             The remaining non-command tokens.
         """
         tokens = normalize_tokens(tokens)
@@ -964,7 +964,7 @@ class App:
         bound: inspect.BoundArguments
             Bound arguments for ``command``.
 
-        unused_tokens: List[str]
+        unused_tokens: list[str]
             Any remaining CLI tokens that didn't get parsed for ``command``.
 
         ignored: dict[str, Any]
@@ -973,7 +973,7 @@ class App:
             :obj:`~typing.Annotated` will be resolved.
             Intended to simplify :ref:`meta apps <Meta App>`.
         """
-        command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
+        command, bound, unused_tokens, ignored, _ = self._parse_known_args(
             tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
         )
         return command, bound, unused_tokens, ignored
@@ -1175,7 +1175,7 @@ class App:
 
         # Normal parsing
         try:
-            command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
+            command, bound, _, ignored, _ = self._parse_known_args(
                 tokens,
                 console=console,
                 end_of_options_delimiter=end_of_options_delimiter,
@@ -1234,6 +1234,7 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
+            Set to an empty string to disable.
         backend: Literal["asyncio", "trio"]
             The async backend to use (if an async command is invoked).
             Defaults to asyncio.
@@ -1480,7 +1481,7 @@ class App:
 
             .. code-block:: python
 
-                def dispatcher(command: Callable, bound: inspect.BoundArguments) -> Any:
+                def dispatcher(command: Callable, bound: inspect.BoundArguments, ignored: dict[str, Any]) -> Any:
                     return command(*bound.args, **bound.kwargs)
 
             The above is the default dispatcher implementation.
