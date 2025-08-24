@@ -25,7 +25,7 @@ class ColumnSpec:
     key: str
 
     formatter: Optional["Formatter"] = None
-    converters: Optional[Union["Converter", list["Converter"]]] = None
+    converters: Optional[Union["Converter", tuple["Converter", ...]]] = None
 
     header: str = ""
     footer: str = ""
@@ -65,7 +65,7 @@ class ColumnSpec:
         entry.try_put(self.key, out)
 
         if self.converters:
-            converters = [self.converters] if not isinstance(self.converters, list) else self.converters
+            converters = (self.converters,) if not isinstance(self.converters, tuple) else self.converters
 
             for converter in converters:
                 out = converter(out, entry)
@@ -93,7 +93,7 @@ NameColumn = ColumnSpec(
     justify="left",
     style="cyan",
     formatter=wrap_formatter,
-    converters=[stretch_name_converter, combine_long_short_converter],
+    converters=(stretch_name_converter, combine_long_short_converter),
 )
 
 DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
@@ -101,7 +101,7 @@ DescriptionColumn = ColumnSpec(key="description", header="", justify="left", ove
 
 def _command_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
-) -> list[ColumnSpec]:
+) -> tuple[ColumnSpec, ...]:
     """Builder for dfault command column_specs."""
     command_column = ColumnSpec(
         key="name",
@@ -109,19 +109,19 @@ def _command_column_spec_builder(
         justify="left",
         style="cyan",
         formatter=wrap_formatter,
-        converters=[stretch_name_converter, combine_long_short_converter],
+        converters=(stretch_name_converter, combine_long_short_converter),
         max_width=math.ceil(console.width * 0.35),
     )
 
-    return [
+    return (
         command_column,
         DescriptionColumn,
-    ]
+    )
 
 
 def _parameter_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
-) -> list[ColumnSpec]:
+) -> tuple[ColumnSpec, ...]:
     """Builder for dfault command column_specs."""
     name_column = ColumnSpec(
         key="name",
@@ -129,21 +129,21 @@ def _parameter_column_spec_builder(
         justify="left",
         style="cyan",
         formatter=wrap_formatter,
-        converters=[stretch_name_converter, combine_long_short_converter],
+        converters=(stretch_name_converter, combine_long_short_converter),
         max_width=math.ceil(console.width * 0.35),
     )
 
     if any(x.required for x in entries):
-        return [
+        return (
             AsteriskColumn,
             name_column,
             DescriptionColumn,
-        ]
+        )
     else:
-        return [
+        return (
             name_column,
             DescriptionColumn,
-        ]
+        )
 
 
 _COLUMN_SPEC_BUILDERS: dict[str, "ColumnSpecBuilder"] = {
@@ -187,8 +187,8 @@ class TableSpec:
     collapse_padding: bool = False
 
     # Use the preset it available.
-    columns: Union[list[ColumnSpec], "ColumnSpecBuilder"] = field(
-        default=Factory(lambda self: _COLUMN_SPEC_BUILDERS.get(self.preset, []), takes_self=True)
+    columns: Union[tuple[ColumnSpec, ...], "ColumnSpecBuilder"] = field(
+        default=Factory(lambda self: _COLUMN_SPEC_BUILDERS.get(self.preset, tuple()), takes_self=True)  # noqa: C408
     )
 
     def realize_columns(self, console, options, entries) -> "TableSpec":
