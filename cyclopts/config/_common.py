@@ -229,7 +229,7 @@ class ConfigFromFile(ABC):
     def source(self) -> str:
         return str(self.path)
 
-    def __call__(self, command_app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
+    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
         config: dict[str, Any] = self.config.copy()
         try:
             for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
@@ -238,7 +238,7 @@ class ConfigFromFile(ABC):
             return
 
         # Ignore keys that represent subcommands
-        config = {k: v for k, v in config.items() if k not in command_app}
+        config = {k: v for k, v in config.items() if k not in app}
 
         assert isinstance(self.path, Path)
         source = str(self.path.absolute())
@@ -247,7 +247,7 @@ class ConfigFromFile(ABC):
             config,
             source,
             arguments,
-            command_app.app_stack.stack[-1],
+            app.app_stack.stack[-1],
             root_keys=self.root_keys,
             allow_unknown=self.allow_unknown,
         )

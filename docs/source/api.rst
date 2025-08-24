@@ -334,14 +334,13 @@ API
 
       .. code-block:: python
 
-         def config(apps: list["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
+         def config(app: "App", commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
              ----------
-             apps: Tuple[App, ...]
-                The application hierarchy that led to the current command function.
-                The current command app is the last element of this tuple.
+             app: App
+                The current command app being executed.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              arguments: ArgumentCollection
