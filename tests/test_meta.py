@@ -3,7 +3,7 @@ from typing import Annotated
 
 import pytest
 
-from cyclopts import App, Parameter
+from cyclopts import App, Parameter, UnknownOptionError
 
 
 @pytest.mark.parametrize(
@@ -207,3 +207,37 @@ def test_meta_app_inheriting_root_default_parameter(app, console):
         """
     )
     assert actual == expected
+
+
+def test_nested_meta_app_inheriting_root_default_parameter(app, console):
+    app.default_parameter = Parameter(negative=[])
+
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        flag1: bool = False,
+    ):
+        return app(tokens)
+
+    foo_app = App(name="foo")
+
+    @foo_app.meta.default
+    def foo_meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        flag2: bool = False,
+    ):
+        return foo_app(tokens)
+
+    @foo_app.default
+    def foo_app_default(
+        *,
+        flag3: bool = False,
+    ):
+        return flag3
+
+    app.command(foo_app.meta, name="foo")
+
+    assert app.meta("foo --flag3") is True
+
+    with pytest.raises(UnknownOptionError):
+        app.meta("foo --no-flag3")
