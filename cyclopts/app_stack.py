@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union, cast, overload
 
 from cyclopts.group_extractors import inverse_groups_from_app
 from cyclopts.parameter import Parameter
@@ -18,11 +18,7 @@ class AppStack:
         self.stack: list[list[App]] = [[app]]
 
     @contextmanager
-    def __call__(self, apps: Sequence["App"] | Sequence[str]):
-        apps = list(apps)
-        if apps and isinstance(apps[0], str):
-            _, apps, _ = self.stack[0][0].parse_commands(apps, include_parent_meta=True)
-
+    def __call__(self, apps: Union[Sequence["App"], Sequence[str]]):
         if not apps:
             try:
                 yield
@@ -30,11 +26,25 @@ class AppStack:
                 pass
             return
 
-        assert len(apps) >= 1
+        # Convert strings to Apps if needed
+        if isinstance(apps[0], str):
+            str_apps = cast(Sequence[str], apps)
+            _, apps_tuple, _ = self.stack[0][0].parse_commands(str_apps, include_parent_meta=True)
+            resolved_apps: list[App] = list(apps_tuple)
+        else:
+            resolved_apps = cast(list["App"], list(apps))
+        del apps
+
+        if not resolved_apps:
+            try:
+                yield
+            finally:
+                pass
+            return
 
         so_far = []
-        app_ids = {id(app) for app in apps}
-        for app in apps:
+        app_ids = {id(app) for app in resolved_apps}
+        for app in resolved_apps:
             if app._meta_parent is None:
                 # Do not include the prior meta-app.
                 while so_far and so_far[-1]._meta_parent is not None:
@@ -55,7 +65,7 @@ class AppStack:
         try:
             yield
         finally:
-            for app in apps:
+            for app in resolved_apps:
                 app.app_stack.stack.pop()
 
     @property
