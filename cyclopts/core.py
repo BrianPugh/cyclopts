@@ -26,7 +26,7 @@ from typing import (
 from attrs import Factory, define, field
 
 from cyclopts.annotations import resolve_annotated
-from cyclopts.appstack import AppStack
+from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.config._env import Env
