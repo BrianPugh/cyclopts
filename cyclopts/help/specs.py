@@ -6,7 +6,7 @@ from attrs import Factory, evolve, field
 
 from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
 from cyclopts.help.formatters import wrap_formatter
-from cyclopts.utils import frozen
+from cyclopts.utils import frozen, to_tuple_converter
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -26,7 +26,9 @@ class ColumnSpec:
     key: str
 
     formatter: Optional["Formatter"] = None
-    converters: Optional[Union["Converter", tuple["Converter", ...]]] = None
+    converters: Optional[Union["Converter", tuple["Converter", ...]]] = field(
+        default=None, converter=to_tuple_converter
+    )
 
     header: str = ""
     footer: str = ""
