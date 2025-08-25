@@ -33,7 +33,7 @@ class Env:
         """
         return self._prefix(commands) + _transform(argument.name)
 
-    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
+    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
         added_tokens = set()
 
         prefix = self._prefix(commands)
