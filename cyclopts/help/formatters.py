@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from cyclopts.help import ColumnSpec, TableEntry
 
 
-def wrap_formatter(out: "RenderableType", entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType":
+def wrap_formatter(entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType":
     import textwrap
     from functools import partial
 
@@ -18,7 +18,7 @@ def wrap_formatter(out: "RenderableType", entry: "TableEntry", col_spec: "Column
     )
 
     if col_spec.max_width:
-        new = "\n".join(wrap(str(out), col_spec.max_width))
+        new = "\n".join(wrap(str(entry.name), col_spec.max_width))
     else:
-        new = "\n".join(wrap(str(out)))
+        new = "\n".join(wrap(str(entry.name)))
     return new

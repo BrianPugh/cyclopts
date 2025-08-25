@@ -69,12 +69,13 @@ class ColumnSpec:
             converters = (self.converters,) if not isinstance(self.converters, tuple) else self.converters
 
             for converter in converters:
-                out = converter(out, entry)
+                # out = converter(out, entry)
+                out = converter(entry)
                 entry.try_put(self.key, out)
 
         # Apply the formatter - takes the current string
         if self.formatter:
-            out = self.formatter(out, entry, self)
+            out = self.formatter(entry, self)
             entry.try_put(self.key, out)
 
         return "" if out is None else out

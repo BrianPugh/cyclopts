@@ -6,13 +6,13 @@ if TYPE_CHECKING:
     from cyclopts.help import TableEntry
 
 
-def asterisk_required_converter(out: "RenderableType", entry: "TableEntry") -> "RenderableType":
+def asterisk_required_converter(entry: "TableEntry") -> "RenderableType":
     if entry.required:
         return "*"
     return ""
 
 
-def stretch_name_converter(out: "RenderableType", entry: "TableEntry") -> "RenderableType":
+def stretch_name_converter(entry: "TableEntry") -> "RenderableType":
     """Split name into two parts based on --.
 
     Example
@@ -25,7 +25,7 @@ def stretch_name_converter(out: "RenderableType", entry: "TableEntry") -> "Rende
     return out[1:] if out[0] == " " else out
 
 
-def combine_long_short_converter(out: "RenderableType", entry: "TableEntry") -> "RenderableType":
+def combine_long_short_converter(entry: "TableEntry") -> "RenderableType":
     """Concatenate a name and its short version.
 
     Examples

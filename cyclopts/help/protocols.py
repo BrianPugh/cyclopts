@@ -11,14 +11,14 @@ if TYPE_CHECKING:
 class Converter(Protocol):
     """Protocol for TableEntry converters."""
 
-    def __call__(self, out: "RenderableType", entry: "TableEntry") -> "RenderableType": ...
+    def __call__(self, entry: "TableEntry") -> "RenderableType": ...
 
 
 @runtime_checkable
 class Formatter(Protocol):
     """Protocol for TableEntry converters."""
 
-    def __call__(self, out: "RenderableType", entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType": ...
+    def __call__(self, entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType": ...
 
 
 @runtime_checkable
