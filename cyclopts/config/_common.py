@@ -39,10 +39,10 @@ def _walk_leaves(
 
 def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
     argument_collection = ArgumentCollection()
-    for i, app in enumerate(apps):
+    for app in apps:
         if app._meta is None:
             continue
-        argument_collection.extend(app._meta.assemble_argument_collection(apps=apps[:i]))
+        argument_collection.extend(app._meta.assemble_argument_collection())  # apps=apps[:i]))
     return argument_collection
 
 
@@ -87,6 +87,7 @@ def update_argument_collection(
 
     Note: it feels bad that we're passing in ``apps`` here.
     """
+    # TODO: we need to skip metas?
     meta_arguments = _meta_arguments(apps or ())
 
     do_not_update = {}
@@ -133,7 +134,11 @@ def update_argument_collection(
                     if v is None:
                         # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
                         token = Token(
-                            keyword=complete_keyword, implicit_value=None, source=source, index=i, keys=remaining_keys
+                            keyword=complete_keyword,
+                            implicit_value=None,
+                            source=source,
+                            index=i,
+                            keys=remaining_keys,
                         )
                     else:
                         # Convert the value back into a string, so it can be re-converted.
@@ -224,7 +229,7 @@ class ConfigFromFile(ABC):
     def source(self) -> str:
         return str(self.path)
 
-    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: ArgumentCollection):
+    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
         config: dict[str, Any] = self.config.copy()
         try:
             for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
@@ -233,12 +238,16 @@ class ConfigFromFile(ABC):
             return
 
         # Ignore keys that represent subcommands
-        command_app = apps[-1] if self.use_commands_as_keys else apps[0]
-        config = {k: v for k, v in config.items() if k not in command_app}
+        config = {k: v for k, v in config.items() if k not in app}
 
         assert isinstance(self.path, Path)
         source = str(self.path.absolute())
 
         update_argument_collection(
-            config, source, arguments, apps, root_keys=self.root_keys, allow_unknown=self.allow_unknown
+            config,
+            source,
+            arguments,
+            app.app_stack.stack[-1],
+            root_keys=self.root_keys,
+            allow_unknown=self.allow_unknown,
         )

@@ -18,15 +18,15 @@ from typing import (
     Callable,
     Literal,
     Optional,
-    Sequence,
     TypeVar,
     Union,
     overload,
 )
 
-from attrs import define, field
+from attrs import Factory, define, field
 
 from cyclopts.annotations import resolve_annotated
+from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.config._env import Env
@@ -39,7 +39,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.group import Group, sort_groups
-from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
+from cyclopts.group_extractors import groups_from_app
 from cyclopts.help import (
     CycloptsPanel,
     HelpPanel,
@@ -48,8 +48,6 @@ from cyclopts.help import (
     format_command_entries,
     format_doc,
     format_usage,
-    resolve_help_format,
-    resolve_version_format,
 )
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
@@ -157,34 +155,11 @@ def _combined_meta_command_mapping(
     return command_mapping
 
 
-def _get_command_groups(parent_app: "App", child_app: "App"):
-    """Extract out the command groups from the ``parent_app`` for a given ``child_app``."""
-    return next(x for x in inverse_groups_from_app(parent_app) if x[0] is child_app)[1]
-
-
-def resolve_default_parameter_from_apps(apps: Optional[Sequence["App"]]) -> Parameter:
-    """The default_parameter resolution depends on the parent-child path traversed."""
-    if not apps:
-        return Parameter()
-
-    cparams = []
-    for parent_app, child_app in zip(apps[:-1], apps[1:]):
-        # child_app could be a command of parent_app.meta
-        if parent_app._meta and child_app in parent_app._meta.subapps:
-            cparams = []  # meta-apps do NOT inherit from their parenting app.
-            parent_app = parent_app._meta
-
-        groups = _get_command_groups(parent_app, child_app)
-        cparams.extend([group.default_parameter for group in groups])
-        cparams.append(parent_app.default_parameter)
-
-    cparams.append(apps[-1].default_parameter)
-
-    return Parameter.combine(*cparams)
-
-
 def _walk_metas(app: "App"):
-    # Iterates from deepest to shallowest meta-apps
+    """Typically the result looks like [app] or [meta_app, app].
+
+    Iterates from deepest to shallowest meta-app (and app).
+    """
     meta_list = [app]  # shallowest to deepest
     meta = app
     while (meta := meta._meta) and meta.default_command:
@@ -331,17 +306,18 @@ class App:
     ######################
     # Private Attributes #
     ######################
+    # `init=False` tells attrs not to include it in the generated __init__
+
     # Maps CLI-name of a command to a function handle.
     _commands: dict[str, "App"] = field(init=False, factory=dict)
-
-    _parents: list["App"] = field(init=False, factory=list)
 
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
     # We will populate this attribute ourselves after initialization
-    # `init=False` tells attrs not to include it in the generated __init__
     _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
+
+    app_stack: AppStack = field(init=False, default=Factory(AppStack, takes_self=True))
 
     def __attrs_post_init__(self):
         # Trigger the setters
@@ -464,8 +440,8 @@ class App:
         self._group_commands = value
 
     @property
-    def config(self) -> tuple[str, ...]:
-        return self._resolve(None, None, "_config")  # pyright: ignore[reportReturnType]
+    def config(self):
+        return self.app_stack.resolve("_config")
 
     @config.setter
     def config(self, value):
@@ -541,8 +517,10 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
         """
-        console = self._resolve_console(None, console)
-        version_format = resolve_version_format([self])
+        console = self._resolve_console(console)
+        version_format = self.app_stack.resolve("version_format")
+        if version_format is None:
+            version_format = self.app_stack.resolve("help_format", fallback="restructuredtext")
 
         version_raw = None
         if self.version is None:
@@ -657,7 +635,7 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
-    def parse_commands(
+    def parse_commands(  # TODO: v4; make this private?
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
@@ -675,31 +653,46 @@ class App:
 
         Returns
         -------
-        List[str]
+        tuple[str, ...]
             Strings that are interpreted as a valid command chain.
-        List[App]
+        tuple[App, ...]
             The associated :class:`App` object for each element in the command chain.
-        List[str]
+        list[str]
             The remaining non-command tokens.
         """
         tokens = normalize_tokens(tokens)
 
         command_chain = []
         app = self
-        apps: list[App] = [app]
+        apps: list[App] = []
         unused_tokens = tokens
 
+        def add_parent_metas(app):
+            if not include_parent_meta:
+                return
+            meta_parents = []
+            meta_parent = app
+            while (meta_parent := meta_parent._meta_parent) is not None:
+                meta_parents.append(meta_parent)
+            # The "root" non-meta app gets highest priority (first)
+            apps.extend(meta_parents[::-1])
+
+        add_parent_metas(app)
+        apps.append(app)
         command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
         for i, token in enumerate(tokens):
             try:
                 app = command_mapping[token]
-                apps.append(app)
-                unused_tokens = tokens[i + 1 :]
             except KeyError:
                 break
-            command_chain.append(token)
+
+            add_parent_metas(app)
+            apps.append(app)
             command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+
+            unused_tokens = tokens[i + 1 :]
+            command_chain.append(token)
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -839,8 +832,6 @@ class App:
             # Warning: app._name may not align with command name
             self._commands[n] = app
 
-        app._parents.append(self)
-
         return obj  # pyright: ignore[reportReturnType]
 
     # This overload is used in code like:
@@ -915,7 +906,6 @@ class App:
     def assemble_argument_collection(
         self,
         *,
-        apps: Optional[Sequence["App"]] = None,
         default_parameter: Optional[Parameter] = None,
         parse_docstring: bool = False,
     ) -> ArgumentCollection:
@@ -923,9 +913,6 @@ class App:
 
         Parameters
         ----------
-        apps: Optional[Sequence[App]]
-            List of parenting apps that lead to this app.
-            If provided, will resolve ``default_parameter`` from the apps.
         default_parameter: Optional[Parameter]
             Default parameter with highest priority.
         parse_docstring: bool
@@ -939,7 +926,7 @@ class App:
         """
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
-            Parameter.combine(resolve_default_parameter_from_apps(apps), self.default_parameter, default_parameter),
+            Parameter.combine(self.app_stack.default_parameter, default_parameter),
             group_arguments=self._group_arguments,  # pyright: ignore
             group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
@@ -976,7 +963,7 @@ class App:
         bound: inspect.BoundArguments
             Bound arguments for ``command``.
 
-        unused_tokens: List[str]
+        unused_tokens: list[str]
             Any remaining CLI tokens that didn't get parsed for ``command``.
 
         ignored: dict[str, Any]
@@ -985,7 +972,7 @@ class App:
             :obj:`~typing.Annotated` will be resolved.
             Intended to simplify :ref:`meta apps <Meta App>`.
         """
-        command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
+        command, bound, unused_tokens, ignored, _ = self._parse_known_args(
             tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
         )
         return command, bound, unused_tokens, ignored
@@ -996,6 +983,7 @@ class App:
         *,
         console: Optional["Console"],
         end_of_options_delimiter: Optional[str],
+        raise_on_unused_tokens: bool = False,
     ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
@@ -1004,112 +992,119 @@ class App:
 
         meta_parent = self
 
+        # This represents the complete inheritance hierarchy (including if a meta-app is invoked)
+        _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
+        # This represents the execution path
         command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+
+        # We don't want the command_app to be the version/help handler; we handle those specially
         command_app = apps[-1]
-
-        ignored: dict[str, Any] = {}
-
-        # We don't want the command_app to be the version/help handler.
         with suppress(IndexError):
             if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
                 apps = apps[:-1]
-                command_app = apps[-1]
 
-        try:
-            parent_app = apps[-2]
-        except IndexError:
-            parent_app = None
+        command_app = apps[-1]
+        del apps  # Always use AppStack from here-on.
 
-        config: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
-        config = tuple(partial(x, apps, command_chain) for x in config)
-        end_of_options_delimiter = self._resolve(apps, end_of_options_delimiter, "end_of_options_delimiter")
-        if end_of_options_delimiter is None:
-            end_of_options_delimiter = "--"
+        ignored: dict[str, Any] = {}
 
-        # Special flags (help/version) get intercepted by the root app.
-        # Special flags are allows to be **anywhere** in the token stream.
+        with self.app_stack(apps_meta):
+            config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
+            config = tuple(partial(x, command_app, command_chain) for x in config)
+            end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", end_of_options_delimiter)
+            if end_of_options_delimiter is None:
+                end_of_options_delimiter = "--"
 
-        help_flag_index = _get_help_flag_index(tokens, command_app.help_flags)
+            # Special flags (help/version) get intercepted by the root app.
+            # Special flags are allows to be **anywhere** in the token stream.
 
-        try:
-            if help_flag_index is not None:
-                tokens.pop(help_flag_index)
+            help_flag_index = _get_help_flag_index(tokens, command_app.help_flags)
 
-                help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+            try:
                 if help_flag_index is not None:
-                    unused_tokens.pop(help_flag_index)
+                    tokens.pop(help_flag_index)
 
-                if unused_tokens and not command_app.default_command:
-                    raise UnknownCommandError(unused_tokens=unused_tokens)
+                    help_flag_index = _get_help_flag_index(unused_tokens, command_app.help_flags)
+                    if help_flag_index is not None:
+                        unused_tokens.pop(help_flag_index)
 
-                command = self.help_print
-                while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.help_print
-                bound = inspect.signature(command).bind(tokens, console=console)
-                unused_tokens = []
-                argument_collection = ArgumentCollection()
-            elif any(flag in tokens for flag in command_app.version_flags):
-                # Version
-                command = self.version_print
-                while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.version_print
-                bound = inspect.signature(command).bind()
-                unused_tokens = []
-                argument_collection = ArgumentCollection()
-            else:
-                if command_app.default_command:
-                    command = command_app.default_command
-                    validate_command(command)
-                    argument_collection = command_app.assemble_argument_collection(apps=apps)
-                    ignored: dict[str, Any] = {
-                        argument.field_info.name: resolve_annotated(argument.field_info.annotation)
-                        for argument in argument_collection.filter_by(parse=False)
-                    }
-
-                    # We want the resolved group that ``app`` belongs to.
-                    command_groups = [] if parent_app is None else _get_command_groups(parent_app, command_app)
-
-                    bound, unused_tokens = create_bound_arguments(
-                        command_app.default_command,
-                        argument_collection,
-                        unused_tokens,
-                        config,
-                        end_of_options_delimiter=end_of_options_delimiter,
-                    )
-                    try:
-                        for validator in command_app.validator:
-                            validator(**bound.arguments)
-                    except (AssertionError, ValueError, TypeError) as e:
-                        raise ValidationError(exception_message=e.args[0] if e.args else "", app=command_app) from e
-
-                    try:
-                        for command_group in command_groups:
-                            for validator in command_group.validator:  # pyright: ignore
-                                validator(**bound.arguments)
-                    except (AssertionError, ValueError, TypeError) as e:
-                        raise ValidationError(
-                            exception_message=e.args[0] if e.args else "",
-                            group=command_group,  # pyright: ignore
-                        ) from e
-
-                else:
-                    if unused_tokens:
+                    if unused_tokens and not command_app.default_command:
                         raise UnknownCommandError(unused_tokens=unused_tokens)
+
+                    command = self.help_print
+                    while meta_parent := meta_parent._meta_parent:
+                        command = meta_parent.help_print
+                    bound = inspect.signature(command).bind(tokens, console=console)
+                    unused_tokens = []
+                    argument_collection = ArgumentCollection()
+                elif any(flag in tokens for flag in command_app.version_flags):
+                    # Version
+                    command = self.version_print
+                    while meta_parent := meta_parent._meta_parent:
+                        command = meta_parent.version_print
+                    bound = inspect.signature(command).bind()
+                    unused_tokens = []
+                    argument_collection = ArgumentCollection()
+                else:
+                    if command_app.default_command:
+                        command = command_app.default_command
+                        validate_command(command)
+                        argument_collection = command_app.assemble_argument_collection()
+                        ignored: dict[str, Any] = {
+                            argument.field_info.name: resolve_annotated(argument.field_info.annotation)
+                            for argument in argument_collection.filter_by(parse=False)
+                        }
+
+                        bound, unused_tokens = create_bound_arguments(
+                            command_app.default_command,
+                            argument_collection,
+                            unused_tokens,
+                            config,
+                            end_of_options_delimiter=end_of_options_delimiter,
+                        )
+                        try:
+                            for validator in command_app.validator:
+                                validator(**bound.arguments)
+                        except (AssertionError, ValueError, TypeError) as e:
+                            raise ValidationError(exception_message=e.args[0] if e.args else "", app=command_app) from e
+
+                        try:
+                            for command_group in command_app.app_stack.command_groups:
+                                for validator in command_group.validator:  # pyright: ignore
+                                    validator(**bound.arguments)
+                        except (AssertionError, ValueError, TypeError) as e:
+                            raise ValidationError(
+                                exception_message=e.args[0] if e.args else "",
+                                group=command_group,  # pyright: ignore
+                            ) from e
+
                     else:
-                        # Running the application with no arguments and no registered
-                        # ``default_command`` will default to ``help_print``.
-                        command = self.help_print
-                        bound = inspect.signature(command).bind(tokens=tokens, console=console)
-                        unused_tokens = []
-                        argument_collection = ArgumentCollection()
-        except CycloptsError as e:
-            e.target = command_app.default_command
-            e.app = command_app
-            if command_chain:
-                e.command_chain = command_chain
-            if e.console is None:
-                e.console = self._resolve_console(tokens, console)
-            raise
+                        if unused_tokens:
+                            raise UnknownCommandError(unused_tokens=unused_tokens)
+                        else:
+                            # Running the application with no arguments and no registered
+                            # ``default_command`` will default to ``help_print``.
+                            command = self.help_print
+                            bound = inspect.signature(command).bind(tokens=tokens, console=console)
+                            unused_tokens = []
+                            argument_collection = ArgumentCollection()
+                if raise_on_unused_tokens and unused_tokens:
+                    for token in unused_tokens:
+                        if is_option_like(token):
+                            token = token.split("=")[0]
+                            raise UnknownOptionError(
+                                token=Token(keyword=token, source="cli"),
+                                argument_collection=argument_collection,
+                            )
+                    raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
+            except CycloptsError as e:
+                e.target = command_app.default_command
+                e.app = command_app
+                if command_chain:
+                    e.command_chain = command_chain
+                if e.console is None:
+                    e.console = command_app._resolve_console(console)
+                raise
 
         return command, bound, unused_tokens, ignored, argument_collection
 
@@ -1175,35 +1170,23 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
-        help_on_error = self._resolve(tokens, help_on_error, "help_on_error") or False
+        help_on_error = self.app_stack.resolve("help_on_error", help_on_error) or False
 
         # Normal parsing
         try:
-            command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
-                tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
+            command, bound, _, ignored, _ = self._parse_known_args(
+                tokens,
+                console=console,
+                end_of_options_delimiter=end_of_options_delimiter,
+                raise_on_unused_tokens=True,
             )
-            if unused_tokens:
-                for token in unused_tokens:
-                    if is_option_like(token):
-                        token = token.split("=")[0]
-                        raise UnknownOptionError(
-                            token=Token(keyword=token, source="cli"), argument_collection=argument_collection
-                        )
-                raise UnusedCliTokensError(
-                    target=command,
-                    unused_tokens=unused_tokens,
-                )
         except CycloptsError as e:
             e.verbose = verbose
             e.root_input_tokens = tokens
-
-            if e.console is None:
-                e.console = self._resolve_console(tokens, console)
+            assert e.console is not None
             if help_on_error:
-                assert e.console
                 self.help_print(tokens, console=e.console)
             if print_error:
-                assert e.console
                 e.console.print(CycloptsPanel(e))
             if exit_on_error:
                 sys.exit(1)
@@ -1250,6 +1233,7 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
+            Set to an empty string to disable.
         backend: Literal["asyncio", "trio"]
             The async backend to use (if an async command is invoked).
             Defaults to asyncio.
@@ -1264,66 +1248,42 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
-        command, bound, _ = self.parse_args(
-            tokens,
-            console=console,
-            print_error=print_error,
-            exit_on_error=exit_on_error,
-            help_on_error=help_on_error,
-            verbose=verbose,
-            end_of_options_delimiter=end_of_options_delimiter,
-        )
+        with self.app_stack(tokens):
+            command, bound, _ = self.parse_args(
+                tokens,
+                console=console,
+                print_error=print_error,
+                exit_on_error=exit_on_error,
+                help_on_error=help_on_error,
+                verbose=verbose,
+                end_of_options_delimiter=end_of_options_delimiter,
+            )
 
-        try:
-            if inspect.iscoroutinefunction(command):
-                # We don't use anyio to avoid the dependency for non-async users.
-                # anyio can auto-select the backend when you're already in an async context,
-                # but here we're creating the top-level event loop & must select ourselves.
-                if backend == "asyncio":
-                    import asyncio
+            try:
+                if inspect.iscoroutinefunction(command):
+                    # We don't use anyio to avoid the dependency for non-async users.
+                    # anyio can auto-select the backend when you're already in an async context,
+                    # but here we're creating the top-level event loop & must select ourselves.
+                    if backend == "asyncio":
+                        import asyncio
 
-                    return asyncio.run(command(*bound.args, **bound.kwargs))
-                elif backend == "trio":
-                    import trio
+                        return asyncio.run(command(*bound.args, **bound.kwargs))
+                    elif backend == "trio":
+                        import trio
 
-                    return trio.run(partial(command, *bound.args, **bound.kwargs))
-                else:  # pragma: no cover
-                    assert_never(backend)
-            else:
-                return command(*bound.args, **bound.kwargs)
-        except KeyboardInterrupt:
-            if self.suppress_keyboard_interrupt:
-                sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
-            else:
-                raise
+                        return trio.run(partial(command, *bound.args, **bound.kwargs))
+                    else:  # pragma: no cover
+                        assert_never(backend)
+                else:
+                    return command(*bound.args, **bound.kwargs)
+            except KeyboardInterrupt:
+                if self.suppress_keyboard_interrupt:
+                    sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
+                else:
+                    raise
 
-    def _resolve(self, tokens_or_apps: Optional[Sequence], override: Optional[V], attribute: str) -> Optional[V]:
-        if override is not None:
-            return override
-
-        if not tokens_or_apps:
-            apps = (self,)
-        elif isinstance(tokens_or_apps[0], App):
-            apps = tokens_or_apps
-        else:
-            _, apps, _ = self.parse_commands(tokens_or_apps)
-
-        for app in reversed(apps):
-            result = getattr(app, attribute)
-            if result is not None:
-                return result
-
-            # Check parenting meta app(s)
-            meta_app = app
-            while (meta_app := meta_app._meta_parent) is not None:
-                result = getattr(meta_app, attribute)
-                if result is not None:
-                    return result
-
-        return None
-
-    def _resolve_console(self, tokens_or_apps: Optional[Sequence], override: Optional["Console"] = None) -> "Console":
-        result = self._resolve(tokens_or_apps, override, "console")
+    def _resolve_console(self, override: Optional["Console"] = None) -> "Console":
+        result = self.app_stack.resolve("console", override)
         if result is not None:
             return result
         from rich.console import Console
@@ -1349,24 +1309,26 @@ class App:
         """
         tokens = normalize_tokens(tokens)
 
-        command_chain, apps, _ = self.parse_commands(tokens)
-        executing_app = apps[-1]
+        _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
+        with self.app_stack(apps_meta):
+            command_chain, apps, _ = self.parse_commands(tokens)
+            executing_app = apps[-1]
 
-        console = self._resolve_console(tokens, console)
+            console = executing_app._resolve_console(console)
 
-        # Print the:
-        #    my-app command COMMAND [ARGS] [OPTIONS]
-        if executing_app.usage is None:
-            console.print(format_usage(self, command_chain))
-        elif executing_app.usage:  # i.e. skip empty-string.
-            console.print(executing_app.usage + "\n")
+            # Print the:
+            #    my-app command COMMAND [ARGS] [OPTIONS]
+            if executing_app.usage is None:
+                console.print(format_usage(self, command_chain))
+            elif executing_app.usage:  # i.e. skip empty-string.
+                console.print(executing_app.usage + "\n")
 
-        # Print the App/Command's Doc String.
-        help_format = resolve_help_format(apps)
-        console.print(format_doc(executing_app, help_format))
+            # Print the App/Command's Doc String.
+            help_format = executing_app.app_stack.resolve("help_format", fallback="restructuredtext")
+            console.print(format_doc(executing_app, help_format))
 
-        for help_panel in self._assemble_help_panels(tokens, help_format):
-            console.print(help_panel)
+            for help_panel in self._assemble_help_panels(tokens, help_format):
+                console.print(help_panel)
 
     def _assemble_help_panels(
         self,
@@ -1377,13 +1339,14 @@ class App:
         from rich.console import NewLine
 
         command_chain, apps, _ = self.parse_commands(tokens)
+        command_app = apps[-1]
 
-        help_format = resolve_help_format(apps)
+        help_format = command_app.app_stack.resolve("help_format", help_format, "restructuredtext")
 
         panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
-        for subapp in _walk_metas(apps[-1]):
+        for subapp in _walk_metas(command_app):
             for group, subapps in groups_from_app(subapp):
                 if not group.show:
                     continue
@@ -1410,14 +1373,15 @@ class App:
                 command_panel.entries.extend(format_command_entries(subapps, format=help_format))
 
         # Handle Arguments/Parameters
-        for subapp in _walk_metas(apps[-1]):
+        # We have to combine all the help-pages of the command-app and it's meta apps.
+        for subapp in _walk_metas(command_app):
             if not subapp.default_command:
                 continue
 
-            argument_collection = subapp.assemble_argument_collection(apps=apps, parse_docstring=True)
+            argument_collection = subapp.assemble_argument_collection(parse_docstring=True)
 
             # Special-case: add config.Env values to Parameter(env_var=)
-            configs: tuple[Callable, ...] = self._resolve(apps, None, "_config") or ()
+            configs: tuple[Callable, ...] = subapp.app_stack.resolve("_config") or ()
             env_configs = tuple(x for x in configs if isinstance(x, Env) and x.show)
             for argument in argument_collection:
                 for env_config in env_configs:
@@ -1492,7 +1456,7 @@ class App:
 
             .. code-block:: python
 
-                def dispatcher(command: Callable, bound: inspect.BoundArguments) -> Any:
+                def dispatcher(command: Callable, bound: inspect.BoundArguments, ignored: dict[str, Any]) -> Any:
                     return command(*bound.args, **bound.kwargs)
 
             The above is the default dispatcher implementation.

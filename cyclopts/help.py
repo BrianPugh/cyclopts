@@ -518,23 +518,6 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry
     return entries
 
 
-def resolve_help_format(app_chain: Iterable["App"]) -> str:
-    # Resolve help_format; None fallsback to parent; non-None overwrites parent.
-    format_ = "restructuredtext"
-    for app in app_chain:
-        if app.help_format is not None:
-            format_ = app.help_format
-    return format_
-
-
-def resolve_version_format(app_chain: Iterable["App"]) -> str:
-    format_ = resolve_help_format(app_chain)
-    for app in app_chain:
-        if app.version_format is not None:
-            format_ = app.version_format
-    return format_
-
-
 # named like a class because it's just a very thin wrapper around a class.
 def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Panel":  # noqa: N802
     """Create a :class:`~rich.panel.Panel` with a consistent style.
