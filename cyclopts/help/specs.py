@@ -2,10 +2,11 @@ import math
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from attrs import Factory, define, evolve, field
+from attrs import Factory, evolve, field
 
 from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
 from cyclopts.help.formatters import wrap_formatter
+from cyclopts.utils import frozen
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from cyclopts.help.protocols import ColumnSpecBuilder, Converter, Formatter
 
 
-@define(frozen=True)
+@frozen
 class ColumnSpec:
     from rich.console import RenderableType
     from rich.style import Style
@@ -159,7 +160,7 @@ def register_panel_columnbuilder(name: str, builder: "ColumnSpecBuilder", *, ove
     _COLUMN_SPEC_BUILDERS[name] = builder
 
 
-@define(frozen=True)
+@frozen
 class TableSpec:
     from rich.box import Box
     from rich.style import Style
@@ -238,7 +239,7 @@ class TableSpec:
         return evolve(self, **kw)
 
 
-@define(frozen=True)
+@frozen
 class PanelSpec:
     from rich.box import ROUNDED, Box
     from rich.console import RenderableType
