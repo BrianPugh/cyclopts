@@ -234,11 +234,6 @@ class TableSpec:
             cells = [col.render_cell(e) for col in self.columns]
             table.add_row(*cells)
 
-    # To help with padding...
-    def with_padding(self, padding: PaddingType) -> "TableSpec":
-        """Immutable helper to tweak padding."""
-        return evolve(self, padding=padding)
-
     def with_(self, **kw):
         return evolve(self, **kw)
 
