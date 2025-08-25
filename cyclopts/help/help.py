@@ -229,13 +229,11 @@ class TableEntry:
         do not have all the same members. This was required for
         `ColeSpec.render_cell`
         """
-        if hasattr(self, key):
-            setattr(self, key, value)
-        elif hasattr(self.extras, key):
-            setattr(self.extras, key, value)
-        return self
+        try:
+            return self.put(key, value)
+        except AttributeError:
+            return self
 
-    # def put(self, key: str, value: Optional[Union[str, "LazyData"]]):
     def put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
         """Put a attr to the dataclass."""
         if hasattr(self, key):
