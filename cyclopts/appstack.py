@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, overload
 
 from cyclopts.group_extractors import inverse_groups_from_app
@@ -17,8 +18,10 @@ class AppStack:
         self.stack: list[list[App]] = [[app]]
 
     @contextmanager
-    def __call__(self, apps: Sequence["App"]):
+    def __call__(self, apps: Sequence["App"] | Sequence[str]):
         apps = list(apps)
+        if apps and isinstance(apps[0], str):
+            _, apps, _ = self.stack[0][0].parse_commands(apps, include_parent_meta=True)
 
         if not apps:
             try:
@@ -59,7 +62,7 @@ class AppStack:
     def default_parameter(self) -> Parameter:
         """default_parameter has special resolution since it needs to include the command groups in the derivation."""
         cparams = []
-        for child_app in self.current_frame:
+        for child_app in chain.from_iterable(self.stack):
             if child_app._meta_parent:
                 continue
             cparams.extend([group.default_parameter for group in child_app.app_stack.command_groups])
@@ -89,7 +92,7 @@ class AppStack:
             return override
 
         # `reversed` so that "closer" apps have higher priority.
-        for app in reversed(self.current_frame):
+        for app in reversed(list(chain.from_iterable(self.stack))):
             result = getattr(app, attribute)
             if result is not None:
                 return result
