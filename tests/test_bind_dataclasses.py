@@ -409,10 +409,11 @@ def test_bind_dataclass_star_parameter_better_error_message(app, console):
         print(foo)
 
     expected_message = (
-        r'Parameter "foo" in function .* has all optional values, uses Parameter\(name="\*"\), '
-        r"but itself has no default value\. Consider either:\n"
-        r'    1\) providing a default value like ""foo" : Foo = Foo\(\)"\n'
-        r'    2\) making it optional like ""foo" : Foo \| None = None"\.'
+        r'Parameter "foo" in function .* has all optional values, uses Parameter\(name="\*"\), but itself has no default value\. Consider either:\n'
+        r'    1\) If immutable, providing a default value "foo: Foo = Foo\(\)"\n'
+        r'    2\) Otherwise, declaring it optional like "foo: Foo \| None = None" and instanting the foo object in the function body:\n'
+        r"           if foo is None:\n"
+        r"               foo = Foo\(\)"
     )
 
     with pytest.raises(ValueError, match=expected_message):
