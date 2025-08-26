@@ -1,7 +1,7 @@
 ========================
 Interactive Shell & Help
 ========================
-Cyclopts has a builtin :meth:`interactive shell-like feature<cyclopts.App.interactive_shell>`:
+Cyclopts has a `builtin interactive shell-like feature <../api.html#cyclopts.App.interactive_shell>`__:
 
 .. code-block:: python
 
