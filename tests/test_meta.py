@@ -226,7 +226,7 @@ def test_nested_meta_app_inheriting_root_default_parameter(app, console):
         *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
         flag2: bool = False,
     ):
-        return foo_app(tokens, exit_on_error=False)
+        return foo_app(tokens)
 
     @foo_app.default
     def foo_app_default(
@@ -240,7 +240,4 @@ def test_nested_meta_app_inheriting_root_default_parameter(app, console):
     assert app.meta("foo --flag3") is True
 
     with pytest.raises(UnknownOptionError):
-        app.meta(
-            "foo --no-flag3",
-            exit_on_error=False,
-        )  # TODO: we should use a context manager in __call__ to set/unset App attributes so they propagate
+        app.meta("foo --no-flag3", exit_on_error=False)

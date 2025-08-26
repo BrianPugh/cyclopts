@@ -71,9 +71,31 @@ Exception Handling and Exiting
 For the most part, Cyclopts is **hands-off** when it comes to handling exceptions and exiting the application.
 However, by default, if there is a **Cyclopts runtime error**, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a ``sys.exit(1)``.
 This is to avoid displaying the unformatted, uncaught exception to the CLI user.
-This can be disabled by specifying ``exit_on_error=False`` when calling the app.
-At the same time, you may want to set ``print_error=False`` to disable the printing
-of the formatted exception.
+
+These behaviors can be controlled via :class:`.App` attributes or method parameters:
+
+- :attr:`.App.exit_on_error` - Calls ``sys.exit(1)`` on errors (defaults to :obj:`True`)
+- :attr:`.App.print_error` - Formatted errors are printed (defaults to :obj:`True`)
+- :attr:`.App.help_on_error` - The help-page is printed before errors (defaults to :obj:`False`)
+- :attr:`.App.verbose` - Include verbose error information that might be useful for **developers** using Cyclopts (defaults to :obj:`False`)
+
+These attributes are inherited by child apps and can be overridden by providing parameters to method calls.
+
+**Setting at App Level:**
+
+.. code-block:: python
+
+   # Configure error handling at the app level
+   app = App(
+       exit_on_error=False,  # Don't exit on errors
+       print_error=False,    # Don't print formatted errors
+   )
+
+   # Child apps inherit these settings
+   child_app = App(name="child")
+   app.command(child_app)
+
+**Method-Level Override:**
 
 .. code-block:: python
 

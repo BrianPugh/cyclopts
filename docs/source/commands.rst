@@ -94,6 +94,34 @@ The :meth:`app.command <cyclopts.App.command>` method can also register another 
 The subcommand may have their own registered ``default`` action.
 Cyclopts's command structure is fully recursive.
 
+------------------------
+SubCommand Configuration
+------------------------
+Subcommands inherit configuration from their parent apps.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   # Root app with specific error handling
+   root_app = App(
+       exit_on_error=False,
+       print_error=False,
+   )
+
+   # Child app inherits parent's settings
+   root_app.command(child_app := App(name="child"))
+
+   @child_app.default
+   def child_action():
+       return "Child executed successfully"
+
+   # Child can override parent settings if needed
+   child_app.command(grandchild_app := App(name="grandchild", exit_on_error=True))
+
+When ``parent_app("child ...")`` is called, the child command will use the parent's
+error handling settings unless explicitly overridden.
+
 .. _Command Changing Name:
 
 ---------------------

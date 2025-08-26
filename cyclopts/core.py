@@ -301,6 +301,12 @@ class App:
 
     end_of_options_delimiter: Optional[str] = field(default=None, kw_only=True)
 
+    print_error: Optional[bool] = field(default=None, kw_only=True)
+
+    exit_on_error: Optional[bool] = field(default=None, kw_only=True)
+
+    verbose: Optional[bool] = field(default=None, kw_only=True)
+
     suppress_keyboard_interrupt: bool = field(default=True, kw_only=True)
 
     ######################
@@ -951,8 +957,7 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         end_of_options_delimiter: Optional[str]
             All tokens after this delimiter will be force-interpreted as positional arguments.
-            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
-            If that is not set, it will default to POSIX-standard ``"--"``.
+            If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
 
         Returns
@@ -1011,9 +1016,9 @@ class App:
         with self.app_stack(apps_meta):
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
-            end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", end_of_options_delimiter)
-            if end_of_options_delimiter is None:
-                end_of_options_delimiter = "--"
+            end_of_options_delimiter = self.app_stack.resolve(
+                "end_of_options_delimiter", end_of_options_delimiter, fallback="--"
+            )
 
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
@@ -1113,10 +1118,10 @@ class App:
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
-        print_error: bool = True,
-        exit_on_error: bool = True,
+        print_error: Optional[bool] = None,
+        exit_on_error: Optional[bool] = None,
         help_on_error: Optional[bool] = None,
-        verbose: bool = False,
+        verbose: Optional[bool] = None,
         end_of_options_delimiter: Optional[str] = None,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
@@ -1134,23 +1139,22 @@ class App:
         console: rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
-        print_error: bool
+        print_error: Optional[bool]
             Print a rich-formatted error on error.
-            Defaults to :obj:`True`.
-        exit_on_error: bool
+            If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
+        exit_on_error: Optional[bool]
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
-            Defaults to :obj:`True`.
-        help_on_error: bool
-            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
-            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
-        verbose: bool
+            If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
+        help_on_error: Optional[bool]
+            Prints the help-page before printing an error.
+            If :obj:`None`, inherits from :attr:`App.help_on_error`, eventually defaulting to :obj:`False`.
+        verbose: Optional[bool]
             Populate exception strings with more information intended for developers.
-            Defaults to :obj:`False`.
+            If :obj:`None`, inherits from :attr:`App.verbose`, eventually defaulting to :obj:`False`.
         end_of_options_delimiter: Optional[str]
             All tokens after this delimiter will be force-interpreted as positional arguments.
-            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
-            If that is not set, it will default to POSIX-standard ``"--"``.
+            If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
 
         Returns
@@ -1170,9 +1174,12 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
-        help_on_error = self.app_stack.resolve("help_on_error", help_on_error) or False
 
-        # Normal parsing
+        print_error = self.app_stack.resolve("print_error", print_error)
+        exit_on_error = self.app_stack.resolve("exit_on_error", exit_on_error)
+        help_on_error = self.app_stack.resolve("help_on_error", help_on_error)
+        verbose = self.app_stack.resolve("verbose", verbose)
+
         try:
             command, bound, _, ignored, _ = self._parse_known_args(
                 tokens,
@@ -1181,14 +1188,14 @@ class App:
                 raise_on_unused_tokens=True,
             )
         except CycloptsError as e:
-            e.verbose = verbose
+            e.verbose = verbose if verbose is not None else False
             e.root_input_tokens = tokens
             assert e.console is not None
-            if help_on_error:
+            if help_on_error if help_on_error is not None else False:
                 self.help_print(tokens, console=e.console)
-            if print_error:
+            if print_error if print_error is not None else True:
                 e.console.print(CycloptsPanel(e))
-            if exit_on_error:
+            if exit_on_error if exit_on_error is not None else True:
                 sys.exit(1)
             raise
 
@@ -1199,10 +1206,10 @@ class App:
         tokens: Union[None, str, Iterable[str]] = None,
         *,
         console: Optional["Console"] = None,
-        print_error: bool = True,
-        exit_on_error: bool = True,
+        print_error: Optional[bool] = None,
+        exit_on_error: Optional[bool] = None,
         help_on_error: Optional[bool] = None,
-        verbose: bool = False,
+        verbose: Optional[bool] = None,
         end_of_options_delimiter: Optional[str] = None,
         backend: Literal["asyncio", "trio"] = "asyncio",
     ):
@@ -1216,23 +1223,22 @@ class App:
         console: rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
-        print_error: bool
+        print_error: Optional[bool]
             Print a rich-formatted error on error.
-            Defaults to :obj:`True`.
-        exit_on_error: bool
+            If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
+        exit_on_error: Optional[bool]
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
-            Defaults to ``True``.
-        help_on_error: bool
-            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
-            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
-        verbose: bool
+            If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
+        help_on_error: Optional[bool]
+            Prints the help-page before printing an error.
+            If :obj:`None`, inherits from :attr:`App.help_on_error`, eventually defaulting to :obj:`False`.
+        verbose: Optional[bool]
             Populate exception strings with more information intended for developers.
-            Defaults to :obj:`False`.
+            If :obj:`None`, inherits from :attr:`App.verbose`, eventually defaulting to :obj:`False`.
         end_of_options_delimiter: Optional[str]
             All tokens after this delimiter will be force-interpreted as positional arguments.
-            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
-            If that is not set, it will default to POSIX-standard ``"--"``.
+            If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
         backend: Literal["asyncio", "trio"]
             The async backend to use (if an async command is invoked).
@@ -1248,6 +1254,7 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
+
         with self.app_stack(tokens):
             command, bound, _ = self.parse_args(
                 tokens,

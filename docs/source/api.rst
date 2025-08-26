@@ -119,6 +119,28 @@ API
       Prints the help-page before printing an error.
       If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
 
+   .. attribute:: print_error
+      :type: Optional[bool]
+      :value: None
+
+      Print a rich-formatted error on error.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+
+   .. attribute:: exit_on_error
+      :type: Optional[bool]
+      :value: None
+
+      If there is an error parsing the CLI tokens, invoke ``sys.exit(1)``.
+      Otherwise, continue to raise the exception.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+
+   .. attribute:: verbose
+      :type: Optional[bool]
+      :value: None
+
+      Populate exception strings with more information intended for developers.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
+
    .. attribute:: version_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
@@ -356,7 +378,7 @@ API
       :value: None
 
       All tokens after this delimiter will be force-interpreted as positional arguments.
-      If no ``end_of_options_delimiter`` is set, it will default to POSIX-standard ``"--"``.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
    .. attribute:: suppress_keyboard_interrupt
