@@ -11,8 +11,11 @@ if TYPE_CHECKING:
 __all__ = [
     # Path
     "ExistingPath",
+    "NonExistentPath",
     "ExistingFile",
+    "NonExistentFile",
     "ExistingDirectory",
+    "NonExistentDirectory",
     "Directory",
     "File",
     "ResolvedExistingPath",
@@ -24,20 +27,28 @@ __all__ = [
     # Path with extensions
     "BinPath",
     "ExistingBinPath",
+    "NonExistentBinPath",
     "CsvPath",
     "ExistingCsvPath",
+    "NonExistentCsvPath",
     "ImagePath",
     "ExistingImagePath",
+    "NonExistentImagePath",
     "JsonPath",
     "ExistingJsonPath",
+    "NonExistentJsonPath",
     "Mp4Path",
     "ExistingMp4Path",
+    "NonExistentMp4Path",
     "TomlPath",
     "ExistingTomlPath",
+    "NonExistentTomlPath",
     "TxtPath",
     "ExistingTxtPath",
+    "NonExistentTxtPath",
     "YamlPath",
     "ExistingYamlPath",
+    "NonExistentYamlPath",
     # Number
     "PositiveFloat",
     "NonNegativeFloat",
@@ -80,6 +91,9 @@ def _path_resolve_converter(type_, tokens: Sequence["Token"]):
 ExistingPath = Annotated[Path, Parameter(validator=validators.Path(exists=True))]
 "A :class:`~pathlib.Path` file or directory that **must** exist."
 
+NonExistentPath = Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` file or directory that **must not** exist."
+
 ResolvedPath = Annotated[Path, Parameter(converter=_path_resolve_converter)]
 "A :class:`~pathlib.Path` file or directory. :meth:`~pathlib.Path.resolve` is invoked prior to returning the path."
 ResolvedExistingPath = Annotated[ExistingPath, Parameter(converter=_path_resolve_converter)]
@@ -89,6 +103,9 @@ Directory = Annotated[Path, Parameter(validator=validators.Path(file_okay=False)
 "A :class:`~pathlib.Path` that **must** be a directory (or not exist)."
 ExistingDirectory = Annotated[Path, Parameter(validator=validators.Path(exists=True, file_okay=False))]
 "A :class:`~pathlib.Path` directory that **must** exist."
+
+NonExistentDirectory = Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` directory that **must not** exist."
 ResolvedDirectory = Annotated[Directory, Parameter(converter=_path_resolve_converter)]
 "A :class:`~pathlib.Path` directory. :meth:`~pathlib.Path.resolve` is invoked prior to returning the path."
 ResolvedExistingDirectory = Annotated[ExistingDirectory, Parameter(converter=_path_resolve_converter)]
@@ -98,6 +115,9 @@ File = Annotated[Path, Parameter(validator=validators.Path(dir_okay=False))]
 "A :class:`~pathlib.File` that **must** be a file (or not exist)."
 ExistingFile = Annotated[Path, Parameter(validator=validators.Path(exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` file that **must** exist."
+
+NonExistentFile = Annotated[Path, Parameter(validator=validators.Path(file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` file that **must not** exist."
 ResolvedFile = Annotated[File, Parameter(converter=_path_resolve_converter)]
 "A :class:`~pathlib.Path` file. :meth:`~pathlib.Path.resolve` is invoked prior to returning the path."
 ResolvedExistingFile = Annotated[ExistingFile, Parameter(converter=_path_resolve_converter)]
@@ -109,15 +129,24 @@ BinPath = Annotated[Path, Parameter(validator=validators.Path(ext="bin", dir_oka
 ExistingBinPath = Annotated[Path, Parameter(validator=validators.Path(ext="bin", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``bin``."
 
+NonExistentBinPath = Annotated[Path, Parameter(validator=validators.Path(ext="bin", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``bin``."
+
 CsvPath = Annotated[Path, Parameter(validator=validators.Path(ext="csv", dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension ``csv``."
 ExistingCsvPath = Annotated[Path, Parameter(validator=validators.Path(ext="csv", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``csv``."
 
+NonExistentCsvPath = Annotated[Path, Parameter(validator=validators.Path(ext="csv", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``csv``."
+
 TxtPath = Annotated[Path, Parameter(validator=validators.Path(ext="txt", dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension ``txt``."
 ExistingTxtPath = Annotated[Path, Parameter(validator=validators.Path(ext="txt", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``txt``."
+
+NonExistentTxtPath = Annotated[Path, Parameter(validator=validators.Path(ext="txt", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``txt``."
 
 ImagePath = Annotated[Path, Parameter(validator=validators.Path(ext=("png", "jpg", "jpeg"), dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension in {``png``, ``jpg``, ``jpeg``}."
@@ -126,25 +155,42 @@ ExistingImagePath = Annotated[
 ]
 "A :class:`~pathlib.Path` that **must** exist and have extension in {``png``, ``jpg``, ``jpeg``}."
 
+NonExistentImagePath = Annotated[
+    Path, Parameter(validator=validators.Path(ext=("png", "jpg", "jpeg"), file_okay=False, dir_okay=False))
+]
+"A :class:`~pathlib.Path` that **must not** exist and have extension in {``png``, ``jpg``, ``jpeg``}."
+
 Mp4Path = Annotated[Path, Parameter(validator=validators.Path(ext="mp4", dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension ``mp4``."
 ExistingMp4Path = Annotated[Path, Parameter(validator=validators.Path(ext="mp4", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``mp4``."
+
+NonExistentMp4Path = Annotated[Path, Parameter(validator=validators.Path(ext="mp4", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``mp4``."
 
 JsonPath = Annotated[Path, Parameter(validator=validators.Path(ext="json", dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension ``json``."
 ExistingJsonPath = Annotated[Path, Parameter(validator=validators.Path(ext="json", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``json``."
 
+NonExistentJsonPath = Annotated[Path, Parameter(validator=validators.Path(ext="json", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``json``."
+
 TomlPath = Annotated[Path, Parameter(validator=validators.Path(ext="toml", dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension ``toml``."
 ExistingTomlPath = Annotated[Path, Parameter(validator=validators.Path(ext="toml", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``toml``."
 
+NonExistentTomlPath = Annotated[Path, Parameter(validator=validators.Path(ext="toml", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``toml``."
+
 YamlPath = Annotated[Path, Parameter(validator=validators.Path(ext="yaml", dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** have extension ``yaml``."
 ExistingYamlPath = Annotated[Path, Parameter(validator=validators.Path(ext="yaml", exists=True, dir_okay=False))]
 "A :class:`~pathlib.Path` that **must** exist and have extension ``yaml``."
+
+NonExistentYamlPath = Annotated[Path, Parameter(validator=validators.Path(ext="yaml", file_okay=False, dir_okay=False))]
+"A :class:`~pathlib.Path` that **must not** exist and have extension ``yaml``."
 
 
 ##########

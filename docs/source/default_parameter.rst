@@ -21,7 +21,7 @@ For example, to disable the :attr:`~.Parameter.negative` flag feature across you
 
 Consequently, ``--no-flag`` is no longer an allowed flag:
 
-.. code-block::
+.. code-block:: console
 
    $ my-script foo --help
    Usage: my-script foo [ARGS] [OPTIONS]
