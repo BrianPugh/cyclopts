@@ -1198,6 +1198,8 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 
 .. autodata:: cyclopts.types.ExistingPath
 
+.. autodata:: cyclopts.types.NonExistentPath
+
 .. autodata:: cyclopts.types.ResolvedPath
 
 .. autodata:: cyclopts.types.ResolvedExistingPath
@@ -1205,6 +1207,8 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 .. autodata:: cyclopts.types.Directory
 
 .. autodata:: cyclopts.types.ExistingDirectory
+
+.. autodata:: cyclopts.types.NonExistentDirectory
 
 .. autodata:: cyclopts.types.ResolvedDirectory
 
@@ -1214,6 +1218,8 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 
 .. autodata:: cyclopts.types.ExistingFile
 
+.. autodata:: cyclopts.types.NonExistentFile
+
 .. autodata:: cyclopts.types.ResolvedFile
 
 .. autodata:: cyclopts.types.ResolvedExistingFile
@@ -1222,33 +1228,49 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 
 .. autodata:: cyclopts.types.ExistingBinPath
 
+.. autodata:: cyclopts.types.NonExistentBinPath
+
 .. autodata:: cyclopts.types.CsvPath
 
 .. autodata:: cyclopts.types.ExistingCsvPath
+
+.. autodata:: cyclopts.types.NonExistentCsvPath
 
 .. autodata:: cyclopts.types.TxtPath
 
 .. autodata:: cyclopts.types.ExistingTxtPath
 
+.. autodata:: cyclopts.types.NonExistentTxtPath
+
 .. autodata:: cyclopts.types.ImagePath
 
 .. autodata:: cyclopts.types.ExistingImagePath
+
+.. autodata:: cyclopts.types.NonExistentImagePath
 
 .. autodata:: cyclopts.types.Mp4Path
 
 .. autodata:: cyclopts.types.ExistingMp4Path
 
+.. autodata:: cyclopts.types.NonExistentMp4Path
+
 .. autodata:: cyclopts.types.JsonPath
 
 .. autodata:: cyclopts.types.ExistingJsonPath
+
+.. autodata:: cyclopts.types.NonExistentJsonPath
 
 .. autodata:: cyclopts.types.TomlPath
 
 .. autodata:: cyclopts.types.ExistingTomlPath
 
+.. autodata:: cyclopts.types.NonExistentTomlPath
+
 .. autodata:: cyclopts.types.YamlPath
 
 .. autodata:: cyclopts.types.ExistingYamlPath
+
+.. autodata:: cyclopts.types.NonExistentYamlPath
 
 .. _Annotated Number Types:
 
@@ -1572,7 +1594,7 @@ Exceptions
    :show-inheritance:
    :members:
 
-.. autoexception:: cyclopts.InvalidCommandError
+.. autoexception:: cyclopts.UnknownCommandError
    :show-inheritance:
    :members:
 

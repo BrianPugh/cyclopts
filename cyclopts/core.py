@@ -33,7 +33,7 @@ from cyclopts.config._env import Env
 from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
-    InvalidCommandError,
+    UnknownCommandError,
     UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
@@ -1040,7 +1040,7 @@ class App:
                     unused_tokens.pop(help_flag_index)
 
                 if unused_tokens and not command_app.default_command:
-                    raise InvalidCommandError(unused_tokens=unused_tokens)
+                    raise UnknownCommandError(unused_tokens=unused_tokens)
 
                 command = self.help_print
                 while meta_parent := meta_parent._meta_parent:
@@ -1094,7 +1094,7 @@ class App:
 
                 else:
                     if unused_tokens:
-                        raise InvalidCommandError(unused_tokens=unused_tokens)
+                        raise UnknownCommandError(unused_tokens=unused_tokens)
                     else:
                         # Running the application with no arguments and no registered
                         # ``default_command`` will default to ``help_print``.

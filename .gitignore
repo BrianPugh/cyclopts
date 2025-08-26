@@ -254,3 +254,4 @@ poetry.toml
 # Misc dev
 /*.py
 /draw.toml
+/*.md

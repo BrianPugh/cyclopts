@@ -9,9 +9,9 @@ from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
     CombinedShortOptionError,
-    InvalidCommandError,
     MissingArgumentError,
     RepeatArgumentError,
+    UnknownCommandError,
     UnknownOptionError,
     UnusedCliTokensError,
 )
@@ -115,7 +115,7 @@ def test_command_delete(app, assert_parse_args):
 
     del app["foo"]
 
-    with pytest.raises(InvalidCommandError):
+    with pytest.raises(UnknownCommandError):
         assert_parse_args(foo, "foo")
 
 
