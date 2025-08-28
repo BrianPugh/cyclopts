@@ -12,7 +12,6 @@ __all__ = [
     "format_command_entries",
     "resolve_help_format",
     "resolve_version_format",
-    "CycloptsPanel",
     "format_doc",
     "format_usage",
     "InlineText",
@@ -20,7 +19,6 @@ __all__ = [
 ]
 
 from .help import (
-    CycloptsPanel,
     HelpPanel,
     InlineText,
     TableData,

@@ -3,6 +3,11 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from attrs import Factory, evolve, field
+from rich.box import ROUNDED, Box
+from rich.console import RenderableType
+from rich.panel import Panel
+from rich.style import Style
+from rich.table import Table
 
 from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
 from cyclopts.help.formatters import wrap_formatter
@@ -17,10 +22,6 @@ if TYPE_CHECKING:
 
 @frozen
 class ColumnSpec:
-    from rich.console import RenderableType
-    from rich.style import Style
-    from rich.table import Table
-
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
     key: str
@@ -106,7 +107,7 @@ DescriptionColumn = ColumnSpec(key="description", header="", justify="left", ove
 def _command_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
 ) -> tuple[ColumnSpec, ...]:
-    """Builder for dfault command column_specs."""
+    """Builder for default command column_specs."""
     command_column = ColumnSpec(
         key="name",
         header="",
@@ -126,7 +127,7 @@ def _command_column_spec_builder(
 def _parameter_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
 ) -> tuple[ColumnSpec, ...]:
-    """Builder for dfault command column_specs."""
+    """Builder for default parameter column_specs."""
     name_column = ColumnSpec(
         key="name",
         header="",
@@ -165,10 +166,6 @@ def register_panel_columnbuilder(name: str, builder: "ColumnSpecBuilder", *, ove
 
 @frozen
 class TableSpec:
-    from rich.box import Box
-    from rich.style import Style
-    from rich.table import Table
-
     StyleType = Union[Style, str]
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
@@ -200,8 +197,6 @@ class TableSpec:
         return self.with_(columns=self.columns(console, options, entries) if callable(self.columns) else self.columns)
 
     def build(self, **overrides) -> Table:
-        from rich.table import Table
-
         """Construct a rich.Table, allowing per-render overrides, e.g. build(padding=0)."""
         opts = {
             "title": self.title,
@@ -244,11 +239,6 @@ class TableSpec:
 
 @frozen
 class PanelSpec:
-    from rich.box import ROUNDED, Box
-    from rich.console import RenderableType
-    from rich.panel import Panel
-    from rich.style import Style
-
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
     StyleType = Union[Style, str]
 
@@ -268,8 +258,6 @@ class PanelSpec:
 
     def build(self, renderable: RenderableType, **overrides) -> Panel:
         """Create a Panel around `renderable`. Use kwargs to override spec per render."""
-        from rich.panel import Panel
-
         opts = {
             "title": self.title,
             "subtitle": self.subtitle,

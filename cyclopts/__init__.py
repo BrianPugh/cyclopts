@@ -59,7 +59,7 @@ from cyclopts.exceptions import (
     ValidationError,
 )
 from cyclopts.group import Group
-from cyclopts.help import CycloptsPanel
+from cyclopts.panel import CycloptsPanel
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token

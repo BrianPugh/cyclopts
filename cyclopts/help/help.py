@@ -28,7 +28,6 @@ from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
-    from rich.panel import Panel
     from rich.text import Text
 
     from cyclopts.argument import ArgumentCollection
@@ -195,7 +194,7 @@ def _resolve(v: Union["RenderableType", "LazyData"], entry: "TableEntry") -> "Re
 class TableData:
     """Intentionally empty dataclass.
 
-    Users can inherit from this and declore concrete fields and then pass
+    Users can inherit from this and declare concrete fields and then pass
     the object to TableEntry
     """
 
@@ -227,7 +226,7 @@ class TableEntry:
         This is looser than put, and will not raise an AttributeError if
         the member does not exist. This is useful when the list of entries
         do not have all the same members. This was required for
-        `ColeSpec.render_cell`
+        `ColumnSpec.render_cell`
         """
         try:
             return self.put(key, value)
@@ -578,44 +577,3 @@ def resolve_version_format(app_chain: Iterable["App"]) -> str:
         if app.version_format is not None:
             format_ = app.version_format
     return format_
-
-
-# named like a class because it's just a very thin wrapper around a class.
-def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Panel":  # noqa: N802
-    """Create a :class:`~rich.panel.Panel` with a consistent style.
-
-    The resulting panel can be displayed using a :class:`~rich.console.Console`.
-
-    .. code-block:: text
-
-        ╭─ Title ──────────────────────────────────╮
-        │ Message content here.                    │
-        ╰──────────────────────────────────────────╯
-
-    Parameters
-    ----------
-    message: Any
-        The body of the panel will be filled with the stringified version of the message.
-    title: str
-        Title of the panel that appears in the top-left corner.
-    style: str
-        Rich `style <https://rich.readthedocs.io/en/stable/style.html>`_ for the panel border.
-
-    Returns
-    -------
-    rich.panel.Panel
-        Formatted panel object.
-    """
-    from rich import box
-    from rich.panel import Panel
-    from rich.text import Text
-
-    panel = Panel(
-        Text(str(message), "default"),
-        title=title,
-        style=style,
-        box=box.ROUNDED,
-        expand=True,
-        title_align="left",
-    )
-    return panel
