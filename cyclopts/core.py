@@ -41,7 +41,6 @@ from cyclopts.exceptions import (
 from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
 from cyclopts.help import (
-    CycloptsPanel,
     HelpPanel,
     InlineText,
     create_parameter_help_panel,
@@ -51,6 +50,7 @@ from cyclopts.help import (
     resolve_help_format,
     resolve_version_format,
 )
+from cyclopts.help.panel import CycloptsPanel
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token

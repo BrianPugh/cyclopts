@@ -20,7 +20,6 @@ __all__ = [
 ]
 
 from .help import (
-    CycloptsPanel,
     HelpPanel,
     InlineText,
     TableData,
@@ -33,6 +32,7 @@ from .help import (
     resolve_help_format,
     resolve_version_format,
 )
+from .panel import CycloptsPanel
 from .protocols import Converter, Formatter, LazyData
 from .specs import (
     ColumnSpec,
