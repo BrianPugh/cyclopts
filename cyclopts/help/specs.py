@@ -107,7 +107,7 @@ DescriptionColumn = ColumnSpec(key="description", header="", justify="left", ove
 def _command_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
 ) -> tuple[ColumnSpec, ...]:
-    """Builder for dfault command column_specs."""
+    """Builder for default command column_specs."""
     command_column = ColumnSpec(
         key="name",
         header="",
@@ -127,7 +127,7 @@ def _command_column_spec_builder(
 def _parameter_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
 ) -> tuple[ColumnSpec, ...]:
-    """Builder for dfault command column_specs."""
+    """Builder for default parameter column_specs."""
     name_column = ColumnSpec(
         key="name",
         header="",

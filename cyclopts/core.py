@@ -1443,9 +1443,6 @@ class App:
                 new_panel = create_parameter_help_panel(group, group_argument_collection, help_format)
 
                 if existing_panel:
-                    # Patch the _new_ panel to include existing
-                    new_panel.entries = new_panel.entries + existing_panel.entries
-
                     # An imperfect merging process
                     existing_panel.format = "parameter"
                     new_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last

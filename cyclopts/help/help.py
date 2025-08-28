@@ -194,7 +194,7 @@ def _resolve(v: Union["RenderableType", "LazyData"], entry: "TableEntry") -> "Re
 class TableData:
     """Intentionally empty dataclass.
 
-    Users can inherit from this and declore concrete fields and then pass
+    Users can inherit from this and declare concrete fields and then pass
     the object to TableEntry
     """
 
@@ -226,7 +226,7 @@ class TableEntry:
         This is looser than put, and will not raise an AttributeError if
         the member does not exist. This is useful when the list of entries
         do not have all the same members. This was required for
-        `ColeSpec.render_cell`
+        `ColumnSpec.render_cell`
         """
         try:
             return self.put(key, value)
