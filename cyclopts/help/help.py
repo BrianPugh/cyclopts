@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
-from math import ceil
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -13,25 +12,27 @@ from typing import (
     Literal,
     Optional,
     Sequence,
+    Union,
     get_args,
     get_origin,
 )
 
-from attrs import define, field
+from attrs import Factory, define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
-from cyclopts.utils import SortHelper, frozen, resolve_callables
+from cyclopts.help.specs import PanelSpec, TableSpec
+from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
-    from rich.panel import Panel
     from rich.text import Text
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
+    from cyclopts.help.protocols import LazyData
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -62,15 +63,6 @@ def docstring_parse(doc: str, format: str):
     assert not res.long_description or res.short_description
 
     return res
-
-
-@frozen
-class HelpEntry:
-    name: str
-    short: str
-    description: "RenderableType"
-    required: bool = False
-    sort_key: Any = None
 
 
 def _text_factory():
@@ -192,12 +184,116 @@ class InlineText:
             yield from wrapped_segments
 
 
+def _resolve(v: Union["RenderableType", "LazyData"], entry: "TableEntry") -> "RenderableType":
+    return v(entry) if callable(v) else v
+
+
+# TODO: Is there a low cost runtime validator that all members in this
+#       are renderable?
+@define(slots=True)
+class TableData:
+    """Intentionally empty dataclass.
+
+    Users can inherit from this and declare concrete fields and then pass
+    the object to TableEntry
+    """
+
+    pass
+
+
+@define(slots=True)
+class TableEntry:
+    """Abstract version of TableEntry.
+
+    Member extras can be a user-defined dataclass. All members in `extras`
+    will be treated as if they are members of `TableEntry` allowing
+    for arbitrary data to be included in the Entry.
+    """
+
+    from rich.console import RenderableType
+
+    name: Optional[str] = None
+    short: Optional[str] = None
+    description: Optional[RenderableType] = None
+    required: bool = False
+    sort_key: Any = None
+
+    extras: TableData = field(factory=TableData, repr=False)
+
+    def try_put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
+        """Put a attr to the dataclass.
+
+        This is looser than put, and will not raise an AttributeError if
+        the member does not exist. This is useful when the list of entries
+        do not have all the same members. This was required for
+        `ColumnSpec.render_cell`
+        """
+        try:
+            return self.put(key, value)
+        except AttributeError:
+            return self
+
+    def put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
+        """Put a attr to the dataclass."""
+        if hasattr(self, key):
+            setattr(self, key, value)
+        elif hasattr(self.extras, key):
+            setattr(self.extras, key, value)
+        else:
+            raise AttributeError(f"'{type(self.extras).__name__}' has no field {key}")
+        return self
+
+    def get(self, key: str, default: Any = None, resolve: bool = False) -> Union["LazyData", "RenderableType"]:
+        if hasattr(self, key):
+            val = getattr(self, key)
+            return _resolve(val, self) if resolve else val
+        if hasattr(self.extras, key):
+            val = getattr(self.extras, key)
+            return _resolve(val, self) if resolve else val
+        return default
+
+    def __getattr__(self, name: str) -> Union[str, "LazyData"]:
+        """Access extra values as if they were members.
+
+        This makes members in the `extra` dataclass feel like
+        members of the `TableEntry` instance. Thus, pseudo
+        adding members is easy, and table generation is simplified.
+        """
+        extras = object.__getattribute__(self, "extras")
+        try:
+            return getattr(extras, name)
+        except AttributeError as err:
+            raise AttributeError(f"'{type(self)} nor {type(self.extras).__name__}' have field {name}") from err
+
+    def with_(self, **kw):
+        return evolve(self, **kw)
+
+
 @define
 class HelpPanel:
-    format: Literal["command", "parameter"]
-    title: str
-    description: "RenderableType" = field(factory=_text_factory)
-    entries: list[HelpEntry] = field(factory=list)
+    """Adjust the Format for the help panel!."""
+
+    from rich.box import ROUNDED, Box
+    from rich.console import Group as RichGroup
+    from rich.console import NewLine, RenderableType
+    from rich.panel import Panel
+    from rich.table import Column, Table
+    from rich.text import Text
+
+    # TODO: This is _only_ here for convenience to be passed to table_spec
+    #       otherwise, we could instantiate this panel and then
+    #       instantiate the table_spec with the correct format.
+    #
+    # I.E) Without this, to make a HelpPanel we'll have to make and
+    #       pass a list of column specs.
+    format: str  # Literal["command", "parameter"]
+
+    title: RenderableType
+    description: RenderableType = field(factory=_text_factory)
+    entries: list[TableEntry] = field(factory=list)
+
+    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(preset=self.format), takes_self=True))
+    panel_spec: PanelSpec = field(default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
 
     def remove_duplicates(self):
         seen, out = set(), []
@@ -215,7 +311,14 @@ class HelpPanel:
 
         if self.format == "command":
             sorted_sort_helper = SortHelper.sort(
-                [SortHelper(entry.sort_key, (entry.name.startswith("-"), entry.name), entry) for entry in self.entries]
+                [
+                    SortHelper(
+                        entry.sort_key,
+                        (entry.name.startswith("-") if entry.name is not None else False, entry.name),
+                        entry,
+                    )
+                    for entry in self.entries
+                ]
             )
             self.entries = [x.value for x in sorted_sort_helper]
         else:
@@ -225,84 +328,24 @@ class HelpPanel:
         if not self.entries:
             return _silent
 
-        import textwrap
-
-        from rich.box import ROUNDED
         from rich.console import Group as RichGroup
         from rich.console import NewLine
-        from rich.panel import Panel
-        from rich.table import Table
         from rich.text import Text
 
-        wrap = partial(
-            textwrap.wrap,
-            subsequent_indent="  ",
-            break_on_hyphens=False,
-            tabsize=4,
-        )
-        # (top, right, bottom, left)
-        table = Table.grid(padding=(0, 2, 0, 0), pad_edge=False)
         panel_description = self.description
-
         if isinstance(panel_description, Text):
             panel_description.end = ""
 
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        panel = Panel(
-            RichGroup(panel_description, table),
-            box=ROUNDED,
-            expand=True,
-            title_align="left",
-            title=self.title,
-        )
+        # 2. Realize spec, build table, and add entries
+        table_spec = self.table_spec.realize_columns(console, options, self.entries)
+        table = table_spec.build()
+        table_spec.add_entries(table, self.entries)
 
-        if self.format == "command":
-            commands_width = ceil(console.width * 0.35)
-            table.add_column("Commands", justify="left", max_width=commands_width, style="cyan")
-            table.add_column("Description", justify="left")
-
-            for entry in self.entries:
-                name = entry.name
-                if entry.short:
-                    name += " " + entry.short
-                name = "\n".join(wrap(name, commands_width))
-                table.add_row(name, entry.description)
-        elif self.format == "parameter":
-            options_width = ceil(console.width * 0.35)
-            short_width = ceil(console.width * 0.1)
-
-            has_short = any(entry.short for entry in self.entries)
-            has_required = any(entry.required for entry in self.entries)
-
-            if has_required:
-                table.add_column("Asterisk", justify="left", width=1, style="red bold")
-            table.add_column("Options", justify="left", overflow="fold", max_width=options_width, style="cyan")
-            if has_short:
-                table.add_column("Short", justify="left", overflow="fold", max_width=short_width, style="green")
-            table.add_column("Description", justify="left", overflow="fold")
-
-            lookup = {col.header: (i, col.max_width) for i, col in enumerate(table.columns)}
-            for entry in self.entries:
-                row = [""] * len(table.columns)
-
-                def add(key, value, custom_wrap=False):
-                    try:
-                        index, max_width = lookup[key]
-                    except KeyError:
-                        return
-                    if custom_wrap and max_width:
-                        value = "\n".join(wrap(value, max_width))
-                    row[index] = value  # noqa: B023
-
-                add("Asterisk", "*" if entry.required else "")
-                add("Options", entry.name, custom_wrap=True)
-                add("Short", entry.short)
-                add("Description", entry.description)
-                table.add_row(*row)
-        else:
-            raise NotImplementedError
+        # 3. Final make the panel
+        panel = self.panel_spec.build(RichGroup(panel_description, table))
 
         yield panel
 
@@ -481,10 +524,10 @@ def create_parameter_help_panel(
             help_description.append(Text(r"[required]", "dim red"))
 
         # populate row
-        entry = HelpEntry(
-            name=" ".join(long_options),
+        entry = TableEntry(
+            name="".join(long_options),
             description=help_description,
-            short=" ".join(short_options),
+            short="".join(short_options),
             required=argument.required,
         )
 
@@ -499,7 +542,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry]:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -507,7 +550,8 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry
         short_names, long_names = [], []
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
-        entry = HelpEntry(
+
+        entry = TableEntry(
             name="\n".join(long_names),
             short=" ".join(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
@@ -516,61 +560,3 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry
         if entry not in entries:
             entries.append(entry)
     return entries
-
-
-def resolve_help_format(app_chain: Iterable["App"]) -> str:
-    # Resolve help_format; None fallsback to parent; non-None overwrites parent.
-    format_ = "restructuredtext"
-    for app in app_chain:
-        if app.help_format is not None:
-            format_ = app.help_format
-    return format_
-
-
-def resolve_version_format(app_chain: Iterable["App"]) -> str:
-    format_ = resolve_help_format(app_chain)
-    for app in app_chain:
-        if app.version_format is not None:
-            format_ = app.version_format
-    return format_
-
-
-# named like a class because it's just a very thin wrapper around a class.
-def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Panel":  # noqa: N802
-    """Create a :class:`~rich.panel.Panel` with a consistent style.
-
-    The resulting panel can be displayed using a :class:`~rich.console.Console`.
-
-    .. code-block:: text
-
-        ╭─ Title ──────────────────────────────────╮
-        │ Message content here.                    │
-        ╰──────────────────────────────────────────╯
-
-    Parameters
-    ----------
-    message: Any
-        The body of the panel will be filled with the stringified version of the message.
-    title: str
-        Title of the panel that appears in the top-left corner.
-    style: str
-        Rich `style <https://rich.readthedocs.io/en/stable/style.html>`_ for the panel border.
-
-    Returns
-    -------
-    rich.panel.Panel
-        Formatted panel object.
-    """
-    from rich import box
-    from rich.panel import Panel
-    from rich.text import Text
-
-    panel = Panel(
-        Text(str(message), "default"),
-        title=title,
-        style=style,
-        box=box.ROUNDED,
-        expand=True,
-        title_align="left",
-    )
-    return panel

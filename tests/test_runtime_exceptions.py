@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 import pytest
 
 from cyclopts import CycloptsError
-from cyclopts.exceptions import InvalidCommandError, MissingArgumentError
+from cyclopts.exceptions import MissingArgumentError, UnknownCommandError
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_runtime_exception_missing_parameter(app, console):
 
 
 def test_runtime_exception_bad_command(app, console):
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
         app(["bad-command", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()
@@ -78,7 +78,7 @@ def test_runtime_exception_bad_command_recommend(app, console):
     def mad_command():
         pass
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
         app(["bad-command", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()
@@ -106,7 +106,7 @@ def test_runtime_exception_bad_command_list_ellipsis(app, console):
     app.command(name="cmd8")(cmd)
     app.command(name="cmd9")(cmd)
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
         app(["cmd", "123"], exit_on_error=False, console=console)
 
     actual = capture.get()

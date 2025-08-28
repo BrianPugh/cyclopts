@@ -19,7 +19,7 @@ __all__ = [
     "EditorDidNotSaveError",
     "EditorDidNotChangeError",
     "Group",
-    "InvalidCommandError",
+    "UnknownCommandError",
     "MissingArgumentError",
     "MixedArgumentError",
     "RepeatArgumentError",
@@ -50,16 +50,16 @@ from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
     DocstringError,
-    InvalidCommandError,
     MissingArgumentError,
     MixedArgumentError,
     RepeatArgumentError,
+    UnknownCommandError,
     UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
 )
 from cyclopts.group import Group
-from cyclopts.help import CycloptsPanel
+from cyclopts.panel import CycloptsPanel
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token

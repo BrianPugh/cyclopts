@@ -119,6 +119,28 @@ API
       Prints the help-page before printing an error.
       If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
 
+   .. attribute:: print_error
+      :type: Optional[bool]
+      :value: None
+
+      Print a rich-formatted error on error.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+
+   .. attribute:: exit_on_error
+      :type: Optional[bool]
+      :value: None
+
+      If there is an error parsing the CLI tokens, invoke ``sys.exit(1)``.
+      Otherwise, continue to raise the exception.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+
+   .. attribute:: verbose
+      :type: Optional[bool]
+      :value: None
+
+      Populate exception strings with more information intended for developers.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
+
    .. attribute:: version_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
@@ -334,14 +356,13 @@ API
 
       .. code-block:: python
 
-         def config(apps: list["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
+         def config(app: "App", commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
              ----------
-             apps: Tuple[App, ...]
-                The application hierarchy that led to the current command function.
-                The current command app is the last element of this tuple.
+             app: App
+                The current command app being executed.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              arguments: ArgumentCollection
@@ -357,7 +378,7 @@ API
       :value: None
 
       All tokens after this delimiter will be force-interpreted as positional arguments.
-      If no ``end_of_options_delimiter`` is set, it will default to POSIX-standard ``"--"``.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
    .. attribute:: suppress_keyboard_interrupt
@@ -1594,7 +1615,7 @@ Exceptions
    :show-inheritance:
    :members:
 
-.. autoexception:: cyclopts.InvalidCommandError
+.. autoexception:: cyclopts.UnknownCommandError
    :show-inheritance:
    :members:
 

@@ -8,11 +8,11 @@ from cyclopts import (
     Argument,
     ArgumentOrderError,
     CoercionError,
-    InvalidCommandError,
     MissingArgumentError,
     MixedArgumentError,
     Parameter,
     Token,
+    UnknownCommandError,
     ValidationError,
 )
 
@@ -295,7 +295,7 @@ def test_exceptions_unknown_command(app, console):
     def foo(bar: int):
         pass
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
         app("bar fizz", console=console, exit_on_error=False)
 
     actual = capture.get()
