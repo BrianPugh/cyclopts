@@ -452,7 +452,7 @@ def test_help_format_group_parameters_short_name(capture_format_group_parameters
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO --foo  -f  Docstring for foo. [required]                    │
+        │ *  FOO --foo -f  Docstring for foo. [required]                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -876,7 +876,7 @@ def test_help_parameter_string_annotation(capture_format_group_parameters):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  NUMBER --number  -n  A number to print. [required]              │
+        │ *  NUMBER --number -n  A number to print. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1273,8 +1273,8 @@ def test_help_print_combined_parameter_command_group(app, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
-        │ *  VALUE1 --value1      [required]                                 │
-        │    --help           -h  Display this message and exit.             │
+        │ *  VALUE1 --value1  [required]                                     │
+        │    --help -h        Display this message and exit.                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1602,7 +1602,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │ *  --hostname -n  Hostname to connect to. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1644,7 +1644,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │ *  --hostname -n  Hostname to connect to. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
