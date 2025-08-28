@@ -40,17 +40,7 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app, inverse_groups_from_app
-from cyclopts.help import (
-    HelpPanel,
-    InlineText,
-    create_parameter_help_panel,
-    format_command_entries,
-    format_doc,
-    format_usage,
-    resolve_help_format,
-    resolve_version_format,
-)
-from cyclopts.help.panel import CycloptsPanel
+from cyclopts.panel import CycloptsPanel
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
@@ -85,6 +75,8 @@ with suppress(ImportError):
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+    from cyclopts.help import HelpPanel
 
 
 class _CannotDeriveCallingModuleNameError(Exception):
@@ -541,6 +533,8 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
         """
+        from cyclopts.help import InlineText, resolve_version_format
+
         console = self._resolve_console(None, console)
         version_format = resolve_version_format([self])
 
@@ -1354,6 +1348,8 @@ class App:
 
         console = self._resolve_console(tokens, console)
 
+        from cyclopts.help import format_doc, format_usage, resolve_help_format
+
         # Print the:
         #    my-app command COMMAND [ARGS] [OPTIONS]
         if executing_app.usage is None:
@@ -1372,9 +1368,17 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> list[HelpPanel]:
+    ) -> list["HelpPanel"]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
+
+        from cyclopts.help import (
+            HelpPanel,
+            InlineText,
+            create_parameter_help_panel,
+            format_command_entries,
+            resolve_help_format,
+        )
 
         command_chain, apps, _ = self.parse_commands(tokens)
 

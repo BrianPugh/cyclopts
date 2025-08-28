@@ -12,7 +12,6 @@ __all__ = [
     "format_command_entries",
     "resolve_help_format",
     "resolve_version_format",
-    "CycloptsPanel",
     "format_doc",
     "format_usage",
     "InlineText",
@@ -32,7 +31,6 @@ from .help import (
     resolve_help_format,
     resolve_version_format,
 )
-from .panel import CycloptsPanel
 from .protocols import Converter, Formatter, LazyData
 from .specs import (
     ColumnSpec,
