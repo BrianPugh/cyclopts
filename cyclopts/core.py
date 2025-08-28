@@ -1175,29 +1175,47 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
-        print_error = self.app_stack.resolve("print_error", print_error)
-        exit_on_error = self.app_stack.resolve("exit_on_error", exit_on_error)
-        help_on_error = self.app_stack.resolve("help_on_error", help_on_error)
-        verbose = self.app_stack.resolve("verbose", verbose)
+        # Store overrides for nested calls
+        overrides = {
+            k: v
+            for k, v in {
+                "print_error": print_error,
+                "exit_on_error": exit_on_error,
+                "help_on_error": help_on_error,
+                "verbose": verbose,
+            }.items()
+            if v is not None
+        }
 
+        # Push overrides onto stack for this invocation
+        self.app_stack.overrides_stack.append(overrides)
         try:
-            command, bound, _, ignored, _ = self._parse_known_args(
-                tokens,
-                console=console,
-                end_of_options_delimiter=end_of_options_delimiter,
-                raise_on_unused_tokens=True,
-            )
-        except CycloptsError as e:
-            e.verbose = verbose if verbose is not None else False
-            e.root_input_tokens = tokens
-            assert e.console is not None
-            if help_on_error if help_on_error is not None else False:
-                self.help_print(tokens, console=e.console)
-            if print_error if print_error is not None else True:
-                e.console.print(CycloptsPanel(e))
-            if exit_on_error if exit_on_error is not None else True:
-                sys.exit(1)
-            raise
+            print_error = self.app_stack.resolve("print_error", print_error)
+            exit_on_error = self.app_stack.resolve("exit_on_error", exit_on_error)
+            help_on_error = self.app_stack.resolve("help_on_error", help_on_error)
+            verbose = self.app_stack.resolve("verbose", verbose)
+
+            try:
+                command, bound, _, ignored, _ = self._parse_known_args(
+                    tokens,
+                    console=console,
+                    end_of_options_delimiter=end_of_options_delimiter,
+                    raise_on_unused_tokens=True,
+                )
+            except CycloptsError as e:
+                e.verbose = verbose if verbose is not None else False
+                e.root_input_tokens = tokens
+                assert e.console is not None
+                if help_on_error if help_on_error is not None else False:
+                    self.help_print(tokens, console=e.console)
+                if print_error if print_error is not None else True:
+                    e.console.print(CycloptsPanel(e))
+                if exit_on_error if exit_on_error is not None else True:
+                    sys.exit(1)
+                raise
+        finally:
+            # Pop overrides from stack
+            self.app_stack.overrides_stack.pop()
 
         return command, bound, ignored
 
@@ -1255,14 +1273,21 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
-        with self.app_stack(tokens):
+        overrides = {
+            k: v
+            for k, v in {
+                "print_error": print_error,
+                "exit_on_error": exit_on_error,
+                "help_on_error": help_on_error,
+                "verbose": verbose,
+            }.items()
+            if v is not None
+        }
+
+        with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
                 tokens,
                 console=console,
-                print_error=print_error,
-                exit_on_error=exit_on_error,
-                help_on_error=help_on_error,
-                verbose=verbose,
                 end_of_options_delimiter=end_of_options_delimiter,
             )
 

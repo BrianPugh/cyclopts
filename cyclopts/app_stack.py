@@ -16,14 +16,19 @@ class AppStack:
     def __init__(self, app):
         # the ``stack`` is guaranteed to have the self-referencing app at the top of the stack.
         self.stack: list[list[App]] = [[app]]
+        # Stack of overrides passed to parse_args/call that should be propagated
+        self.overrides_stack: list[dict[str, Any]] = [{}]
 
     @contextmanager
-    def __call__(self, apps: Union[Sequence["App"], Sequence[str]]):
+    def __call__(self, apps: Union[Sequence["App"], Sequence[str]], overrides: Optional[dict[str, Any]] = None):
+        # Push overrides onto stack (even if None/empty to keep stack balanced)
+        self.overrides_stack.append(overrides or {})
+
         if not apps:
             try:
                 yield
             finally:
-                pass
+                self.overrides_stack.pop()
             return
 
         # Convert strings to Apps if needed
@@ -39,7 +44,7 @@ class AppStack:
             try:
                 yield
             finally:
-                pass
+                self.overrides_stack.pop()
             return
 
         so_far = []
@@ -52,6 +57,8 @@ class AppStack:
 
             so_far.append(app)
             app.app_stack.stack.append(so_far.copy())
+            # Also push the overrides onto this app's stack
+            app.app_stack.overrides_stack.append(overrides or {})
 
             # Also traverse the app's meta app
             meta_app = app
@@ -62,11 +69,23 @@ class AppStack:
                 meta_subapps = so_far.copy()
                 meta_subapps.append(meta_app)
                 meta_app.app_stack.stack.append(meta_subapps)
+                # Also push the overrides onto the meta app's stack
+                meta_app.app_stack.overrides_stack.append(overrides or {})
         try:
             yield
         finally:
             for app in resolved_apps:
                 app.app_stack.stack.pop()
+                app.app_stack.overrides_stack.pop()
+                # Also pop from meta apps
+                meta_app = app
+                while (meta_app := meta_app._meta) is not None:
+                    if id(meta_app) in app_ids:
+                        continue
+                    meta_app.app_stack.stack.pop()
+                    meta_app.app_stack.overrides_stack.pop()
+            # Pop overrides from stack
+            self.overrides_stack.pop()
 
     @property
     def default_parameter(self) -> Parameter:
@@ -103,6 +122,13 @@ class AppStack:
         """Resolve an attribute from the App hierarchy."""
         if override is not None:
             return override
+
+        # Check if we have a stored override from parent invocations (most recent first)
+        for overrides_frame in reversed(self.overrides_stack):
+            if attribute in overrides_frame:
+                value = overrides_frame[attribute]
+                if value is not None:
+                    return value
 
         # `reversed` so that "closer" apps have higher priority.
         for app in reversed(list(chain.from_iterable(self.stack))):
