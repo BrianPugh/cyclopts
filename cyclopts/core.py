@@ -40,15 +40,7 @@ from cyclopts.exceptions import (
 )
 from cyclopts.group import Group, sort_groups
 from cyclopts.group_extractors import groups_from_app
-from cyclopts.help import (
-    CycloptsPanel,
-    HelpPanel,
-    InlineText,
-    create_parameter_help_panel,
-    format_command_entries,
-    format_doc,
-    format_usage,
-)
+from cyclopts.panel import CycloptsPanel
 from cyclopts.parameter import Parameter, validate_command
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
@@ -83,6 +75,8 @@ with suppress(ImportError):
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+    from cyclopts.help import HelpPanel
 
 
 class _CannotDeriveCallingModuleNameError(Exception):
@@ -523,6 +517,8 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
         """
+        from cyclopts.help import InlineText
+
         console = self._resolve_console(console)
         version_format = self.app_stack.resolve("version_format")
         if version_format is None:
@@ -1339,6 +1335,8 @@ class App:
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
+        from cyclopts.help import format_doc, format_usage
+
         tokens = normalize_tokens(tokens)
 
         _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
@@ -1366,9 +1364,16 @@ class App:
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> list[HelpPanel]:
+    ) -> list["HelpPanel"]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
+
+        from cyclopts.help import (
+            HelpPanel,
+            InlineText,
+            create_parameter_help_panel,
+            format_command_entries,
+        )
 
         command_chain, apps, _ = self.parse_commands(tokens)
         command_app = apps[-1]
@@ -1431,26 +1436,22 @@ class App:
                 if not group_argument_collection:
                     continue
 
-                try:
-                    _, existing_panel = panels[group.name]
-                except KeyError:
-                    existing_panel = None
-
+                _, existing_panel = panels.get(group.name, (None, None))
                 new_panel = create_parameter_help_panel(group, group_argument_collection, help_format)
 
                 if existing_panel:
                     # An imperfect merging process
                     existing_panel.format = "parameter"
-                    existing_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
+                    new_panel.entries = new_panel.entries + existing_panel.entries  # Commands go last
                     if new_panel.description:
                         if existing_panel.description:
-                            existing_panel.description = RichGroup(
+                            new_panel.description = RichGroup(
                                 existing_panel.description, NewLine(), new_panel.description
                             )
-                        else:
-                            existing_panel.description = new_panel.description
-                else:
-                    panels[group.name] = (group, new_panel)
+                    else:
+                        new_panel.description = existing_panel.description
+
+                panels[group.name] = (group, new_panel)
 
         groups = [x[0] for x in panels.values()]
         help_panels = [x[1] for x in panels.values()]
