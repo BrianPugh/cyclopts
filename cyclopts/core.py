@@ -218,7 +218,7 @@ class App:
 
     show: bool = field(default=True, kw_only=True)
 
-    console: Optional["Console"] = field(default=None, kw_only=True)
+    _console: Optional["Console"] = field(default=None, kw_only=True, alias="console")
 
     # This can ONLY ever be a Tuple[str, ...]
     _help_flags: Union[str, Iterable[str]] = field(
@@ -316,6 +316,8 @@ class App:
 
     # We will populate this attribute ourselves after initialization
     _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
+
+    _fallback_console: Optional["Console"] = field(init=False, default=None)
 
     app_stack: AppStack = field(init=False, default=Factory(AppStack, takes_self=True))
 
@@ -504,6 +506,26 @@ class App:
             out[x] = self[x]
         return out
 
+    @property
+    def console(self) -> "Console":
+        result = self.app_stack.resolve("_console")
+        if result is not None:
+            return result
+
+        # We always want to return back the same console object,
+        # but if someone manually overrides `console`, then
+        # we want to return that.
+        if self._fallback_console is None:
+            from rich.console import Console
+
+            self._fallback_console = Console()
+
+        return self._fallback_console
+
+    @console.setter
+    def console(self, console: Optional["Console"]):
+        self._console = console
+
     def version_print(
         self,
         console: Optional["Console"] = None,
@@ -519,7 +541,6 @@ class App:
         """
         from cyclopts.help import InlineText
 
-        console = self._resolve_console(console)
         version_format = self.app_stack.resolve("version_format")
         if version_format is None:
             version_format = self.app_stack.resolve("help_format", fallback="restructuredtext")
@@ -540,7 +561,7 @@ class App:
             version_raw = _default_version()
 
         version_formatted = InlineText.from_format(version_raw, format=version_format)
-        console.print(version_formatted)
+        (console or self.console).print(version_formatted)
 
     @property
     def subapps(self):
@@ -975,17 +996,19 @@ class App:
             :obj:`~typing.Annotated` will be resolved.
             Intended to simplify :ref:`meta apps <Meta App>`.
         """
-        command, bound, unused_tokens, ignored, _ = self._parse_known_args(
-            tokens, console=console, end_of_options_delimiter=end_of_options_delimiter
-        )
+        overrides = {
+            "console": console,
+            "end_of_options_delimiter": end_of_options_delimiter,
+        }
+        with self.app_stack([], overrides=overrides):
+            command, bound, unused_tokens, ignored, _ = self._parse_known_args(tokens)
+
         return command, bound, unused_tokens, ignored
 
     def _parse_known_args(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
-        console: Optional["Console"],
-        end_of_options_delimiter: Optional[str],
         raise_on_unused_tokens: bool = False,
     ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
         if tokens is None:
@@ -1014,9 +1037,8 @@ class App:
         with self.app_stack(apps_meta):
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
-            end_of_options_delimiter = self.app_stack.resolve(
-                "end_of_options_delimiter", end_of_options_delimiter, fallback="--"
-            )
+            end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
+            console = command_app.console
 
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
@@ -1105,7 +1127,7 @@ class App:
                 if command_chain:
                     e.command_chain = command_chain
                 if e.console is None:
-                    e.console = command_app._resolve_console(console)
+                    e.console = console
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
@@ -1176,30 +1198,29 @@ class App:
         overrides = {
             k: v
             for k, v in {
+                "_console": console,
                 "print_error": print_error,
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
                 "verbose": verbose,
+                "end_of_options_delimiter": end_of_options_delimiter,
             }.items()
             if v is not None
         }
 
-        # Push overrides onto stack for this invocation
-        self.app_stack.overrides_stack.append(overrides)
-        try:
-            print_error = self.app_stack.resolve("print_error", print_error)
-            exit_on_error = self.app_stack.resolve("exit_on_error", exit_on_error)
-            help_on_error = self.app_stack.resolve("help_on_error", help_on_error)
-            verbose = self.app_stack.resolve("verbose", verbose)
-
+        # overrides isn't being propagated to subcommands because they aren't provided to the context manager here.
+        with self.app_stack([], overrides=overrides):
             try:
                 command, bound, _, ignored, _ = self._parse_known_args(
                     tokens,
-                    console=console,
-                    end_of_options_delimiter=end_of_options_delimiter,
                     raise_on_unused_tokens=True,
                 )
             except CycloptsError as e:
+                print_error = self.app_stack.resolve("print_error")
+                exit_on_error = self.app_stack.resolve("exit_on_error")
+                help_on_error = self.app_stack.resolve("help_on_error")
+                verbose = self.app_stack.resolve("verbose")
+
                 e.verbose = verbose if verbose is not None else False
                 e.root_input_tokens = tokens
                 assert e.console is not None
@@ -1210,9 +1231,6 @@ class App:
                 if exit_on_error if exit_on_error is not None else True:
                     sys.exit(1)
                 raise
-        finally:
-            # Pop overrides from stack
-            self.app_stack.overrides_stack.pop()
 
         return command, bound, ignored
 
@@ -1273,6 +1291,7 @@ class App:
         overrides = {
             k: v
             for k, v in {
+                "_console": console,
                 "print_error": print_error,
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
@@ -1311,14 +1330,6 @@ class App:
                 else:
                     raise
 
-    def _resolve_console(self, override: Optional["Console"] = None) -> "Console":
-        result = self.app_stack.resolve("console", override)
-        if result is not None:
-            return result
-        from rich.console import Console
-
-        return Console()
-
     def help_print(
         self,
         tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
@@ -1341,11 +1352,12 @@ class App:
         tokens = normalize_tokens(tokens)
 
         _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
-        with self.app_stack(apps_meta):
+        overrides = {"_console": console}
+        with self.app_stack(apps_meta, overrides=overrides):
             command_chain, apps, _ = self.parse_commands(tokens)
             executing_app = apps[-1]
 
-            console = executing_app._resolve_console(console)
+            console = executing_app.console
 
             # Print the:
             #    my-app command COMMAND [ARGS] [OPTIONS]

@@ -102,9 +102,7 @@ def configured_app(app):
 def test_config_common_root_keys_empty(configured_app, config):
     config.path.touch()
     configured_app.config = config
-    _, _, _, _, argument_collection = configured_app._parse_known_args(
-        "--key1 cli1", console=None, end_of_options_delimiter=None
-    )
+    _, _, _, _, argument_collection = configured_app._parse_known_args("--key1 cli1")
     assert len(argument_collection) == 2
     assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
     assert argument_collection[1].tokens == [Token(keyword="[key2]", value="foo2", source=str(config.path))]
@@ -114,9 +112,7 @@ def test_config_common_root_keys_populated(configured_app, config_root_keys):
     configured_app.config = config_root_keys
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
-    _, _, _, _, argument_collection = configured_app._parse_known_args(
-        "--key1 cli1", console=None, end_of_options_delimiter=None
-    )
+    _, _, _, _, argument_collection = configured_app._parse_known_args("--key1 cli1")
 
     assert len(argument_collection) == 2
     assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
@@ -224,7 +220,7 @@ def test_config_common_kwargs(app, config):
     ):
         pass
 
-    _, _, _, _, argument_collection = app._parse_known_args("--key1 foo1", console=None, end_of_options_delimiter=None)
+    _, _, _, _, argument_collection = app._parse_known_args("--key1 foo1")
 
     # Don't attempt to parse the key ``"kwargs"`` from config.
     assert len(argument_collection) == 2
@@ -246,7 +242,7 @@ def test_config_common_subkeys(app, config_sub_keys):
     def foo(key1: Example, key2):
         pass
 
-    _, _, _, _, argument_collection = app._parse_known_args("", console=None, end_of_options_delimiter=None)
+    _, _, _, _, argument_collection = app._parse_known_args("")
 
     assert len(argument_collection) == 4
 

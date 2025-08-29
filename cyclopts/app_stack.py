@@ -21,7 +21,9 @@ class AppStack:
 
     @contextmanager
     def __call__(self, apps: Union[Sequence["App"], Sequence[str]], overrides: Optional[dict[str, Any]] = None):
-        # Push overrides onto stack (even if None/empty to keep stack balanced)
+        # set `overrides` default-values with current overrides so that they properly propagate down the call-stack.
+        overrides = self.overrides | (overrides or {})
+
         self.overrides_stack.append(overrides or {})
 
         if not apps:
@@ -86,6 +88,15 @@ class AppStack:
                     meta_app.app_stack.overrides_stack.pop()
             # Pop overrides from stack
             self.overrides_stack.pop()
+
+    @property
+    def overrides(self) -> dict:
+        out = {}
+        for overrides_frame in reversed(self.overrides_stack):
+            for key, value in overrides_frame.items():
+                if value is not None:
+                    out.setdefault(key, value)
+        return out
 
     @property
     def default_parameter(self) -> Parameter:
