@@ -265,7 +265,7 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: my-default-command [ARGS] [OPTIONS]
+        Usage: test_bind_dataclasses [ARGS] [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -297,7 +297,7 @@ def test_bind_dataclass_default_factory_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: my-default-command [ARGS] [OPTIONS]
+        Usage: test_bind_dataclasses [ARGS] [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │

@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from enum import Enum
 from functools import lru_cache, partial
 from inspect import isclass
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -21,6 +22,7 @@ from attrs import Factory, define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
+from cyclopts.core import _get_root_module_name
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.help.specs import PanelSpec, TableSpec
@@ -367,14 +369,26 @@ def _is_short(s):
 
 
 def format_usage(
-    app,
+    app: "App",
     command_chain: Iterable[str],
 ):
     from rich.text import Text
 
     usage = []
     usage.append("Usage:")
-    usage.append(app.name[0])
+
+    # If we're at the root level (no command chain), the app has a default_command,
+    # and no explicit name was set, derive a better name from sys.argv[0]
+    if not command_chain and app.default_command and not app._name:
+        # Use the same logic as in App.name property for apps without default_command
+        name = Path(sys.argv[0]).name
+        if name == "__main__.py":
+            name = _get_root_module_name()
+        app_name = name
+    else:
+        app_name = app.name[0]
+
+    usage.append(app_name)
     usage.extend(command_chain)
 
     for command in command_chain:

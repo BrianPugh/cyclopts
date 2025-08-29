@@ -153,7 +153,7 @@ def test_bind_pydantic_basemodel_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: foo [ARGS] [OPTIONS]
+        Usage: test_pydantic [ARGS] [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -416,7 +416,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: main [ARGS] [OPTIONS]
+        Usage: test_pydantic [ARGS] [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
