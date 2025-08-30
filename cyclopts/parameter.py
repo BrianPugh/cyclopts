@@ -291,7 +291,8 @@ class Parameter:
             assert isinstance(negative_prefixes, tuple)
             if self.negative is None:
                 for negative_prefix in negative_prefixes:
-                    out.append(f"--{name_prefix}{negative_prefix}{name_components[-1]}")
+                    if negative_prefix:
+                        out.append(f"--{name_prefix}{negative_prefix}{name_components[-1]}")
             else:
                 for negative in user_negatives:
                     out.append(f"--{name_prefix}{negative}")
