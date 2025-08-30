@@ -254,3 +254,6 @@ poetry.toml
 # Misc dev
 /*.py
 /draw.toml
+
+# Editor config
+.vscode

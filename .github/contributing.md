@@ -19,13 +19,14 @@ Good docstrings include information like:
 3. When dealing with physical values, include units.
 
 ## Unit Tests
-We use the [pytest](https://docs.pytest.org/) framework for unit testing. Ideally, all new code is partners with
+We use the [pytest](https://docs.pytest.org/) framework for unit testing. Ideally, all new code is partnered with
 new unit tests to exercise that code. If fixing a bug, consider writing the test first to confirm the existence of the
 bug, and to confirm that the new code fixes it.
 
 Unit tests should only test a single concise body of code. If this is hard to do, there are two solutions that can help:
 1. Restructure the code. Keep inputs/outputs to be simple variables. Avoid complicated interactions with state.
 2. Use [pytest-mock](https://pytest-mock.readthedocs.io/en/latest/) to mock out external interactions.
+3. Run tests with `python -m pytest`.
 
 ## Coding Style
 In an attempt to keep consistency and maintainability in the code-base, here are some high-level guidelines for code that might not be enforced by linters.
