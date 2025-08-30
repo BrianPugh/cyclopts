@@ -428,7 +428,7 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
-def format_doc(app: "App", format: str = "restructuredtext"):
+def format_doc(app: "App", format: str):
     raw_doc_string = app.help
 
     if not raw_doc_string:

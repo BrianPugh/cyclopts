@@ -64,10 +64,6 @@ else:  # pragma: no cover
     from importlib.metadata import PackageNotFoundError
     from importlib.metadata import version as importlib_metadata_version
 
-T = TypeVar("T", bound=Callable[..., Any])
-V = TypeVar("V")
-
-
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
     # Not available on windows
@@ -77,6 +73,11 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from cyclopts.help import HelpPanel
+
+T = TypeVar("T", bound=Callable[..., Any])
+V = TypeVar("V")
+
+_DEFAULT_FORMAT = "restructuredtext"
 
 
 class _CannotDeriveCallingModuleNameError(Exception):
@@ -543,7 +544,7 @@ class App:
 
         version_format = self.app_stack.resolve("version_format")
         if version_format is None:
-            version_format = self.app_stack.resolve("help_format", fallback="restructuredtext")
+            version_format = self.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
 
         version_raw = None
         if self.version is None:
@@ -1367,7 +1368,7 @@ class App:
                 console.print(executing_app.usage + "\n")
 
             # Print the App/Command's Doc String.
-            help_format = executing_app.app_stack.resolve("help_format", fallback="restructuredtext")
+            help_format = executing_app.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
             console.print(format_doc(executing_app, help_format))
 
             for help_panel in self._assemble_help_panels(tokens, help_format):
@@ -1391,7 +1392,7 @@ class App:
         command_chain, apps, _ = self.parse_commands(tokens)
         command_app = apps[-1]
 
-        help_format = command_app.app_stack.resolve("help_format", help_format, "restructuredtext")
+        help_format = command_app.app_stack.resolve("help_format", help_format, _DEFAULT_FORMAT)
 
         panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
