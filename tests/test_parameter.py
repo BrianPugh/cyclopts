@@ -24,6 +24,12 @@ def test_parameter_get_negatives_iterable_custom_prefix(type_):
 
 
 @pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+def test_parameter_get_negatives_iterable_empty_string_prefix(type_):
+    p = Parameter(negative_iterable="", name=("--foo", "--bar"))
+    assert () == p.get_negatives(type_)
+
+
+@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
 def test_parameter_get_negatives_iterable_custom_prefix_list(type_):
     p = Parameter(negative_iterable=["vacant-", "blank-"], name=("--foo", "--bar"))
     assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(p.get_negatives(type_))
