@@ -77,7 +77,7 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
-_DEFAULT_FORMAT = "restructuredtext"
+_DEFAULT_FORMAT = "markdown"
 
 
 class _CannotDeriveCallingModuleNameError(Exception):

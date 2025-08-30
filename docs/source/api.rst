@@ -110,7 +110,7 @@ API
 
       The markup language used in function docstring.
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
-      If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
+      If no :attr:`~.App.help_format` is defined, falls back to ``"markdown"``.
 
    .. attribute:: help_on_error
       :type: Optional[bool]
