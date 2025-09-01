@@ -1282,11 +1282,25 @@ class App:
                 if backend == "asyncio":
                     import asyncio
 
-                    return asyncio.run(command(*bound.args, **bound.kwargs))
+                    try:
+                        # Check if we're already in an async context
+                        asyncio.get_running_loop()
+                        # We're in an async context, return the coroutine for the caller to await
+                        return command(*bound.args, **bound.kwargs)
+                    except RuntimeError:
+                        # No running loop, create one
+                        return asyncio.run(command(*bound.args, **bound.kwargs))
                 elif backend == "trio":
                     import trio
 
-                    return trio.run(partial(command, *bound.args, **bound.kwargs))
+                    try:
+                        # Check if we're already in a trio context
+                        trio.lowlevel.current_trio_token()
+                        # We're in a trio context, return the coroutine for the caller to await
+                        return command(*bound.args, **bound.kwargs)
+                    except RuntimeError:
+                        # No trio context, create one
+                        return trio.run(partial(command, *bound.args, **bound.kwargs))
                 else:  # pragma: no cover
                     assert_never(backend)
             else:
