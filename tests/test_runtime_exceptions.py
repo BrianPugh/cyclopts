@@ -92,6 +92,31 @@ def test_runtime_exception_bad_command_recommend(app, console):
     )
 
 
+def test_runtime_exception_bad_command_recommend_no_show(app, console):
+    """If a command is hidden, do not show recommendations for it."""
+
+    @app.command(show=False)
+    def mad_command():  # "mad-command" should not be recommended, and not show up as an available command.
+        pass
+
+    @app.command
+    def other_command():
+        pass
+
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        app(["bad-command", "123"], exit_on_error=False, console=console)
+
+    actual = capture.get()
+    assert actual == dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Unknown command "bad-command". Did you mean "other-command"?       │
+        │ Available commands: other-command.                                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+
 def test_runtime_exception_bad_command_list_ellipsis(app, console):
     def cmd():
         pass

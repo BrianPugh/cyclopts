@@ -273,14 +273,23 @@ class UnknownCommandError(CycloptsError):
         if self.app and self.app._commands:
             import difflib
 
-            close_matches = difflib.get_close_matches(token, self.app._commands, n=1, cutoff=0.6)
+            close_matches = difflib.get_close_matches(
+                token,
+                (name for name, command_app in self.app._commands.items() if command_app.show),
+                n=1,
+                cutoff=0.6,
+            )
             if close_matches:
                 response += f' Did you mean "{close_matches[0]}"?'
 
             # The following is a heuristic to be "maximally helpful" to someone who may have
             # forgotten a command in their CLI call.
             max_commands = 8
-            available_commands = [name for name in self.app if not name.startswith("-")]
+            available_commands = [
+                name
+                for name, command_app in self.app._commands.items()
+                if not name.startswith("-") and command_app.show
+            ]
             if available_commands:
                 if len(available_commands) > max_commands:
                     response += f" Available commands: {', '.join(available_commands[:max_commands])}, ..."
