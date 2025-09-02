@@ -56,7 +56,7 @@ def test_async_meta_with_async_command():
     async def launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
         await asyncio.sleep(0)  # Simulate async initialization
         results.append("Meta initialized")
-        result = await app(tokens)  # app should return a coroutine when inside an sync context.
+        result = await app(tokens)  # app should return a coroutine when inside an async context.
         results.append("Meta finished")
         return result
 
