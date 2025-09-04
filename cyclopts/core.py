@@ -1285,11 +1285,12 @@ class App:
                     try:
                         # Check if we're already in an async context
                         asyncio.get_running_loop()
-                        # We're in an async context, return the coroutine for the caller to await
-                        return command(*bound.args, **bound.kwargs)
                     except RuntimeError:
                         # No running loop, create one
                         return asyncio.run(command(*bound.args, **bound.kwargs))
+                    else:
+                        # We're in an async context, return the coroutine for the caller to await
+                        return command(*bound.args, **bound.kwargs)
                 elif backend == "trio":
                     import trio
 
