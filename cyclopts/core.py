@@ -1297,11 +1297,12 @@ class App:
                     try:
                         # Check if we're already in a trio context
                         trio.lowlevel.current_trio_token()
-                        # We're in a trio context, return the coroutine for the caller to await
-                        return command(*bound.args, **bound.kwargs)
                     except RuntimeError:
                         # No trio context, create one
                         return trio.run(partial(command, *bound.args, **bound.kwargs))
+                    else:
+                        # We're in a trio context, return the coroutine for the caller to await
+                        return command(*bound.args, **bound.kwargs)
                 else:  # pragma: no cover
                     assert_never(backend)
             else:
