@@ -54,7 +54,7 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, CaseInsensitiveTupleDict, grouper, is_builtin
+from cyclopts.utils import UNSET, grouper, is_builtin
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -356,9 +356,7 @@ class ArgumentCollection(list["Argument"]):
                     positional_index = None
 
                 subkey_docstring_lookup = {
-                    k[1:]: v
-                    for k, v in hint_docstring_lookup.items()
-                    if k[0].lower() == sub_field_name.lower() and len(k) > 1
+                    k[1:]: v for k, v in hint_docstring_lookup.items() if k[0] == sub_field_name and len(k) > 1
                 }
 
                 subkey_argument_collection = cls._from_type(
@@ -1459,15 +1457,13 @@ def _extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
         f = f.func  # pyright: ignore[reportFunctionMemberAccess]
 
     try:
-        return CaseInsensitiveTupleDict(
-            {
-                tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)
-                for dparam in parse_from_object(f).params
-            }
-        )
+        return {
+            tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)
+            for dparam in parse_from_object(f).params
+        }
     except TypeError:
         # Type hints like ``dict[str, str]`` trigger this.
-        return CaseInsensitiveTupleDict()
+        return {}
 
 
 def _resolve_parameter_name_helper(elem):

@@ -272,11 +272,8 @@ def _enum_flag_field_infos(enum_flag) -> dict[str, FieldInfo]:
     """Extract field infos from a Flag enum, treating each member as a boolean field."""
     out = {}
     for member_name in enum_flag.__members__:
-        # Each flag member becomes a boolean field
-        # Use lowercase for CLI consistency
-        field_name = member_name.lower()
-        out[field_name] = FieldInfo(
-            names=(field_name,),
+        out[member_name] = FieldInfo(
+            names=(member_name,),
             kind=FieldInfo.KEYWORD_ONLY,
             # The Enum member should NEVER have a type-annotation.
             # Thusly, it by definition cannot have an Annotated[...].

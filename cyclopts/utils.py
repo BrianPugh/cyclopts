@@ -264,44 +264,6 @@ class UNSET(Sentinel):
     """Special sentinel value indicating that no data was provided. **Do not instantiate**."""
 
 
-class CaseInsensitiveTupleDict(dict):
-    """A dictionary with case-insensitive lookup for tuple keys containing strings.
-
-    This is useful for matching docstring parameter names where case may vary
-    (e.g., enum member names in uppercase vs field names in lowercase).
-    """
-
-    def __init__(self, data=None):
-        super().__init__()
-        if data:
-            for key, value in data.items():
-                self[key] = value
-
-    def _normalize_key(self, key):
-        """Normalize a key for case-insensitive comparison."""
-        if isinstance(key, tuple):
-            return tuple(k.lower() if isinstance(k, str) else k for k in key)
-        return key
-
-    def __getitem__(self, key):
-        # Try exact match first
-        try:
-            return super().__getitem__(key)
-        except KeyError:
-            # Try case-insensitive match
-            normalized_key = self._normalize_key(key)
-            for k, v in self.items():
-                if self._normalize_key(k) == normalized_key:
-                    return v
-            raise KeyError(key) from None
-
-    def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-
 def record_init(target: str):
     """Class decorator that records init argument names as a tuple to ``target``."""
 
