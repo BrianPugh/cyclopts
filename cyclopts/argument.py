@@ -1,8 +1,10 @@
 import inspect
 import itertools
+import operator
 import sys
 from contextlib import suppress
-from functools import partial
+from enum import Flag
+from functools import partial, reduce
 from typing import Any, Callable, Literal, Optional, Sequence, Union, get_args, get_origin
 
 from attrs import define, field
@@ -10,12 +12,14 @@ from attrs import define, field
 from cyclopts._convert import (
     ITERABLE_TYPES,
     convert,
+    convert_enum_flag,
     token_count,
 )
 from cyclopts.annotations import (
     contains_hint,
     is_attrs,
     is_dataclass,
+    is_enum_flag,
     is_namedtuple,
     is_nonetype,
     is_pydantic,
@@ -50,7 +54,7 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, grouper, is_builtin
+from cyclopts.utils import UNSET, CaseInsensitiveTupleDict, grouper, is_builtin
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -118,6 +122,28 @@ def _get_annotated_discriminator(annotation):
         except AttributeError:
             pass
     return None
+
+
+def _enum_flag_from_dict(
+    enum_type: type[Flag],
+    data: dict[str, bool],
+    name_transform: Callable[[str], str],
+) -> Flag:
+    """Convert a dictionary of boolean flags to a Flag enum value.
+
+    Parameters
+    ----------
+    enum_type : type[Flag]
+        The Flag enum type to convert to.
+    data : dict[str, bool]
+        Dictionary mapping flag names to boolean values.
+
+    Returns
+    -------
+    Flag
+        The combined flag value.
+    """
+    return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)
 
 
 class ArgumentCollection(list["Argument"]):
@@ -300,15 +326,22 @@ class ArgumentCollection(list["Argument"]):
                     )
 
         if field_info.is_keyword_only:
+            # We cannot supply keyword-only arguments positionally.
             positional_index = None
 
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
-        if not argument._accepts_keywords and positional_index is not None:
-            argument.index = positional_index
-            positional_index += 1
+
+        if positional_index is not None:
+            # We check for _enum_flag_type here so that supplied strings that represent the individual enum
+            # values get assigned to the root Flag object, rather than the individual bool-like flags.
+            # e.g. `read write` get assigned to `class Permissions(Flag)` rather than to Permissions.read/Permissions.write.
+            if not argument._accepts_keywords or argument._enum_flag_type:
+                argument.index = positional_index
+                positional_index += 1
 
         out.append(argument)
         if argument._accepts_keywords:
+            # Iterate over all the sub-fields.
             hint_docstring_lookup = _extract_docstring_help(argument.hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
 
@@ -323,7 +356,9 @@ class ArgumentCollection(list["Argument"]):
                     positional_index = None
 
                 subkey_docstring_lookup = {
-                    k[1:]: v for k, v in hint_docstring_lookup.items() if k[0] == sub_field_name and len(k) > 1
+                    k[1:]: v
+                    for k, v in hint_docstring_lookup.items()
+                    if k[0].lower() == sub_field_name.lower() and len(k) > 1
                 }
 
                 subkey_argument_collection = cls._from_type(
@@ -592,6 +627,8 @@ class Argument:
 
     _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
 
+    _enum_flag_type: Optional[Any] = field(default=None, init=False, repr=False)
+
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
         hint = resolve(self.hint)
@@ -644,6 +681,11 @@ class Argument:
                 self._accepts_keywords = True
                 # pydantic's __init__ signature doesn't accurately reflect its requirements.
                 # so we cannot use _generic_class_required_optional(...)
+                self._update_lookup(field_infos)
+            elif is_enum_flag(hint):
+                # Flag enums are special - each member becomes a boolean field
+                self._enum_flag_type = hint
+                self._accepts_keywords = True
                 self._update_lookup(field_infos)
             elif not is_builtin(hint) and field_infos:
                 # Some classic user class.
@@ -1058,6 +1100,15 @@ class Argument:
         else:  # A dictionary-like structure.
             data = {}
 
+            if self._enum_flag_type:
+                out = self._enum_flag_type(0)
+
+            # Handle direct string values for Flag enums (e.g., --perms read write)
+            if self._enum_flag_type and self.tokens:
+                # Process tokens as flag member names using the new conversion function
+                converted_flags = safe_converter(self._enum_flag_type, self.tokens)
+                out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags  # pyright: ignore
+
             if self._should_attempt_json_dict():
                 # Dict-like structures may have incoming json data from an environment variable.
                 # Pass these values along as Tokens to children.
@@ -1098,7 +1149,13 @@ class Argument:
 
             self._run_missing_keys_checker(data)
 
-            if data:
+            if self._enum_flag_type:
+                # We need an explicit function here to create the enum.Flag object since
+                # there's no builtin way of creating enum.Flag from keyword arguments.
+                out |= _enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)  # pyright: ignore[reportPossiblyUnboundVariable]
+                if not out:
+                    out = UNSET
+            elif data:
                 out = self.hint(**data)
             elif self.required:
                 # This should NEVER happen: empty data to a required dict field.
@@ -1240,6 +1297,9 @@ class Argument:
             hint = self._type_hint_for_key(keys[0])
         else:
             hint = self.hint
+            # Flag enums can consume multiple string values when used directly
+            if self._enum_flag_type and not keys:
+                return 1, True  # Consume all remaining tokens
         tokens_per_element, consume_all = token_count(hint)
         return tokens_per_element, consume_all
 
@@ -1399,13 +1459,15 @@ def _extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
         f = f.func  # pyright: ignore[reportFunctionMemberAccess]
 
     try:
-        return {
-            tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)
-            for dparam in parse_from_object(f).params
-        }
+        return CaseInsensitiveTupleDict(
+            {
+                tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)
+                for dparam in parse_from_object(f).params
+            }
+        )
     except TypeError:
         # Type hints like ``dict[str, str]`` trigger this.
-        return {}
+        return CaseInsensitiveTupleDict()
 
 
 def _resolve_parameter_name_helper(elem):

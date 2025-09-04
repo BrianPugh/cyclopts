@@ -1,5 +1,6 @@
 import inspect
 import sys
+from enum import Flag
 from inspect import isclass
 from typing import Annotated, Any, Optional, Union, get_args, get_origin
 
@@ -54,6 +55,11 @@ def is_namedtuple(hint) -> bool:
 
 def is_attrs(hint) -> bool:
     return attrs.has(hint)
+
+
+def is_enum_flag(hint) -> bool:
+    """Check if a type hint is an enum.Flag subclass."""
+    return isclass(hint) and issubclass(hint, Flag)
 
 
 def is_annotated(hint) -> bool:

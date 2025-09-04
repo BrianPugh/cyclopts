@@ -20,6 +20,7 @@ from cyclopts.annotations import (
     is_annotated,
     is_attrs,
     is_dataclass,
+    is_enum_flag,
     is_namedtuple,
     is_pydantic,
     is_typeddict,
@@ -267,6 +268,26 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
     return out
 
 
+def _enum_flag_field_infos(enum_flag) -> dict[str, FieldInfo]:
+    """Extract field infos from a Flag enum, treating each member as a boolean field."""
+    out = {}
+    for member_name in enum_flag.__members__:
+        # Each flag member becomes a boolean field
+        # Use lowercase for CLI consistency
+        field_name = member_name.lower()
+        out[field_name] = FieldInfo(
+            names=(field_name,),
+            kind=FieldInfo.KEYWORD_ONLY,
+            # The Enum member should NEVER have a type-annotation.
+            # Thusly, it by definition cannot have an Annotated[...].
+            # see: https://typing.python.org/en/latest/spec/enums.html#defining-members
+            annotation=bool,  # Each flag acts as a boolean
+            default=False,  # Default to False (not included in combination)
+            required=False,  # All flags are optional
+        )
+    return out
+
+
 def get_field_infos(hint) -> dict[str, FieldInfo]:
     if is_dataclass(hint):
         # This must be before ``is_pydantic`` check so that we
@@ -280,6 +301,8 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return _typed_dict_field_infos(hint)
     elif is_attrs(hint):
         return _attrs_field_infos(hint)
+    elif is_enum_flag(hint):
+        return _enum_flag_field_infos(hint)
     else:
         return _generic_class_field_infos(hint)
 

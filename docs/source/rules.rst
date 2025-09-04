@@ -602,6 +602,55 @@ As a real-world example, the PNG image format supports `5 different color-types 
    $ my-program grayscale-alpha
    Writing color-type value: 4 to the image header.
 
+****
+Flag
+****
+:class:`~enum.Flag` enums are treated as a collection of boolean flags.
+
+The :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets applied to all :class:`~enum.Flag` names, as well as the CLI provided token.
+By default, this means that a **case-insensitive name** lookup is performed.
+If an enum name contains an underscore, the CLI parameter **may** instead contain a hyphen, ``-``.
+Leading/Trailing underscores will be stripped.
+
+.. code-block:: python
+
+   from cyclopts import App
+   from enum import Flag, auto
+
+   app = App()
+
+   class Permission(Flag):
+       READ = auto()
+       WRITE = auto()
+       EXECUTE = auto()
+
+   @app.default
+   def default(permissions: Permission = Permission.READ):
+       print(f"Permissions: {permissions}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program
+   Permissions: Permission.READ
+
+   $ my-program write
+   Permissions: Permission.WRITE
+
+   $ my-program read write
+   Permissions: Permission.READ|WRITE
+
+   $ my-program --permissions.write
+   Permissions: Permission.WRITE
+
+   $ my-program --permissions.write --permissions.read
+   Permissions: Permission.READ|WRITE
+
+.. note::
+    If you want to directly expose the flags as booleans (e.g. ``--read``), then see :ref:`Namespace Flattening <Namespace Flattening>`.
+
+
 .. _Coercion Rules - Dataclasses:
 
 ********
