@@ -605,7 +605,7 @@ As a real-world example, the PNG image format supports `5 different color-types 
 ****
 Flag
 ****
-:class:`~enum.Flag` enums are treated as a collection of boolean flags.
+:class:`~enum.Flag` enums (and by extension, :class:`~enum.IntFlag`) are treated as a collection of boolean flags.
 
 The :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets applied to all :class:`~enum.Flag` names, as well as the CLI provided token.
 By default, this means that a **case-insensitive name** lookup is performed.

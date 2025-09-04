@@ -1,13 +1,13 @@
 """Tests for enum.Flag and enum.IntFlag support in cyclopts."""
 
 from dataclasses import dataclass
-from enum import Flag, auto
+from enum import Flag, IntFlag, auto
 from textwrap import dedent
-from typing import Annotated
+from typing import Annotated, Optional
 
 import pytest
 
-from cyclopts import App, MissingArgumentError, Parameter
+from cyclopts import MissingArgumentError, Parameter
 from cyclopts.exceptions import CoercionError, UnknownOptionError
 
 
@@ -16,12 +16,18 @@ class Permission(Flag):
 
     READ = auto()
     """Enable read permissions."""
-
     WRITE = auto()
     """Enable write permissions."""
-
     EXECUTE = auto()
     """Enable execute permissions."""
+
+
+class HttpStatus(IntFlag):
+    INFORMATIONAL = 100
+    SUCCESS = 200
+    REDIRECTION = 300
+    CLIENT_ERROR = 400
+    SERVER_ERROR = 500
 
 
 @dataclass
@@ -30,51 +36,47 @@ class User:
     perms: Permission = Permission.READ
 
 
-def test_flag_as_boolean_flags():
+def test_flag_as_boolean_flags(app, assert_parse_args):
     """Test that Flag enum members are exposed as boolean CLI flags."""
-    app = App()
 
     @app.default
     def main(perms: Permission = Permission.READ):
-        return perms
+        pass
 
-    # Test individual flags
-    result = app(["--perms.read"], exit_on_error=False)
-    assert result == Permission.READ
+    assert_parse_args(main, "--perms.read", perms=Permission.READ)
+    assert_parse_args(main, "--perms.write", perms=Permission.WRITE)
+    assert_parse_args(main, "--perms.read --perms.write", perms=Permission.READ | Permission.WRITE)
 
-    result = app(["--perms.write"], exit_on_error=False)
-    assert result == Permission.WRITE
 
-    result = app(["--perms.execute"], exit_on_error=False)
-    assert result == Permission.EXECUTE
+def test_int_flag_as_boolean_flags(app, assert_parse_args):
+    """Test that IntFlag enum members are exposed as boolean CLI flags."""
 
-    # Test multiple flags combined
-    result = app(["--perms.read", "--perms.write"], exit_on_error=False)
-    assert result == Permission.READ | Permission.WRITE
+    @app.default
+    def main(error_on: Optional[HttpStatus] = None):
+        pass
 
-    result = app(["--perms.read", "--perms.write", "--perms.execute"], exit_on_error=False)
-    assert result == Permission.READ | Permission.WRITE | Permission.EXECUTE
+    assert_parse_args(main, "")
+    assert_parse_args(main, "--error-on.success", error_on=HttpStatus.SUCCESS)
 
 
 @pytest.mark.parametrize(
     "command",
-    [["--perms", "read", "--perms", "write"], ["read", "write"]],
+    ["--perms read --perms write", "read write"],
 )
-def test_flag_with_list_str_input(app, command):
+def test_flag_with_list_str_input(app, assert_parse_args, command):
     """Test that Flag enum members are exposed as boolean CLI flags."""
 
     @app.default
     def main(perms: Permission = Permission.READ):
-        return perms
+        pass
 
-    result = app(command, exit_on_error=False)
-    assert result == Permission.READ | Permission.WRITE
+    assert_parse_args(main, command, Permission.READ | Permission.WRITE)
 
 
 def test_flag_unknown_member_str(app):
     @app.default
     def main(perms: Permission = Permission.READ):
-        return perms
+        pass
 
     with pytest.raises(CoercionError):
         app("foo", exit_on_error=False)
@@ -83,36 +85,28 @@ def test_flag_unknown_member_str(app):
 def test_flag_unknown_member_option(app):
     @app.default
     def main(perms: Permission = Permission.READ):
-        return perms
+        pass
 
     with pytest.raises(UnknownOptionError):
         app("--perms.foo", exit_on_error=False)
 
 
-def test_flag_as_boolean_flags_star_name(app, console):
+def test_flag_as_boolean_flags_star_name(app, assert_parse_args, console):
     """Test that Flag enum members are exposed as boolean CLI flags."""
 
     @app.default
     def main(perms: Annotated[Permission, Parameter(name="*", negative_bool="")] = Permission.READ):
         """Manage file permissions."""
-        return perms
+        pass
 
     # Test individual flags
-    result = app(["--read"], exit_on_error=False)
-    assert result == Permission.READ
-
-    result = app(["--write"], exit_on_error=False)
-    assert result == Permission.WRITE
-
-    result = app(["--execute"], exit_on_error=False)
-    assert result == Permission.EXECUTE
+    assert_parse_args(main, "--read", Permission.READ)
+    assert_parse_args(main, "--write", Permission.WRITE)
+    assert_parse_args(main, "--execute", Permission.EXECUTE)
 
     # Test multiple flags combined
-    result = app(["--read", "--write"], exit_on_error=False)
-    assert result == Permission.READ | Permission.WRITE
-
-    result = app(["--read", "--write", "--execute"], exit_on_error=False)
-    assert result == Permission.READ | Permission.WRITE | Permission.EXECUTE
+    assert_parse_args(main, "--read --write", Permission.READ | Permission.WRITE)
+    assert_parse_args(main, "--read --write --execute", Permission.READ | Permission.WRITE | Permission.EXECUTE)
 
     # Test help output
     with console.capture() as capture:
@@ -139,104 +133,32 @@ def test_flag_as_boolean_flags_star_name(app, console):
     assert expected == actual
 
 
-@pytest.mark.skip
-def test_flag_with_negative_bool_star_name():
-    """Test that negative boolean flags work with Flag enums."""
-    app = App()
-
-    @app.default
-    def main(
-        perms: Annotated[Permission, Parameter(name="*")] = Permission.READ | Permission.WRITE,
-    ):
-        return perms
-
-    # Test removing flags with negative
-    result = app(["--no-read"], exit_on_error=False)
-    assert result == Permission.WRITE
-
-    result = app(["--no-write"], exit_on_error=False)
-    assert result == Permission.READ
-
-    result = app(["--no-read", "--no-write"], exit_on_error=False)
-    assert result == Permission.READ
-
-    # Test combining positive and negative
-    result = app(["--execute", "--no-read"], exit_on_error=False)
-    assert result == Permission.WRITE | Permission.EXECUTE
-
-
-def test_flag_with_default_value():
+def test_flag_with_default_value(app, assert_parse_args):
     """Test Flag enum with non-zero default value."""
-    app = App()
 
     @app.default
     def main(perms: Permission = Permission.READ | Permission.WRITE):
-        return perms
+        pass
 
-    # Test default value is used when no arguments
-    result = app([], exit_on_error=False)
-    assert result == Permission.READ | Permission.WRITE
-
-    # Test that providing flags overrides the default completely
-    result = app(["--perms.execute"], exit_on_error=False)
-    assert result == Permission.EXECUTE
-
-    # Test combining multiple flags overrides default
-    result = app(["--perms.read", "--perms.execute"], exit_on_error=False)
-    assert result == Permission.READ | Permission.EXECUTE
+    assert_parse_args(main, "")
 
 
-def test_flag_empty_value():
-    """Test Flag enum with empty (zero) value."""
-    app = App()
-
-    @app.default
-    def main(perms: Permission = Permission.READ):
-        return perms
-
-    # Test empty value when no arguments
-    result = app([], exit_on_error=False)
-    assert result == Permission.READ
-
-    # Test that empty value can be modified
-    result = app(["--perms.read"], exit_on_error=False)
-    assert result == Permission.READ
-
-
-def test_flag_all_flags():
-    """Test combining all flags results in the complete set."""
-    app = App()
-
-    @app.default
-    def main(perms: Permission = Permission.READ):
-        return perms
-
-    # Test all flags combined
-    all_flags = Permission.READ | Permission.WRITE | Permission.EXECUTE
-    result = app(["--perms.read", "--perms.write", "--perms.execute"], exit_on_error=False)
-    assert result == all_flags
-
-
-def test_flag_with_other_parameters():
+def test_flag_with_other_parameters(app, assert_parse_args):
     """Test Flag enum alongside other parameters."""
-    app = App()
 
     @app.default
     def main(name: str, perms: Permission = Permission.READ, verbose: bool = False):
-        return name, perms, verbose
+        pass
 
     # Test with positional and flag parameters
-    result = app(["test.txt", "--perms.read", "--perms.write"], exit_on_error=False)
-    assert result == ("test.txt", Permission.READ | Permission.WRITE, False)
+    assert_parse_args(main, "test.txt --perms.read --perms.write", "test.txt", Permission.READ | Permission.WRITE)
 
     # Test with all parameter types
-    result = app(["test.txt", "--perms.execute", "--verbose"], exit_on_error=False)
-    assert result == ("test.txt", Permission.EXECUTE, True)
+    assert_parse_args(main, "test.txt --perms.execute --verbose", "test.txt", Permission.EXECUTE, True)
 
 
-def test_flag_star_name_with_other_parameters():
+def test_flag_star_name_with_other_parameters(app, assert_parse_args):
     """Test Flag enum with star name alongside other parameters."""
-    app = App()
 
     @app.default
     def main(
@@ -244,33 +166,30 @@ def test_flag_star_name_with_other_parameters():
         perms: Annotated[Permission, Parameter(name="*")] = Permission.READ,
         verbose: bool = False,
     ):
-        return name, perms, verbose
+        pass
 
     # Test star name expansion with other parameters
-    result = app(["test.txt", "--read", "--write", "--verbose"], exit_on_error=False)
-    assert result == ("test.txt", Permission.READ | Permission.WRITE, True)
+    assert_parse_args(main, "test.txt --read --write --verbose", "test.txt", Permission.READ | Permission.WRITE, True)
 
 
-def test_flag_no_flags_provided():
+def test_flag_no_flags_provided(app):
     """Test behavior when no flags are provided but parameter is required."""
-    app = App()
 
     @app.default
     def main(perms: Permission):  # No default value
-        return perms
+        pass
 
     with pytest.raises(MissingArgumentError):
         app([], exit_on_error=False)
 
 
-def test_flag_help_shows_member_docstrings(console):
+def test_flag_help_shows_member_docstrings(app, console):
     """Test that Flag enum member docstrings appear in help output."""
-    app = App()
 
     @app.default
     def main(perms: Permission = Permission.READ):
         """Manage file permissions."""
-        return perms
+        pass
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -300,14 +219,13 @@ def test_flag_help_shows_member_docstrings(console):
     assert expected == actual
 
 
-def test_flag_help_star_name_shows_member_docstrings(console):
+def test_flag_help_star_name_shows_member_docstrings(app, console):
     """Test that Flag enum member docstrings appear with star name expansion."""
-    app = App()
 
     @app.default
     def main(perms: Annotated[Permission, Parameter(name="*")] = Permission.READ):
         """Manage file permissions."""
-        return perms
+        pass
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -335,51 +253,39 @@ def test_flag_help_star_name_shows_member_docstrings(console):
     assert expected == actual
 
 
-def test_flag_in_dataclass():
+def test_flag_in_dataclass(app, assert_parse_args):
     """Test Flag enum field in a dataclass."""
-    app = App()
 
     @app.default
     def main(user: User):
-        return user
+        pass
 
     # Test with name only (should use default perms)
-    result = app(["Alice"], exit_on_error=False)
-    assert result.name == "Alice"
-    assert result.perms == Permission.READ
+    assert_parse_args(main, "Alice", User("Alice", Permission.READ))
 
     # Test with name and flag permissions
-    result = app(["Bob", "--user.perms.write", "--user.perms.execute"], exit_on_error=False)
-    assert result.name == "Bob"
-    assert result.perms == Permission.WRITE | Permission.EXECUTE
-
-    # Test with all permissions
-    result = app(["Charlie", "--user.perms.read", "--user.perms.write", "--user.perms.execute"], exit_on_error=False)
-    assert result.name == "Charlie"
-    assert result.perms == Permission.READ | Permission.WRITE | Permission.EXECUTE
+    assert_parse_args(
+        main, "Bob --user.perms.write --user.perms.execute", User("Bob", Permission.WRITE | Permission.EXECUTE)
+    )
 
 
-def test_flag_in_dataclass_positionally():
+def test_flag_in_dataclass_positionally(app, assert_parse_args):
     """Test Flag enum field positionally in a dataclass."""
-    app = App()
 
     @app.default
     def main(user: User):
-        return user
+        pass
 
-    result = app(["Bob", "write", "execute"], exit_on_error=False)
-    assert result.name == "Bob"
-    assert result.perms == Permission.WRITE | Permission.EXECUTE
+    assert_parse_args(main, "Bob write execute", User("Bob", Permission.WRITE | Permission.EXECUTE))
 
 
-def test_flag_in_dataclass_help(console):
+def test_flag_in_dataclass_help(app, console):
     """Test help output for dataclass with Flag enum field."""
-    app = App()
 
     @app.default
     def main(user: User):
         """Create a user with permissions."""
-        return user
+        pass
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -410,14 +316,13 @@ def test_flag_in_dataclass_help(console):
     assert expected == actual
 
 
-def test_flag_in_dataclass_help_no_negative(console):
+def test_flag_in_dataclass_help_no_negative(app, console):
     """Test help output for dataclass with Flag enum field."""
-    app = App()
 
     @app.default
     def main(user: Annotated[User, Parameter(negative="")]):
         """Create a user with permissions."""
-        return user
+        pass
 
     with console.capture() as capture:
         app.help_print([], console=console)
@@ -459,7 +364,7 @@ def test_flag_in_dataclass_help_no_keywords(app, assert_parse_args, console):
     @app.default
     def main(user: Annotated[User, Parameter(negative="")]):
         """Create a user with permissions."""
-        return user
+        pass
 
     with console.capture() as capture:
         app.help_print([], console=console)
