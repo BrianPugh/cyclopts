@@ -1211,6 +1211,47 @@ class App:
 
         return command, bound, ignored
 
+    def _run_with_asyncio(self, command: Callable, bound: inspect.BoundArguments):
+        """Run async command with asyncio backend."""
+        import asyncio
+
+        try:
+            # Check if we're already in an async context
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop, create one
+            return asyncio.run(command(*bound.args, **bound.kwargs))
+        else:
+            # We're in an async context, return the coroutine for the caller to await
+            return command(*bound.args, **bound.kwargs)
+
+    def _run_with_trio(self, command: Callable, bound: inspect.BoundArguments):
+        """Run async command with trio backend."""
+        from functools import partial
+
+        import trio
+
+        try:
+            # Check if we're already in a trio context
+            trio.lowlevel.current_trio_token()
+        except RuntimeError:
+            # No trio context, create one
+            return trio.run(partial(command, *bound.args, **bound.kwargs))
+        else:
+            # We're in a trio context, return the coroutine for the caller to await
+            return command(*bound.args, **bound.kwargs)
+
+    def _execute_async_command(
+        self, command: Callable, bound: inspect.BoundArguments, backend: Literal["asyncio", "trio"]
+    ):
+        """Execute an async command with the specified backend."""
+        if backend == "asyncio":
+            return self._run_with_asyncio(command, bound)
+        elif backend == "trio":
+            return self._run_with_trio(command, bound)
+        else:  # pragma: no cover
+            assert_never(backend)
+
     def __call__(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
@@ -1276,45 +1317,7 @@ class App:
 
         try:
             if inspect.iscoroutinefunction(command):
-                # We don't use anyio to avoid the dependency for non-async users.
-                # anyio can auto-select the backend when you're already in an async context,
-                # but here we're creating the top-level event loop & must select ourselves.
-                if backend == "asyncio":
-                    import asyncio
-
-                    try:
-                        # Check if we're already in an async context
-                        asyncio.get_running_loop()
-                        in_async_context = True
-                    except RuntimeError:
-                        # No running loop
-                        in_async_context = False
-
-                    if in_async_context:
-                        # We're in an async context, return the coroutine for the caller to await
-                        return command(*bound.args, **bound.kwargs)
-                    else:
-                        # No running loop, create one
-                        return asyncio.run(command(*bound.args, **bound.kwargs))
-                elif backend == "trio":
-                    import trio
-
-                    try:
-                        # Check if we're already in a trio context
-                        trio.lowlevel.current_trio_token()
-                        in_trio_context = True
-                    except RuntimeError:
-                        # No trio context
-                        in_trio_context = False
-
-                    if in_trio_context:
-                        # We're in a trio context, return the coroutine for the caller to await
-                        return command(*bound.args, **bound.kwargs)
-                    else:
-                        # No trio context, create one
-                        return trio.run(partial(command, *bound.args, **bound.kwargs))
-                else:  # pragma: no cover
-                    assert_never(backend)
+                return self._execute_async_command(command, bound, backend)
             else:
                 return command(*bound.args, **bound.kwargs)
         except KeyboardInterrupt:
