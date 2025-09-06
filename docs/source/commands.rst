@@ -228,6 +228,24 @@ Cyclopts also works with **async** commands:
 
    app()
 
+Cyclopts' calling behavior depends on whether or not it's already running in an async context:
+
+* **In a synchronous context**: Creates a new event loop and executes the coroutine, returning the result directly.
+* **In an async context**: Returns the coroutine for the caller to await.
+
+This allows the same ``app()`` call to work seamlessly in both contexts:
+
+.. code-block:: python
+
+   # Synchronous normal python - executes immediately
+   result = app()  # Runs the async command in a new event loop and returns the result
+
+   # Async context - returns coroutine
+   async def main():
+       result = await app()  # Returns coroutine that must be awaited
+
+   asyncio.run(main())
+
 --------------------------
 Decorated Function Details
 --------------------------
