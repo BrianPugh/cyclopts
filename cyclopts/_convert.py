@@ -1,10 +1,11 @@
 import collections.abc
+import operator
 import sys
 import typing
 from collections.abc import Sequence
 from datetime import datetime, timedelta
-from enum import Enum
-from functools import partial
+from enum import Enum, Flag
+from functools import partial, reduce
 from inspect import isclass
 from typing import (
     TYPE_CHECKING,
@@ -23,7 +24,7 @@ if sys.version_info >= (3, 12):
 else:
     TypeAliasType = None
 
-from cyclopts.annotations import is_annotated, is_nonetype, is_union, resolve
+from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_infos
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin
@@ -155,6 +156,62 @@ def _timedelta(s: str) -> timedelta:
     if negative:
         seconds = -seconds
     return timedelta(seconds=seconds)
+
+
+def get_enum_member(
+    type_: Any,
+    token: Union["Token", str],
+    name_transform: Callable[[str], str],
+):
+    """Match a token's value to an enum's member.
+
+    Applies ``name_transform`` to both the value and the member.
+    """
+    from cyclopts.argument import Token
+
+    is_token = isinstance(token, Token)
+    value = token.value if is_token else token
+    value_transformed = name_transform(value)
+    for name, member in type_.__members__.items():
+        if name_transform(name) == value_transformed:
+            return member
+    raise CoercionError(
+        token=token if is_token else None,
+        target_type=type_,
+    )
+
+
+def convert_enum_flag(
+    enum_type: type[Flag],
+    tokens: Union[Iterable[str], Iterable["Token"]],
+    name_transform: Callable[[str], str],
+) -> Flag:
+    """Convert tokens to a Flag enum value.
+
+    Parameters
+    ----------
+    enum_type : type[Flag]
+        The Flag enum type to convert to.
+    tokens : Union[Sequence[str], Sequence[Token]]
+        The tokens to convert. Can be member names or Token objects.
+    name_transform : Optional[Callable[[str], str]]
+        Function to transform names for comparison.
+
+    Returns
+    -------
+    Flag
+        The combined flag value.
+
+    Raises
+    ------
+    CoercionError
+        If a token is not a valid flag member.
+    """
+    return reduce(
+        operator.or_,
+        (get_enum_member(enum_type, token, name_transform) for token in tokens),
+        enum_type(0),
+    )
 
 
 # For types that need more logic than just invoking their type
@@ -310,18 +367,15 @@ def _convert(
         else:
             gen = token
         out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+    elif isclass(type_) and issubclass(type_, Flag):
+        # TODO: this might never execute since enum.Flag is now handled in ``convert``.
+        out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
     elif isclass(type_) and issubclass(type_, Enum):
         if isinstance(token, Sequence):
             raise ValueError
 
         if converter is None:
-            element_transformed = name_transform(token.value)
-            for name, member in type_.__members__.items():
-                if name_transform(name) == element_transformed:
-                    out = member
-                    break
-            else:
-                raise CoercionError(token=token, target_type=type_)
+            out = get_enum_member(type_, token, name_transform)
         else:
             out = converter(type_, token.value)
     else:
@@ -487,6 +541,10 @@ def convert(
         return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)  # pyright: ignore
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
+    elif is_enum_flag(maybe_origin_type):
+        # Unlike other types that can accept multiple tokens, the result is not a sequence, it's a single
+        # enum.Flag object.
+        return convert_enum_flag(maybe_origin_type, tokens, name_transform)
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
@@ -528,6 +586,8 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 0, False
     elif type_ in ITERABLE_TYPES or (origin_type in ITERABLE_TYPES and len(get_args(type_)) == 0):
         return 1, True
+    elif is_enum_flag(type_):
+        return 1, True
     elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(type_)):
         return token_count(get_args(type_)[0])[0], True
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
@@ -558,7 +618,7 @@ def token_count(type_: Any) -> tuple[int, bool]:
             count += elem_count
             consume_all |= elem_consume_all
 
-        # classes like ``Enum`` can slip through here with a 0 count.
+        # classes like ``enum.Enum`` can slip through here with a 0 count.
         if not count:
             return 1, False
 
