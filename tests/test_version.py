@@ -65,3 +65,16 @@ def test_version_print_help_format_override(app, console):
         app.version_print(console)
 
     assert "foo\n" == capture.get()
+
+
+def test_version_print_custom_async_callable(app, console):
+    """Test that async callables work for version."""
+    async def my_async_version():
+        return "**async-foo**"
+
+    app.version = my_async_version
+
+    with console.capture() as capture:
+        app.version_print(console)
+
+    assert "async-foo\n" == capture.get()
