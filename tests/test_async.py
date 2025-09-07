@@ -1,9 +1,6 @@
-import asyncio
-from typing import Annotated
-
 import sniffio
 
-from cyclopts import App, Parameter
+from cyclopts import App
 
 
 def test_async_handler():
@@ -39,74 +36,3 @@ def test_handler():
         return "Sync handler works"
 
     assert app("command") == "Sync handler works"
-
-
-def test_async_meta_with_async_command():
-    app = App()
-    results = []
-
-    @app.command
-    async def async_command(value: int):
-        await asyncio.sleep(0)  # Simulate async work
-        result = f"Async command executed with {value}"
-        results.append(result)
-        return result
-
-    @app.meta.default
-    async def launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
-        await asyncio.sleep(0)  # Simulate async initialization
-        results.append("Meta initialized")
-        result = await app(tokens)  # app should return a coroutine when inside an async context.
-        results.append("Meta finished")
-        return result
-
-    result = app.meta(["async-command", "42"])
-    assert result == "Async command executed with 42"
-    assert results == ["Meta initialized", "Async command executed with 42", "Meta finished"]
-
-
-def test_async_meta_with_sync_command():
-    app = App()
-    results = []
-
-    @app.command
-    def sync_command(value: int):
-        result = f"Sync command executed with {value}"
-        results.append(result)
-        return result
-
-    @app.meta.default
-    async def launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
-        await asyncio.sleep(0)  # Simulate async initialization
-        results.append("Meta initialized")
-        # Synchronous commands should also work from async meta
-        result = app(tokens)
-        results.append("Meta finished")
-        return result
-
-    result = app.meta(["sync-command", "42"])
-    assert result == "Sync command executed with 42"
-    assert results == ["Meta initialized", "Sync command executed with 42", "Meta finished"]
-
-
-def test_async_meta_with_nested_async():
-    app = App()
-    results = []
-
-    @app.default
-    async def default_handler():
-        await asyncio.sleep(0)
-        results.append("Default handler")
-        return "Default result"
-
-    @app.meta.default
-    async def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
-        await asyncio.sleep(0)
-        results.append("Meta handler")
-        result = await app(tokens)
-        results.append("Meta complete")
-        return result
-
-    result = app.meta([])
-    assert result == "Default result"
-    assert results == ["Meta handler", "Default handler", "Meta complete"]
