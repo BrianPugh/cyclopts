@@ -183,6 +183,58 @@ def resolve_default_parameter_from_apps(apps: Optional[Sequence["App"]]) -> Para
     return Parameter.combine(*cparams)
 
 
+def _run_maybe_async_command(
+    command: Callable,
+    bound: Optional[inspect.BoundArguments] = None,
+    backend: Literal["asyncio", "trio"] = "asyncio",
+):
+    """Run a command, handling both sync and async cases.
+
+    If the command is async, an async context will be created to run it.
+
+    Parameters
+    ----------
+    command : Callable
+        The command to execute.
+    bound : Optional[inspect.BoundArguments]
+        Bound arguments for the command. If None, command is called with no arguments.
+    backend : Literal["asyncio", "trio"]
+        The async backend to use if the command is async.
+
+    Returns
+    -------
+    return_value: Any
+        The value the command function returns.
+    """
+    if not inspect.iscoroutinefunction(command):
+        # Synchronous command
+        if bound is None:
+            return command()
+        else:
+            return command(*bound.args, **bound.kwargs)
+
+    # Async command - create event loop
+    # We don't use anyio to avoid the dependency for non-async users.
+    # anyio can auto-select the backend when you're already in an async context,
+    # but here we're creating the top-level event loop & must select ourselves.
+    if backend == "asyncio":
+        import asyncio
+
+        if bound is None:
+            return asyncio.run(command())
+        else:
+            return asyncio.run(command(*bound.args, **bound.kwargs))
+    elif backend == "trio":
+        import trio
+
+        if bound is None:
+            return trio.run(command)
+        else:
+            return trio.run(partial(command, *bound.args, **bound.kwargs))
+    else:  # pragma: no cover
+        assert_never(backend)
+
+
 def _walk_metas(app: "App"):
     # Iterates from deepest to shallowest meta-apps
     meta_list = [app]  # shallowest to deepest
@@ -1275,20 +1327,102 @@ class App:
         )
 
         try:
+            return _run_maybe_async_command(command, bound, backend)
+        except KeyboardInterrupt:
+            if self.suppress_keyboard_interrupt:
+                sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
+            else:
+                raise
+
+    async def run_async(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        *,
+        console: Optional["Console"] = None,
+        print_error: bool = True,
+        exit_on_error: bool = True,
+        help_on_error: Optional[bool] = None,
+        verbose: bool = False,
+        end_of_options_delimiter: Optional[str] = None,
+    ):
+        """Async equivalent of :meth:`__call__` for use within existing event loops.
+
+        This method should be used when you're already in an async context
+        (e.g., Jupyter notebooks, existing async applications) and need to
+        execute a Cyclopts command without creating a new event loop.
+
+        Parameters
+        ----------
+        tokens : Union[None, str, Iterable[str]]
+            Either a string, or a list of strings to launch a command.
+            Defaults to ``sys.argv[1:]``.
+        console: rich.console.Console
+            Console to print help and runtime Cyclopts errors.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
+        print_error: bool
+            Print a rich-formatted error on error.
+            Defaults to :obj:`True`.
+        exit_on_error: bool
+            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            Otherwise, continue to raise the exception.
+            Defaults to ``True``.
+        help_on_error: bool
+            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
+            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
+        verbose: bool
+            Populate exception strings with more information intended for developers.
+            Defaults to :obj:`False`.
+        end_of_options_delimiter: Optional[str]
+            All tokens after this delimiter will be force-interpreted as positional arguments.
+            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
+            If that is not set, it will default to POSIX-standard ``"--"``.
+
+        Returns
+        -------
+        return_value: Any
+            The value the command function returns.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            import asyncio
+            from cyclopts import App
+
+            app = App()
+
+
+            @app.command
+            async def my_async_command():
+                await asyncio.sleep(1)
+                return "Done!"
+
+
+            # In an async context (e.g., Jupyter notebook or existing async app):
+            async def main():
+                result = await app.run_async(["my-async-command"])
+                print(result)  # Prints: Done!
+
+
+            asyncio.run(main())
+        """
+        if tokens is None:
+            _log_framework_warning(_detect_test_framework())
+
+        tokens = normalize_tokens(tokens)
+        command, bound, _ = self.parse_args(
+            tokens,
+            console=console,
+            print_error=print_error,
+            exit_on_error=exit_on_error,
+            help_on_error=help_on_error,
+            verbose=verbose,
+            end_of_options_delimiter=end_of_options_delimiter,
+        )
+
+        try:
             if inspect.iscoroutinefunction(command):
-                # We don't use anyio to avoid the dependency for non-async users.
-                # anyio can auto-select the backend when you're already in an async context,
-                # but here we're creating the top-level event loop & must select ourselves.
-                if backend == "asyncio":
-                    import asyncio
-
-                    return asyncio.run(command(*bound.args, **bound.kwargs))
-                elif backend == "trio":
-                    import trio
-
-                    return trio.run(partial(command, *bound.args, **bound.kwargs))
-                else:  # pragma: no cover
-                    assert_never(backend)
+                return await command(*bound.args, **bound.kwargs)
             else:
                 return command(*bound.args, **bound.kwargs)
         except KeyboardInterrupt:
