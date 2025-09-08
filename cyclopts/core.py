@@ -68,12 +68,8 @@ if sys.version_info < (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     from typing import assert_never
 
-if sys.version_info < (3, 10):  # pragma: no cover
-    from importlib_metadata import PackageNotFoundError  # pyright: ignore[reportMissingImports]
-    from importlib_metadata import version as importlib_metadata_version  # pyright: ignore[reportMissingImports]
-else:  # pragma: no cover
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as importlib_metadata_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as importlib_metadata_version
 
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
