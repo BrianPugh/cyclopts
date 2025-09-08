@@ -106,38 +106,6 @@ def _get_root_module_name():
     raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
-def _default_version(default="0.0.0") -> str:
-    """Attempts to get the calling code's version.
-
-    Returns
-    -------
-    version: str
-        ``default`` if it cannot determine version.
-    """
-    try:
-        root_module_name = _get_root_module_name()
-    except _CannotDeriveCallingModuleNameError:  # pragma: no cover
-        return default
-
-    # Attempt to get the Distribution Package’s version number.
-    try:
-        return importlib_metadata_version(root_module_name)
-    except PackageNotFoundError:
-        pass
-
-    # Attempt packagename.__version__
-    # Not sure if this is redundant with ``importlib.metadata``,
-    # but there's no real harm in checking.
-    try:
-        module = importlib.import_module(root_module_name)
-        return module.__version__
-    except (ImportError, AttributeError):
-        pass
-
-    # Final fallback
-    return default
-
-
 def _validate_default_command(x):
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
@@ -583,13 +551,21 @@ class App:
             out[x] = self[x]
         return out
 
-    def _get_version_string_from_module(self) -> Optional[str]:
-        """Try to get version string from the instantiating module.
+    def _get_fallback_version_string(self, default: str = "0.0.0") -> str:
+        """Get the version string with multiple fallback strategies.
+
+        First tries to derive from the instantiating module, then tries to get it
+        from the calling code's module, and finally falls back to a default.
+
+        Parameters
+        ----------
+        default : str
+            Default version to use if no version can be determined.
 
         Returns
         -------
-        Optional[str]
-            Version string if found, None otherwise.
+        str
+            Version string.
         """
         if self._instantiating_module is not None:
             full_module_name = self._instantiating_module.__name__
@@ -598,21 +574,44 @@ class App:
                 return importlib_metadata_version(root_module_name)
             except PackageNotFoundError:
                 pass
-        return None
 
-    def _format_and_print_version(self, version_raw: Optional[str], console: "Console") -> None:
+            try:
+                return self._instantiating_module.__version__  # type: ignore[attr-defined]
+            except AttributeError:
+                pass
+
+        try:
+            root_module_name = _get_root_module_name()
+        except _CannotDeriveCallingModuleNameError:  # pragma: no cover
+            return default
+
+        try:
+            return importlib_metadata_version(root_module_name)
+        except PackageNotFoundError:
+            pass
+
+        # Attempt packagename.__version__
+        # Not sure if this is redundant with ``importlib.metadata``,
+        # but there's no real harm in checking.
+        try:
+            module = importlib.import_module(root_module_name)
+            return module.__version__  # type: ignore[attr-defined]
+        except (ImportError, AttributeError):
+            pass
+
+        return default
+
+    def _format_and_print_version(self, version_raw: str, console: "Console") -> None:
         """Format and print the version string.
 
         Parameters
         ----------
-        version_raw : Optional[str]
+        version_raw : str
             Raw version string to format and print.
         console : Console
             Console to print to.
         """
         version_format = resolve_version_format([self])
-        if not version_raw:
-            version_raw = _default_version()
         version_formatted = InlineText.from_format(version_raw, format=version_format)
         console.print(version_formatted)
 
@@ -631,17 +630,17 @@ class App:
         """
         console = self._resolve_console(None, console)
 
-        version_raw: Optional[str] = None
-        if self.version is None:
-            version_raw = self._get_version_string_from_module()
-        else:
+        if self.version is not None:
             if callable(self.version):
                 # Note: async version callables are handled by _version_print_async
                 if inspect.iscoroutinefunction(self.version):
                     raise ValueError("async version handler detected. Use App.run_async within an async context.")
-                version_raw = cast(Optional[str], self.version())
+                version_raw = cast(str, self.version())
             else:
                 version_raw = self.version
+        else:
+            # self.version is None, use fallback logic
+            version_raw = self._get_fallback_version_string()
 
         self._format_and_print_version(version_raw, console)
 
@@ -660,10 +659,7 @@ class App:
         """
         console = self._resolve_console(None, console)
 
-        version_raw: Optional[str] = None
-        if self.version is None:
-            version_raw = self._get_version_string_from_module()
-        else:
+        if self.version is not None:
             if callable(self.version):
                 if inspect.iscoroutinefunction(self.version):
                     version_raw = await self.version()
@@ -671,9 +667,12 @@ class App:
                     # This should never happen, since if ``self.version`` is callable
                     # and not async, then we would be using ``App.version_print``.
                     # This is only here for completeness.
-                    version_raw = cast(Optional[str], self.version())
+                    version_raw = cast(str, self.version())
             else:
                 version_raw = self.version
+        else:
+            # self.version is None, use fallback logic
+            version_raw = self._get_fallback_version_string()
 
         self._format_and_print_version(version_raw, console)
 
