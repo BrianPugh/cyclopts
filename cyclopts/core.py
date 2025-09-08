@@ -290,7 +290,7 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str]] = field(default=None, kw_only=True)
+    version: Union[None, str, Callable[..., str], Callable[..., Coroutine[Any, Any, str]]] = field(default=None, kw_only=True)
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -606,7 +606,15 @@ class App:
                 except PackageNotFoundError:
                     pass
         else:
-            version_raw = self.version() if callable(self.version) else self.version
+            if callable(self.version):
+                if inspect.iscoroutinefunction(self.version):
+                    # For async version callables, use asyncio as the default backend
+                    import asyncio
+                    version_raw = asyncio.run(self.version())
+                else:
+                    version_raw = self.version()
+            else:
+                version_raw = self.version
 
         if not version_raw:
             version_raw = _default_version()
