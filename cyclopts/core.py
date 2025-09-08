@@ -20,6 +20,7 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -57,12 +58,8 @@ if sys.version_info < (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     from typing import assert_never
 
-if sys.version_info < (3, 10):  # pragma: no cover
-    from importlib_metadata import PackageNotFoundError  # pyright: ignore[reportMissingImports]
-    from importlib_metadata import version as importlib_metadata_version  # pyright: ignore[reportMissingImports]
-else:  # pragma: no cover
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as importlib_metadata_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as importlib_metadata_version
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -98,42 +95,17 @@ def _get_root_module_name():
     raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
-def _default_version(default="0.0.0") -> str:
-    """Attempts to get the calling code's version.
-
-    Returns
-    -------
-    version: str
-        ``default`` if it cannot determine version.
-    """
-    try:
-        root_module_name = _get_root_module_name()
-    except _CannotDeriveCallingModuleNameError:  # pragma: no cover
-        return default
-
-    # Attempt to get the Distribution Package’s version number.
-    try:
-        return importlib_metadata_version(root_module_name)
-    except PackageNotFoundError:
-        pass
-
-    # Attempt packagename.__version__
-    # Not sure if this is redundant with ``importlib.metadata``,
-    # but there's no real harm in checking.
-    try:
-        module = importlib.import_module(root_module_name)
-        return module.__version__
-    except (ImportError, AttributeError):
-        pass
-
-    # Final fallback
-    return default
-
-
 def _validate_default_command(x):
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
     return x
+
+
+def _get_version_command(app):
+    if callable(app.version) and inspect.iscoroutinefunction(app.version):
+        return app._version_print_async
+    else:
+        return app.version_print
 
 
 def _combined_meta_command_mapping(
@@ -148,6 +120,58 @@ def _combined_meta_command_mapping(
     if recurse_parent_meta and app._meta_parent:
         command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
     return command_mapping
+
+
+def _run_maybe_async_command(
+    command: Callable,
+    bound: Optional[inspect.BoundArguments] = None,
+    backend: Literal["asyncio", "trio"] = "asyncio",
+):
+    """Run a command, handling both sync and async cases.
+
+    If the command is async, an async context will be created to run it.
+
+    Parameters
+    ----------
+    command : Callable
+        The command to execute.
+    bound : Optional[inspect.BoundArguments]
+        Bound arguments for the command. If None, command is called with no arguments.
+    backend : Literal["asyncio", "trio"]
+        The async backend to use if the command is async.
+
+    Returns
+    -------
+    return_value: Any
+        The value the command function returns.
+    """
+    if not inspect.iscoroutinefunction(command):
+        # Synchronous command
+        if bound is None:
+            return command()
+        else:
+            return command(*bound.args, **bound.kwargs)
+
+    # Async command - create event loop
+    # We don't use anyio to avoid the dependency for non-async users.
+    # anyio can auto-select the backend when you're already in an async context,
+    # but here we're creating the top-level event loop & must select ourselves.
+    if backend == "asyncio":
+        import asyncio
+
+        if bound is None:
+            return asyncio.run(command())
+        else:
+            return asyncio.run(command(*bound.args, **bound.kwargs))
+    elif backend == "trio":
+        import trio
+
+        if bound is None:
+            return trio.run(command)
+        else:
+            return trio.run(partial(command, *bound.args, **bound.kwargs))
+    else:  # pragma: no cover
+        assert_never(backend)
 
 
 def _walk_metas(app: "App"):
@@ -208,7 +232,9 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str]] = field(default=None, kw_only=True)
+    version: Union[None, str, Callable[..., str], Callable[..., Coroutine[Any, Any, str]]] = field(
+        default=None, kw_only=True
+    )
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -527,6 +553,74 @@ class App:
     def console(self, console: Optional["Console"]):
         self._console = console
 
+    def _get_fallback_version_string(self, default: str = "0.0.0") -> str:
+        """Get the version string with multiple fallback strategies.
+
+        First tries to derive from the instantiating module, then tries to get it
+        from the calling code's module, and finally falls back to a default.
+
+        Parameters
+        ----------
+        default : str
+            Default version to use if no version can be determined.
+
+        Returns
+        -------
+        str
+            Version string.
+        """
+        if self._instantiating_module is not None:
+            full_module_name = self._instantiating_module.__name__
+            root_module_name = full_module_name.split(".")[0]
+            try:
+                return importlib_metadata_version(root_module_name)
+            except PackageNotFoundError:
+                pass
+
+            try:
+                return self._instantiating_module.__version__  # type: ignore[attr-defined]
+            except AttributeError:
+                pass
+
+        try:
+            root_module_name = _get_root_module_name()
+        except _CannotDeriveCallingModuleNameError:  # pragma: no cover
+            return default
+
+        try:
+            return importlib_metadata_version(root_module_name)
+        except PackageNotFoundError:
+            pass
+
+        # Attempt packagename.__version__
+        # Not sure if this is redundant with ``importlib.metadata``,
+        # but there's no real harm in checking.
+        try:
+            module = importlib.import_module(root_module_name)
+            return module.__version__  # type: ignore[attr-defined]
+        except (ImportError, AttributeError):
+            pass
+
+        return default
+
+    def _format_and_print_version(self, version_raw: str, console: Optional["Console"]) -> None:
+        """Format and print the version string.
+
+        Parameters
+        ----------
+        version_raw : str
+            Raw version string to format and print.
+        console : Console
+            Console to print to.
+        """
+        from cyclopts.help import InlineText
+
+        version_format = self.app_stack.resolve("version_format")
+        if version_format is None:
+            version_format = self.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
+        version_formatted = InlineText.from_format(version_raw, format=version_format)
+        (console or self.console).print(version_formatted)
+
     def version_print(
         self,
         console: Optional["Console"] = None,
@@ -540,29 +634,47 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
         """
-        from cyclopts.help import InlineText
-
-        version_format = self.app_stack.resolve("version_format")
-        if version_format is None:
-            version_format = self.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
-
-        version_raw = None
-        if self.version is None:
-            if self._instantiating_module is not None:
-                full_module_name = self._instantiating_module.__name__
-                root_module_name = full_module_name.split(".")[0]
-                try:
-                    version_raw = importlib_metadata_version(root_module_name)
-                except PackageNotFoundError:
-                    pass
+        if self.version is not None:
+            if callable(self.version):
+                # Note: async version callables are handled by _version_print_async
+                if inspect.iscoroutinefunction(self.version):
+                    raise ValueError("async version handler detected. Use App.run_async within an async context.")
+                version_raw = cast(str, self.version())
+            else:
+                version_raw = self.version
         else:
-            version_raw = self.version() if callable(self.version) else self.version
+            version_raw = self._get_fallback_version_string()
 
-        if not version_raw:
-            version_raw = _default_version()
+        self._format_and_print_version(version_raw, console)
 
-        version_formatted = InlineText.from_format(version_raw, format=version_format)
-        (console or self.console).print(version_formatted)
+    async def _version_print_async(
+        self,
+        console: Optional["Console"] = None,
+    ) -> None:
+        """Async version of version_print for handling async version callables.
+
+        Parameters
+        ----------
+        console: rich.console.Console
+            Console to print version string to.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
+
+        """
+        if self.version is not None:
+            if callable(self.version):
+                if inspect.iscoroutinefunction(self.version):
+                    version_raw = await self.version()
+                else:
+                    # This should never happen, since if ``self.version`` is callable
+                    # and not async, then we would be using ``App.version_print``.
+                    # This is only here for completeness.
+                    version_raw = cast(str, self.version())
+            else:
+                version_raw = self.version
+        else:
+            version_raw = self._get_fallback_version_string()
+
+        self._format_and_print_version(version_raw, console)
 
     @property
     def subapps(self):
@@ -1054,9 +1166,6 @@ class App:
                     if help_flag_index is not None:
                         unused_tokens.pop(help_flag_index)
 
-                    if unused_tokens and not command_app.default_command:
-                        raise UnknownCommandError(unused_tokens=unused_tokens)
-
                     command = self.help_print
                     while meta_parent := meta_parent._meta_parent:
                         command = meta_parent.help_print
@@ -1064,16 +1173,17 @@ class App:
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 elif any(flag in tokens for flag in command_app.version_flags):
-                    # Version
-                    command = self.version_print
+                    command = _get_version_command(self)
                     while meta_parent := meta_parent._meta_parent:
-                        command = meta_parent.version_print
-                    bound = inspect.signature(command).bind()
+                        command = _get_version_command(meta_parent)
+
+                    bound = inspect.signature(command).bind(console=console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 else:
                     if command_app.default_command:
                         command = command_app.default_command
+                        validate_command(command)
                         argument_collection = command_app.assemble_argument_collection()
                         ignored: dict[str, Any] = {
                             argument.field_info.name: resolve_annotated(argument.field_info.annotation)
@@ -1284,6 +1394,111 @@ class App:
         return_value: Any
             The value the command function returns.
         """
+        # TODO: Create App.backend and use the same inheritance mechanism.
+        if tokens is None:
+            _log_framework_warning(_detect_test_framework())
+
+        tokens = normalize_tokens(tokens)
+
+        overrides = {
+            k: v
+            for k, v in {
+                "_console": console,
+                "print_error": print_error,
+                "exit_on_error": exit_on_error,
+                "help_on_error": help_on_error,
+                "verbose": verbose,
+            }.items()
+            if v is not None
+        }
+
+        with self.app_stack(tokens, overrides):
+            command, bound, _ = self.parse_args(
+                tokens,
+                console=console,
+                end_of_options_delimiter=end_of_options_delimiter,
+            )
+
+            try:
+                return _run_maybe_async_command(command, bound, backend)
+            except KeyboardInterrupt:
+                if self.suppress_keyboard_interrupt:
+                    sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
+                else:
+                    raise
+
+    async def run_async(
+        self,
+        tokens: Union[None, str, Iterable[str]] = None,
+        *,
+        console: Optional["Console"] = None,
+        print_error: bool = True,
+        exit_on_error: bool = True,
+        help_on_error: Optional[bool] = None,
+        verbose: bool = False,
+        end_of_options_delimiter: Optional[str] = None,
+    ):
+        """Async equivalent of :meth:`__call__` for use within existing event loops.
+
+        This method should be used when you're already in an async context
+        (e.g., Jupyter notebooks, existing async applications) and need to
+        execute a Cyclopts command without creating a new event loop.
+
+        Parameters
+        ----------
+        tokens : Union[None, str, Iterable[str]]
+            Either a string, or a list of strings to launch a command.
+            Defaults to ``sys.argv[1:]``.
+        console: rich.console.Console
+            Console to print help and runtime Cyclopts errors.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
+        print_error: bool
+            Print a rich-formatted error on error.
+            Defaults to :obj:`True`.
+        exit_on_error: bool
+            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            Otherwise, continue to raise the exception.
+            Defaults to ``True``.
+        help_on_error: bool
+            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
+            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
+        verbose: bool
+            Populate exception strings with more information intended for developers.
+            Defaults to :obj:`False`.
+        end_of_options_delimiter: Optional[str]
+            All tokens after this delimiter will be force-interpreted as positional arguments.
+            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
+            If that is not set, it will default to POSIX-standard ``"--"``.
+
+        Returns
+        -------
+        return_value: Any
+            The value the command function returns.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            import asyncio
+            from cyclopts import App
+
+            app = App()
+
+
+            @app.command
+            async def my_async_command():
+                await asyncio.sleep(1)
+                return "Done!"
+
+
+            # In an async context (e.g., Jupyter notebook or existing async app):
+            async def main():
+                result = await app.run_async(["my-async-command"])
+                print(result)  # Prints: Done!
+
+
+            asyncio.run(main())
+        """
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
 
@@ -1310,19 +1525,7 @@ class App:
 
             try:
                 if inspect.iscoroutinefunction(command):
-                    # We don't use anyio to avoid the dependency for non-async users.
-                    # anyio can auto-select the backend when you're already in an async context,
-                    # but here we're creating the top-level event loop & must select ourselves.
-                    if backend == "asyncio":
-                        import asyncio
-
-                        return asyncio.run(command(*bound.args, **bound.kwargs))
-                    elif backend == "trio":
-                        import trio
-
-                        return trio.run(partial(command, *bound.args, **bound.kwargs))
-                    else:  # pragma: no cover
-                        assert_never(backend)
+                    return await command(*bound.args, **bound.kwargs)
                 else:
                     return command(*bound.args, **bound.kwargs)
             except KeyboardInterrupt:
