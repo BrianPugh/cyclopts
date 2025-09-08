@@ -108,6 +108,13 @@ def _validate_default_command(x):
     return x
 
 
+def _get_version_command(app):
+    if callable(app.version) and inspect.iscoroutinefunction(app.version):
+        return app._version_print_async
+    else:
+        return app.version_print
+
+
 def _combined_meta_command_mapping(
     app: Optional["App"], recurse_meta=True, recurse_parent_meta=True
 ) -> dict[str, "App"]:
@@ -635,7 +642,6 @@ class App:
             else:
                 version_raw = self.version
         else:
-            # self.version is None, use fallback logic
             version_raw = self._get_fallback_version_string()
 
         self._format_and_print_version(version_raw, console)
@@ -667,7 +673,6 @@ class App:
             else:
                 version_raw = self.version
         else:
-            # self.version is None, use fallback logic
             version_raw = self._get_fallback_version_string()
 
         self._format_and_print_version(version_raw, console)
@@ -1159,16 +1164,10 @@ class App:
                 unused_tokens = []
                 argument_collection = ArgumentCollection()
             elif any(flag in tokens for flag in command_app.version_flags):
-                # Version - dynamically select sync or async handler
-                if callable(self.version) and inspect.iscoroutinefunction(self.version):
-                    command = self._version_print_async
-                else:
-                    command = self.version_print
+                command = _get_version_command(self)
                 while meta_parent := meta_parent._meta_parent:
-                    if callable(meta_parent.version) and inspect.iscoroutinefunction(meta_parent.version):
-                        command = meta_parent._version_print_async
-                    else:
-                        command = meta_parent.version_print
+                    command = _get_version_command(meta_parent)
+
                 bound = inspect.signature(command).bind(console=console)
                 unused_tokens = []
                 argument_collection = ArgumentCollection()
