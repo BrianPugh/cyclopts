@@ -21,6 +21,7 @@ from typing import (
     Sequence,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -67,12 +68,8 @@ if sys.version_info < (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     from typing import assert_never
 
-if sys.version_info < (3, 10):  # pragma: no cover
-    from importlib_metadata import PackageNotFoundError  # pyright: ignore[reportMissingImports]
-    from importlib_metadata import version as importlib_metadata_version  # pyright: ignore[reportMissingImports]
-else:  # pragma: no cover
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as importlib_metadata_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as importlib_metadata_version
 
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
@@ -105,42 +102,17 @@ def _get_root_module_name():
     raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
-def _default_version(default="0.0.0") -> str:
-    """Attempts to get the calling code's version.
-
-    Returns
-    -------
-    version: str
-        ``default`` if it cannot determine version.
-    """
-    try:
-        root_module_name = _get_root_module_name()
-    except _CannotDeriveCallingModuleNameError:  # pragma: no cover
-        return default
-
-    # Attempt to get the Distribution Package’s version number.
-    try:
-        return importlib_metadata_version(root_module_name)
-    except PackageNotFoundError:
-        pass
-
-    # Attempt packagename.__version__
-    # Not sure if this is redundant with ``importlib.metadata``,
-    # but there's no real harm in checking.
-    try:
-        module = importlib.import_module(root_module_name)
-        return module.__version__
-    except (ImportError, AttributeError):
-        pass
-
-    # Final fallback
-    return default
-
-
 def _validate_default_command(x):
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
     return x
+
+
+def _get_version_command(app):
+    if callable(app.version) and inspect.iscoroutinefunction(app.version):
+        return app._version_print_async
+    else:
+        return app.version_print
 
 
 def _combined_meta_command_mapping(
@@ -290,7 +262,9 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str]] = field(default=None, kw_only=True)
+    version: Union[None, str, Callable[..., str], Callable[..., Coroutine[Any, Any, str]]] = field(
+        default=None, kw_only=True
+    )
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -580,6 +554,70 @@ class App:
             out[x] = self[x]
         return out
 
+    def _get_fallback_version_string(self, default: str = "0.0.0") -> str:
+        """Get the version string with multiple fallback strategies.
+
+        First tries to derive from the instantiating module, then tries to get it
+        from the calling code's module, and finally falls back to a default.
+
+        Parameters
+        ----------
+        default : str
+            Default version to use if no version can be determined.
+
+        Returns
+        -------
+        str
+            Version string.
+        """
+        if self._instantiating_module is not None:
+            full_module_name = self._instantiating_module.__name__
+            root_module_name = full_module_name.split(".")[0]
+            try:
+                return importlib_metadata_version(root_module_name)
+            except PackageNotFoundError:
+                pass
+
+            try:
+                return self._instantiating_module.__version__  # type: ignore[attr-defined]
+            except AttributeError:
+                pass
+
+        try:
+            root_module_name = _get_root_module_name()
+        except _CannotDeriveCallingModuleNameError:  # pragma: no cover
+            return default
+
+        try:
+            return importlib_metadata_version(root_module_name)
+        except PackageNotFoundError:
+            pass
+
+        # Attempt packagename.__version__
+        # Not sure if this is redundant with ``importlib.metadata``,
+        # but there's no real harm in checking.
+        try:
+            module = importlib.import_module(root_module_name)
+            return module.__version__  # type: ignore[attr-defined]
+        except (ImportError, AttributeError):
+            pass
+
+        return default
+
+    def _format_and_print_version(self, version_raw: str, console: "Console") -> None:
+        """Format and print the version string.
+
+        Parameters
+        ----------
+        version_raw : str
+            Raw version string to format and print.
+        console : Console
+            Console to print to.
+        """
+        version_format = resolve_version_format([self])
+        version_formatted = InlineText.from_format(version_raw, format=version_format)
+        console.print(version_formatted)
+
     def version_print(
         self,
         console: Optional["Console"] = None,
@@ -594,25 +632,50 @@ class App:
 
         """
         console = self._resolve_console(None, console)
-        version_format = resolve_version_format([self])
 
-        version_raw = None
-        if self.version is None:
-            if self._instantiating_module is not None:
-                full_module_name = self._instantiating_module.__name__
-                root_module_name = full_module_name.split(".")[0]
-                try:
-                    version_raw = importlib_metadata_version(root_module_name)
-                except PackageNotFoundError:
-                    pass
+        if self.version is not None:
+            if callable(self.version):
+                # Note: async version callables are handled by _version_print_async
+                if inspect.iscoroutinefunction(self.version):
+                    raise ValueError("async version handler detected. Use App.run_async within an async context.")
+                version_raw = cast(str, self.version())
+            else:
+                version_raw = self.version
         else:
-            version_raw = self.version() if callable(self.version) else self.version
+            version_raw = self._get_fallback_version_string()
 
-        if not version_raw:
-            version_raw = _default_version()
+        self._format_and_print_version(version_raw, console)
 
-        version_formatted = InlineText.from_format(version_raw, format=version_format)
-        console.print(version_formatted)
+    async def _version_print_async(
+        self,
+        console: Optional["Console"] = None,
+    ) -> None:
+        """Async version of version_print for handling async version callables.
+
+        Parameters
+        ----------
+        console: rich.console.Console
+            Console to print version string to.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
+
+        """
+        console = self._resolve_console(None, console)
+
+        if self.version is not None:
+            if callable(self.version):
+                if inspect.iscoroutinefunction(self.version):
+                    version_raw = await self.version()
+                else:
+                    # This should never happen, since if ``self.version`` is callable
+                    # and not async, then we would be using ``App.version_print``.
+                    # This is only here for completeness.
+                    version_raw = cast(str, self.version())
+            else:
+                version_raw = self.version
+        else:
+            version_raw = self._get_fallback_version_string()
+
+        self._format_and_print_version(version_raw, console)
 
     @property
     def subapps(self):
@@ -1101,11 +1164,11 @@ class App:
                 unused_tokens = []
                 argument_collection = ArgumentCollection()
             elif any(flag in tokens for flag in command_app.version_flags):
-                # Version
-                command = self.version_print
+                command = _get_version_command(self)
                 while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.version_print
-                bound = inspect.signature(command).bind()
+                    command = _get_version_command(meta_parent)
+
+                bound = inspect.signature(command).bind(console=console)
                 unused_tokens = []
                 argument_collection = ArgumentCollection()
             else:
