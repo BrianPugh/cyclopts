@@ -668,6 +668,9 @@ class App:
                 if inspect.iscoroutinefunction(self.version):
                     version_raw = await self.version()
                 else:
+                    # This should never happen, since if ``self.version`` is callable
+                    # and not async, then we would be using ``App.version_print``.
+                    # This is only here for completeness.
                     version_raw = cast(Optional[str], self.version())
             else:
                 version_raw = self.version
