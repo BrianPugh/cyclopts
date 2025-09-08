@@ -21,6 +21,7 @@ from typing import (
     Sequence,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -290,7 +291,9 @@ class App:
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str], Callable[..., Coroutine[Any, Any, str]]] = field(default=None, kw_only=True)
+    version: Union[None, str, Callable[..., str], Callable[..., Coroutine[Any, Any, str]]] = field(
+        default=None, kw_only=True
+    )
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: Union[str, Iterable[str]] = field(
         default=["--version"],
@@ -580,6 +583,39 @@ class App:
             out[x] = self[x]
         return out
 
+    def _get_version_string_from_module(self) -> Optional[str]:
+        """Try to get version string from the instantiating module.
+
+        Returns
+        -------
+        Optional[str]
+            Version string if found, None otherwise.
+        """
+        if self._instantiating_module is not None:
+            full_module_name = self._instantiating_module.__name__
+            root_module_name = full_module_name.split(".")[0]
+            try:
+                return importlib_metadata_version(root_module_name)
+            except PackageNotFoundError:
+                pass
+        return None
+
+    def _format_and_print_version(self, version_raw: Optional[str], console: "Console") -> None:
+        """Format and print the version string.
+
+        Parameters
+        ----------
+        version_raw : Optional[str]
+            Raw version string to format and print.
+        console : Console
+            Console to print to.
+        """
+        version_format = resolve_version_format([self])
+        if not version_raw:
+            version_raw = _default_version()
+        version_formatted = InlineText.from_format(version_raw, format=version_format)
+        console.print(version_formatted)
+
     def version_print(
         self,
         console: Optional["Console"] = None,
@@ -594,33 +630,49 @@ class App:
 
         """
         console = self._resolve_console(None, console)
-        version_format = resolve_version_format([self])
 
-        version_raw = None
+        version_raw: Optional[str] = None
         if self.version is None:
-            if self._instantiating_module is not None:
-                full_module_name = self._instantiating_module.__name__
-                root_module_name = full_module_name.split(".")[0]
-                try:
-                    version_raw = importlib_metadata_version(root_module_name)
-                except PackageNotFoundError:
-                    pass
+            version_raw = self._get_version_string_from_module()
         else:
             if callable(self.version):
+                # Note: async version callables are handled by _version_print_async
                 if inspect.iscoroutinefunction(self.version):
-                    # For async version callables, use asyncio as the default backend
-                    import asyncio
-                    version_raw = asyncio.run(self.version())
-                else:
-                    version_raw = self.version()
+                    raise ValueError("async version handler detected. Use App.run_async within an async context.")
+                version_raw = cast(Optional[str], self.version())
             else:
                 version_raw = self.version
 
-        if not version_raw:
-            version_raw = _default_version()
+        self._format_and_print_version(version_raw, console)
 
-        version_formatted = InlineText.from_format(version_raw, format=version_format)
-        console.print(version_formatted)
+    async def _version_print_async(
+        self,
+        console: Optional["Console"] = None,
+    ) -> None:
+        """Async version of version_print for handling async version callables.
+
+        Parameters
+        ----------
+        console: rich.console.Console
+            Console to print version string to.
+            If not provided, follows the resolution order defined in :attr:`App.console`.
+
+        """
+        console = self._resolve_console(None, console)
+
+        version_raw: Optional[str] = None
+        if self.version is None:
+            version_raw = self._get_version_string_from_module()
+        else:
+            if callable(self.version):
+                if inspect.iscoroutinefunction(self.version):
+                    version_raw = await self.version()
+                else:
+                    version_raw = cast(Optional[str], self.version())
+            else:
+                version_raw = self.version
+
+        self._format_and_print_version(version_raw, console)
 
     @property
     def subapps(self):
@@ -1109,11 +1161,17 @@ class App:
                 unused_tokens = []
                 argument_collection = ArgumentCollection()
             elif any(flag in tokens for flag in command_app.version_flags):
-                # Version
-                command = self.version_print
+                # Version - dynamically select sync or async handler
+                if callable(self.version) and inspect.iscoroutinefunction(self.version):
+                    command = self._version_print_async
+                else:
+                    command = self.version_print
                 while meta_parent := meta_parent._meta_parent:
-                    command = meta_parent.version_print
-                bound = inspect.signature(command).bind()
+                    if callable(meta_parent.version) and inspect.iscoroutinefunction(meta_parent.version):
+                        command = meta_parent._version_print_async
+                    else:
+                        command = meta_parent.version_print
+                bound = inspect.signature(command).bind(console=console)
                 unused_tokens = []
                 argument_collection = ArgumentCollection()
             else:

@@ -68,13 +68,53 @@ def test_version_print_help_format_override(app, console):
 
 
 def test_version_print_custom_async_callable(app, console):
-    """Test that async callables work for version."""
+    """Test that async callables work for version via command-line."""
+
     async def my_async_version():
         return "**async-foo**"
 
     app.version = my_async_version
 
+    # Test via command-line invocation (uses _run_maybe_async_command)
     with console.capture() as capture:
-        app.version_print(console)
+        app(["--version"], console=console)
 
     assert "async-foo\n" == capture.get()
+
+
+def test_version_print_async_in_async_context(app, console):
+    """Test that async version callables work when called from within an async context."""
+    import asyncio
+
+    async def my_async_version():
+        # Verify we're in an async context
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return "ERROR: Not in async context"
+        return "**async-version-from-async-context**"
+
+    app.version = my_async_version
+
+    async def run_test():
+        with console.capture() as capture:
+            # This should use _version_print_async and not create a new event loop
+            await app.run_async(["--version"], console=console)
+        return capture.get()
+
+    result = asyncio.run(run_test())
+    assert "async-version-from-async-context\n" == result
+
+
+def test_version_print_sync_callable_end_to_end(app, console):
+    """Test that vanilla sync version callables works end-to-end."""
+
+    def my_sync_version():
+        return "**sync-foo**"
+
+    app.version = my_sync_version
+
+    with console.capture() as capture:
+        app(["--version"], console=console)
+
+    assert "sync-foo\n" == capture.get()
