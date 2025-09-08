@@ -213,7 +213,7 @@ There are a few ways to add a help string to a command:
 -----
 Async
 -----
-Cyclopts also works with **async** commands:
+Cyclopts also works with **async** commands; when an async command is encountered, an event loop will be automatically created using the specified ``backend`` parameter (default :mod:`asyncio`).
 
 .. code-block:: python
 
@@ -227,6 +227,14 @@ Cyclopts also works with **async** commands:
        await asyncio.sleep(10)
 
    app()
+
+When calling from within an existing async context, :keyword:`await` the async method :meth:`~cyclopts.App.run_async`:
+
+.. code-block:: python
+
+   async def main():
+       result = await app.run_async(["foo"])
+       # Instead of: app(["foo"]) which would raise RuntimeError
 
 --------------------------
 Decorated Function Details
