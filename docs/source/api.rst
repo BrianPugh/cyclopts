@@ -388,6 +388,33 @@ API
       If the application receives a keyboard interrupt (Ctrl-C), suppress the error message and exit gracefully.
       Set to :obj:`False` to let :class:`KeyboardInterrupt` propagate normally.
 
+   .. attribute:: backend
+      :type: Optional[Literal["asyncio", "trio"]]
+      :value: None
+
+      The async backend to use when executing async commands.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to ``"asyncio"``.
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(backend="asyncio")
+
+         @app.default
+         async def main():
+             await some_async_operation()
+
+         app()
+
+      The backend can also be overridden on a per-call basis:
+
+      .. code-block:: python
+
+         app(backend="trio")  # Override the app's backend for this call
+
 .. autoclass:: cyclopts.Parameter
    :special-members: __call__
 

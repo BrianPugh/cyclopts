@@ -330,6 +330,8 @@ class App:
 
     suppress_keyboard_interrupt: bool = field(default=True, kw_only=True)
 
+    backend: Optional[Literal["asyncio", "trio"]] = field(default=None, kw_only=True)
+
     ######################
     # Private Attributes #
     ######################
@@ -1355,7 +1357,7 @@ class App:
         help_on_error: Optional[bool] = None,
         verbose: Optional[bool] = None,
         end_of_options_delimiter: Optional[str] = None,
-        backend: Literal["asyncio", "trio"] = "asyncio",
+        backend: Optional[Literal["asyncio", "trio"]] = None,
     ):
         """Interprets and executes a command.
 
@@ -1384,9 +1386,9 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
-        backend: Literal["asyncio", "trio"]
-            The async backend to use (if an async command is invoked).
-            Defaults to asyncio.
+        backend: Optional[Literal["asyncio", "trio"]]
+            Override the async backend to use (if an async command is invoked).
+            If :obj:`None`, inherits from :attr:`App.backend`, eventually defaulting to "asyncio".
             If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
 
         Returns
@@ -1394,7 +1396,6 @@ class App:
         return_value: Any
             The value the command function returns.
         """
-        # TODO: Create App.backend and use the same inheritance mechanism.
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
 
@@ -1408,6 +1409,7 @@ class App:
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
                 "verbose": verbose,
+                "backend": backend,
             }.items()
             if v is not None
         }
@@ -1419,8 +1421,9 @@ class App:
                 end_of_options_delimiter=end_of_options_delimiter,
             )
 
+            resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
             try:
-                return _run_maybe_async_command(command, bound, backend)
+                return _run_maybe_async_command(command, bound, resolved_backend)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
