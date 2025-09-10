@@ -295,7 +295,7 @@ class HelpPanel:
     entries: list[TableEntry] = field(factory=list)
 
     table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(preset=self.format), takes_self=True))
-    panel_spec: PanelSpec = field(default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
+    panel_spec: PanelSpec = field(default=Factory(PanelSpec))
 
     def remove_duplicates(self):
         seen, out = set(), []
@@ -347,7 +347,10 @@ class HelpPanel:
         table_spec.add_entries(table, self.entries)
 
         # 3. Final make the panel
-        panel = self.panel_spec.build(RichGroup(panel_description, table))
+        if self.panel_spec.title is None:
+            panel = self.panel_spec.build(RichGroup(panel_description, table), title=self.title)
+        else:
+            panel = self.panel_spec.build(RichGroup(panel_description, table))
 
         yield panel
 
@@ -478,11 +481,20 @@ def create_parameter_help_panel(
 ) -> HelpPanel:
     from rich.text import Text
 
-    help_panel = HelpPanel(
-        format="parameter",
-        title=group.name,
-        description=InlineText.from_format(group.help, format=format, force_empty_end=True) if group.help else Text(),
-    )
+    kwargs = {
+        "format": "parameter",
+        "title": group.name,
+        "description": InlineText.from_format(group.help, format=format, force_empty_end=True)
+        if group.help
+        else Text(),
+    }
+
+    if group.table_spec is not None:
+        kwargs["table_spec"] = group.table_spec
+    if group.panel_spec is not None:
+        kwargs["panel_spec"] = group.panel_spec
+
+    help_panel = HelpPanel(**kwargs)
 
     def help_append(text, style):
         if help_components:

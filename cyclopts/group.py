@@ -15,6 +15,7 @@ from cyclopts.utils import UNSET, Sentinel, SortHelper, frozen, is_iterable, res
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
+    from cyclopts.help.specs import PanelSpec, TableSpec
     from cyclopts.parameter import Parameter
 
 
@@ -87,6 +88,9 @@ class Group:
         kw_only=True,
     )
 
+    table_spec: Optional["TableSpec"] = field(default=None, kw_only=True)
+    panel_spec: Optional["PanelSpec"] = field(default=None, kw_only=True)
+
     @property
     def name(self) -> str:
         return "" if type(self._name) is object else self._name
@@ -112,7 +116,18 @@ class Group:
         return cls(name, sort_key=DEFAULT_COMMANDS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_ordered(cls, name="", help="", *, show=None, sort_key=None, validator=None, default_parameter=None):
+    def create_ordered(
+        cls,
+        name="",
+        help="",
+        *,
+        show=None,
+        sort_key=None,
+        validator=None,
+        default_parameter=None,
+        table_spec=None,
+        panel_spec=None,
+    ):
         """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
         Used to create a group that will be displayed **after** a previously instantiated :meth:`Group.create_ordered` group on the help-page.
@@ -136,6 +151,10 @@ class Group:
             Group validator to collectively apply.
         default_parameter: Optional[cyclopts.Parameter]
             Default parameter for elements within the group.
+        table_spec: Optional[cyclopts.help.TableSpec]
+            Custom table specification for this group's help display.
+        panel_spec: Optional[cyclopts.help.PanelSpec]
+            Custom panel specification for this group's help display.
         """
         count = next(_sort_key_counter)
         if sort_key is None:
@@ -151,6 +170,8 @@ class Group:
             sort_key=sort_key,
             validator=validator,
             default_parameter=default_parameter,
+            table_spec=table_spec,
+            panel_spec=panel_spec,
         )
 
 

@@ -243,8 +243,8 @@ class PanelSpec:
     StyleType = Union[Style, str]
 
     # Content-independent panel chrome
-    title: RenderableType = ""
-    subtitle: RenderableType = ""
+    title: Optional[RenderableType] = None
+    subtitle: Optional[RenderableType] = None
     title_align: Literal["left", "center", "right"] = "left"
     subtitle_align: Literal["left", "center", "right"] = "center"
     style: Optional[StyleType] = "none"
@@ -259,8 +259,6 @@ class PanelSpec:
     def build(self, renderable: RenderableType, **overrides) -> Panel:
         """Create a Panel around `renderable`. Use kwargs to override spec per render."""
         opts = {
-            "title": self.title,
-            "subtitle": self.subtitle,
             "title_align": self.title_align,
             "subtitle_align": self.subtitle_align,
             "style": self.style,
@@ -272,6 +270,11 @@ class PanelSpec:
             "height": self.height,
             "safe_box": self.safe_box,
         }
+        if self.title is not None:
+            opts["title"] = self.title
+        if self.subtitle is not None:
+            opts["subtitle"] = self.subtitle
+
         opts.update(overrides)
         return Panel(renderable, **opts)
 
