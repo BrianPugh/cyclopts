@@ -1612,10 +1612,12 @@ class App:
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
-                    command_panel = HelpPanel(
-                        format="command",
-                        title=group.name,
-                    )
+                    kwargs = {}
+                    if group.table_spec is not None:
+                        kwargs["table_spec"] = group.table_spec
+                    if group.panel_spec is not None:
+                        kwargs["panel_spec"] = group.panel_spec
+                    command_panel = HelpPanel(title=group.name, format="command", **kwargs)
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
