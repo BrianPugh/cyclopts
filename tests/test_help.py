@@ -16,6 +16,8 @@ from cyclopts.help import (
     format_command_entries,
     format_usage,
 )
+from cyclopts.help.formatters import format_plain
+from cyclopts.help.formatters.default import _render_panel_rich
 
 
 @pytest.fixture
@@ -27,8 +29,6 @@ def app():
 
 
 def test_empty_help_panel_rich_silent(console):
-    from cyclopts.help.formatters import _render_panel_rich
-
     help_panel = HelpPanel(format="command", title="test")
     rendered = _render_panel_rich(help_panel, console)
 
@@ -157,8 +157,6 @@ def test_help_format_usage_command(app, console):
 
 
 def test_format_commands_docstring(app, console):
-    from cyclopts.help.formatters import _render_panel_rich
-
     @app.command
     def foo():
         """Docstring for foo.
@@ -192,7 +190,6 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
         * https://github.com/BrianPugh/cyclopts/issues/393
         * https://github.com/BrianPugh/cyclopts/issues/402
     """
-    from cyclopts.help.formatters import _render_panel_rich
 
     @app.command
     def foo():
@@ -252,8 +249,6 @@ def test_format_commands_no_show(app, console, assert_parse_args):
 
 
 def test_format_commands_explicit_help(app, console):
-    from cyclopts.help.formatters import _render_panel_rich
-
     @app.command(help="Docstring for foo.")
     def foo():
         """Should not be shown."""
@@ -274,8 +269,6 @@ def test_format_commands_explicit_help(app, console):
 
 
 def test_format_commands_explicit_name(app, console):
-    from cyclopts.help.formatters import _render_panel_rich
-
     @app.command(name="bar")
     def foo():
         """Docstring for bar.
@@ -409,8 +402,6 @@ def test_format_choices_rich_format(app, console, assert_parse_args):
 
 @pytest.fixture
 def capture_format_group_parameters(console, default_function_groups):
-    from cyclopts.help.formatters import _render_panel_rich
-
     def inner(cmd):
         argument_collection = ArgumentCollection._from_callable(
             cmd,
@@ -2008,8 +1999,6 @@ def test_issue_373_help_space_with_meta_app(app, console):
 @pytest.mark.skip(reason="WIP")
 def test_format_plain_formatter(console):
     """Test that format_plain formatter produces correct plain text output."""
-    from cyclopts.help.formatters import format_plain
-
     app = App(
         name="test_app",
         help="Test application for format_plain",
