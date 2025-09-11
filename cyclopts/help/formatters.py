@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 from cyclopts.help.silent import SILENT
 
 
-def format_rich(
+def format_default(
     help_panels: list["HelpPanel"],
     usage: Any,
     description: Any,

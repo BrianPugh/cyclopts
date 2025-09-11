@@ -1558,7 +1558,7 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
         from cyclopts.help import format_doc, format_usage
-        from cyclopts.help.formatters import format_rich
+        from cyclopts.help.formatters import format_default
 
         tokens = normalize_tokens(tokens)
 
@@ -1586,7 +1586,7 @@ class App:
             help_panels = self._assemble_help_panels(tokens, help_format)
 
             # Use formatter to render everything
-            formatter = executing_app.app_stack.resolve("help_formatter", fallback=format_rich)
+            formatter = executing_app.app_stack.resolve("help_formatter", fallback=format_default)
             formatter(help_panels, usage, description, console)
 
     def _assemble_help_panels(
