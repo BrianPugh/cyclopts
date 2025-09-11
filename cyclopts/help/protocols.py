@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType
@@ -56,8 +56,8 @@ class HelpFormatter(Protocol):
         help_panels: list["HelpPanel"],
         usage: Any,
         description: Any,
-        console: Optional["Console"] = None,
-    ) -> "RenderableType":
+        console: "Console",
+    ) -> None:
         """Format and render all help components.
 
         Parameters
@@ -68,7 +68,7 @@ class HelpFormatter(Protocol):
             The usage line to display.
         description : Any
             The app/command description to display.
-        console : Optional[Console]
-            Console to render to (for Rich-based formatters).
+        console : Console
+            Console to render to.
         """
         ...

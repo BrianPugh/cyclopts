@@ -2003,3 +2003,47 @@ def test_issue_373_help_space_with_meta_app(app, console):
         """
     )
     assert actual == expected
+
+
+@pytest.mark.skip(reason="WIP")
+def test_format_plain_formatter(console):
+    """Test that format_plain formatter produces correct plain text output."""
+    from cyclopts.help.formatters import format_plain
+
+    app = App(
+        name="test_app",
+        help="Test application for format_plain",
+        help_formatter=format_plain,
+    )
+
+    @app.command
+    def cmd1(arg: str = "default"):
+        """First test command."""
+        print(f"cmd1 with {arg}")
+
+    @app.command
+    def cmd2(required: int, optional: bool = False):
+        """Second test command."""
+        print(f"cmd2 with {required} and {optional}")
+
+    @app.default
+    def main(verbose: bool = False):
+        """Main function with a parameter."""
+        print(f"verbose={verbose}")
+
+    # Capture the help output
+    with console.capture() as capture:
+        try:
+            app(["--help"], console=console)
+        except SystemExit:
+            # Help normally exits, which is expected
+            pass
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        TODO
+        """
+    )
+    assert actual == expected
