@@ -10,7 +10,7 @@ from rich.style import Style
 from rich.table import Table
 
 from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
-from cyclopts.help.formatters import wrap_formatter
+from cyclopts.help.utils import wrap_formatter
 from cyclopts.utils import frozen, to_tuple_converter
 
 if TYPE_CHECKING:

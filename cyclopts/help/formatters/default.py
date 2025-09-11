@@ -2,33 +2,33 @@
 
 from typing import TYPE_CHECKING, Any, Optional
 
+from attrs import define
+
+from cyclopts.help.silent import SILENT
+
 if TYPE_CHECKING:
     from rich.console import Console, RenderableType
 
     from cyclopts.help import HelpPanel
     from cyclopts.help.specs import PanelSpec, TableSpec
 
-from cyclopts.help.silent import SILENT
 
-
-class RichFormatter:
-    """Rich-based help formatter with customizable table and panel specs.
+@define
+class DefaultFormatter:
+    """Default help formatter using Rich library with customizable table and panel specs.
 
     Parameters
     ----------
     table_spec : Optional[TableSpec]
-        Default table specification for rendering parameter/command tables.
-    panel_spec : Optional[PanelSpec]
-        Default panel specification for rendering help panels.
+        Table specification for rendering parameter/command tables.
+        If not provided, a default TableSpec will be created based on panel format.
+    panel_spec : PanelSpec
+        Panel specification for rendering help panels.
+        If not provided, a default PanelSpec will be created.
     """
 
-    def __init__(
-        self,
-        table_spec: Optional["TableSpec"] = None,
-        panel_spec: Optional["PanelSpec"] = None,
-    ):
-        self.table_spec = table_spec
-        self.panel_spec = panel_spec
+    table_spec: Optional["TableSpec"] = None
+    panel_spec: Optional["PanelSpec"] = None
 
     def __call__(
         self,
@@ -93,6 +93,8 @@ class RichFormatter:
         from rich.console import NewLine
         from rich.text import Text
 
+        from cyclopts.help.specs import PanelSpec, TableSpec
+
         panel_description = help_panel.description
         if isinstance(panel_description, Text):
             panel_description.end = ""
@@ -100,9 +102,8 @@ class RichFormatter:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        # Use formatter's specs if provided, otherwise use panel's specs
-        table_spec = self.table_spec or help_panel.table_spec
-        panel_spec = self.panel_spec or help_panel.panel_spec
+        table_spec = self.table_spec or TableSpec(preset=help_panel.format)
+        panel_spec = self.panel_spec or PanelSpec()
 
         # Realize spec, build table, and add entries
         table_spec = table_spec.realize_columns(console, console.options, help_panel.entries)

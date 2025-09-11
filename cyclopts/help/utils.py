@@ -1,4 +1,4 @@
-"""Utility functions for help formatters."""
+"""Utility functions for help system."""
 
 from typing import TYPE_CHECKING
 

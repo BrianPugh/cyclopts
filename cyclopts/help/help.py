@@ -18,7 +18,7 @@ from typing import (
     get_origin,
 )
 
-from attrs import Factory, define, evolve, field
+from attrs import define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
@@ -26,7 +26,6 @@ from cyclopts.core import _get_root_module_name
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.help.silent import SILENT
-from cyclopts.help.specs import PanelSpec, TableSpec
 from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
@@ -274,29 +273,14 @@ class TableEntry:
 
 @define
 class HelpPanel:
-    """Adjust the Format for the help panel!."""
+    """Data container for help panel information."""
 
-    from rich.box import ROUNDED, Box
-    from rich.console import Group as RichGroup
-    from rich.console import NewLine, RenderableType
-    from rich.panel import Panel
-    from rich.table import Column, Table
-    from rich.text import Text
+    from rich.console import RenderableType
 
-    # TODO: This is _only_ here for convenience to be passed to table_spec
-    #       otherwise, we could instantiate this panel and then
-    #       instantiate the table_spec with the correct format.
-    #
-    # I.E) Without this, to make a HelpPanel we'll have to make and
-    #       pass a list of column specs.
     format: str  # Literal["command", "parameter"]
-
     title: RenderableType
     description: RenderableType = field(factory=_text_factory)
     entries: list[TableEntry] = field(factory=list)
-
-    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(preset=self.format), takes_self=True))
-    panel_spec: PanelSpec = field(default=Factory(PanelSpec))
 
     def remove_duplicates(self):
         seen, out = set(), []

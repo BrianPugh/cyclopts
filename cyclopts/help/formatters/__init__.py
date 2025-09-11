@@ -1,11 +1,9 @@
 """Help formatters for Cyclopts."""
 
-from .default import RichFormatter
+from .default import DefaultFormatter
 from .plain import PlainFormatter
-from .utils import wrap_formatter
 
 __all__ = [
-    "RichFormatter",
+    "DefaultFormatter",
     "PlainFormatter",
-    "wrap_formatter",
 ]

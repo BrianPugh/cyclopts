@@ -1558,6 +1558,7 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
         from cyclopts.help import format_doc, format_usage
+        from cyclopts.help.formatters import DefaultFormatter
 
         tokens = normalize_tokens(tokens)
 
@@ -1584,12 +1585,8 @@ class App:
             # Prepare panels with their associated groups
             help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
 
-            # Get default formatter for app-level content
-            from cyclopts.help.formatters.default import RichFormatter
-
-            default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=RichFormatter())
-
             # Render usage
+            default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=DefaultFormatter())
             if hasattr(default_formatter, "render_usage"):
                 default_formatter.render_usage(usage, console)
             elif usage:
