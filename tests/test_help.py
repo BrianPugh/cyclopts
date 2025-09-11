@@ -16,8 +16,7 @@ from cyclopts.help import (
     format_command_entries,
     format_usage,
 )
-from cyclopts.help.formatters import format_plain
-from cyclopts.help.formatters.default import _render_panel_rich
+from cyclopts.help.formatters import PlainFormatter, RichFormatter
 
 
 @pytest.fixture
@@ -30,7 +29,8 @@ def app():
 
 def test_empty_help_panel_rich_silent(console):
     help_panel = HelpPanel(format="command", title="test")
-    rendered = _render_panel_rich(help_panel, console)
+    formatter = RichFormatter()
+    rendered = formatter._render_panel(help_panel, console)
 
     with console.capture() as capture:
         console.print(rendered)
@@ -166,7 +166,8 @@ def test_format_commands_docstring(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
-    rendered = _render_panel_rich(panel, console)
+    formatter = RichFormatter()
+    rendered = formatter._render_panel(panel, console)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -200,7 +201,8 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
-    rendered = _render_panel_rich(panel, console)
+    formatter = RichFormatter()
+    rendered = formatter._render_panel(panel, console)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -256,7 +258,8 @@ def test_format_commands_explicit_help(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
-    rendered = _render_panel_rich(panel, console)
+    formatter = RichFormatter()
+    rendered = formatter._render_panel(panel, console)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -279,7 +282,8 @@ def test_format_commands_explicit_name(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
-    rendered = _render_panel_rich(panel, console)
+    formatter = RichFormatter()
+    rendered = formatter._render_panel(panel, console)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -413,7 +417,8 @@ def capture_format_group_parameters(console, default_function_groups):
             group = argument_collection.groups[0]
             group_argument_collection = argument_collection.filter_by(group=group)
             panel = create_parameter_help_panel(group, group_argument_collection, "restructuredtext")
-            rendered = _render_panel_rich(panel, console)
+            formatter = RichFormatter()
+            rendered = formatter._render_panel(panel, console)
             console.print(rendered)
 
         return capture.get()
@@ -1998,11 +2003,11 @@ def test_issue_373_help_space_with_meta_app(app, console):
 
 @pytest.mark.skip(reason="WIP")
 def test_format_plain_formatter(console):
-    """Test that format_plain formatter produces correct plain text output."""
+    """Test that PlainFormatter produces correct plain text output."""
     app = App(
         name="test_app",
-        help="Test application for format_plain",
-        help_formatter=format_plain,
+        help="Test application for PlainFormatter",
+        help_formatter=PlainFormatter(),
     )
 
     @app.command

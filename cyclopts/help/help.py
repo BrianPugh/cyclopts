@@ -450,11 +450,6 @@ def create_parameter_help_panel(
         else Text(),
     }
 
-    if group.table_spec is not None:
-        kwargs["table_spec"] = group.table_spec
-    if group.panel_spec is not None:
-        kwargs["panel_spec"] = group.panel_spec
-
     help_panel = HelpPanel(**kwargs)
 
     def help_append(text, style):

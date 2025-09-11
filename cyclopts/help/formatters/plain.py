@@ -1,6 +1,6 @@
 """Plain text help formatter for improved accessibility."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -80,138 +80,42 @@ def _split_parameter_names(name: str) -> list[str]:
     return names
 
 
-def _format_parameter_entry(
-    name: str,
-    short: str,
-    desc: str,
-    console: "Console",
-) -> None:
-    """Format and print a parameter entry.
+class PlainFormatter:
+    """Plain text formatter for improved accessibility.
 
     Parameters
     ----------
-    name : str
-        Parameter name(s).
-    short : str
-        Short form of the parameter.
-    desc : str
-        Parameter description.
-    console : Console
-        Console to print to.
+    indent_width : int
+        Number of spaces to indent entries (default: 2).
+    max_width : Optional[int]
+        Maximum line width for wrapping text.
     """
-    names = _split_parameter_names(name)
 
-    # Print each option name
-    for i, option_name in enumerate(names):
-        if i == 0 and desc:
-            # First option gets the description
-            if short:
-                console.print(f"  {option_name}, {short}: {desc}")
-            else:
-                console.print(f"  {option_name}: {desc}")
-        else:
-            console.print(f"  {option_name}")
+    def __init__(
+        self,
+        indent_width: int = 2,
+        max_width: Optional[int] = None,
+    ):
+        self.indent_width = indent_width
+        self.max_width = max_width
+        self.indent = " " * indent_width
 
+    def __call__(
+        self,
+        panel: "HelpPanel",
+        console: "Console",
+    ) -> None:
+        """Format and render a single help panel as plain text.
 
-def _format_command_entry(
-    name: str,
-    short: str,
-    desc: str,
-    console: "Console",
-) -> None:
-    """Format and print a command entry.
-
-    Parameters
-    ----------
-    name : str
-        Command name(s).
-    short : str
-        Short form of the command.
-    desc : str
-        Command description.
-    console : Console
-        Console to print to.
-    """
-    # Check if name has newlines (for commands with multiple names)
-    name_lines = name.split("\n") if name else []
-
-    if len(name_lines) > 1:
-        # Multiple option names on separate lines
-        for i, line in enumerate(name_lines):
-            line = line.strip()
-            if line:
-                if i == 0:
-                    # First line gets short form and description
-                    parts = [line]
-                    if short:
-                        parts.append(", " + short)
-                    entry_name = " ".join(parts)
-                    if desc:
-                        console.print(f"  {entry_name}: {desc}")
-                    else:
-                        console.print(f"  {entry_name}")
-                else:
-                    # Additional lines
-                    console.print(f"  {line}")
-    elif name:
-        # Single name
-        parts = []
-        if name:
-            parts.append(name)
-        if short:
-            parts.append(", " + short)
-
-        entry_name = " ".join(parts)
-
-        if desc:
-            console.print(f"  {entry_name}: {desc}")
-        else:
-            console.print(f"  {entry_name}")
-    elif short:
-        # Only short name
-        if desc:
-            console.print(f"  {short}: {desc}")
-        else:
-            console.print(f"  {short}")
-
-
-def format_plain(
-    help_panels: list["HelpPanel"],
-    usage: Any,
-    description: Any,
-    console: "Console",
-) -> None:
-    """Format help as plain text without Rich formatting.
-
-    Parameters
-    ----------
-    help_panels : list[HelpPanel]
-        List of help panels to render.
-    usage : Any
-        The usage line (Text or str).
-    description : Any
-        The description (can be various Rich renderables).
-    console : Console
-        Console to render to.
-    """
-    # Print usage line
-    if usage:
-        usage_text = _to_plain_text(usage, console)
-        if usage_text:
-            console.print(usage_text)
-
-    # Print description with blank line after usage
-    if description:
-        desc_text = _to_plain_text(description, console)
-        if desc_text:
-            if usage:  # Only add blank line if there was usage text
-                console.print("")
-            console.print(desc_text)
-
-    # Print help panels
-    for panel in help_panels:
+        Parameters
+        ----------
+        panel : HelpPanel
+            Help panel to render.
+        console : Console
+            Console to render to.
+        """
         if not panel.entries:
-            continue
+            return
 
         # Print panel title with appropriate formatting
         if panel.title:
@@ -228,8 +132,142 @@ def format_plain(
             # Format the entry line
             if name or short:
                 # Handle parameters section specially - names might be concatenated
-                if panel.title == "Parameters" and name:  # TODO: this is wrong; don't rely on title name.
-                    _format_parameter_entry(name, short, desc, console)
+                if panel.format == "parameter" and name:
+                    self._format_parameter_entry(name, short, desc, console)
                 else:
                     # For commands or other panels
-                    _format_command_entry(name, short, desc, console)
+                    self._format_command_entry(name, short, desc, console)
+
+    def render_usage(
+        self,
+        usage: Any,
+        console: "Console",
+    ) -> None:
+        """Render the usage line.
+
+        Parameters
+        ----------
+        usage : Any
+            The usage line (Text or str).
+        console : Console
+            Console to render to.
+        """
+        if usage:
+            usage_text = _to_plain_text(usage, console)
+            if usage_text:
+                console.print(usage_text)
+
+    def render_description(
+        self,
+        description: Any,
+        console: "Console",
+    ) -> None:
+        """Render the description.
+
+        Parameters
+        ----------
+        description : Any
+            The description (can be various Rich renderables).
+        console : Console
+            Console to render to.
+        """
+        if description:
+            desc_text = _to_plain_text(description, console)
+            if desc_text:
+                console.print("")
+                console.print(desc_text)
+
+    def _format_parameter_entry(
+        self,
+        name: str,
+        short: str,
+        desc: str,
+        console: "Console",
+    ) -> None:
+        """Format and print a parameter entry.
+
+        Parameters
+        ----------
+        name : str
+            Parameter name(s).
+        short : str
+            Short form of the parameter.
+        desc : str
+            Parameter description.
+        console : Console
+            Console to print to.
+        """
+        names = _split_parameter_names(name)
+
+        # Print each option name
+        for i, option_name in enumerate(names):
+            if i == 0 and desc:
+                # First option gets the description
+                if short:
+                    console.print(f"{self.indent}{option_name}, {short}: {desc}")
+                else:
+                    console.print(f"{self.indent}{option_name}: {desc}")
+            else:
+                console.print(f"{self.indent}{option_name}")
+
+    def _format_command_entry(
+        self,
+        name: str,
+        short: str,
+        desc: str,
+        console: "Console",
+    ) -> None:
+        """Format and print a command entry.
+
+        Parameters
+        ----------
+        name : str
+            Command name(s).
+        short : str
+            Short form of the command.
+        desc : str
+            Command description.
+        console : Console
+            Console to print to.
+        """
+        # Check if name has newlines (for commands with multiple names)
+        name_lines = name.split("\n") if name else []
+
+        if len(name_lines) > 1:
+            # Multiple option names on separate lines
+            for i, line in enumerate(name_lines):
+                line = line.strip()
+                if line:
+                    if i == 0:
+                        # First line gets short form and description
+                        parts = [line]
+                        if short:
+                            parts.append(", " + short)
+                        entry_name = " ".join(parts)
+                        if desc:
+                            console.print(f"{self.indent}{entry_name}: {desc}")
+                        else:
+                            console.print(f"{self.indent}{entry_name}")
+                    else:
+                        # Additional lines
+                        console.print(f"{self.indent}{line}")
+        elif name:
+            # Single name
+            parts = []
+            if name:
+                parts.append(name)
+            if short:
+                parts.append(", " + short)
+
+            entry_name = " ".join(parts)
+
+            if desc:
+                console.print(f"{self.indent}{entry_name}: {desc}")
+            else:
+                console.print(f"{self.indent}{entry_name}")
+        elif short:
+            # Only short name
+            if desc:
+                console.print(f"{self.indent}{short}: {desc}")
+            else:
+                console.print(f"{self.indent}{short}")

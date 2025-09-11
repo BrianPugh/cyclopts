@@ -1558,7 +1558,6 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
         from cyclopts.help import format_doc, format_usage
-        from cyclopts.help.formatters import format_default
 
         tokens = normalize_tokens(tokens)
 
@@ -1582,18 +1581,38 @@ class App:
             help_format = executing_app.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
             description = format_doc(executing_app, help_format)
 
-            # Prepare panels
-            help_panels = self._assemble_help_panels(tokens, help_format)
+            # Prepare panels with their associated groups
+            help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
 
-            # Use formatter to render everything
-            formatter = executing_app.app_stack.resolve("help_formatter", fallback=format_default)
-            formatter(help_panels, usage, description, console)
+            # Get default formatter for app-level content
+            from cyclopts.help.formatters.default import RichFormatter
+
+            default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=RichFormatter())
+
+            # Render usage
+            if hasattr(default_formatter, "render_usage"):
+                default_formatter.render_usage(usage, console)
+            elif usage:
+                console.print(usage)
+
+            # Render description
+            if hasattr(default_formatter, "render_description"):
+                default_formatter.render_description(description, console)
+            elif description:
+                console.print(description)
+
+            # Render each panel with its group's formatter (or default)
+            for group, panel in help_panels_with_groups:
+                formatter = group.help_formatter if group else None
+                if formatter is None:
+                    formatter = default_formatter
+                formatter(panel, console)
 
     def _assemble_help_panels(
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> list["HelpPanel"]:
+    ) -> list[tuple[Optional["Group"], "HelpPanel"]]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -1621,12 +1640,7 @@ class App:
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
-                    kwargs = {}
-                    if group.table_spec is not None:
-                        kwargs["table_spec"] = group.table_spec
-                    if group.panel_spec is not None:
-                        kwargs["panel_spec"] = group.panel_spec
-                    command_panel = HelpPanel(title=group.name, format="command", **kwargs)
+                    command_panel = HelpPanel(title=group.name, format="command")
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
@@ -1688,12 +1702,13 @@ class App:
         help_panels = [x[1] for x in panels.values()]
 
         out = []
-        for help_panel in sort_groups(groups, help_panels)[1]:
+        sorted_groups, sorted_panels = sort_groups(groups, help_panels)
+        for group, help_panel in zip(sorted_groups, sorted_panels):
             help_panel.remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
                 help_panel.sort()
-            out.append(help_panel)
+            out.append((group, help_panel))
         return out
 
     def interactive_shell(

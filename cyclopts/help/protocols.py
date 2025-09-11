@@ -53,19 +53,45 @@ class HelpFormatter(Protocol):
 
     def __call__(
         self,
-        help_panels: list["HelpPanel"],
-        usage: Any,
-        description: Any,
+        panel: "HelpPanel",
         console: "Console",
     ) -> None:
-        """Format and render all help components.
+        """Format and render a single help panel.
 
         Parameters
         ----------
-        help_panels : list[HelpPanel]
-            List of help panels to render (commands, parameters, etc).
+        panel : HelpPanel
+            Help panel to render (commands, parameters, etc).
+        console : Console
+            Console to render to.
+        """
+        ...
+
+    def render_usage(
+        self,
+        usage: Any,
+        console: "Console",
+    ) -> None:
+        """Render the usage line.
+
+        Parameters
+        ----------
         usage : Any
             The usage line to display.
+        console : Console
+            Console to render to.
+        """
+        ...
+
+    def render_description(
+        self,
+        description: Any,
+        console: "Console",
+    ) -> None:
+        """Render the description.
+
+        Parameters
+        ----------
         description : Any
             The app/command description to display.
         console : Console

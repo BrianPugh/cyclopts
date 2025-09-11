@@ -15,7 +15,7 @@ from cyclopts.utils import UNSET, Sentinel, SortHelper, frozen, is_iterable, res
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
-    from cyclopts.help.specs import PanelSpec, TableSpec
+    from cyclopts.help.protocols import HelpFormatter
     from cyclopts.parameter import Parameter
 
 
@@ -88,8 +88,7 @@ class Group:
         kw_only=True,
     )
 
-    table_spec: Optional["TableSpec"] = field(default=None, kw_only=True)
-    panel_spec: Optional["PanelSpec"] = field(default=None, kw_only=True)
+    help_formatter: Optional["HelpFormatter"] = field(default=None, kw_only=True)
 
     @property
     def name(self) -> str:
@@ -125,8 +124,7 @@ class Group:
         sort_key=None,
         validator=None,
         default_parameter=None,
-        table_spec=None,
-        panel_spec=None,
+        help_formatter=None,
     ):
         """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
@@ -151,10 +149,8 @@ class Group:
             Group validator to collectively apply.
         default_parameter: Optional[cyclopts.Parameter]
             Default parameter for elements within the group.
-        table_spec: Optional[cyclopts.help.TableSpec]
-            Custom table specification for this group's help display.
-        panel_spec: Optional[cyclopts.help.PanelSpec]
-            Custom panel specification for this group's help display.
+        help_formatter: Optional[cyclopts.help.protocols.HelpFormatter]
+            Custom help formatter for this group's help display.
         """
         count = next(_sort_key_counter)
         if sort_key is None:
@@ -170,8 +166,7 @@ class Group:
             sort_key=sort_key,
             validator=validator,
             default_parameter=default_parameter,
-            table_spec=table_spec,
-            panel_spec=panel_spec,
+            help_formatter=help_formatter,
         )
 
 

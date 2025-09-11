@@ -14,8 +14,11 @@ __all__ = [
     "format_usage",
     "InlineText",
     "_get_choices",
+    "RichFormatter",
+    "PlainFormatter",
 ]
 
+from .formatters import PlainFormatter, RichFormatter
 from .help import (
     HelpPanel,
     InlineText,
