@@ -25,11 +25,12 @@ from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.core import _get_root_module_name
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
+from cyclopts.help.silent import SILENT
 from cyclopts.help.specs import PanelSpec, TableSpec
 from cyclopts.utils import SortHelper, resolve_callables
 
 if TYPE_CHECKING:
-    from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
+    from rich.console import RenderableType
     from rich.text import Text
 
     from cyclopts.argument import ArgumentCollection
@@ -326,46 +327,6 @@ class HelpPanel:
         else:
             raise NotImplementedError
 
-    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
-        if not self.entries:
-            return _silent
-
-        from rich.console import Group as RichGroup
-        from rich.console import NewLine
-        from rich.text import Text
-
-        panel_description = self.description
-        if isinstance(panel_description, Text):
-            panel_description.end = ""
-
-            if panel_description.plain:
-                panel_description = RichGroup(panel_description, NewLine(2))
-
-        # 2. Realize spec, build table, and add entries
-        table_spec = self.table_spec.realize_columns(console, options, self.entries)
-        table = table_spec.build()
-        table_spec.add_entries(table, self.entries)
-
-        # 3. Final make the panel
-        if self.panel_spec.title is None:
-            panel = self.panel_spec.build(RichGroup(panel_description, table), title=self.title)
-        else:
-            panel = self.panel_spec.build(RichGroup(panel_description, table))
-
-        yield panel
-
-
-class SilentRich:
-    """Dummy object that causes nothing to be printed."""
-
-    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
-        # This generator yields nothing, so ``rich`` will print nothing for this object.
-        if False:
-            yield
-
-
-_silent = SilentRich()
-
 
 def _is_short(s):
     return not s.startswith("--") and s.startswith("-")
@@ -435,7 +396,7 @@ def format_doc(app: "App", format: str):
     raw_doc_string = app.help
 
     if not raw_doc_string:
-        return _silent
+        return SILENT
 
     parsed = docstring_parse(raw_doc_string, format)
 

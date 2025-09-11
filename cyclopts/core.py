@@ -70,6 +70,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from cyclopts.help import HelpPanel
+    from cyclopts.help.protocols import HelpFormatter
 
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
@@ -331,6 +332,8 @@ class App:
     suppress_keyboard_interrupt: bool = field(default=True, kw_only=True)
 
     backend: Optional[Literal["asyncio", "trio"]] = field(default=None, kw_only=True)
+
+    help_formatter: Optional["HelpFormatter"] = field(default=None, kw_only=True)
 
     ######################
     # Private Attributes #
@@ -1555,6 +1558,7 @@ class App:
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
         from cyclopts.help import format_doc, format_usage
+        from cyclopts.help.formatters import format_rich
 
         tokens = normalize_tokens(tokens)
 
@@ -1566,19 +1570,24 @@ class App:
 
             console = executing_app.console
 
-            # Print the:
-            #    my-app command COMMAND [ARGS] [OPTIONS]
+            # Prepare usage
             if executing_app.usage is None:
-                console.print(format_usage(self, command_chain))
+                usage = format_usage(self, command_chain)
             elif executing_app.usage:  # i.e. skip empty-string.
-                console.print(executing_app.usage + "\n")
+                usage = executing_app.usage + "\n"
+            else:
+                usage = None
 
-            # Print the App/Command's Doc String.
+            # Prepare description
             help_format = executing_app.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
-            console.print(format_doc(executing_app, help_format))
+            description = format_doc(executing_app, help_format)
 
-            for help_panel in self._assemble_help_panels(tokens, help_format):
-                console.print(help_panel)
+            # Prepare panels
+            help_panels = self._assemble_help_panels(tokens, help_format)
+
+            # Use formatter to render everything
+            formatter = executing_app.app_stack.resolve("help_formatter", fallback=format_rich)
+            formatter(help_panels, usage, description, console)
 
     def _assemble_help_panels(
         self,

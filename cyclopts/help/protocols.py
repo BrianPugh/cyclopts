@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType
 
-    from .help import TableEntry
+    from .help import HelpPanel, TableEntry
     from .specs import ColumnSpec
 
 
@@ -15,7 +15,7 @@ class Converter(Protocol):
 
 
 @runtime_checkable
-class Formatter(Protocol):
+class TableEntryFormatter(Protocol):
     """Protocol for TableEntry converters."""
 
     def __call__(self, entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType": ...
@@ -45,3 +45,30 @@ class ColumnSpecBuilder(Protocol):
     def __call__(
         self, console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
     ) -> tuple["ColumnSpec", ...]: ...
+
+
+@runtime_checkable
+class HelpFormatter(Protocol):
+    """Protocol for help formatter functions."""
+
+    def __call__(
+        self,
+        help_panels: list["HelpPanel"],
+        usage: Any,
+        description: Any,
+        console: Optional["Console"] = None,
+    ) -> "RenderableType":
+        """Format and render all help components.
+
+        Parameters
+        ----------
+        help_panels : list[HelpPanel]
+            List of help panels to render (commands, parameters, etc).
+        usage : Any
+            The usage line to display.
+        description : Any
+            The app/command description to display.
+        console : Optional[Console]
+            Console to render to (for Rich-based formatters).
+        """
+        ...

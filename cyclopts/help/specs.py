@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import TableEntry
-    from cyclopts.help.protocols import ColumnSpecBuilder, Converter, Formatter
+    from cyclopts.help.protocols import ColumnSpecBuilder, Converter, TableEntryFormatter
 
 
 @frozen
@@ -26,7 +26,7 @@ class ColumnSpec:
 
     key: str
 
-    formatter: Optional["Formatter"] = None
+    formatter: Optional["TableEntryFormatter"] = None
     converters: Optional[Union["Converter", tuple["Converter", ...]]] = field(
         default=None, converter=to_tuple_converter
     )

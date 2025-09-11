@@ -27,10 +27,13 @@ def app():
 
 
 def test_empty_help_panel_rich_silent(console):
+    from cyclopts.help.formatters import _render_panel_rich
+
     help_panel = HelpPanel(format="command", title="test")
+    rendered = _render_panel_rich(help_panel, console)
 
     with console.capture() as capture:
-        console.print(help_panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == ""
@@ -154,6 +157,8 @@ def test_help_format_usage_command(app, console):
 
 
 def test_format_commands_docstring(app, console):
+    from cyclopts.help.formatters import _render_panel_rich
+
     @app.command
     def foo():
         """Docstring for foo.
@@ -163,8 +168,9 @@ def test_format_commands_docstring(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    rendered = _render_panel_rich(panel, console)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -186,6 +192,7 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
         * https://github.com/BrianPugh/cyclopts/issues/393
         * https://github.com/BrianPugh/cyclopts/issues/402
     """
+    from cyclopts.help.formatters import _render_panel_rich
 
     @app.command
     def foo():
@@ -196,8 +203,9 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    rendered = _render_panel_rich(panel, console)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == dedent(
@@ -244,6 +252,8 @@ def test_format_commands_no_show(app, console, assert_parse_args):
 
 
 def test_format_commands_explicit_help(app, console):
+    from cyclopts.help.formatters import _render_panel_rich
+
     @app.command(help="Docstring for foo.")
     def foo():
         """Should not be shown."""
@@ -251,8 +261,9 @@ def test_format_commands_explicit_help(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    rendered = _render_panel_rich(panel, console)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -263,6 +274,8 @@ def test_format_commands_explicit_help(app, console):
 
 
 def test_format_commands_explicit_name(app, console):
+    from cyclopts.help.formatters import _render_panel_rich
+
     @app.command(name="bar")
     def foo():
         """Docstring for bar.
@@ -273,8 +286,9 @@ def test_format_commands_explicit_name(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
+    rendered = _render_panel_rich(panel, console)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -395,6 +409,8 @@ def test_format_choices_rich_format(app, console, assert_parse_args):
 
 @pytest.fixture
 def capture_format_group_parameters(console, default_function_groups):
+    from cyclopts.help.formatters import _render_panel_rich
+
     def inner(cmd):
         argument_collection = ArgumentCollection._from_callable(
             cmd,
@@ -405,7 +421,9 @@ def capture_format_group_parameters(console, default_function_groups):
         with console.capture() as capture:
             group = argument_collection.groups[0]
             group_argument_collection = argument_collection.filter_by(group=group)
-            console.print(create_parameter_help_panel(group, group_argument_collection, "restructuredtext"))
+            panel = create_parameter_help_panel(group, group_argument_collection, "restructuredtext")
+            rendered = _render_panel_rich(panel, console)
+            console.print(rendered)
 
         return capture.get()
 

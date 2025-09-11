@@ -1,6 +1,6 @@
 __all__ = [
     "Converter",
-    "Formatter",
+    "TableEntryFormatter",
     "LazyData",
     "TableEntry",
     "TableData",
@@ -27,7 +27,7 @@ from .help import (
     format_doc,
     format_usage,
 )
-from .protocols import Converter, Formatter, LazyData
+from .protocols import Converter, LazyData, TableEntryFormatter
 from .specs import (
     ColumnSpec,
     PanelSpec,
