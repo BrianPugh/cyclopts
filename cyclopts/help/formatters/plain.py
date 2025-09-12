@@ -125,18 +125,19 @@ class PlainFormatter:
         # Print each entry in the panel
         for entry in panel.entries:
             # Extract the components
-            name = _to_plain_text(entry.name, console)
-            short = _to_plain_text(entry.short, console)
+            # Join names and shorts if they are tuples
+            names_text = " ".join(entry.names) if entry.names else ""
+            shorts_text = " ".join(entry.shorts) if entry.shorts else ""
             desc = _to_plain_text(entry.description, console)
 
             # Format the entry line
-            if name or short:
-                # Handle parameters section specially - names might be concatenated
-                if panel.format == "parameter" and name:
-                    self._format_parameter_entry(name, short, desc, console)
+            if names_text or shorts_text:
+                # Handle parameters section specially
+                if panel.format == "parameter":
+                    self._format_parameter_entry(entry.names, entry.shorts, desc, console)
                 else:
                     # For commands or other panels
-                    self._format_command_entry(name, short, desc, console)
+                    self._format_command_entry(entry.names, entry.shorts, desc, console)
 
     def render_usage(
         self,
@@ -179,8 +180,8 @@ class PlainFormatter:
 
     def _format_parameter_entry(
         self,
-        name: str,
-        short: str,
+        names: tuple[str, ...],
+        shorts: tuple[str, ...],
         desc: str,
         console: "Console",
     ) -> None:
@@ -188,32 +189,41 @@ class PlainFormatter:
 
         Parameters
         ----------
-        name : str
-            Parameter name(s).
-        short : str
-            Short form of the parameter.
+        names : tuple[str, ...]
+            Parameter long names.
+        shorts : tuple[str, ...]
+            Short forms of the parameter.
         desc : str
             Parameter description.
         console : Console
             Console to print to.
         """
-        names = _split_parameter_names(name)
+        # Combine all names and shorts
+        all_options = list(names) + list(shorts)
 
-        # Print each option name
-        for i, option_name in enumerate(names):
-            if i == 0 and desc:
-                # First option gets the description
-                if short:
-                    console.print(f"{self.indent}{option_name}, {short}: {desc}")
-                else:
-                    console.print(f"{self.indent}{option_name}: {desc}")
+        if not all_options:
+            return
+
+        # First option gets the description
+        first_option = all_options[0]
+        if len(all_options) > 1:
+            # Multiple options - show them all on first line with description
+            options_str = ", ".join(all_options)
+            if desc:
+                console.print(f"{self.indent}{options_str}: {desc}")
             else:
-                console.print(f"{self.indent}{option_name}")
+                console.print(f"{self.indent}{options_str}")
+        else:
+            # Single option
+            if desc:
+                console.print(f"{self.indent}{first_option}: {desc}")
+            else:
+                console.print(f"{self.indent}{first_option}")
 
     def _format_command_entry(
         self,
-        name: str,
-        short: str,
+        names: tuple[str, ...],
+        shorts: tuple[str, ...],
         desc: str,
         console: "Console",
     ) -> None:
@@ -221,53 +231,36 @@ class PlainFormatter:
 
         Parameters
         ----------
-        name : str
-            Command name(s).
-        short : str
-            Short form of the command.
+        names : tuple[str, ...]
+            Command long names.
+        shorts : tuple[str, ...]
+            Short forms of the command.
         desc : str
             Command description.
         console : Console
             Console to print to.
         """
-        # Check if name has newlines (for commands with multiple names)
-        name_lines = name.split("\n") if name else []
-
-        if len(name_lines) > 1:
-            # Multiple option names on separate lines
-            for i, line in enumerate(name_lines):
-                line = line.strip()
-                if line:
-                    if i == 0:
-                        # First line gets short form and description
-                        parts = [line]
-                        if short:
-                            parts.append(", " + short)
-                        entry_name = " ".join(parts)
-                        if desc:
-                            console.print(f"{self.indent}{entry_name}: {desc}")
-                        else:
-                            console.print(f"{self.indent}{entry_name}")
+        # For commands, we typically want to show long names on separate lines
+        # and shorts together
+        if names:
+            for i, name in enumerate(names):
+                if i == 0:
+                    # First name gets the shorts and description
+                    parts = [name]
+                    if shorts:
+                        parts.append(", " + " ".join(shorts))
+                    entry_name = "".join(parts)
+                    if desc:
+                        console.print(f"{self.indent}{entry_name}: {desc}")
                     else:
-                        # Additional lines
-                        console.print(f"{self.indent}{line}")
-        elif name:
-            # Single name
-            parts = []
-            if name:
-                parts.append(name)
-            if short:
-                parts.append(", " + short)
-
-            entry_name = " ".join(parts)
-
+                        console.print(f"{self.indent}{entry_name}")
+                else:
+                    # Additional names on separate lines
+                    console.print(f"{self.indent}{name}")
+        elif shorts:
+            # Only short names
+            shorts_str = " ".join(shorts)
             if desc:
-                console.print(f"{self.indent}{entry_name}: {desc}")
+                console.print(f"{self.indent}{shorts_str}: {desc}")
             else:
-                console.print(f"{self.indent}{entry_name}")
-        elif short:
-            # Only short name
-            if desc:
-                console.print(f"{self.indent}{short}: {desc}")
-            else:
-                console.print(f"{self.indent}{short}")
+                console.print(f"{self.indent}{shorts_str}")

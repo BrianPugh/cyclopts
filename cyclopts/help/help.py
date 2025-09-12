@@ -214,8 +214,8 @@ class TableEntry:
 
     from rich.console import RenderableType
 
-    name: Optional[str] = None
-    short: Optional[str] = None
+    names: tuple[str, ...] = ()
+    shorts: tuple[str, ...] = ()
     description: Optional[RenderableType] = None
     required: bool = False
     sort_key: Any = None
@@ -285,7 +285,7 @@ class HelpPanel:
     def remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            hashable = (item.name, item.short)
+            hashable = (item.names, item.shorts)
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
@@ -301,7 +301,10 @@ class HelpPanel:
                 [
                     SortHelper(
                         entry.sort_key,
-                        (entry.name.startswith("-") if entry.name is not None else False, entry.name),
+                        (
+                            entry.names[0].startswith("-") if entry.names else False,
+                            entry.names[0] if entry.names else "",
+                        ),
                         entry,
                     )
                     for entry in self.entries
@@ -491,9 +494,9 @@ def create_parameter_help_panel(
 
         # populate row
         entry = TableEntry(
-            name="".join(long_options),
+            names=tuple(long_options),
             description=help_description,
-            short="".join(short_options),
+            shorts=tuple(short_options),
             required=argument.required,
         )
 
@@ -518,8 +521,8 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntr
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
         entry = TableEntry(
-            name="\n".join(long_names),
-            short=" ".join(short_names),
+            names=tuple(long_names),
+            shorts=tuple(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
             sort_key=resolve_callables(app.sort_key, app),
         )

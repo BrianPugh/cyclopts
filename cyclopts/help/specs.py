@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.style import Style
 from rich.table import Table
 
-from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
+from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter
 from cyclopts.utils import frozen, to_tuple_converter
 
 if TYPE_CHECKING:
@@ -44,10 +44,17 @@ def wrap_formatter(entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableTy
         tabsize=4,
     )
 
+    # Get the text to wrap - this depends on which converter is being used
+    # After combine_long_short_converter, entry.names will be a string in the key
+    text = entry.get(col_spec.key)
+    if text is None:
+        # If not yet converted, this shouldn't happen
+        text = ""
+
     if col_spec.max_width:
-        new = "\n".join(wrap(str(entry.name), col_spec.max_width))
+        new = "\n".join(wrap(str(text), col_spec.max_width))
     else:
-        new = "\n".join(wrap(str(entry.name)))
+        new = "\n".join(wrap(str(text)))
     return new
 
 
@@ -124,12 +131,12 @@ AsteriskColumn = ColumnSpec(
 )
 
 NameColumn = ColumnSpec(
-    key="name",
+    key="names",
     header="",
     justify="left",
     style="cyan",
     formatter=wrap_formatter,
-    converters=(stretch_name_converter, combine_long_short_converter),
+    converters=combine_long_short_converter,
 )
 
 DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
@@ -140,12 +147,12 @@ def _command_column_spec_builder(
 ) -> tuple[ColumnSpec, ...]:
     """Builder for default command column_specs."""
     command_column = ColumnSpec(
-        key="name",
+        key="names",
         header="",
         justify="left",
         style="cyan",
         formatter=wrap_formatter,
-        converters=(stretch_name_converter, combine_long_short_converter),
+        converters=combine_long_short_converter,
         max_width=math.ceil(console.width * 0.35),
     )
 
@@ -160,12 +167,12 @@ def _parameter_column_spec_builder(
 ) -> tuple[ColumnSpec, ...]:
     """Builder for default parameter column_specs."""
     name_column = ColumnSpec(
-        key="name",
+        key="names",
         header="",
         justify="left",
         style="cyan",
         formatter=wrap_formatter,
-        converters=(stretch_name_converter, combine_long_short_converter),
+        converters=combine_long_short_converter,
         max_width=math.ceil(console.width * 0.35),
     )
 

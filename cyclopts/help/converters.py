@@ -12,28 +12,18 @@ def asterisk_required_converter(entry: "TableEntry") -> "RenderableType":
     return ""
 
 
-def stretch_name_converter(entry: "TableEntry") -> "RenderableType":
-    """Split name into two parts based on --.
-
-    Example
-    -------
-        '--foo--no-foo'  to '--foo --no-foo'.
-    """
-    if entry.name is None:
-        return ""
-    out = " --".join(entry.name.split("--"))
-    return out[1:] if out[0] == " " else out
-
-
 def combine_long_short_converter(entry: "TableEntry") -> "RenderableType":
-    """Concatenate a name and its short version.
+    """Concatenate names and shorts.
 
     Examples
     --------
-        name = "--help"
-        short = "-h"
+        names = ("--help",)
+        shorts = ("-h",)
         return: "--help -h"
     """
-    name = "" if entry.name is None else entry.name
-    short = "" if entry.short is None else entry.short
-    return name + " " + short
+    names_str = " ".join(entry.names) if entry.names else ""
+    shorts_str = " ".join(entry.shorts) if entry.shorts else ""
+
+    if names_str and shorts_str:
+        return names_str + " " + shorts_str
+    return names_str or shorts_str
