@@ -13,12 +13,11 @@ from typing import (
     Literal,
     Optional,
     Sequence,
-    Union,
     get_args,
     get_origin,
 )
 
-from attrs import define, evolve, field
+from attrs import define, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
@@ -34,7 +33,6 @@ if TYPE_CHECKING:
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
-    from cyclopts.help.protocols import LazyData
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -186,31 +184,9 @@ class InlineText:
             yield from wrapped_segments
 
 
-def _resolve(v: Union["RenderableType", "LazyData"], entry: "TableEntry") -> "RenderableType":
-    return v(entry) if callable(v) else v
-
-
-# TODO: Is there a low cost runtime validator that all members in this
-#       are renderable?
-@define(slots=True)
-class TableData:
-    """Intentionally empty dataclass.
-
-    Users can inherit from this and declare concrete fields and then pass
-    the object to TableEntry
-    """
-
-    pass
-
-
 @define(slots=True)
 class TableEntry:
-    """Abstract version of TableEntry.
-
-    Member extras can be a user-defined dataclass. All members in `extras`
-    will be treated as if they are members of `TableEntry` allowing
-    for arbitrary data to be included in the Entry.
-    """
+    """Container for help table entry data."""
 
     from rich.console import RenderableType
 
@@ -220,56 +196,6 @@ class TableEntry:
     required: bool = False
     sort_key: Any = None
     type: Optional[Any] = None
-
-    extras: TableData = field(factory=TableData, repr=False)
-
-    def try_put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
-        """Put a attr to the dataclass.
-
-        This is looser than put, and will not raise an AttributeError if
-        the member does not exist. This is useful when the list of entries
-        do not have all the same members. This was required for
-        `ColumnSpec.render_cell`
-        """
-        try:
-            return self.put(key, value)
-        except AttributeError:
-            return self
-
-    def put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
-        """Put a attr to the dataclass."""
-        if hasattr(self, key):
-            setattr(self, key, value)
-        elif hasattr(self.extras, key):
-            setattr(self.extras, key, value)
-        else:
-            raise AttributeError(f"'{type(self.extras).__name__}' has no field {key}")
-        return self
-
-    def get(self, key: str, default: Any = None, resolve: bool = False) -> Union["LazyData", "RenderableType"]:
-        if hasattr(self, key):
-            val = getattr(self, key)
-            return _resolve(val, self) if resolve else val
-        if hasattr(self.extras, key):
-            val = getattr(self.extras, key)
-            return _resolve(val, self) if resolve else val
-        return default
-
-    def __getattr__(self, name: str) -> Union[str, "LazyData"]:
-        """Access extra values as if they were members.
-
-        This makes members in the `extra` dataclass feel like
-        members of the `TableEntry` instance. Thus, pseudo
-        adding members is easy, and table generation is simplified.
-        """
-        extras = object.__getattribute__(self, "extras")
-        try:
-            return getattr(extras, name)
-        except AttributeError as err:
-            raise AttributeError(f"'{type(self)} nor {type(self.extras).__name__}' have field {name}") from err
-
-    def with_(self, **kw):
-        return evolve(self, **kw)
 
 
 @define

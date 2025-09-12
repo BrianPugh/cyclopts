@@ -15,18 +15,6 @@ class Renderer(Protocol):
 
 
 @runtime_checkable
-class LazyData(Protocol):
-    """Protocol for TableEntry LazyData.
-
-    A member of in a TableData instance can be a callable. This allows for some
-    dyanic / lazy data gathering. Because the cell must be rendered, the callable's
-    arguments need a protocol. That is, the current "out", and the whole entry
-    """
-
-    def __call__(self, entry: "TableEntry") -> "RenderableType": ...
-
-
-@runtime_checkable
 class ColumnSpecBuilder(Protocol):
     """Protocol for ColumnSpecBuilders.
 

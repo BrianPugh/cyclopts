@@ -108,11 +108,27 @@ def description_renderer(entry: "TableEntry") -> "RenderableType":
 class ColumnSpec:
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
-    key: str
-    """Key identifying this column's purpose (e.g., 'names', 'description', 'asterisk')."""
+    renderer: Union[str, "Renderer"]
+    """Specifies how to extract and render cell content from a :class:`~cyclopts.help.TableEntry`.
 
-    renderer: Optional["Renderer"] = None
-    """Function that renders this column's cell from a TableEntry."""
+    Can be either:
+    - A string: The attribute name to retrieve from :class:`~cyclopts.help.TableEntry` (e.g., 'names',
+      'description', 'required', 'type'). The value is retrieved using
+      :meth:`~cyclopts.help.TableEntry.get` and displayed as-is.
+    - A callable: A function matching the :class:`~cyclopts.help.protocols.Renderer` protocol.
+      The function receives a :class:`~cyclopts.help.TableEntry` and should return a
+      :class:`~rich.console.RenderableType` (str, :class:`~rich.text.Text`, or other Rich renderable).
+
+    Examples::
+
+        # String renderer - get attribute directly
+        ColumnSpec(renderer="description")
+
+        # Callable renderer - custom formatting
+        def format_names(entry: TableEntry) -> str:
+            return ", ".join(entry.names) if entry.names else ""
+        ColumnSpec(renderer=format_names)
+    """
 
     header: str = ""
     footer: str = ""
@@ -146,16 +162,17 @@ class ColumnSpec:
         )
 
     def render_cell(self, entry: "TableEntry") -> RenderableType:
-        """Render the cell using the renderer function.
+        """Render the cell content based on the renderer type.
 
-        If no renderer is provided, attempts to get the value directly from the entry
-        using the key attribute.
+        If renderer is a string, retrieves that attribute from the entry.
+        If renderer is callable, calls it with the entry.
         """
-        value = self.renderer(entry) if self.renderer else entry.get(self.key, None)
-
-        if callable(value):  # Handle lazy data (callables)
-            value = value(entry)
-
+        if isinstance(self.renderer, str):
+            value = str(getattr(entry, self.renderer) or "")
+        elif callable(self.renderer):
+            value = self.renderer(entry)
+        else:
+            value = None
         return "" if value is None else value
 
     def with_(self, **kw):
@@ -163,21 +180,16 @@ class ColumnSpec:
 
 
 # For Parameters:
-AsteriskColumn = ColumnSpec(
-    key="asterisk", header="", justify="left", width=1, style="red bold", renderer=asterisk_renderer
-)
+AsteriskColumn = ColumnSpec(renderer=asterisk_renderer, header="", justify="left", width=1, style="red bold")
 
 NameColumn = ColumnSpec(
-    key="names",
+    renderer=name_renderer,
     header="",
     justify="left",
     style="cyan",
-    renderer=name_renderer,
 )
 
-DescriptionColumn = ColumnSpec(
-    key="description", header="", justify="left", overflow="fold", renderer=description_renderer
-)
+DescriptionColumn = ColumnSpec(renderer=description_renderer, header="", justify="left", overflow="fold")
 
 
 def _command_column_spec_builder(
@@ -186,11 +198,10 @@ def _command_column_spec_builder(
     """Builder for default command column_specs."""
     max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
-        key="names",
+        renderer=partial(wrapped_name_renderer, max_width=max_width),
         header="",
         justify="left",
         style="cyan",
-        renderer=partial(wrapped_name_renderer, max_width=max_width),
         max_width=max_width,
     )
 
@@ -206,11 +217,10 @@ def _parameter_column_spec_builder(
     """Builder for default parameter column_specs."""
     max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
-        key="names",
+        renderer=partial(wrapped_name_renderer, max_width=max_width),
         header="",
         justify="left",
         style="cyan",
-        renderer=partial(wrapped_name_renderer, max_width=max_width),
         max_width=max_width,
     )
 

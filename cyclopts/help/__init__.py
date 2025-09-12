@@ -1,8 +1,6 @@
 __all__ = [
     "Renderer",
-    "LazyData",
     "TableEntry",
-    "TableData",
     "TableSpec",
     "PanelSpec",
     "ColumnSpec",
@@ -21,7 +19,6 @@ from .formatters import DefaultFormatter, PlainFormatter
 from .help import (
     HelpPanel,
     InlineText,
-    TableData,
     TableEntry,
     _get_choices,
     create_parameter_help_panel,
@@ -29,7 +26,7 @@ from .help import (
     format_doc,
     format_usage,
 )
-from .protocols import LazyData, Renderer
+from .protocols import Renderer
 from .specs import (
     ColumnSpec,
     PanelSpec,
