@@ -366,12 +366,5 @@ class PanelSpec:
         opts.update(overrides)
         return Panel(renderable, **opts)
 
-    # Handy immutable helpers
-    def with_box(self, box: Box) -> "PanelSpec":
-        return evolve(self, box=box)
-
-    def with_padding(self, padding: PaddingType) -> "PanelSpec":
-        return evolve(self, padding=padding)
-
-    def with_border_style(self, style: StyleType) -> "PanelSpec":
-        return evolve(self, border_style=style)
+    def with_(self, **kw):
+        return evolve(self, **kw)
