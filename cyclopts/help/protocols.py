@@ -8,17 +8,10 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class Converter(Protocol):
-    """Protocol for TableEntry converters."""
+class Renderer(Protocol):
+    """Protocol for column renderers that transform TableEntry to display content."""
 
     def __call__(self, entry: "TableEntry") -> "RenderableType": ...
-
-
-@runtime_checkable
-class TableEntryFormatter(Protocol):
-    """Protocol for TableEntry converters."""
-
-    def __call__(self, entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType": ...
 
 
 @runtime_checkable

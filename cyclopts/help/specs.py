@@ -1,41 +1,79 @@
 import math
+import textwrap
 from collections.abc import Iterable
+from functools import partial
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from attrs import evolve, field
+from attrs import evolve
 from rich.box import ROUNDED, Box
 from rich.console import RenderableType
 from rich.panel import Panel
 from rich.style import Style
 from rich.table import Table
 
-from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter
-from cyclopts.utils import frozen, to_tuple_converter
+from cyclopts.utils import frozen
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import TableEntry
-    from cyclopts.help.protocols import ColumnSpecBuilder, Converter, TableEntryFormatter
+    from cyclopts.help.protocols import ColumnSpecBuilder, Renderer
 
 
-def wrap_formatter(entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType":
-    """Wrap text for table entries.
+# Renderer functions for different column types
+def asterisk_renderer(entry: "TableEntry") -> "RenderableType":
+    """Render an asterisk for required parameters.
 
     Parameters
     ----------
     entry : TableEntry
-        The table entry to format.
-    col_spec : ColumnSpec
-        Column specification with width constraints.
+        The table entry to render.
 
     Returns
     -------
     RenderableType
-        Wrapped text suitable for rendering.
+        "*" if required, empty string otherwise.
     """
-    import textwrap
-    from functools import partial
+    return "*" if entry.required else ""
+
+
+def name_renderer(entry: "TableEntry") -> "RenderableType":
+    """Render the names column by combining names and shorts.
+
+    Parameters
+    ----------
+    entry : TableEntry
+        The table entry to render.
+
+    Returns
+    -------
+    RenderableType
+        Combined names and shorts as a string.
+    """
+    names_str = " ".join(entry.names) if entry.names else ""
+    shorts_str = " ".join(entry.shorts) if entry.shorts else ""
+
+    if names_str and shorts_str:
+        return names_str + " " + shorts_str
+    return names_str or shorts_str
+
+
+def wrapped_name_renderer(entry: "TableEntry", max_width: Optional[int] = None) -> "RenderableType":
+    """Render names with text wrapping.
+
+    Parameters
+    ----------
+    entry : TableEntry
+        The table entry to render.
+    max_width : Optional[int]
+        Maximum width for wrapping.
+
+    Returns
+    -------
+    RenderableType
+        Wrapped names text.
+    """
+    text = str(name_renderer(entry))
 
     wrap = partial(
         textwrap.wrap,
@@ -44,18 +82,26 @@ def wrap_formatter(entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableTy
         tabsize=4,
     )
 
-    # Get the text to wrap - this depends on which converter is being used
-    # After combine_long_short_converter, entry.names will be a string in the key
-    text = entry.get(col_spec.key)
-    if text is None:
-        # If not yet converted, this shouldn't happen
-        text = ""
-
-    if col_spec.max_width:
-        new = "\n".join(wrap(str(text), col_spec.max_width))
+    if max_width:
+        return "\n".join(wrap(text, max_width))
     else:
-        new = "\n".join(wrap(str(text)))
-    return new
+        return "\n".join(wrap(text))
+
+
+def description_renderer(entry: "TableEntry") -> "RenderableType":
+    """Render the description column.
+
+    Parameters
+    ----------
+    entry : TableEntry
+        The table entry to render.
+
+    Returns
+    -------
+    RenderableType
+        The description or empty string.
+    """
+    return entry.description if entry.description is not None else ""
 
 
 @frozen
@@ -63,11 +109,10 @@ class ColumnSpec:
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
     key: str
+    """Key identifying this column's purpose (e.g., 'names', 'description', 'asterisk')."""
 
-    formatter: Optional["TableEntryFormatter"] = None
-    converters: Optional[Union["Converter", tuple["Converter", ...]]] = field(
-        default=None, converter=to_tuple_converter
-    )
+    renderer: Optional["Renderer"] = None
+    """Function that renders this column's cell from a TableEntry."""
 
     header: str = ""
     footer: str = ""
@@ -101,25 +146,17 @@ class ColumnSpec:
         )
 
     def render_cell(self, entry: "TableEntry") -> RenderableType:
-        """Render the cell."""
-        raw = entry.get(self.key, None)
-        out = raw(entry) if callable(raw) else raw
-        entry.try_put(self.key, out)
+        """Render the cell using the renderer function.
 
-        if self.converters:
-            converters = (self.converters,) if not isinstance(self.converters, tuple) else self.converters
+        If no renderer is provided, attempts to get the value directly from the entry
+        using the key attribute.
+        """
+        value = self.renderer(entry) if self.renderer else entry.get(self.key, None)
 
-            for converter in converters:
-                # out = converter(out, entry)
-                out = converter(entry)
-                entry.try_put(self.key, out)
+        if callable(value):  # Handle lazy data (callables)
+            value = value(entry)
 
-        # Apply the formatter - takes the current string
-        if self.formatter:
-            out = self.formatter(entry, self)
-            entry.try_put(self.key, out)
-
-        return "" if out is None else out
+        return "" if value is None else value
 
     def with_(self, **kw):
         return evolve(self, **kw)
@@ -127,7 +164,7 @@ class ColumnSpec:
 
 # For Parameters:
 AsteriskColumn = ColumnSpec(
-    key="asterisk", header="", justify="left", width=1, style="red bold", converters=asterisk_required_converter
+    key="asterisk", header="", justify="left", width=1, style="red bold", renderer=asterisk_renderer
 )
 
 NameColumn = ColumnSpec(
@@ -135,25 +172,26 @@ NameColumn = ColumnSpec(
     header="",
     justify="left",
     style="cyan",
-    formatter=wrap_formatter,
-    converters=combine_long_short_converter,
+    renderer=name_renderer,
 )
 
-DescriptionColumn = ColumnSpec(key="description", header="", justify="left", overflow="fold")
+DescriptionColumn = ColumnSpec(
+    key="description", header="", justify="left", overflow="fold", renderer=description_renderer
+)
 
 
 def _command_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
 ) -> tuple[ColumnSpec, ...]:
     """Builder for default command column_specs."""
+    max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
         key="names",
         header="",
         justify="left",
         style="cyan",
-        formatter=wrap_formatter,
-        converters=combine_long_short_converter,
-        max_width=math.ceil(console.width * 0.35),
+        renderer=partial(wrapped_name_renderer, max_width=max_width),
+        max_width=max_width,
     )
 
     return (
@@ -166,14 +204,14 @@ def _parameter_column_spec_builder(
     console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
 ) -> tuple[ColumnSpec, ...]:
     """Builder for default parameter column_specs."""
+    max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
         key="names",
         header="",
         justify="left",
         style="cyan",
-        formatter=wrap_formatter,
-        converters=combine_long_short_converter,
-        max_width=math.ceil(console.width * 0.35),
+        renderer=partial(wrapped_name_renderer, max_width=max_width),
+        max_width=max_width,
     )
 
     if any(x.required for x in entries):
