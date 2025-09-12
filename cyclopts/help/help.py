@@ -219,6 +219,7 @@ class TableEntry:
     description: Optional[RenderableType] = None
     required: bool = False
     sort_key: Any = None
+    type: Optional[Any] = None
 
     extras: TableData = field(factory=TableData, repr=False)
 
@@ -498,6 +499,7 @@ def create_parameter_help_panel(
             description=help_description,
             shorts=tuple(short_options),
             required=argument.required,
+            type=resolve_annotated(argument.field_info.annotation),
         )
 
         if argument.field_info.is_positional:
