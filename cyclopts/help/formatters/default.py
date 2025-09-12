@@ -82,10 +82,7 @@ class DefaultFormatter:
             console.print(description)
 
     def _render_panel(self, help_panel: "HelpPanel", console: "Console") -> "RenderableType":
-        """Render a single help panel.
-
-        This extracts the logic from HelpPanel.__rich_console__.
-        """
+        """Render a single help panel."""
         if not help_panel.entries:
             return SILENT
 
@@ -102,7 +99,10 @@ class DefaultFormatter:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        table_spec = self.table_spec or TableSpec(preset=help_panel.format)
+        if self.table_spec is None:
+            table_spec = TableSpec.for_commands() if help_panel.format == "command" else TableSpec.for_parameters()
+        else:
+            table_spec = self.table_spec
         panel_spec = self.panel_spec or PanelSpec()
 
         # Realize spec, build table, and add entries

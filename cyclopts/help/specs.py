@@ -2,7 +2,7 @@ import math
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from attrs import Factory, evolve, field
+from attrs import evolve, field
 from rich.box import ROUNDED, Box
 from rich.console import RenderableType
 from rich.panel import Panel
@@ -151,25 +151,12 @@ def _parameter_column_spec_builder(
         )
 
 
-_COLUMN_SPEC_BUILDERS: dict[str, "ColumnSpecBuilder"] = {
-    "command": _command_column_spec_builder,
-    "parameter": _parameter_column_spec_builder,
-}
-
-
-def register_panel_columnbuilder(name: str, builder: "ColumnSpecBuilder", *, overwrite: bool = False) -> None:
-    """Register a columnbuilder."""
-    if not overwrite and name in _COLUMN_SPEC_BUILDERS:
-        raise KeyError(f"Preset '{name}' already exists.")
-    _COLUMN_SPEC_BUILDERS[name] = builder
-
-
 @frozen
 class TableSpec:
     StyleType = Union[Style, str]
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
-    preset: str
+    columns: Union[tuple[ColumnSpec, ...], "ColumnSpecBuilder"]
 
     # Intrinsic table styling/config
     title: Optional[str] = None
@@ -186,11 +173,6 @@ class TableSpec:
     pad_edge: bool = False
     padding: PaddingType = (0, 2, 0, 0)
     collapse_padding: bool = False
-
-    # Use the preset it available.
-    columns: Union[tuple[ColumnSpec, ...], "ColumnSpecBuilder"] = field(
-        default=Factory(lambda self: _COLUMN_SPEC_BUILDERS.get(self.preset, tuple()), takes_self=True)  # noqa: C408
-    )
 
     def realize_columns(self, console, options, entries) -> "TableSpec":
         """Realize ColumnSpecBuilders."""
@@ -235,6 +217,36 @@ class TableSpec:
 
     def with_(self, **kw):
         return evolve(self, **kw)
+
+    @classmethod
+    def for_commands(cls, **kwargs) -> "TableSpec":
+        """Create a TableSpec configured for command display.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments to override defaults.
+        """
+        defaults: dict = {
+            "columns": _command_column_spec_builder,
+        }
+        defaults.update(kwargs)
+        return cls(**defaults)
+
+    @classmethod
+    def for_parameters(cls, **kwargs) -> "TableSpec":
+        """Create a TableSpec configured for parameter display.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments to override defaults.
+        """
+        defaults: dict = {
+            "columns": _parameter_column_spec_builder,
+        }
+        defaults.update(kwargs)
+        return cls(**defaults)
 
 
 @frozen
