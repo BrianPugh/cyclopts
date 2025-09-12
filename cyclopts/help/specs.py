@@ -10,7 +10,6 @@ from rich.style import Style
 from rich.table import Table
 
 from cyclopts.help.converters import asterisk_required_converter, combine_long_short_converter, stretch_name_converter
-from cyclopts.help.utils import wrap_formatter
 from cyclopts.utils import frozen, to_tuple_converter
 
 if TYPE_CHECKING:
@@ -18,6 +17,38 @@ if TYPE_CHECKING:
 
     from cyclopts.help import TableEntry
     from cyclopts.help.protocols import ColumnSpecBuilder, Converter, TableEntryFormatter
+
+
+def wrap_formatter(entry: "TableEntry", col_spec: "ColumnSpec") -> "RenderableType":
+    """Wrap text for table entries.
+
+    Parameters
+    ----------
+    entry : TableEntry
+        The table entry to format.
+    col_spec : ColumnSpec
+        Column specification with width constraints.
+
+    Returns
+    -------
+    RenderableType
+        Wrapped text suitable for rendering.
+    """
+    import textwrap
+    from functools import partial
+
+    wrap = partial(
+        textwrap.wrap,
+        subsequent_indent="  ",
+        break_on_hyphens=False,
+        tabsize=4,
+    )
+
+    if col_spec.max_width:
+        new = "\n".join(wrap(str(entry.name), col_spec.max_width))
+    else:
+        new = "\n".join(wrap(str(entry.name)))
+    return new
 
 
 @frozen
