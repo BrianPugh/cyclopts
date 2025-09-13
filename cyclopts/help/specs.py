@@ -16,17 +16,17 @@ from cyclopts.utils import frozen
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
-    from cyclopts.help import TableEntry
+    from cyclopts.help import HelpEntry
     from cyclopts.help.protocols import ColumnSpecBuilder, Renderer
 
 
 # Renderer functions for different column types
-def asterisk_renderer(entry: "TableEntry") -> "RenderableType":
+def asterisk_renderer(entry: "HelpEntry") -> "RenderableType":
     """Render an asterisk for required parameters.
 
     Parameters
     ----------
-    entry : TableEntry
+    entry : HelpEntry
         The table entry to render.
 
     Returns
@@ -37,12 +37,12 @@ def asterisk_renderer(entry: "TableEntry") -> "RenderableType":
     return "*" if entry.required else ""
 
 
-def name_renderer(entry: "TableEntry") -> "RenderableType":
+def name_renderer(entry: "HelpEntry") -> "RenderableType":
     """Render the names column by combining names and shorts.
 
     Parameters
     ----------
-    entry : TableEntry
+    entry : HelpEntry
         The table entry to render.
 
     Returns
@@ -58,12 +58,12 @@ def name_renderer(entry: "TableEntry") -> "RenderableType":
     return names_str or shorts_str
 
 
-def wrapped_name_renderer(entry: "TableEntry", max_width: Optional[int] = None) -> "RenderableType":
+def wrapped_name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "RenderableType":
     """Render names with text wrapping.
 
     Parameters
     ----------
-    entry : TableEntry
+    entry : HelpEntry
         The table entry to render.
     max_width : Optional[int]
         Maximum width for wrapping.
@@ -88,12 +88,12 @@ def wrapped_name_renderer(entry: "TableEntry", max_width: Optional[int] = None) 
         return "\n".join(wrap(text))
 
 
-def description_renderer(entry: "TableEntry") -> "RenderableType":
+def description_renderer(entry: "HelpEntry") -> "RenderableType":
     """Render the description column.
 
     Parameters
     ----------
-    entry : TableEntry
+    entry : HelpEntry
         The table entry to render.
 
     Returns
@@ -109,14 +109,14 @@ class ColumnSpec:
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
     renderer: Union[str, "Renderer"]
-    """Specifies how to extract and render cell content from a :class:`~cyclopts.help.TableEntry`.
+    """Specifies how to extract and render cell content from a :class:`~cyclopts.help.HelpEntry`.
 
     Can be either:
-    - A string: The attribute name to retrieve from :class:`~cyclopts.help.TableEntry` (e.g., 'names',
+    - A string: The attribute name to retrieve from :class:`~cyclopts.help.HelpEntry` (e.g., 'names',
       'description', 'required', 'type'). The value is retrieved using
-      :meth:`~cyclopts.help.TableEntry.get` and displayed as-is.
+      :meth:`~cyclopts.help.HelpEntry.get` and displayed as-is.
     - A callable: A function matching the :class:`~cyclopts.help.protocols.Renderer` protocol.
-      The function receives a :class:`~cyclopts.help.TableEntry` and should return a
+      The function receives a :class:`~cyclopts.help.HelpEntry` and should return a
       :class:`~rich.console.RenderableType` (str, :class:`~rich.text.Text`, or other Rich renderable).
 
     Examples::
@@ -125,7 +125,7 @@ class ColumnSpec:
         ColumnSpec(renderer="description")
 
         # Callable renderer - custom formatting
-        def format_names(entry: TableEntry) -> str:
+        def format_names(entry: HelpEntry) -> str:
             return ", ".join(entry.names) if entry.names else ""
         ColumnSpec(renderer=format_names)
     """
@@ -161,7 +161,7 @@ class ColumnSpec:
             no_wrap=self.no_wrap,
         )
 
-    def render_cell(self, entry: "TableEntry") -> RenderableType:
+    def render_cell(self, entry: "HelpEntry") -> RenderableType:
         """Render the cell content based on the renderer type.
 
         If renderer is a string, retrieves that attribute from the entry.
@@ -193,7 +193,7 @@ DescriptionColumn = ColumnSpec(renderer=description_renderer, header="", justify
 
 
 def _command_column_spec_builder(
-    console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
+    console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"]
 ) -> tuple[ColumnSpec, ...]:
     """Builder for default command column_specs."""
     max_width = math.ceil(console.width * 0.35)
@@ -212,7 +212,7 @@ def _command_column_spec_builder(
 
 
 def _parameter_column_spec_builder(
-    console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
+    console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"]
 ) -> tuple[ColumnSpec, ...]:
     """Builder for default parameter column_specs."""
     max_width = math.ceil(console.width * 0.35)
@@ -292,7 +292,7 @@ class TableSpec:
             col.add_to(table)
         return table
 
-    def add_entries(self, table: Table, entries: Iterable["TableEntry"]) -> None:
+    def add_entries(self, table: Table, entries: Iterable["HelpEntry"]) -> None:
         """Insert the entries into the table."""
         if callable(self.columns):
             raise TypeError("Columns must be realized before building table")

@@ -3,15 +3,15 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType
 
-    from .help import HelpPanel, TableEntry
+    from .help import HelpEntry, HelpPanel
     from .specs import ColumnSpec
 
 
 @runtime_checkable
 class Renderer(Protocol):
-    """Protocol for column renderers that transform TableEntry to display content."""
+    """Protocol for column renderers that transform HelpEntry to display content."""
 
-    def __call__(self, entry: "TableEntry") -> "RenderableType": ...
+    def __call__(self, entry: "HelpEntry") -> "RenderableType": ...
 
 
 @runtime_checkable
@@ -24,7 +24,7 @@ class ColumnSpecBuilder(Protocol):
     """
 
     def __call__(
-        self, console: "Console", options: "ConsoleOptions", entries: list["TableEntry"]
+        self, console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"]
     ) -> tuple["ColumnSpec", ...]: ...
 
 

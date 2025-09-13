@@ -185,7 +185,7 @@ class InlineText:
 
 
 @define(slots=True)
-class TableEntry:
+class HelpEntry:
     """Container for help table entry data."""
 
     from rich.console import RenderableType
@@ -207,7 +207,7 @@ class HelpPanel:
     format: str  # Literal["command", "parameter"]
     title: RenderableType
     description: RenderableType = field(factory=_text_factory)
-    entries: list[TableEntry] = field(factory=list)
+    entries: list[HelpEntry] = field(factory=list)
 
     def remove_duplicates(self):
         seen, out = set(), []
@@ -420,7 +420,7 @@ def create_parameter_help_panel(
             help_description.append(Text(r"[required]", "dim red"))
 
         # populate row
-        entry = TableEntry(
+        entry = HelpEntry(
             names=tuple(long_options),
             description=help_description,
             shorts=tuple(short_options),
@@ -439,7 +439,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntry]:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -448,7 +448,7 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntr
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
-        entry = TableEntry(
+        entry = HelpEntry(
             names=tuple(long_names),
             shorts=tuple(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),

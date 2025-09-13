@@ -1,6 +1,6 @@
 __all__ = [
     "Renderer",
-    "TableEntry",
+    "HelpEntry",
     "TableSpec",
     "PanelSpec",
     "ColumnSpec",
@@ -17,9 +17,9 @@ __all__ = [
 
 from .formatters import DefaultFormatter, PlainFormatter
 from .help import (
+    HelpEntry,
     HelpPanel,
     InlineText,
-    TableEntry,
     _get_choices,
     create_parameter_help_panel,
     format_command_entries,
