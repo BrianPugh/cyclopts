@@ -1,14 +1,15 @@
 """Plain text help formatter for improved accessibility."""
 
+import io
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from rich.console import Console
-
     from cyclopts.help import HelpPanel
 
+from rich.console import Console
 
-def _to_plain_text(obj: Any, console: "Console") -> str:
+
+def _to_plain_text(obj: Any, console: Console) -> str:
     """Extract plain text from Rich renderables.
 
     Parameters
@@ -25,59 +26,34 @@ def _to_plain_text(obj: Any, console: "Console") -> str:
     """
     if obj is None:
         return ""
+
+    # Rich Text objects have a .plain property for plain text
     if hasattr(obj, "plain"):
         return obj.plain.rstrip()
-    if hasattr(obj, "primary_renderable"):
-        # InlineText object - render it to plain text
-        with console.capture() as capture:
-            console.print(obj, end="")
-        return capture.get().rstrip()
+
+    # For any Rich renderable, render without styles
     if hasattr(obj, "__rich_console__"):
-        # Other Rich renderables
-        with console.capture() as capture:
-            console.print(obj, end="")
+        # Create a plain console that preserves layout but removes styling
+        plain_console = Console(
+            file=io.StringIO(),
+            width=console.width,
+            height=console.height,
+            tab_size=console.tab_size,
+            legacy_windows=console.legacy_windows,
+            safe_box=console.safe_box,
+            # Disable all styling
+            force_terminal=False,
+            no_color=True,
+            highlight=False,
+            markup=False,
+            emoji=False,
+        )
+        with plain_console.capture() as capture:
+            plain_console.print(obj, end="")
         return capture.get().rstrip()
+
+    # Fallback for non-Rich objects
     return str(obj).rstrip()
-
-
-def _split_parameter_names(name: str) -> list[str]:
-    """Split concatenated parameter names.
-
-    Handles cases like "VERBOSE--verbose--no-verbose" by intelligently
-    splitting them into separate option names.
-
-    Parameters
-    ----------
-    name : str
-        Concatenated parameter names.
-
-    Returns
-    -------
-    list[str]
-        List of individual option names.
-    """
-    import re
-
-    # Split on "--" but keep the "--" with each option
-    parts = re.split(r"(--)", name)
-    names = []
-    current = ""
-    for part in parts:
-        if part == "--":
-            if current and not current.startswith("--"):
-                # Save the previous part (like "VERBOSE")
-                names.append(current)
-                current = "--"
-            else:
-                current += part
-        elif part:
-            current += part
-            if current.startswith("--"):
-                names.append(current)
-                current = ""
-    if current:
-        names.append(current)
-    return names
 
 
 class PlainFormatter:
@@ -100,6 +76,10 @@ class PlainFormatter:
         self.max_width = max_width
         self.indent = " " * indent_width
 
+    def _print_plain(self, console: Console, text: str) -> None:
+        """Print text without any highlighting or markup."""
+        console.print(text, highlight=False)
+
     def __call__(
         self,
         panel: "HelpPanel",
@@ -119,8 +99,8 @@ class PlainFormatter:
 
         # Print panel title with appropriate formatting
         if panel.title:
-            console.print("")
-            console.print(f"{panel.title}:")
+            self._print_plain(console, "")
+            self._print_plain(console, f"{panel.title}:")
 
         # Print each entry in the panel
         for entry in panel.entries:
@@ -156,7 +136,7 @@ class PlainFormatter:
         if usage:
             usage_text = _to_plain_text(usage, console)
             if usage_text:
-                console.print(usage_text)
+                self._print_plain(console, usage_text)
 
     def render_description(
         self,
@@ -176,7 +156,7 @@ class PlainFormatter:
             desc_text = _to_plain_text(description, console)
             if desc_text:
                 console.print("")
-                console.print(desc_text)
+                self._print_plain(console, desc_text)
 
     def _format_parameter_entry(
         self,
@@ -210,15 +190,15 @@ class PlainFormatter:
             # Multiple options - show them all on first line with description
             options_str = ", ".join(all_options)
             if desc:
-                console.print(f"{self.indent}{options_str}: {desc}")
+                self._print_plain(console, f"{self.indent}{options_str}: {desc}")
             else:
-                console.print(f"{self.indent}{options_str}")
+                self._print_plain(console, f"{self.indent}{options_str}")
         else:
             # Single option
             if desc:
-                console.print(f"{self.indent}{first_option}: {desc}")
+                self._print_plain(console, f"{self.indent}{first_option}: {desc}")
             else:
-                console.print(f"{self.indent}{first_option}")
+                self._print_plain(console, f"{self.indent}{first_option}")
 
     def _format_command_entry(
         self,
@@ -251,16 +231,16 @@ class PlainFormatter:
                         parts.append(", " + " ".join(shorts))
                     entry_name = "".join(parts)
                     if desc:
-                        console.print(f"{self.indent}{entry_name}: {desc}")
+                        self._print_plain(console, f"{self.indent}{entry_name}: {desc}")
                     else:
-                        console.print(f"{self.indent}{entry_name}")
+                        self._print_plain(console, f"{self.indent}{entry_name}")
                 else:
                     # Additional names on separate lines
-                    console.print(f"{self.indent}{name}")
+                    self._print_plain(console, f"{self.indent}{name}")
         elif shorts:
             # Only short names
             shorts_str = " ".join(shorts)
             if desc:
-                console.print(f"{self.indent}{shorts_str}: {desc}")
+                self._print_plain(console, f"{self.indent}{shorts_str}: {desc}")
             else:
-                console.print(f"{self.indent}{shorts_str}")
+                self._print_plain(console, f"{self.indent}{shorts_str}")
