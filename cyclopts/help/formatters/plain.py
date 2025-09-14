@@ -1,6 +1,7 @@
 """Plain text help formatter for improved accessibility."""
 
 import io
+import textwrap
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
@@ -190,15 +191,17 @@ class PlainFormatter:
             # Multiple options - show them all on first line with description
             options_str = ", ".join(all_options)
             if desc:
-                self._print_plain(console, f"{self.indent}{options_str}: {desc}")
+                text = f"{options_str}: {desc}"
             else:
-                self._print_plain(console, f"{self.indent}{options_str}")
+                text = options_str
+            self._print_plain(console, textwrap.indent(text, self.indent))
         else:
             # Single option
             if desc:
-                self._print_plain(console, f"{self.indent}{first_option}: {desc}")
+                text = f"{first_option}: {desc}"
             else:
-                self._print_plain(console, f"{self.indent}{first_option}")
+                text = first_option
+            self._print_plain(console, textwrap.indent(text, self.indent))
 
     def _format_command_entry(
         self,
@@ -231,16 +234,18 @@ class PlainFormatter:
                         parts.append(", " + " ".join(shorts))
                     entry_name = "".join(parts)
                     if desc:
-                        self._print_plain(console, f"{self.indent}{entry_name}: {desc}")
+                        text = f"{entry_name}: {desc}"
                     else:
-                        self._print_plain(console, f"{self.indent}{entry_name}")
+                        text = entry_name
+                    self._print_plain(console, textwrap.indent(text, self.indent))
                 else:
                     # Additional names on separate lines
-                    self._print_plain(console, f"{self.indent}{name}")
+                    self._print_plain(console, textwrap.indent(name, self.indent))
         elif shorts:
             # Only short names
             shorts_str = " ".join(shorts)
             if desc:
-                self._print_plain(console, f"{self.indent}{shorts_str}: {desc}")
+                text = f"{shorts_str}: {desc}"
             else:
-                self._print_plain(console, f"{self.indent}{shorts_str}")
+                text = shorts_str
+            self._print_plain(console, textwrap.indent(text, self.indent))
