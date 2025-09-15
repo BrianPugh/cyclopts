@@ -109,6 +109,7 @@ class ColumnSpec:
     """Specifies how to extract and render cell content from a :class:`~cyclopts.help.HelpEntry`.
 
     Can be either:
+
     - A string: The attribute name to retrieve from :class:`~cyclopts.help.HelpEntry` (e.g., 'names',
       'description', 'required', 'type'). The value is retrieved using
       :meth:`~cyclopts.help.HelpEntry.get` and displayed as-is.

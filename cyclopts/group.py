@@ -4,6 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Literal,
     Optional,
     Union,
     cast,
@@ -11,7 +12,16 @@ from typing import (
 
 from attrs import field
 
-from cyclopts.utils import UNSET, Sentinel, SortHelper, frozen, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import (
+    UNSET,
+    Sentinel,
+    SortHelper,
+    frozen,
+    help_formatter_converter,
+    is_iterable,
+    resolve_callables,
+    to_tuple_converter,
+)
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -88,7 +98,9 @@ class Group:
         kw_only=True,
     )
 
-    help_formatter: Optional["HelpFormatter"] = field(default=None, kw_only=True)
+    help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
+        default=None, converter=help_formatter_converter, kw_only=True
+    )
 
     @property
     def name(self) -> str:
