@@ -198,6 +198,31 @@ def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
         raise TypeError
 
 
+def _help_formatter_converter(
+    input_value: Union[None, Literal["default", "plain"], "HelpFormatter"],
+) -> Optional["HelpFormatter"]:
+    """Convert string literals to formatter instances.
+
+    Lazily imports formatters to avoid importing Rich during normal execution.
+    """
+    if input_value is None:
+        return None
+    elif isinstance(input_value, str):
+        if input_value == "default":
+            from cyclopts.help.formatters import DefaultFormatter
+
+            return DefaultFormatter()
+        elif input_value == "plain":
+            from cyclopts.help.formatters import PlainFormatter
+
+            return PlainFormatter()
+        else:
+            raise ValueError(f"Unknown formatter: {input_value!r}. Must be 'default' or 'plain'")
+    else:
+        # Assume it's already a HelpFormatter instance
+        return input_value
+
+
 @define
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
@@ -333,7 +358,9 @@ class App:
 
     backend: Optional[Literal["asyncio", "trio"]] = field(default=None, kw_only=True)
 
-    help_formatter: Optional["HelpFormatter"] = field(default=None, kw_only=True)
+    help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
+        default=None, converter=_help_formatter_converter, kw_only=True
+    )
 
     ######################
     # Private Attributes #
