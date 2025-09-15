@@ -25,7 +25,7 @@ from cyclopts.core import _get_root_module_name
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.help.silent import SILENT
-from cyclopts.utils import SortHelper, resolve_callables
+from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -184,7 +184,7 @@ class InlineText:
             yield from wrapped_segments
 
 
-@define(slots=True)
+@frozen(kw_only=True)
 class HelpEntry:
     """Container for help table entry data."""
 
