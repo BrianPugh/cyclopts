@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from rich.box import ROUNDED, Box
 from rich.console import RenderableType
+from rich.padding import PaddingDimensions
 from rich.panel import Panel
-from rich.style import Style
+from rich.style import StyleType
 from rich.table import Table
 
 from cyclopts.utils import frozen
@@ -104,8 +105,6 @@ def description_renderer(entry: "HelpEntry") -> "RenderableType":
 
 @frozen
 class ColumnSpec:
-    PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
-
     renderer: Union[str, "Renderer"]
     """Specifies how to extract and render cell content from a :class:`~cyclopts.help.HelpEntry`.
 
@@ -130,9 +129,9 @@ class ColumnSpec:
 
     header: str = ""
     footer: str = ""
-    header_style: Optional[Union[Style, str]] = None
-    footer_style: Optional[Union[Style, str]] = None
-    style: Optional[Union[Style, str]] = None
+    header_style: Optional[StyleType] = None
+    footer_style: Optional[StyleType] = None
+    style: Optional[StyleType] = None
     justify: Literal["default", "left", "center", "right", "full"] = "left"
     vertical: Literal["top", "middle", "bottom"] = "top"
     overflow: Literal["fold", "crop", "ellipsis", "ignore"] = "ellipsis"
@@ -247,9 +246,6 @@ def get_default_parameter_columns(
 
 @frozen
 class TableSpec:
-    StyleType = Union[Style, str]
-    PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
-
     # Intrinsic table styling/config
     title: Optional[str] = None
     caption: Optional[str] = None
@@ -263,7 +259,7 @@ class TableSpec:
     show_lines: bool = False
     expand: bool = False
     pad_edge: bool = False
-    padding: PaddingType = (0, 2, 0, 0)
+    padding: PaddingDimensions = (0, 2, 0, 0)
     collapse_padding: bool = False
 
     def build(
@@ -342,9 +338,6 @@ class TableSpec:
 
 @frozen
 class PanelSpec:
-    PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
-    StyleType = Union[Style, str]
-
     # Content-independent panel chrome
     title: Optional[RenderableType] = None
     subtitle: Optional[RenderableType] = None
@@ -353,7 +346,7 @@ class PanelSpec:
     style: Optional[StyleType] = "none"
     border_style: Optional[StyleType] = "none"
     box: Box = ROUNDED
-    padding: PaddingType = (0, 1)
+    padding: PaddingDimensions = (0, 1)
     expand: bool = True
     width: Optional[int] = None
     height: Optional[int] = None
