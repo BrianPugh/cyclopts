@@ -4,17 +4,15 @@ from collections.abc import Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from rich.box import ROUNDED, Box
-from rich.console import RenderableType
-from rich.padding import PaddingDimensions
-from rich.panel import Panel
-from rich.style import StyleType
-from rich.table import Table
-
 from cyclopts.utils import frozen
 
 if TYPE_CHECKING:
-    from rich.console import Console, ConsoleOptions
+    from rich.box import Box
+    from rich.console import Console, ConsoleOptions, RenderableType
+    from rich.padding import PaddingDimensions
+    from rich.panel import Panel
+    from rich.style import StyleType
+    from rich.table import Table
 
     from cyclopts.help import HelpEntry
     from cyclopts.help.protocols import Renderer
@@ -130,9 +128,9 @@ class ColumnSpec:
 
     header: str = ""
     footer: str = ""
-    header_style: Optional[StyleType] = None
-    footer_style: Optional[StyleType] = None
-    style: Optional[StyleType] = None
+    header_style: Optional["StyleType"] = None
+    footer_style: Optional["StyleType"] = None
+    style: Optional["StyleType"] = None
     justify: Literal["default", "left", "center", "right", "full"] = "left"
     vertical: Literal["top", "middle", "bottom"] = "top"
     overflow: Literal["fold", "crop", "ellipsis", "ignore"] = "ellipsis"
@@ -142,7 +140,7 @@ class ColumnSpec:
     ratio: Optional[int] = None
     no_wrap: bool = False
 
-    def render_cell(self, entry: "HelpEntry") -> RenderableType:
+    def render_cell(self, entry: "HelpEntry") -> "RenderableType":
         """Render the cell content based on the renderer type.
 
         If renderer is a string, retrieves that attribute from the entry.
@@ -250,17 +248,17 @@ class TableSpec:
     # Intrinsic table styling/config
     title: Optional[str] = None
     caption: Optional[str] = None
-    style: Optional[StyleType] = None
-    border_style: Optional[StyleType] = None
-    header_style: Optional[StyleType] = None
-    footer_style: Optional[StyleType] = None
-    box: Optional[Box] = None
+    style: Optional["StyleType"] = None
+    border_style: Optional["StyleType"] = None
+    header_style: Optional["StyleType"] = None
+    footer_style: Optional["StyleType"] = None
+    box: Optional["Box"] = None
     show_header: bool = False
     show_footer: bool = False
     show_lines: bool = False
     expand: bool = False
     pad_edge: bool = False
-    padding: PaddingDimensions = (0, 2, 0, 0)
+    padding: "PaddingDimensions" = (0, 2, 0, 0)
     collapse_padding: bool = False
 
     def build(
@@ -268,7 +266,7 @@ class TableSpec:
         columns: tuple[ColumnSpec, ...],
         entries: Iterable["HelpEntry"],
         **overrides,
-    ) -> Table:
+    ) -> "Table":
         """Construct and populate a rich.Table.
 
         Parameters
@@ -309,6 +307,8 @@ class TableSpec:
         }
         opts.update(overrides)
 
+        from rich.table import Table
+
         table = Table(**opts)
 
         # Add columns
@@ -340,27 +340,34 @@ class TableSpec:
 @frozen
 class PanelSpec:
     # Content-independent panel chrome
-    title: Optional[RenderableType] = None
-    subtitle: Optional[RenderableType] = None
+    title: Optional["RenderableType"] = None
+    subtitle: Optional["RenderableType"] = None
     title_align: Literal["left", "center", "right"] = "left"
     subtitle_align: Literal["left", "center", "right"] = "center"
-    style: Optional[StyleType] = "none"
-    border_style: Optional[StyleType] = "none"
-    box: Box = ROUNDED
-    padding: PaddingDimensions = (0, 1)
+    style: Optional["StyleType"] = "none"
+    border_style: Optional["StyleType"] = "none"
+    box: Optional["Box"] = None  # Will use ROUNDED as default when building
+    padding: "PaddingDimensions" = (0, 1)
     expand: bool = True
     width: Optional[int] = None
     height: Optional[int] = None
     safe_box: Optional[bool] = None
 
-    def build(self, renderable: RenderableType, **overrides) -> Panel:
+    def build(self, renderable: "RenderableType", **overrides) -> "Panel":
         """Create a Panel around `renderable`. Use kwargs to override spec per render."""
+        # Import box here for lazy loading
+        box = self.box
+        if box is None:
+            from rich.box import ROUNDED
+
+            box = ROUNDED
+
         opts = {
             "title_align": self.title_align,
             "subtitle_align": self.subtitle_align,
             "style": self.style,
             "border_style": self.border_style,
-            "box": self.box,
+            "box": box,
             "padding": self.padding,
             "expand": self.expand,
             "width": self.width,
@@ -373,4 +380,7 @@ class PanelSpec:
             opts["subtitle"] = self.subtitle
 
         opts.update(overrides)
+
+        from rich.panel import Panel
+
         return Panel(renderable, **opts)

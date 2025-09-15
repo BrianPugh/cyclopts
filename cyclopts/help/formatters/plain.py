@@ -5,19 +5,19 @@ import textwrap
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
+    from rich.console import Console
+
     from cyclopts.help import HelpPanel
 
-from rich.console import Console
 
-
-def _to_plain_text(obj: Any, console: Console) -> str:
+def _to_plain_text(obj: Any, console: "Console") -> str:
     """Extract plain text from Rich renderables.
 
     Parameters
     ----------
     obj : Any
         Object to convert to plain text.
-    console : Console
+    console : "Console"
         Console for rendering Rich objects.
 
     Returns
@@ -35,6 +35,8 @@ def _to_plain_text(obj: Any, console: Console) -> str:
     # For any Rich renderable, render without styles
     if hasattr(obj, "__rich_console__"):
         # Create a plain console that preserves layout but removes styling
+        from rich.console import Console
+
         plain_console = Console(
             file=io.StringIO(),
             width=console.width,
@@ -77,7 +79,7 @@ class PlainFormatter:
         self.max_width = max_width
         self.indent = " " * indent_width
 
-    def _print_plain(self, console: Console, text: str) -> None:
+    def _print_plain(self, console: "Console", text: str) -> None:
         """Print text without any highlighting or markup."""
         console.print(text, highlight=False)
 
@@ -92,7 +94,7 @@ class PlainFormatter:
         ----------
         panel : HelpPanel
             Help panel to render.
-        console : Console
+        console : "Console"
             Console to render to.
         """
         if not panel.entries:
@@ -131,7 +133,7 @@ class PlainFormatter:
         ----------
         usage : Any
             The usage line (Text or str).
-        console : Console
+        console : "Console"
             Console to render to.
         """
         if usage:
@@ -150,7 +152,7 @@ class PlainFormatter:
         ----------
         description : Any
             The description (can be various Rich renderables).
-        console : Console
+        console : "Console"
             Console to render to.
         """
         if description:
@@ -176,7 +178,7 @@ class PlainFormatter:
             Short forms of the parameter.
         desc : str
             Parameter description.
-        console : Console
+        console : "Console"
             Console to print to.
         """
         # Combine all names and shorts
@@ -220,7 +222,7 @@ class PlainFormatter:
             Short forms of the command.
         desc : str
             Command description.
-        console : Console
+        console : "Console"
             Console to print to.
         """
         # For commands, we typically want to show long names on separate lines

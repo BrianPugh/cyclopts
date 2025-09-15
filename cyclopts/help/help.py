@@ -188,11 +188,9 @@ class InlineText:
 class HelpEntry:
     """Container for help table entry data."""
 
-    from rich.console import RenderableType
-
     names: tuple[str, ...] = ()
     shorts: tuple[str, ...] = ()
-    description: Optional[RenderableType] = None
+    description: Optional["RenderableType"] = None
     required: bool = False
     sort_key: Any = None
     type: Optional[Any] = None
@@ -202,11 +200,9 @@ class HelpEntry:
 class HelpPanel:
     """Data container for help panel information."""
 
-    from rich.console import RenderableType
-
     format: str  # Literal["command", "parameter"]
-    title: RenderableType
-    description: RenderableType = field(factory=_text_factory)
+    title: "RenderableType"
+    description: "RenderableType" = field(factory=_text_factory)
     entries: list[HelpEntry] = field(factory=list)
 
     def remove_duplicates(self):
