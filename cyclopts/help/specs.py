@@ -342,28 +342,6 @@ class TableSpec:
 
         return table
 
-    @classmethod
-    def for_commands(cls, **kwargs) -> "TableSpec":
-        """Create a TableSpec configured for command display.
-
-        Parameters
-        ----------
-        **kwargs
-            Additional keyword arguments to override defaults.
-        """
-        return cls(**kwargs)
-
-    @classmethod
-    def for_parameters(cls, **kwargs) -> "TableSpec":
-        """Create a TableSpec configured for parameter display.
-
-        Parameters
-        ----------
-        **kwargs
-            Additional keyword arguments to override defaults.
-        """
-        return cls(**kwargs)
-
 
 @frozen
 class PanelSpec:
