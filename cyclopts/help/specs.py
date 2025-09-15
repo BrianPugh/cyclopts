@@ -142,23 +142,6 @@ class ColumnSpec:
     ratio: Optional[int] = None
     no_wrap: bool = False
 
-    def add_to(self, table: Table) -> None:
-        table.add_column(
-            self.header,
-            footer=self.footer,
-            header_style=self.header_style,
-            footer_style=self.footer_style,
-            style=self.style,
-            justify=self.justify,
-            vertical=self.vertical,
-            overflow=self.overflow,
-            width=self.width,
-            min_width=self.min_width,
-            max_width=self.max_width,
-            ratio=self.ratio,
-            no_wrap=self.no_wrap,
-        )
-
     def render_cell(self, entry: "HelpEntry") -> RenderableType:
         """Render the cell content based on the renderer type.
 
@@ -332,8 +315,22 @@ class TableSpec:
         table = Table(**opts)
 
         # Add columns
-        for col in columns:
-            col.add_to(table)
+        for column in columns:
+            table.add_column(
+                column.header,
+                footer=column.footer,
+                header_style=column.header_style,
+                footer_style=column.footer_style,
+                style=column.style,
+                justify=column.justify,
+                vertical=column.vertical,
+                overflow=column.overflow,
+                width=column.width,
+                min_width=column.min_width,
+                max_width=column.max_width,
+                ratio=column.ratio,
+                no_wrap=column.no_wrap,
+            )
 
         # Add entries
         for e in entries:
