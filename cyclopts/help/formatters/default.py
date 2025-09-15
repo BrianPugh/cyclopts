@@ -1,6 +1,6 @@
 """Default Rich-based help formatter."""
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from attrs import define
 
@@ -10,25 +10,33 @@ if TYPE_CHECKING:
     from rich.console import Console, RenderableType
 
     from cyclopts.help import HelpPanel
-    from cyclopts.help.specs import PanelSpec, TableSpec
+    from cyclopts.help.protocols import ColumnSpecBuilder
+    from cyclopts.help.specs import ColumnSpec, PanelSpec, TableSpec
 
 
-@define
+@define(kw_only=True)
 class DefaultFormatter:
-    """Default help formatter using Rich library with customizable table and panel specs.
+    """Default help formatter using Rich library with customizable specs.
+
+    Specs are organized from outer to inner container:
+    panel (outer box) → table (inner structure) → columns (content).
 
     Parameters
     ----------
-    table_spec : Optional[TableSpec]
-        Table specification for rendering parameter/command tables.
-        If not provided, a default TableSpec will be created based on panel format.
-    panel_spec : PanelSpec
-        Panel specification for rendering help panels.
+    panel_spec : Optional[PanelSpec]
+        Panel specification for the outer box/panel styling.
         If not provided, a default PanelSpec will be created.
+    table_spec : Optional[TableSpec]
+        Table specification for table styling (borders, padding, etc).
+        If not provided, a default TableSpec will be created.
+    column_specs : Optional[Union[tuple[ColumnSpec, ...], ColumnSpecBuilder]]
+        Column specifications or builder function for table columns.
+        If not provided, default columns will be used based on panel format.
     """
 
-    table_spec: Optional["TableSpec"] = None
     panel_spec: Optional["PanelSpec"] = None
+    table_spec: Optional["TableSpec"] = None
+    column_specs: Optional[Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"]] = None
 
     def __call__(
         self,
@@ -90,7 +98,12 @@ class DefaultFormatter:
         from rich.console import NewLine
         from rich.text import Text
 
-        from cyclopts.help.specs import PanelSpec, TableSpec
+        from cyclopts.help.specs import (
+            PanelSpec,
+            TableSpec,
+            get_default_command_columns,
+            get_default_parameter_columns,
+        )
 
         panel_description = help_panel.description
         if isinstance(panel_description, Text):
@@ -99,16 +112,25 @@ class DefaultFormatter:
             if panel_description.plain:
                 panel_description = RichGroup(panel_description, NewLine(2))
 
-        if self.table_spec is None:
-            table_spec = TableSpec.for_commands() if help_panel.format == "command" else TableSpec.for_parameters()
-        else:
-            table_spec = self.table_spec
+        # Get table spec (styling only)
+        table_spec = self.table_spec or TableSpec()
         panel_spec = self.panel_spec or PanelSpec()
 
-        # Realize spec, build table, and add entries
-        table_spec = table_spec.realize_columns(console, console.options, help_panel.entries)
-        table = table_spec.build()
-        table_spec.add_entries(table, help_panel.entries)
+        # Determine/Resolve column specs
+        columns = self.column_specs
+        if columns is None:
+            # Use default columns based on panel format
+            if help_panel.format == "command":
+                columns = get_default_command_columns
+            else:
+                columns = get_default_parameter_columns
+
+        if callable(columns):
+            # It's a column builder
+            columns = columns(console, console.options, help_panel.entries)
+
+        # Build table with columns and entries
+        table = table_spec.build(columns, help_panel.entries)
 
         # Build the panel
         if panel_spec.title is None:

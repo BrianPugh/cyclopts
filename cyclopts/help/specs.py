@@ -4,7 +4,6 @@ from collections.abc import Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
-from attrs import evolve
 from rich.box import ROUNDED, Box
 from rich.console import RenderableType
 from rich.panel import Panel
@@ -17,10 +16,9 @@ if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpEntry
-    from cyclopts.help.protocols import ColumnSpecBuilder, Renderer
+    from cyclopts.help.protocols import Renderer
 
 
-# Renderer functions for different column types
 def asterisk_renderer(entry: "HelpEntry") -> "RenderableType":
     """Render an asterisk for required parameters.
 
@@ -175,9 +173,6 @@ class ColumnSpec:
             value = None
         return "" if value is None else value
 
-    def with_(self, **kw):
-        return evolve(self, **kw)
-
 
 # For Parameters:
 AsteriskColumn = ColumnSpec(renderer=asterisk_renderer, header="", justify="left", width=1, style="red bold")
@@ -192,10 +187,25 @@ NameColumn = ColumnSpec(
 DescriptionColumn = ColumnSpec(renderer=description_renderer, header="", justify="left", overflow="fold")
 
 
-def _command_column_spec_builder(
+def get_default_command_columns(
     console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"]
 ) -> tuple[ColumnSpec, ...]:
-    """Builder for default command column_specs."""
+    """Get default column specifications for command display.
+
+    Parameters
+    ----------
+    console : Console
+        Rich console for width calculations.
+    options : ConsoleOptions
+        Console rendering options.
+    entries : list[HelpEntry]
+        Command entries to display.
+
+    Returns
+    -------
+    tuple[ColumnSpec, ...]
+        Column specifications for command table.
+    """
     max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
         renderer=partial(wrapped_name_renderer, max_width=max_width),
@@ -211,10 +221,25 @@ def _command_column_spec_builder(
     )
 
 
-def _parameter_column_spec_builder(
+def get_default_parameter_columns(
     console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"]
 ) -> tuple[ColumnSpec, ...]:
-    """Builder for default parameter column_specs."""
+    """Get default column specifications for parameter display.
+
+    Parameters
+    ----------
+    console : Console
+        Rich console for width calculations.
+    options : ConsoleOptions
+        Console rendering options.
+    entries : list[HelpEntry]
+        Parameter entries to display.
+
+    Returns
+    -------
+    tuple[ColumnSpec, ...]
+        Column specifications for parameter table.
+    """
     max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
         renderer=partial(wrapped_name_renderer, max_width=max_width),
@@ -242,8 +267,6 @@ class TableSpec:
     StyleType = Union[Style, str]
     PaddingType = Union[int, tuple[int, int], tuple[int, int, int, int]]
 
-    columns: Union[tuple[ColumnSpec, ...], "ColumnSpecBuilder"]
-
     # Intrinsic table styling/config
     title: Optional[str] = None
     caption: Optional[str] = None
@@ -260,19 +283,32 @@ class TableSpec:
     padding: PaddingType = (0, 2, 0, 0)
     collapse_padding: bool = False
 
-    def realize_columns(self, console, options, entries) -> "TableSpec":
-        """Realize ColumnSpecBuilders."""
-        return self.with_(columns=self.columns(console, options, entries) if callable(self.columns) else self.columns)
+    def build(
+        self,
+        columns: tuple[ColumnSpec, ...],
+        entries: Iterable["HelpEntry"],
+        **overrides,
+    ) -> Table:
+        """Construct and populate a rich.Table.
 
-    def build(self, **overrides) -> Table:
-        """Construct a rich.Table, allowing per-render overrides, e.g. build(padding=0)."""
-        if callable(self.columns):
-            raise TypeError("Columns must be realized before building table")
+        Parameters
+        ----------
+        columns : tuple[ColumnSpec, ...]
+            Column specifications defining the table structure.
+        entries : Iterable[HelpEntry]
+            Table entries to populate the table with.
+        **overrides
+            Per-render overrides for table settings.
 
+        Returns
+        -------
+        Table
+            A populated Rich Table.
+        """
         # If show_header is True but all columns have empty headers, don't show the header
         # This prevents an empty line from appearing at the top of the table
         show_header = self.show_header
-        if show_header and all(not col.header for col in self.columns):
+        if show_header and all(not col.header for col in columns):
             show_header = False
 
         opts = {
@@ -295,21 +331,16 @@ class TableSpec:
 
         table = Table(**opts)
 
-        for col in self.columns:
+        # Add columns
+        for col in columns:
             col.add_to(table)
-        return table
 
-    def add_entries(self, table: Table, entries: Iterable["HelpEntry"]) -> None:
-        """Insert the entries into the table."""
-        if callable(self.columns):
-            raise TypeError("Columns must be realized before building table")
-
+        # Add entries
         for e in entries:
-            cells = [col.render_cell(e) for col in self.columns]
+            cells = [col.render_cell(e) for col in columns]
             table.add_row(*cells)
 
-    def with_(self, **kw):
-        return evolve(self, **kw)
+        return table
 
     @classmethod
     def for_commands(cls, **kwargs) -> "TableSpec":
@@ -320,11 +351,7 @@ class TableSpec:
         **kwargs
             Additional keyword arguments to override defaults.
         """
-        defaults: dict = {
-            "columns": _command_column_spec_builder,
-        }
-        defaults.update(kwargs)
-        return cls(**defaults)
+        return cls(**kwargs)
 
     @classmethod
     def for_parameters(cls, **kwargs) -> "TableSpec":
@@ -335,11 +362,7 @@ class TableSpec:
         **kwargs
             Additional keyword arguments to override defaults.
         """
-        defaults: dict = {
-            "columns": _parameter_column_spec_builder,
-        }
-        defaults.update(kwargs)
-        return cls(**defaults)
+        return cls(**kwargs)
 
 
 @frozen
@@ -382,6 +405,3 @@ class PanelSpec:
 
         opts.update(overrides)
         return Panel(renderable, **opts)
-
-    def with_(self, **kw):
-        return evolve(self, **kw)
