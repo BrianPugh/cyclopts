@@ -1705,10 +1705,10 @@ class App:
         out = []
         sorted_groups, sorted_panels = sort_groups(groups, help_panels)
         for group, help_panel in zip(sorted_groups, sorted_panels):
-            help_panel.remove_duplicates()
+            help_panel._remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
-                help_panel.sort()
+                help_panel._sort()
             out.append((group, help_panel))
         return out
 

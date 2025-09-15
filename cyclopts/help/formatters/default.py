@@ -18,20 +18,45 @@ if TYPE_CHECKING:
 class DefaultFormatter:
     """Default help formatter using Rich library with customizable specs.
 
-    Specs are organized from outer to inner container:
-    panel (outer box) → table (inner structure) → columns (content).
-
     Parameters
     ----------
     panel_spec : Optional[PanelSpec]
         Panel specification for the outer box/panel styling.
-        If not provided, a default PanelSpec will be created.
     table_spec : Optional[TableSpec]
         Table specification for table styling (borders, padding, etc).
-        If not provided, a default TableSpec will be created.
     column_specs : Optional[Union[tuple[ColumnSpec, ...], ColumnSpecBuilder]]
         Column specifications or builder function for table columns.
-        If not provided, default columns will be used based on panel format.
+
+    Notes
+    -----
+    The relationship between these specs can be visualized as:
+
+    ::
+
+        ╭─ Commands ───────────────────────────────────────────────────────╮  ← panel_spec
+        │ serve     Start the development server                           │     (border, title)
+        │ --help    Display this message and exit.                         │
+        ╰──────────────────────────────────────────────────────────────────╯
+         ↑         ↑
+         col[0]    col[1]
+         (name)    (description)
+
+        ╭─ Parameters ─────────────────────────────────────────────────────╮  ← panel_spec
+        │ *  PORT --port        Server port number [required]              │
+        │    VERBOSE --verbose  Enable verbose output [default: False]     │
+        ╰──────────────────────────────────────────────────────────────────╯
+         ↑  ↑                  ↑
+         │  col[1]             col[2]
+         │  (name/flags)       (description)
+         │
+         col[0]
+         (required marker)
+
+    Where:
+
+    - ``panel_spec`` controls the outer panel appearance (border, title, etc.)
+    - ``table_spec`` controls the inner table styling (no visible borders by default)
+    - ``column_specs`` defines individual columns (width, style, alignment, etc.)
     """
 
     panel_spec: Optional["PanelSpec"] = None

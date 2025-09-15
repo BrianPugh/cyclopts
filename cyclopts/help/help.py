@@ -189,23 +189,41 @@ class HelpEntry:
     """Container for help table entry data."""
 
     names: tuple[str, ...] = ()
+    """Long option names (e.g., "--verbose", "--help")."""
+
     shorts: tuple[str, ...] = ()
+    """Short option names (e.g., "-v", "-h")."""
+
     description: Optional["RenderableType"] = None
+    """Help text description for this entry."""
+
     required: bool = False
+    """Whether this parameter/command is required."""
+
     sort_key: Any = None
+    """Custom sorting key for ordering entries."""
+
     type: Optional[Any] = None
+    """Type annotation of the parameter."""
 
 
 @define
 class HelpPanel:
     """Data container for help panel information."""
 
-    format: str  # Literal["command", "parameter"]
-    title: "RenderableType"
-    description: "RenderableType" = field(factory=_text_factory)
-    entries: list[HelpEntry] = field(factory=list)
+    format: Literal["command", "parameter"]
+    """Panel format type, either "command" or "parameter"."""
 
-    def remove_duplicates(self):
+    title: "RenderableType"
+    """The title text displayed at the top of the help panel."""
+
+    description: "RenderableType" = field(factory=_text_factory)
+    """Optional description text displayed below the title."""
+
+    entries: list[HelpEntry] = field(factory=list)
+    """List of help entries to display in the panel."""
+
+    def _remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
             hashable = (item.names, item.shorts)
@@ -214,7 +232,7 @@ class HelpPanel:
                 out.append(item)
         self.entries = out
 
-    def sort(self):
+    def _sort(self):
         """Sort entries in-place."""
         if not self.entries:
             return

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderableType
@@ -30,7 +30,22 @@ class ColumnSpecBuilder(Protocol):
 
 @runtime_checkable
 class HelpFormatter(Protocol):
-    """Protocol for help formatter functions."""
+    """Protocol for help formatter functions.
+
+    Implementations may optionally provide the following methods for custom rendering:
+
+    .. code-block:: python
+
+        def render_usage(self, usage: Any, console: Console) -> None:
+            \"\"\"Render the usage line.\"\"\"
+            ...
+
+        def render_description(self, description: Any, console: Console) -> None:
+            \"\"\"Render the description.\"\"\"
+            ...
+
+    If these methods are not provided, default rendering will be used.
+    """
 
     def __call__(
         self,
@@ -43,38 +58,6 @@ class HelpFormatter(Protocol):
         ----------
         panel : HelpPanel
             Help panel to render (commands, parameters, etc).
-        console : Console
-            Console to render to.
-        """
-        ...
-
-    def render_usage(
-        self,
-        usage: Any,
-        console: "Console",
-    ) -> None:
-        """Render the usage line.
-
-        Parameters
-        ----------
-        usage : Any
-            The usage line to display.
-        console : Console
-            Console to render to.
-        """
-        ...
-
-    def render_description(
-        self,
-        description: Any,
-        console: "Console",
-    ) -> None:
-        """Render the description.
-
-        Parameters
-        ----------
-        description : Any
-            The app/command description to display.
         console : Console
             Console to render to.
         """
