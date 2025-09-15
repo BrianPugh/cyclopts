@@ -148,7 +148,7 @@ class ColumnSpec:
         If renderer is callable, calls it with the entry.
         """
         if isinstance(self.renderer, str):
-            value = str(getattr(entry, self.renderer) or "")
+            value = str(getattr(entry, self.renderer))
         elif callable(self.renderer):
             value = self.renderer(entry)
         else:
