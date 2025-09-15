@@ -266,6 +266,15 @@ class TableSpec:
 
     def build(self, **overrides) -> Table:
         """Construct a rich.Table, allowing per-render overrides, e.g. build(padding=0)."""
+        if callable(self.columns):
+            raise TypeError("Columns must be realized before building table")
+
+        # If show_header is True but all columns have empty headers, don't show the header
+        # This prevents an empty line from appearing at the top of the table
+        show_header = self.show_header
+        if show_header and all(not col.header for col in self.columns):
+            show_header = False
+
         opts = {
             "title": self.title,
             "caption": self.caption,
@@ -274,7 +283,7 @@ class TableSpec:
             "header_style": self.header_style,
             "footer_style": self.footer_style,
             "box": self.box,
-            "show_header": self.show_header,
+            "show_header": show_header,
             "show_footer": self.show_footer,
             "show_lines": self.show_lines,
             "expand": self.expand,
@@ -283,10 +292,8 @@ class TableSpec:
             "collapse_padding": self.collapse_padding,
         }
         opts.update(overrides)
-        table = Table(**opts)
 
-        if callable(self.columns):
-            raise TypeError("Columns must be realized before building table")
+        table = Table(**opts)
 
         for col in self.columns:
             col.add_to(table)
