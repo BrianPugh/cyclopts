@@ -34,43 +34,31 @@ def asterisk_renderer(entry: "HelpEntry") -> "RenderableType":
     return "*" if entry.required else ""
 
 
-def name_renderer(entry: "HelpEntry") -> "RenderableType":
-    """Render the names column by combining names and shorts.
-
-    Parameters
-    ----------
-    entry : HelpEntry
-        The table entry to render.
-
-    Returns
-    -------
-    ~rich.console.RenderableType
-        Combined names and shorts as a string.
-    """
-    names_str = " ".join(entry.names) if entry.names else ""
-    shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-
-    if names_str and shorts_str:
-        return names_str + " " + shorts_str
-    return names_str or shorts_str
-
-
-def wrapped_name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "RenderableType":
-    """Render names with text wrapping.
+def name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "RenderableType":
+    """Render the names column with optional text wrapping.
 
     Parameters
     ----------
     entry : HelpEntry
         The table entry to render.
     max_width : Optional[int]
-        Maximum width for wrapping.
+        Maximum width for wrapping. If None, no wrapping is applied.
 
     Returns
     -------
     ~rich.console.RenderableType
-        Wrapped names text.
+        Combined names and shorts, optionally wrapped.
     """
-    text = str(name_renderer(entry))
+    names_str = " ".join(entry.names) if entry.names else ""
+    shorts_str = " ".join(entry.shorts) if entry.shorts else ""
+
+    if names_str and shorts_str:
+        text = names_str + " " + shorts_str
+    else:
+        text = names_str or shorts_str
+
+    if max_width is None:
+        return text
 
     wrap = partial(
         textwrap.wrap,
@@ -79,10 +67,7 @@ def wrapped_name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -
         tabsize=4,
     )
 
-    if max_width:
-        return "\n".join(wrap(text, max_width))
-    else:
-        return "\n".join(wrap(text))
+    return "\n".join(wrap(text, max_width))
 
 
 def description_renderer(entry: "HelpEntry") -> "RenderableType":
@@ -280,7 +265,7 @@ def get_default_command_columns(
     """
     max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
-        renderer=partial(wrapped_name_renderer, max_width=max_width),
+        renderer=partial(name_renderer, max_width=max_width),
         header="",
         justify="left",
         style="cyan",
@@ -314,7 +299,7 @@ def get_default_parameter_columns(
     """
     max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
-        renderer=partial(wrapped_name_renderer, max_width=max_width),
+        renderer=partial(name_renderer, max_width=max_width),
         header="",
         justify="left",
         style="cyan",
