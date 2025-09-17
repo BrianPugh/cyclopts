@@ -70,22 +70,6 @@ def name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "Rende
     return "\n".join(wrap(text, max_width))
 
 
-def description_renderer(entry: "HelpEntry") -> "RenderableType":
-    """Render the description column.
-
-    Parameters
-    ----------
-    entry : HelpEntry
-        The table entry to render.
-
-    Returns
-    -------
-    ~rich.console.RenderableType
-        The description or empty string.
-    """
-    return entry.description if entry.description is not None else ""
-
-
 @frozen
 class ColumnSpec:
     """Specification for a single column in a help table.
@@ -107,8 +91,7 @@ class ColumnSpec:
     Can be either:
 
     - A string: The attribute name to retrieve from :class:`~cyclopts.help.HelpEntry` (e.g., 'names',
-      'description', 'required', 'type'). The value is retrieved using
-      :meth:`~cyclopts.help.HelpEntry.get` and displayed as-is.
+      'description', 'required', 'type'). The string is displayed as-is.
     - A callable: A function matching the :class:`~cyclopts.help.protocols.Renderer` protocol.
       The function receives a :class:`~cyclopts.help.HelpEntry` and should return a
       :class:`~rich.console.RenderableType` (str, :class:`~rich.text.Text`, or other Rich renderable).
@@ -223,7 +206,7 @@ class ColumnSpec:
         If renderer is callable, calls it with the entry.
         """
         if isinstance(self.renderer, str):
-            value = str(getattr(entry, self.renderer))
+            value = getattr(entry, self.renderer)
         elif callable(self.renderer):
             value = self.renderer(entry)
         else:
@@ -241,7 +224,7 @@ NameColumn = ColumnSpec(
     style="cyan",
 )
 
-DescriptionColumn = ColumnSpec(renderer=description_renderer, header="", justify="left", overflow="fold")
+DescriptionColumn = ColumnSpec(renderer="description", header="", justify="left", overflow="fold")
 
 
 def get_default_command_columns(
