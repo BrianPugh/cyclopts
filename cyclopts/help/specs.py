@@ -98,11 +98,11 @@ class ColumnSpec:
     Example::
 
         header="Options" renders:
-        ┌─────────┬────────────┐
-        │ Options │ Description│
-        ├─────────┼────────────┤
-        │ --help  │ Show help  │
-        └─────────┴────────────┘
+        ┌─────────┬─────────────┐
+        │ Options │ Description │
+        ├─────────┼─────────────┤
+        │ --help  │ Show help   │
+        └─────────┴─────────────┘
     """
 
     footer: str = ""
@@ -184,7 +184,7 @@ class ColumnSpec:
     Corresponds to the ``no_wrap`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
-    def render_cell(self, entry: "HelpEntry") -> "RenderableType":
+    def _render_cell(self, entry: "HelpEntry") -> "RenderableType":
         """Render the cell content based on the renderer type.
 
         If renderer is a string, retrieves that attribute from the entry.
@@ -463,7 +463,7 @@ class TableSpec:
 
         # Add entries
         for e in entries:
-            cells = [col.render_cell(e) for col in columns]
+            cells = [col._render_cell(e) for col in columns]
             table.add_row(*cells)
 
         return table
