@@ -2,6 +2,7 @@ import math
 import textwrap
 from collections.abc import Iterable
 from functools import partial
+from operator import attrgetter
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from cyclopts.utils import frozen
@@ -190,7 +191,7 @@ class ColumnSpec:
         If renderer is callable, calls it with the entry.
         """
         if isinstance(self.renderer, str):
-            value = getattr(entry, self.renderer)
+            value = attrgetter(self.renderer)(entry)
         elif callable(self.renderer):
             value = self.renderer(entry)
         else:
