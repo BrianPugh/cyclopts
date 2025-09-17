@@ -18,22 +18,6 @@ if TYPE_CHECKING:
     from cyclopts.help.protocols import Renderer
 
 
-def asterisk_renderer(entry: "HelpEntry") -> "RenderableType":
-    """Render an asterisk for required parameters.
-
-    Parameters
-    ----------
-    entry : HelpEntry
-        The table entry to render.
-
-    Returns
-    -------
-    ~rich.console.RenderableType
-        "*" if required, empty string otherwise.
-    """
-    return "*" if entry.required else ""
-
-
 def name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "RenderableType":
     """Render the names column with optional text wrapping.
 
@@ -215,7 +199,13 @@ class ColumnSpec:
 
 
 # For Parameters:
-AsteriskColumn = ColumnSpec(renderer=asterisk_renderer, header="", justify="left", width=1, style="red bold")
+AsteriskColumn = ColumnSpec(
+    renderer=lambda entry: "*" if entry.required else "",
+    header="",
+    justify="left",
+    width=1,
+    style="red bold",
+)
 
 NameColumn = ColumnSpec(
     renderer=name_renderer,
