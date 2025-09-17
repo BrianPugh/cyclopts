@@ -1477,15 +1477,15 @@ Cyclopts provides a flexible help formatting system for customizing the help-pag
    :members:
 
 
-.. autoclass:: cyclopts.help.protocols.ColumnSpecBuilder
-   :members:
-
-
 .. autoclass:: cyclopts.help.DefaultFormatter
    :members:
 
 
 .. autoclass:: cyclopts.help.PlainFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.protocols.ColumnSpecBuilder
    :members:
 
 
