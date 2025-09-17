@@ -212,7 +212,7 @@ class HelpPanel:
     """Data container for help panel information."""
 
     format: Literal["command", "parameter"]
-    """Panel format type, either "command" or "parameter"."""
+    """Panel format type."""
 
     title: "RenderableType"
     """The title text displayed at the top of the help panel."""
@@ -221,7 +221,7 @@ class HelpPanel:
     """Optional description text displayed below the title."""
 
     entries: list[HelpEntry] = field(factory=list)
-    """List of help entries to display in the panel."""
+    """List of help entries to display (in order) in the panel."""
 
     def _remove_duplicates(self):
         seen, out = set(), []

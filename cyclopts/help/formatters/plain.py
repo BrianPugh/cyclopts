@@ -5,7 +5,7 @@ import textwrap
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from rich.console import Console
+    from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpPanel
 
@@ -85,17 +85,20 @@ class PlainFormatter:
 
     def __call__(
         self,
-        panel: "HelpPanel",
         console: "Console",
+        options: "ConsoleOptions",
+        panel: "HelpPanel",
     ) -> None:
         """Format and render a single help panel as plain text.
 
         Parameters
         ----------
-        panel : HelpPanel
-            Help panel to render.
         console : "Console"
             Console to render to.
+        options : "ConsoleOptions"
+            Console rendering options.
+        panel : HelpPanel
+            Help panel to render.
         """
         if not panel.entries:
             return
@@ -124,17 +127,20 @@ class PlainFormatter:
 
     def render_usage(
         self,
-        usage: Any,
         console: "Console",
+        options: "ConsoleOptions",
+        usage: Any,
     ) -> None:
         """Render the usage line.
 
         Parameters
         ----------
-        usage : Any
-            The usage line (Text or str).
         console : "Console"
             Console to render to.
+        options : "ConsoleOptions"
+            Console rendering options.
+        usage : Any
+            The usage line (Text or str).
         """
         if usage:
             usage_text = _to_plain_text(usage, console)
@@ -143,17 +149,20 @@ class PlainFormatter:
 
     def render_description(
         self,
-        description: Any,
         console: "Console",
+        options: "ConsoleOptions",
+        description: Any,
     ) -> None:
         """Render the description.
 
         Parameters
         ----------
-        description : Any
-            The description (can be various Rich renderables).
         console : "Console"
             Console to render to.
+        options : "ConsoleOptions"
+            Console rendering options.
+        description : Any
+            The description (can be various Rich renderables).
         """
         if description:
             desc_text = _to_plain_text(description, console)

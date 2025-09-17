@@ -302,6 +302,12 @@ To disable the help-page entirely, set ``help_flags`` to an empty string or iter
    app = cyclopts.App(help_flags="")
    app = cyclopts.App(help_flags=[])
 
+--------------------
+Help Customization
+--------------------
+For advanced customization of help screen appearance, including custom formatters,
+styled panels, and dynamic column layouts, see :ref:`Help Customization`.
+
 
 .. _PEP-0257: https://peps.python.org/pep-0257/
 .. _PEP-0287: https://peps.python.org/pep-0287/

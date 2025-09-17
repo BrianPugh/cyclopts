@@ -7,7 +7,7 @@ from attrs import define
 from cyclopts.help.silent import SILENT
 
 if TYPE_CHECKING:
-    from rich.console import Console, RenderableType
+    from rich.console import Console, ConsoleOptions, RenderableType
 
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import ColumnSpecBuilder
@@ -60,61 +60,60 @@ class DefaultFormatter:
     """
 
     panel_spec: Optional["PanelSpec"] = None
-    table_spec: Optional["TableSpec"] = None
-    column_specs: Optional[Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"]] = None
+    """Panel specification for the outer box/panel styling (border, title, padding, etc)."""
 
-    def __call__(
-        self,
-        panel: "HelpPanel",
-        console: "Console",
-    ) -> None:
+    table_spec: Optional["TableSpec"] = None
+    """Table specification for table styling (borders, padding, column separation, etc)."""
+
+    column_specs: Optional[Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"]] = None
+    """Column specifications or builder function for table columns (width, style, alignment, etc)."""
+
+    def __call__(self, console: "Console", options: "ConsoleOptions", panel: "HelpPanel") -> None:
         """Format and render a single help panel using Rich.
 
         Parameters
         ----------
+        console : ~rich.console.Console
+            Console to render to.
+        options : ~rich.console.ConsoleOptions
+            Console rendering options.
         panel : HelpPanel
             Help panel to render.
-        console : Console
-            Console to render to.
         """
-        rendered = self._render_panel(panel, console)
+        rendered = self._render_panel(panel, console, options)
         console.print(rendered)
 
-    def render_usage(
-        self,
-        usage: Any,
-        console: "Console",
-    ) -> None:
+    def render_usage(self, console: "Console", options: "ConsoleOptions", usage: Any) -> None:
         """Render the usage line.
 
         Parameters
         ----------
+        console : ~rich.console.Console
+            Console to render to.
+        options : ~rich.console.ConsoleOptions
+            Console rendering options.
         usage : Any
             The usage line (Text or str).
-        console : Console
-            Console to render to.
         """
         if usage:
             console.print(usage)
 
-    def render_description(
-        self,
-        description: Any,
-        console: "Console",
-    ) -> None:
+    def render_description(self, console: "Console", options: "ConsoleOptions", description: Any) -> None:
         """Render the description.
 
         Parameters
         ----------
+        console : ~rich.console.Console
+            Console to render to.
+        options : ~rich.console.ConsoleOptions
+            Console rendering options.
         description : Any
             The description (can be various Rich renderables).
-        console : Console
-            Console to render to.
         """
         if description:
             console.print(description)
 
-    def _render_panel(self, help_panel: "HelpPanel", console: "Console") -> "RenderableType":
+    def _render_panel(self, help_panel: "HelpPanel", console: "Console", options: "ConsoleOptions") -> "RenderableType":
         """Render a single help panel."""
         if not help_panel.entries:
             return SILENT
@@ -152,7 +151,7 @@ class DefaultFormatter:
 
         if callable(columns):
             # It's a column builder
-            columns = columns(console, console.options, help_panel.entries)
+            columns = columns(console, options, help_panel.entries)
 
         # Build table with columns and entries
         table = table_spec.build(columns, help_panel.entries)

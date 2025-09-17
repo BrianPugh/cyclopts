@@ -618,7 +618,7 @@ class App:
         ----------
         version_raw : str
             Raw version string to format and print.
-        console : Console
+        console : ~rich.console.Console
             Console to print to.
         """
         from cyclopts.help import InlineText
@@ -637,7 +637,7 @@ class App:
 
         Parameters
         ----------
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print version string to.
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
@@ -663,7 +663,7 @@ class App:
 
         Parameters
         ----------
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print version string to.
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
@@ -1092,7 +1092,7 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         end_of_options_delimiter: Optional[str]
@@ -1274,7 +1274,7 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: Optional[bool]
@@ -1372,7 +1372,7 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: Optional[bool]
@@ -1458,7 +1458,7 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
@@ -1556,7 +1556,7 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Tokens to interpret for traversing the application command structure.
             If not provided, defaults to ``sys.argv``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
@@ -1591,13 +1591,13 @@ class App:
             # Render usage
             default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=DefaultFormatter())
             if hasattr(default_formatter, "render_usage"):
-                default_formatter.render_usage(usage, console)
+                default_formatter.render_usage(console, console.options, usage)
             elif usage:
                 console.print(usage)
 
             # Render description
             if hasattr(default_formatter, "render_description"):
-                default_formatter.render_description(description, console)
+                default_formatter.render_description(console, console.options, description)
             elif description:
                 console.print(description)
 
@@ -1607,7 +1607,7 @@ class App:
                 if formatter is None:
                     formatter = default_formatter
                 formatter = cast("HelpFormatter", formatter)
-                formatter(panel, console)
+                formatter(console, console.options, panel)
 
     def _assemble_help_panels(
         self,

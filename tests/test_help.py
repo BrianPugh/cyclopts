@@ -30,7 +30,7 @@ def app():
 def test_empty_help_panel_rich_silent(console):
     help_panel = HelpPanel(format="command", title="test")
     formatter = DefaultFormatter()
-    rendered = formatter._render_panel(help_panel, console)
+    rendered = formatter._render_panel(help_panel, console, console.options)
 
     with console.capture() as capture:
         console.print(rendered)
@@ -167,7 +167,7 @@ def test_format_commands_docstring(app, console):
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     formatter = DefaultFormatter()
-    rendered = formatter._render_panel(panel, console)
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -202,7 +202,7 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     formatter = DefaultFormatter()
-    rendered = formatter._render_panel(panel, console)
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -259,7 +259,7 @@ def test_format_commands_explicit_help(app, console):
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
     formatter = DefaultFormatter()
-    rendered = formatter._render_panel(panel, console)
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -283,7 +283,7 @@ def test_format_commands_explicit_name(app, console):
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
     formatter = DefaultFormatter()
-    rendered = formatter._render_panel(panel, console)
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
         console.print(rendered)
 
@@ -418,7 +418,7 @@ def capture_format_group_parameters(console, default_function_groups):
             group_argument_collection = argument_collection.filter_by(group=group)
             panel = create_parameter_help_panel(group, group_argument_collection, "restructuredtext")
             formatter = DefaultFormatter()
-            rendered = formatter._render_panel(panel, console)
+            rendered = formatter._render_panel(panel, console, console.options)
             console.print(rendered)
 
         return capture.get()
