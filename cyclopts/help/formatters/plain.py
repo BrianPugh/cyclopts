@@ -17,7 +17,7 @@ def _to_plain_text(obj: Any, console: "Console") -> str:
     ----------
     obj : Any
         Object to convert to plain text.
-    console : "Console"
+    console : ~rich.console.Console
         Console for rendering Rich objects.
 
     Returns
@@ -93,9 +93,9 @@ class PlainFormatter:
 
         Parameters
         ----------
-        console : "Console"
+        console : ~rich.console.Console
             Console to render to.
-        options : "ConsoleOptions"
+        options : ~rich.console.ConsoleOptions
             Console rendering options.
         panel : HelpPanel
             Help panel to render.
@@ -135,9 +135,9 @@ class PlainFormatter:
 
         Parameters
         ----------
-        console : "Console"
+        console : ~rich.console.Console
             Console to render to.
-        options : "ConsoleOptions"
+        options : ~rich.console.ConsoleOptions
             Console rendering options.
         usage : Any
             The usage line (Text or str).
@@ -157,9 +157,9 @@ class PlainFormatter:
 
         Parameters
         ----------
-        console : "Console"
+        console : ~rich.console.Console
             Console to render to.
-        options : "ConsoleOptions"
+        options : ~rich.console.ConsoleOptions
             Console rendering options.
         description : Any
             The description (can be various Rich renderables).
@@ -187,7 +187,7 @@ class PlainFormatter:
             Short forms of the parameter.
         desc : str
             Parameter description.
-        console : "Console"
+        console : ~rich.console.Console
             Console to print to.
         """
         # Combine all names and shorts
@@ -231,7 +231,7 @@ class PlainFormatter:
             Short forms of the command.
         desc : str
             Command description.
-        console : "Console"
+        console : ~rich.console.Console
             Console to print to.
         """
         # For commands, we typically want to show long names on separate lines

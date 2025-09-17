@@ -294,10 +294,10 @@ API
       Defaults to ``["--version"]``.
 
    .. attribute:: console
-      :type: rich.console.Console
+      :type: ~rich.console.Console
       :value: None
 
-      Default :class:`rich.console.Console` to use when displaying runtime messages.
+      Default :class:`~rich.console.Console` to use when displaying runtime messages.
       Cyclopts console resolution is as follows:
 
       #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.

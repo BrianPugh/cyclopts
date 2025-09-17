@@ -166,113 +166,69 @@ class ColumnSpec:
     """
 
     header_style: Optional["StyleType"] = None
-    """Rich style applied to the column header text.
+    """Style applied to the column header text.
 
-    Example::
-
-        header_style="bold cyan" renders the header in bold cyan color:
-        [bold cyan]Options[/bold cyan]
+    Corresponds to the ``header_style`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     footer_style: Optional["StyleType"] = None
-    """Rich style applied to the column footer text.
+    """Style applied to the column footer text.
 
-    Example::
-
-        footer_style="dim italic" renders the footer in dim italic:
-        [dim italic]Required[/dim italic]
+    Corresponds to the ``footer_style`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     style: Optional["StyleType"] = None
-    """Default Rich style applied to all cells in this column.
+    """Default style applied to all cells in this column.
 
-    Example::
-
-        style="cyan" renders all cell content in cyan:
-        [cyan]--verbose[/cyan]
-        [cyan]--debug[/cyan]
+    Corresponds to the ``style`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     justify: Literal["default", "left", "center", "right", "full"] = "left"
     """Text justification within the column.
 
-    Example::
-
-        justify="center" centers text in column:
-        │   --help   │
-        justify="right" aligns text to the right:
-        │      --help│
+    Corresponds to the ``justify`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     vertical: Literal["top", "middle", "bottom"] = "top"
-    """Vertical alignment of text within cells when cells have multiple lines.
+    """Vertical alignment of text within cells.
 
-    Example::
-
-        vertical="middle" with multi-line cells:
-        │        │ Line 1    │
-        │ --help │ Line 2    │  <- --help is vertically centered
-        │        │ Line 3    │
+    Corresponds to the ``vertical`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     overflow: Literal["fold", "crop", "ellipsis", "ignore"] = "ellipsis"
     """How to handle text that exceeds column width.
 
-    Example::
-
-        overflow="ellipsis" with long text:
-        │ --very-long-option-na... │
-        overflow="fold" wraps to next line:
-        │ --very-long-option-     │
-        │ name                    │
+    Corresponds to the ``overflow`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     width: Optional[int] = None
     """Fixed width for the column in characters.
 
-    Example::
-
-        width=10 creates a column exactly 10 characters wide:
-        │ --help    │  <- exactly 10 chars
+    Corresponds to the ``width`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     min_width: Optional[int] = None
     """Minimum width for the column in characters.
 
-    Example::
-
-        min_width=15 ensures column is at least 15 chars:
-        │ --h           │  <- padded to 15 chars minimum
+    Corresponds to the ``min_width`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     max_width: Optional[int] = None
     """Maximum width for the column in characters.
 
-    Example::
-
-        max_width=20 limits column width:
-        │ --very-long-option...│  <- truncated at 20 chars
+    Corresponds to the ``max_width`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     ratio: Optional[int] = None
     """Relative width ratio compared to other columns.
 
-    Example::
-
-        Column A with ratio=2, Column B with ratio=1:
-        │     Column A (2/3 width)     │ Col B (1/3) │
+    Corresponds to the ``ratio`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     no_wrap: bool = False
     """Prevent text wrapping in the column.
 
-    Example::
-
-        no_wrap=True forces single line (may overflow):
-        │ --very-long-option-name-that-wont-wrap │
-        no_wrap=False allows wrapping:
-        │ --very-long-option- │
-        │ name-that-wraps    │
+    Corresponds to the ``no_wrap`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
     def render_cell(self, entry: "HelpEntry") -> "RenderableType":
@@ -397,160 +353,85 @@ class TableSpec:
     title: Optional[str] = None
     """Title text displayed above the table.
 
-    Example::
-
-        title="Available Options" renders:
-        Available Options
-        ┌────────┬────────────┐
-        │ --help │ Show help  │
-        └────────┴────────────┘
+    Corresponds to the ``title`` parameter of :class:`~rich.table.Table`.
     """
 
     caption: Optional[str] = None
     """Caption text displayed below the table.
 
-    Example::
-
-        caption="Use --help for more info" renders:
-        ┌────────┬────────────┐
-        │ --help │ Show help  │
-        └────────┴────────────┘
-        Use --help for more info
+    Corresponds to the ``caption`` parameter of :class:`~rich.table.Table`.
     """
 
     style: Optional["StyleType"] = None
     """Default style applied to the entire table.
 
-    Example::
-
-        style="dim" renders the entire table in dim style:
-        [dim]┌────────┬────────────┐
-        │ --help │ Show help  │
-        └────────┴────────────┘[/dim]
+    Corresponds to the ``style`` parameter of :class:`~rich.table.Table`.
     """
 
     border_style: Optional["StyleType"] = None
     """Style applied to table borders.
 
-    Example::
-
-        border_style="cyan" renders borders in cyan:
-        [cyan]┌────────┬────────────┐[/cyan]
-        [cyan]│[/cyan] --help [cyan]│[/cyan] Show help  [cyan]│[/cyan]
-        [cyan]└────────┴────────────┘[/cyan]
+    Corresponds to the ``border_style`` parameter of :class:`~rich.table.Table`.
     """
 
     header_style: Optional["StyleType"] = None
     """Default style for all table headers (can be overridden per column).
 
-    Example::
-
-        header_style="bold underline" with show_header=True:
-        [bold underline]Options  Description[/bold underline]
-        --help   Show help
+    Corresponds to the ``header_style`` parameter of :class:`~rich.table.Table`.
     """
 
     footer_style: Optional["StyleType"] = None
     """Default style for all table footers (can be overridden per column).
 
-    Example::
-
-        footer_style="italic" with show_footer=True:
-        --help   Show help
-        [italic]Required Optional[/italic]
+    Corresponds to the ``footer_style`` parameter of :class:`~rich.table.Table`.
     """
 
     box: Optional["Box"] = None
     """Box drawing style for the table borders.
 
-    Example::
-
-        box=SIMPLE renders:
-          --help   Show help
-        box=DOUBLE renders:
-        ╔════════╦════════════╗
-        ║ --help ║ Show help  ║
-        ╚════════╩════════════╝
+    Corresponds to the ``box`` parameter of :class:`~rich.table.Table`. See :mod:`rich.box` for available styles.
     """
 
     show_header: bool = False
     """Whether to display column headers.
 
-    Example::
-
-        show_header=True with header="Option" renders:
-        Option   Description
-        --help   Show help
-        show_header=False renders:
-        --help   Show help
+    Corresponds to the ``show_header`` parameter of :class:`~rich.table.Table`.
     """
 
     show_footer: bool = False
     """Whether to display column footers.
 
-    Example::
-
-        show_footer=True with footer="Required" renders:
-        --help   Show help
-        Required
+    Corresponds to the ``show_footer`` parameter of :class:`~rich.table.Table`.
     """
 
     show_lines: bool = False
     """Whether to show horizontal lines between rows.
 
-    Example::
-
-        show_lines=True renders:
-        ┌────────┬────────────┐
-        │ --help │ Show help  │
-        ├────────┼────────────┤
-        │ --verbose │ Verbose  │
-        └────────┴────────────┘
+    Corresponds to the ``show_lines`` parameter of :class:`~rich.table.Table`.
     """
 
     expand: bool = False
     """Whether the table should expand to fill available width.
 
-    Example::
-
-        expand=True with 80 char terminal:
-        ┌──────────────────────────────────┬───────────────────────────────────────────┐
-        │ --help                           │ Show help                                 │
-        └──────────────────────────────────┴───────────────────────────────────────────┘
+    Corresponds to the ``expand`` parameter of :class:`~rich.table.Table`.
     """
 
     pad_edge: bool = False
     """Whether to add padding to the table edges.
 
-    Example::
-
-        pad_edge=True adds space around table edges:
-        ┌──────────┬──────────────┐
-        │  --help  │  Show help  │  <- extra padding
-        └──────────┴──────────────┘
+    Corresponds to the ``pad_edge`` parameter of :class:`~rich.table.Table`.
     """
 
     padding: "PaddingDimensions" = (0, 2, 0, 0)
     """Padding around cell content (top, right, bottom, left).
 
-    Example::
-
-        padding=(1, 2, 1, 2) adds vertical and horizontal padding:
-        ┌────────────┬────────────────┐
-        │            │                │  <- top padding
-        │  --help    │  Show help     │  <- left/right padding
-        │            │                │  <- bottom padding
-        └────────────┴────────────────┘
+    Corresponds to the ``padding`` parameter of :class:`~rich.table.Table`.
     """
 
     collapse_padding: bool = False
     """Whether to collapse padding when adjacent cells are empty.
 
-    Example::
-
-        collapse_padding=True removes padding between empty cells:
-        Normal:    │  --help  │          │  <- padding maintained
-        Collapsed: │  --help  ││  <- padding collapsed for empty cell
+    Corresponds to the ``collapse_padding`` parameter of :class:`~rich.table.Table`.
     """
 
     def build(
@@ -648,149 +529,74 @@ class PanelSpec:
     title: Optional["RenderableType"] = None
     """Title text displayed at the top of the panel.
 
-    Example::
-
-        title="Help Information" renders:
-        ╭─ Help Information ────────────────╮
-        │ Panel content here              │
-        ╰─────────────────────────────────╯
+    Corresponds to the ``title`` parameter of :class:`~rich.panel.Panel`.
     """
 
     subtitle: Optional["RenderableType"] = None
     """Subtitle text displayed at the bottom of the panel.
 
-    Example::
-
-        subtitle="Version 1.0" renders:
-        ╭─────────────────────────────────╮
-        │ Panel content here              │
-        ╰───────────── Version 1.0 ──────╯
+    Corresponds to the ``subtitle`` parameter of :class:`~rich.panel.Panel`.
     """
 
     title_align: Literal["left", "center", "right"] = "left"
     """Alignment of the title text within the panel.
 
-    Example::
-
-        title_align="center" renders:
-        ╭──────── Title Here ─────────╮
-        title_align="right" renders:
-        ╭──────────────── Title Here ─╮
+    Corresponds to the ``title_align`` parameter of :class:`~rich.panel.Panel`.
     """
 
     subtitle_align: Literal["left", "center", "right"] = "center"
     """Alignment of the subtitle text within the panel.
 
-    Example::
-
-        subtitle_align="left" renders:
-        ╰─ Subtitle ───────────────────╯
-        subtitle_align="right" renders:
-        ╰─────────────────── Subtitle ─╯
+    Corresponds to the ``subtitle_align`` parameter of :class:`~rich.panel.Panel`.
     """
 
     style: Optional["StyleType"] = "none"
     """Style applied to the panel background.
 
-    Example::
-
-        style="on blue" renders the panel with blue background:
-        [on blue]╭─────────────────────────────────╮
-        │ Panel content here              │
-        ╰─────────────────────────────────╯[/on blue]
+    Corresponds to the ``style`` parameter of :class:`~rich.panel.Panel`.
     """
 
     border_style: Optional["StyleType"] = "none"
     """Style applied to the panel border.
 
-    Example::
-
-        border_style="cyan bold" renders borders in bold cyan:
-        [cyan bold]╭─────────────────────────────────╮[/cyan bold]
-        [cyan bold]│[/cyan bold] Panel content here              [cyan bold]│[/cyan bold]
-        [cyan bold]╰─────────────────────────────────╯[/cyan bold]
+    Corresponds to the ``border_style`` parameter of :class:`~rich.panel.Panel`.
     """
 
     box: Optional["Box"] = None  # Will use ROUNDED as default when building
     """Box drawing style for the panel border.
 
-    Example::
-
-        box=SQUARE renders:
-        ┌─────────────────────────────────┐
-        │ Panel content here              │
-        └─────────────────────────────────┘
-        box=DOUBLE renders:
-        ╔═════════════════════════════════╗
-        ║ Panel content here              ║
-        ╚═════════════════════════════════╝
+    Corresponds to the ``box`` parameter of :class:`~rich.panel.Panel`. See :mod:`rich.box` for available styles.
+    Defaults to ``rich.box.ROUNDED``.
     """
 
     padding: "PaddingDimensions" = (0, 1)
     """Padding inside the panel (top/bottom, left/right) or (top, right, bottom, left).
 
-    Example::
-
-        padding=(1, 2) adds vertical and horizontal padding:
-        ╭─────────────────────────────────╮
-        │                                │  <- top padding
-        │  Panel content here            │  <- left/right padding
-        │                                │  <- bottom padding
-        ╰─────────────────────────────────╯
+    Corresponds to the ``padding`` parameter of :class:`~rich.panel.Panel`.
     """
 
     expand: bool = True
     """Whether the panel should expand to fill available width.
 
-    Example::
-
-        expand=True with 60 char terminal:
-        ╭────────────────────────────────────────────────────────╮
-        │ Content                                                  │
-        ╰────────────────────────────────────────────────────────╯
-        expand=False:
-        ╭─────────╮
-        │ Content │
-        ╰─────────╯
+    Corresponds to the ``expand`` parameter of :class:`~rich.panel.Panel`.
     """
 
     width: Optional[int] = None
     """Fixed width for the panel in characters.
 
-    Example::
-
-        width=40 creates a panel exactly 40 characters wide:
-        ╭────────────────────────────────────╮
-        │ Content                            │
-        ╰────────────────────────────────────╯
+    Corresponds to the ``width`` parameter of :class:`~rich.panel.Panel`.
     """
 
     height: Optional[int] = None
     """Fixed height for the panel in lines.
 
-    Example::
-
-        height=5 creates a panel exactly 5 lines tall:
-        ╭─────────────────────────────────╮
-        │ Content                        │
-        │                                │  <- padded to height
-        │                                │
-        ╰─────────────────────────────────╯
+    Corresponds to the ``height`` parameter of :class:`~rich.panel.Panel`.
     """
 
     safe_box: Optional[bool] = None
     """Whether to use ASCII-safe box characters for compatibility.
 
-    Example::
-
-        safe_box=True uses ASCII characters:
-        +----------------------------------+
-        | Panel content here               |
-        +----------------------------------+
-        safe_box=False uses Unicode box drawing:
-        ╭─────────────────────────────────╮
-        │ Panel content here              │
-        ╰─────────────────────────────────╯
+    Corresponds to the ``safe_box`` parameter of :class:`~rich.panel.Panel`.
     """
 
     def build(self, renderable: "RenderableType", **overrides) -> "Panel":
