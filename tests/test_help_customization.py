@@ -593,14 +593,20 @@ class SimpleCustomFormatter:
                 else:
                     desc = f"[default: {entry.default}]"
 
-            # Format line with the expected spacing
-            # Match the test's expected output exactly
-            if "verbose" in name_part.lower():
-                # VERBOSE line: one space between name and default
-                line = f"{name_part} {desc}"
+            # Format line based on panel format
+            if panel.format == "command":
+                # Commands: align with padding for readability
+                if desc:
+                    # Pad the name part to a reasonable width for alignment
+                    line = f"{name_part:<20} {desc}"
+                else:
+                    line = name_part
             else:
-                # CONFIG line: add extra spaces for visual balance
-                line = f"CONFIG --config     {desc}"
+                # Parameters: similar padding for consistency
+                if desc:
+                    line = f"{name_part:<20} {desc}"
+                else:
+                    line = name_part
 
             # Use Text object to prevent wrapping
             text_line = Text(f"| {line:<66} |", no_wrap=True)
@@ -642,7 +648,7 @@ def test_custom_help_formatter_basic(console: Console):
         +--------------------------------------------------------------------+
         | These are custom options.                                          |
         | VERBOSE --verbose --no-verbose [default: False]                    |
-        | CONFIG --config     [default: default.cfg]                         |
+        | CONFIG --config      [default: default.cfg]                        |
         +--------------------------------------------------------------------+
         """
     )
@@ -909,8 +915,8 @@ def test_group_formatter_none_fallback(console: Console):
         +--------------------------------------------------------------------+
         |                              Commands                              |
         +--------------------------------------------------------------------+
-        | CONFIG --config     Display this message and exit.                 |
-        | CONFIG --config     Display application version.                   |
+        | --help -h            Display this message and exit.                |
+        | --version            Display application version.                  |
         +--------------------------------------------------------------------+
         ╭─ Explicitly DefaultFormatter Group ────────────────────────────────╮
         │ OPT2 --opt2  [default: custom1]                                    │
@@ -918,7 +924,7 @@ def test_group_formatter_none_fallback(console: Console):
         +--------------------------------------------------------------------+
         |                Fallback to App.help_formatter Group                |
         +--------------------------------------------------------------------+
-        | CONFIG --config     [default: default1]                            |
+        | OPT1 --opt1          [default: default1]                           |
         +--------------------------------------------------------------------+
         """
     )
