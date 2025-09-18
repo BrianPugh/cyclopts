@@ -2046,7 +2046,6 @@ def test_format_plain_formatter(console):
           --help, -h: Display this message and exit.
           --version: Display application version.
 
-
         Parameters:
           VERBOSE, --verbose, --no-verbose: [default: False]
 

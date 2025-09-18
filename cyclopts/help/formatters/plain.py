@@ -105,7 +105,6 @@ class PlainFormatter:
 
         # Print panel title with appropriate formatting
         if panel.title:
-            self._print_plain(console, "")
             self._print_plain(console, f"{panel.title}:")
 
         # Print each entry in the panel
@@ -149,6 +148,7 @@ class PlainFormatter:
             usage_text = _to_plain_text(usage, console)
             if usage_text:
                 self._print_plain(console, usage_text)
+                console.print()
 
     def render_description(
         self,
@@ -170,8 +170,8 @@ class PlainFormatter:
         if description:
             desc_text = _to_plain_text(description, console)
             if desc_text:
-                console.print("")
                 self._print_plain(console, desc_text)
+                console.print()
 
     def _format_parameter_entry(
         self,

@@ -828,7 +828,6 @@ def test_multiple_groups_different_formatters(console: Console):
         ╰────────────────────────────────────────────────────────────────────╯
         >> Custom Group
            -> OPT1 --opt1: [default: val1]
-
         Plain Group:
           OPT2, --opt2: [default: val2]
 
