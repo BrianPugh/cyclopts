@@ -245,3 +245,54 @@ def test_nested_meta_app_inheriting_root_default_parameter(app, console):
 
     with pytest.raises(UnknownOptionError):
         app.meta("foo --no-flag3", exit_on_error=False)
+
+
+def test_meta_app_help_inconsistency_with_argument_order(app, console):
+    """Test for issue #551: Inconsistent help page display with different argument orders.
+
+    The issue is that when meta app parameters come before the command name,
+    the help display is different than when they come after the command name.
+    Both should display the same help page for the foo command.
+    """
+    app["--help"].group = "Global options"
+    app["--version"].group = "Global options"
+    app.meta.group_parameters = Group("Global options", sort_key=0)
+
+    @app.command
+    def foo(loops: int, *, user: Annotated[str, Parameter(parse=False)]):
+        print(f"Hello {user}")
+        for i in range(loops):
+            print(f"Looping! {i}")
+
+    @app.meta.default
+    def my_app_launcher(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)], user: str):
+        command, bound, ignored = app.parse_args(tokens)
+        return command(*bound.args, **bound.kwargs, user=user)
+
+    expected = dedent(
+        """\
+        Usage: test_meta foo [ARGS] [OPTIONS]
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  LOOPS --loops  [required]                                       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Global options ───────────────────────────────────────────────────╮
+        │ *  --user  [required]                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    # Test help with --user before command
+    with console.capture() as capture:
+        app.meta(["--user", "test", "foo", "--help"], console=console)
+
+    help_user_before_foo = capture.get()
+    assert help_user_before_foo == expected
+
+    # Test help with --user after command
+    with console.capture() as capture:
+        app.meta(["foo", "--user", "test", "--help"], console=console)
+
+    help_user_after_foo = capture.get()
+
+    assert help_user_after_foo == expected
