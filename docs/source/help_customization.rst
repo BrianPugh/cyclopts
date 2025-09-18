@@ -20,7 +20,7 @@ The :class:`~cyclopts.App` class accepts a ``help_formatter`` parameter that con
    from cyclopts import App
    from cyclopts.help import DefaultFormatter, PlainFormatter
 
-   # Use a built-in formatter by name
+   # Use a built-in formatter by name: {"default", "plain"}
    app = App(help_formatter="plain")
 
    # Or pass a formatter instance with custom configuration
@@ -30,7 +30,7 @@ The :class:`~cyclopts.App` class accepts a ``help_formatter`` parameter that con
        )
    )
 
-   # Or use a completely custom formatter
+   # Or use a completely custom formatter; see HelpFormatter protocol.
    app = App(help_formatter=MyCustomFormatter())
 
 Group-Level Formatting
@@ -61,17 +61,9 @@ Individual :class:`~cyclopts.Group` instances can have their own ``help_formatte
    # Parameters in advanced_group will use the group's formatter,
    # while other parameters use the app's formatter
 
-This allows you to:
-
-- Apply consistent formatting across your entire application via ``App.help_formatter``
-- Override formatting for specific parameter groups via ``Group.help_formatter``
-- Mix different formatting styles within a single application (e.g., highlighting critical options differently)
-
 -------------------
 Built-in Formatters
 -------------------
-
-Cyclopts includes two built-in formatters to cover common use cases:
 
 DefaultFormatter
 ^^^^^^^^^^^^^^^^
@@ -106,20 +98,22 @@ borders, and structured layouts.
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: my-app [ARGS] [OPTIONS]</span>
 
    A simple greeting application.
 
-   ╭─ Parameters ──────────────────────────────────────────────────────────╮
-   │ *  NAME --name    Person to greet. [required]                         │
-   │    COUNT --count  Number of times to greet. [default: 1]              │
-   ╰───────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ────────────────────────────────────────────────────────────╮
-   │ --help -h  Display this message and exit.                             │
-   │ --version  Display application version.                               │
-   ╰───────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ <span style="color: #0088cc">--help -h</span>  Display this message and exit.                                    │
+   │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">NAME --name</span>    Person to greet. <span style="color: #cc3333; opacity: 0.7">[required]</span>                                │
+   │    <span style="color: #0088cc">COUNT --count</span>  Number of times to greet. <span style="opacity: 0.7">[default: 1]</span>                     │
+   ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
 
 PlainFormatter
 ^^^^^^^^^^^^^^
@@ -206,24 +200,27 @@ The :class:`~cyclopts.help.PanelSpec` controls the outer panel appearance:
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: demo.py [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py [ARGS] [OPTIONS]</span>
 
    Process a file with custom panel styling.
 
-   ╔═ Commands ═══════════════════════════════════════════════════════════╗
-   ║                                                                      ║
-   ║  --help -h  Display this message and exit.                           ║
-   ║  --version  Display application version.                             ║
-   ║                                                                      ║
-   ╚══════════════════════════════════════════════════════════════════════╝
-   ╔═ Parameters ═════════════════════════════════════════════════════════╗
-   ║                                                                      ║
-   ║  *  PATH --path                     [required]                       ║
-   ║     VERBOSE --verbose --no-verbose  [default: False]                 ║
-   ║                                                                      ║
-   ╚══════════════════════════════════════════════════════════════════════╝
+   <span style="color: #0088cc">╔═ Commands ═══════════════════════════════════════════════════════════╗</span>
+   <span style="color: #0088cc">║                                                                      ║</span>
+   <span style="color: #0088cc">║  </span><span style="color: #0088cc">--help -h  </span>Display this message and exit.                           <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║  </span><span style="color: #0088cc">--version  </span>Display application version.                             <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║                                                                      ║</span>
+   <span style="color: #0088cc">╚══════════════════════════════════════════════════════════════════════╝</span>
+   <span style="color: #0088cc">╔═ Parameters ═════════════════════════════════════════════════════════╗</span>
+   <span style="color: #0088cc">║                                                                      ║</span>
+   <span style="color: #0088cc">║  </span><span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #0088cc">PATH --path                   </span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                       <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║     </span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="opacity: 0.7">[default: False]</span>                              <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║       </span><span style="color: #0088cc">--no-verbose   </span>                                                <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║                                                                      ║</span>
+   <span style="color: #0088cc">╚══════════════════════════════════════════════════════════════════════╝</span></pre>
+   </div>
 
 
 Table Customization
@@ -239,10 +236,12 @@ The :class:`~cyclopts.help.TableSpec` controls the table styling within panels:
    app = App(
        help_formatter=DefaultFormatter(
            table_spec=TableSpec(
-               show_header=True,        # Show column headers
-               show_lines=True,         # Show lines between rows
-               border_style="green",    # Green table elements
-               padding=(0, 2, 0, 0),   # Extra right padding
+               show_header=True,  # Show column headers
+               show_lines=True,  # Show lines between rows
+               show_edge=False,  # Remove outer table border
+               border_style="green",  # Green table elements
+               padding=(0, 2, 0, 0),  # Extra right padding
+               box=SQUARE,  # otherwise we won't see the lines
            )
        )
    )
@@ -257,18 +256,29 @@ The :class:`~cyclopts.help.TableSpec` controls the table styling within panels:
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: test_table_custom.py [ARGS] [OPTIONS]</span>
 
    Process a file with custom table styling.
 
-   ╭─ Parameters ──────────────────────────────────────────────────────────╮
-   │ Required │ Option           │ Description                            │
-   │ ─────────┼──────────────────┼─────────────────────────────────────── │
-   │ *        │ PATH --path      │ [required]                             │
-   │          │ VERBOSE --verbose│ [default: False]                       │
-   ╰───────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ Command    <span style="color: #00aa00">│</span>Description                                                      │
+   │ <span style="color: #00aa00">───────────┼────────────────────────────────────────────────────────────────</span> │
+   │ <span style="color: #0088cc">--help -h</span>  <span style="color: #00aa00">│</span>Display this message and exit.                                   │
+   │ <span style="color: #00aa00">───────────┼────────────────────────────────────────────────────────────────</span> │
+   │ <span style="color: #0088cc">--version</span>  <span style="color: #00aa00">│</span>Display application version.                                     │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+   │    <span style="color: #00aa00">│</span>Option             <span style="color: #00aa00">│</span>Description                                          │
+   │ <span style="color: #00aa00">───┼───────────────────┼────────────────────────────────────────────────────</span> │
+   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #00aa00">│</span><span style="color: #0088cc">PATH --path</span>        <span style="color: #00aa00">│</span><span style="color: #cc3333; opacity: 0.7">[required]</span>                                           │
+   │ <span style="color: #00aa00">───┼───────────────────┼────────────────────────────────────────────────────</span> │
+   │    <span style="color: #00aa00">│</span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #00aa00">│</span><span style="opacity: 0.7">[default: False]</span>                                     │
+   │    <span style="color: #00aa00">│</span><span style="color: #0088cc">  --no-verbose</span>     <span style="color: #00aa00">│</span>                                                     │
+   ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
 
 Combining Customizations
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -306,20 +316,22 @@ You can combine both panel and table specifications:
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: my-app [ARGS] [OPTIONS]</span>
 
    Process a file with combined customizations.
 
-   ╭──────────────────────────────────────────────────────────────────────╮
-   │ *  PATH --path       [required]                                      │
-   │    VERBOSE --verbose [default: False]                                │
-   ╰──────────────────────────────────────────────────────────────────────╯
-   ╭──────────────────────────────────────────────────────────────────────╮
-   │ --help -h  Display this message and exit.                            │
-   │ --version  Display application version.                              │
-   ╰──────────────────────────────────────────────────────────────────────╯
+   <span style="color: #00aaaa">╭─ Commands ──────────────────────────────────────────────────────────╮</span>
+   <span style="color: #00aaaa">│ </span><span style="color: #0088cc">--help -h</span>  Display this message and exit.                           <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">│ </span><span style="color: #0088cc">--version</span>  Display application version.                             <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">╰─────────────────────────────────────────────────────────────────────╯</span>
+   <span style="color: #00aaaa">╭─ Parameters ────────────────────────────────────────────────────────╮</span>
+   <span style="color: #00aaaa">│ </span><span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">PATH --path</span>       <span style="color: #cc3333; opacity: 0.7">[required]</span>                                     <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">│    </span><span style="color: #0088cc">VERBOSE --verbose</span> <span style="opacity: 0.7">[default: False]</span>                               <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">╰─────────────────────────────────────────────────────────────────────╯</span></pre>
+   </div>
 
 -----------------------
 Group-Level Formatting
@@ -378,24 +390,27 @@ visually distinguish between different types of options:
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: test_group_formatting.py [ARGS] [OPTIONS]</span>
 
    Process files with styled help groups.
 
-   ╔═══════════════════════════════════════════════════════════════════════╗
-   ║ *  INPUT-FILE --input-file  [required]                               ║
-   ║ *  OUTPUT-DIR --output-dir  [required]                               ║
-   ╚═══════════════════════════════════════════════════════════════════════╝
-   ┌───────────────────────────────────────────────────────────────────────┐
-   │ VERBOSE --verbose  [default: False]                                   │
-   │ THREADS --threads  [default: 4]                                       │
-   └───────────────────────────────────────────────────────────────────────┘
-   ╭─ Commands ────────────────────────────────────────────────────────────╮
-   │ --help -h  Display this message and exit.                             │
-   │ --version  Display application version.                               │
-   ╰───────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ <span style="color: #0088cc">--help -h</span>  Display this message and exit.                                    │
+   │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   <span style="color: #00aa00">   Optional Settings                                                            </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">VERBOSE --verbose</span>  <span style="opacity: 0.7">[default: False]</span>                                          <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">  --no-verbose</span>     <span style="opacity: 0.7"></span>                                                          <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">THREADS --threads</span>  <span style="opacity: 0.7">[default: 4]</span>                                              <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00">                                                                                </span>
+   <span style="color: #cc3333; font-weight: bold">╔═ Required Options ═══════════════════════════════════════════════════════════╗</span>
+   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">INPUT-FILE --input-file</span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
+   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">OUTPUT-DIR --output-dir</span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
+   <span style="color: #cc3333; font-weight: bold">╚══════════════════════════════════════════════════════════════════════════════╝</span></pre>
+   </div>
 
 ---------------------
 Custom Column Layout
@@ -471,22 +486,24 @@ using :class:`~cyclopts.help.ColumnSpec`:
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: test_custom_column.py [ARGS] [OPTIONS]</span>
 
    Demo custom column layout.
 
-   ╭─ Custom Layout ────────────────────────────────────────────────────────╮
-   │    Option                     Type   Description                      │
-   │ ★  INPUT-PATH --input-path    str    Input file path                 │
-   │ ★  OUTPUT-PATH --output-path  str    Output file path                │
-   │    COUNT --count              int    Number of iterations            │
-   ╰────────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ─────────────────────────────────────────────────────────────╮
-   │ --help -h  Display this message and exit.                             │
-   │ --version  Display application version.                               │
-   ╰────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ <span style="color: #0088cc">--help -h</span>  Display this message and exit.                                    │
+   │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Custom Layout ──────────────────────────────────────────────────────────────╮
+   │     Option                     Type  Description                             │
+   │ <span style="color: #ffaa00; font-weight: bold">★</span>   <span style="color: #0088cc">INPUT-PATH --input-path</span>    <span style="color: #aa00aa">str</span>   Input file path                         │
+   │ <span style="color: #ffaa00; font-weight: bold">★</span>   <span style="color: #0088cc">OUTPUT-PATH --output-path</span>  <span style="color: #aa00aa">str</span>   Output file path                        │
+   │     <span style="color: #0088cc">COUNT --count</span>              <span style="color: #aa00aa">int</span>   Number of iterations                    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
 
 Dynamic Column Builders
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -550,18 +567,27 @@ conditions:
 
 Output (adjusts based on terminal width):
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: test_dynamic_columns.py [ARGS] [OPTIONS]</span>
 
    Process files with dynamic columns.
 
-   ╭─ Parameters ───────────────────────────────────────────────────────────╮
-   │ Option                          Description                           │
-   │ * INPUT-FILE --input-file       [required]                            │
-   │ * OUTPUT-FILE --output-file     [required]                            │
-   │   VERBOSE --verbose             [default: False]                      │
-   ╰────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ Option     Description                                                       │
+   │ <span style="color: #0088cc">--help -h</span>  Display this message and exit.                                    │
+   │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+   │     Option                    Description                                    │
+   │ <span style="color: #cc3333">*</span>   <span style="color: #0088cc">INPUT-FILE --input-file</span>                                                  │
+   │ <span style="color: #cc3333">*</span>   <span style="color: #0088cc">OUTPUT-FILE</span>                                                              │
+   │     <span style="color: #0088cc">--output-file</span>                                                            │
+   │     <span style="color: #0088cc">VERBOSE --verbose</span>                                                        │
+   │     <span style="color: #0088cc">--no-verbose</span>                                                             │
+   ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
 
 --------------------------
 Creating Custom Formatters
@@ -641,189 +667,31 @@ receive the console and options first, followed by the content to render:
 
 Output:
 
-.. code-block:: text
+.. raw:: html
 
-   Usage: my-app [ARGS] [OPTIONS]
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="color: #00aa00; font-weight: bold">Usage:</span> test_custom_formatter.py [ARGS] [OPTIONS]
 
-   Process files with custom formatter.
+   <span style="font-style: italic">Process files with custom formatter.</span>
 
-   ╭─ Parameters ──────────────────────────────────────────────────────────╮
-   │ Option                       Description                              │
-   │ INPUT-FILE --input-file      [required]                               │
-   │ OUTPUT-FILE --output-file    [required]                               │
-   │ VERBOSE --verbose            [default: False]                         │
-   ╰────────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ─────────────────────────────────────────────────────────────╮
-   │ Option             Description                                        │
-   │ --help -h          Display this message and exit.                     │
-   │ --version          Display application version.                       │
-   ╰────────────────────────────────────────────────────────────────────────╯
-
----------------------------
-Complete Example
----------------------------
-
-Here's a complete example demonstrating various customization techniques:
-
-.. code-block:: python
-
-   #!/usr/bin/env python
-   """CLI with extensively customized help formatting."""
-
-   from pathlib import Path
-   from typing import Annotated
-
-   from rich.box import DOUBLE, MINIMAL_HEAVY_HEAD, ROUNDED
-
-   from cyclopts import App, Group, Parameter
-   from cyclopts.help import (
-       ColumnSpec,
-       DefaultFormatter,
-       PanelSpec,
-       TableSpec,
-   )
-
-   # Define different styles for different parameter groups
-   critical_group = Group(
-       "🔴 Critical Settings",
-       help="These options significantly affect operation",
-       help_formatter=DefaultFormatter(
-           panel_spec=PanelSpec(
-               box=DOUBLE,
-               border_style="red bold",
-               padding=(0, 2),
-           ),
-           table_spec=TableSpec(
-               show_header=True,
-               border_style="red",
-           ),
-           column_specs=(
-               ColumnSpec(
-                   renderer=lambda e: "⚠" if e.required else " ",
-                   width=2,
-                   style="red bold",
-               ),
-               ColumnSpec(
-                   renderer=lambda e: " ".join(e.names + e.shorts),
-                   header="Option",
-                   style="yellow bold",
-               ),
-               ColumnSpec(
-                   renderer="description",
-                   header="Impact",
-                   style="white",
-               ),
-           ),
-       ),
-   )
-
-   performance_group = Group(
-       "⚡ Performance Tuning",
-       help_formatter=DefaultFormatter(
-           panel_spec=PanelSpec(
-               box=MINIMAL_HEAVY_HEAD,
-               border_style="cyan",
-           ),
-           table_spec=TableSpec(
-               show_lines=True,
-               padding=(0, 1),
-           ),
-       ),
-   )
-
-   # Create the application
-   app = App(
-       name="styled-cli",
-       help="A beautifully formatted CLI application",
-       # Set a default formatter for ungrouped parameters
-       help_formatter=DefaultFormatter(
-           panel_spec=PanelSpec(
-               box=ROUNDED,
-               border_style="green",
-           ),
-       ),
-   )
-
-   @app.default
-   def main(
-       # Critical parameters
-       config: Annotated[
-           Path,
-           Parameter(
-               group=critical_group,
-               help="Configuration file (changes entire behavior)",
-           ),
-       ],
-
-       # Performance parameters
-       workers: Annotated[
-           int,
-           Parameter(
-               group=performance_group,
-               help="Number of parallel workers",
-           ),
-       ] = 4,
-       cache_size: Annotated[
-           int,
-           Parameter(
-               group=performance_group,
-               help="Cache size in MB",
-           ),
-       ] = 100,
-
-       # Regular parameters (use default formatting)
-       verbose: Annotated[
-           bool,
-           Parameter(help="Enable verbose output"),
-       ] = False,
-   ):
-       """Process data with style.
-
-       This application demonstrates how different parameter
-       groups can have completely different visual styles
-       in the help output.
-       """
-       print(f"Loading config from {config}")
-       print(f"Using {workers} workers with {cache_size}MB cache")
-
-   if __name__ == "__main__":
-       app()
-
-Output:
-
-.. code-block:: text
-
-   Usage: styled-cli [ARGS] [OPTIONS]
-
-   A beautifully formatted CLI application
-
-   Process data with style.
-
-   This application demonstrates how different parameter
-   groups can have completely different visual styles
-   in the help output.
-
-   ╔═══════════════════════════════════════════════════════════════════════╗
-   ║                                                                       ║
-   ║     Option                Impact                                      ║
-   ║  ⚠  CONFIG --config       Configuration file (changes entire         ║
-   ║                           behavior)                                  ║
-   ║                                                                       ║
-   ╚═══════════════════════════════════════════════════════════════════════╝
-   ┏━ ⚡ Performance Tuning ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-   ┃                                                                       ┃
-   ┃  WORKERS --workers      Number of parallel workers [default: 4]      ┃
-   ┃ ───────────────────────────────────────────────────────────────────  ┃
-   ┃  CACHE-SIZE --cache-size Cache size in MB [default: 100]             ┃
-   ┃                                                                       ┃
-   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-   ╭─ Parameters ──────────────────────────────────────────────────────────╮
-   │ VERBOSE --verbose  Enable verbose output [default: False]             │
-   ╰───────────────────────────────────────────────────────────────────────╯
-   ╭─ Commands ────────────────────────────────────────────────────────────╮
-   │ --help -h  Display this message and exit.                             │
-   │ --version  Display application version.                               │
-   ╰───────────────────────────────────────────────────────────────────────╯
+   <span style="color: #0088cc">╭─ </span><span style="color: #0088cc; font-weight: bold">Commands</span><span style="color: #0088cc"> ───────────────────────────────────────────────────────────────────╮</span>
+   <span style="color: #0088cc">│</span> ┏━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓                               <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> ┃<span style="color: #aa00aa; font-weight: bold"> Option    </span>┃<span style="color: #aa00aa; font-weight: bold"> Description                    </span>┃                               <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> ┡━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩                               <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> │<span style="color: #00aaaa"> --help -h </span>│ Display this message and exit. │                               <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> │<span style="color: #00aaaa"> --version </span>│ Display application version.   │                               <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> └───────────┴────────────────────────────────┘                               <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">╰──────────────────────────────────────────────────────────────────────────────╯</span>
+   <span style="color: #0088cc">╭─ </span><span style="color: #0088cc; font-weight: bold">Parameters</span><span style="color: #0088cc"> ─────────────────────────────────────────────────────────────────╮</span>
+   <span style="color: #0088cc">│</span> ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┓                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> ┃<span style="color: #aa00aa; font-weight: bold"> Option                         </span>┃<span style="color: #aa00aa; font-weight: bold"> Description </span>┃                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━┩                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> │<span style="color: #00aaaa"> INPUT-FILE --input-file        </span>│             │                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> │<span style="color: #00aaaa"> OUTPUT-FILE --output-file      </span>│             │                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> │<span style="color: #00aaaa"> VERBOSE --verbose --no-verbose </span>│             │                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">│</span> └────────────────────────────────┴─────────────┘                             <span style="color: #0088cc">│</span>
+   <span style="color: #0088cc">╰──────────────────────────────────────────────────────────────────────────────╯</span></pre>
+   </div>
 
 ---------
 Reference

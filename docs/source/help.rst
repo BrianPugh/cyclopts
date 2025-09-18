@@ -189,13 +189,13 @@ Displays text as `Rich Markup`_.
 .. raw:: html
 
    <div class="highlight-default notranslate">
-         <pre style="font-family: 'JetBrains Mono', 'Fira Code', Monaco, Consolas, monospace;">Usage: default COMMAND
+         <pre style="font-family: monospace;">Usage: default COMMAND
 
-   Rich can display colors like <span style="color: #ff6666">red</span> easily.
+   Rich can display colors like <span style="color: #cc3333">red</span> easily.
 
    ╭─ Commands ───────────────────────────────────────────────────────╮
-   │ <span style="color: #66b3ff">--help -h  </span>Display this message and exit.                        │
-   │ <span style="color: #66b3ff">--version  </span>Display application version.                          │
+   │ <span style="color: #0088cc">--help -h  </span>Display this message and exit.                        │
+   │ <span style="color: #0088cc">--version  </span>Display application version.                          │
    ╰──────────────────────────────────────────────────────────────────╯</pre>
    </div>
 
@@ -229,7 +229,7 @@ Resulting help:
 .. raw:: html
 
    <div class="highlight-default notranslate">
-         <pre style="font-family: 'JetBrains Mono', 'Fira Code', Monaco, Consolas, monospace;">Usage: default COMMAND
+         <pre style="font-family: monospace;">Usage: default COMMAND
 
    My application summary.
 
@@ -242,8 +242,8 @@ Resulting help:
    2. bullet point 2.
 
    ╭─ Commands ──────────────────────────────────────────────────────────╮
-   │ <span style="color: #66b3ff">--help -h  </span>Display this message and exit.                           │
-   │ <span style="color: #66b3ff">--version  </span>Display application version.                             │
+   │ <span style="color: #0088cc">--help -h  </span>Display this message and exit.                           │
+   │ <span style="color: #0088cc">--version  </span>Display application version.                             │
    ╰─────────────────────────────────────────────────────────────────────╯
    </pre></div>
 
@@ -273,15 +273,15 @@ Resulting help:
 .. raw:: html
 
    <div class="highlight-default notranslate">
-         <pre style="font-family: 'JetBrains Mono', 'Fira Code', Monaco, Consolas, monospace;">Usage: default COMMAND
+         <pre style="font-family: monospace;">Usage: default COMMAND
 
    My application summary.
 
-   We can do markdown things like have <span style="font-weight: bold">bold text</span>. <a href="https://cyclopts.readthedocs.io" style="color: #66b3ff">Hyperlinks work as well</a>.
+   We can do markdown things like have <span style="font-weight: bold">bold text</span>. <a href="https://cyclopts.readthedocs.io" style="color: #0088cc">Hyperlinks work as well</a>.
 
    ╭─ Commands ──────────────────────────────────────────────────────────╮
-   │ <span style="color: #66b3ff">--help -h  </span>Display this message and exit.                           │
-   │ <span style="color: #66b3ff">--version  </span>Display application version.                             │
+   │ <span style="color: #0088cc">--help -h  </span>Display this message and exit.                           │
+   │ <span style="color: #0088cc">--version  </span>Display application version.                             │
    ╰─────────────────────────────────────────────────────────────────────╯
    </pre></div>
 
