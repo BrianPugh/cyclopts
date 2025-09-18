@@ -438,6 +438,12 @@ class TableSpec:
     Corresponds to the ``show_lines`` parameter of :class:`~rich.table.Table`.
     """
 
+    show_edge: bool = True
+    """Whether to draw a box around the outside of the table.
+
+    Corresponds to the ``show_edge`` parameter of :class:`~rich.table.Table`.
+    """
+
     expand: bool = False
     """Whether the table should expand to fill available width.
 
@@ -460,6 +466,24 @@ class TableSpec:
     """Whether to collapse padding when adjacent cells are empty.
 
     Corresponds to the ``collapse_padding`` parameter of :class:`~rich.table.Table`.
+    """
+
+    width: Optional[int] = None
+    """Fixed width for the table in characters.
+
+    Corresponds to the ``width`` parameter of :class:`~rich.table.Table`.
+    """
+
+    min_width: Optional[int] = None
+    """Minimum width for the table in characters.
+
+    Corresponds to the ``min_width`` parameter of :class:`~rich.table.Table`.
+    """
+
+    safe_box: Optional[bool] = None
+    """Whether to use ASCII-safe box characters for compatibility.
+
+    Corresponds to the ``safe_box`` parameter of :class:`~rich.table.Table`.
     """
 
     def build(
@@ -501,10 +525,14 @@ class TableSpec:
             "show_header": show_header,
             "show_footer": self.show_footer,
             "show_lines": self.show_lines,
+            "show_edge": self.show_edge,
             "expand": self.expand,
             "pad_edge": self.pad_edge,
             "padding": self.padding,
             "collapse_padding": self.collapse_padding,
+            "width": self.width,
+            "min_width": self.min_width,
+            "safe_box": self.safe_box,
         }
         opts.update(overrides)
 
