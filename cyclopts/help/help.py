@@ -17,19 +17,19 @@ from typing import (
     get_origin,
 )
 
-from attrs import define, field
+from attrs import define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.core import _get_root_module_name
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
+from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT
 from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
-    from rich.text import Text
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
@@ -71,119 +71,6 @@ def _text_factory():
     return Text()
 
 
-class InlineText:
-    def __init__(self, primary_renderable: "RenderableType", *, force_empty_end=False):
-        self.primary_renderable = primary_renderable
-        self.texts = []
-        self.force_empty_end = force_empty_end
-
-    @classmethod
-    def from_format(cls, content: Optional[str], format: str, *, force_empty_end=False):
-        if content is None:
-            from rich.text import Text
-
-            primary_renderable = Text(end="")
-        elif format == "plaintext":
-            from rich.text import Text
-
-            primary_renderable = Text(content.rstrip())
-        elif format in ("markdown", "md"):
-            from rich.markdown import Markdown
-
-            primary_renderable = Markdown(content)
-        elif format in ("restructuredtext", "rst"):
-            from rich_rst import RestructuredText
-
-            primary_renderable = RestructuredText(content)
-        elif format == "rich":
-            from rich.text import Text
-
-            primary_renderable = Text.from_markup(content)
-        else:
-            raise ValueError(f'Unknown help_format "{format}"')
-
-        return cls(primary_renderable, force_empty_end=force_empty_end)
-
-    def append(self, text: "Text"):
-        self.texts.append(text)
-
-    def __rich_console__(self, console, options):
-        from rich.segment import Segment
-        from rich.text import Text
-
-        if not self.primary_renderable and not self.texts:
-            return
-
-        # Group segments by line
-        lines_of_segments, current_line = [], []
-        for segment in console.render(self.primary_renderable, options):
-            if segment.text == "\n":
-                lines_of_segments.append(current_line + [segment])
-                current_line = []
-            else:
-                current_line.append(segment)
-
-        if current_line:
-            lines_of_segments.append(current_line)
-
-        # If no content, just yield the additional texts
-        if not lines_of_segments:
-            if self.texts:
-                combined_text = Text.assemble(*self.texts)
-                yield from console.render(combined_text, options)
-            return
-
-        # Yield all but the last line unchanged
-        for line in lines_of_segments[:-1]:
-            for segment in line:
-                yield segment
-
-        # For the last line, concatenate all of our additional texts;
-        # We have to re-render to properly handle textwrapping.
-        if lines_of_segments:
-            last_line = lines_of_segments[-1]
-
-            # Check for newline at end
-            has_newline = last_line and last_line[-1].text == "\n"
-            newline_segment = last_line.pop() if has_newline else None
-
-            # rstrip the last segment
-            if last_line:
-                last_segment = last_line[-1]
-                last_segment = Segment(
-                    last_segment.text.rstrip(),
-                    style=last_segment.style,
-                    control=last_segment.control,
-                )
-                last_line[-1] = last_segment
-
-            # Convert last line segments to text and combine with additional text
-            last_line_text = Text("", end="")
-            for segment in last_line:
-                if segment.text:
-                    last_line_text.append(segment.text, segment.style)
-
-            separator = Text(" ")
-            for text in self.texts:
-                if last_line_text:
-                    last_line_text += separator
-                last_line_text += text
-
-            # Re-render with proper wrapping
-            wrapped_segments = list(console.render(last_line_text, options))
-
-            if self.force_empty_end:
-                last_segment = wrapped_segments[-1]
-                if last_segment and not last_segment.text.endswith("\n"):
-                    wrapped_segments.append(Segment("\n"))
-
-            # Add back newline if it was present
-            if newline_segment:
-                wrapped_segments.append(newline_segment)
-
-            yield from wrapped_segments
-
-
 @frozen(kw_only=True)
 class HelpEntry:
     """Container for help table entry data."""
@@ -206,6 +93,18 @@ class HelpEntry:
     type: Optional[Any] = None
     """Type annotation of the parameter."""
 
+    choices: Optional[tuple[str, ...]] = None
+    """Available choices for this parameter."""
+
+    env_var: Optional[tuple[str, ...]] = None
+    """Environment variable names that can set this parameter."""
+
+    default: Optional[str] = None
+    """Default value for this parameter to display. None means no default to show."""
+
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)
+
 
 @define
 class HelpPanel:
@@ -222,6 +121,9 @@ class HelpPanel:
 
     entries: list[HelpEntry] = field(factory=list)
     """List of help entries to display (in order) in the panel."""
+
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)
 
     def _remove_duplicates(self):
         seen, out = set(), []
@@ -410,28 +312,27 @@ def create_parameter_help_panel(
 
         help_description = InlineText.from_format(argument.parameter.help, format=format)
 
+        # Prepare choices if needed
+        choices = None
         if argument.parameter.show_choices:
-            choices = _get_choices(argument.hint, argument.parameter.name_transform)
-            choices = ", ".join(choices)
-            if choices:
-                help_description.append(Text(rf"[choices: {choices}]", "dim"))
+            choices_list = _get_choices(argument.hint, argument.parameter.name_transform)
+            if choices_list:
+                choices = tuple(choices_list)
 
+        # Prepare env_var if needed
+        env_var = None
         if argument.parameter.show_env_var and argument.parameter.env_var:
-            env_vars = ", ".join(argument.parameter.env_var)
-            help_description.append(Text(rf"[env var: {env_vars}]", "dim"))
+            env_var = tuple(argument.parameter.env_var)
 
+        # Prepare default if needed
+        default = None
         if argument.show_default:
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
                 default = argument.parameter.name_transform(argument.field_info.default.name)
             else:
-                default = argument.field_info.default
+                default = str(argument.field_info.default)
             if callable(argument.show_default):
-                default = argument.show_default(default)
-
-            help_description.append(Text(rf"[default: {default}]", "dim"))
-
-        if argument.required:
-            help_description.append(Text(r"[required]", "dim red"))
+                default = argument.show_default(argument.field_info.default)
 
         # populate row
         entry = HelpEntry(
@@ -440,6 +341,9 @@ def create_parameter_help_panel(
             shorts=tuple(short_options),
             required=argument.required,
             type=resolve_annotated(argument.field_info.annotation),
+            choices=choices,
+            env_var=env_var,
+            default=default,
         )
 
         if argument.field_info.is_positional:

@@ -5,6 +5,8 @@ from functools import partial
 from operator import attrgetter
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
+from attrs import evolve
+
 from cyclopts.utils import frozen
 
 if TYPE_CHECKING:
@@ -53,6 +55,66 @@ def name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "Rende
     )
 
     return "\n".join(wrap(text, max_width))
+
+
+def parameter_description_renderer(entry: "HelpEntry") -> "RenderableType":
+    """Render parameter description with metadata annotations.
+
+    Enriches the base description with choices, environment variables,
+    default values, and required status.
+
+    Parameters
+    ----------
+    entry : HelpEntry
+        The table entry to render.
+
+    Returns
+    -------
+    ~rich.console.RenderableType
+        Description with appended metadata.
+    """
+    from rich.text import Text
+
+    from cyclopts.help.inline_text import InlineText
+
+    description = entry.description
+    if description is None:
+        description = InlineText(Text())
+    elif not isinstance(description, InlineText):
+        # Convert to InlineText if it isn't already
+        if hasattr(entry.description, "__rich_console__"):
+            # It's already a Rich renderable, wrap it
+            description = InlineText(description)
+        else:
+            # Convert to Text first, then wrap in InlineText
+            from rich.text import Text
+
+            description = InlineText(Text(str(description)))
+
+    # Append metadata fields in the standard order
+    if entry.choices:
+        from rich.text import Text
+
+        choices_str = ", ".join(entry.choices)
+        description.append(Text(rf"[choices: {choices_str}]", "dim"))
+
+    if entry.env_var:
+        from rich.text import Text
+
+        env_vars_str = ", ".join(entry.env_var)
+        description.append(Text(rf"[env var: {env_vars_str}]", "dim"))
+
+    if entry.default is not None:
+        from rich.text import Text
+
+        description.append(Text(rf"[default: {entry.default}]", "dim"))
+
+    if entry.required:
+        from rich.text import Text
+
+        description.append(Text(r"[required]", "dim red"))
+
+    return description
 
 
 @frozen
@@ -198,6 +260,9 @@ class ColumnSpec:
             value = None
         return "" if value is None else value
 
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)
+
 
 # For Parameters:
 AsteriskColumn = ColumnSpec(
@@ -216,6 +281,10 @@ NameColumn = ColumnSpec(
 )
 
 DescriptionColumn = ColumnSpec(renderer="description", header="Description", justify="left", overflow="fold")
+
+ParameterDescriptionColumn = ColumnSpec(
+    renderer=parameter_description_renderer, header="Description", justify="left", overflow="fold"
+)
 
 
 def get_default_command_columns(
@@ -284,12 +353,12 @@ def get_default_parameter_columns(
         return (
             AsteriskColumn,
             name_column,
-            DescriptionColumn,
+            ParameterDescriptionColumn,
         )
     else:
         return (
             name_column,
-            DescriptionColumn,
+            ParameterDescriptionColumn,
         )
 
 
@@ -468,6 +537,9 @@ class TableSpec:
 
         return table
 
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)
+
 
 @frozen
 class PanelSpec:
@@ -589,3 +661,6 @@ class PanelSpec:
         from rich.panel import Panel
 
         return Panel(renderable, **opts)
+
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)

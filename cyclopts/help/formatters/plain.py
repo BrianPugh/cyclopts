@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
-    from cyclopts.help import HelpPanel
+    from cyclopts.help import HelpEntry, HelpPanel
 
 
 def _to_plain_text(obj: Any, console: "Console") -> str:
@@ -81,7 +81,7 @@ class PlainFormatter:
 
     def _print_plain(self, console: "Console", text: str) -> None:
         """Print text without any highlighting or markup."""
-        console.print(text, highlight=False)
+        console.print(text, highlight=False, markup=False)
 
     def __call__(
         self,
@@ -120,7 +120,7 @@ class PlainFormatter:
             if names_text or shorts_text:
                 # Handle parameters section specially
                 if panel.format == "parameter":
-                    self._format_parameter_entry(entry.names, entry.shorts, desc, console)
+                    self._format_parameter_entry(entry.names, entry.shorts, desc, console, entry)
                 else:
                     # For commands or other panels
                     self._format_command_entry(entry.names, entry.shorts, desc, console)
@@ -176,6 +176,7 @@ class PlainFormatter:
         shorts: tuple[str, ...],
         desc: str,
         console: "Console",
+        entry: "HelpEntry",
     ) -> None:
         """Format and print a parameter entry.
 
@@ -189,6 +190,8 @@ class PlainFormatter:
             Parameter description.
         console : ~rich.console.Console
             Console to print to.
+        entry : HelpEntry
+            The full help entry with metadata fields.
         """
         # Combine all names and shorts
         all_options = list(names) + list(shorts)
@@ -196,22 +199,43 @@ class PlainFormatter:
         if not all_options:
             return
 
-        # First option gets the description
-        first_option = all_options[0]
+        # Build the description with metadata
+        desc_parts = []
+        if desc:
+            desc_parts.append(desc)
+
+        # Add metadata fields from entry
+        if entry.choices:
+            choices_str = ", ".join(entry.choices)
+            desc_parts.append(f"[choices: {choices_str}]")
+
+        if entry.env_var:
+            env_vars_str = ", ".join(entry.env_var)
+            desc_parts.append(f"[env var: {env_vars_str}]")
+
+        if entry.default is not None:
+            desc_parts.append(f"[default: {entry.default}]")
+
+        if entry.required:
+            desc_parts.append("[required]")
+
+        full_desc = " ".join(desc_parts)
+
+        # Format output based on number of options
         if len(all_options) > 1:
             # Multiple options - show them all on first line with description
             options_str = ", ".join(all_options)
-            if desc:
-                text = f"{options_str}: {desc}"
+            if full_desc:
+                text = f"{options_str}: {full_desc}"
             else:
                 text = options_str
             self._print_plain(console, textwrap.indent(text, self.indent))
         else:
             # Single option
-            if desc:
-                text = f"{first_option}: {desc}"
+            if full_desc:
+                text = f"{all_options[0]}: {full_desc}"
             else:
-                text = first_option
+                text = all_options[0]
             self._print_plain(console, textwrap.indent(text, self.indent))
 
     def _format_command_entry(
