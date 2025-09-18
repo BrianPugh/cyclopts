@@ -1,9 +1,6 @@
 __all__ = [
-    "Converter",
-    "Formatter",
-    "LazyData",
-    "TableEntry",
-    "TableData",
+    "Renderer",
+    "HelpEntry",
     "TableSpec",
     "PanelSpec",
     "ColumnSpec",
@@ -14,20 +11,22 @@ __all__ = [
     "format_usage",
     "InlineText",
     "_get_choices",
+    "DefaultFormatter",
+    "PlainFormatter",
 ]
 
+from .formatters import DefaultFormatter, PlainFormatter
 from .help import (
+    HelpEntry,
     HelpPanel,
-    InlineText,
-    TableData,
-    TableEntry,
     _get_choices,
     create_parameter_help_panel,
     format_command_entries,
     format_doc,
     format_usage,
 )
-from .protocols import Converter, Formatter, LazyData
+from .inline_text import InlineText
+from .protocols import Renderer
 from .specs import (
     ColumnSpec,
     PanelSpec,

@@ -6,6 +6,36 @@ from cyclopts import App, CycloptsError
 from cyclopts.exceptions import UnusedCliTokensError
 
 
+def _create_mock_console(mocker):
+    from rich.console import ConsoleDimensions, ConsoleOptions
+
+    console = mocker.MagicMock()
+    console.width = 80
+    console.height = 24
+    console.legacy_windows = False
+    console.is_terminal = True
+    console.encoding = "utf-8"
+
+    # Add a proper options attribute that matches what Rich provides
+    console.options = ConsoleOptions(
+        size=ConsoleDimensions(console.width, console.height),
+        legacy_windows=console.legacy_windows,
+        min_width=1,
+        max_width=console.width,
+        is_terminal=console.is_terminal,
+        encoding=console.encoding,
+        max_height=console.height,
+    )
+
+    return console
+
+
+@pytest.fixture
+def mock_console(mocker):
+    """Create a mock console with required attributes for Rich compatibility."""
+    return _create_mock_console(mocker)
+
+
 @pytest.fixture
 def subapp(app):
     app.command(subapp := App(name="foo"))
@@ -13,8 +43,8 @@ def subapp(app):
 
 
 @pytest.mark.parametrize("cmd", ["foo --help", "foo invalid-command"])
-def test_root_console(app, mocker, cmd):
-    app.console = mocker.MagicMock()
+def test_root_console(app, mock_console, cmd):
+    app.console = mock_console
 
     with suppress(CycloptsError):
         app(cmd, exit_on_error=False)
@@ -23,9 +53,9 @@ def test_root_console(app, mocker, cmd):
 
 
 @pytest.mark.parametrize("cmd", ["foo --help", "foo invalid-command"])
-def test_root_console_subapp(app, subapp, mocker, cmd):
+def test_root_console_subapp(app, subapp, mock_console, cmd):
     """Check if root console is properly resolved (subapp.console not specified)."""
-    app.console = mocker.MagicMock()
+    app.console = mock_console
 
     with suppress(CycloptsError):
         app(cmd, exit_on_error=False)
@@ -34,10 +64,10 @@ def test_root_console_subapp(app, subapp, mocker, cmd):
 
 
 @pytest.mark.parametrize("cmd", ["foo --help", "foo invalid-command"])
-def test_root_subapp_console(app, subapp, mocker, cmd):
+def test_root_subapp_console(app, subapp, mock_console, mocker, cmd):
     """Check if subapp console is properly resolved (NOT app.console)."""
-    app.console = mocker.MagicMock()
-    subapp.console = mocker.MagicMock()
+    app.console = mock_console
+    subapp.console = _create_mock_console(mocker)
 
     with suppress(CycloptsError):
         app(cmd, exit_on_error=False)
@@ -47,9 +77,9 @@ def test_root_subapp_console(app, subapp, mocker, cmd):
 
 
 @pytest.mark.parametrize("cmd", ["foo --help", "foo invalid-command"])
-def test_root_subapp_arg_console(app, subapp, mocker, cmd):
+def test_root_subapp_arg_console(app, subapp, mock_console, mocker, cmd):
     """Explicitly provided console should be used."""
-    console = mocker.MagicMock()
+    console = mock_console
     app.console = mocker.MagicMock()
     subapp.console = mocker.MagicMock()
 

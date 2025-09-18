@@ -97,9 +97,7 @@ class CycloptsError(Exception):
     """
 
     console: Optional["Console"] = field(default=None, kw_only=True)
-    """
-    Rich console to display runtime errors.
-    """
+    """:class:`~rich.console.Console` to display runtime errors."""
 
     def __str__(self):
         if self.msg is not None:

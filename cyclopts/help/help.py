@@ -13,28 +13,26 @@ from typing import (
     Literal,
     Optional,
     Sequence,
-    Union,
     get_args,
     get_origin,
 )
 
-from attrs import Factory, define, evolve, field
+from attrs import converters, define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.core import _get_root_module_name
 from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
-from cyclopts.help.specs import PanelSpec, TableSpec
-from cyclopts.utils import SortHelper, resolve_callables
+from cyclopts.help.inline_text import InlineText
+from cyclopts.help.silent import SILENT
+from cyclopts.utils import SortHelper, frozen, resolve_callables
 
 if TYPE_CHECKING:
-    from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
-    from rich.text import Text
+    from rich.console import RenderableType
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
-    from cyclopts.help.protocols import LazyData
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -73,240 +71,79 @@ def _text_factory():
     return Text()
 
 
-class InlineText:
-    def __init__(self, primary_renderable: "RenderableType", *, force_empty_end=False):
-        self.primary_renderable = primary_renderable
-        self.texts = []
-        self.force_empty_end = force_empty_end
+@frozen(kw_only=True)
+class HelpEntry:
+    """Container for help table entry data."""
 
-    @classmethod
-    def from_format(cls, content: Optional[str], format: str, *, force_empty_end=False):
-        if content is None:
-            from rich.text import Text
+    names: tuple[str, ...] = ()
+    """Long option names (e.g., "--verbose", "--help")."""
 
-            primary_renderable = Text(end="")
-        elif format == "plaintext":
-            from rich.text import Text
+    shorts: tuple[str, ...] = ()
+    """Short option names (e.g., "-v", "-h")."""
 
-            primary_renderable = Text(content.rstrip())
-        elif format in ("markdown", "md"):
-            from rich.markdown import Markdown
+    description: Any = None
+    """Help text description for this entry.
 
-            primary_renderable = Markdown(content)
-        elif format in ("restructuredtext", "rst"):
-            from rich_rst import RestructuredText
-
-            primary_renderable = RestructuredText(content)
-        elif format == "rich":
-            from rich.text import Text
-
-            primary_renderable = Text.from_markup(content)
-        else:
-            raise ValueError(f'Unknown help_format "{format}"')
-
-        return cls(primary_renderable, force_empty_end=force_empty_end)
-
-    def append(self, text: "Text"):
-        self.texts.append(text)
-
-    def __rich_console__(self, console, options):
-        from rich.segment import Segment
-        from rich.text import Text
-
-        if not self.primary_renderable and not self.texts:
-            return
-
-        # Group segments by line
-        lines_of_segments, current_line = [], []
-        for segment in console.render(self.primary_renderable, options):
-            if segment.text == "\n":
-                lines_of_segments.append(current_line + [segment])
-                current_line = []
-            else:
-                current_line.append(segment)
-
-        if current_line:
-            lines_of_segments.append(current_line)
-
-        # If no content, just yield the additional texts
-        if not lines_of_segments:
-            if self.texts:
-                combined_text = Text.assemble(*self.texts)
-                yield from console.render(combined_text, options)
-            return
-
-        # Yield all but the last line unchanged
-        for line in lines_of_segments[:-1]:
-            for segment in line:
-                yield segment
-
-        # For the last line, concatenate all of our additional texts;
-        # We have to re-render to properly handle textwrapping.
-        if lines_of_segments:
-            last_line = lines_of_segments[-1]
-
-            # Check for newline at end
-            has_newline = last_line and last_line[-1].text == "\n"
-            newline_segment = last_line.pop() if has_newline else None
-
-            # rstrip the last segment
-            if last_line:
-                last_segment = last_line[-1]
-                last_segment = Segment(
-                    last_segment.text.rstrip(),
-                    style=last_segment.style,
-                    control=last_segment.control,
-                )
-                last_line[-1] = last_segment
-
-            # Convert last line segments to text and combine with additional text
-            last_line_text = Text("", end="")
-            for segment in last_line:
-                if segment.text:
-                    last_line_text.append(segment.text, segment.style)
-
-            separator = Text(" ")
-            for text in self.texts:
-                if last_line_text:
-                    last_line_text += separator
-                last_line_text += text
-
-            # Re-render with proper wrapping
-            wrapped_segments = list(console.render(last_line_text, options))
-
-            if self.force_empty_end:
-                last_segment = wrapped_segments[-1]
-                if last_segment and not last_segment.text.endswith("\n"):
-                    wrapped_segments.append(Segment("\n"))
-
-            # Add back newline if it was present
-            if newline_segment:
-                wrapped_segments.append(newline_segment)
-
-            yield from wrapped_segments
-
-
-def _resolve(v: Union["RenderableType", "LazyData"], entry: "TableEntry") -> "RenderableType":
-    return v(entry) if callable(v) else v
-
-
-# TODO: Is there a low cost runtime validator that all members in this
-#       are renderable?
-@define(slots=True)
-class TableData:
-    """Intentionally empty dataclass.
-
-    Users can inherit from this and declare concrete fields and then pass
-    the object to TableEntry
+    Typically a :class:`str` or a :obj:`~rich.console.RenderableType`
     """
 
-    pass
-
-
-@define(slots=True)
-class TableEntry:
-    """Abstract version of TableEntry.
-
-    Member extras can be a user-defined dataclass. All members in `extras`
-    will be treated as if they are members of `TableEntry` allowing
-    for arbitrary data to be included in the Entry.
-    """
-
-    from rich.console import RenderableType
-
-    name: Optional[str] = None
-    short: Optional[str] = None
-    description: Optional[RenderableType] = None
     required: bool = False
+    """Whether this parameter/command is required."""
+
     sort_key: Any = None
+    """Custom sorting key for ordering entries."""
 
-    extras: TableData = field(factory=TableData, repr=False)
+    type: Optional[Any] = None
+    """Type annotation of the parameter."""
 
-    def try_put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
-        """Put a attr to the dataclass.
+    choices: Optional[tuple[str, ...]] = None
+    """Available choices for this parameter."""
 
-        This is looser than put, and will not raise an AttributeError if
-        the member does not exist. This is useful when the list of entries
-        do not have all the same members. This was required for
-        `ColumnSpec.render_cell`
-        """
-        try:
-            return self.put(key, value)
-        except AttributeError:
-            return self
+    env_var: Optional[tuple[str, ...]] = None
+    """Environment variable names that can set this parameter."""
 
-    def put(self, key: str, value: Optional[Union["RenderableType", "LazyData"]]):
-        """Put a attr to the dataclass."""
-        if hasattr(self, key):
-            setattr(self, key, value)
-        elif hasattr(self.extras, key):
-            setattr(self.extras, key, value)
-        else:
-            raise AttributeError(f"'{type(self.extras).__name__}' has no field {key}")
-        return self
+    default: Optional[str] = None
+    """Default value for this parameter to display. None means no default to show."""
 
-    def get(self, key: str, default: Any = None, resolve: bool = False) -> Union["LazyData", "RenderableType"]:
-        if hasattr(self, key):
-            val = getattr(self, key)
-            return _resolve(val, self) if resolve else val
-        if hasattr(self.extras, key):
-            val = getattr(self.extras, key)
-            return _resolve(val, self) if resolve else val
-        return default
-
-    def __getattr__(self, name: str) -> Union[str, "LazyData"]:
-        """Access extra values as if they were members.
-
-        This makes members in the `extra` dataclass feel like
-        members of the `TableEntry` instance. Thus, pseudo
-        adding members is easy, and table generation is simplified.
-        """
-        extras = object.__getattribute__(self, "extras")
-        try:
-            return getattr(extras, name)
-        except AttributeError as err:
-            raise AttributeError(f"'{type(self)} nor {type(self.extras).__name__}' have field {name}") from err
-
-    def with_(self, **kw):
-        return evolve(self, **kw)
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)
 
 
 @define
 class HelpPanel:
-    """Adjust the Format for the help panel!."""
+    """Data container for help panel information."""
 
-    from rich.box import ROUNDED, Box
-    from rich.console import Group as RichGroup
-    from rich.console import NewLine, RenderableType
-    from rich.panel import Panel
-    from rich.table import Column, Table
-    from rich.text import Text
+    format: Literal["command", "parameter"]
+    """Panel format type."""
 
-    # TODO: This is _only_ here for convenience to be passed to table_spec
-    #       otherwise, we could instantiate this panel and then
-    #       instantiate the table_spec with the correct format.
-    #
-    # I.E) Without this, to make a HelpPanel we'll have to make and
-    #       pass a list of column specs.
-    format: str  # Literal["command", "parameter"]
+    title: "RenderableType"
+    """The title text displayed at the top of the help panel."""
 
-    title: RenderableType
-    description: RenderableType = field(factory=_text_factory)
-    entries: list[TableEntry] = field(factory=list)
+    description: Any = field(
+        default=None,
+        converter=converters.default_if_none(factory=_text_factory),
+    )
+    """Optional description text displayed below the title.
 
-    table_spec: TableSpec = field(default=Factory(lambda self: TableSpec(preset=self.format), takes_self=True))
-    panel_spec: PanelSpec = field(default=Factory(lambda self: PanelSpec(title=self.title), takes_self=True))
+    Typically a :class:`str` or a :obj:`~rich.console.RenderableType`
+    """
 
-    def remove_duplicates(self):
+    entries: list[HelpEntry] = field(factory=list)
+    """List of help entries to display (in order) in the panel."""
+
+    def copy(self, **kwargs):
+        return evolve(self, **kwargs)
+
+    def _remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            hashable = (item.name, item.short)
+            hashable = (item.names, item.shorts)
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
         self.entries = out
 
-    def sort(self):
+    def _sort(self):
         """Sort entries in-place."""
         if not self.entries:
             return
@@ -316,7 +153,10 @@ class HelpPanel:
                 [
                     SortHelper(
                         entry.sort_key,
-                        (entry.name.startswith("-") if entry.name is not None else False, entry.name),
+                        (
+                            entry.names[0].startswith("-") if entry.names else False,
+                            entry.names[0] if entry.names else "",
+                        ),
                         entry,
                     )
                     for entry in self.entries
@@ -325,43 +165,6 @@ class HelpPanel:
             self.entries = [x.value for x in sorted_sort_helper]
         else:
             raise NotImplementedError
-
-    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
-        if not self.entries:
-            return _silent
-
-        from rich.console import Group as RichGroup
-        from rich.console import NewLine
-        from rich.text import Text
-
-        panel_description = self.description
-        if isinstance(panel_description, Text):
-            panel_description.end = ""
-
-            if panel_description.plain:
-                panel_description = RichGroup(panel_description, NewLine(2))
-
-        # 2. Realize spec, build table, and add entries
-        table_spec = self.table_spec.realize_columns(console, options, self.entries)
-        table = table_spec.build()
-        table_spec.add_entries(table, self.entries)
-
-        # 3. Final make the panel
-        panel = self.panel_spec.build(RichGroup(panel_description, table))
-
-        yield panel
-
-
-class SilentRich:
-    """Dummy object that causes nothing to be printed."""
-
-    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
-        # This generator yields nothing, so ``rich`` will print nothing for this object.
-        if False:
-            yield
-
-
-_silent = SilentRich()
 
 
 def _is_short(s):
@@ -432,7 +235,7 @@ def format_doc(app: "App", format: str):
     raw_doc_string = app.help
 
     if not raw_doc_string:
-        return _silent
+        return SILENT
 
     parsed = docstring_parse(raw_doc_string, format)
 
@@ -478,11 +281,15 @@ def create_parameter_help_panel(
 ) -> HelpPanel:
     from rich.text import Text
 
-    help_panel = HelpPanel(
-        format="parameter",
-        title=group.name,
-        description=InlineText.from_format(group.help, format=format, force_empty_end=True) if group.help else Text(),
-    )
+    kwargs = {
+        "format": "parameter",
+        "title": group.name,
+        "description": InlineText.from_format(group.help, format=format, force_empty_end=True)
+        if group.help
+        else Text(),
+    }
+
+    help_panel = HelpPanel(**kwargs)
 
     def help_append(text, style):
         if help_components:
@@ -514,35 +321,38 @@ def create_parameter_help_panel(
 
         help_description = InlineText.from_format(argument.parameter.help, format=format)
 
+        # Prepare choices if needed
+        choices = None
         if argument.parameter.show_choices:
-            choices = _get_choices(argument.hint, argument.parameter.name_transform)
-            choices = ", ".join(choices)
-            if choices:
-                help_description.append(Text(rf"[choices: {choices}]", "dim"))
+            choices_list = _get_choices(argument.hint, argument.parameter.name_transform)
+            if choices_list:
+                choices = tuple(choices_list)
 
+        # Prepare env_var if needed
+        env_var = None
         if argument.parameter.show_env_var and argument.parameter.env_var:
-            env_vars = ", ".join(argument.parameter.env_var)
-            help_description.append(Text(rf"[env var: {env_vars}]", "dim"))
+            env_var = tuple(argument.parameter.env_var)
 
+        # Prepare default if needed
+        default = None
         if argument.show_default:
             if isclass(argument.hint) and issubclass(argument.hint, Enum):
                 default = argument.parameter.name_transform(argument.field_info.default.name)
             else:
-                default = argument.field_info.default
+                default = str(argument.field_info.default)
             if callable(argument.show_default):
-                default = argument.show_default(default)
-
-            help_description.append(Text(rf"[default: {default}]", "dim"))
-
-        if argument.required:
-            help_description.append(Text(r"[required]", "dim red"))
+                default = argument.show_default(argument.field_info.default)
 
         # populate row
-        entry = TableEntry(
-            name="".join(long_options),
+        entry = HelpEntry(
+            names=tuple(long_options),
             description=help_description,
-            short="".join(short_options),
+            shorts=tuple(short_options),
             required=argument.required,
+            type=resolve_annotated(argument.field_info.annotation),
+            choices=choices,
+            env_var=env_var,
+            default=default,
         )
 
         if argument.field_info.is_positional:
@@ -556,7 +366,7 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntry]:
+def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry]:
     entries = []
     for app in apps:
         if not app.show:
@@ -565,9 +375,9 @@ def format_command_entries(apps: Iterable["App"], format: str) -> list[TableEntr
         for name in app.name:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
-        entry = TableEntry(
-            name="\n".join(long_names),
-            short=" ".join(short_names),
+        entry = HelpEntry(
+            names=tuple(long_names),
+            shorts=tuple(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
             sort_key=resolve_callables(app.sort_key, app),
         )

@@ -112,6 +112,38 @@ API
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"markdown"``.
 
+   .. attribute:: help_formatter
+      :type: Union[None, Literal["default", "plain"], HelpFormatter]
+      :value: None
+
+      Help formatter to use for rendering help panels.
+
+      * If :obj:`None` (default), inherits from parent :class:`App`, eventually defaulting to :class:`~cyclopts.help.DefaultFormatter`.
+
+      * If ``"default"``, uses :class:`~cyclopts.help.DefaultFormatter`.
+
+      * If ``"plain"``, uses :class:`~cyclopts.help.PlainFormatter` for no-frills plain text output.
+
+      * If a callable (see :class:`~cyclopts.help.protocols.HelpFormatter` protocol), uses the provided formatter.
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+         from cyclopts.help import DefaultFormatter, PlainFormatter, PanelSpec
+
+         # Use plain text formatter
+         app = App(help_formatter="plain")
+
+         # Use default formatter with customization
+         app = App(help_formatter=DefaultFormatter(
+             panel_spec=PanelSpec(border_style="blue")
+         ))
+
+      See :ref:`Help Customization` for detailed examples and advanced usage.
+
+
    .. attribute:: help_on_error
       :type: Optional[bool]
       :value: None
@@ -262,10 +294,10 @@ API
       Defaults to ``["--version"]``.
 
    .. attribute:: console
-      :type: rich.console.Console
+      :type: ~rich.console.Console
       :value: None
 
-      Default :class:`rich.console.Console` to use when displaying runtime messages.
+      Default :class:`~rich.console.Console` to use when displaying runtime messages.
       Cyclopts console resolution is as follows:
 
       #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
@@ -987,6 +1019,53 @@ API
       Show this group on the help-page.
       Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
 
+   .. attribute:: help_formatter
+      :type: Union[None, Literal["default", "plain"], HelpFormatter]
+      :value: None
+
+      Help formatter to use for rendering this group's help panel.
+
+      * If :obj:`None` (default), inherits from the :class:`App`'s :attr:`~App.help_formatter`.
+
+      * If ``"default"``, uses :class:`~cyclopts.help.DefaultFormatter`.
+
+      * If ``"plain"``, uses :class:`~cyclopts.help.PlainFormatter` for no-frills plain text output.
+
+      * If a callable (see :class:`~cyclopts.help.protocols.HelpFormatter` protocol), uses the provided formatter.
+
+      This allows per-group customization of help appearance:
+
+      .. code-block:: python
+
+         from cyclopts import App, Group, Parameter
+         from cyclopts.help import DefaultFormatter, PanelSpec
+         from typing import Annotated
+
+         app = App()
+
+         # Using string literal
+         simple_group = Group(
+             "Simple Options",
+             help_formatter="plain"
+         )
+
+         # Using custom formatter instance
+         custom_group = Group(
+             "Custom Options",
+             help_formatter=DefaultFormatter(
+                 panel_spec=PanelSpec(border_style="red")
+             )
+         )
+
+         @app.default
+         def main(
+             opt1: Annotated[str, Parameter(group=simple_group)],
+             opt2: Annotated[str, Parameter(group=custom_group)]
+         ):
+             pass
+
+      See :ref:`Help Customization` for detailed examples.
+
    .. attribute:: sort_key
       :type: Any
       :value: None
@@ -1388,6 +1467,47 @@ Annotated types for common web-related values.
 .. autodata:: cyclopts.types.Port
 
 .. autodata:: cyclopts.types.URL
+
+---------------
+Help Formatting
+---------------
+Cyclopts provides a flexible help formatting system for customizing the help-page's appearance.
+
+.. autoclass:: cyclopts.help.protocols.HelpFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.DefaultFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.PlainFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.protocols.ColumnSpecBuilder
+   :members:
+
+
+.. autoclass:: cyclopts.help.PanelSpec
+   :members:
+
+
+.. autoclass:: cyclopts.help.TableSpec
+   :members:
+
+
+.. autoclass:: cyclopts.help.ColumnSpec
+   :members:
+
+
+.. autoclass:: cyclopts.help.HelpPanel
+   :members:
+
+
+.. autoclass:: cyclopts.help.HelpEntry
+   :members:
+
 
 ------
 Config

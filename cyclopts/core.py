@@ -48,6 +48,7 @@ from cyclopts.token import Token
 from cyclopts.utils import (
     UNSET,
     default_name_transform,
+    help_formatter_converter,
     optional_to_tuple_converter,
     to_list_converter,
     to_tuple_converter,
@@ -70,6 +71,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from cyclopts.help import HelpPanel
+    from cyclopts.help.protocols import HelpFormatter
 
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
@@ -331,6 +333,10 @@ class App:
     suppress_keyboard_interrupt: bool = field(default=True, kw_only=True)
 
     backend: Optional[Literal["asyncio", "trio"]] = field(default=None, kw_only=True)
+
+    help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
+        default=None, converter=help_formatter_converter, kw_only=True
+    )
 
     ######################
     # Private Attributes #
@@ -612,7 +618,7 @@ class App:
         ----------
         version_raw : str
             Raw version string to format and print.
-        console : Console
+        console : ~rich.console.Console
             Console to print to.
         """
         from cyclopts.help import InlineText
@@ -631,7 +637,7 @@ class App:
 
         Parameters
         ----------
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print version string to.
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
@@ -657,7 +663,7 @@ class App:
 
         Parameters
         ----------
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print version string to.
             If not provided, follows the resolution order defined in :attr:`App.console`.
 
@@ -1086,7 +1092,7 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         end_of_options_delimiter: Optional[str]
@@ -1268,7 +1274,7 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: Optional[bool]
@@ -1366,7 +1372,7 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: Optional[bool]
@@ -1452,7 +1458,7 @@ class App:
         tokens : Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         print_error: bool
@@ -1550,11 +1556,12 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Tokens to interpret for traversing the application command structure.
             If not provided, defaults to ``sys.argv``.
-        console: rich.console.Console
+        console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
         from cyclopts.help import format_doc, format_usage
+        from cyclopts.help.formatters import DefaultFormatter
 
         tokens = normalize_tokens(tokens)
 
@@ -1566,25 +1573,47 @@ class App:
 
             console = executing_app.console
 
-            # Print the:
-            #    my-app command COMMAND [ARGS] [OPTIONS]
+            # Prepare usage
             if executing_app.usage is None:
-                console.print(format_usage(self, command_chain))
+                usage = format_usage(self, command_chain)
             elif executing_app.usage:  # i.e. skip empty-string.
-                console.print(executing_app.usage + "\n")
+                usage = executing_app.usage + "\n"
+            else:
+                usage = None
 
-            # Print the App/Command's Doc String.
+            # Prepare description
             help_format = executing_app.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
-            console.print(format_doc(executing_app, help_format))
+            description = format_doc(executing_app, help_format)
 
-            for help_panel in self._assemble_help_panels(tokens, help_format):
-                console.print(help_panel)
+            # Prepare panels with their associated groups
+            help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
+
+            # Render usage
+            default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=DefaultFormatter())
+            if hasattr(default_formatter, "render_usage"):
+                default_formatter.render_usage(console, console.options, usage)
+            elif usage:
+                console.print(usage)
+
+            # Render description
+            if hasattr(default_formatter, "render_description"):
+                default_formatter.render_description(console, console.options, description)
+            elif description:
+                console.print(description)
+
+            # Render each panel with its group's formatter (or default)
+            for group, panel in help_panels_with_groups:
+                formatter = group.help_formatter if group else None
+                if formatter is None:
+                    formatter = default_formatter
+                formatter = cast("HelpFormatter", formatter)
+                formatter(console, console.options, panel)
 
     def _assemble_help_panels(
         self,
         tokens: Union[None, str, Iterable[str]],
         help_format,
-    ) -> list["HelpPanel"]:
+    ) -> list[tuple[Optional["Group"], "HelpPanel"]]:
         from rich.console import Group as RichGroup
         from rich.console import NewLine
 
@@ -1612,10 +1641,7 @@ class App:
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
-                    command_panel = HelpPanel(
-                        format="command",
-                        title=group.name,
-                    )
+                    command_panel = HelpPanel(title=group.name, format="command")
                     panels[group.name] = (group, command_panel)
 
                 if group.help:
@@ -1677,12 +1703,13 @@ class App:
         help_panels = [x[1] for x in panels.values()]
 
         out = []
-        for help_panel in sort_groups(groups, help_panels)[1]:
-            help_panel.remove_duplicates()
+        sorted_groups, sorted_panels = sort_groups(groups, help_panels)
+        for group, help_panel in zip(sorted_groups, sorted_panels):
+            help_panel._remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
-                help_panel.sort()
-            out.append(help_panel)
+                help_panel._sort()
+            out.append((group, help_panel))
         return out
 
     def interactive_shell(

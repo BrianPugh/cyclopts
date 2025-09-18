@@ -4,6 +4,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Literal,
     Optional,
     Union,
     cast,
@@ -11,10 +12,20 @@ from typing import (
 
 from attrs import field
 
-from cyclopts.utils import UNSET, Sentinel, SortHelper, frozen, is_iterable, resolve_callables, to_tuple_converter
+from cyclopts.utils import (
+    UNSET,
+    Sentinel,
+    SortHelper,
+    frozen,
+    help_formatter_converter,
+    is_iterable,
+    resolve_callables,
+    to_tuple_converter,
+)
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
+    from cyclopts.help.protocols import HelpFormatter
     from cyclopts.parameter import Parameter
 
 
@@ -87,6 +98,10 @@ class Group:
         kw_only=True,
     )
 
+    help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
+        default=None, converter=help_formatter_converter, kw_only=True
+    )
+
     @property
     def name(self) -> str:
         return "" if type(self._name) is object else self._name
@@ -112,7 +127,17 @@ class Group:
         return cls(name, sort_key=DEFAULT_COMMANDS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_ordered(cls, name="", help="", *, show=None, sort_key=None, validator=None, default_parameter=None):
+    def create_ordered(
+        cls,
+        name="",
+        help="",
+        *,
+        show=None,
+        sort_key=None,
+        validator=None,
+        default_parameter=None,
+        help_formatter=None,
+    ):
         """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
         Used to create a group that will be displayed **after** a previously instantiated :meth:`Group.create_ordered` group on the help-page.
@@ -136,6 +161,8 @@ class Group:
             Group validator to collectively apply.
         default_parameter: Optional[cyclopts.Parameter]
             Default parameter for elements within the group.
+        help_formatter: Optional[cyclopts.help.protocols.HelpFormatter]
+            Custom help formatter for this group's help display.
         """
         count = next(_sort_key_counter)
         if sort_key is None:
@@ -151,6 +178,7 @@ class Group:
             sort_key=sort_key,
             validator=validator,
             default_parameter=default_parameter,
+            help_formatter=help_formatter,
         )
 
 

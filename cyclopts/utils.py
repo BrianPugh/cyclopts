@@ -332,6 +332,43 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
     return to_tuple_converter(value)
 
 
+def help_formatter_converter(
+    input_value: Union[None, Literal["default", "plain"], Any],
+) -> Optional[Any]:
+    """Convert string literals to help formatter instances.
+
+    Parameters
+    ----------
+    input_value : Union[None, Literal["default", "plain"], Any]
+        The input value to convert. Can be None, "default", "plain", or a formatter instance.
+
+    Returns
+    -------
+    Optional[Any]
+        None, or a HelpFormatter instance.
+
+    Notes
+    -----
+    Lazily imports formatters to avoid importing Rich during normal execution.
+    """
+    if input_value is None:
+        return None
+    elif isinstance(input_value, str):
+        if input_value == "default":
+            from cyclopts.help.formatters import DefaultFormatter
+
+            return DefaultFormatter()
+        elif input_value == "plain":
+            from cyclopts.help.formatters import PlainFormatter
+
+            return PlainFormatter()
+        else:
+            raise ValueError(f"Unknown formatter: {input_value!r}. Must be 'default' or 'plain'")
+    else:
+        # Assume it's already a HelpFormatter instance
+        return input_value
+
+
 def default_name_transform(s: str) -> str:
     """Converts a python identifier into a CLI token.
 

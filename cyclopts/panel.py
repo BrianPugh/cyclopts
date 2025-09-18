@@ -28,7 +28,7 @@ def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Pa
 
     Returns
     -------
-    rich.panel.Panel
+    ~rich.panel.Panel
         Formatted panel object.
     """
     from rich import box

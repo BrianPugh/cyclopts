@@ -16,6 +16,7 @@ from cyclopts.help import (
     format_command_entries,
     format_usage,
 )
+from cyclopts.help.formatters import DefaultFormatter, PlainFormatter
 
 
 @pytest.fixture
@@ -28,9 +29,11 @@ def app():
 
 def test_empty_help_panel_rich_silent(console):
     help_panel = HelpPanel(format="command", title="test")
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(help_panel, console, console.options)
 
     with console.capture() as capture:
-        console.print(help_panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == ""
@@ -163,8 +166,10 @@ def test_format_commands_docstring(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -196,8 +201,10 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == dedent(
@@ -251,8 +258,10 @@ def test_format_commands_explicit_help(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -273,8 +282,10 @@ def test_format_commands_explicit_name(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -405,7 +416,10 @@ def capture_format_group_parameters(console, default_function_groups):
         with console.capture() as capture:
             group = argument_collection.groups[0]
             group_argument_collection = argument_collection.filter_by(group=group)
-            console.print(create_parameter_help_panel(group, group_argument_collection, "restructuredtext"))
+            panel = create_parameter_help_panel(group, group_argument_collection, "restructuredtext")
+            formatter = DefaultFormatter()
+            rendered = formatter._render_panel(panel, console, console.options)
+            console.print(rendered)
 
         return capture.get()
 
@@ -1982,6 +1996,59 @@ def test_issue_373_help_space_with_meta_app(app, console):
         │ *  VALUE --value  [required]                                       │
         │    --meta-value   [default: 3]                                     │
         ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_format_plain_formatter(console):
+    """Test that PlainFormatter produces correct plain text output."""
+    app = App(
+        name="test_app",
+        help="Test application for PlainFormatter",
+        help_formatter=PlainFormatter(),
+    )
+
+    @app.command
+    def cmd1(arg: str = "default"):
+        """First test command."""
+        print(f"cmd1 with {arg}")
+
+    @app.command
+    def cmd2(required: int, optional: bool = False):
+        """Second test command."""
+        print(f"cmd2 with {required} and {optional}")
+
+    @app.default
+    def main(verbose: bool = False):
+        """Main function with a parameter."""
+        print(f"verbose={verbose}")
+
+    # Capture the help output
+    with console.capture() as capture:
+        try:
+            app(["--help"], console=console)
+        except SystemExit:
+            # Help normally exits, which is expected
+            pass
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_app COMMAND [ARGS] [OPTIONS]
+
+        Test application for PlainFormatter
+
+        Commands:
+          cmd1: First test command.
+          cmd2: Second test command.
+          --help, -h: Display this message and exit.
+          --version: Display application version.
+
+        Parameters:
+          VERBOSE, --verbose, --no-verbose: [default: False]
+
         """
     )
     assert actual == expected
