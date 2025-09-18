@@ -4,10 +4,68 @@
 Help Customization
 ==================
 
-Cyclopts provides extensive customization options for help screen appearance and formatting.
-Whether you need to match your organization's style guide, improve accessibility, or create
-a unique CLI experience, the help formatter system offers complete control over how help
-information is presented to users.
+Cyclopts provides extensive customization options for help screen appearance and formatting through the ``help_formatter`` parameter available on both :attr:`App <cyclopts.App.help_formatter>` and :attr:`Group <cyclopts.Group.help_formatter>`. These parameters accept formatters that follow the :class:`~cyclopts.help.protocols.HelpFormatter` protocol.
+
+--------------------------
+Setting Help Formatters
+--------------------------
+
+App-Level Formatting
+^^^^^^^^^^^^^^^^^^^^
+
+The :class:`~cyclopts.App` class accepts a ``help_formatter`` parameter that controls the default formatting for all help output:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from cyclopts.help import DefaultFormatter, PlainFormatter
+
+   # Use a built-in formatter by name
+   app = App(help_formatter="plain")
+
+   # Or pass a formatter instance with custom configuration
+   app = App(
+       help_formatter=DefaultFormatter(
+           # Custom configuration options
+       )
+   )
+
+   # Or use a completely custom formatter
+   app = App(help_formatter=MyCustomFormatter())
+
+Group-Level Formatting
+^^^^^^^^^^^^^^^^^^^^^^
+
+Individual :class:`~cyclopts.Group` instances can have their own ``help_formatter`` that overrides the app-level default:
+
+.. code-block:: python
+
+   from cyclopts import App, Group
+   from cyclopts.help import DefaultFormatter, PanelSpec
+   from rich.box import DOUBLE
+
+   # Create a group with custom formatting
+   advanced_group = Group(
+       "Advanced Options",
+       help_formatter=DefaultFormatter(
+           panel_spec=PanelSpec(
+               border_style="red",
+               box=DOUBLE,
+           )
+       )
+   )
+
+   # The app can have a different default formatter
+   app = App(help_formatter="plain")
+
+   # Parameters in advanced_group will use the group's formatter,
+   # while other parameters use the app's formatter
+
+This allows you to:
+
+- Apply consistent formatting across your entire application via ``App.help_formatter``
+- Override formatting for specific parameter groups via ``Group.help_formatter``
+- Mix different formatting styles within a single application (e.g., highlighting critical options differently)
 
 -------------------
 Built-in Formatters
@@ -97,17 +155,17 @@ Output:
 
 .. code-block:: text
 
-   Usage: my-app [ARGS] [OPTIONS]
+   Usage: demo.py [ARGS] [OPTIONS]
 
    A simple greeting application.
 
-   Parameters:
-     NAME --name         Person to greet. [required]
-     COUNT --count       Number of times to greet. [default: 1]
-
    Commands:
-     --help -h           Display this message and exit.
-     --version           Display application version.
+   --help, -h: Display this message and exit.
+   --version: Display application version.
+
+   Parameters:
+   NAME, --name: Person to greet.
+   COUNT, --count: Number of times to greet.
 
 ---------------------
 Basic Customization
@@ -150,22 +208,23 @@ Output:
 
 .. code-block:: text
 
-   Usage: my-app [ARGS] [OPTIONS]
+   Usage: demo.py [ARGS] [OPTIONS]
 
    Process a file with custom panel styling.
 
-   ╔══════════════════════════════════════════════════════════════════════╗
+   ╔═ Commands ═══════════════════════════════════════════════════════════╗
    ║                                                                      ║
-   ║    *  PATH --path        [required]                                 ║
-   ║       VERBOSE --verbose  [default: False]                           ║
-   ║                                                                      ║
-   ╚══════════════════════════════════════════════════════════════════════╝
-   ╔══════════════════════════════════════════════════════════════════════╗
-   ║                                                                      ║
-   ║    --help -h  Display this message and exit.                        ║
-   ║    --version  Display application version.                          ║
+   ║  --help -h  Display this message and exit.                           ║
+   ║  --version  Display application version.                             ║
    ║                                                                      ║
    ╚══════════════════════════════════════════════════════════════════════╝
+   ╔═ Parameters ═════════════════════════════════════════════════════════╗
+   ║                                                                      ║
+   ║  *  PATH --path                     [required]                       ║
+   ║     VERBOSE --verbose --no-verbose  [default: False]                 ║
+   ║                                                                      ║
+   ╚══════════════════════════════════════════════════════════════════════╝
+
 
 Table Customization
 ^^^^^^^^^^^^^^^^^^^

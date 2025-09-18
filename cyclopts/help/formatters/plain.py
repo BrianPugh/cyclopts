@@ -125,6 +125,9 @@ class PlainFormatter:
                     # For commands or other panels
                     self._format_command_entry(entry.names, entry.shorts, desc, console)
 
+        # Add trailing newline for visual separation between panels
+        console.print()
+
     def render_usage(
         self,
         console: "Console",
