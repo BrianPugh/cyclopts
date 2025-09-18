@@ -1095,6 +1095,7 @@ def test_plain_formatter_no_title(console: Console):
         formatter(console, console.options, panel)
 
     actual = capture.get()
+    # When panel has no title, PlainFormatter still indents entries with 2 spaces
     expected = "  --option: Test option [default: value]\n\n"
     assert actual == expected
 
@@ -1243,7 +1244,13 @@ def test_plain_formatter_command_only_shorts(console: Console):
         formatter(console, console.options, panel)
 
     actual = capture.get()
-    expected = "Options:\n  -v -vv: Verbose output\n\n"
+    expected = dedent(
+        """\
+        Options:
+          -v -vv: Verbose output
+
+        """
+    )
     assert actual == expected
 
 
@@ -1280,8 +1287,14 @@ def test_plain_formatter_rich_renderable(console: Console):
         formatter(console, console.options, panel)
 
     actual = capture.get()
-    assert "--option" in actual
-    assert "Rich Content" in actual
+    expected = dedent(
+        """\
+        Rich Content:
+          --option: Test
+
+        """
+    )
+    assert actual == expected
 
 
 def test_plain_formatter_none_values(console: Console):
@@ -1309,7 +1322,13 @@ def test_plain_formatter_none_values(console: Console):
         formatter(console, console.options, panel)
 
     actual = capture.get()
-    expected = "Test:\n  --test\n\n"
+    expected = dedent(
+        """\
+        Test:
+          --test
+
+        """
+    )
     assert actual == expected
 
 
@@ -1341,5 +1360,11 @@ def test_plain_formatter_fallback_str_conversion(console: Console):
         formatter(console, console.options, panel)
 
     actual = capture.get()
-    assert "Custom" in actual
-    assert "--custom: Custom description" in actual
+    expected = dedent(
+        """\
+        Custom:
+          --custom: Custom description
+
+        """
+    )
+    assert actual == expected
