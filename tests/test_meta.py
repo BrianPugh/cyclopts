@@ -3,7 +3,7 @@ from typing import Annotated
 
 import pytest
 
-from cyclopts import App, Parameter, UnknownOptionError
+from cyclopts import App, Group, Parameter, UnknownOptionError
 
 
 @pytest.mark.parametrize(
@@ -161,6 +161,7 @@ def test_meta_app_nested_exec(nested_meta_app, queue, cmd_str, expected):
 def test_meta_app_inheriting_root_default_parameter(app, console):
     """Confirms that default_parameter gets inherited root_app->meta_app (as well as to subapps when a meta app is used)."""
     app.default_parameter = Parameter(negative=[])
+    app.meta.group_parameters = Group("Global options", sort_key=0)
 
     @app.meta.default
     def meta(
@@ -186,7 +187,7 @@ def test_meta_app_inheriting_root_default_parameter(app, console):
         │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
-        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        ╭─ Global options ───────────────────────────────────────────────────╮
         │ --flag1  [default: False]                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -203,6 +204,9 @@ def test_meta_app_inheriting_root_default_parameter(app, console):
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --flag2  [default: False]                                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Global options ───────────────────────────────────────────────────╮
+        │ --flag1  [default: False]                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
