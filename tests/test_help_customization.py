@@ -1002,3 +1002,338 @@ def test_custom_formatter_receives_correct_arguments(console: Console):
         """
     )
     assert actual == expected
+
+
+def test_plain_formatter_with_rich_text(console: Console):
+    """Test PlainFormatter handling of Rich Text objects with .plain property."""
+    from cyclopts.help.formatters import PlainFormatter
+
+    # Create a group with PlainFormatter
+    plain_group = Group(
+        "Plain Options",
+        help="Test group with rich text",
+        help_formatter=PlainFormatter(),
+    )
+
+    app = App()
+
+    @app.default
+    def main(
+        option: Annotated[str, Parameter(group=plain_group, help="Test option")] = "value",
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    actual = capture.get()
+    # Commands group still uses default formatter, only Plain Options uses PlainFormatter
+    expected = dedent(
+        """\
+        Usage: test_help_customization [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        Plain Options:
+          OPTION, --option: Test option [default: value]
+
+        """
+    )
+    assert actual == expected
+
+
+def test_plain_formatter_empty_panel(console: Console):
+    """Test PlainFormatter skips empty panels."""
+    from cyclopts.help import HelpPanel
+    from cyclopts.help.formatters import PlainFormatter
+
+    formatter = PlainFormatter()
+
+    # Create an empty panel
+    empty_panel = HelpPanel(
+        title="Empty Panel", description="This panel has no entries", entries=[], format="parameter"
+    )
+
+    # This should not output anything
+    with console.capture() as capture:
+        formatter(console, console.options, empty_panel)
+
+    assert capture.get() == ""
+
+
+def test_plain_formatter_no_title(console: Console):
+    """Test PlainFormatter with panel without title."""
+    from cyclopts.help import HelpEntry, HelpPanel
+    from cyclopts.help.formatters import PlainFormatter
+
+    formatter = PlainFormatter()
+
+    # Create a panel without title
+    panel = HelpPanel(
+        title="",
+        description="",
+        entries=[
+            HelpEntry(
+                names=("--option",),
+                shorts=(),
+                description="Test option",
+                default="value",
+            )
+        ],
+        format="parameter",
+    )
+
+    with console.capture() as capture:
+        formatter(console, console.options, panel)
+
+    actual = capture.get()
+    expected = "  --option: Test option [default: value]\n\n"
+    assert actual == expected
+
+
+def test_plain_formatter_render_methods(console: Console):
+    """Test PlainFormatter render_usage and render_description methods."""
+    from cyclopts.help.formatters import PlainFormatter
+
+    app = App(
+        help="Test application with plain formatter.",
+        help_formatter=PlainFormatter(indent_width=4),
+    )
+
+    @app.default
+    def main(
+        verbose: bool = False,
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: test_help_customization [ARGS] [OPTIONS]
+
+        Test application with plain formatter.
+
+        Commands:
+            --help, -h: Display this message and exit.
+            --version: Display application version.
+
+        Parameters:
+            VERBOSE, --verbose, --no-verbose: [default: False]
+
+        """
+    )
+    assert actual == expected
+
+
+def test_plain_formatter_parameter_with_metadata(console: Console):
+    """Test PlainFormatter with parameters having env_var, required."""
+    from typing import Literal
+
+    from cyclopts.help.formatters import PlainFormatter
+
+    plain_group = Group(
+        "Settings",
+        help_formatter=PlainFormatter(),
+    )
+
+    app = App()
+
+    @app.default
+    def main(
+        mode: Annotated[
+            Literal["fast", "slow", "medium"], Parameter(group=plain_group, help="Operation mode", env_var="MODE")
+        ],
+        output: Annotated[
+            str,
+            Parameter(
+                group=plain_group,
+                help="Output file",
+                required=True,
+            ),
+        ],
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    actual = capture.get()
+    # Commands group uses default formatter
+    expected = dedent(
+        """\
+        Usage: test_help_customization [ARGS] [OPTIONS]
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        Settings:
+          MODE, --mode: Operation mode [choices: fast, slow, medium] [env var:
+        MODE] [required]
+          OUTPUT, --output: Output file [required]
+
+        """
+    )
+    assert actual == expected
+
+
+def test_plain_formatter_command_multiple_names(console: Console):
+    """Test PlainFormatter with command having multiple names."""
+    from cyclopts.help.formatters import PlainFormatter
+
+    app = App(help_formatter=PlainFormatter())
+
+    @app.command(name=["list", "ls", "show"])
+    def list_cmd():
+        """List items."""
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: test_help_customization COMMAND
+
+        Commands:
+          list: List items.
+          ls
+          show
+          --help, -h: Display this message and exit.
+          --version: Display application version.
+
+        """
+    )
+    assert actual == expected
+
+
+def test_plain_formatter_command_only_shorts(console: Console):
+    """Test PlainFormatter with entries having only short names."""
+    from cyclopts.help import HelpEntry, HelpPanel
+    from cyclopts.help.formatters import PlainFormatter
+
+    formatter = PlainFormatter()
+
+    panel = HelpPanel(
+        title="Options",
+        description="",
+        entries=[
+            HelpEntry(
+                names=(),
+                shorts=("-v", "-vv"),
+                description="Verbose output",
+            )
+        ],
+        format="command",
+    )
+
+    with console.capture() as capture:
+        formatter(console, console.options, panel)
+
+    actual = capture.get()
+    expected = "Options:\n  -v -vv: Verbose output\n\n"
+    assert actual == expected
+
+
+def test_plain_formatter_rich_renderable(console: Console):
+    """Test PlainFormatter with Rich renderable objects."""
+    from rich.table import Table
+
+    from cyclopts.help import HelpEntry, HelpPanel
+    from cyclopts.help.formatters import PlainFormatter
+
+    formatter = PlainFormatter()
+
+    # Create a Rich table as description
+    table = Table(title="Test Table")
+    table.add_column("Name")
+    table.add_column("Value")
+    table.add_row("test", "123")
+
+    panel = HelpPanel(
+        title="Rich Content",
+        description=table,
+        entries=[
+            HelpEntry(
+                names=("--option",),
+                shorts=(),
+                description="Test",
+            )
+        ],
+        format="parameter",
+    )
+
+    # Note: PlainFormatter doesn't print panel description, only entries
+    with console.capture() as capture:
+        formatter(console, console.options, panel)
+
+    actual = capture.get()
+    assert "--option" in actual
+    assert "Rich Content" in actual
+
+
+def test_plain_formatter_none_values(console: Console):
+    """Test PlainFormatter handles None values gracefully."""
+    from cyclopts.help import HelpEntry, HelpPanel
+    from cyclopts.help.formatters import PlainFormatter
+
+    formatter = PlainFormatter()
+
+    panel = HelpPanel(
+        title="Test",
+        description=None,
+        entries=[
+            HelpEntry(
+                names=("--test",),
+                shorts=(),
+                description=None,  # No description
+                default=None,  # No default
+            )
+        ],
+        format="parameter",
+    )
+
+    with console.capture() as capture:
+        formatter(console, console.options, panel)
+
+    actual = capture.get()
+    expected = "Test:\n  --test\n\n"
+    assert actual == expected
+
+
+def test_plain_formatter_fallback_str_conversion(console: Console):
+    """Test PlainFormatter fallback to str() for unknown objects."""
+    from cyclopts.help import HelpEntry, HelpPanel
+    from cyclopts.help.formatters import PlainFormatter
+
+    class CustomObject:
+        def __str__(self):
+            return "Custom description"
+
+    formatter = PlainFormatter()
+
+    panel = HelpPanel(
+        title="Custom",
+        description=CustomObject(),  # Object without __rich_console__ or .plain
+        entries=[
+            HelpEntry(
+                names=("--custom",),
+                shorts=(),
+                description=CustomObject(),
+            )
+        ],
+        format="parameter",
+    )
+
+    with console.capture() as capture:
+        formatter(console, console.options, panel)
+
+    actual = capture.get()
+    assert "Custom" in actual
+    assert "--custom: Custom description" in actual

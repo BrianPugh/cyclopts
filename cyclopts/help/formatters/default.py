@@ -157,6 +157,7 @@ class DefaultFormatter:
         table = table_spec.build(columns, help_panel.entries)
 
         # Build the panel
+        assert panel_description is not None  # Always true due to attrs converter
         if panel_spec.title is None:
             panel = panel_spec.build(RichGroup(panel_description, table), title=help_panel.title)
         else:

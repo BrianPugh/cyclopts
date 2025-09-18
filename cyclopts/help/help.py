@@ -17,7 +17,7 @@ from typing import (
     get_origin,
 )
 
-from attrs import define, evolve, field
+from attrs import converters, define, evolve, field
 
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
@@ -81,8 +81,11 @@ class HelpEntry:
     shorts: tuple[str, ...] = ()
     """Short option names (e.g., "-v", "-h")."""
 
-    description: Optional["RenderableType"] = None
-    """Help text description for this entry."""
+    description: Any = None
+    """Help text description for this entry.
+
+    Typically a :class:`str` or a :obj:`~rich.console.RenderableType`
+    """
 
     required: bool = False
     """Whether this parameter/command is required."""
@@ -116,8 +119,14 @@ class HelpPanel:
     title: "RenderableType"
     """The title text displayed at the top of the help panel."""
 
-    description: "RenderableType" = field(factory=_text_factory)
-    """Optional description text displayed below the title."""
+    description: Any = field(
+        default=None,
+        converter=converters.default_if_none(factory=_text_factory),
+    )
+    """Optional description text displayed below the title.
+
+    Typically a :class:`str` or a :obj:`~rich.console.RenderableType`
+    """
 
     entries: list[HelpEntry] = field(factory=list)
     """List of help entries to display (in order) in the panel."""
