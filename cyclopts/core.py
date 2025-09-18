@@ -1657,7 +1657,19 @@ class App:
 
         # Handle Arguments/Parameters
         # We have to combine all the help-pages of the command-app and it's meta apps.
-        for subapp in _walk_metas(command_app):
+        # Get all apps including meta apps from the app_stack context
+        apps_for_params = list(_walk_metas(command_app))
+        if command_app.app_stack.stack:
+            for app in command_app.app_stack.stack[-1]:
+                # Include the app's meta if it exists and isn't already in the list
+                # But don't include it if the command_app itself is a command from the meta
+                if app._meta and app._meta not in apps_for_params:
+                    # Check if command_app is a command from the meta app
+                    is_meta_command = command_app in app._meta._commands.values()
+                    if not is_meta_command:
+                        apps_for_params.append(app._meta)
+
+        for subapp in apps_for_params:
             if not subapp.default_command:
                 continue
 
