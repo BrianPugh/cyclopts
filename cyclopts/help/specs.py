@@ -210,12 +210,12 @@ AsteriskColumn = ColumnSpec(
 
 NameColumn = ColumnSpec(
     renderer=name_renderer,
-    header="",
+    header="Option",
     justify="left",
     style="cyan",
 )
 
-DescriptionColumn = ColumnSpec(renderer="description", header="", justify="left", overflow="fold")
+DescriptionColumn = ColumnSpec(renderer="description", header="Description", justify="left", overflow="fold")
 
 
 def get_default_command_columns(
@@ -240,7 +240,7 @@ def get_default_command_columns(
     max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
         renderer=partial(name_renderer, max_width=max_width),
-        header="",
+        header="Command",
         justify="left",
         style="cyan",
         max_width=max_width,
@@ -274,7 +274,7 @@ def get_default_parameter_columns(
     max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
         renderer=partial(name_renderer, max_width=max_width),
-        header="",
+        header="Option",
         justify="left",
         style="cyan",
         max_width=max_width,
