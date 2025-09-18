@@ -2001,7 +2001,6 @@ def test_issue_373_help_space_with_meta_app(app, console):
     assert actual == expected
 
 
-@pytest.mark.skip(reason="WIP")
 def test_format_plain_formatter(console):
     """Test that PlainFormatter produces correct plain text output."""
     app = App(
@@ -2037,7 +2036,20 @@ def test_format_plain_formatter(console):
 
     expected = dedent(
         """\
-        TODO
+        Usage: test_app COMMAND [ARGS] [OPTIONS]
+
+        Test application for PlainFormatter
+
+        Commands:
+          cmd1: First test command.
+          cmd2: Second test command.
+          --help, -h: Display this message and exit.
+          --version: Display application version.
+
+
+        Parameters:
+          VERBOSE, --verbose, --no-verbose: [default: False]
+
         """
     )
     assert actual == expected
