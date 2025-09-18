@@ -246,6 +246,12 @@ class ColumnSpec:
     Corresponds to the ``no_wrap`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
+    highlight: Optional[bool] = None
+    """Enable automatic highlighting of text in the column.
+
+    Corresponds to the ``highlight`` parameter of :meth:`rich.table.Table.add_column`.
+    """
+
     def _render_cell(self, entry: "HelpEntry") -> "RenderableType":
         """Render the cell content based on the renderer type.
 
@@ -542,21 +548,24 @@ class TableSpec:
 
         # Add columns
         for column in columns:
-            table.add_column(
-                column.header,
-                footer=column.footer,
-                header_style=column.header_style,
-                footer_style=column.footer_style,
-                style=column.style,
-                justify=column.justify,
-                vertical=column.vertical,
-                overflow=column.overflow,
-                width=column.width,
-                min_width=column.min_width,
-                max_width=column.max_width,
-                ratio=column.ratio,
-                no_wrap=column.no_wrap,
-            )
+            col_opts = {
+                "header": column.header,
+                "footer": column.footer,
+                "header_style": column.header_style,
+                "footer_style": column.footer_style,
+                "style": column.style,
+                "justify": column.justify,
+                "vertical": column.vertical,
+                "overflow": column.overflow,
+                "width": column.width,
+                "min_width": column.min_width,
+                "max_width": column.max_width,
+                "ratio": column.ratio,
+                "no_wrap": column.no_wrap,
+            }
+            if column.highlight is not None:
+                col_opts["highlight"] = column.highlight
+            table.add_column(**col_opts)
 
         # Add entries
         for e in entries:
@@ -658,6 +667,12 @@ class PanelSpec:
     Corresponds to the ``safe_box`` parameter of :class:`~rich.panel.Panel`.
     """
 
+    highlight: bool = False
+    """Enable automatic highlighting of panel contents.
+
+    Corresponds to the ``highlight`` parameter of :class:`~rich.panel.Panel`.
+    """
+
     def build(self, renderable: "RenderableType", **overrides) -> "Panel":
         """Create a Panel around `renderable`. Use kwargs to override spec per render."""
         # Import box here for lazy loading
@@ -678,6 +693,7 @@ class PanelSpec:
             "width": self.width,
             "height": self.height,
             "safe_box": self.safe_box,
+            "highlight": self.highlight,
         }
         if self.title is not None:
             opts["title"] = self.title
