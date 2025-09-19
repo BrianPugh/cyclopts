@@ -135,7 +135,8 @@ def _combined_meta_command_mapping(
     if recurse_meta and app._meta:
         command_mapping.update(_combined_meta_command_mapping(app._meta))
     if recurse_parent_meta and app._meta_parent:
-        command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
+        meta_parent_commands = _combined_meta_command_mapping(app._meta_parent, recurse_meta=False)
+        command_mapping.update(meta_parent_commands)
     return command_mapping
 
 
@@ -794,7 +795,7 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
-    def parse_commands(  # TODO: v4; make this private?
+    def parse_commands(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
@@ -810,7 +811,18 @@ class App:
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         include_parent_meta: bool
-            If True, includes parent meta apps in the execution path for backward compatibility.
+            Controls whether parent meta apps are included in the execution path.
+
+            When True (default):
+            - Parent meta apps (i.e. the "normal" app ) are added to the apps list.
+            - Meta app options are consumed while parsing commands.
+            - Used for getting the inheritance hierarchy.
+
+            When False:
+            - Meta app options are treated as regular arguments.
+            - Used for getting the execution hierarchy.
+
+            This parameter is primarily for internal use.
 
         Returns
         -------
@@ -829,6 +841,10 @@ class App:
         unused_tokens = tokens
 
         def add_parent_metas(app):
+            """If ``app`` is a meta-app, also add it's "normal" app.
+
+            We assume that ``app._meta`` will always invoke the ``app``.
+            """
             if not include_parent_meta:
                 return
             meta_parents = []
@@ -842,18 +858,30 @@ class App:
         apps.append(app)
         command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
 
-        for i, token in enumerate(tokens):
+        unused_tokens = tokens
+        while unused_tokens:
+            token = unused_tokens[0]
             try:
                 app = command_mapping[token]
             except KeyError:
+                # Token is not a command. Try to consume it as a meta app parameter.
+                # This is only relevant when ``include_parent_meta==True``, because
+                # otherwise it will be handled by the natural parsing process.
+                if include_parent_meta:
+                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
+                    if len(remaining) < len(unused_tokens):
+                        # Some meta parameters were consumed, continue looking for commands
+                        unused_tokens = remaining
+                        continue
+                # Not a command or meta parameter, stop parsing commands
                 break
 
+            # Found a command - add it to the chain
             add_parent_metas(app)
             apps.append(app)
             command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-
-            unused_tokens = tokens[i + 1 :]
             command_chain.append(token)
+            unused_tokens = unused_tokens[1:]
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -893,6 +921,66 @@ class App:
                             apps.append(app._meta)
 
         return apps
+
+    def _consume_leading_meta_options(self, apps: list["App"], tokens: list[str]) -> list[str]:
+        """Consume meta app options from the beginning of the token stream.
+
+        This is used to skip over meta app parameters when looking for commands.
+
+        Limitation: positional parameters for the meta app are NOT skipped.
+        This is because we do not know which meta-parameters are for the
+        meta-app itself vs which it will pass along to the normal app.
+
+        Parameters
+        ----------
+        apps: list[App]
+            Current app stack including parent meta apps.
+        tokens: list[str]
+            Tokens to try parsing, starting from current position.
+
+        Returns
+        -------
+        list[str]
+            The remaining unused tokens after consuming any leading meta options.
+        """
+        if not apps or not tokens:
+            return tokens
+
+        from cyclopts.bind import _parse_kw_and_flags
+
+        # Resolve end_of_options_delimiter from the partially-resolved app stack
+        with self.app_stack(apps):
+            end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
+
+        # Collect meta apps that could have parameters
+        # We need both:
+        # 1. Meta apps in the current stack (apps that ARE meta apps)
+        # 2. The meta app of the current context (if it exists)
+        meta_apps_to_try = [app for app in apps if app._meta_parent is not None and app.default_command]
+
+        # Add the current app's meta if it exists
+        if apps[-1]._meta and apps[-1]._meta.default_command:
+            meta_apps_to_try.append(apps[-1]._meta)
+
+        # Try to parse with each meta app's parameters
+        unused_tokens = tokens
+        for meta_app in meta_apps_to_try:
+            try:
+                argument_collection = meta_app.assemble_argument_collection()
+
+                # Try to consume tokens with this meta app's parameters
+                # stop_at_first_unknown=True ensures we only consume contiguous leading options
+                unused_tokens = _parse_kw_and_flags(
+                    argument_collection,
+                    unused_tokens,
+                    end_of_options_delimiter=end_of_options_delimiter,
+                    stop_at_first_unknown=True,
+                )
+            except Exception:
+                # If parsing fails, try next meta app
+                continue
+
+        return unused_tokens
 
     # This overload is used in code like:
     #
@@ -1622,12 +1710,10 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
-        _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
+        command_chain, apps, _ = self.parse_commands(tokens)
+        executing_app = apps[-1]
         overrides = {"_console": console}
-        with self.app_stack(apps_for_context, overrides=overrides):
-            command_chain, execution_path, _ = self.parse_commands(tokens)
-            executing_app = execution_path[-1]
-
+        with self.app_stack(apps, overrides=overrides):
             console = executing_app.console
 
             # Prepare usage
