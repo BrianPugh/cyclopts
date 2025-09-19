@@ -141,18 +141,40 @@ def update_argument_collection(
                 argument, remaining_keys, _ = arguments.match(cli_option_name)
             except ValueError:
                 # If no direct match, try to find an argument by checking field_info names
-                # This handles Pydantic aliases and other alternative names
+                # This handles Pydantic aliases and other alternative names at all levels
                 if subkeys:  # Only try alias matching if we have subkeys
                     for arg in arguments:
                         # Check if the path lengths match
                         if len(subkeys) != len(arg.keys):
                             continue
 
-                        # Check if the last key (which may have an alias) matches
-                        if subkeys[-1] in arg.field_info.names:
-                            # For nested paths, we should ideally check all intermediate keys
-                            # but for now we just check the leaf which handles the common case
-                            # of Pydantic models with aliases
+                        # Check if all keys match, considering aliases at each level
+                        all_match = True
+                        for i, (subkey, arg_key) in enumerate(zip(subkeys, arg.keys)):
+                            if subkey == arg_key:
+                                # Exact match at this level
+                                continue
+
+                            # Check if this is an alias match
+                            if i == len(arg.keys) - 1:
+                                # For the last key, check the current argument's field_info.names
+                                if subkey not in arg.field_info.names:
+                                    all_match = False
+                                    break
+                            else:
+                                # For intermediate keys, find parent arguments to check their aliases
+                                # Build the parent keys up to this level
+                                parent_keys = arg.keys[: i + 1]
+                                alias_found = False
+                                for parent_arg in arguments:
+                                    if parent_arg.keys == parent_keys and subkey in parent_arg.field_info.names:
+                                        alias_found = True
+                                        break
+                                if not alias_found:
+                                    all_match = False
+                                    break
+
+                        if all_match:
                             argument = arg
                             remaining_keys = ()
                             break
