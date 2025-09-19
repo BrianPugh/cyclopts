@@ -261,6 +261,8 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
         '{"storageclass": "longhorn"}',
         # check for incorrectly parsing "null" as a string
         '{"storage_class": "longhorn", "limit": null}',
+        # Test the actual Pydantic camelCase alias
+        '{"storageClass": "longhorn"}',
     ],
 )
 def test_pydantic_alias_env_var_json(app, assert_parse_args, monkeypatch, env_var):
@@ -436,6 +438,68 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         """
     )
     assert actual == expected
+
+
+def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatch):
+    """
+    Test that Pydantic's own JSON serialization (which uses aliases by default)
+    can be round-tripped through cyclopts environment variable loading.
+
+    This ensures that if a user saves a Pydantic model to JSON and then loads it
+    back through cyclopts, it works correctly.
+    """
+    import json
+
+    class BaseK8sModel(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            populate_by_name=True,
+            from_attributes=True,
+        )
+
+    class DatabaseConfig(BaseK8sModel):
+        host: str = "localhost"
+        port: int = 5432
+        connection_timeout: int = 30
+        max_pool_size: int = 10
+
+    class Spec(BaseK8sModel):
+        storage_class: str
+        enable_caching: bool = True
+        database_config: Optional[DatabaseConfig] = None
+        api_key: Optional[str] = None
+
+    # Create a Pydantic model instance with data
+    original_spec = Spec(
+        storage_class="fast-ssd",
+        enable_caching=False,
+        database_config=DatabaseConfig(host="db.example.com", port=3306, connection_timeout=60, max_pool_size=50),
+        api_key="secret123",
+    )
+
+    # Serialize to JSON using Pydantic's model_dump_json with by_alias=True
+    # This will use the camelCase aliases
+    json_str = original_spec.model_dump_json(by_alias=True)
+
+    # Verify the JSON has the expected camelCase structure
+    json_data = json.loads(json_str)
+    expected_json = {
+        "storageClass": "fast-ssd",
+        "enableCaching": False,
+        "databaseConfig": {"host": "db.example.com", "port": 3306, "connectionTimeout": 60, "maxPoolSize": 50},
+        "apiKey": "secret123",
+    }
+    assert json_data == expected_json
+
+    # Now set this as environment variable and parse with cyclopts
+    monkeypatch.setenv("SPEC", json_str)
+
+    @app.default
+    def run(spec: Annotated[Spec, Parameter(env_var="SPEC")]) -> None:
+        pass
+
+    # Should parse back to the exact same object
+    assert_parse_args(run, "", original_spec)
 
 
 @pytest.mark.parametrize(
