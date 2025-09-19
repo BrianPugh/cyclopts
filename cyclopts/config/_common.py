@@ -1,49 +1,20 @@
 import errno
-import itertools
 import os
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from contextlib import suppress
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from attrs import define, field
 
-from cyclopts.argument import ArgumentCollection
-from cyclopts.exceptions import CycloptsError, UnknownOptionError
-from cyclopts.token import Token
-from cyclopts.utils import is_iterable, to_tuple_converter
+from cyclopts.argument import ArgumentCollection, update_argument_collection
+from cyclopts.exceptions import CycloptsError
+from cyclopts.utils import to_tuple_converter
 
 if TYPE_CHECKING:
     from cyclopts.core import App
-
-
-def _walk_leaves(
-    d,
-    parent_keys: Optional[tuple[str, ...]] = None,
-) -> Iterator[tuple[tuple[str, ...], Any]]:
-    if parent_keys is None:
-        parent_keys = ()
-
-    if isinstance(d, dict):
-        for key, value in d.items():
-            current_keys = parent_keys + (key,)
-            if isinstance(value, dict):
-                yield from _walk_leaves(value, current_keys)
-            else:
-                yield current_keys, value
-    else:
-        yield (), d
-
-
-def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
-    argument_collection = ArgumentCollection()
-    for app in apps:
-        if app._meta is None:
-            continue
-        argument_collection.extend(app._meta.assemble_argument_collection())  # apps=apps[:i]))
-    return argument_collection
 
 
 class CacheKey:
@@ -68,163 +39,6 @@ class CacheKey:
             return False
 
         return self._mtime == other._mtime and self._size == other._size and self.path == other.path
-
-
-def to_cli_option_name(*keys: str) -> str:
-    return "--" + ".".join(keys)
-
-
-def update_argument_collection(
-    config: dict,
-    source: str,
-    arguments: ArgumentCollection,
-    apps: Optional[Sequence["App"]] = None,
-    *,
-    root_keys: Iterable[str],
-    allow_unknown: bool,
-):
-    """Updates an argument collection with values from a configuration dictionary.
-
-    This function takes configuration data (typically from JSON, TOML, YAML files
-    or environment variables) and populates the corresponding arguments in the
-    ArgumentCollection with tokens representing those values.
-
-    The function handles various naming conventions, including:
-    - Exact matches (e.g., "storage_class" matches "storage_class")
-    - Transformed matches (e.g., "storage-class" matches "storage_class")
-    - Pydantic aliases (e.g., "storageClass" matches field with alias "storageClass")
-
-    Parameters
-    ----------
-    config : dict
-        Configuration dictionary with nested structure mapping to CLI arguments.
-    source : str
-        Source identifier (e.g., file path or "env") for error messages and tracking.
-    arguments : ArgumentCollection
-        Collection of arguments to populate with configuration values.
-    apps : Optional[Sequence[App]]
-        Stack of App instances for meta-argument handling.
-    root_keys : Iterable[str]
-        Base path keys to prepend to all configuration keys.
-    allow_unknown : bool
-        If True, ignore unrecognized configuration keys instead of raising errors.
-
-    Raises
-    ------
-    UnknownOptionError
-        If a configuration key doesn't match any argument and allow_unknown is False.
-
-    Notes
-    -----
-    Arguments that already have tokens are skipped to preserve command-line
-    precedence over configuration files.
-    """
-    # TODO: we need to skip metas?
-    meta_arguments = _meta_arguments(apps or ())
-
-    do_not_update = {}
-
-    for option_key, option_value in config.items():
-        for subkeys, value in _walk_leaves(option_value):
-            cli_option_name = to_cli_option_name(option_key, *subkeys)
-            complete_keyword = "".join(f"[{k}]" for k in itertools.chain(root_keys, (option_key,), subkeys))
-
-            try:
-                meta_arguments.match(cli_option_name)
-                continue
-            except ValueError:
-                pass
-
-            argument = None
-            remaining_keys = ()
-            try:
-                argument, remaining_keys, _ = arguments.match(cli_option_name)
-            except ValueError:
-                # If no direct match, try to find an argument by checking field_info names
-                # This handles Pydantic aliases and other alternative names at all levels
-                if subkeys:  # Only try alias matching if we have subkeys
-                    for arg in arguments:
-                        # Check if the path lengths match
-                        if len(subkeys) != len(arg.keys):
-                            continue
-
-                        # Check if all keys match, considering aliases at each level
-                        all_match = True
-                        for i, (subkey, arg_key) in enumerate(zip(subkeys, arg.keys)):
-                            if subkey == arg_key:
-                                # Exact match at this level
-                                continue
-
-                            # Check if this is an alias match
-                            if i == len(arg.keys) - 1:
-                                # For the last key, check the current argument's field_info.names
-                                if subkey not in arg.field_info.names:
-                                    all_match = False
-                                    break
-                            else:
-                                # For intermediate keys, find parent arguments to check their aliases
-                                # Build the parent keys up to this level
-                                parent_keys = arg.keys[: i + 1]
-                                alias_found = False
-                                for parent_arg in arguments:
-                                    if parent_arg.keys == parent_keys and subkey in parent_arg.field_info.names:
-                                        alias_found = True
-                                        break
-                                if not alias_found:
-                                    all_match = False
-                                    break
-
-                        if all_match:
-                            argument = arg
-                            remaining_keys = ()
-                            break
-
-            if not argument:
-                if allow_unknown:
-                    continue
-                if apps and apps[-1]._meta_parent:
-                    # We're currently in the meta-app portion of the launch process,
-                    # so MOST supplied options will be unmatched, as we haven't gotten
-                    # to the actual command processing yet.
-                    continue
-                raise UnknownOptionError(
-                    token=Token(keyword=complete_keyword, source=source), argument_collection=arguments
-                ) from None
-
-            if do_not_update.setdefault(id(argument), bool(argument.tokens)):
-                # If this argument already has tokens on **first** access, then skip it.
-                # Allows us to add multiple tokens to an argument from a **single** source (config file).
-                continue
-
-            # Convert all values to strings, so that the Cyclopts engine can process them.
-            # This may (eventually) result in converting back to the original dtype.
-            if not is_iterable(value):
-                value = (value,)
-
-            if value:
-                for i, v in enumerate(value):
-                    # TODO: is this index correct? If the source value is a list, it should probably be different
-                    if v is None:
-                        # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
-                        token = Token(
-                            keyword=complete_keyword,
-                            implicit_value=None,
-                            source=source,
-                            index=i,
-                            keys=remaining_keys,
-                        )
-                    else:
-                        # Convert the value back into a string, so it can be re-converted.
-                        token = Token(
-                            keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys
-                        )
-                    argument.append(token)
-            else:
-                # E.g. an empty list.
-                token = Token(
-                    keyword=complete_keyword, implicit_value=value, source=source, index=0, keys=remaining_keys
-                )
-                argument.append(token)
 
 
 @define
