@@ -83,9 +83,41 @@ def update_argument_collection(
     root_keys: Iterable[str],
     allow_unknown: bool,
 ):
-    """Updates an argument collection if it doesn't already have tokens.
+    """Updates an argument collection with values from a configuration dictionary.
 
-    Note: it feels bad that we're passing in ``apps`` here.
+    This function takes configuration data (typically from JSON, TOML, YAML files
+    or environment variables) and populates the corresponding arguments in the
+    ArgumentCollection with tokens representing those values.
+
+    The function handles various naming conventions, including:
+    - Exact matches (e.g., "storage_class" matches "storage_class")
+    - Transformed matches (e.g., "storage-class" matches "storage_class")
+    - Pydantic aliases (e.g., "storageClass" matches field with alias "storageClass")
+
+    Parameters
+    ----------
+    config : dict
+        Configuration dictionary with nested structure mapping to CLI arguments.
+    source : str
+        Source identifier (e.g., file path or "env") for error messages and tracking.
+    arguments : ArgumentCollection
+        Collection of arguments to populate with configuration values.
+    apps : Optional[Sequence[App]]
+        Stack of App instances for meta-argument handling.
+    root_keys : Iterable[str]
+        Base path keys to prepend to all configuration keys.
+    allow_unknown : bool
+        If True, ignore unrecognized configuration keys instead of raising errors.
+
+    Raises
+    ------
+    UnknownOptionError
+        If a configuration key doesn't match any argument and allow_unknown is False.
+
+    Notes
+    -----
+    Arguments that already have tokens are skipped to preserve command-line
+    precedence over configuration files.
     """
     # TODO: we need to skip metas?
     meta_arguments = _meta_arguments(apps or ())
@@ -99,14 +131,33 @@ def update_argument_collection(
 
             try:
                 meta_arguments.match(cli_option_name)
+                continue
             except ValueError:
                 pass
-            else:
-                continue
 
+            argument = None
+            remaining_keys = ()
             try:
                 argument, remaining_keys, _ = arguments.match(cli_option_name)
             except ValueError:
+                # If no direct match, try to find an argument by checking field_info names
+                # This handles Pydantic aliases and other alternative names
+                if subkeys:  # Only try alias matching if we have subkeys
+                    for arg in arguments:
+                        # Check if the path lengths match
+                        if len(subkeys) != len(arg.keys):
+                            continue
+
+                        # Check if the last key (which may have an alias) matches
+                        if subkeys[-1] in arg.field_info.names:
+                            # For nested paths, we should ideally check all intermediate keys
+                            # but for now we just check the leaf which handles the common case
+                            # of Pydantic models with aliases
+                            argument = arg
+                            remaining_keys = ()
+                            break
+
+            if not argument:
                 if allow_unknown:
                     continue
                 if apps and apps[-1]._meta_parent:
