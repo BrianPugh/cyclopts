@@ -3,7 +3,7 @@ import inspect
 import os
 import sys
 import traceback
-from collections.abc import Coroutine, Iterable, Iterator
+from collections.abc import Coroutine, Iterable, Iterator, Sequence
 from contextlib import suppress
 from copy import copy
 from enum import Enum
@@ -113,11 +113,26 @@ def _get_version_command(app):
 def _combined_meta_command_mapping(
     app: Optional["App"], recurse_meta=True, recurse_parent_meta=True
 ) -> dict[str, "App"]:
-    """Return a copied and combined mapping containing app and meta-app commands."""
+    """Return a mapping of command names to Apps, including meta app commands.
+
+    Parameters
+    ----------
+    app : Optional[App]
+        The app to get commands from.
+    recurse_meta : bool
+        If True, include commands from the app's meta.
+    recurse_parent_meta : bool
+        If True, include commands from parent meta apps.
+
+    Returns
+    -------
+    dict[str, App]
+        Mapping of command names to Apps.
+    """
     if app is None:
         return {}
     command_mapping = copy(app._commands)
-    if recurse_meta:
+    if recurse_meta and app._meta:
         command_mapping.update(_combined_meta_command_mapping(app._meta))
     if recurse_parent_meta and app._meta_parent:
         command_mapping.update(_combined_meta_command_mapping(app._meta_parent, recurse_meta=False))
@@ -794,13 +809,15 @@ class App:
         tokens: Union[None, str, Iterable[str]]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
+        include_parent_meta: bool
+            If True, includes parent meta apps in the execution path for backward compatibility.
 
         Returns
         -------
         tuple[str, ...]
             Strings that are interpreted as a valid command chain.
         tuple[App, ...]
-            The associated :class:`App` object for each element in the command chain.
+            The execution path - apps that will be invoked in order.
         list[str]
             The remaining non-command tokens.
         """
@@ -839,6 +856,43 @@ class App:
             command_chain.append(token)
 
         return tuple(command_chain), tuple(apps), unused_tokens
+
+    def _get_resolution_context(self, execution_path: Sequence["App"]) -> list["App"]:
+        """Get all apps that contribute to parameter resolution for the given execution path.
+
+        This includes parent meta apps and the meta app of the final command app.
+
+        Parameters
+        ----------
+        execution_path : Sequence[App]
+            The execution path returned from parse_commands.
+
+        Returns
+        -------
+        list[App]
+            All apps that contribute configuration and parameters, ordered by priority.
+        """
+        apps = []
+
+        # For the last app in execution path, include it and its meta
+        if execution_path:
+            last_app = execution_path[-1]
+            # Include all metas from walk_metas (includes the app itself)
+            for app in _walk_metas(last_app):
+                if app not in apps:
+                    apps.append(app)
+
+            # Include parent metas from the stack if they exist
+            if last_app.app_stack.stack:
+                for app in last_app.app_stack.stack[-1]:
+                    # Include the app's meta if it exists and isn't already in the list
+                    if app._meta and app._meta not in apps:
+                        # Check if last_app is a command from the meta app
+                        is_meta_command = last_app in app._meta._commands.values()
+                        if not is_meta_command:
+                            apps.append(app._meta)
+
+        return apps
 
     # This overload is used in code like:
     #
@@ -1139,23 +1193,26 @@ class App:
 
         meta_parent = self
 
-        # This represents the complete inheritance hierarchy (including if a meta-app is invoked)
-        _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
-        # This represents the execution path
-        command_chain, apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+        # We need both versions of the apps list:
+        # 1. apps_for_context (with parent metas) - for setting up the app_stack context
+        # 2. execution_apps (without parent metas) - for determining the actual execution command
+        # These can differ when parse_commands is called from a meta app, so we must
+        # call parse_commands twice. This is not inefficient since the parsing is fast.
+        _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
+        command_chain, execution_apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
 
         # We don't want the command_app to be the version/help handler; we handle those specially
-        command_app = apps[-1]
+        command_app = execution_apps[-1]
         with suppress(IndexError):
-            if set(command_app.name) & set(apps[-2].help_flags + apps[-2].version_flags):  # pyright: ignore
-                apps = apps[:-1]
+            if set(command_app.name) & set(execution_apps[-2].help_flags + execution_apps[-2].version_flags):  # pyright: ignore
+                execution_apps = execution_apps[:-1]
 
-        command_app = apps[-1]
-        del apps  # Always use AppStack from here-on.
+        command_app = execution_apps[-1]
+        del execution_apps  # Always use AppStack from here-on.
 
         ignored: dict[str, Any] = {}
 
-        with self.app_stack(apps_meta):
+        with self.app_stack(apps_for_context):
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
@@ -1565,11 +1622,11 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
-        _, apps_meta, _ = self.parse_commands(tokens, include_parent_meta=True)
+        _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
         overrides = {"_console": console}
-        with self.app_stack(apps_meta, overrides=overrides):
-            command_chain, apps, _ = self.parse_commands(tokens)
-            executing_app = apps[-1]
+        with self.app_stack(apps_for_context, overrides=overrides):
+            command_chain, execution_path, _ = self.parse_commands(tokens)
+            executing_app = execution_path[-1]
 
             console = executing_app.console
 
@@ -1624,8 +1681,8 @@ class App:
             format_command_entries,
         )
 
-        command_chain, apps, _ = self.parse_commands(tokens)
-        command_app = apps[-1]
+        command_chain, execution_path, _ = self.parse_commands(tokens)
+        command_app = execution_path[-1]
 
         help_format = command_app.app_stack.resolve("help_format", help_format, _DEFAULT_FORMAT)
 
@@ -1657,17 +1714,8 @@ class App:
 
         # Handle Arguments/Parameters
         # We have to combine all the help-pages of the command-app and it's meta apps.
-        # Get all apps including meta apps from the app_stack context
-        apps_for_params = list(_walk_metas(command_app))
-        if command_app.app_stack.stack:
-            for app in command_app.app_stack.stack[-1]:
-                # Include the app's meta if it exists and isn't already in the list
-                # But don't include it if the command_app itself is a command from the meta
-                if app._meta and app._meta not in apps_for_params:
-                    # Check if command_app is a command from the meta app
-                    is_meta_command = command_app in app._meta._commands.values()
-                    if not is_meta_command:
-                        apps_for_params.append(app._meta)
+        # Use get_resolution_context to get all apps that contribute parameters
+        apps_for_params = self._get_resolution_context(execution_path)
 
         for subapp in apps_for_params:
             if not subapp.default_command:
