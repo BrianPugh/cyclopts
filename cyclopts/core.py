@@ -1710,12 +1710,10 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
-        _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
+        command_chain, apps, _ = self.parse_commands(tokens)
+        executing_app = apps[-1]
         overrides = {"_console": console}
-        with self.app_stack(apps_for_context, overrides=overrides):
-            command_chain, execution_path, _ = self.parse_commands(tokens)
-            executing_app = execution_path[-1]
-
+        with self.app_stack(apps, overrides=overrides):
             console = executing_app.console
 
             # Prepare usage
