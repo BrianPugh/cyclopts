@@ -68,6 +68,7 @@ def _parse_kw_and_flags(
     tokens: Sequence[str],
     *,
     end_of_options_delimiter: str = "--",
+    stop_at_first_unknown: bool = False,
 ):
     unused_tokens, positional_only_tokens = [], []
     skip_next_iterations = 0
@@ -86,6 +87,10 @@ def _parse_kw_and_flags(
             continue
 
         if not is_option_like(token, allow_numbers=True):
+            if stop_at_first_unknown:
+                # Stop parsing and return all remaining tokens as unused
+                unused_tokens.extend(tokens[i:])
+                break
             unused_tokens.append(token)
             continue
 
@@ -117,8 +122,16 @@ def _parse_kw_and_flags(
                     try:
                         matches.append(argument_collection.match(flag))
                     except ValueError:
+                        if stop_at_first_unknown:
+                            # Can't parse this flag combination, stop here
+                            unused_tokens.extend(tokens[i:])
+                            return unused_tokens
                         unused_tokens.append(flag)
             else:
+                if stop_at_first_unknown:
+                    # Unknown option, stop parsing and return all remaining tokens
+                    unused_tokens.extend(tokens[i:])
+                    return unused_tokens
                 unused_tokens.append(token)
                 continue
         for argument, leftover_keys, implicit_value in matches:
@@ -146,7 +159,6 @@ def _parse_kw_and_flags(
                 else:
                     argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
             elif len(matches) != 1:
-                # TODO: more specific exception?
                 raise CombinedShortOptionError(msg=f"Cannot combine flags and short-options in token {cli_option}")
             else:
                 tokens_per_element, consume_all = argument.token_count(leftover_keys)
