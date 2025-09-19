@@ -795,7 +795,7 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
-    def parse_commands(  # TODO: v4; make this private?
+    def parse_commands(
         self,
         tokens: Union[None, str, Iterable[str]] = None,
         *,
@@ -811,7 +811,18 @@ class App:
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         include_parent_meta: bool
-            If True, includes parent meta apps in the execution path for backward compatibility.
+            Controls whether parent meta apps are included in the execution path.
+
+            When True (default):
+            - Parent meta apps (i.e. the "normal" app ) are added to the apps list.
+            - Meta app options are consumed while parsing commands.
+            - Used for getting the inheritance hierarchy.
+
+            When False:
+            - Meta app options are treated as regular arguments.
+            - Used for getting the execution hierarchy.
+
+            This parameter is primarily for internal use.
 
         Returns
         -------
