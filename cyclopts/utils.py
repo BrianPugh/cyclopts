@@ -332,6 +332,27 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
     return to_tuple_converter(value)
 
 
+def sort_key_converter(value: Any) -> Any:
+    """Convert sort_key value, consuming generators with next().
+
+    Parameters
+    ----------
+    value : Any
+        The sort_key value to convert. Can be None, a generator, or any other value.
+
+    Returns
+    -------
+    Any
+        UNSET if value is None, next(value) if generator, otherwise value unchanged.
+    """
+    if value is None:
+        return UNSET
+    elif inspect.isgenerator(value):
+        return next(value)
+    else:
+        return value
+
+
 def help_formatter_converter(
     input_value: Union[None, Literal["default", "plain"], Any],
 ) -> Optional[Any]:

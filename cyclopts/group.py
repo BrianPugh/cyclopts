@@ -21,6 +21,7 @@ from cyclopts.utils import (
     help_formatter_converter,
     is_iterable,
     resolve_callables,
+    sort_key_converter,
     to_tuple_converter,
 )
 
@@ -80,7 +81,7 @@ class Group:
     _sort_key: Any = field(
         default=None,
         alias="sort_key",
-        converter=lambda x: UNSET if x is None else next(x) if inspect.isgenerator(x) else x,
+        converter=sort_key_converter,
         kw_only=True,
     )
 
