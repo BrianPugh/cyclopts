@@ -233,7 +233,7 @@ API
 
       Modifies command display order on the help-page.
 
-      1. If :attr:`sort_key` is a generator, it will be consumed immediately with ``next()`` to get the actual value.
+      1. If :attr:`sort_key` is a generator, it will be consumed immediately with :func:`next` to get the actual value.
 
       2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(app)`` and apply the returned value to (3) if :obj:`None`, (4) otherwise.
 
@@ -279,7 +279,7 @@ API
          │ --version  Display application version.                     │
          ╰─────────────────────────────────────────────────────────────╯
 
-      Using generators (e.g., ``itertools.count``):
+      Using generators (e.g., :func:`itertools.count`):
 
       .. code-block:: python
 
@@ -290,14 +290,25 @@ API
          counter = itertools.count()
 
          @app.command(sort_key=counter)
-         def first():
-             pass
+         def beta():
+             """Beta help description."""
 
          @app.command(sort_key=counter)
-         def second():
-             pass
+         def alpha():
+             """Alpha help description."""
 
-         # Commands will display in order: first (0), second (1)
+         app()
+
+      .. code-block:: text
+
+         Usage: demo.py COMMAND
+
+         ╭─ Commands ──────────────────────────────────────────────────╮
+         │ beta       Beta help description.                           │
+         │ alpha      Alpha help description.                          │
+         │ --help -h  Display this message and exit.                   │
+         │ --version  Display application version.                     │
+         ╰─────────────────────────────────────────────────────────────╯
 
    .. attribute:: version
       :type: Union[None, str, Callable]
@@ -1094,7 +1105,7 @@ API
 
       Modifies group-panel display order on the help-page.
 
-      1. If :attr:`sort_key` is a generator, it will be consumed immediately with ``next()`` to get the actual value.
+      1. If :attr:`sort_key` is a generator, it will be consumed immediately with :func:`next` to get the actual value.
 
       2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
 
@@ -1193,26 +1204,6 @@ API
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
-
-      Using generators with :meth:`Group.create_ordered`:
-
-      .. code-block:: python
-
-         import itertools
-         from cyclopts import App, Group
-
-         app = App()
-         counter = itertools.count()
-
-         @app.command(group=Group.create_ordered("First Group", sort_key=counter))
-         def cmd1():
-             pass
-
-         @app.command(group=Group.create_ordered("Second Group", sort_key=counter))
-         def cmd2():
-             pass
-
-         # Groups will display in order: "First Group" (0), "Second Group" (1)
 
    .. attribute:: default_parameter
       :type: Optional[Parameter]

@@ -333,7 +333,7 @@ def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optio
 
 
 def sort_key_converter(value: Any) -> Any:
-    """Convert sort_key value, consuming generators with next().
+    """Convert sort_key value, consuming generators with :func:`next`.
 
     Parameters
     ----------
@@ -343,7 +343,7 @@ def sort_key_converter(value: Any) -> Any:
     Returns
     -------
     Any
-        UNSET if value is None, next(value) if generator, otherwise value unchanged.
+        UNSET if value is None, ``next(value)`` if generator, otherwise value unchanged.
     """
     if value is None:
         return UNSET
