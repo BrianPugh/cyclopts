@@ -1,3 +1,4 @@
+import inspect
 import itertools
 from collections.abc import Iterable
 from typing import (
@@ -20,6 +21,7 @@ from cyclopts.utils import (
     help_formatter_converter,
     is_iterable,
     resolve_callables,
+    sort_key_converter,
     to_tuple_converter,
 )
 
@@ -79,7 +81,7 @@ class Group:
     _sort_key: Any = field(
         default=None,
         alias="sort_key",
-        converter=lambda x: UNSET if x is None else x,
+        converter=sort_key_converter,
         kw_only=True,
     )
 
@@ -165,6 +167,8 @@ class Group:
             Custom help formatter for this group's help display.
         """
         count = next(_sort_key_counter)
+        if inspect.isgenerator(sort_key):
+            sort_key = next(sort_key)
         if sort_key is None:
             sort_key = (UNSET, count)
         elif is_iterable(sort_key):

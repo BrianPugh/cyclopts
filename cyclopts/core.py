@@ -50,6 +50,7 @@ from cyclopts.utils import (
     default_name_transform,
     help_formatter_converter,
     optional_to_tuple_converter,
+    sort_key_converter,
     to_list_converter,
     to_tuple_converter,
 )
@@ -334,7 +335,7 @@ class App:
     _sort_key: Any = field(
         default=None,
         alias="sort_key",
-        converter=lambda x: UNSET if x is None else x,
+        converter=sort_key_converter,
         kw_only=True,
     )
 
@@ -545,7 +546,7 @@ class App:
 
     @sort_key.setter
     def sort_key(self, value):
-        self._sort_key = value
+        self._sort_key = sort_key_converter(value)
 
     @property
     def _registered_commands(self) -> dict[str, "App"]:
