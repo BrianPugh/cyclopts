@@ -233,12 +233,14 @@ API
 
       Modifies command display order on the help-page.
 
-      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(app)`` and apply the returned value to (2) if :obj:`None`, (3) otherwise.
+      1. If :attr:`sort_key` is a generator, it will be consumed immediately with ``next()`` to get the actual value.
 
-      2. For all commands with ``sort_key==None`` (default value), sort them alphabetically.
-         These sorted commands will be displayed **after** ``sort_key != None`` list (see 3).
+      2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(app)`` and apply the returned value to (3) if :obj:`None`, (4) otherwise.
 
-      3. For all commands with ``sort_key!=None``, sort them by ``(sort_key, app.name)``.
+      3. For all commands with ``sort_key==None`` (default value), sort them alphabetically.
+         These sorted commands will be displayed **after** ``sort_key != None`` list (see 4).
+
+      4. For all commands with ``sort_key!=None``, sort them by ``(sort_key, app.name)``.
          It is the user's responsibility that ``sort_key`` s are comparable.
 
       Example usage:
@@ -276,6 +278,26 @@ API
          │ --help -h  Display this message and exit.                   │
          │ --version  Display application version.                     │
          ╰─────────────────────────────────────────────────────────────╯
+
+      Using generators (e.g., ``itertools.count``):
+
+      .. code-block:: python
+
+         import itertools
+         from cyclopts import App
+
+         app = App()
+         counter = itertools.count()
+
+         @app.command(sort_key=counter)
+         def first():
+             pass
+
+         @app.command(sort_key=counter)
+         def second():
+             pass
+
+         # Commands will display in order: first (0), second (1)
 
    .. attribute:: version
       :type: Union[None, str, Callable]
@@ -1072,9 +1094,11 @@ API
 
       Modifies group-panel display order on the help-page.
 
-      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
+      1. If :attr:`sort_key` is a generator, it will be consumed immediately with ``next()`` to get the actual value.
 
-      2. The :class:`App` default groups (:attr:`App.group_command`, :attr:`App.group_arguments`, :attr:`App.group_parameters`) will be displayed first.
+      2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
+
+      3. The :class:`App` default groups (:attr:`App.group_command`, :attr:`App.group_arguments`, :attr:`App.group_parameters`) will be displayed first.
          If you want to further customize the ordering of these default groups, you can define custom values and they will be treated like any other group:
 
          .. code-block:: python
@@ -1112,11 +1136,11 @@ API
             │ --version  Display application version.                               │
             ╰───────────────────────────────────────────────────────────────────────╯
 
-      2. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
+      4. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
          That is, sort them by their ``sort_key``, and then break ties alphabetically.
          It is the user's responsibility that ``sort_key`` are comparable.
 
-      3. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (2), :attr:`App.group_commands`, :attr:`App.group_arguments`, and :attr:`.App.group_parameters`.
+      5. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (4), :attr:`App.group_commands`, :attr:`App.group_arguments`, and :attr:`.App.group_parameters`.
 
       Example usage:
 
@@ -1169,6 +1193,26 @@ API
         │ --help,-h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
+
+      Using generators with :meth:`Group.create_ordered`:
+
+      .. code-block:: python
+
+         import itertools
+         from cyclopts import App, Group
+
+         app = App()
+         counter = itertools.count()
+
+         @app.command(group=Group.create_ordered("First Group", sort_key=counter))
+         def cmd1():
+             pass
+
+         @app.command(group=Group.create_ordered("Second Group", sort_key=counter))
+         def cmd2():
+             pass
+
+         # Groups will display in order: "First Group" (0), "Second Group" (1)
 
    .. attribute:: default_parameter
       :type: Optional[Parameter]

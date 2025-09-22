@@ -131,6 +131,26 @@ def test_group_sort_key_property():
     assert g.sort_key == 1
 
 
+def test_group_sort_key_generator():
+    """Test that Group.sort_key accepts and processes generators."""
+
+    def sort_key_gen():
+        yield 5
+
+    # Test with generator function
+    g1 = Group("Test1", sort_key=sort_key_gen())
+    assert g1.sort_key == 5
+
+    # Test with generator expression
+    g2 = Group("Test2", sort_key=(x for x in [10]))
+    assert g2.sort_key == 10
+
+    # Test with create_ordered and generator
+    g3 = Group.create_ordered("Test3", sort_key=(x * 2 for x in [7]))
+    # create_ordered wraps the sort_key in a tuple with a counter
+    assert g3.sort_key[0] == 14  # pyright: ignore[reportOptionalSubscript]
+
+
 @pytest.fixture
 def mock_sort_key_counter(mocker):
     mock = mocker.patch("cyclopts.group._sort_key_counter")

@@ -1559,6 +1559,47 @@ def test_help_print_commands_sort_key(app, console):
     assert actual == expected
 
 
+def test_help_print_commands_sort_key_generator(app, console):
+    """Test that App.sort_key accepts and processes generators."""
+
+    def sort_key_gen():
+        yield 2
+
+    @app.command(sort_key=(x for x in [1]))  # Generator expression in constructor
+    def alice():
+        pass
+
+    @app.command
+    def bob():
+        pass
+
+    # Test setting via property setter with generator function
+    app["bob"].sort_key = sort_key_gen()
+
+    @app.command(sort_key=3)
+    def charlie():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    # Check that the commands are sorted correctly (alice=1, bob=2, charlie=3)
+    assert "│ alice" in actual
+    assert "│ bob" in actual
+    assert "│ charlie" in actual
+
+    # Verify the order by checking their positions
+    alice_pos = actual.index("alice")
+    bob_pos = actual.index("bob")
+    charlie_pos = actual.index("charlie")
+
+    assert (
+        alice_pos < bob_pos < charlie_pos
+    ), f"Commands not in expected order. Positions: alice={alice_pos}, bob={bob_pos}, charlie={charlie_pos}"
+
+
 def test_help_print_commands_plus_meta_short(app, console):
     app.help = None
 

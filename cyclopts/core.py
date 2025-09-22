@@ -334,7 +334,7 @@ class App:
     _sort_key: Any = field(
         default=None,
         alias="sort_key",
-        converter=lambda x: UNSET if x is None else x,
+        converter=lambda x: UNSET if x is None else next(x) if inspect.isgenerator(x) else x,
         kw_only=True,
     )
 
@@ -545,6 +545,8 @@ class App:
 
     @sort_key.setter
     def sort_key(self, value):
+        if inspect.isgenerator(value):
+            value = next(value)
         self._sort_key = value
 
     @property
