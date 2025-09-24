@@ -92,8 +92,9 @@ def test_json_list_env_str(app, assert_parse_args, env_str, monkeypatch, json_li
     assert_parse_args(main, "", [1, 2, 3])
 
 
-@pytest.mark.skip(reason="Need to implement token exploding.")
-def test_json_list_of_dataclass_cli(app, assert_parse_args):
+def test_json_list_of_dataclass_array(app, assert_parse_args):
+    """Test JSON array input for list of dataclasses."""
+
     @app.default
     def main(values: list[User]):
         pass
@@ -102,4 +103,63 @@ def test_json_list_of_dataclass_cli(app, assert_parse_args):
         main,
         ["--values", '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 40}]'],
         [User("Alice", 30), User("Bob", 40)],
+    )
+
+
+def test_json_list_of_dataclass_individual(app, assert_parse_args):
+    """Test multiple individual JSON objects for list of dataclasses."""
+
+    @app.default
+    def main(values: list[User]):
+        pass
+
+    assert_parse_args(
+        main,
+        ["--values", '{"name": "Alice", "age": 30}', "--values", '{"name": "Bob", "age": 40}'],
+        [User("Alice", 30), User("Bob", 40)],
+    )
+
+
+def test_json_list_of_dataclass_mixed(app, assert_parse_args):
+    """Test mixing individual JSON objects with JSON arrays."""
+
+    @app.default
+    def main(values: list[User]):
+        pass
+
+    assert_parse_args(
+        main,
+        [
+            "--values",
+            '{"name": "Alice", "age": 30}',
+            "--values",
+            '[{"name": "Bob", "age": 40}, {"name": "Charlie", "age": 50}]',
+            "--values",
+            '{"name": "David", "age": 60}',
+        ],
+        [User("Alice", 30), User("Bob", 40), User("Charlie", 50), User("David", 60)],
+    )
+
+
+def test_json_list_of_dataclass_empty_array(app, assert_parse_args):
+    """Test empty JSON array for list of dataclasses."""
+
+    @app.default
+    def main(values: Optional[list[User]] = None):  # pyright: ignore
+        pass
+
+    assert_parse_args(main, ["--values", "[]"], [])
+
+
+def test_json_list_of_dataclass_single_element_array(app, assert_parse_args):
+    """Test single-element JSON array."""
+
+    @app.default
+    def main(values: list[User]):
+        pass
+
+    assert_parse_args(
+        main,
+        ["--values", '[{"name": "Alice", "age": 30}]'],
+        [User("Alice", 30)],
     )

@@ -362,7 +362,17 @@ def _convert(
         count, _ = token_count(inner_types[0])
         if not isinstance(token, Sequence):
             raise ValueError
-        if count > 1:
+
+        # Check if tokens are JSON strings
+        inner_type = inner_types[0]
+        if (
+            count > 1
+            and any(isinstance(t, Token) and t.value.strip().startswith("{") for t in token)
+            and inner_type is not str
+        ):
+            # Each token is a complete JSON representation of the dataclass
+            gen = token
+        elif count > 1:
             gen = zip(*[iter(token)] * count)
         else:
             gen = token
@@ -404,30 +414,69 @@ def _convert(
                 raise CoercionError(token=token, target_type=type_) from None
         else:
             # Convert it into a user-supplied class.
-            if not isinstance(token, Sequence):
-                token = [token]
-            i = 0
-            pos_values = []
-            hint = type_
-            for field_info in field_infos.values():
-                hint = field_info.hint
-                if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
-                    pos_values.append(token[i].value)
-                    i += 1
-                else:
-                    tokens_per_element, consume_all = token_count(hint)
-                    if tokens_per_element == 1:
-                        pos_values.append(convert(hint, token[i]))
+            # First check if we have a single token that's a JSON string
+            if isinstance(token, Token) and token.value.strip().startswith("{") and type_ is not str:
+                import json
+
+                try:
+                    data = json.loads(token.value)
+                    if not isinstance(data, dict):
+                        # This should never happen because of prior startswith("{") check
+                        raise TypeError  # noqa: TRY301
+                    # Convert dict directly to dataclass
+                    out = type_(**data)
+                except (json.JSONDecodeError, TypeError):
+                    # Fall back to positional argument parsing
+                    if not isinstance(token, Sequence):
+                        token = [token]
+                    i = 0
+                    pos_values = []
+                    hint = type_
+                    for field_info in field_infos.values():
+                        hint = field_info.hint
+                        if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
+                            pos_values.append(token[i].value)
+                            i += 1
+                        else:
+                            tokens_per_element, consume_all = token_count(hint)
+                            if tokens_per_element == 1:
+                                pos_values.append(convert(hint, token[i]))
+                                i += 1
+                            else:
+                                pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                                i += tokens_per_element
+                            if consume_all:
+                                break
+                        if i == len(token):
+                            break
+                    assert i == len(token)
+                    out = type_(*pos_values)
+            else:
+                # Standard positional argument parsing
+                if not isinstance(token, Sequence):
+                    token = [token]
+                i = 0
+                pos_values = []
+                hint = type_
+                for field_info in field_infos.values():
+                    hint = field_info.hint
+                    if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
+                        pos_values.append(token[i].value)
                         i += 1
                     else:
-                        pos_values.append(convert(hint, token[i : i + tokens_per_element]))
-                        i += tokens_per_element
-                    if consume_all:
+                        tokens_per_element, consume_all = token_count(hint)
+                        if tokens_per_element == 1:
+                            pos_values.append(convert(hint, token[i]))
+                            i += 1
+                        else:
+                            pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                            i += tokens_per_element
+                        if consume_all:
+                            break
+                    if i == len(token):
                         break
-                if i == len(token):
-                    break
-            assert i == len(token)
-            out = type_(*pos_values)
+                assert i == len(token)
+                out = type_(*pos_values)
 
     if cparam:
         # An inner type may have an independent Parameter annotation;
