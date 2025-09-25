@@ -1,7 +1,6 @@
 import math
 import textwrap
 from collections.abc import Iterable
-from functools import partial
 from operator import attrgetter
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
@@ -21,100 +20,180 @@ if TYPE_CHECKING:
     from cyclopts.help.protocols import Renderer
 
 
-def name_renderer(entry: "HelpEntry", max_width: Optional[int] = None) -> "RenderableType":
-    """Render the names column with optional text wrapping.
+class NameRenderer:
+    """Renderer for parameter/command names with optional text wrapping.
 
     Parameters
     ----------
-    entry : HelpEntry
-        The table entry to render.
     max_width : Optional[int]
         Maximum width for wrapping. If None, no wrapping is applied.
-
-    Returns
-    -------
-    ~rich.console.RenderableType
-        Combined names and shorts, optionally wrapped.
     """
-    names_str = " ".join(entry.names) if entry.names else ""
-    shorts_str = " ".join(entry.shorts) if entry.shorts else ""
 
-    if names_str and shorts_str:
-        text = names_str + " " + shorts_str
-    else:
-        text = names_str or shorts_str
+    def __init__(self, max_width: Optional[int] = None):
+        """Initialize the renderer with formatting options.
 
-    if max_width is None:
-        return text
+        Parameters
+        ----------
+        max_width : Optional[int]
+            Maximum width for wrapping. If None, no wrapping is applied.
+        """
+        self.max_width = max_width
 
-    wrap = partial(
-        textwrap.wrap,
-        subsequent_indent="  ",
-        break_on_hyphens=False,
-        tabsize=4,
-    )
+    def __call__(self, entry: "HelpEntry") -> "RenderableType":
+        """Render the names column with optional text wrapping.
 
-    return "\n".join(wrap(text, max_width))
+        Parameters
+        ----------
+        entry : HelpEntry
+            The table entry to render.
+
+        Returns
+        -------
+        ~rich.console.RenderableType
+            Combined names and shorts, optionally wrapped.
+        """
+        names_str = " ".join(entry.names) if entry.names else ""
+        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
+
+        if names_str and shorts_str:
+            text = names_str + " " + shorts_str
+        else:
+            text = names_str or shorts_str
+
+        if self.max_width is None:
+            return text
+
+        wrapped = textwrap.wrap(
+            text,
+            self.max_width,
+            subsequent_indent="  ",
+            break_on_hyphens=False,
+            tabsize=4,
+        )
+
+        return "\n".join(wrapped)
 
 
-def parameter_description_renderer(entry: "HelpEntry") -> "RenderableType":
-    """Render parameter description with metadata annotations.
-
-    Enriches the base description with choices, environment variables,
-    default values, and required status.
+class DescriptionRenderer:
+    """Renderer for descriptions with configurable metadata formatting.
 
     Parameters
     ----------
-    entry : HelpEntry
-        The table entry to render.
-
-    Returns
-    -------
-    ~rich.console.RenderableType
-        Description with appended metadata.
+    newline_metadata : bool
+        If True, display metadata (choices, env vars, defaults) on separate lines.
+        If False (default), display metadata inline with the description.
     """
-    from rich.text import Text
 
-    from cyclopts.help.inline_text import InlineText
+    def __init__(self, newline_metadata: bool = False):
+        """Initialize the renderer with formatting options.
 
-    description = entry.description
-    if description is None:
-        description = InlineText(Text())
-    elif not isinstance(description, InlineText):
-        # Convert to InlineText if it isn't already
-        if hasattr(entry.description, "__rich_console__"):
-            # It's already a Rich renderable, wrap it
-            description = InlineText(description)
-        else:
-            # Convert to Text first, then wrap in InlineText
+        Parameters
+        ----------
+        newline_metadata : bool
+            If True, display metadata on separate lines instead of inline.
+        """
+        self.newline_metadata = newline_metadata
+
+    def __call__(self, entry: "HelpEntry") -> "RenderableType":
+        """Render parameter description with metadata annotations.
+
+        Enriches the base description with choices, environment variables,
+        default values, and required status.
+
+        Parameters
+        ----------
+        entry : HelpEntry
+            The table entry to render.
+
+        Returns
+        -------
+        ~rich.console.RenderableType
+            Description with appended metadata.
+        """
+        from rich.text import Text
+
+        from cyclopts.help.inline_text import InlineText
+
+        description = entry.description
+        if description is None:
+            description = InlineText(Text())
+        elif not isinstance(description, InlineText):
+            # Convert to InlineText if it isn't already
+            if hasattr(entry.description, "__rich_console__"):
+                # It's already a Rich renderable, wrap it
+                description = InlineText(description)
+            else:
+                # Convert to Text first, then wrap in InlineText
+                from rich.text import Text
+
+                description = InlineText(Text(str(description)))
+
+        # Collect metadata items
+        metadata_items = []
+
+        if entry.choices:
+            choices_str = ", ".join(entry.choices)
+            metadata_items.append(Text(rf"[choices: {choices_str}]", "dim"))
+
+        if entry.env_var:
+            env_vars_str = ", ".join(entry.env_var)
+            metadata_items.append(Text(rf"[env var: {env_vars_str}]", "dim"))
+
+        if entry.default is not None:
+            metadata_items.append(Text(rf"[default: {entry.default}]", "dim"))
+
+        if entry.required:
+            metadata_items.append(Text(r"[required]", "dim red"))
+
+        # Apply metadata based on formatting mode
+        if self.newline_metadata and metadata_items:
+            # Add metadata on separate lines with indentation
+            from rich.console import Group as RichGroup
             from rich.text import Text
 
-            description = InlineText(Text(str(description)))
+            # Create a list of renderables to group
+            renderables = []
 
-    # Append metadata fields in the standard order
-    if entry.choices:
-        from rich.text import Text
+            # Add the original description first
+            if description.primary_renderable:
+                renderables.append(description.primary_renderable)
 
-        choices_str = ", ".join(entry.choices)
-        description.append(Text(rf"[choices: {choices_str}]", "dim"))
+            # Add each metadata item with indentation
+            for item in metadata_items:
+                indented_item = Text("  ")  # 2-space indentation
+                indented_item.append(item)
+                renderables.append(indented_item)
 
-    if entry.env_var:
-        from rich.text import Text
+            # Return a Rich Group that stacks these vertically
+            return RichGroup(*renderables) if renderables else Text()
+        else:
+            # Original inline behavior
+            for item in metadata_items:
+                description.append(item)
 
-        env_vars_str = ", ".join(entry.env_var)
-        description.append(Text(rf"[env var: {env_vars_str}]", "dim"))
+            return description
 
-    if entry.default is not None:
-        from rich.text import Text
 
-        description.append(Text(rf"[default: {entry.default}]", "dim"))
+class AsteriskRenderer:
+    """Renderer for required parameter asterisk indicator.
 
-    if entry.required:
-        from rich.text import Text
+    A simple renderer that displays an asterisk (*) for required parameters.
+    """
 
-        description.append(Text(r"[required]", "dim red"))
+    def __call__(self, entry: "HelpEntry") -> "RenderableType":
+        """Render an asterisk for required parameters.
 
-    return description
+        Parameters
+        ----------
+        entry : HelpEntry
+            The table entry to render.
+
+        Returns
+        -------
+        ~rich.console.RenderableType
+            An asterisk if the entry is required, empty string otherwise.
+        """
+        return "*" if entry.required else ""
 
 
 @frozen
@@ -272,7 +351,7 @@ class ColumnSpec:
 
 # For Parameters:
 AsteriskColumn = ColumnSpec(
-    renderer=lambda entry: "*" if entry.required else "",
+    renderer=AsteriskRenderer(),
     header="",
     justify="left",
     width=1,
@@ -280,17 +359,13 @@ AsteriskColumn = ColumnSpec(
 )
 
 NameColumn = ColumnSpec(
-    renderer=name_renderer,
+    renderer=NameRenderer(),
     header="Option",
     justify="left",
     style="cyan",
 )
 
-DescriptionColumn = ColumnSpec(renderer="description", header="Description", justify="left", overflow="fold")
-
-ParameterDescriptionColumn = ColumnSpec(
-    renderer=parameter_description_renderer, header="Description", justify="left", overflow="fold"
-)
+DescriptionColumn = ColumnSpec(renderer=DescriptionRenderer(), header="Description", justify="left", overflow="fold")
 
 
 def get_default_command_columns(
@@ -314,7 +389,7 @@ def get_default_command_columns(
     """
     max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
-        renderer=partial(name_renderer, max_width=max_width),
+        renderer=NameRenderer(max_width=max_width),
         header="Command",
         justify="left",
         style="cyan",
@@ -348,7 +423,7 @@ def get_default_parameter_columns(
     """
     max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
-        renderer=partial(name_renderer, max_width=max_width),
+        renderer=NameRenderer(max_width=max_width),
         header="Option",
         justify="left",
         style="cyan",
@@ -359,12 +434,12 @@ def get_default_parameter_columns(
         return (
             AsteriskColumn,
             name_column,
-            ParameterDescriptionColumn,
+            DescriptionColumn,
         )
     else:
         return (
             name_column,
-            ParameterDescriptionColumn,
+            DescriptionColumn,
         )
 
 

@@ -9,7 +9,7 @@ from rich.console import Console
 from cyclopts import App, Group, Parameter
 from cyclopts.annotations import get_hint_name
 from cyclopts.help import ColumnSpec, DefaultFormatter, PanelSpec, TableSpec
-from cyclopts.help.specs import ParameterDescriptionColumn
+from cyclopts.help.specs import DescriptionColumn
 
 
 def _type_renderer(entry: Any) -> str:
@@ -124,7 +124,7 @@ def test_group_custom_columns(console: Console):
     custom_columns = (
         ColumnSpec(renderer=names_renderer, style="green bold", header="Option"),
         ColumnSpec(renderer=_type_renderer, style="yellow", header="Type"),
-        ParameterDescriptionColumn,
+        DescriptionColumn,
     )
 
     custom_group = Group(
@@ -438,12 +438,12 @@ def test_table_headers_with_default_columns(console: Console):
 
 def test_table_headers_suppressed_when_all_empty(console: Console):
     """Test that headers are suppressed when all column headers are empty strings."""
-    from cyclopts.help.specs import parameter_description_renderer
+    from cyclopts.help import DescriptionRenderer
 
     # Create columns with explicitly empty headers
     custom_columns = (
         ColumnSpec(renderer=lambda entry: " ".join(entry.names) if entry.names else "", header="", style="cyan"),
-        ColumnSpec(renderer=parameter_description_renderer, header=""),
+        ColumnSpec(renderer=DescriptionRenderer(), header=""),
     )
 
     custom_group = Group(
@@ -497,7 +497,7 @@ def test_table_headers_with_non_empty_headers(console: Console):
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, header="Option", style="cyan"),
-        ParameterDescriptionColumn,
+        DescriptionColumn,
     )
 
     custom_group = Group(
