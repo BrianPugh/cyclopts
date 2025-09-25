@@ -1,4 +1,5 @@
 import inspect
+import json
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Sequence, get_args, get_origin
 
@@ -222,8 +223,6 @@ class CoercionError(CycloptsError):
             else:
                 return f"Invalid value for {self.token.keyword}: {self.msg}"
         else:
-            import json
-
             # If a JsonDecodeError, try and verbosify it.
             if isinstance(self.__cause__, json.JSONDecodeError):
                 msg = json_decode_error_verbosifier(self.__cause__)  # pyright: ignore[reportArgumentType]

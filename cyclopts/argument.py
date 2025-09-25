@@ -1,5 +1,6 @@
 import inspect
 import itertools
+import json
 import operator
 import sys
 from collections.abc import Iterable, Iterator
@@ -1056,8 +1057,6 @@ class Argument:
             def expand_tokens(tokens):
                 for token in tokens:
                     if self._should_attempt_json_list(token):
-                        import json
-
                         try:
                             parsed_json = json.loads(token.value)
                         except json.JSONDecodeError as e:
@@ -1134,8 +1133,6 @@ class Argument:
             if self._should_attempt_json_dict():
                 # Dict-like structures may have incoming json data from an environment variable.
                 # Pass these values along as Tokens to children.
-                import json
-
                 while self.tokens:
                     token = self.tokens.pop(0)
                     try:

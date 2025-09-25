@@ -1,4 +1,5 @@
 import collections.abc
+import json
 import operator
 import sys
 import typing
@@ -268,6 +269,52 @@ def _convert_tuple(
     return out
 
 
+def _convert_json(
+    type_: Any,
+    data: dict,
+    field_infos: dict,
+    converter: Optional[Callable],
+    name_transform: Callable[[str], str],
+):
+    """Convert JSON dict to dataclass with proper type conversion for fields.
+
+    Parameters
+    ----------
+    type_ : Type
+        The dataclass type to create.
+    data : dict
+        The JSON dictionary containing field values.
+    field_infos : dict
+        Field information from the dataclass.
+    converter : Optional[Callable]
+        Optional converter function.
+    name_transform : Callable[[str], str]
+        Function to transform field names.
+
+    Returns
+    -------
+    Instance of type_ with properly converted field values.
+    """
+    from cyclopts.token import Token
+
+    converted_data = {}
+    for field_name, field_info in field_infos.items():
+        if field_name in data:
+            value = data[field_name]
+            # Convert the value to the proper type
+            if value is not None and not (isclass(field_info.hint) and issubclass(field_info.hint, str)):
+                # Create a token for the value and convert it
+                token = Token(value=json.dumps(value) if isinstance(value, (dict, list)) else str(value))
+                # Always attempt conversion, let errors propagate for consistency
+                converted_value = convert(field_info.hint, [token], converter, name_transform)
+            else:
+                converted_value = value
+            converted_data[field_name] = converted_value
+
+    # Create the dataclass with converted values
+    return type_(**converted_data)
+
+
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
@@ -416,15 +463,13 @@ def _convert(
             # Convert it into a user-supplied class.
             # First check if we have a single token that's a JSON string
             if isinstance(token, Token) and token.value.strip().startswith("{") and type_ is not str:
-                import json
-
                 try:
                     data = json.loads(token.value)
                     if not isinstance(data, dict):
                         # This should never happen because of prior startswith("{") check
                         raise TypeError  # noqa: TRY301
-                    # Convert dict directly to dataclass
-                    out = type_(**data)
+                    # Convert dict to dataclass with proper type conversion
+                    out = _convert_json(type_, data, field_infos, converter, name_transform)
                 except (json.JSONDecodeError, TypeError):
                     # Fall back to positional argument parsing
                     if not isinstance(token, Sequence):
