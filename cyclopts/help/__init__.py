@@ -13,6 +13,9 @@ __all__ = [
     "_get_choices",
     "DefaultFormatter",
     "PlainFormatter",
+    "NameRenderer",
+    "DescriptionRenderer",
+    "AsteriskRenderer",
 ]
 
 from .formatters import DefaultFormatter, PlainFormatter
@@ -28,7 +31,10 @@ from .help import (
 from .inline_text import InlineText
 from .protocols import Renderer
 from .specs import (
+    AsteriskRenderer,
     ColumnSpec,
+    DescriptionRenderer,
+    NameRenderer,
     PanelSpec,
     TableSpec,
 )

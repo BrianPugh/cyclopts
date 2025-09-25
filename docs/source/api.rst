@@ -1536,6 +1536,18 @@ Cyclopts provides a flexible help formatting system for customizing the help-pag
    :members:
 
 
+.. autoclass:: cyclopts.help.NameRenderer
+   :members:
+
+
+.. autoclass:: cyclopts.help.DescriptionRenderer
+   :members:
+
+
+.. autoclass:: cyclopts.help.AsteriskRenderer
+   :members:
+
+
 .. autoclass:: cyclopts.help.HelpPanel
    :members:
 
