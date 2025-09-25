@@ -1,6 +1,7 @@
 import collections.abc
 import json
 import operator
+import re
 import sys
 import typing
 from collections.abc import Sequence
@@ -28,7 +29,7 @@ else:
 from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_infos
-from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin
+from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -302,7 +303,7 @@ def _convert_json(
         if field_name in data:
             value = data[field_name]
             # Convert the value to the proper type
-            if value is not None and not (isclass(field_info.hint) and issubclass(field_info.hint, str)):
+            if value is not None and not is_class_and_subclass(field_info.hint, str):
                 # Create a token for the value and convert it
                 token = Token(value=json.dumps(value) if isinstance(value, (dict, list)) else str(value))
                 # Always attempt conversion, let errors propagate for consistency
@@ -359,11 +360,11 @@ def _create_json_decode_error_message(
 
     # Common error patterns with helpful hints
     hint = ""
-    if "True" in value_str:
+    if re.search(r"\bTrue\b", value_str):
         hint = "\n    Hint: Use lowercase 'true' instead of Python's True"
-    elif "False" in value_str:
+    elif re.search(r"\bFalse\b", value_str):
         hint = "\n    Hint: Use lowercase 'false' instead of Python's False"
-    elif "None" in value_str:
+    elif re.search(r"\bNone\b", value_str):
         hint = "\n    Hint: Use 'null' instead of Python's None"
     elif "'" in value_str:
         hint = "\n    Hint: JSON requires double quotes, not single quotes"
@@ -480,10 +481,10 @@ def _convert(
         else:
             gen = token
         out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
-    elif isclass(type_) and issubclass(type_, Flag):
+    elif is_class_and_subclass(type_, Flag):
         # TODO: this might never execute since enum.Flag is now handled in ``convert``.
         out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
-    elif isclass(type_) and issubclass(type_, Enum):
+    elif is_class_and_subclass(type_, Enum):
         if isinstance(token, Sequence):
             raise ValueError
 
@@ -522,7 +523,7 @@ def _convert(
                 try:
                     data = json.loads(token.value)
                     if not isinstance(data, dict):
-                        # This should never happen because of prior startswith("{") check
+                        # JSON was valid but didn't produce a dict (e.g., it was an array or scalar)
                         raise TypeError  # noqa: TRY301
                     # Convert dict to dataclass with proper type conversion
                     out = _convert_json(type_, data, field_infos, converter, name_transform)
@@ -539,7 +540,7 @@ def _convert(
                     hint = type_
                     for field_info in field_infos.values():
                         hint = field_info.hint
-                        if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
+                        if is_class_and_subclass(hint, str):  # Avoids infinite recursion
                             pos_values.append(token[i].value)
                             i += 1
                         else:

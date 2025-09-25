@@ -1,10 +1,11 @@
 import inspect
 import sys
 from enum import Flag
-from inspect import isclass
 from typing import Annotated, Any, Optional, Union, get_args, get_origin
 
 import attrs
+
+from cyclopts.utils import is_class_and_subclass
 
 _IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
 
@@ -50,7 +51,7 @@ def is_dataclass(hint) -> bool:
 
 
 def is_namedtuple(hint) -> bool:
-    return isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
+    return is_class_and_subclass(hint, tuple) and hasattr(hint, "_fields")
 
 
 def is_attrs(hint) -> bool:
@@ -59,7 +60,7 @@ def is_attrs(hint) -> bool:
 
 def is_enum_flag(hint) -> bool:
     """Check if a type hint is an enum.Flag subclass."""
-    return isclass(hint) and issubclass(hint, Flag)
+    return is_class_and_subclass(hint, Flag)
 
 
 def is_annotated(hint) -> bool:
@@ -75,7 +76,7 @@ def contains_hint(hint, target_type) -> bool:
     if is_union(hint):
         return any(contains_hint(x, target_type) for x in get_args(hint))
     else:
-        return isclass(hint) and issubclass(hint, target_type)
+        return is_class_and_subclass(hint, target_type)
 
 
 def is_typeddict(hint) -> bool:
@@ -89,7 +90,7 @@ def is_typeddict(hint) -> bool:
     if is_union(hint):
         return any(is_typeddict(x) for x in get_args(hint))
 
-    if not (isclass(hint) and issubclass(hint, dict)):
+    if not is_class_and_subclass(hint, dict):
         return False
 
     return (
