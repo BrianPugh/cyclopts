@@ -1699,8 +1699,15 @@ def update_argument_collection(
                         )
                     else:
                         # Convert the value back into a string, so it can be re-converted.
+                        # For dict/list values (from YAML/TOML), use json.dumps to create valid JSON strings
+                        if isinstance(v, (dict, list)):
+                            import json
+
+                            value_str = json.dumps(v)
+                        else:
+                            value_str = str(v)
                         token = Token(
-                            keyword=complete_keyword, value=str(v), source=source, index=i, keys=remaining_keys
+                            keyword=complete_keyword, value=value_str, source=source, index=i, keys=remaining_keys
                         )
                     argument.append(token)
             else:
