@@ -23,6 +23,7 @@ include = ["cyclopts/*.so", "cyclopts/*.pyd"]  # Compiled extensions
 generate-setup-file = false
 
 [tool.poetry.scripts]
+cyclopts = "cyclopts.cli:app"
 
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
