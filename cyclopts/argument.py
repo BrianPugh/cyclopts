@@ -1687,7 +1687,6 @@ def update_argument_collection(
 
             if value:
                 for i, v in enumerate(value):
-                    # TODO: is this index correct? If the source value is a list, it should probably be different
                     if v is None:
                         # Pass ``None`` as an implicit_value so it certainly gets interpreted as ``None`` later.
                         token = Token(
