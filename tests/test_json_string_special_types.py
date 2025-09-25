@@ -11,9 +11,11 @@ a valid value for that type, so JSON parsing should be disabled.
 """
 
 from dataclasses import dataclass
-from typing import NewType, Optional, Union
+from typing import Annotated, NewType, Optional, Union
 
 import pytest
+
+from cyclopts import Parameter
 
 
 class CustomStr(str):
@@ -72,6 +74,25 @@ def test_json_not_parsed_for_str_like_types(app, assert_parse_args, type_hint, e
         ["--value", '{"name": "Alice"}'],
         expected_value,
     )
+
+
+@pytest.mark.parametrize(
+    "type_hint,expected_value",
+    [
+        (CustomStr, CustomStr('{"name": "Alice"}')),
+        (MyStr, MyStr('{"name": "Alice"}')),
+    ],
+    ids=["CustomStr", "NewType"],
+)
+def test_json_not_parsed_for_str_like_types_env_var(app, assert_parse_args, type_hint, expected_value, monkeypatch):
+    """JSON should NOT be parsed for string subclasses or NewType(str) from environment variables."""
+    monkeypatch.setenv("VALUE", '{"name": "Alice"}')
+
+    @app.default
+    def main(value: Annotated[type_hint, Parameter(env_var="VALUE")]):  # type: ignore
+        pass
+
+    assert_parse_args(main, "", expected_value)
 
 
 @pytest.mark.parametrize(
@@ -144,6 +165,18 @@ def test_union_with_str_no_json_parsing(app, assert_parse_args):
         ["--value", '{"name": "Alice"}'],
         '{"name": "Alice"}',
     )
+
+
+def test_union_with_str_no_json_parsing_env_var(app, assert_parse_args, monkeypatch):
+    """JSON should NOT be parsed from env var when type is Union[str, ...]."""
+    json_str = '{"name": "Alice"}'
+    monkeypatch.setenv("VALUE", json_str)
+
+    @app.default
+    def main(value: Annotated[Union[str, int], Parameter(env_var="VALUE")]):
+        pass
+
+    assert_parse_args(main, "", json_str)
 
 
 # =============================================================================

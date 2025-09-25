@@ -106,6 +106,17 @@ def test_json_list_of_dataclass_array(app, assert_parse_args):
     )
 
 
+def test_json_list_of_dataclass_env_var(app, assert_parse_args, monkeypatch):
+    """Test JSON array from environment variable for list of dataclasses."""
+    monkeypatch.setenv("USERS", '[{"name": "Alice", "age": 30}, {"name": "Bob", "age": 40}]')
+
+    @app.default
+    def main(values: Annotated[list[User], Parameter(env_var="USERS")]):
+        pass
+
+    assert_parse_args(main, "", [User("Alice", 30), User("Bob", 40)])
+
+
 def test_json_list_of_dataclass_individual(app, assert_parse_args):
     """Test multiple individual JSON objects for list of dataclasses."""
 
@@ -194,6 +205,32 @@ def test_json_list_malformed_json_object(app):
         app(["--values", '{"name": "Alice", "age": 30'], exit_on_error=False)
 
 
+def test_json_list_malformed_json_array_env_var(app, monkeypatch):
+    """Test that malformed JSON array from environment variable raises appropriate error."""
+    # Missing closing bracket
+    monkeypatch.setenv("USERS", '[{"name": "Alice", "age": 30}')
+
+    @app.default
+    def main(values: Annotated[list[User], Parameter(env_var="USERS")]):
+        pass
+
+    with pytest.raises(CycloptsError):
+        app([], exit_on_error=False)
+
+
+def test_json_list_malformed_json_object_env_var(app, monkeypatch):
+    """Test that malformed JSON object from environment variable raises appropriate error."""
+    # Missing closing brace
+    monkeypatch.setenv("USER", '{"name": "Alice", "age": 30')
+
+    @app.default
+    def main(value: Annotated[User, Parameter(env_var="USER")]):
+        pass
+
+    with pytest.raises(CycloptsError):
+        app([], exit_on_error=False)
+
+
 def test_json_list_invalid_json_syntax(app):
     """Test that invalid JSON syntax raises appropriate error with helpful message."""
 
@@ -211,6 +248,25 @@ def test_json_list_invalid_json_syntax(app):
     assert "'" in error_str  # Should show the problematic quote
     assert "^" in error_str  # Should have error marker
     assert "Hint: JSON requires double quotes" in error_str  # Should provide hint
+
+
+def test_json_invalid_syntax_env_var(app, monkeypatch):
+    """Test that invalid JSON syntax from environment variable raises appropriate error."""
+    # Invalid JSON - Python-style boolean
+    monkeypatch.setenv("USER", '{"name": "Alice", "age": 30, "active": True}')
+
+    @app.default
+    def main(value: Annotated[User, Parameter(env_var="USER")]):
+        pass
+
+    with pytest.raises(CycloptsError) as exc_info:
+        app([], exit_on_error=False)
+
+    error_str = str(exc_info.value)
+    # Environment variables have a different error message format
+    assert "Invalid value for USER" in error_str
+    assert "JSONDecodeError" in error_str
+    assert "True" in error_str
 
 
 def test_json_list_python_style_booleans(app):
