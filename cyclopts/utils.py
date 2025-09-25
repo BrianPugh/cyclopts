@@ -290,6 +290,28 @@ def is_iterable(obj) -> bool:
     return not isinstance(obj, str) and isinstance(obj, Iterable)
 
 
+def is_class_and_subclass(hint, target_class) -> bool:
+    """Safely check if a type is both a class and a subclass of target_class.
+
+    Parameters
+    ----------
+    hint : Any
+        The type to check.
+    target_class : type
+        The target class to check subclass relationship against.
+
+    Returns
+    -------
+    bool
+        True if hint is a class and is a subclass of target_class, False otherwise.
+    """
+    try:
+        return inspect.isclass(hint) and issubclass(hint, target_class)
+    except TypeError:
+        # issubclass() raises TypeError for non-class arguments like Union types
+        return False
+
+
 def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:
     """Convert a single element or an iterable of elements into a tuple.
 

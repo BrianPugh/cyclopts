@@ -1,5 +1,6 @@
 import inspect
 import itertools
+import json
 import operator
 import sys
 from collections.abc import Iterable, Iterator
@@ -801,16 +802,28 @@ class Argument:
             tokens = self.tokens
         if not tokens:
             return False
-        if not self._accepts_keywords:
-            return False
         value = tokens[0].value if isinstance(tokens[0], Token) else tokens[0]
         if not value.strip().startswith("{"):
             return False
-        if self.parameter.json_dict is not None:
-            return self.parameter.json_dict
-        if contains_hint(self.field_info.annotation, str):
-            return False
-        return True
+
+        # Check if this is for a dict-like type that accepts keywords
+        if self._accepts_keywords:
+            if self.parameter.json_dict is not None:
+                return self.parameter.json_dict
+            if contains_hint(self.field_info.annotation, str):
+                return False
+            return True
+
+        # Check if this is for an element of an iterable (list, set, etc.)
+        hint = resolve(self.hint)
+        origin = get_origin(hint)
+        if origin in ITERABLE_TYPES:
+            # Check the element type
+            args = get_args(hint)
+            if args and args[0] is not str:
+                return True
+
+        return False
 
     def _should_attempt_json_list(
         self, tokens: Union[Sequence[Union[Token, str]], Token, str, None] = None, keys: tuple[str, ...] = ()
@@ -1044,8 +1057,6 @@ class Argument:
             def expand_tokens(tokens):
                 for token in tokens:
                     if self._should_attempt_json_list(token):
-                        import json
-
                         try:
                             parsed_json = json.loads(token.value)
                         except json.JSONDecodeError as e:
@@ -1054,11 +1065,18 @@ class Argument:
                         if not isinstance(parsed_json, list):
                             raise CoercionError(token=token, target_type=self.hint)
 
-                        for element in parsed_json:
-                            if element is None:
-                                yield token.evolve(value="", implicit_value=element)
-                            else:
-                                yield token.evolve(value=str(element))
+                        if not parsed_json:
+                            # Empty list - yield a special token that indicates an empty list
+                            yield token.evolve(value="", implicit_value=[])
+                        else:
+                            for element in parsed_json:
+                                if element is None:
+                                    yield token.evolve(value="", implicit_value=element)
+                                elif isinstance(element, dict):
+                                    # Keep dicts as JSON strings for dataclass parsing
+                                    yield token.evolve(value=json.dumps(element))
+                                else:
+                                    yield token.evolve(value=str(element))
                     else:
                         yield token
 
@@ -1115,8 +1133,6 @@ class Argument:
             if self._should_attempt_json_dict():
                 # Dict-like structures may have incoming json data from an environment variable.
                 # Pass these values along as Tokens to children.
-                import json
-
                 while self.tokens:
                     token = self.tokens.pop(0)
                     try:

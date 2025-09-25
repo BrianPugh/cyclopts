@@ -3,7 +3,6 @@ import sys
 from collections.abc import Iterable
 from enum import Enum
 from functools import lru_cache, partial
-from inspect import isclass
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -26,7 +25,7 @@ from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT
-from cyclopts.utils import SortHelper, frozen, resolve_callables
+from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -254,7 +253,7 @@ def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]
     get_choices = partial(_get_choices, name_transform=name_transform)
     choices = []
     _origin = get_origin(type_)
-    if isclass(type_) and issubclass(type_, Enum):
+    if is_class_and_subclass(type_, Enum):
         choices.extend(name_transform(x) for x in type_.__members__)
     elif is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
@@ -336,7 +335,7 @@ def create_parameter_help_panel(
         # Prepare default if needed
         default = None
         if argument.show_default:
-            if isclass(argument.hint) and issubclass(argument.hint, Enum):
+            if is_class_and_subclass(argument.hint, Enum):
                 default = argument.parameter.name_transform(argument.field_info.default.name)
             else:
                 default = str(argument.field_info.default)

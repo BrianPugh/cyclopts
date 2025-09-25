@@ -1,5 +1,7 @@
 import collections.abc
+import json
 import operator
+import re
 import sys
 import typing
 from collections.abc import Sequence
@@ -27,7 +29,7 @@ else:
 from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import get_field_infos
-from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin
+from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -268,6 +270,108 @@ def _convert_tuple(
     return out
 
 
+def _convert_json(
+    type_: Any,
+    data: dict,
+    field_infos: dict,
+    converter: Optional[Callable],
+    name_transform: Callable[[str], str],
+):
+    """Convert JSON dict to dataclass with proper type conversion for fields.
+
+    Parameters
+    ----------
+    type_ : Type
+        The dataclass type to create.
+    data : dict
+        The JSON dictionary containing field values.
+    field_infos : dict
+        Field information from the dataclass.
+    converter : Optional[Callable]
+        Optional converter function.
+    name_transform : Callable[[str], str]
+        Function to transform field names.
+
+    Returns
+    -------
+    Instance of type_ with properly converted field values.
+    """
+    from cyclopts.token import Token
+
+    converted_data = {}
+    for field_name, field_info in field_infos.items():
+        if field_name in data:
+            value = data[field_name]
+            # Convert the value to the proper type
+            if value is not None and not is_class_and_subclass(field_info.hint, str):
+                # Create a token for the value and convert it
+                token = Token(value=json.dumps(value) if isinstance(value, (dict, list)) else str(value))
+                # Always attempt conversion, let errors propagate for consistency
+                converted_value = convert(field_info.hint, [token], converter, name_transform)
+            else:
+                converted_value = value
+            converted_data[field_name] = converted_value
+
+    # Create the dataclass with converted values
+    return type_(**converted_data)
+
+
+def _create_json_decode_error_message(
+    token: "Token",
+    type_: Any,
+    error: json.JSONDecodeError,
+) -> str:
+    """Create a helpful error message for JSON decode errors.
+
+    Parameters
+    ----------
+    token : Token
+        The token containing the invalid JSON.
+    type_ : Type
+        The target type we were trying to convert to.
+    error : json.JSONDecodeError
+        The JSON decode error that occurred.
+
+    Returns
+    -------
+    str
+        A formatted error message with context and hints.
+    """
+    value_str = token.value.strip()
+
+    # Try to provide context around the error
+    error_pos = error.pos if hasattr(error, "pos") else error.colno - 1 if hasattr(error, "colno") else 0
+
+    # Create a snippet showing the error location
+    snippet_start = max(0, error_pos - 20)
+    snippet_end = min(len(value_str), error_pos + 20)
+    snippet = value_str[snippet_start:snippet_end]
+
+    # Add markers if we truncated
+    if snippet_start > 0:
+        snippet = "..." + snippet
+    if snippet_end < len(value_str):
+        snippet = snippet + "..."
+
+    # Calculate where the error marker should point
+    marker_pos = error_pos - snippet_start
+    if snippet_start > 0:
+        marker_pos += 3  # Account for "..."
+
+    # Common error patterns with helpful hints
+    hint = ""
+    if re.search(r"\bTrue\b", value_str):
+        hint = "\n    Hint: Use lowercase 'true' instead of Python's True"
+    elif re.search(r"\bFalse\b", value_str):
+        hint = "\n    Hint: Use lowercase 'false' instead of Python's False"
+    elif re.search(r"\bNone\b", value_str):
+        hint = "\n    Hint: Use 'null' instead of Python's None"
+    elif "'" in value_str:
+        hint = "\n    Hint: JSON requires double quotes, not single quotes"
+
+    return f"Invalid JSON for {type_.__name__}:\n" f"    {snippet}\n" f"    {' ' * marker_pos}^ {error.msg}{hint}"
+
+
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
@@ -362,15 +466,25 @@ def _convert(
         count, _ = token_count(inner_types[0])
         if not isinstance(token, Sequence):
             raise ValueError
-        if count > 1:
+
+        # Check if tokens are JSON strings
+        inner_type = inner_types[0]
+        if (
+            count > 1
+            and any(isinstance(t, Token) and t.value.strip().startswith("{") for t in token)
+            and inner_type is not str
+        ):
+            # Each token is a complete JSON representation of the dataclass
+            gen = token
+        elif count > 1:
             gen = zip(*[iter(token)] * count)
         else:
             gen = token
         out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
-    elif isclass(type_) and issubclass(type_, Flag):
+    elif is_class_and_subclass(type_, Flag):
         # TODO: this might never execute since enum.Flag is now handled in ``convert``.
         out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
-    elif isclass(type_) and issubclass(type_, Enum):
+    elif is_class_and_subclass(type_, Enum):
         if isinstance(token, Sequence):
             raise ValueError
 
@@ -404,30 +518,71 @@ def _convert(
                 raise CoercionError(token=token, target_type=type_) from None
         else:
             # Convert it into a user-supplied class.
-            if not isinstance(token, Sequence):
-                token = [token]
-            i = 0
-            pos_values = []
-            hint = type_
-            for field_info in field_infos.values():
-                hint = field_info.hint
-                if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
-                    pos_values.append(token[i].value)
-                    i += 1
-                else:
-                    tokens_per_element, consume_all = token_count(hint)
-                    if tokens_per_element == 1:
-                        pos_values.append(convert(hint, token[i]))
+            # First check if we have a single token that's a JSON string
+            if isinstance(token, Token) and token.value.strip().startswith("{") and type_ is not str:
+                try:
+                    data = json.loads(token.value)
+                    if not isinstance(data, dict):
+                        # JSON was valid but didn't produce a dict (e.g., it was an array or scalar)
+                        raise TypeError  # noqa: TRY301
+                    # Convert dict to dataclass with proper type conversion
+                    out = _convert_json(type_, data, field_infos, converter, name_transform)
+                except json.JSONDecodeError as e:
+                    # Create helpful error message for invalid JSON
+                    msg = _create_json_decode_error_message(token, type_, e)
+                    raise CoercionError(msg=msg, token=token, target_type=type_) from e
+                except TypeError:
+                    # Fall back to positional argument parsing
+                    if not isinstance(token, Sequence):
+                        token = [token]
+                    i = 0
+                    pos_values = []
+                    hint = type_
+                    for field_info in field_infos.values():
+                        hint = field_info.hint
+                        if is_class_and_subclass(hint, str):  # Avoids infinite recursion
+                            pos_values.append(token[i].value)
+                            i += 1
+                        else:
+                            tokens_per_element, consume_all = token_count(hint)
+                            if tokens_per_element == 1:
+                                pos_values.append(convert(hint, token[i]))
+                                i += 1
+                            else:
+                                pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                                i += tokens_per_element
+                            if consume_all:
+                                break
+                        if i == len(token):
+                            break
+                    assert i == len(token)
+                    out = type_(*pos_values)
+            else:
+                # Standard positional argument parsing
+                if not isinstance(token, Sequence):
+                    token = [token]
+                i = 0
+                pos_values = []
+                hint = type_
+                for field_info in field_infos.values():
+                    hint = field_info.hint
+                    if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
+                        pos_values.append(token[i].value)
                         i += 1
                     else:
-                        pos_values.append(convert(hint, token[i : i + tokens_per_element]))
-                        i += tokens_per_element
-                    if consume_all:
+                        tokens_per_element, consume_all = token_count(hint)
+                        if tokens_per_element == 1:
+                            pos_values.append(convert(hint, token[i]))
+                            i += 1
+                        else:
+                            pos_values.append(convert(hint, token[i : i + tokens_per_element]))
+                            i += tokens_per_element
+                        if consume_all:
+                            break
+                    if i == len(token):
                         break
-                if i == len(token):
-                    break
-            assert i == len(token)
-            out = type_(*pos_values)
+                assert i == len(token)
+                out = type_(*pos_values)
 
     if cparam:
         # An inner type may have an independent Parameter annotation;

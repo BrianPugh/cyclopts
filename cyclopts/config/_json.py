@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Any
 
@@ -7,8 +8,6 @@ from cyclopts.exceptions import CoercionError
 
 class Json(ConfigFromFile):
     def _load_config(self, path: Path) -> dict[str, Any]:
-        import json
-
         with path.open() as f:
             try:
                 return json.load(f)
