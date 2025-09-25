@@ -315,6 +315,62 @@ def _convert_json(
     return type_(**converted_data)
 
 
+def _create_json_decode_error_message(
+    token: "Token",
+    type_: Any,
+    error: json.JSONDecodeError,
+) -> str:
+    """Create a helpful error message for JSON decode errors.
+
+    Parameters
+    ----------
+    token : Token
+        The token containing the invalid JSON.
+    type_ : Type
+        The target type we were trying to convert to.
+    error : json.JSONDecodeError
+        The JSON decode error that occurred.
+
+    Returns
+    -------
+    str
+        A formatted error message with context and hints.
+    """
+    value_str = token.value.strip()
+
+    # Try to provide context around the error
+    error_pos = error.pos if hasattr(error, "pos") else error.colno - 1 if hasattr(error, "colno") else 0
+
+    # Create a snippet showing the error location
+    snippet_start = max(0, error_pos - 20)
+    snippet_end = min(len(value_str), error_pos + 20)
+    snippet = value_str[snippet_start:snippet_end]
+
+    # Add markers if we truncated
+    if snippet_start > 0:
+        snippet = "..." + snippet
+    if snippet_end < len(value_str):
+        snippet = snippet + "..."
+
+    # Calculate where the error marker should point
+    marker_pos = error_pos - snippet_start
+    if snippet_start > 0:
+        marker_pos += 3  # Account for "..."
+
+    # Common error patterns with helpful hints
+    hint = ""
+    if "True" in value_str:
+        hint = "\n    Hint: Use lowercase 'true' instead of Python's True"
+    elif "False" in value_str:
+        hint = "\n    Hint: Use lowercase 'false' instead of Python's False"
+    elif "None" in value_str:
+        hint = "\n    Hint: Use 'null' instead of Python's None"
+    elif "'" in value_str:
+        hint = "\n    Hint: JSON requires double quotes, not single quotes"
+
+    return f"Invalid JSON for {type_.__name__}:\n" f"    {snippet}\n" f"    {' ' * marker_pos}^ {error.msg}{hint}"
+
+
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
@@ -470,7 +526,11 @@ def _convert(
                         raise TypeError  # noqa: TRY301
                     # Convert dict to dataclass with proper type conversion
                     out = _convert_json(type_, data, field_infos, converter, name_transform)
-                except (json.JSONDecodeError, TypeError):
+                except json.JSONDecodeError as e:
+                    # Create helpful error message for invalid JSON
+                    msg = _create_json_decode_error_message(token, type_, e)
+                    raise CoercionError(msg=msg, token=token, target_type=type_) from e
+                except TypeError:
                     # Fall back to positional argument parsing
                     if not isinstance(token, Sequence):
                         token = [token]

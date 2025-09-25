@@ -195,16 +195,92 @@ def test_json_list_malformed_json_object(app):
 
 
 def test_json_list_invalid_json_syntax(app):
-    """Test that invalid JSON syntax raises appropriate error."""
+    """Test that invalid JSON syntax raises appropriate error with helpful message."""
 
     @app.default
     def main(values: list[User]):
         pass
 
-    # Invalid JSON - trailing comma (not actually invalid in Python's json module)
-    # Using a different invalid syntax: single quotes
-    with pytest.raises(CycloptsError):
+    # Invalid JSON - single quotes instead of double quotes
+    with pytest.raises(CycloptsError) as exc_info:
         app(["--values", "{'name': 'Alice', 'age': 30}"], exit_on_error=False)
+
+    # Should show it's invalid JSON with context
+    error_str = str(exc_info.value)
+    assert "Invalid JSON for User" in error_str
+    assert "'" in error_str  # Should show the problematic quote
+    assert "^" in error_str  # Should have error marker
+    assert "Hint: JSON requires double quotes" in error_str  # Should provide hint
+
+
+def test_json_list_python_style_booleans(app):
+    """Test that Python-style booleans (True/False) in JSON raise appropriate error.
+
+    JSON requires lowercase 'true' and 'false', not Python's 'True' and 'False'.
+    This test ensures we properly handle this common mistake with clear, specific error messages.
+    """
+
+    @dataclass
+    class Item:
+        enabled: bool
+        disabled: bool
+        name: str
+
+    @app.default
+    def main(values: list[Item]):
+        pass
+
+    # Test Python-style True - should fail with specific message
+    with pytest.raises(CycloptsError) as exc_info:
+        app(["--values", '{"enabled": True, "disabled": false, "name": "test"}'], exit_on_error=False)
+
+    error_str = str(exc_info.value)
+    assert "Invalid JSON for Item" in error_str
+    assert "True" in error_str  # Should show the problematic part
+    assert "^" in error_str  # Should have error marker
+    assert "Hint: Use lowercase 'true' instead of Python's True" in error_str
+
+    # Test Python-style False - should fail with specific message
+    with pytest.raises(CycloptsError) as exc_info:
+        app(["--values", '{"enabled": true, "disabled": False, "name": "test"}'], exit_on_error=False)
+
+    error_str = str(exc_info.value)
+    assert "Invalid JSON for Item" in error_str
+    assert "False" in error_str  # Should show the problematic part
+    assert "^" in error_str  # Should have error marker
+    assert "Hint: Use lowercase 'false' instead of Python's False" in error_str
+
+    # Valid JSON with lowercase booleans should work correctly
+    _, bound, _ = app.parse_args(["--values", '{"enabled": true, "disabled": false, "name": "test"}'])
+    assert bound.arguments["values"] == [Item(enabled=True, disabled=False, name="test")]
+
+
+def test_json_list_python_none(app):
+    """Test that Python's None in JSON raises appropriate error with specific hint."""
+
+    @dataclass
+    class Config:
+        name: str
+        value: Optional[int]
+
+    @app.default
+    def main(values: list[Config]):
+        pass
+
+    # Python-style None should fail (invalid JSON)
+    with pytest.raises(CycloptsError) as exc_info:
+        app(["--values", '{"name": "test", "value": None}'], exit_on_error=False)
+
+    # The error message should provide specific hint for None
+    error_str = str(exc_info.value)
+    assert "Invalid JSON for Config" in error_str
+    assert "None" in error_str  # Should show the problematic part
+    assert "^" in error_str  # Should have error marker
+    assert "Hint: Use 'null' instead of Python's None" in error_str
+
+    # Valid JSON with null should work correctly
+    _, bound, _ = app.parse_args(["--values", '{"name": "test", "value": null}'])
+    assert bound.arguments["values"] == [Config(name="test", value=None)]
 
 
 def test_json_list_type_mismatch_in_field(app):
