@@ -9,7 +9,9 @@ Cyclopts supports classically defined user classes, as well as classes defined b
 * `NamedTuple <https://docs.python.org/3/library/typing.html#typing.NamedTuple>`_
 * `TypedDict <https://docs.python.org/3/library/typing.html#typing.TypedDict>`_
 
-As an example, lets consider using the builtin :obj:`~dataclasses.dataclass` to make a CLI that manages a movie collection.
+Basic Example
+^^^^^^^^^^^^^
+As an example, let's consider using the builtin :obj:`~dataclasses.dataclass` to make a CLI that manages a movie collection.
 
 .. code-block:: python
 
@@ -46,27 +48,121 @@ As an example, lets consider using the builtin :obj:`~dataclasses.dataclass` to 
    $ movie-maintainer add --movie.title 'Furiosa: A Mad Max Saga' --movie.year 2024
    Adding movie: Movie(title='Furiosa: A Mad Max Saga', year=2024)
 
-In most circumstances\*, Cyclopts will also parse a json-string for a dataclass-like parameter:
+In most circumstances, Cyclopts will also parse a json-string for a dataclass-like parameter:
 
 .. code-block:: console
 
    $ movie-maintainer add --movie='{"title": "Mad Max: Fury Road", "year": 2024}'
    Adding movie: Movie(title='Mad Max: Fury Road', year=2024)
 
-Json parsing will be performed when:
+JSON Dict Parsing
+^^^^^^^^^^^^^^^^^
 
-1. The parameter has to be specified as a keyword option; e.g. ``--movie``.
-2. The referenced parameter must be dataclass-like.
-3. The referenced parameter **cannot** be union'd with a ``str``.
-4. The first character must be a ``{``.
+JSON dict parsing will be performed when:
 
-This behavior can be further configured via :class:`.Parameter`
+1. The parameter is specified as a keyword option; e.g. ``--movie``.
+2. The referenced parameter type has various sub-arguments (is dataclass-like).
+3. The referenced parameter is **not** union'd with a ``str``.
+4. The first character is a ``{``.
+
+This behavior can be configured via :attr:`.Parameter.json_dict`.
+
+.. code-block:: python
+
+   from cyclopts import App
+   from dataclasses import dataclass
+
+   app = App(name="movie-manager")
+
+   @dataclass
+   class Movie:
+      title: str
+      year: int
+      rating: float = 8.0
+
+   @app.command
+   def add(movie: Movie):
+      print(f"Adding: {movie}")
+
+   app()
+
+.. code-block:: console
+
+   $ movie-manager add --movie '{"title": "Mad Max: Fury Road", "year": 2015, "rating": 8.1}'
+   Adding: Movie(title='Mad Max: Fury Road', year=2015, rating=8.1)
+
+   $ movie-manager add --movie '{"title": "Furiosa", "year": 2024}'
+   Adding: Movie(title='Furiosa', year=2024, rating=8.0)
+
+Note that JSON parsing only works when using the keyword option format (``--movie``). The traditional positional argument format still works with individual fields:
+
+.. code-block:: console
+
+   $ movie-manager add --movie.title "Dune" --movie.year 2021 --movie.rating 8.5
+   Adding: Movie(title='Dune', year=2021, rating=8.5)
+
+JSON List Parsing
+^^^^^^^^^^^^^^^^^
+
+Cyclopts also supports JSON parsing for lists of dataclasses. This allows you to pass multiple structured objects via JSON:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from dataclasses import dataclass
+
+   app = App(name="movie-collection")
+
+   @dataclass
+   class Movie:
+      title: str
+      year: int
+
+   @app.command
+   def add_batch(movies: list[Movie]):
+      for movie in movies:
+          print(f"Adding: {movie}")
+
+   app()
+
+You can provide the list in several ways:
+
+1. JSON Array - Multiple objects in a single argument:
+
+   .. code-block:: console
+
+      $ movie-collection add-batch --movies '[{"title": "Mad Max", "year": 2015}, {"title": "Furiosa", "year": 2024}]'
+      Adding: Movie(title='Mad Max', year=2015)
+      Adding: Movie(title='Furiosa', year=2024)
+
+2. Individual JSON - Each object as a separate argument:
+
+   .. code-block:: console
+
+      $ movie-collection add-batch --movies '{"title": "Mad Max", "year": 2015}' --movies '{"title": "Furiosa", "year": 2024}'
+      Adding: Movie(title='Mad Max', year=2015)
+      Adding: Movie(title='Furiosa', year=2024)
+
+3. Mixed - Combining arrays and individual objects:
+
+   .. code-block:: console
+
+      $ movie-collection add-batch --movies '{"title": "Mad Max", "year": 2015}' --movies '[{"title": "Furiosa", "year": 2024}, {"title": "Dune", "year": 2021}]'
+      Adding: Movie(title='Mad Max', year=2015)
+      Adding: Movie(title='Furiosa', year=2024)
+      Adding: Movie(title='Dune', year=2021)
+
+JSON list parsing is automatically enabled for ``list`` types containing dataclasses. The same rules apply as for dict parsing:
+
+- The element type cannot be union'd with ``str``
+- JSON objects must start with ``{`` or be arrays starting with ``[``
+
+This behavior can be configured via :attr:`.Parameter.json_list`.
 
 .. _Namespace Flattening:
 
---------------------
 Namespace Flattening
---------------------
+^^^^^^^^^^^^^^^^^^^^
 
 It is likely that the actual movie class/object is not important to the CLI user, and the parameter names like ``--movie.title`` are unnecessarily verbose. We can remove ``movie`` from the name by giving the ``Movie`` type annotation the special name ``"*"``.
 
@@ -124,9 +220,8 @@ The :class:`.Parameter` configuration will also be inherited by subclasses.
 
 .. _Sharing Parameters:
 
-------------------
 Sharing Parameters
-------------------
+^^^^^^^^^^^^^^^^^^
 A flattened dataclass provides a natural way of easily sharing a set of parameters between commands.
 
 .. code-block:: python
@@ -177,9 +272,8 @@ A flattened dataclass provides a natural way of easily sharing a set of paramete
    Removing movie: Movie(title='Mad Max: Fury Road', year=2015)
 
 
------------
 Config File
------------
+^^^^^^^^^^^
 Having the user specify ``--user`` every single call is a bit cumbersome, especially if they're always going to provide the same value.
 We can have Cyclopts fallback to a :ref:`toml configuration file <Config Files>`.
 
