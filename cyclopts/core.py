@@ -1859,6 +1859,96 @@ class App:
             out.append((group, help_panel))
         return out
 
+    def generate_docs(
+        self,
+        output_path: Optional[Path] = None,
+        output_format: Optional[Literal["markdown"]] = None,
+        recursive: bool = True,
+        include_hidden: bool = False,
+        heading_level: int = 1,
+    ) -> str:
+        """Generate documentation for this CLI application.
+
+        Parameters
+        ----------
+        output_path : Optional[Path]
+            If provided, write the documentation to this file.
+            If None, returns the documentation as a string.
+        output_format : Optional[Literal["markdown"]]
+            Output format for the documentation. Currently only supports "markdown".
+            If None, will infer from output_path extension if provided,
+            otherwise defaults to "markdown".
+        recursive : bool
+            If True, generate documentation for all subcommands recursively.
+            Default is True.
+        include_hidden : bool
+            If True, include hidden commands/parameters in documentation.
+            Default is False.
+        heading_level : int
+            Starting heading level for the main application title.
+            Default is 1 (single #).
+
+        Returns
+        -------
+        str
+            The generated documentation.
+
+        Raises
+        ------
+        ValueError
+            If an unsupported output format is specified.
+
+        Examples
+        --------
+        >>> app = App(name="myapp", help="My CLI Application")
+        >>> docs = app.generate_docs()  # Generate markdown as string
+        >>> app.generate_docs(output_path=Path("docs/cli.md"))  # Write markdown to file
+        >>> app.generate_docs(output_format="markdown")  # Explicitly specify format
+        """
+        from cyclopts.docs import generate_markdown_docs
+
+        # Determine output format
+        if output_format is None:
+            if output_path:
+                # Infer format from file extension
+                ext = Path(output_path).suffix.lower()
+                format_map: dict[str, Literal["markdown"]] = {
+                    ".md": "markdown",
+                    ".markdown": "markdown",
+                    # Future formats can be added here
+                    # ".rst": "restructuredtext",
+                    # ".html": "html",
+                }
+                output_format = format_map.get(ext, "markdown")
+            else:
+                output_format = "markdown"
+
+        # Validate output format (this is now redundant with type checking, but kept for runtime safety)
+        if output_format not in ("markdown",):
+            raise ValueError(f"Unsupported output format: {output_format}. Currently only 'markdown' is supported.")
+
+        # Generate documentation based on format
+        if output_format == "markdown":
+            doc = generate_markdown_docs(
+                self,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                heading_level=heading_level,
+            )
+        # Future formats would be handled here:
+        # elif output_format == "rst":
+        #     doc = generate_rst_docs(self, recursive=recursive, ...)
+        # elif output_format == "html":
+        #     doc = generate_html_docs(self, recursive=recursive, ...)
+
+        # Write to file if path provided
+        if output_path:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(doc)
+
+        return doc
+
     def interactive_shell(
         self,
         prompt: str = "$ ",

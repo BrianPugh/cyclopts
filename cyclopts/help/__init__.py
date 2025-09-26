@@ -12,13 +12,14 @@ __all__ = [
     "InlineText",
     "_get_choices",
     "DefaultFormatter",
+    "MarkdownFormatter",
     "PlainFormatter",
     "NameRenderer",
     "DescriptionRenderer",
     "AsteriskRenderer",
 ]
 
-from .formatters import DefaultFormatter, PlainFormatter
+from .formatters import DefaultFormatter, MarkdownFormatter, PlainFormatter
 from .help import (
     HelpEntry,
     HelpPanel,
