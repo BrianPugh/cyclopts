@@ -1,15 +1,15 @@
 """Test help customization via Group help_formatter."""
 
 from textwrap import dedent
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 from rich.box import DOUBLE, SIMPLE, SQUARE
 from rich.console import Console
 
 from cyclopts import App, Group, Parameter
 from cyclopts.annotations import get_hint_name
-from cyclopts.help import ColumnSpec, DefaultFormatter, PanelSpec, TableSpec
-from cyclopts.help.specs import DescriptionColumn
+from cyclopts.help import ColumnSpec, DefaultFormatter, HelpEntry, PanelSpec, TableSpec
+from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer
 
 
 def _type_renderer(entry: Any) -> str:
@@ -1368,3 +1368,179 @@ def test_plain_formatter_fallback_str_conversion(console: Console):
         """
     )
     assert actual == expected
+
+
+def test_description_renderer_newline_metadata():
+    """Test DescriptionRenderer with newline_metadata=True."""
+    from rich.console import Console
+
+    # Create a test entry with metadata
+    entry = HelpEntry(
+        names=("verbose",),
+        shorts=("--verbose",),
+        description="Enable verbose output",
+        env_var=("VERBOSE", "VERB"),
+        default="False",
+        choices=("true", "false"),
+        required=False,
+    )
+
+    # Test with newline_metadata=True
+    renderer = DescriptionRenderer(newline_metadata=True)
+    result = renderer(entry)
+
+    # Render to string for testing
+    console = Console(width=80, force_terminal=False, legacy_windows=False)
+    with console.capture() as capture:
+        console.print(result, end="")
+
+    output = capture.get()
+
+    # Check that metadata is on separate lines
+    lines = output.strip().split("\n")
+    assert len(lines) == 4, f"Expected 4 lines, got {len(lines)}: {lines}"
+
+    assert lines[0] == "Enable verbose output"
+    assert lines[1] == "[choices: true, false]"
+    assert lines[2] == "[env var: VERBOSE, VERB]"
+    assert lines[3] == "[default: False]"
+
+
+def test_description_renderer_inline_metadata():
+    """Test DescriptionRenderer with newline_metadata=False (default)."""
+    from rich.console import Console
+
+    # Create a test entry with metadata
+    entry = HelpEntry(
+        names=("verbose",),
+        shorts=("--verbose",),
+        description="Enable verbose output",
+        env_var=("VERBOSE",),
+        default="False",
+        required=False,
+    )
+
+    # Test with newline_metadata=False (default)
+    renderer = DescriptionRenderer(newline_metadata=False)
+    result = renderer(entry)
+
+    # Render to string for testing
+    console = Console(width=80, force_terminal=False, legacy_windows=False)
+    with console.capture() as capture:
+        console.print(result, end="")
+
+    output = capture.get()
+
+    # Check that metadata is inline (all on one line)
+    lines = output.strip().split("\n")
+    assert len(lines) == 1, f"Expected 1 line, got {len(lines)}: {lines}"
+    assert "Enable verbose output [env var: VERBOSE] [default: False]" in output
+
+
+def test_with_newline_metadata_classmethod(console: Console):
+    """Test DefaultFormatter.with_newline_metadata() classmethod."""
+    app = App(help_formatter=DefaultFormatter.with_newline_metadata())
+
+    @app.default
+    def main(
+        verbose: Annotated[bool, Parameter(help="Enable verbose output", env_var="VERBOSE")] = False,
+        config: Annotated[str, Parameter(help="Config file path", env_var=["CONFIG", "CFG"])] = "config.yaml",
+        output: Annotated[Optional[str], Parameter(help="Output file")] = None,
+    ):
+        """Test application with newline metadata."""
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    actual = capture.get()
+
+    # Check that metadata appears on separate lines
+    assert "[env var: VERBOSE]" in actual
+    assert "[default: False]" in actual
+    assert "[env var: CONFIG, CFG]" in actual
+    assert "[default: config.yaml]" in actual
+
+    # Check structure - metadata should be on its own line
+    lines = actual.split("\n")
+    for i, line in enumerate(lines):
+        if "Enable verbose output" in line:
+            # Next lines should contain the metadata
+            assert "[env var: VERBOSE]" not in line, "Metadata should not be inline"
+            # Find the env var line (should be within next few lines)
+            found_env = False
+            found_default = False
+            for j in range(i + 1, min(i + 4, len(lines))):
+                if "[env var: VERBOSE]" in lines[j]:
+                    found_env = True
+                if "[default: False]" in lines[j]:
+                    found_default = True
+            assert found_env, "Should find env var on separate line"
+            assert found_default, "Should find default on separate line"
+            break
+
+
+def test_default_formatter_regular_inline(console: Console):
+    """Test that regular DefaultFormatter still shows metadata inline."""
+    app = App(help_formatter=DefaultFormatter())
+
+    @app.default
+    def main(
+        verbose: Annotated[bool, Parameter(help="Enable verbose output", env_var="VERBOSE")] = False,
+    ):
+        """Test application with inline metadata."""
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+
+    actual = capture.get()
+
+    # Check that metadata is inline with description
+    # Due to line wrapping in narrow console, we just check they're not on separate lines
+    lines = actual.split("\n")
+
+    # Find the line with "Enable verbose output"
+    for i, line in enumerate(lines):
+        if "Enable verbose output" in line:
+            # Check that env var is on same or immediately continued line (not indented on new line)
+            if "[env var: VERBOSE]" in line:
+                # It's inline on the same line
+                pass
+            elif i + 1 < len(lines) and "[env var: VERBOSE]" in lines[i + 1]:
+                # It wrapped to next line - check it's not indented like newline mode
+                next_line = lines[i + 1]
+                # In newline mode it would start directly with bracket
+                # In inline mode it continues at the column position
+                assert not next_line.lstrip().startswith("[env var"), "Should not be on its own line like newline mode"
+            break
+    else:
+        assert False, "Should find description in output"
+
+
+def test_description_renderer_no_extra_whitespace():
+    """Test that DescriptionRenderer with newline_metadata doesn't add extra spaces."""
+    from rich.console import Console
+
+    entry = HelpEntry(
+        names=("test",),
+        description="Test description",
+        env_var=("TEST_VAR",),
+        default="value",
+    )
+
+    renderer = DescriptionRenderer(newline_metadata=True)
+    result = renderer(entry)
+
+    console = Console(width=80, force_terminal=False, legacy_windows=False)
+    with console.capture() as capture:
+        console.print(result, end="")
+
+    output = capture.get()
+    lines = output.strip().split("\n")
+
+    # Check that metadata lines start with bracket (no indentation)
+    for line in lines[1:]:  # Skip the description line
+        if line.strip():  # Skip empty lines
+            # The line should start with "[metadata...]" with no indentation
+            assert line.startswith("["), f"Line should not be indented: {repr(line)}"
