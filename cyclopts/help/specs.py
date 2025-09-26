@@ -158,11 +158,9 @@ class DescriptionRenderer:
             if description.primary_renderable:
                 renderables.append(description.primary_renderable)
 
-            # Add each metadata item with indentation
+            # Add each metadata item without indentation
             for item in metadata_items:
-                indented_item = Text("  ")  # 2-space indentation
-                indented_item.append(item)
-                renderables.append(indented_item)
+                renderables.append(item)
 
             # Return a Rich Group that stacks these vertically
             return RichGroup(*renderables) if renderables else Text()

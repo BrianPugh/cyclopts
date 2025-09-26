@@ -68,6 +68,59 @@ class DefaultFormatter:
     column_specs: Optional[Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"]] = None
     """Column specifications or builder function for table columns (width, style, alignment, etc)."""
 
+    @classmethod
+    def with_newline_metadata(cls, **kwargs):
+        """Create formatter with metadata on separate lines.
+
+        Returns a DefaultFormatter configured to display parameter metadata
+        (choices, env vars, defaults) on separate indented lines rather
+        than inline with descriptions.
+
+        Parameters
+        ----------
+        **kwargs
+            Additional keyword arguments to pass to DefaultFormatter constructor.
+
+        Returns
+        -------
+        DefaultFormatter
+            Configured formatter instance with newline metadata display.
+
+        Examples
+        --------
+        >>> from cyclopts import App
+        >>> from cyclopts.help import DefaultFormatter
+        >>> app = App(help_formatter=DefaultFormatter.with_newline_metadata())
+        """
+
+        def column_builder(console, options, entries):
+            import math
+
+            from cyclopts.help.specs import (
+                AsteriskColumn,
+                ColumnSpec,
+                DescriptionRenderer,
+                NameRenderer,
+            )
+
+            max_width = math.ceil(console.width * 0.35)
+            name_column = ColumnSpec(
+                renderer=NameRenderer(max_width=max_width),
+                header="Option",
+                style="cyan",
+                max_width=max_width,
+            )
+
+            description_column = ColumnSpec(
+                renderer=DescriptionRenderer(newline_metadata=True), header="Description", overflow="fold"
+            )
+
+            if any(x.required for x in entries):
+                return (AsteriskColumn, name_column, description_column)
+            return (name_column, description_column)
+
+        return cls(column_specs=column_builder, **kwargs)
+
     def __call__(self, console: "Console", options: "ConsoleOptions", panel: "HelpPanel") -> None:
         """Format and render a single help panel using Rich.
 
