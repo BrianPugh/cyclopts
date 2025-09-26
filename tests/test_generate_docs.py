@@ -468,8 +468,8 @@ def test_generate_docs_invalid_format():
 
     app = App(name="myapp", help="Test app")
 
-    with pytest.raises(ValueError, match="Unsupported output format: html"):
-        app.generate_docs(output_format="html")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="Unsupported output format: pdf"):
+        app.generate_docs(output_format="pdf")  # type: ignore[arg-type]
 
     with pytest.raises(ValueError, match="Unsupported output format: rst"):
         app.generate_docs(output_format="rst")  # type: ignore[arg-type]

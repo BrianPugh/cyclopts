@@ -1862,7 +1862,7 @@ class App:
     def generate_docs(
         self,
         output_path: Optional[Path] = None,
-        output_format: Optional[Literal["markdown"]] = None,
+        output_format: Optional[Literal["markdown", "html"]] = None,
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
@@ -1874,8 +1874,8 @@ class App:
         output_path : Optional[Path]
             If provided, write the documentation to this file.
             If None, returns the documentation as a string.
-        output_format : Optional[Literal["markdown"]]
-            Output format for the documentation. Currently only supports "markdown".
+        output_format : Optional[Literal["markdown", "html"]]
+            Output format for the documentation. Supports "markdown" and "html".
             If None, will infer from output_path extension if provided,
             otherwise defaults to "markdown".
         recursive : bool
@@ -1906,26 +1906,26 @@ class App:
         >>> app.generate_docs(output_format="markdown")  # Explicitly specify format
         """
         from cyclopts.docs import generate_markdown_docs
+        from cyclopts.docs.html import generate_html_docs
 
         # Determine output format
         if output_format is None:
             if output_path:
                 # Infer format from file extension
                 ext = Path(output_path).suffix.lower()
-                format_map: dict[str, Literal["markdown"]] = {
+                format_map: dict[str, Literal["markdown", "html"]] = {
                     ".md": "markdown",
                     ".markdown": "markdown",
-                    # Future formats can be added here
-                    # ".rst": "restructuredtext",
-                    # ".html": "html",
+                    ".html": "html",
+                    ".htm": "html",
                 }
                 output_format = format_map.get(ext, "markdown")
             else:
                 output_format = "markdown"
 
         # Validate output format (this is now redundant with type checking, but kept for runtime safety)
-        if output_format not in ("markdown",):
-            raise ValueError(f"Unsupported output format: {output_format}. Currently only 'markdown' is supported.")
+        if output_format not in ("markdown", "html"):
+            raise ValueError(f"Unsupported output format: {output_format}. Supported formats: 'markdown', 'html'.")
 
         # Generate documentation based on format
         if output_format == "markdown":
@@ -1935,11 +1935,13 @@ class App:
                 include_hidden=include_hidden,
                 heading_level=heading_level,
             )
-        # Future formats would be handled here:
-        # elif output_format == "rst":
-        #     doc = generate_rst_docs(self, recursive=recursive, ...)
-        # elif output_format == "html":
-        #     doc = generate_html_docs(self, recursive=recursive, ...)
+        elif output_format == "html":
+            doc = generate_html_docs(
+                self,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                heading_level=heading_level,
+            )
 
         # Write to file if path provided
         if output_path:
