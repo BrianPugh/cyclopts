@@ -307,20 +307,8 @@ class MarkdownFormatter:
                     else:
                         name_str = names[0]
 
-                # Format type hint for display
-                type_str = ""
-                if entry.type and not is_positional:
-                    # Only show type for options, not arguments (Typer style)
-                    formatted_type = _format_type_name(entry.type)
-                    if formatted_type and formatted_type != "bool":
-                        # Use uppercase simple types for Typer-like output
-                        if formatted_type in ["str", "int", "float"]:
-                            type_str = f" {formatted_type.upper()}"
-                        elif formatted_type != "bool":
-                            type_str = f" {formatted_type}"
-
-                # Start the entry
-                self._output.write(f"* `{name_str}{type_str}`: ")
+                # Start the entry (no type display)
+                self._output.write(f"* `{name_str}`: ")
 
                 # Add description
                 desc = _extract_plain_text(entry.description, console)
@@ -328,14 +316,16 @@ class MarkdownFormatter:
                     self._output.write(desc)
 
                 # Add metadata in brackets
-                metadata = []
+                # Handle required separately for bold formatting
+                is_required = False
                 if entry.required and not is_positional:
                     # Only show required for options, arguments show it differently
-                    metadata.append("required")
+                    is_required = True
                 elif is_positional and entry.required:
                     # For positional args, add [required] at the end
-                    metadata.append("required")
+                    is_required = True
 
+                metadata = []
                 if entry.choices:
                     choices_str = ", ".join(entry.choices)
                     metadata.append(f"choices: {choices_str}")
@@ -366,8 +356,13 @@ class MarkdownFormatter:
                     else:
                         metadata.append(f"default: {default_str}")
 
-                if metadata:
-                    self._output.write(f"  [{', '.join(metadata)}]")
+                # Write required in bold and separate brackets first
+                if is_required:
+                    self._output.write("  **[required]**")
+
+                # Write each metadata item in its own brackets with italics
+                for item in metadata:
+                    self._output.write(f"  *[{item}]*")
 
                 self._output.write("\n")
 
