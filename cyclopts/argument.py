@@ -162,6 +162,55 @@ class ArgumentCollection(list["Argument"]):
         """Returns a shallow copy of the :class:`ArgumentCollection`."""
         return type(self)(self)
 
+    def get(
+        self,
+        term: Union[str, int],
+        default: Any = UNSET,
+        *,
+        transform: Optional[Callable[[str], str]] = None,
+        delimiter: str = ".",
+    ) -> Optional["Argument"]:
+        """Get an :class:`Argument` by name or index.
+
+        This is a convenience wrapper around :meth:`match` that returns just
+        the :class:`Argument` object instead of a tuple.
+
+        Parameters
+        ----------
+        term : Union[str, int]
+            Either a string keyword or an integer positional index.
+        default : Any
+            Default value to return if term not found. If :data:`~cyclopts.utils.UNSET` (default),
+            will raise :exc:`KeyError`/:exc:`IndexError`.
+        transform : Optional[Callable[[str], str]]
+            Optional function to transform string terms before matching.
+        delimiter : str
+            Delimiter for nested field access.
+
+        Returns
+        -------
+        Optional[:class:`Argument`]
+            The matched :class:`Argument`, or ``default`` if provided and not found.
+
+        Raises
+        ------
+        :exc:`KeyError`
+            If ``term`` is a string and not found (when ``default`` is :data:`~cyclopts.utils.UNSET`).
+        :exc:`IndexError`
+            If ``term`` is an int and is out-of-range (when ``default`` is :data:`~cyclopts.utils.UNSET`).
+
+        See Also
+        --------
+        :meth:`match` : Returns a tuple of (:class:`Argument`, keys, value) with more detailed information.
+        """
+        try:
+            argument, _, _ = self.match(term, transform=transform, delimiter=delimiter)
+            return argument
+        except (KeyError, IndexError):
+            if default is UNSET:
+                raise
+            return default
+
     def match(
         self,
         term: Union[str, int],

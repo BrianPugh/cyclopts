@@ -1861,8 +1861,7 @@ class App:
 
     def generate_docs(
         self,
-        output_path: Optional[Path] = None,
-        output_format: Optional[Literal["markdown", "html"]] = None,
+        output_format: Literal["markdown", "html"] = "markdown",
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
@@ -1871,13 +1870,9 @@ class App:
 
         Parameters
         ----------
-        output_path : Optional[Path]
-            If provided, write the documentation to this file.
-            If None, returns the documentation as a string.
-        output_format : Optional[Literal["markdown", "html"]]
-            Output format for the documentation. Supports "markdown" and "html".
-            If None, will infer from output_path extension if provided,
-            otherwise defaults to "markdown".
+        output_format : Literal["markdown", "html"]
+            Output format for the documentation.
+            Default is "markdown".
         recursive : bool
             If True, generate documentation for all subcommands recursively.
             Default is True.
@@ -1902,26 +1897,12 @@ class App:
         --------
         >>> app = App(name="myapp", help="My CLI Application")
         >>> docs = app.generate_docs()  # Generate markdown as string
-        >>> app.generate_docs(output_path=Path("docs/cli.md"))  # Write markdown to file
-        >>> app.generate_docs(output_format="markdown")  # Explicitly specify format
+        >>> html_docs = app.generate_docs(output_format="html")  # Generate HTML
+        >>> # To write to file, caller can do:
+        >>> # Path("docs/cli.md").write_text(docs)
         """
         from cyclopts.docs import generate_markdown_docs
         from cyclopts.docs.html import generate_html_docs
-
-        # Determine output format
-        if output_format is None:
-            if output_path:
-                # Infer format from file extension
-                ext = Path(output_path).suffix.lower()
-                format_map: dict[str, Literal["markdown", "html"]] = {
-                    ".md": "markdown",
-                    ".markdown": "markdown",
-                    ".html": "html",
-                    ".htm": "html",
-                }
-                output_format = format_map.get(ext, "markdown")
-            else:
-                output_format = "markdown"
 
         # Validate output format (this is now redundant with type checking, but kept for runtime safety)
         if output_format not in ("markdown", "html"):
@@ -1942,12 +1923,6 @@ class App:
                 include_hidden=include_hidden,
                 heading_level=heading_level,
             )
-
-        # Write to file if path provided
-        if output_path:
-            output_path = Path(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(doc)
 
         return doc
 

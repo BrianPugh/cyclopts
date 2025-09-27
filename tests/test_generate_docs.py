@@ -378,8 +378,8 @@ def test_generate_docs_write_to_file():
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "docs" / "cli.md"
 
-        # Write docs to file
-        actual = app.generate_docs(output_path=output_path)
+        # Generate docs
+        actual = app.generate_docs()
 
         expected = dedent(
             """\
@@ -395,12 +395,16 @@ def test_generate_docs_write_to_file():
             """
         )
 
+        # Write to file manually
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(actual)
+
         # Check file was created and contains expected content
         assert output_path.exists()
         content = output_path.read_text()
         assert content == expected
 
-        # Should also return the content
+        # Should return the expected content
         assert actual == expected
 
 
@@ -433,8 +437,8 @@ def test_generate_docs_output_format_explicit():
     assert actual == expected
 
 
-def test_generate_docs_output_format_inferred():
-    """Test inferring output format from file extension."""
+def test_generate_docs_output_format_markdown():
+    """Test generating markdown format documentation."""
     app = App(name="myapp", help="Test app")
 
     @app.default
@@ -442,24 +446,14 @@ def test_generate_docs_output_format_inferred():
         """Main command."""
         pass
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Test .md extension
-        md_path = Path(tmpdir) / "cli.md"
-        docs_md = app.generate_docs(output_path=md_path)
-        assert md_path.exists()
-        assert "# myapp" in docs_md
+    # Test markdown format (default)
+    docs_md = app.generate_docs()
+    assert "# myapp" in docs_md
 
-        # Test .markdown extension
-        markdown_path = Path(tmpdir) / "cli.markdown"
-        docs_markdown = app.generate_docs(output_path=markdown_path)
-        assert markdown_path.exists()
-        assert "# myapp" in docs_markdown
-
-        # Unknown extension should default to markdown
-        txt_path = Path(tmpdir) / "cli.txt"
-        docs_txt = app.generate_docs(output_path=txt_path)
-        assert txt_path.exists()
-        assert "# myapp" in docs_txt  # Still markdown format
+    # Test explicitly specifying markdown
+    docs_explicit = app.generate_docs(output_format="markdown")
+    assert "# myapp" in docs_explicit
+    assert docs_md == docs_explicit
 
 
 def test_generate_docs_invalid_format():

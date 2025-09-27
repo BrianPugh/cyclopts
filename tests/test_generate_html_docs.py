@@ -176,8 +176,12 @@ def test_generate_html_docs_write_to_file():
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = Path(tmpdir) / "docs" / "cli.html"
 
-        # Write docs to file
-        docs = app.generate_docs(output_path=output_path)
+        # Generate HTML docs
+        docs = app.generate_docs(output_format="html")
+
+        # Write to file manually
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(docs)
 
         # Check file was created
         assert output_path.exists()
@@ -188,26 +192,19 @@ def test_generate_html_docs_write_to_file():
         assert "<html" in content
         assert '<h1 class="app-title">myapp</h1>' in content
 
-        # Return value should match file content
+        # Content should match what we wrote
         assert docs == content
 
 
-def test_generate_html_docs_format_inference():
-    """Test inferring HTML format from file extension."""
+def test_generate_html_docs_format_explicit():
+    """Test explicitly generating HTML format."""
     app = App(name="myapp", help="Test app")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Test .html extension
-        html_path = Path(tmpdir) / "cli.html"
-        docs_html = app.generate_docs(output_path=html_path)
-        assert html_path.exists()
-        assert "<!DOCTYPE html>" in docs_html
-
-        # Test .htm extension
-        htm_path = Path(tmpdir) / "cli.htm"
-        docs_htm = app.generate_docs(output_path=htm_path)
-        assert htm_path.exists()
-        assert "<!DOCTYPE html>" in docs_htm
+    # Test explicitly specifying HTML format
+    docs_html = app.generate_docs(output_format="html")
+    assert "<!DOCTYPE html>" in docs_html
+    assert "<html" in docs_html
+    assert '<h1 class="app-title">myapp</h1>' in docs_html
 
 
 def test_generate_html_docs_with_meta_app():

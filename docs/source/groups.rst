@@ -33,7 +33,7 @@ Groups can be created in two ways:
    If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
 
    .. warning::
-      While convenient and terse, mistyping a group name as a string will unintentionally create a new group!
+      While convenient and terse, mistyping a group name will unintentionally create a new group!
 
 Every command and parameter belongs to at least one group.
 
