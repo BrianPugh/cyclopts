@@ -2,10 +2,48 @@
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from cyclopts.core import App
+
+
+def _generate_html_toc(
+    lines: List[str],
+    app: "App",
+    include_hidden: bool,
+    app_name: str,
+    prefix: str,
+    depth: int = 0,
+) -> None:
+    """Recursively generate HTML table of contents."""
+    if not app._commands:
+        return
+
+    for name, subapp in app._commands.items():
+        # Skip built-in commands
+        if name in app._help_flags or name in app._version_flags:
+            continue
+
+        if isinstance(subapp, type(app)):  # Check if it's an App instance
+            if not include_hidden and not subapp.show:
+                continue
+
+            # Create display name and anchor
+            display_name = f"{prefix}{name}" if prefix else name
+            full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
+
+            # Add TOC entry
+            indent = "  " * (depth + 1)
+            lines.append(f'{indent}<li><a href="#{full_path}"><code>{name}</code></a>')
+
+            # Recursively add nested commands
+            if subapp._commands:
+                lines.append(f"{indent}  <ul>")
+                _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)
+                lines.append(f"{indent}  </ul>")
+
+            lines.append(f"{indent}</li>")
 
 
 # CSS styles embedded as a string - clean, modern design
@@ -77,8 +115,9 @@ pre code {
     border-left: 4px solid #0066cc;
 }
 
-.description {
+.description, .app-description, .command-description {
     margin: 16px 0;
+    color: var(--text-color);
 }
 
 .panel-description {
@@ -90,43 +129,132 @@ pre code {
     margin: 24px 0;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
+/* List styles for commands and parameters */
+.commands-list, .parameters-list {
+    list-style: none;
+    padding-left: 0;
     margin: 16px 0;
 }
 
-th, td {
-    text-align: left;
-    padding: 12px;
+.commands-list li, .parameters-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.commands-list li:last-child, .parameters-list li:last-child {
+    border-bottom: none;
+}
+
+.commands-list code, .parameters-list code {
+    font-weight: 600;
+}
+
+/* Metadata styling */
+.parameter-metadata {
+    display: inline-flex;
+    gap: 8px;
+    margin-left: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.metadata-item {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.85em;
+    border-radius: 4px;
+    background: var(--code-bg);
     border: 1px solid var(--border-color);
 }
 
-th {
+.metadata-required {
+    background: #fee;
+    border-color: #fcc;
+    color: #c00;
+    font-weight: 600;
+}
+
+.metadata-default {
+    background: #f0f8ff;
+    border-color: #d0e8ff;
+    color: #0066cc;
+}
+
+.metadata-env {
+    background: #f0fff0;
+    border-color: #d0ffd0;
+    color: #080;
+}
+
+.metadata-choices {
+    background: #fffaf0;
+    border-color: #ffd0a0;
+    color: #840;
+}
+
+.metadata-label {
+    font-weight: 600;
+    opacity: 0.8;
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+
+/* Table of Contents */
+.table-of-contents {
     background: var(--header-bg);
-    font-weight: 600;
+    border-radius: 6px;
+    padding: 16px;
+    margin: 24px 0;
 }
 
-tr:hover {
-    background: #f8f9fa;
+.table-of-contents h2 {
+    margin-top: 0;
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
-.required-col {
-    width: 80px;
-    text-align: center;
+.table-of-contents ul {
+    margin: 8px 0;
+    padding-left: 24px;
 }
 
-.required-cell {
-    text-align: center;
-    color: var(--required-color);
-    font-weight: bold;
+.table-of-contents li {
+    margin: 4px 0;
 }
 
-.commands-table code,
-.parameters-table code {
-    background: #fff;
-    padding: 2px 4px;
-    font-weight: 600;
+.table-of-contents a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+.table-of-contents a:hover {
+    text-decoration: underline;
+}
+
+/* General link styles */
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.commands-list a code {
+    color: var(--link-color);
+}
+
+/* Back to top link */
+.back-to-top {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+.back-to-top:hover {
+    opacity: 1;
 }
 
 /* Responsive design */
@@ -135,12 +263,8 @@ tr:hover {
         padding: 10px;
     }
 
-    table {
+    .commands-list, .parameters-list {
         font-size: 0.9em;
-    }
-
-    th, td {
-        padding: 8px;
     }
 }
 
@@ -155,18 +279,37 @@ tr:hover {
         --header-bg: #2d2d2d;
     }
 
-    .commands-table code,
-    .parameters-table code {
-        background: #2d2d2d;
-    }
-
     .usage {
         background: #2d2d2d;
         border-left-color: #66b3ff;
     }
 
-    tr:hover {
+    .table-of-contents {
         background: #2d2d2d;
+    }
+
+    .metadata-required {
+        background: #4a2020;
+        border-color: #6a3030;
+        color: #ff9999;
+    }
+
+    .metadata-default {
+        background: #20304a;
+        border-color: #304060;
+        color: #99ccff;
+    }
+
+    .metadata-env {
+        background: #204a20;
+        border-color: #306030;
+        color: #99ff99;
+    }
+
+    .metadata-choices {
+        background: #4a3020;
+        border-color: #604030;
+        color: #ffcc99;
     }
 }
 
@@ -190,6 +333,8 @@ def generate_html_docs(
     heading_level: int = 1,
     standalone: bool = True,
     custom_css: Optional[str] = None,
+    command_chain: Optional[list[str]] = None,
+    generate_toc: bool = True,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -211,6 +356,12 @@ def generate_html_docs(
         If False, generate only the body content. Default is True.
     custom_css : str
         Custom CSS to use instead of the default styles.
+    command_chain : list[str]
+        Internal parameter to track command hierarchy.
+        Default is None.
+    generate_toc : bool
+        If True, generate a table of contents for multi-command apps.
+        Default is True.
 
     Returns
     -------
@@ -220,15 +371,35 @@ def generate_html_docs(
     from cyclopts.help import format_doc, format_usage
     from cyclopts.help.formatters.html import HtmlFormatter, _escape_html, _extract_plain_text
 
+    # Initialize command chain if not provided
+    if command_chain is None:
+        command_chain = []
+
     # Build the main documentation
     lines = []
 
-    # Start main content div
-    lines.append('<div class="cli-documentation">')
+    # Only add the outer div for standalone documents or root level
+    if standalone or not command_chain:
+        lines.append('<div class="cli-documentation">')
 
-    # Add main title and description
-    app_name = app.name[0] if app._name else Path(sys.argv[0]).name
-    lines.append(f'<h{heading_level} class="app-title">{_escape_html(app_name)}</h{heading_level}>')
+    # Determine the app name and full command path
+    if not command_chain:
+        # Root level - use app name or derive from sys.argv
+        app_name = app.name[0] if app._name else Path(sys.argv[0]).name
+        full_command = app_name
+        title = app_name
+        lines.append(f'<h{heading_level} class="app-title">{title}</h{heading_level}>')
+    else:
+        # Nested command - build full path
+        app_name = command_chain[0] if command_chain else app.name[0]
+        full_command = " ".join(command_chain)
+        # Create anchor-friendly ID
+        anchor_id = f"{app_name}-{'-'.join(command_chain[1:])}"
+        anchor_id = anchor_id.lower().replace(" ", "-")
+        lines.append('<section class="command-section">')
+        lines.append(
+            f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{_escape_html(full_command)}</code></h{heading_level}>'
+        )
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
@@ -238,6 +409,15 @@ def generate_html_docs(
         if desc_text:
             lines.append(f'<div class="app-description">{_escape_html(desc_text)}</div>')
 
+    # Generate table of contents if this is the root level and has commands
+    if generate_toc and not command_chain and app._commands:
+        lines.append('<div class="table-of-contents">')
+        lines.append("<h2>Table of Contents</h2>")
+        lines.append("<ul>")
+        _generate_html_toc(lines, app, include_hidden, app_name, "", 0)
+        lines.append("</ul>")
+        lines.append("</div>")
+
     # Add usage section if not suppressed
     if app.usage is None:
         usage = format_usage(app, [])
@@ -245,6 +425,17 @@ def generate_html_docs(
             lines.append(f"<h{heading_level + 1}>Usage</h{heading_level + 1}>")
             lines.append('<div class="usage-block">')
             usage_text = _extract_plain_text(usage, None)
+            # Format usage with correct command path
+            if "Usage:" in usage_text:
+                usage_text = usage_text.replace("Usage: ", "")
+            # Build proper command path
+            parts = usage_text.split(" ", 1)
+            if len(parts) > 1 and not command_chain:
+                usage_text = f"$ {app_name} {parts[1]}"
+            elif command_chain:
+                usage_text = f"$ {full_command} {parts[1] if len(parts) > 1 else ''}".strip()
+            else:
+                usage_text = f"$ {usage_text}" if not usage_text.startswith("$") else usage_text
             lines.append(f'<pre class="usage">{_escape_html(usage_text)}</pre>')
             lines.append("</div>")
     elif app.usage:  # Non-empty custom usage
@@ -260,6 +451,8 @@ def generate_html_docs(
     formatter = HtmlFormatter(
         heading_level=heading_level + 1,
         include_hidden=include_hidden,
+        app_name=app_name,
+        command_chain=command_chain,
     )
     formatter.reset()
     for group, panel in help_panels_with_groups:
@@ -294,10 +487,19 @@ def generate_html_docs(
                 if not include_hidden and not subapp.show:
                     continue
 
+                # Build the command chain for this subcommand
+                sub_command_chain = command_chain + [name] if command_chain else [app_name, name]
+
                 # Generate subcommand documentation
                 lines.append('<section class="command-section">')
+                # Create anchor-friendly ID
+                anchor_id = (
+                    f"{app_name}-{'-'.join(sub_command_chain[1:])}".lower()
+                    if len(sub_command_chain) > 1
+                    else f"{app_name}-{name}".lower()
+                )
                 lines.append(
-                    f'<h{heading_level + 1} class="command-title">Command: {_escape_html(name)}</h{heading_level + 1}>'
+                    f'<h{heading_level + 1} id="{anchor_id}" class="command-title"><code>{_escape_html(" ".join(sub_command_chain))}</code></h{heading_level + 1}>'
                 )
 
                 # Get subapp help
@@ -316,8 +518,17 @@ def generate_html_docs(
                             lines.append(f"<h{heading_level + 2}>Usage</h{heading_level + 2}>")
                             lines.append('<div class="usage-block">')
                             sub_usage_text = _extract_plain_text(sub_usage, None)
-                            escaped_usage = _escape_html(sub_usage_text.replace(subapp.name[0], f"{app_name} {name}"))
-                            lines.append(f'<pre class="usage">{escaped_usage}</pre>')
+                            # Format usage with full command path
+                            if "Usage:" in sub_usage_text:
+                                sub_usage_text = sub_usage_text.replace("Usage: ", "")
+                            # Build the full command path for usage
+                            usage_parts = sub_usage_text.split(" ", 1)
+                            full_cmd = " ".join(sub_command_chain)
+                            if len(usage_parts) > 1:
+                                sub_usage_text = f"$ {full_cmd} {usage_parts[1]}"
+                            else:
+                                sub_usage_text = f"$ {full_cmd}"
+                            lines.append(f'<pre class="usage">{_escape_html(sub_usage_text)}</pre>')
                             lines.append("</div>")
                     elif subapp.usage:
                         lines.append(f"<h{heading_level + 2}>Usage</h{heading_level + 2}>")
@@ -334,6 +545,8 @@ def generate_html_docs(
                         sub_formatter = HtmlFormatter(
                             heading_level=heading_level + 2,
                             include_hidden=include_hidden,
+                            app_name=app_name,
+                            command_chain=sub_command_chain,
                         )
                         for sub_group, sub_panel in sub_panels:
                             if not include_hidden and sub_group and not sub_group.show:
@@ -371,6 +584,8 @@ def generate_html_docs(
                                 if isinstance(nested_app, type(app)):  # Check if it's an App instance
                                     if not include_hidden and not nested_app.show:
                                         continue
+                                    # Build nested command chain
+                                    nested_chain = sub_command_chain + [nested_name]
                                     # Recursively generate docs for nested commands
                                     nested_docs = generate_html_docs(
                                         nested_app,
@@ -379,17 +594,23 @@ def generate_html_docs(
                                         heading_level=heading_level + 2,
                                         standalone=False,  # Not standalone for nested
                                         custom_css=None,
-                                    )
-                                    # Update the title
-                                    nested_docs = nested_docs.replace(
-                                        f'<h{heading_level + 2} class="app-title">{_escape_html(nested_app.name[0] if nested_app._name else nested_name)}</h{heading_level + 2}>',
-                                        f'<h{heading_level + 2} class="command-title">Command: {_escape_html(nested_name)}</h{heading_level + 2}>',
+                                        command_chain=nested_chain,  # Pass the command chain
+                                        generate_toc=False,  # No TOC for nested commands
                                     )
                                     lines.append(nested_docs)
 
+                # Add back to top link if we're in a nested section
+                if command_chain:
+                    lines.append('<a href="#top" class="back-to-top">↑ Back to top</a>')
                 lines.append("</section>")
 
-    lines.append("</div>")  # Close cli-documentation div
+    # Close section if nested command
+    if command_chain:
+        lines.append("</section>")
+
+    # Only close cli-documentation div for standalone or root
+    if standalone or not command_chain:
+        lines.append("</div>")  # Close cli-documentation div
 
     # Join all lines into body content
     body_content = "\n".join(lines)
@@ -407,7 +628,7 @@ def generate_html_docs(
 {css}
     </style>
 </head>
-<body>
+<body id="top">
 {body_content}
 </body>
 </html>"""

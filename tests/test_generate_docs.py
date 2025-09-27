@@ -33,18 +33,19 @@ def test_generate_docs_simple_app():
 
         A simple CLI application
 
-        ## Usage
+        **Usage**:
 
+        ```console
+        $ myapp [ARGS] [OPTIONS]
         ```
-        Usage: myapp [ARGS] [OPTIONS]
-        ```
 
-        ## Parameters
+        **Arguments**:
 
-        | Required | Parameter | Description |
-        | :------: | --------- | ----------- |
-        | ✓ | `NAME`, `--name` | Your name.<br><br>Type: `<class 'str'>` |
-        |  | `VERBOSE`, `--verbose`, `--no-verbose` | Enable verbose output.<br><br>Type: `<class 'bool'>`<br>Default: `False` |
+        * `NAME`: Your name.  [required]
+
+        **Options**:
+
+        * `VERBOSE, --verbose, --no-verbose`: Enable verbose output.  [default: --no-verbose]
         """
     )
 
@@ -84,25 +85,25 @@ def test_generate_docs_with_commands():
     assert "CLI with commands" in actual
 
     # Main usage section
-    assert "## Usage" in actual
-    assert "Usage: myapp COMMAND" in actual
+    assert "**Usage**:" in actual
+    assert "$ myapp COMMAND" in actual
 
-    # Commands table
-    assert "## Commands" in actual
-    assert "| `build` | Build the project. |" in actual
-    assert "| `serve` | Start the server. |" in actual
+    # Commands list
+    assert "**Commands**:" in actual
+    assert "* `build`: Build the project." in actual
+    assert "* `serve`: Start the server." in actual
 
     # Serve command details
-    assert "## Command: serve" in actual
+    assert "## `myapp serve`" in actual
     assert "Start the server." in actual
-    assert "### Usage" in actual
-    assert "### Parameters" in actual
-    assert "| `PORT`, `--port` | Port number.<br><br>Type: `<class 'int'>`<br>Default: `8000` |" in actual
+    assert "**Usage**:" in actual
+    assert "**Options**:" in actual
+    assert "* `PORT, --port INT`: Port number.  [default: 8000]" in actual
 
     # Build command details
-    assert "## Command: build" in actual
+    assert "## `myapp build`" in actual
     assert "Build the project." in actual
-    assert "| `OUTPUT`, `--output` | Output directory.<br><br>Type: `<class 'str'>`<br>Default: `./dist` |" in actual
+    assert "* `OUTPUT, --output STR`: Output directory.  [default: ./dist]" in actual
 
 
 def test_generate_docs_recursive():
@@ -134,7 +135,7 @@ def test_generate_docs_recursive():
     # Verify structure of recursive documentation
     assert "# myapp" in actual
     assert "Main app" in actual
-    assert "## Command: db" in actual
+    assert "## `myapp db`" in actual
     assert "Database commands" in actual
     assert "migrate" in actual
     assert "backup" in actual
@@ -163,26 +164,29 @@ def test_generate_docs_non_recursive():
 
         Main app
 
-        ## Usage
+        ## Table of Contents
 
+        - [`db`](#myapp-db)
+          - [`migrate`](#myapp-db-migrate)
+
+        **Usage**:
+
+        ```console
+        $ myapp COMMAND
         ```
-        Usage: myapp COMMAND
-        ```
 
-        ## Commands
+        **Commands**:
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `db` | Database commands |
+        * `db`: Database commands
 
-        ## Command: db
+        ## `myapp db`
 
         Database commands
 
-        ### Usage
+        **Usage**:
 
-        ```
-        Usage: myapp db COMMAND
+        ```console
+        $ myapp db COMMAND
         ```
         """
     )

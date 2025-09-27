@@ -28,6 +28,54 @@ def _escape_html(text: Optional[str]) -> str:
     return html.escape(text)
 
 
+def _format_type_name(type_obj: Any) -> str:
+    """Format a type object into a readable string.
+
+    Parameters
+    ----------
+    type_obj : Any
+        Type object to format.
+
+    Returns
+    -------
+    str
+        Formatted type name.
+    """
+    if type_obj is None:
+        return ""
+
+    # Extract plain text if it's a Rich object
+    if hasattr(type_obj, "plain"):
+        type_str = type_obj.plain.rstrip()
+    elif hasattr(type_obj, "__rich_console__"):
+        type_str = _extract_plain_text(type_obj, None)
+    else:
+        type_str = str(type_obj)
+
+    # Clean up the type string
+    type_str = type_str.replace("<class '", "").replace("'>", "")
+
+    # Handle Optional types
+    if type_str.startswith("typing.Optional["):
+        inner_type = type_str[16:-1]  # Remove "typing.Optional[" and "]"
+        return f"Optional[{inner_type}]"
+    elif type_str.startswith("Optional["):
+        return type_str
+
+    # Handle Union types
+    if type_str.startswith("typing.Union["):
+        inner_types = type_str[13:-1]  # Remove "typing.Union[" and "]"
+        return f"Union[{inner_types}]"
+    elif type_str.startswith("Union["):
+        return type_str
+
+    # Handle List/Dict/etc
+    if type_str.startswith("typing."):
+        return type_str[7:]  # Remove "typing." prefix
+
+    return type_str
+
+
 def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
     """Extract plain text from Rich renderables or any object.
 
@@ -84,15 +132,23 @@ class HtmlFormatter:
         E.g., 2 produces "<h2>Commands</h2>", 3 produces "<h3>Commands</h3>".
     include_hidden : bool
         Include hidden commands/parameters in documentation (default: False).
+    app_name : str
+        The root application name for generating anchor IDs.
+    command_chain : list[str]
+        The current command chain for generating anchor IDs.
     """
 
     def __init__(
         self,
         heading_level: int = 2,
         include_hidden: bool = False,
+        app_name: Optional[str] = None,
+        command_chain: Optional[list[str]] = None,
     ):
         self.heading_level = heading_level
         self.include_hidden = include_hidden
+        self.app_name = app_name
+        self.command_chain = command_chain or []
         self._output = io.StringIO()
 
     def reset(self) -> None:
@@ -164,11 +220,8 @@ class HtmlFormatter:
         if not entries:
             return
 
-        self._output.write('<table class="commands-table">\n')
-        self._output.write("<thead>\n")
-        self._output.write("<tr><th>Command</th><th>Description</th></tr>\n")
-        self._output.write("</thead>\n")
-        self._output.write("<tbody>\n")
+        # Use list format instead of table
+        self._output.write('<ul class="commands-list">\n')
 
         for entry in entries:
             # Get command name(s)
@@ -178,13 +231,36 @@ class HtmlFormatter:
             if entry.shorts:
                 names.extend(entry.shorts)
 
-            name_html = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names) if names else ""
+            # Generate anchor link if we have app context
+            if self.app_name and names:
+                # Build the anchor ID for this command
+                primary_name = names[0]
+                if self.command_chain:
+                    # We're in a subcommand, build full chain
+                    full_chain = self.command_chain + [primary_name]
+                    anchor_id = f"{self.app_name}-{'-'.join(full_chain[1:])}".lower()
+                else:
+                    # Top-level command
+                    anchor_id = f"{self.app_name}-{primary_name}".lower()
+
+                # Create linked command name
+                name_html = f'<a href="#{anchor_id}"><code>{_escape_html(primary_name)}</code></a>'
+                if len(names) > 1:
+                    # Add aliases
+                    aliases = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names[1:])
+                    name_html = f"{name_html}, {aliases}"
+            else:
+                # Fallback to non-linked format
+                name_html = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names) if names else ""
+
             desc_html = _escape_html(_extract_plain_text(entry.description, console))
 
-            self._output.write(f"<tr><td>{name_html}</td><td>{desc_html}</td></tr>\n")
+            self._output.write(f"<li><strong>{name_html}</strong>")
+            if desc_html:
+                self._output.write(f": {desc_html}")
+            self._output.write("</li>\n")
 
-        self._output.write("</tbody>\n")
-        self._output.write("</table>\n")
+        self._output.write("</ul>\n")
 
     def _format_parameter_panel(self, entries: list["HelpEntry"], console: Optional["Console"]) -> None:
         """Format parameter entries as HTML.
@@ -199,71 +275,112 @@ class HtmlFormatter:
         if not entries:
             return
 
-        # Determine which columns we need
-        has_required = any(e.required for e in entries)
-
-        self._output.write('<table class="parameters-table">\n')
-        self._output.write("<thead>\n")
-        self._output.write("<tr>")
-        if has_required:
-            self._output.write('<th class="required-col">Required</th>')
-        self._output.write("<th>Parameter</th><th>Description</th></tr>\n")
-        self._output.write("</thead>\n")
-        self._output.write("<tbody>\n")
+        # Use list format instead of table
+        self._output.write('<ul class="parameters-list">\n')
 
         for entry in entries:
-            # Build parameter names
+            # Build parameter names - prefer negatives for boolean defaults
             names = []
             if entry.names:
                 names.extend(entry.names)
             if entry.shorts:
                 names.extend(entry.shorts)
 
-            name_html = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names) if names else ""
+            # Check if this is a boolean flag with a default
+            default_str = _extract_plain_text(entry.default, console) if entry.default is not None else None
+            is_bool_flag = False
 
-            # Build description with metadata
-            desc_parts = []
+            # Look for --no- prefixed names to determine if this is a boolean flag
+            if names:
+                has_positive = any(not n.startswith("--no-") and n.startswith("--") for n in names)
+                has_negative = any(n.startswith("--no-") for n in names)
+                is_bool_flag = has_positive and has_negative
+
+                if is_bool_flag and default_str in ["True", "enabled"]:
+                    # Prefer showing the negative flag when default is True
+                    names = [n for n in names if n.startswith("--no-")] + [
+                        n for n in names if not n.startswith("--no-")
+                    ]
+                elif is_bool_flag and default_str in ["False", "disabled"]:
+                    # Prefer showing the positive flag when default is False
+                    names = [n for n in names if not n.startswith("--no-")] + [
+                        n for n in names if n.startswith("--no-")
+                    ]
+
+            # Format name with code tags
+            if names:
+                # For boolean flags, show both but emphasize the preferred one
+                if is_bool_flag and len(names) >= 2:
+                    name_html = f"<code>{_escape_html(names[0])}</code>, <code>{_escape_html(names[1])}</code>"
+                else:
+                    name_html = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names)
+            else:
+                name_html = ""
+
+            # Start list item (no type display)
+            self._output.write(f"<li><strong>{name_html}</strong>")
+
+            # Add description
             desc = _extract_plain_text(entry.description, console)
             if desc:
-                desc_parts.append(_escape_html(desc))
+                self._output.write(f": {_escape_html(desc)}")
 
-            # Add metadata as a list
-            metadata = []
-            if entry.type:
-                type_str = _extract_plain_text(entry.type, console)
-                if type_str:
-                    metadata.append(f"Type: <code>{_escape_html(type_str)}</code>")
+            # Add metadata as styled badges
+            metadata_items = []
 
+            # Add required marker
+            if entry.required:
+                metadata_items.append('<span class="metadata-item metadata-required">Required</span>')
+
+            # Add choices
             if entry.choices:
-                choices_html = ", ".join(f"<code>{_escape_html(str(c))}</code>" for c in entry.choices)
-                metadata.append(f"Choices: {choices_html}")
+                choices_str = ", ".join(f"<code>{_escape_html(str(c))}</code>" for c in entry.choices)
+                metadata_items.append(
+                    f'<span class="metadata-item metadata-choices"><span class="metadata-label">choices:</span> {choices_str}</span>'
+                )
 
+            # Add default - format boolean defaults specially
+            if default_str is not None:
+                if is_bool_flag:
+                    # For boolean flags, show which flag is the default
+                    if default_str in ["True", "enabled"]:
+                        # Find the positive flag name
+                        positive_flag = next(
+                            (n for n in names if not n.startswith("--no-") and n.startswith("--")),
+                            names[0] if names else "--flag",
+                        )
+                        metadata_items.append(
+                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(positive_flag)}</code></span>'
+                        )
+                    elif default_str in ["False", "disabled"]:
+                        # Find the negative flag name
+                        negative_flag = next((n for n in names if n.startswith("--no-")), "--no-flag")
+                        metadata_items.append(
+                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(negative_flag)}</code></span>'
+                        )
+                    else:
+                        metadata_items.append(
+                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(default_str)}</code></span>'
+                        )
+                else:
+                    metadata_items.append(
+                        f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(default_str)}</code></span>'
+                    )
+
+            # Add environment variable
             if entry.env_var:
                 env_html = ", ".join(f"<code>{_escape_html(e)}</code>" for e in entry.env_var)
-                metadata.append(f"Environment: {env_html}")
+                metadata_items.append(
+                    f'<span class="metadata-item metadata-env"><span class="metadata-label">env:</span> {env_html}</span>'
+                )
 
-            if entry.default is not None:
-                default_str = _extract_plain_text(entry.default, console)
-                metadata.append(f"Default: <code>{_escape_html(default_str)}</code>")
+            # Write metadata
+            if metadata_items:
+                self._output.write(f'<span class="parameter-metadata">{"".join(metadata_items)}</span>')
 
-            # Combine description and metadata
-            full_desc = desc_parts[0] if desc_parts else ""
-            if metadata:
-                metadata_html = "<br>".join(metadata)
-                if full_desc:
-                    full_desc += "<br><br>" + metadata_html
-                else:
-                    full_desc = metadata_html
+            self._output.write("</li>\n")
 
-            # Write table row
-            self._output.write("<tr>")
-            if has_required:
-                required_marker = "✓" if entry.required else ""
-                self._output.write(f'<td class="required-cell">{required_marker}</td>')
-            self._output.write(f"<td>{name_html}</td><td>{full_desc}</td></tr>\n")
-
-        self._output.write("</tbody>\n")
-        self._output.write("</table>\n")
+        self._output.write("</ul>\n")
 
     def render_usage(
         self,
