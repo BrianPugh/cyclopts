@@ -139,17 +139,17 @@ Add a prefix to all command headings in the generated documentation:
 
 This will prefix all command headings with "Command:" (e.g., "Command: deploy", "Command: init"). Useful for consistent formatting or when integrating CLI docs with other content.
 
-``:generate-anchors:`` - Generate Reference Labels
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Automatic Reference Labels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Generate RST reference labels for cross-referencing commands:
+The Sphinx directive automatically generates RST reference labels for all commands, enabling cross-referencing throughout your documentation. The anchor format is ``cyclopts-{app-name}-{command-path}``, which prevents naming conflicts when documenting multiple CLIs.
 
-.. code-block:: rst
+For example:
+- Root application: ``cyclopts-myapp``
+- Subcommand: ``cyclopts-myapp-deploy``
+- Nested subcommand: ``cyclopts-myapp-deploy-production``
 
-   .. cyclopts:: mypackage.cli:app
-      :generate-anchors: true
-
-This creates RST labels like ``.. _cli-command-name:`` before each command, allowing you to reference them elsewhere in your documentation using ``:ref:`cli-command-name```. The anchor names are derived from the full command path (e.g., ``cli-deploy-production`` for "deploy production" subcommand).
+You can reference these commands elsewhere in your documentation using ``:ref:`cyclopts-myapp-deploy```.
 
 ``:no-root-title:`` - Skip Root Application Title
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -275,18 +275,17 @@ When you want each command to have its own distinct heading for better navigatio
       :prog: myapp
       :flatten-commands: true
       :command-prefix: "Command: "
-      :generate-anchors: true
 
    This generates:
 
    - All commands at the same heading level (not nested)
    - Each command prefixed with "Command: "
-   - Reference labels for cross-linking
+   - Automatic reference labels for cross-linking
 
    You can then reference specific commands:
 
-   See :ref:`cli-deploy` for deployment options.
-   The :ref:`cli-init` command sets up your project.
+   See :ref:`cyclopts-myapp-deploy` for deployment options.
+   The :ref:`cyclopts-myapp-init` command sets up your project.
 
 Output Formats
 --------------

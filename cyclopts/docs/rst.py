@@ -104,7 +104,6 @@ def generate_rst_docs(
     generate_toc: bool = True,
     flatten_commands: bool = False,
     command_prefix: str = "",
-    generate_anchors: bool = False,
     no_root_title: bool = False,
     sections_only: bool = False,
 ) -> str:
@@ -135,9 +134,6 @@ def generate_rst_docs(
     command_prefix : str
         Prefix to add to command headings (e.g., "Command: ").
         Default is empty string.
-    generate_anchors : bool
-        If True, generate RST reference labels for cross-referencing.
-        Default is False.
     no_root_title : bool
         If True, skip generating the root application title.
         Useful when embedding in existing documentation with its own title.
@@ -182,12 +178,18 @@ def generate_rst_docs(
     if command_prefix:
         title = f"{command_prefix}{title}"
 
-    # Generate RST anchor/label if requested
-    if generate_anchors:
-        # Create a safe anchor name from the command path
-        anchor_name = full_command.replace(" ", "-").replace("/", "-").lower()
-        lines.append(f".. _cli-{anchor_name}:")
-        lines.append("")
+    # Always generate RST anchor/label with improved namespacing
+    # Create a safe anchor name from the app name and command path
+    anchor_parts = ["cyclopts"]
+    if command_chain:
+        # For subcommands, include the full hierarchy
+        anchor_parts.extend(command_chain)
+    else:
+        # For root, just use the app name
+        anchor_parts.append(app_name)
+    anchor_name = "-".join(anchor_parts).replace(" ", "-").replace("/", "-").lower()
+    lines.append(f".. _{anchor_name}:")
+    lines.append("")
 
     # Determine effective heading level for this command
     if no_root_title and not command_chain:
@@ -445,7 +447,6 @@ def generate_rst_docs(
                 generate_toc=False,  # Only generate TOC at root level
                 flatten_commands=flatten_commands,
                 command_prefix=command_prefix,
-                generate_anchors=generate_anchors,
                 no_root_title=False,  # Subcommands should have titles
                 sections_only=sections_only,  # Propagate sections_only mode
             )

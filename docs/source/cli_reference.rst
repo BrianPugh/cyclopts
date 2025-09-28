@@ -8,6 +8,5 @@ The ``cyclopts`` package includes a command-line interface for various developme
    :prog: cyclopts
    :heading-level: 2
    :flatten-commands:
-   :generate-anchors:
    :sections-only:
    :no-root-title:

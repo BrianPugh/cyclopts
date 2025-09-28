@@ -377,8 +377,8 @@ def hello():
         finally:
             sys.path.remove(str(tmp_path))
 
-    def test_generate_anchors_option(self, tmp_path):
-        """Test generate-anchors option creates RST reference labels."""
+    def test_automatic_anchors(self, tmp_path):
+        """Test that RST reference labels are automatically generated."""
         module_file = tmp_path / "test_anchors_module.py"
         module_file.write_text("""from cyclopts import App
 
@@ -403,7 +403,7 @@ def action():
             directive = CycloptsDirective(
                 name="cyclopts",
                 arguments=["test_anchors_module:app"],
-                options={"generate-anchors": True, "recursive": True},
+                options={"recursive": True},  # No generate-anchors option needed
                 content=StringList(),
                 lineno=1,
                 content_offset=0,
@@ -415,15 +415,16 @@ def action():
             result = directive.run()
             assert len(result) == 1
 
-            # Check that anchors are generated
+            # Check that anchors are automatically generated with new format
             call_args = mock_state.nested_parse.call_args
             rst_lines = call_args[0][0]
             rst_content = "\n".join(rst_lines)
 
-            # Should contain RST reference labels
-            assert ".. _cli-" in rst_content
+            # Should contain RST reference labels with new format
+            assert ".. _cyclopts-test-cli:" in rst_content
             # Check for the subcommand anchor
-            assert "sub" in rst_content
+            assert ".. _cyclopts-test-cli-sub:" in rst_content
+            assert ".. _cyclopts-test-cli-sub-action:" in rst_content
 
         finally:
             sys.path.remove(str(tmp_path))

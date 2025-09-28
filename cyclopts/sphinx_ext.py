@@ -72,7 +72,6 @@ class DirectiveOptions:
     include_hidden: bool = False
     flatten_commands: bool = False
     command_prefix: str = ""
-    generate_anchors: bool = False
     no_root_title: bool = False
     sections_only: bool = False
 
@@ -86,7 +85,6 @@ class DirectiveOptions:
             include_hidden="include-hidden" in options,
             flatten_commands="flatten-commands" in options,
             command_prefix=options.get("command-prefix", ""),
-            generate_anchors="generate-anchors" in options,
             no_root_title="no-root-title" in options,
             sections_only="sections-only" in options,
         )
@@ -222,7 +220,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             "include-hidden": directives.flag,
             "flatten-commands": directives.flag,
             "command-prefix": directives.unchanged,
-            "generate-anchors": directives.flag,
             "no-root-title": directives.flag,
             "sections-only": directives.flag,
         }
@@ -263,7 +260,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
                 heading_level=opts.heading_level,
                 flatten_commands=opts.flatten_commands,
                 command_prefix=opts.command_prefix,
-                generate_anchors=opts.generate_anchors,
                 no_root_title=opts.no_root_title,
                 sections_only=opts.sections_only,
             )

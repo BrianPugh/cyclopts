@@ -1867,7 +1867,6 @@ class App:
         heading_level: int = 1,
         flatten_commands: bool = False,
         command_prefix: str = "",
-        generate_anchors: bool = False,
         no_root_title: bool = False,
         sections_only: bool = False,
     ) -> str:
@@ -1893,9 +1892,6 @@ class App:
         command_prefix : str
             Prefix to add to command headings (e.g., "Command: ").
             Default is empty string.
-        generate_anchors : bool
-            If True, generate RST reference labels for cross-referencing (RST only).
-            Default is False.
         no_root_title : bool
             If True, skip generating the root application title.
             Useful when embedding in existing documentation with its own title.
@@ -1958,7 +1954,6 @@ class App:
                 heading_level=heading_level,
                 flatten_commands=flatten_commands,
                 command_prefix=command_prefix,
-                generate_anchors=generate_anchors,
                 no_root_title=no_root_title,
                 sections_only=sections_only,
             )
