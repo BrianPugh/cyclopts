@@ -96,6 +96,28 @@ class DirectiveOptions:
 
         return cls(**kwargs)
 
+    @staticmethod
+    def spec() -> Dict[str, Any]:
+        """Generate Sphinx option_spec from DirectiveOptions fields."""
+        if not SPHINX_AVAILABLE:
+            return {}
+
+        from docutils.parsers.rst import directives
+
+        type_mapping = {
+            bool: directives.flag,
+            int: directives.nonnegative_int,
+            str: directives.unchanged,
+        }
+
+        option_spec = {}
+        for field in attrs.fields(DirectiveOptions):
+            option_name = field.name.replace("_", "-")
+            validator = type_mapping.get(field.type, directives.unchanged)
+            option_spec[option_name] = validator
+
+        return option_spec
+
 
 def _process_rst_content(content: str, skip_title: bool = False) -> List[str]:
     """Process RST content to remove problematic elements."""
@@ -216,19 +238,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
     required_arguments = 1
     optional_arguments = 0
     final_argument_whitespace = False
-
-    if SPHINX_AVAILABLE:
-        from docutils.parsers.rst import directives
-
-        option_spec = {
-            "heading-level": directives.nonnegative_int,
-            "no-recursive": directives.flag,
-            "include-hidden": directives.flag,
-            "flatten-commands": directives.flag,
-            "command-prefix": directives.unchanged,
-        }
-    else:
-        option_spec = {}
+    option_spec = DirectiveOptions.spec()
 
     def run(self) -> List["nodes.Node"]:
         """Generate documentation nodes for the Cyclopts app."""
