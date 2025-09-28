@@ -1,8 +1,9 @@
 """Sphinx extension for automatic Cyclopts CLI documentation."""
 
 import importlib
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List
+
+import attrs
 
 if TYPE_CHECKING:
     from docutils import nodes
@@ -62,26 +63,38 @@ def _import_app(module_path: str) -> Any:
     raise AttributeError(f"No Cyclopts App found in '{module_name}'. Specify explicitly: '{module_name}:app_name'")
 
 
-@dataclass
+@attrs.define(kw_only=True)
 class DirectiveOptions:
     """Configuration for the Cyclopts directive."""
 
     heading_level: int = 2
-    recursive: bool = True
+    command_prefix: str = ""
+
+    # All booleans must have ``False`` default.
+    no_recursive: bool = False
     include_hidden: bool = False
     flatten_commands: bool = False
-    command_prefix: str = ""
 
     @classmethod
     def from_dict(cls, options: dict) -> "DirectiveOptions":
         """Create options from directive options dictionary."""
-        return cls(
-            heading_level=options.get("heading-level", 2),
-            recursive="recursive" in options if "recursive" in options else True,
-            include_hidden="include-hidden" in options,
-            flatten_commands="flatten-commands" in options,
-            command_prefix=options.get("command-prefix", ""),
-        )
+        kwargs = {}
+        for field in attrs.fields(cls):
+            # Convert underscore to dash for looking up in options
+            option_name = field.name.replace("_", "-")
+
+            if field.type is bool:
+                # For boolean fields using directives.flag, presence means True
+                # The value is None when present, absent from dict when not specified
+                if option_name in options:
+                    kwargs[field.name] = True
+                # Use default value if not specified
+            elif option_name in options:
+                # For non-boolean fields, get the value from options
+                kwargs[field.name] = options[option_name]
+            # If not specified, the dataclass default will be used
+
+        return cls(**kwargs)
 
 
 def _process_rst_content(content: str, skip_title: bool = False) -> List[str]:
@@ -209,7 +222,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
 
         option_spec = {
             "heading-level": directives.nonnegative_int,
-            "recursive": directives.flag,
+            "no-recursive": directives.flag,
             "include-hidden": directives.flag,
             "flatten-commands": directives.flag,
             "command-prefix": directives.unchanged,
@@ -242,7 +255,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         # Call generate_rst_docs directly to access internal no_root_title parameter
         return generate_rst_docs(
             app,
-            recursive=opts.recursive,
+            recursive=not opts.no_recursive,
             include_hidden=opts.include_hidden,
             heading_level=opts.heading_level,
             flatten_commands=opts.flatten_commands,
