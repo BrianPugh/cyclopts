@@ -72,7 +72,6 @@ class DirectiveOptions:
     include_hidden: bool = False
     flatten_commands: bool = False
     command_prefix: str = ""
-    sections_only: bool = False
 
     @classmethod
     def from_dict(cls, options: dict) -> "DirectiveOptions":
@@ -84,7 +83,6 @@ class DirectiveOptions:
             include_hidden="include-hidden" in options,
             flatten_commands="flatten-commands" in options,
             command_prefix=options.get("command-prefix", ""),
-            sections_only="sections-only" in options,
         )
 
 
@@ -218,7 +216,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             "include-hidden": directives.flag,
             "flatten-commands": directives.flag,
             "command-prefix": directives.unchanged,
-            "sections-only": directives.flag,
         }
     else:
         option_spec = {}
@@ -261,7 +258,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
                 flatten_commands=opts.flatten_commands,
                 command_prefix=opts.command_prefix,
                 no_root_title=True,  # Always skip root title in Sphinx context
-                sections_only=opts.sections_only,
+                sections_only=True,  # Always use sections-only mode for better Sphinx integration
             )
         finally:
             if original_name is not None:
@@ -272,17 +269,10 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         if not SPHINX_AVAILABLE:
             return []
 
-        from docutils import nodes
-        from docutils.statemachine import StringList
-
         lines = _process_rst_content(rst_content, skip_title=False)  # Title already skipped in generate_docs
 
-        if opts.sections_only:
-            return _create_section_nodes(lines, self.state)
-
-        container = nodes.container()
-        self.state.nested_parse(StringList(lines), 0, container)
-        return [container]
+        # Always use section nodes for better Sphinx integration
+        return _create_section_nodes(lines, self.state)
 
     def _error_node(self, message: str) -> List["nodes.Node"]:
         """Create an error node with the given message."""
