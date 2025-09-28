@@ -10,6 +10,19 @@ from cyclopts.parameter import Parameter
 from cyclopts.utils import UNSET
 
 
+def _canonicalize_format(format_value: str) -> Literal["markdown", "html", "rst"]:
+    """Canonicalize format aliases to standard format names."""
+    format_lower = format_value.lower()
+    if format_lower in ("md", "markdown"):
+        return "markdown"
+    elif format_lower in ("html", "htm"):
+        return "html"
+    elif format_lower in ("rst", "rest", "restructuredtext"):
+        return "rst"
+    else:
+        raise ValueError(f'Unsupported format "{format_value}". Supported formats: markdown, html, rst')
+
+
 def _format_group_validator(argument_collection):
     format_arg = argument_collection.get("--format")
     output_arg = argument_collection.get("--output")
@@ -39,7 +52,10 @@ def generate_docs(
     script: str,
     output: Annotated[Optional[Path], Parameter(group=format_group)] = None,
     *,
-    format: Annotated[Optional[Literal["markdown", "html", "rst"]], Parameter(group=format_group)] = None,
+    format: Annotated[
+        Optional[Literal["markdown", "md", "html", "htm", "rst", "rest", "restructuredtext"]],
+        Parameter(group=format_group),
+    ] = None,
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
@@ -54,8 +70,9 @@ def generate_docs(
         script's global namespace.
     output : Optional[Path]
         Output file path. If not specified, prints to stdout.
-    format : Optional[Literal["markdown", "html", "rst"]]
-        Output format for documentation. If not specified, inferred from output
+    format : Optional[Literal["markdown", "md", "html", "htm", "rst", "rest", "restructuredtext"]]
+        Output format for documentation. Accepts "markdown"/"md", "html"/"htm",
+        or "rst"/"rest"/"restructuredtext". If not specified, inferred from output
         file extension (.md/.markdown for markdown, .html/.htm for html,
         .rst/.rest for reStructuredText).
     recursive : bool
@@ -66,11 +83,8 @@ def generate_docs(
         Starting heading level for markdown format.
     """
     assert format is not None  # Handled by _format_group_validator
-
-    # Load the App object from the script
+    format = _canonicalize_format(format)
     app_obj, _ = load_app_from_script(script)
-
-    # Generate documentation
     docs_content = app_obj.generate_docs(
         output_format=format,
         recursive=recursive,
