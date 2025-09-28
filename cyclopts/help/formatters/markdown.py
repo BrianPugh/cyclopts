@@ -113,7 +113,7 @@ def _format_type_name(type_obj: Any) -> str:
     return type_str
 
 
-def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
+def _extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
     """Extract plain text from Rich renderables or any object.
 
     Parameters
@@ -122,6 +122,9 @@ def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
         Object to convert to plain text.
     console : Optional[Console]
         Console for rendering Rich objects.
+    preserve_markup : bool
+        If True, preserve original markdown/RST markup when available.
+        Should be True when input and output formats match.
 
     Returns
     -------
@@ -131,9 +134,23 @@ def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
     if obj is None:
         return ""
 
+    # Handle InlineText objects - check if they contain markdown/RST
+    if hasattr(obj, "primary_renderable"):
+        # For InlineText objects, check if the primary renderable has markup and we want to preserve it
+        if preserve_markup and hasattr(obj.primary_renderable, "markup"):
+            # Return the original markdown/RST text preserved in the markup attribute
+            return obj.primary_renderable.markup.rstrip()
+        # Otherwise extract from the primary renderable
+        return _extract_plain_text(obj.primary_renderable, console, preserve_markup=preserve_markup)
+
     # Rich Text objects have a .plain property
     if hasattr(obj, "plain"):
         return obj.plain.rstrip()
+
+    # For Rich Markdown and RST objects, preserve markup only when requested
+    if preserve_markup and hasattr(obj, "markup"):
+        # Return the original markdown/RST text preserved in the markup attribute
+        return obj.markup.rstrip()
 
     # For Rich renderables, extract without styles
     if hasattr(obj, "__rich_console__"):

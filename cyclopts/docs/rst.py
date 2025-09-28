@@ -1,7 +1,5 @@
 """RST documentation generation functions for cyclopts apps."""
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 if TYPE_CHECKING:
@@ -104,6 +102,11 @@ def generate_rst_docs(
     heading_level: int = 1,
     command_chain: Optional[list[str]] = None,
     generate_toc: bool = True,
+    flatten_commands: bool = False,
+    command_prefix: str = "",
+    generate_anchors: bool = False,
+    no_root_title: bool = False,
+    sections_only: bool = False,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -126,6 +129,23 @@ def generate_rst_docs(
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
+    flatten_commands : bool
+        If True, generate all commands at the same heading level instead of nested.
+        Default is False.
+    command_prefix : str
+        Prefix to add to command headings (e.g., "Command: ").
+        Default is empty string.
+    generate_anchors : bool
+        If True, generate RST reference labels for cross-referencing.
+        Default is False.
+    no_root_title : bool
+        If True, skip generating the root application title.
+        Useful when embedding in existing documentation with its own title.
+        Default is False.
+    sections_only : bool
+        If True, generate clean sections for commands with minimal subsections.
+        Renders usage, arguments, and options as content rather than subsections.
+        Default is False.
 
     Returns
     -------
@@ -145,53 +165,129 @@ def generate_rst_docs(
     # Determine the app name and full command path
     if not command_chain:
         # Root level - use app name or derive from sys.argv
-        app_name = app.name[0] if app._name else Path(sys.argv[0]).name
+        app_name = app.name[0]
         full_command = app_name
         title = app_name
     else:
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        title = f"``{full_command}``"
+        # Don't use backticks in sections_only mode - we want real section headers
+        if sections_only:
+            title = full_command
+        else:
+            title = f"``{full_command}``"
+
+    # Add command prefix if specified
+    if command_prefix:
+        title = f"{command_prefix}{title}"
+
+    # Generate RST anchor/label if requested
+    if generate_anchors:
+        # Create a safe anchor name from the command path
+        anchor_name = full_command.replace(" ", "-").replace("/", "-").lower()
+        lines.append(f".. _cli-{anchor_name}:")
+        lines.append("")
+
+    # Determine effective heading level for this command
+    if no_root_title and not command_chain:
+        # Skip title entirely for root when no_root_title is True
+        effective_heading_level = heading_level
+    elif flatten_commands and command_chain:
+        # When flattening, all commands use the same heading level
+        effective_heading_level = heading_level
+    else:
+        # Normal hierarchical: increment level for nested commands
+        effective_heading_level = heading_level + len(command_chain) - 1 if command_chain else heading_level
 
     # Add title
-    header_lines = _make_section_header(title, heading_level)
-    lines.extend(header_lines)
-    lines.append("")
+    if not (no_root_title and not command_chain):
+        header_lines = _make_section_header(title, effective_heading_level)
+        lines.extend(header_lines)
+        lines.append("")
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
     description = format_doc(app, help_format)
     if description:
         # Extract plain text from description
-        desc_text = _extract_plain_text(description, None)
+        # Preserve markup when help_format matches output format (RST)
+        preserve = help_format in ("restructuredtext", "rst")
+        desc_text = _extract_plain_text(description, None, preserve_markup=preserve)
         if desc_text:
             lines.append(desc_text.strip())
             lines.append("")
 
     # Generate table of contents if this is the root level and has commands
-    if generate_toc and not command_chain and app._commands:
+    # Skip TOC when sections_only is enabled (sections integrate with Sphinx's toctree)
+    if generate_toc and not command_chain and app._commands and not sections_only:
         # Collect all commands recursively for TOC
         toc_commands = _collect_commands_for_toc(app, include_hidden=include_hidden)
         if toc_commands:
             _generate_toc_entries(lines, toc_commands, app_name=app_name)
             lines.append("")
 
-    # Add usage section
-    usage_heading = _make_section_header("Usage", heading_level + 1)
-    lines.extend(usage_heading)
-    lines.append("")
+    # Add usage section - only if we have a parent title and not in sections_only mode
+    if not (no_root_title and not command_chain) and not sections_only:
+        usage_heading = _make_section_header("Usage", effective_heading_level + 1)
+        lines.extend(usage_heading)
+        lines.append("")
+    elif sections_only and command_chain:
+        # In sections_only mode, render usage as bold text for subcommands
+        lines.append("**Usage:**")
+        lines.append("")
 
-    # Generate usage line
-    usage = format_usage(app, [])
-    usage_text = _extract_plain_text(usage, None)
-    if usage_text:
-        lines.append("::")
-        lines.append("")
-        # Indent usage text
-        for line in usage_text.split("\n"):
-            lines.append(f"    {line}")
-        lines.append("")
+    # Generate usage line - only if we're documenting a specific command
+    if not (no_root_title and not command_chain):
+        # For subcommands, we need to construct the usage with the full command path
+        if command_chain:
+            # Create a mock usage string with the full command path
+            from rich.text import Text
+
+            from cyclopts.help import format_usage
+
+            usage_parts = ["Usage:"] + list(command_chain)
+
+            # Check if the app has commands
+            if any(app[x].show for x in app._registered_commands):
+                usage_parts.append("COMMAND")
+
+            # Check for arguments/options
+            help_panels_with_groups = app._assemble_help_panels(
+                [], app.app_stack.resolve("help_format", fallback="restructuredtext")
+            )
+            has_args = False
+            has_options = False
+            for _, panel in help_panels_with_groups:
+                if panel.format == "parameter":
+                    for entry in panel.entries:
+                        if entry.required and entry.default is None:
+                            has_args = True
+                        else:
+                            has_options = True
+
+            # Check for default command (only add [ARGS] if no explicit args were found)
+            if app.default_command and not has_args:
+                usage_parts.append("[ARGS]")
+            elif has_args:
+                usage_parts.append("[ARGS]")
+
+            if has_options:
+                usage_parts.append("[OPTIONS]")
+
+            usage = Text(" ".join(usage_parts))
+        else:
+            # Root command - use format_usage normally
+            usage = format_usage(app, [])
+        usage_text = _extract_plain_text(usage, None, preserve_markup=False)
+        if usage_text:
+            # Use literal block with double colon
+            lines.append("::")
+            lines.append("")
+            # Indent usage text with 4 spaces for literal block
+            for line in usage_text.split("\n"):
+                lines.append(f"    {line}")
+            lines.append("")
 
     # Get help panels for the current app
     help_panels_with_groups = app._assemble_help_panels([], help_format)
@@ -251,10 +347,15 @@ def generate_rst_docs(
 
     # Render panels in order: Arguments, Options, Commands
     # Render arguments
-    if argument_panels:
-        arg_heading = _make_section_header("Arguments", heading_level + 1)
-        lines.extend(arg_heading)
-        lines.append("")
+    if argument_panels and not (no_root_title and not command_chain):
+        if sections_only:
+            # In sections_only mode, use bold text instead of subsections
+            lines.append("**Arguments:**")
+            lines.append("")
+        else:
+            arg_heading = _make_section_header("Arguments", effective_heading_level + 1)
+            lines.extend(arg_heading)
+            lines.append("")
         for _, panel in argument_panels:
             formatter.reset()
             panel.title = ""
@@ -265,10 +366,15 @@ def generate_rst_docs(
                 lines.append("")
 
     # Render options
-    if option_panels or grouped_panels:
-        opt_heading = _make_section_header("Options", heading_level + 1)
-        lines.extend(opt_heading)
-        lines.append("")
+    if (option_panels or grouped_panels) and not (no_root_title and not command_chain):
+        if sections_only:
+            # In sections_only mode, use bold text instead of subsections
+            lines.append("**Options:**")
+            lines.append("")
+        else:
+            opt_heading = _make_section_header("Options", effective_heading_level + 1)
+            lines.extend(opt_heading)
+            lines.append("")
 
         # First render ungrouped options
         for _, panel in option_panels:
@@ -291,17 +397,20 @@ def generate_rst_docs(
 
     # Render commands
     if command_panels:
-        cmd_heading = _make_section_header("Commands", heading_level + 1)
-        lines.extend(cmd_heading)
-        lines.append("")
-        for _, panel in command_panels:
-            formatter.reset()
-            panel.title = ""
-            formatter(None, None, panel)
-            output = formatter.get_output().strip()
-            if output:
-                lines.append(output)
+        # Skip command list entirely when sections_only is enabled
+        if not sections_only:
+            if not (no_root_title and not command_chain):
+                cmd_heading = _make_section_header("Commands", effective_heading_level + 1)
+                lines.extend(cmd_heading)
                 lines.append("")
+            for _, panel in command_panels:
+                formatter.reset()
+                panel.title = ""
+                formatter(None, None, panel)
+                output = formatter.get_output().strip()
+                if output:
+                    lines.append(output)
+                    lines.append("")
 
     # Recursively document subcommands
     if recursive and app._commands:
@@ -320,13 +429,25 @@ def generate_rst_docs(
 
             # Recursively generate docs for subcommand
             subcommand_chain = command_chain + [name] if command_chain else [app_name, name]
+            # When flattening, keep the same base heading level; otherwise increment
+            if flatten_commands:
+                next_heading_level = heading_level
+            else:
+                # Normal hierarchical mode - don't increment heading_level, let the chain length determine it
+                next_heading_level = heading_level
+
             subdocs = generate_rst_docs(
                 subapp,
                 recursive=recursive,
                 include_hidden=include_hidden,
-                heading_level=heading_level + 1,
+                heading_level=next_heading_level,
                 command_chain=subcommand_chain,
                 generate_toc=False,  # Only generate TOC at root level
+                flatten_commands=flatten_commands,
+                command_prefix=command_prefix,
+                generate_anchors=generate_anchors,
+                no_root_title=False,  # Subcommands should have titles
+                sections_only=sections_only,  # Propagate sections_only mode
             )
             lines.append(subdocs)
 

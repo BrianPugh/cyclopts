@@ -1865,6 +1865,11 @@ class App:
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
+        flatten_commands: bool = False,
+        command_prefix: str = "",
+        generate_anchors: bool = False,
+        no_root_title: bool = False,
+        sections_only: bool = False,
     ) -> str:
         """Generate documentation for this CLI application.
 
@@ -1882,6 +1887,23 @@ class App:
         heading_level : int
             Starting heading level for the main application title.
             Default is 1 (single # for markdown, = for RST).
+        flatten_commands : bool
+            If True, generate all commands at the same heading level instead of nested.
+            Default is False.
+        command_prefix : str
+            Prefix to add to command headings (e.g., "Command: ").
+            Default is empty string.
+        generate_anchors : bool
+            If True, generate RST reference labels for cross-referencing (RST only).
+            Default is False.
+        no_root_title : bool
+            If True, skip generating the root application title (RST only).
+            Useful when embedding in existing documentation with its own title.
+            Default is False.
+        sections_only : bool
+            If True, generate clean sections for commands with minimal subsections (RST only).
+            Renders usage, arguments, and options as content rather than subsections.
+            Default is False.
 
         Returns
         -------
@@ -1932,6 +1954,11 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                flatten_commands=flatten_commands,
+                command_prefix=command_prefix,
+                generate_anchors=generate_anchors,
+                no_root_title=no_root_title,
+                sections_only=sections_only,
             )
 
         return doc

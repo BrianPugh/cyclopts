@@ -25,6 +25,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    rules.rst
    text_editor.rst
    api
+   cli_reference.rst
    known_issues.rst
 
 
@@ -36,6 +37,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    user_classes.rst
    args_and_kwargs.rst
    config_file.rst
+   sphinx_integration.rst
    packaging.rst
    app_calling.rst
    meta_app.rst

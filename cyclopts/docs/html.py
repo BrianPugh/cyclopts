@@ -1,7 +1,5 @@
 """HTML documentation generation for cyclopts apps."""
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
@@ -385,7 +383,7 @@ def generate_html_docs(
     # Determine the app name and full command path
     if not command_chain:
         # Root level - use app name or derive from sys.argv
-        app_name = app.name[0] if app._name else Path(sys.argv[0]).name
+        app_name = app.name[0]
         full_command = app_name
         title = app_name
         lines.append(f'<h{heading_level} class="app-title">{title}</h{heading_level}>')

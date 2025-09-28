@@ -15,7 +15,7 @@ def load_app_from_script(script: Union[str, Path]) -> Tuple["App", str]:
     Parameters
     ----------
     script : Union[str, Path]
-        Python script path, optionally with '::app_object' notation to specify
+        Python script path, optionally with ``'::app_object'`` notation to specify
         the App object (only supported with str). If not specified, will search
         for App objects in the script's global namespace.
 

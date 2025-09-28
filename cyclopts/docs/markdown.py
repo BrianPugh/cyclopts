@@ -1,7 +1,5 @@
 """Documentation generation functions for cyclopts apps."""
 
-import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 if TYPE_CHECKING:
@@ -118,7 +116,7 @@ def generate_markdown_docs(
     # Determine the app name and full command path
     if not command_chain:
         # Root level - use app name or derive from sys.argv
-        app_name = app.name[0] if app._name else Path(sys.argv[0]).name
+        app_name = app.name[0]
         full_command = app_name
         title = app_name
     else:
@@ -135,7 +133,9 @@ def generate_markdown_docs(
     description = format_doc(app, help_format)
     if description:
         # Extract plain text from description
-        desc_text = _extract_plain_text(description, None)
+        # Preserve markup when help_format matches output format (markdown)
+        preserve = help_format in ("markdown", "md")
+        desc_text = _extract_plain_text(description, None, preserve_markup=preserve)
         if desc_text:
             lines.append(desc_text.strip())
             lines.append("")
@@ -157,7 +157,7 @@ def generate_markdown_docs(
             lines.append("**Usage**:")
             lines.append("")
             lines.append("```console")
-            usage_text = _extract_plain_text(usage, None)
+            usage_text = _extract_plain_text(usage, None, preserve_markup=False)
             # Ensure usage starts with $ for console style
             usage_line = usage_text.strip()
             if "Usage:" in usage_line:
@@ -328,9 +328,11 @@ def generate_markdown_docs(
                 # Get subapp help
                 with subapp.app_stack([subapp]):
                     sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
+                    # Preserve markup when sub_help_format matches output format (markdown)
+                    preserve_sub = sub_help_format in ("markdown", "md")
                     sub_description = format_doc(subapp, sub_help_format)
                     if sub_description:
-                        sub_desc_text = _extract_plain_text(sub_description, None)
+                        sub_desc_text = _extract_plain_text(sub_description, None, preserve_markup=preserve_sub)
                         if sub_desc_text:
                             lines.append(sub_desc_text.strip())
                             lines.append("")
@@ -343,7 +345,7 @@ def generate_markdown_docs(
                             lines.append("**Usage**:")
                             lines.append("")
                             lines.append("```console")
-                            sub_usage_text = _extract_plain_text(sub_usage, None)
+                            sub_usage_text = _extract_plain_text(sub_usage, None, preserve_markup=False)
                             # Build the proper command chain for display
                             usage_line = sub_usage_text.strip()
                             if "Usage:" in usage_line:
@@ -496,7 +498,9 @@ def generate_markdown_docs(
                                         if entry.names:
                                             cmd_name = entry.names[0]
                                             desc_text = (
-                                                _extract_plain_text(entry.description, None)
+                                                _extract_plain_text(
+                                                    entry.description, None, preserve_markup=preserve_sub
+                                                )
                                                 if entry.description
                                                 else ""
                                             )

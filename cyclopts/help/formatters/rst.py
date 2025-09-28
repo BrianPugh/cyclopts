@@ -31,7 +31,7 @@ def _escape_rst(text: Optional[str]) -> str:
     return text.replace("\\", "\\\\")
 
 
-def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
+def _extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
     """Extract plain text from Rich renderables or any object.
 
     Parameters
@@ -40,6 +40,9 @@ def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
         Object to convert to plain text.
     console : Optional[Console]
         Console for rendering Rich objects.
+    preserve_markup : bool
+        If True, preserve original markdown/RST markup when available.
+        Should be True when input and output formats match.
 
     Returns
     -------
@@ -49,9 +52,23 @@ def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
     if obj is None:
         return ""
 
+    # Handle InlineText objects - check if they contain markdown/RST
+    if hasattr(obj, "primary_renderable"):
+        # For InlineText objects, check if the primary renderable has markup and we want to preserve it
+        if preserve_markup and hasattr(obj.primary_renderable, "markup"):
+            # Return the original markdown/RST text preserved in the markup attribute
+            return obj.primary_renderable.markup.rstrip()
+        # Otherwise extract from the primary renderable
+        return _extract_plain_text(obj.primary_renderable, console, preserve_markup=preserve_markup)
+
     # Rich Text objects have a .plain property
     if hasattr(obj, "plain"):
         return obj.plain.rstrip()
+
+    # For Rich Markdown and RST objects, preserve markup only when requested
+    if preserve_markup and hasattr(obj, "markup"):
+        # Return the original markdown/RST text preserved in the markup attribute
+        return obj.markup.rstrip()
 
     # For Rich renderables, extract without styles
     if hasattr(obj, "__rich_console__"):
@@ -221,12 +238,18 @@ class RstFormatter:
                 # Use definition list format
                 self._output.write(f"``{primary_name}``\n")
 
-                desc = _extract_plain_text(entry.description, console)
+                # Check if the description has RST markup to preserve
+                preserve_rst_markup = (
+                    hasattr(entry.description, "primary_renderable")
+                    and hasattr(entry.description.primary_renderable, "__class__")
+                    and "RestructuredText" in entry.description.primary_renderable.__class__.__name__
+                )
+                desc = _extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
                 if desc:
-                    # Indent description
-                    self._output.write(f"    {desc}\n")
-
-                self._output.write("\n")
+                    # Join multi-line descriptions into a single paragraph for proper RST formatting
+                    # This prevents each line from being interpreted as a separate blockquote
+                    desc_text = " ".join(line.strip() for line in desc.split("\n") if line.strip())
+                    self._output.write(f"    {desc_text}\n\n")
 
     def _format_parameter_panel(self, entries: list["HelpEntry"], console: Optional["Console"]) -> None:
         """Format parameter entries as RST.
@@ -265,7 +288,13 @@ class RstFormatter:
                 desc_parts = []
 
                 # Add main description
-                desc = _extract_plain_text(entry.description, console)
+                # Check if the description has RST markup to preserve
+                preserve_rst_markup = (
+                    hasattr(entry.description, "primary_renderable")
+                    and hasattr(entry.description.primary_renderable, "__class__")
+                    and "RestructuredText" in entry.description.primary_renderable.__class__.__name__
+                )
+                desc = _extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
                 if desc:
                     desc_parts.append(desc)
 
@@ -282,7 +311,7 @@ class RstFormatter:
                     metadata.append(f"Choices: {choices_str}")
 
                 if entry.default is not None:
-                    default_str = _extract_plain_text(entry.default, console)
+                    default_str = _extract_plain_text(entry.default, console, preserve_markup=False)
                     # For boolean flags, format as flag style
                     if entry.type and "bool" in str(entry.type):
                         # Find the appropriate flag name
@@ -308,16 +337,18 @@ class RstFormatter:
                     env_str = ", ".join(f"``{e}``" for e in entry.env_var)
                     metadata.append(f"Environment variable: {env_str}")
 
-                # Combine description and metadata
+                # Combine description and metadata - handle multi-line descriptions
                 if desc_parts:
-                    self._output.write(f"    {desc_parts[0]}")
+                    # Join multi-line descriptions into a single paragraph for proper RST formatting
+                    # This prevents each line from being interpreted as a separate blockquote
+                    desc_text = " ".join(line.strip() for line in desc_parts[0].split("\n") if line.strip())
+                    self._output.write(f"    {desc_text}")
+
                     if metadata:
                         self._output.write(f" [{', '.join(metadata)}]")
-                    self._output.write("\n")
+                    self._output.write("\n\n")
                 elif metadata:
-                    self._output.write(f"    {', '.join(metadata)}\n")
-
-                self._output.write("\n")
+                    self._output.write(f"    {', '.join(metadata)}\n\n")
 
     def render_usage(
         self,
