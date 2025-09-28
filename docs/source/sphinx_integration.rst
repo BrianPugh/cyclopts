@@ -69,14 +69,14 @@ The directive supports several options to customize the generated documentation:
 ``:heading-level:`` - Heading Level
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Set the starting heading level for the generated documentation (1-6):
+Set the starting heading level for the generated documentation (1-6, default: 2):
 
 .. code-block:: rst
 
    .. cyclopts:: mypackage.cli:app
-      :heading-level: 2
+      :heading-level: 3
 
-This is useful when embedding CLI docs within a larger document structure.
+This is useful when you need to adjust the heading hierarchy. The default of 2 works well for most cases where the directive is placed under a page title.
 
 ``:recursive:`` - Include Subcommands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

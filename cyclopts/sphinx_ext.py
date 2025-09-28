@@ -66,7 +66,7 @@ def _import_app(module_path: str) -> Any:
 class DirectiveOptions:
     """Configuration for the Cyclopts directive."""
 
-    heading_level: int = 1
+    heading_level: int = 2
     recursive: bool = True
     include_hidden: bool = False
     flatten_commands: bool = False
@@ -76,7 +76,7 @@ class DirectiveOptions:
     def from_dict(cls, options: dict) -> "DirectiveOptions":
         """Create options from directive options dictionary."""
         return cls(
-            heading_level=options.get("heading-level", 1),
+            heading_level=options.get("heading-level", 2),
             recursive="recursive" in options if "recursive" in options else True,
             include_hidden="include-hidden" in options,
             flatten_commands="flatten-commands" in options,
