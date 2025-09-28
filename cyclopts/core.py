@@ -1861,7 +1861,7 @@ class App:
 
     def generate_docs(
         self,
-        output_format: Literal["markdown", "html"] = "markdown",
+        output_format: Literal["markdown", "html", "rst"] = "markdown",
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
@@ -1870,7 +1870,7 @@ class App:
 
         Parameters
         ----------
-        output_format : Literal["markdown", "html"]
+        output_format : Literal["markdown", "html", "rst"]
             Output format for the documentation.
             Default is "markdown".
         recursive : bool
@@ -1881,7 +1881,7 @@ class App:
             Default is False.
         heading_level : int
             Starting heading level for the main application title.
-            Default is 1 (single #).
+            Default is 1 (single # for markdown, = for RST).
 
         Returns
         -------
@@ -1898,15 +1898,18 @@ class App:
         >>> app = App(name="myapp", help="My CLI Application")
         >>> docs = app.generate_docs()  # Generate markdown as string
         >>> html_docs = app.generate_docs(output_format="html")  # Generate HTML
+        >>> rst_docs = app.generate_docs(output_format="rst")  # Generate RST
         >>> # To write to file, caller can do:
         >>> # Path("docs/cli.md").write_text(docs)
         """
-        from cyclopts.docs import generate_markdown_docs
+        from cyclopts.docs import generate_markdown_docs, generate_rst_docs
         from cyclopts.docs.html import generate_html_docs
 
         # Validate output format (this is now redundant with type checking, but kept for runtime safety)
-        if output_format not in ("markdown", "html"):
-            raise ValueError(f"Unsupported output format: {output_format}. Supported formats: 'markdown', 'html'.")
+        if output_format not in ("markdown", "html", "rst"):
+            raise ValueError(
+                f"Unsupported output format: {output_format}. Supported formats: 'markdown', 'html', 'rst'."
+            )
 
         # Generate documentation based on format
         if output_format == "markdown":
@@ -1918,6 +1921,13 @@ class App:
             )
         elif output_format == "html":
             doc = generate_html_docs(
+                self,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                heading_level=heading_level,
+            )
+        elif output_format == "rst":
+            doc = generate_rst_docs(
                 self,
                 recursive=recursive,
                 include_hidden=include_hidden,

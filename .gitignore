@@ -256,6 +256,7 @@ poetry.toml
 /draw.toml
 /*.md
 /*.html
+/*.rst
 
 # Editor config
 .vscode

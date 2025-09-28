@@ -23,6 +23,8 @@ def _format_group_validator(argument_collection):
             format_arg.value = "markdown"
         elif suffix in (".html", ".htm"):
             format_arg.value = "html"
+        elif suffix in (".rst", ".rest"):
+            format_arg.value = "rst"
         else:
             raise ValueError(
                 f'Cannot infer format from output extension "{suffix}". Please specify "--format" explicitly.'
@@ -37,7 +39,7 @@ def generate_docs(
     script: str,
     output: Annotated[Optional[Path], Parameter(group=format_group)] = None,
     *,
-    format: Annotated[Optional[Literal["markdown", "html"]], Parameter(group=format_group)] = None,
+    format: Annotated[Optional[Literal["markdown", "html", "rst"]], Parameter(group=format_group)] = None,
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
@@ -52,9 +54,10 @@ def generate_docs(
         script's global namespace.
     output : Optional[Path]
         Output file path. If not specified, prints to stdout.
-    format : Optional[Literal["markdown", "html"]]
+    format : Optional[Literal["markdown", "html", "rst"]]
         Output format for documentation. If not specified, inferred from output
-        file extension (.md/.markdown for markdown, .html/.htm for html).
+        file extension (.md/.markdown for markdown, .html/.htm for html,
+        .rst/.rest for reStructuredText).
     recursive : bool
         Include documentation for subcommands recursively.
     include_hidden : bool

@@ -1,0 +1,369 @@
+"""reStructuredText documentation formatter."""
+
+import io
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from rich.console import Console, ConsoleOptions
+
+    from cyclopts.help import HelpEntry, HelpPanel
+
+
+def _escape_rst(text: Optional[str]) -> str:
+    """Escape special reStructuredText characters in text.
+
+    Parameters
+    ----------
+    text : Optional[str]
+        Text to escape. Can be None.
+
+    Returns
+    -------
+    str
+        Escaped text safe for RST.
+    """
+    if not text:
+        return ""
+
+    # RST special characters that might need escaping in certain contexts
+    # For now, we'll be conservative and only escape backslashes
+    # Most RST content is fine as-is
+    return text.replace("\\", "\\\\")
+
+
+def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
+    """Extract plain text from Rich renderables or any object.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to convert to plain text.
+    console : Optional[Console]
+        Console for rendering Rich objects.
+
+    Returns
+    -------
+    str
+        Plain text representation.
+    """
+    if obj is None:
+        return ""
+
+    # Rich Text objects have a .plain property
+    if hasattr(obj, "plain"):
+        return obj.plain.rstrip()
+
+    # For Rich renderables, extract without styles
+    if hasattr(obj, "__rich_console__"):
+        from rich.console import Console
+
+        # Create a plain console for text extraction
+        plain_console = Console(
+            file=io.StringIO(),
+            width=console.width if console else 120,
+            force_terminal=False,
+            no_color=True,
+            highlight=False,
+            markup=False,
+            emoji=False,
+        )
+        with plain_console.capture() as capture:
+            plain_console.print(obj, end="")
+        return capture.get().rstrip()
+
+    # Fallback to string conversion
+    return str(obj).rstrip()
+
+
+def _make_section_header(title: str, level: int) -> str:
+    """Create an RST section header.
+
+    Parameters
+    ----------
+    title : str
+        Section title.
+    level : int
+        Heading level (1-6).
+
+    Returns
+    -------
+    str
+        RST formatted section header.
+    """
+    # RST section markers in order
+    # Level 1: ====== (over and under)
+    # Level 2: ------ (under only)
+    # Level 3: ^^^^^^ (under only)
+    # Level 4: """""" (under only)
+    # Level 5: '''''' (under only)
+    # Level 6: ~~~~~~ (under only)
+
+    markers = {
+        1: "=",
+        2: "-",
+        3: "^",
+        4: '"',
+        5: "'",
+        6: "~",
+    }
+
+    if level < 1:
+        level = 1
+    elif level > 6:
+        level = 6
+
+    marker = markers[level]
+    underline = marker * len(title)
+
+    # Level 1 gets both overline and underline
+    if level == 1:
+        return f"{underline}\n{title}\n{underline}"
+    else:
+        return f"{title}\n{underline}"
+
+
+class RstFormatter:
+    """reStructuredText documentation formatter.
+
+    Parameters
+    ----------
+    heading_level : int
+        Starting heading level for panels (default: 2).
+    include_hidden : bool
+        Include hidden commands/parameters in documentation (default: False).
+    """
+
+    def __init__(
+        self,
+        heading_level: int = 2,
+        include_hidden: bool = False,
+    ):
+        self.heading_level = heading_level
+        self.include_hidden = include_hidden
+        self._output = io.StringIO()
+
+    def reset(self) -> None:
+        """Reset the internal output buffer."""
+        self._output = io.StringIO()
+
+    def get_output(self) -> str:
+        """Get the accumulated RST output.
+
+        Returns
+        -------
+        str
+            The RST documentation string.
+        """
+        return self._output.getvalue()
+
+    def __call__(
+        self,
+        console: Optional["Console"],
+        options: Optional["ConsoleOptions"],
+        panel: "HelpPanel",
+    ) -> None:
+        """Format and render a help panel as RST.
+
+        Parameters
+        ----------
+        console : Optional[Console]
+            Console for rendering (used for extracting plain text).
+        options : Optional[ConsoleOptions]
+            Console rendering options (unused for RST).
+        panel : HelpPanel
+            Help panel to render.
+        """
+        if not panel.entries:
+            return
+
+        # Write panel title as heading
+        if panel.title:
+            title_text = _extract_plain_text(panel.title, console)
+            header = _make_section_header(title_text, self.heading_level)
+            self._output.write(f"{header}\n\n")
+
+        # Write panel description if present
+        if panel.description:
+            desc_text = _extract_plain_text(panel.description, console)
+            if desc_text:
+                self._output.write(f"{desc_text}\n\n")
+
+        # Format entries based on panel type
+        if panel.format == "command":
+            self._format_command_panel(panel.entries, console)
+        elif panel.format == "parameter":
+            self._format_parameter_panel(panel.entries, console)
+
+        self._output.write("\n")
+
+    def _format_command_panel(self, entries: list["HelpEntry"], console: Optional["Console"]) -> None:
+        """Format command entries as RST.
+
+        Parameters
+        ----------
+        entries : list[HelpEntry]
+            Command entries to format.
+        console : Optional[Console]
+            Console for text extraction.
+        """
+        for entry in entries:
+            # Get command name(s)
+            names = []
+            if entry.names:
+                names.extend(entry.names)
+            if entry.shorts:
+                names.extend(entry.shorts)
+
+            if names:
+                # Use first name as primary
+                primary_name = names[0]
+
+                # Use definition list format
+                self._output.write(f"``{primary_name}``\n")
+
+                desc = _extract_plain_text(entry.description, console)
+                if desc:
+                    # Indent description
+                    self._output.write(f"    {desc}\n")
+
+                self._output.write("\n")
+
+    def _format_parameter_panel(self, entries: list["HelpEntry"], console: Optional["Console"]) -> None:
+        """Format parameter entries as RST.
+
+        Parameters
+        ----------
+        entries : list[HelpEntry]
+            Parameter entries to format.
+        console : Optional[Console]
+            Console for text extraction.
+        """
+        for entry in entries:
+            # Build parameter names
+            names = []
+            if entry.names:
+                names.extend(entry.names)
+            if entry.shorts:
+                names.extend(entry.shorts)
+
+            if names:
+                # Determine if we should display as positional based on requirement and default
+                is_positional = entry.required and entry.default is None and not any(n.startswith("-") for n in names)
+
+                if is_positional:
+                    # For positional arguments, show in uppercase
+                    positional_names = [n for n in names if not n.startswith("-")]
+                    name_str = positional_names[0].upper() if positional_names else names[0].upper()
+                else:
+                    # For options, format with all forms
+                    name_str = ", ".join(names)
+
+                # Use definition list format
+                self._output.write(f"``{name_str}``\n")
+
+                # Build description with metadata
+                desc_parts = []
+
+                # Add main description
+                desc = _extract_plain_text(entry.description, console)
+                if desc:
+                    desc_parts.append(desc)
+
+                # Add metadata
+                metadata = []
+
+                if is_positional and entry.required:
+                    metadata.append("**Required**")
+                elif entry.required and not is_positional:
+                    metadata.append("**Required**")
+
+                if entry.choices:
+                    choices_str = ", ".join(f"``{c}``" for c in entry.choices)
+                    metadata.append(f"Choices: {choices_str}")
+
+                if entry.default is not None:
+                    default_str = _extract_plain_text(entry.default, console)
+                    # For boolean flags, format as flag style
+                    if entry.type and "bool" in str(entry.type):
+                        # Find the appropriate flag name
+                        positive_flag = None
+                        negative_flag = None
+                        for name in names:
+                            if name.startswith("--no-"):
+                                negative_flag = name
+                            elif name.startswith("--"):
+                                if not positive_flag:
+                                    positive_flag = name
+
+                        if default_str.lower() == "true" and positive_flag:
+                            metadata.append(f"Default: ``{positive_flag}``")
+                        elif default_str.lower() == "false" and negative_flag:
+                            metadata.append(f"Default: ``{negative_flag}``")
+                        else:
+                            metadata.append(f"Default: ``{default_str}``")
+                    else:
+                        metadata.append(f"Default: ``{default_str}``")
+
+                if entry.env_var:
+                    env_str = ", ".join(f"``{e}``" for e in entry.env_var)
+                    metadata.append(f"Environment variable: {env_str}")
+
+                # Combine description and metadata
+                if desc_parts:
+                    self._output.write(f"    {desc_parts[0]}")
+                    if metadata:
+                        self._output.write(f" [{', '.join(metadata)}]")
+                    self._output.write("\n")
+                elif metadata:
+                    self._output.write(f"    {', '.join(metadata)}\n")
+
+                self._output.write("\n")
+
+    def render_usage(
+        self,
+        console: Optional["Console"],
+        options: Optional["ConsoleOptions"],
+        usage: Any,
+    ) -> None:
+        """Render the usage line as RST.
+
+        Parameters
+        ----------
+        console : Optional[Console]
+            Console for text extraction.
+        options : Optional[ConsoleOptions]
+            Console rendering options (unused).
+        usage : Any
+            The usage line content.
+        """
+        if usage:
+            usage_text = _extract_plain_text(usage, console)
+            if usage_text:
+                # Use literal block for usage
+                self._output.write("::\n\n")
+                # Indent the usage text
+                for line in usage_text.split("\n"):
+                    self._output.write(f"    {line}\n")
+                self._output.write("\n")
+
+    def render_description(
+        self,
+        console: Optional["Console"],
+        options: Optional["ConsoleOptions"],
+        description: Any,
+    ) -> None:
+        """Render the description as RST.
+
+        Parameters
+        ----------
+        console : Optional[Console]
+            Console for text extraction.
+        options : Optional[ConsoleOptions]
+            Console rendering options (unused).
+        description : Any
+            The description content.
+        """
+        if description:
+            desc_text = _extract_plain_text(description, console)
+            if desc_text:
+                self._output.write(f"{desc_text}\n\n")
