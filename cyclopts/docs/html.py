@@ -333,7 +333,6 @@ def generate_html_docs(
     custom_css: Optional[str] = None,
     command_chain: Optional[list[str]] = None,
     generate_toc: bool = True,
-    no_root_title: bool = False,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -361,10 +360,6 @@ def generate_html_docs(
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
-    no_root_title : bool
-        If True, skip generating the root application title.
-        Useful when embedding in existing documentation with its own title.
-        Default is False.
 
     Returns
     -------
@@ -391,9 +386,8 @@ def generate_html_docs(
         app_name = app.name[0]
         full_command = app_name
         title = app_name
-        # Add title unless no_root_title is True for root level
-        if not (no_root_title and not command_chain):
-            lines.append(f'<h{heading_level} class="app-title">{title}</h{heading_level}>')
+        # Add title for all levels
+        lines.append(f'<h{heading_level} class="app-title">{title}</h{heading_level}>')
     else:
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]

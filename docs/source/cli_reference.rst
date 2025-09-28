@@ -9,4 +9,3 @@ The ``cyclopts`` package includes a command-line interface for various developme
    :heading-level: 2
    :flatten-commands:
    :sections-only:
-   :no-root-title:

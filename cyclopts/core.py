@@ -1867,7 +1867,6 @@ class App:
         heading_level: int = 1,
         flatten_commands: bool = False,
         command_prefix: str = "",
-        no_root_title: bool = False,
         sections_only: bool = False,
     ) -> str:
         """Generate documentation for this CLI application.
@@ -1892,10 +1891,6 @@ class App:
         command_prefix : str
             Prefix to add to command headings (e.g., "Command: ").
             Default is empty string.
-        no_root_title : bool
-            If True, skip generating the root application title.
-            Useful when embedding in existing documentation with its own title.
-            Default is False.
         sections_only : bool
             If True, generate clean sections for commands with minimal subsections (RST only).
             Renders usage, arguments, and options as content rather than subsections.
@@ -1936,7 +1931,6 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
-                no_root_title=no_root_title,
             )
         elif output_format == "html":
             doc = generate_html_docs(
@@ -1944,7 +1938,6 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
-                no_root_title=no_root_title,
             )
         elif output_format == "rst":
             doc = generate_rst_docs(
@@ -1954,8 +1947,8 @@ class App:
                 heading_level=heading_level,
                 flatten_commands=flatten_commands,
                 command_prefix=command_prefix,
-                no_root_title=no_root_title,
                 sections_only=sections_only,
+                no_root_title=False,  # Default to False for direct API usage
             )
 
         return doc

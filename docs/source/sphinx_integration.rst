@@ -151,18 +151,6 @@ For example:
 
 You can reference these commands elsewhere in your documentation using ``:ref:`cyclopts-myapp-deploy```.
 
-``:no-root-title:`` - Skip Root Application Title
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Skip generating the title for the root application:
-
-.. code-block:: rst
-
-   .. cyclopts:: mypackage.cli:app
-      :no-root-title:
-
-This is useful when embedding the CLI documentation in a page that already has its own title, avoiding duplicate headings. The option only affects the root application title; subcommand titles are still generated.
-
 Complete Example
 ----------------
 

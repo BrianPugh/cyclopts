@@ -72,7 +72,6 @@ class DirectiveOptions:
     include_hidden: bool = False
     flatten_commands: bool = False
     command_prefix: str = ""
-    no_root_title: bool = False
     sections_only: bool = False
 
     @classmethod
@@ -85,7 +84,6 @@ class DirectiveOptions:
             include_hidden="include-hidden" in options,
             flatten_commands="flatten-commands" in options,
             command_prefix=options.get("command-prefix", ""),
-            no_root_title="no-root-title" in options,
             sections_only="sections-only" in options,
         )
 
@@ -220,7 +218,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             "include-hidden": directives.flag,
             "flatten-commands": directives.flag,
             "command-prefix": directives.unchanged,
-            "no-root-title": directives.flag,
             "sections-only": directives.flag,
         }
     else:
@@ -244,6 +241,8 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
 
     def _generate_documentation(self, module_path: str, opts: DirectiveOptions) -> str:
         """Generate RST documentation for the app."""
+        from cyclopts.docs.rst import generate_rst_docs
+
         app = _import_app(module_path)
 
         # Temporarily override app name if specified
@@ -253,14 +252,15 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             app._name = (opts.prog,)
 
         try:
-            return app.generate_docs(
-                output_format="rst",
+            # Call generate_rst_docs directly to access internal no_root_title parameter
+            return generate_rst_docs(
+                app,
                 recursive=opts.recursive,
                 include_hidden=opts.include_hidden,
                 heading_level=opts.heading_level,
                 flatten_commands=opts.flatten_commands,
                 command_prefix=opts.command_prefix,
-                no_root_title=opts.no_root_title,
+                no_root_title=True,  # Always skip root title in Sphinx context
                 sections_only=opts.sections_only,
             )
         finally:
@@ -275,7 +275,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         from docutils import nodes
         from docutils.statemachine import StringList
 
-        lines = _process_rst_content(rst_content, skip_title=not opts.no_root_title)
+        lines = _process_rst_content(rst_content, skip_title=False)  # Title already skipped in generate_docs
 
         if opts.sections_only:
             return _create_section_nodes(lines, self.state)
