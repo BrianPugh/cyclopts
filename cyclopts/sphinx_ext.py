@@ -2,7 +2,7 @@
 
 import importlib
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from docutils import nodes
@@ -66,7 +66,6 @@ def _import_app(module_path: str) -> Any:
 class DirectiveOptions:
     """Configuration for the Cyclopts directive."""
 
-    prog: Optional[str] = None
     heading_level: int = 1
     recursive: bool = True
     include_hidden: bool = False
@@ -77,7 +76,6 @@ class DirectiveOptions:
     def from_dict(cls, options: dict) -> "DirectiveOptions":
         """Create options from directive options dictionary."""
         return cls(
-            prog=options.get("prog"),
             heading_level=options.get("heading-level", 1),
             recursive="recursive" in options if "recursive" in options else True,
             include_hidden="include-hidden" in options,
@@ -210,7 +208,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         from docutils.parsers.rst import directives
 
         option_spec = {
-            "prog": directives.unchanged,
             "heading-level": directives.nonnegative_int,
             "recursive": directives.flag,
             "include-hidden": directives.flag,
@@ -242,27 +239,17 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
 
         app = _import_app(module_path)
 
-        # Temporarily override app name if specified
-        original_name = None
-        if opts.prog:
-            original_name = app._name
-            app._name = (opts.prog,)
-
-        try:
-            # Call generate_rst_docs directly to access internal no_root_title parameter
-            return generate_rst_docs(
-                app,
-                recursive=opts.recursive,
-                include_hidden=opts.include_hidden,
-                heading_level=opts.heading_level,
-                flatten_commands=opts.flatten_commands,
-                command_prefix=opts.command_prefix,
-                no_root_title=True,  # Always skip root title in Sphinx context
-                sections_only=True,  # Always use sections-only mode for better Sphinx integration
-            )
-        finally:
-            if original_name is not None:
-                app._name = original_name
+        # Call generate_rst_docs directly to access internal no_root_title parameter
+        return generate_rst_docs(
+            app,
+            recursive=opts.recursive,
+            include_hidden=opts.include_hidden,
+            heading_level=opts.heading_level,
+            flatten_commands=opts.flatten_commands,
+            command_prefix=opts.command_prefix,
+            no_root_title=True,  # Always skip root title in Sphinx context
+            sections_only=True,  # Always use sections-only mode for better Sphinx integration
+        )
 
     def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> List["nodes.Node"]:
         """Create docutils nodes from RST content."""

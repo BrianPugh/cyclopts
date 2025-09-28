@@ -24,7 +24,6 @@ Quick Start
    .. code-block:: rst
 
       .. cyclopts:: mypackage.cli:app
-         :prog: my-cli
 
 Directive Usage
 ---------------
@@ -66,18 +65,6 @@ Directive Options
 -----------------
 
 The directive supports several options to customize the generated documentation:
-
-``:prog:`` - Program Name
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Override the program name displayed in usage examples:
-
-.. code-block:: rst
-
-   .. cyclopts:: mypackage.cli:app
-      :prog: awesome-tool
-
-This will show ``awesome-tool`` in usage examples instead of the default program name.
 
 ``:heading-level:`` - Heading Level
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
