@@ -75,6 +75,7 @@ def generate_markdown_docs(
     heading_level: int = 1,
     command_chain: Optional[list[str]] = None,
     generate_toc: bool = True,
+    no_root_title: bool = False,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -97,6 +98,10 @@ def generate_markdown_docs(
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
+    no_root_title : bool
+        If True, skip generating the root application title.
+        Useful when embedding in existing documentation with its own title.
+        Default is False.
 
     Returns
     -------
@@ -125,8 +130,10 @@ def generate_markdown_docs(
         full_command = " ".join(command_chain)
         title = f"`{full_command}`"
 
-    lines.append(f"{'#' * heading_level} {title}")
-    lines.append("")
+    # Add title unless no_root_title is True for root level
+    if not (no_root_title and not command_chain):
+        lines.append(f"{'#' * heading_level} {title}")
+        lines.append("")
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")

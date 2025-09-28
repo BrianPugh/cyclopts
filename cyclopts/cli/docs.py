@@ -59,6 +59,7 @@ def generate_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
+    no_root_title: bool = False,
 ):
     """Generate documentation for a Cyclopts application.
 
@@ -81,8 +82,12 @@ def generate_docs(
         Include hidden commands in documentation.
     heading_level : int
         Starting heading level for markdown format.
+    no_root_title : bool
+        Skip generating the root application title.
+        Useful when embedding in existing documentation with its own title.
     """
-    assert format is not None  # Handled by _format_group_validator
+    if format is None:  # Handled by _format_group_validator
+        raise ValueError("Must specify format.")
     format = _canonicalize_format(format)
     app_obj, _ = load_app_from_script(script)
     docs_content = app_obj.generate_docs(
@@ -90,6 +95,7 @@ def generate_docs(
         recursive=recursive,
         include_hidden=include_hidden,
         heading_level=heading_level,
+        no_root_title=no_root_title,
     )
 
     if output:

@@ -1897,7 +1897,7 @@ class App:
             If True, generate RST reference labels for cross-referencing (RST only).
             Default is False.
         no_root_title : bool
-            If True, skip generating the root application title (RST only).
+            If True, skip generating the root application title.
             Useful when embedding in existing documentation with its own title.
             Default is False.
         sections_only : bool
@@ -1940,6 +1940,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                no_root_title=no_root_title,
             )
         elif output_format == "html":
             doc = generate_html_docs(
