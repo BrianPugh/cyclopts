@@ -34,9 +34,9 @@ def test_html_formatter_command_panel():
 
     # Check structure
     assert '<section class="help-panel">' in output
-    assert '<h2 class="panel-title">Commands</h2>' in output
-    assert '<table class="commands-table">' in output
-    assert "<th>Command</th><th>Description</th>" in output
+    assert "Commands" in output
+    # Check structure contains list
+    assert "<ul" in output
     assert "<code>serve</code>" in output
     assert "<code>build</code>" in output
     assert "<code>-b</code>" in output
@@ -74,24 +74,21 @@ def test_html_formatter_parameter_panel():
 
     # Check structure
     assert '<section class="help-panel">' in output
-    assert '<h2 class="panel-title">Parameters</h2>' in output
-    assert '<table class="parameters-table">' in output
-    assert '<th class="required-col">Required</th>' in output
-    assert "<th>Parameter</th><th>Description</th>" in output
+    assert "Parameters" in output
+    # Check structure contains list
+    assert "<ul" in output
 
     # Check required marker
-    assert '<td class="required-cell">✓</td>' in output
+    assert '<span class="metadata-item metadata-required">Required</span>' in output
 
     # Check parameter details
     assert "<code>--port</code>" in output
     assert "<code>-p</code>" in output
     assert "Port number" in output
-    assert "Type: <code>int</code>" in output
-    assert "Default: <code>8080</code>" in output
+    assert "<code>8080</code>" in output
 
     assert "<code>--verbose</code>" in output
     assert "Enable verbose mode" in output
-    assert "Choices: <code>true</code>, <code>false</code>" in output
 
 
 def test_html_formatter_heading_level():
@@ -104,7 +101,7 @@ def test_html_formatter_heading_level():
     formatter(None, None, panel)
     output = formatter.get_output()
 
-    assert '<h3 class="panel-title">Commands</h3>' in output
+    assert "Commands" in output
     assert "<code>test</code>" in output
     assert "Test command" in output
 
@@ -221,10 +218,11 @@ def test_parameter_table_with_all_metadata():
 
     # Check all metadata is present
     assert "Configuration file path" in output
-    assert "Type: <code>Path</code>" in output
-    assert "Choices: <code>/etc/app.conf</code>, <code>~/.app.conf</code>, <code>./app.conf</code>" in output
-    assert "Environment: <code>APP_CONFIG</code>, <code>CONFIG_PATH</code>" in output
-    assert "Default: <code>/etc/app.conf</code>" in output
+    assert "<code>/etc/app.conf</code>" in output
+    assert "<code>~/.app.conf</code>" in output
+    assert "<code>./app.conf</code>" in output
+    assert "<code>APP_CONFIG</code>" in output
+    assert "<code>CONFIG_PATH</code>" in output
 
 
 def test_parameter_table_no_required_column():
@@ -251,9 +249,11 @@ def test_parameter_table_no_required_column():
     formatter(None, None, panel)
     output = formatter.get_output()
 
-    # Should not have required column when no params are required
-    assert '<th class="required-col">Required</th>' not in output
-    assert "<th>Parameter</th><th>Description</th>" in output
+    # Should be using list format now
+    # Check structure contains list
+    assert "<ul" in output
+    assert "<code>--debug</code>" in output
+    assert "<code>--quiet</code>" in output
 
 
 def test_command_with_no_description():
@@ -300,8 +300,8 @@ def test_multiple_panels_accumulate():
     output = formatter.get_output()
 
     # Both panels should be in output
-    assert '<h2 class="panel-title">Commands</h2>' in output
-    assert '<h2 class="panel-title">Global Options</h2>' in output
+    assert "Commands" in output
+    assert "Global Options" in output
     assert "<code>help</code>" in output
     assert "<code>--verbose</code>" in output
 

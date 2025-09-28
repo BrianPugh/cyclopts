@@ -41,11 +41,11 @@ def test_generate_docs_simple_app():
 
         **Arguments**:
 
-        * `NAME`: Your name.  [required]
+        * `NAME`: Your name.  **[required]**
 
         **Options**:
 
-        * `VERBOSE, --verbose, --no-verbose`: Enable verbose output.  [default: --no-verbose]
+        * `VERBOSE, --verbose, --no-verbose`: Enable verbose output.  *[default: --no-verbose]*
         """
     )
 
@@ -98,12 +98,12 @@ def test_generate_docs_with_commands():
     assert "Start the server." in actual
     assert "**Usage**:" in actual
     assert "**Options**:" in actual
-    assert "* `PORT, --port INT`: Port number.  [default: 8000]" in actual
+    assert "* `PORT, --port`: Port number.  *[default: 8000]*" in actual
 
     # Build command details
     assert "## `myapp build`" in actual
     assert "Build the project." in actual
-    assert "* `OUTPUT, --output STR`: Output directory.  [default: ./dist]" in actual
+    assert "* `OUTPUT, --output`: Output directory.  *[default: ./dist]*" in actual
 
 
 def test_generate_docs_recursive():
@@ -220,26 +220,28 @@ def test_generate_docs_with_hidden_commands(mocker):
 
         App with hidden commands
 
-        ## Usage
+        ## Table of Contents
 
+        - [`visible`](#myapp-visible)
+
+        **Usage**:
+
+        ```console
+        $ myapp COMMAND
         ```
-        Usage: myapp COMMAND
-        ```
 
-        ## Commands
+        **Commands**:
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `visible` | Visible command. |
+        * `visible`: Visible command.
 
-        ## Command: visible
+        ## `myapp visible`
 
         Visible command.
 
-        ### Usage
+        **Usage**:
 
-        ```
-        Usage: myapp
+        ```console
+        $ myapp visible
         ```
         """
     )
@@ -250,11 +252,11 @@ def test_generate_docs_with_hidden_commands(mocker):
     actual_with_hidden = app.generate_docs(include_hidden=True)
 
     # Verify the hidden command is present when include_hidden=True
-    assert "## Command: hidden" in actual_with_hidden
+    assert "## `myapp hidden`" in actual_with_hidden
     assert "Hidden command." in actual_with_hidden
     # Also verify it has help and version commands shown
-    assert "`--help`, `-h`" in actual_with_hidden
-    assert "`--version`" in actual_with_hidden
+    assert "* `--help`: Display this message and exit." in actual_with_hidden
+    assert "* `--version`: Display application version." in actual_with_hidden
 
 
 def test_generate_docs_with_required_parameters():
@@ -277,18 +279,19 @@ def test_generate_docs_with_required_parameters():
 
         Main command.
 
-        ## Usage
+        **Usage**:
 
+        ```console
+        $ myapp [ARGS] [OPTIONS]
         ```
-        Usage: myapp [ARGS] [OPTIONS]
-        ```
 
-        ## Parameters
+        **Arguments**:
 
-        | Required | Parameter | Description |
-        | :------: | --------- | ----------- |
-        | ✓ | `REQUIRED`, `--required` | Required parameter<br><br>Type: `<class 'str'>` |
-        |  | `OPTIONAL`, `--optional` | Type: `<class 'str'>`<br>Default: `default` |
+        * `REQUIRED`: Required parameter  **[required]**
+
+        **Options**:
+
+        * `OPTIONAL, --optional`:   *[default: default]*
         """
     )
 
@@ -317,7 +320,7 @@ def test_generate_docs_with_choices():
     assert "red" in actual
     assert "green" in actual
     assert "blue" in actual
-    assert "Choices:" in actual
+    assert "choices:" in actual
 
 
 def test_generate_docs_with_custom_usage():
@@ -337,10 +340,10 @@ def test_generate_docs_with_custom_usage():
 
         Main command.
 
-        ## Usage
+        **Usage**:
 
-        ```
-        myapp [OPTIONS] <input> <output>
+        ```console
+        $ myapp [OPTIONS] <input> <output>
         ```
         """
     )
@@ -391,10 +394,10 @@ def test_generate_docs_write_to_file():
 
             Test app
 
-            ## Usage
+            **Usage**:
 
-            ```
-            Usage: myapp
+            ```console
+            $ myapp
             ```
             """
         )
@@ -430,10 +433,10 @@ def test_generate_docs_output_format_explicit():
 
         Test app
 
-        ## Usage
+        **Usage**:
 
-        ```
-        Usage: myapp
+        ```console
+        $ myapp
         ```
         """
     )
@@ -469,8 +472,8 @@ def test_generate_docs_invalid_format():
     with pytest.raises(ValueError, match="Unsupported output format: pdf"):
         app.generate_docs(output_format="pdf")  # type: ignore[arg-type]
 
-    with pytest.raises(ValueError, match="Unsupported output format: rst"):
-        app.generate_docs(output_format="rst")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="Unsupported output format: invalid"):
+        app.generate_docs(output_format="invalid")  # type: ignore[arg-type]
 
 
 def test_generate_docs_with_heading_levels():
@@ -487,10 +490,9 @@ def test_generate_docs_with_heading_levels():
     # Check the heading levels
     assert "## myapp" in actual
     assert "Main app" in actual
-    assert "### Usage" in actual
-    assert "### Commands" in actual
-    assert "### Command: cmd" in actual
-    assert "#### Usage" in actual
+    assert "**Usage**:" in actual
+    assert "**Commands**:" in actual
+    assert "### `myapp cmd`" in actual
 
 
 def test_generate_docs_complex_nested_app():
@@ -542,7 +544,7 @@ def test_generate_docs_complex_nested_app():
     assert "Complex CLI tool" in docs
     assert "version" in docs
     assert "Show version information" in docs
-    assert "## Command: git" in docs
+    assert "## `cli git`" in docs
     assert "Git operations" in docs
     assert "clone" in docs
     assert "push" in docs
@@ -610,19 +612,20 @@ def test_generate_docs_with_meta_app():
 
         Main application
 
-        ## Usage
+        **Usage**:
 
+        ```console
+        $ myapp [ARGS] [OPTIONS]
         ```
-        Usage: myapp [ARGS] [OPTIONS]
-        ```
 
-        ## Parameters
+        **Arguments**:
 
-        | Required | Parameter | Description |
-        | :------: | --------- | ----------- |
-        | ✓ | `INPUT-FILE`, `--input-file` | Input file path.<br><br>Type: `<class 'str'>` |
-        |  | `VERBOSE`, `--verbose`, `--no-verbose` | Enable verbose output.<br><br>Type: `<class 'bool'>`<br>Default: `False` |
-        |  | `CONFIG`, `--config` | Config file<br><br>Type: `typing.Optional[str]` |
+        * `INPUT-FILE`: Input file path.  **[required]**
+
+        **Options**:
+
+        * `VERBOSE, --verbose, --no-verbose`: Enable verbose output.  *[default: --no-verbose]*
+        * `CONFIG, --config`: Config file
         """
     )
 
@@ -724,7 +727,7 @@ def test_generate_docs_nested_meta_apps():
     assert "Verbose output" in docs
 
     # Check db subcommand appears
-    assert "## Command: db" in docs
+    assert "## `myapp db`" in docs
     # When registering db_app.meta, it uses the meta's docstring
     assert "Database meta options" in docs
 

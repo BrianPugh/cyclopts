@@ -258,11 +258,12 @@ class MarkdownFormatter:
             if names:
                 # Use first name as primary
                 primary_name = names[0]
-                self._output.write(f"* `{primary_name}`: ")
-
                 desc = _extract_plain_text(entry.description, console)
+
                 if desc:
-                    self._output.write(desc)
+                    self._output.write(f"* `{primary_name}`: {desc}")
+                else:
+                    self._output.write(f"* `{primary_name}`:")
 
                 self._output.write("\n")
 

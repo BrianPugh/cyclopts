@@ -17,7 +17,7 @@ def test_markdown_formatter_empty_panel():
 
 
 def test_markdown_formatter_command_panel_table():
-    """Test command panel formatting as a table."""
+    """Test command panel formatting (always uses list style now)."""
     formatter = MarkdownFormatter(table_style="table")
     panel = HelpPanel(
         format="command",
@@ -34,10 +34,8 @@ def test_markdown_formatter_command_panel_table():
     expected = dedent("""\
         ## Commands
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `serve` | Start the server |
-        | `build`, `-b` | Build the project |
+        * `serve`: Start the server
+        * `build`: Build the project
 
         """)
 
@@ -62,12 +60,8 @@ def test_markdown_formatter_command_panel_list():
     expected = dedent("""\
         ## Commands
 
-        **`serve`**
-        Start the server
-
-        **`build`, `-b`**
-        Build the project
-
+        * `serve`: Start the server
+        * `build`: Build the project
 
         """)
 
@@ -105,10 +99,8 @@ def test_markdown_formatter_parameter_panel_table():
     expected = dedent("""\
         ## Parameters
 
-        | Required | Parameter | Description |
-        | :------: | --------- | ----------- |
-        | ✓ | `--port`, `-p` | Port number<br><br>Type: `int`<br>Default: `8080` |
-        |  | `--verbose`, `-v` | Enable verbose mode<br><br>Choices: `true`, `false` |
+        * `-p, --port`: Port number  **[required]**  *[default: 8080]*
+        * `-v, --verbose`: Enable verbose mode  *[choices: true, false]*
 
         """)
 
@@ -144,15 +136,8 @@ def test_markdown_formatter_parameter_panel_list():
     expected = (
         "## Parameters\n"
         "\n"
-        "**`--port`, `-p`** *(required)*  \n"
-        "Port number  \n"
-        "  - Type: `int`  \n"
-        "  - Default: `8080`  \n"
-        "\n"
-        "**`--verbose`**  \n"
-        "Enable verbose mode  \n"
-        "  - Environment: `VERBOSE`  \n"
-        "\n"
+        "* `-p, --port`: Port number  **[required]**  *[default: 8080]*\n"
+        "* `--verbose`: Enable verbose mode  *[env: VERBOSE]*\n"
         "\n"
     )
 
@@ -172,9 +157,7 @@ def test_markdown_formatter_heading_level():
     expected = dedent("""\
         ### Commands
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `test` | Test command |
+        * `test`: Test command
 
         """)
 
@@ -199,9 +182,7 @@ def test_markdown_formatter_with_panel_description():
 
         Available commands for the application
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `test` | Test command |
+        * `test`: Test command
 
         """)
 
@@ -316,9 +297,7 @@ def test_parameter_table_with_all_metadata():
     expected = dedent("""\
         ## Parameters
 
-        | Required | Parameter | Description |
-        | :------: | --------- | ----------- |
-        | ✓ | `--config`, `-c` | Configuration file path<br><br>Type: `Path`<br>Choices: `/etc/app.conf`, `~/.app.conf`, `./app.conf`<br>Env: `APP_CONFIG`, `CONFIG_PATH`<br>Default: `/etc/app.conf` |
+        * `-c, --config`: Configuration file path  **[required]**  *[choices: /etc/app.conf, ~/.app.conf, ./app.conf]*  *[env: APP_CONFIG, CONFIG_PATH]*  *[default: /etc/app.conf]*
 
         """)
 
@@ -352,10 +331,8 @@ def test_parameter_table_no_required_column():
     expected = dedent("""\
         ## Options
 
-        | Parameter | Description |
-        | --------- | ----------- |
-        | `--debug` | Enable debug mode<br><br>Type: `bool`<br>Default: `False` |
-        | `--quiet`, `-q` | Suppress output |
+        * `--debug`: Enable debug mode
+        * `-q, --quiet`: Suppress output
 
         """)
 
@@ -383,9 +360,7 @@ def test_parameter_with_no_description():
     expected = dedent("""\
         ## Parameters
 
-        | Parameter | Description |
-        | --------- | ----------- |
-        | `--flag` | Type: `bool`<br>Default: `True` |
+        * `--flag`:   *[default: --flag]*
 
         """)
 
@@ -410,10 +385,8 @@ def test_command_table_empty_description():
     expected = dedent("""\
         ## Commands
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `test` |  |
-        | `run` | Run the application |
+        * `test`:
+        * `run`: Run the application
 
         """)
 
@@ -446,12 +419,8 @@ def test_command_list_with_shorts_and_aliases():
     expected = dedent("""\
         ## Available Commands
 
-        **`serve`, `server`, `s`**
-        Start the development server
-
-        **`test`, `t`, `T`**
-        Run tests
-
+        * `serve`: Start the development server
+        * `test`: Run tests
 
         """)
 
@@ -483,15 +452,11 @@ def test_multiple_panels_accumulate():
     expected = dedent("""\
         ## Commands
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `help` | Show help |
+        * `help`: Show help
 
         ## Global Options
 
-        | Parameter | Description |
-        | --------- | ----------- |
-        | `--verbose` | Verbose output<br><br>Type: `bool` |
+        * `--verbose`: Verbose output
 
         """)
 
@@ -515,9 +480,7 @@ def test_escape_markdown_in_descriptions():
     expected = dedent("""\
         ## Commands
 
-        | Command | Description |
-        | ------- | ----------- |
-        | `pipe` | Use \\| to separate values |
+        * `pipe`: Use | to separate values
 
         """)
 
