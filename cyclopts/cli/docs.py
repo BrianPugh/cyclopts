@@ -9,18 +9,35 @@ from cyclopts.loader import load_app_from_script
 from cyclopts.parameter import Parameter
 from cyclopts.utils import UNSET
 
+_FORMAT_MAP: dict[str, Literal["markdown", "html", "rst"]] = {
+    "md": "markdown",
+    "markdown": "markdown",
+    "html": "html",
+    "htm": "html",
+    "rst": "rst",
+    "rest": "rst",
+    "restructuredtext": "rst",
+}
+
+_SUFFIX_FORMAT_MAP: dict[str, Literal["markdown", "html", "rst"]] = {
+    ".md": "markdown",
+    ".markdown": "markdown",
+    ".html": "html",
+    ".htm": "html",
+    ".rst": "rst",
+    ".rest": "rst",
+}
+
 
 def _canonicalize_format(format_value: str) -> Literal["markdown", "html", "rst"]:
     """Canonicalize format aliases to standard format names."""
     format_lower = format_value.lower()
-    if format_lower in ("md", "markdown"):
-        return "markdown"
-    elif format_lower in ("html", "htm"):
-        return "html"
-    elif format_lower in ("rst", "rest", "restructuredtext"):
-        return "rst"
-    else:
+    canonical_format = _FORMAT_MAP.get(format_lower)
+
+    if canonical_format is None:
         raise ValueError(f'Unsupported format "{format_value}". Supported formats: markdown, html, rst')
+
+    return canonical_format
 
 
 def _format_group_validator(argument_collection):
@@ -32,16 +49,14 @@ def _format_group_validator(argument_collection):
             raise ValueError('"--format" must be specified when output path is not provided.')
 
         suffix = output_arg.value.suffix.lower()
-        if suffix in (".md", ".markdown"):
-            format_arg.value = "markdown"
-        elif suffix in (".html", ".htm"):
-            format_arg.value = "html"
-        elif suffix in (".rst", ".rest"):
-            format_arg.value = "rst"
-        else:
+        inferred_format = _SUFFIX_FORMAT_MAP.get(suffix)
+
+        if inferred_format is None:
             raise ValueError(
                 f'Cannot infer format from output extension "{suffix}". Please specify "--format" explicitly.'
             )
+
+        format_arg.value = inferred_format
 
 
 format_group = Group(validator=_format_group_validator)
