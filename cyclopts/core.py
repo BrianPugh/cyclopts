@@ -1948,6 +1948,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                no_root_title=no_root_title,
             )
         elif output_format == "rst":
             doc = generate_rst_docs(
