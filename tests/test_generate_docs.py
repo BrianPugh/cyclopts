@@ -469,10 +469,10 @@ def test_generate_docs_invalid_format():
 
     app = App(name="myapp", help="Test app")
 
-    with pytest.raises(ValueError, match="Unsupported output format: pdf"):
+    with pytest.raises(ValueError, match='Unsupported format "pdf"'):
         app.generate_docs(output_format="pdf")  # type: ignore[arg-type]
 
-    with pytest.raises(ValueError, match="Unsupported output format: invalid"):
+    with pytest.raises(ValueError, match='Unsupported format "invalid"'):
         app.generate_docs(output_format="invalid")  # type: ignore[arg-type]
 
 

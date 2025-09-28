@@ -71,6 +71,7 @@ with suppress(ImportError):
 if TYPE_CHECKING:
     from rich.console import Console
 
+    from cyclopts.docs.types import DocFormat
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
@@ -1861,7 +1862,7 @@ class App:
 
     def generate_docs(
         self,
-        output_format: Literal["markdown", "html", "rst"] = "markdown",
+        output_format: "DocFormat" = "markdown",
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
@@ -1873,9 +1874,9 @@ class App:
 
         Parameters
         ----------
-        output_format : Literal["markdown", "html", "rst"]
-            Output format for the documentation.
-            Default is "markdown".
+        output_format : DocFormat
+            Output format for the documentation. Accepts "markdown"/"md", "html"/"htm",
+            or "rst"/"rest"/"restructuredtext". Default is "markdown".
         recursive : bool
             If True, generate documentation for all subcommands recursively.
             Default is True.
@@ -1915,14 +1916,15 @@ class App:
         >>> # To write to file, caller can do:
         >>> # Path("docs/cli.md").write_text(docs)
         """
-        from cyclopts.docs import generate_markdown_docs, generate_rst_docs
+        from cyclopts.docs import (
+            canonicalize_format,
+            generate_markdown_docs,
+            generate_rst_docs,
+        )
         from cyclopts.docs.html import generate_html_docs
 
-        # Validate output format (this is now redundant with type checking, but kept for runtime safety)
-        if output_format not in ("markdown", "html", "rst"):
-            raise ValueError(
-                f"Unsupported output format: {output_format}. Supported formats: 'markdown', 'html', 'rst'."
-            )
+        # Canonicalize the format to handle aliases
+        output_format = canonicalize_format(output_format)
 
         # Generate documentation based on format
         if output_format == "markdown":

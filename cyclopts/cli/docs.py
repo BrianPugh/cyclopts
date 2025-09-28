@@ -1,43 +1,18 @@
 """Generate documentation for Cyclopts applications."""
 
 from pathlib import Path
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Optional
 
 from cyclopts.cli import app
+from cyclopts.docs.types import (
+    FORMAT_ALIASES,
+    DocFormat,
+    canonicalize_format,
+)
 from cyclopts.group import Group
 from cyclopts.loader import load_app_from_script
 from cyclopts.parameter import Parameter
 from cyclopts.utils import UNSET
-
-_FORMAT_MAP: dict[str, Literal["markdown", "html", "rst"]] = {
-    "md": "markdown",
-    "markdown": "markdown",
-    "html": "html",
-    "htm": "html",
-    "rst": "rst",
-    "rest": "rst",
-    "restructuredtext": "rst",
-}
-
-_SUFFIX_FORMAT_MAP: dict[str, Literal["markdown", "html", "rst"]] = {
-    ".md": "markdown",
-    ".markdown": "markdown",
-    ".html": "html",
-    ".htm": "html",
-    ".rst": "rst",
-    ".rest": "rst",
-}
-
-
-def _canonicalize_format(format_value: str) -> Literal["markdown", "html", "rst"]:
-    """Canonicalize format aliases to standard format names."""
-    format_lower = format_value.lower()
-    canonical_format = _FORMAT_MAP.get(format_lower)
-
-    if canonical_format is None:
-        raise ValueError(f'Unsupported format "{format_value}". Supported formats: markdown, html, rst')
-
-    return canonical_format
 
 
 def _format_group_validator(argument_collection):
@@ -49,7 +24,9 @@ def _format_group_validator(argument_collection):
             raise ValueError('"--format" must be specified when output path is not provided.')
 
         suffix = output_arg.value.suffix.lower()
-        inferred_format = _SUFFIX_FORMAT_MAP.get(suffix)
+        # Strip the leading period from suffix to look up in FORMAT_ALIASES
+        suffix_key = suffix.lstrip(".")
+        inferred_format = FORMAT_ALIASES.get(suffix_key)
 
         if inferred_format is None:
             raise ValueError(
@@ -68,7 +45,7 @@ def generate_docs(
     output: Annotated[Optional[Path], Parameter(group=format_group)] = None,
     *,
     format: Annotated[
-        Optional[Literal["markdown", "md", "html", "htm", "rst", "rest", "restructuredtext"]],
+        Optional[DocFormat],
         Parameter(group=format_group),
     ] = None,
     recursive: bool = True,
@@ -85,7 +62,7 @@ def generate_docs(
         script's global namespace.
     output : Optional[Path]
         Output file path. If not specified, prints to stdout.
-    format : Optional[Literal["markdown", "md", "html", "htm", "rst", "rest", "restructuredtext"]]
+    format : Optional[DocFormat]
         Output format for documentation. Accepts "markdown"/"md", "html"/"htm",
         or "rst"/"rest"/"restructuredtext". If not specified, inferred from output
         file extension (.md/.markdown for markdown, .html/.htm for html,
@@ -99,7 +76,7 @@ def generate_docs(
     """
     if format is None:  # Handled by _format_group_validator
         raise ValueError("Must specify format.")
-    format = _canonicalize_format(format)
+    format = canonicalize_format(format)
     app_obj, _ = load_app_from_script(script)
     docs_content = app_obj.generate_docs(
         output_format=format,
