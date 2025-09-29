@@ -287,7 +287,6 @@ def generate_rst_docs(
     commands_filter: Optional[list[str]] = None,
     exclude_commands: Optional[list[str]] = None,
     no_root_title: bool = False,
-    sections_only: bool = False,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -328,10 +327,6 @@ def generate_rst_docs(
         If True, skip generating the root application title.
         Useful when embedding in existing documentation with its own title.
         Default is False.
-    sections_only : bool
-        If True, generate clean sections for commands with minimal subsections.
-        Renders usage, arguments, and options as content rather than subsections.
-        Default is False.
 
     Returns
     -------
@@ -358,11 +353,8 @@ def generate_rst_docs(
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        # Don't use backticks in sections_only mode - we want real section headers
-        if sections_only:
-            title = full_command
-        else:
-            title = f"``{full_command}``"
+        # Use clean section headers
+        title = full_command
 
     # Add command prefix if specified
     if command_prefix:
@@ -410,9 +402,8 @@ def generate_rst_docs(
             lines.append(desc_text.strip())
             lines.append("")
 
-    # Generate table of contents if this is the root level and has commands
-    # Skip TOC when sections_only is enabled (sections integrate with Sphinx's toctree)
-    if generate_toc and not command_chain and app._commands and not sections_only:
+    # Skip TOC generation (sections integrate with Sphinx's toctree)
+    if False:  # Previously: generate_toc and not command_chain and app._commands
         # Collect all commands recursively for TOC
         toc_commands = _collect_commands_for_toc(
             app,
@@ -424,13 +415,9 @@ def generate_rst_docs(
             _generate_toc_entries(lines, toc_commands, app_name=app_name)
             lines.append("")
 
-    # Add usage section - only if we have a parent title and not in sections_only mode
-    if not (no_root_title and not command_chain) and not sections_only:
-        usage_heading = _make_section_header("Usage", effective_heading_level + 1)
-        lines.extend(usage_heading)
-        lines.append("")
-    elif sections_only and command_chain:
-        # In sections_only mode, render usage as bold text for subcommands
+    # Add usage section - only if we have a parent title
+    if not (no_root_title and not command_chain) and command_chain:
+        # Render usage as bold text for subcommands
         lines.append("**Usage:**")
         lines.append("")
 
@@ -545,14 +532,9 @@ def generate_rst_docs(
     # Render panels in order: Arguments, Options, Commands
     # Render arguments
     if argument_panels and not (no_root_title and not command_chain):
-        if sections_only:
-            # In sections_only mode, use bold text instead of subsections
-            lines.append("**Arguments:**")
-            lines.append("")
-        else:
-            arg_heading = _make_section_header("Arguments", effective_heading_level + 1)
-            lines.extend(arg_heading)
-            lines.append("")
+        # Use bold text instead of subsections
+        lines.append("**Arguments:**")
+        lines.append("")
         for _, panel in argument_panels:
             formatter.reset()
             panel.title = ""
@@ -564,14 +546,9 @@ def generate_rst_docs(
 
     # Render options
     if (option_panels or grouped_panels) and not (no_root_title and not command_chain):
-        if sections_only:
-            # In sections_only mode, use bold text instead of subsections
-            lines.append("**Options:**")
-            lines.append("")
-        else:
-            opt_heading = _make_section_header("Options", effective_heading_level + 1)
-            lines.extend(opt_heading)
-            lines.append("")
+        # Use bold text instead of subsections
+        lines.append("**Options:**")
+        lines.append("")
 
         # First render ungrouped options
         for _, panel in option_panels:
@@ -592,22 +569,8 @@ def generate_rst_docs(
                 lines.append(output)
                 lines.append("")
 
-    # Render commands
-    if command_panels:
-        # Skip command list entirely when sections_only is enabled
-        if not sections_only:
-            if not (no_root_title and not command_chain):
-                cmd_heading = _make_section_header("Commands", effective_heading_level + 1)
-                lines.extend(cmd_heading)
-                lines.append("")
-            for _, panel in command_panels:
-                formatter.reset()
-                panel.title = ""
-                formatter(None, None, panel)
-                output = formatter.get_output().strip()
-                if output:
-                    lines.append(output)
-                    lines.append("")
+    # Skip command list entirely (sections integrate with Sphinx's toctree)
+    # Command panels are not rendered in sections mode
 
     # Recursively document subcommands
     if recursive and app._commands:
@@ -663,7 +626,6 @@ def generate_rst_docs(
                 commands_filter=sub_commands_filter,
                 exclude_commands=sub_exclude_commands,
                 no_root_title=False,  # Subcommands should have titles
-                sections_only=sections_only,  # Propagate sections_only mode
             )
             lines.append(subdocs)
 

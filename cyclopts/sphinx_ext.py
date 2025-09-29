@@ -381,7 +381,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             commands_filter=opts.commands,
             exclude_commands=opts.exclude_commands,
             no_root_title=True,  # Always skip root title in Sphinx context
-            sections_only=True,  # Always use sections-only mode for better Sphinx integration
         )
 
     def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> List["nodes.Node"]:

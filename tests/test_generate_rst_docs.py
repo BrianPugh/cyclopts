@@ -24,18 +24,14 @@ def test_generate_rst_docs_simple_app():
 
     docs = app.generate_docs(output_format="rst")
 
-    # Check RST structure - heading markers match the length of title
     assert "=====\nmyapp\n=====" in docs  # Level 1 heading with matching markers
     assert "myapp" in docs
     assert "A simple CLI application" in docs
 
-    # Check usage section
-    assert "Usage" in docs
-    assert "-----" in docs  # Level 2 heading marker
+    assert "Usage:" in docs
     assert "::" in docs  # Literal block marker
     assert "myapp" in docs
 
-    # Check parameters are documented
     assert "``NAME, --name``" in docs or "name, --name" in docs.lower()
     assert "Your name" in docs
     assert "``VERBOSE, --verbose" in docs or "verbose, --verbose" in docs.lower()
@@ -75,9 +71,9 @@ def test_generate_rst_docs_with_commands():
     assert "myapp" in docs
     assert "CLI with commands" in docs
 
-    # Check commands are listed
-    assert "``serve``" in docs
-    assert "``build``" in docs
+    # Check commands are documented as sections (not in a list)
+    assert "myapp serve" in docs
+    assert "myapp build" in docs
     assert "Start the server" in docs
     assert "Build the project" in docs
 
@@ -107,8 +103,8 @@ def test_generate_rst_docs_recursive():
     assert "=====\nmyapp\n=====" in docs
     assert "myapp" in docs
 
-    # Check subcommand is documented
-    assert "``db``" in docs
+    # Check subcommand is documented as a section
+    assert "myapp db" in docs
     assert "Database operations" in docs
 
     # Check nested command
@@ -198,12 +194,12 @@ def test_generate_rst_docs_hidden_commands():
     docs = app.generate_docs(output_format="rst", include_hidden=False)
     assert "visible" in docs
     # Check that the hidden command is not documented (not in Commands section)
-    assert "``hidden``" not in docs  # Check for the command name in RST format
+    assert "myapp hidden" not in docs  # Hidden command should not appear as a section
 
     # With include_hidden
     docs_with_hidden = app.generate_docs(output_format="rst", include_hidden=True)
     assert "visible" in docs_with_hidden
-    assert "``myapp hidden``" in docs_with_hidden  # Hidden command appears as subcommand section
+    assert "myapp hidden" in docs_with_hidden  # Hidden command appears as subcommand section
     assert "Hidden command." in docs_with_hidden  # And its docstring is included
 
 

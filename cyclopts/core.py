@@ -1868,7 +1868,6 @@ class App:
         heading_level: int = 1,
         flatten_commands: bool = False,
         command_prefix: str = "",
-        sections_only: bool = False,
     ) -> str:
         """Generate documentation for this CLI application.
 
@@ -1892,10 +1891,6 @@ class App:
         command_prefix : str
             Prefix to add to command headings (e.g., "Command: ").
             Default is empty string.
-        sections_only : bool
-            If True, generate clean sections for commands with minimal subsections (RST only).
-            Renders usage, arguments, and options as content rather than subsections.
-            Default is False.
 
         Returns
         -------
@@ -1949,7 +1944,6 @@ class App:
                 heading_level=heading_level,
                 flatten_commands=flatten_commands,
                 command_prefix=command_prefix,
-                sections_only=sections_only,
                 no_root_title=False,  # Default to False for direct API usage
             )
 
