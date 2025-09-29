@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from contextlib import suppress
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from attrs import define, field
 
@@ -24,7 +24,7 @@ class CacheKey:
     then the file needs to be re-read.
     """
 
-    def __init__(self, path: Union[str, Path]):
+    def __init__(self, path: str | Path):
         self.path = Path(path).absolute()
         if self.path.exists():
             stat = self.path.stat()
@@ -43,7 +43,7 @@ class CacheKey:
 
 @define
 class ConfigFromFile(ABC):
-    path: Union[str, Path] = field(converter=Path)
+    path: str | Path = field(converter=Path)
 
     root_keys: Iterable[str] = field(default=(), converter=to_tuple_converter)
     must_exist: bool = field(default=False, kw_only=True)
@@ -51,10 +51,10 @@ class ConfigFromFile(ABC):
     allow_unknown: bool = field(default=False, kw_only=True)
     use_commands_as_keys: bool = field(default=True, kw_only=True)
 
-    _config: Optional[dict[str, Any]] = field(default=None, init=False, repr=False)
+    _config: dict[str, Any] | None = field(default=None, init=False, repr=False)
     "Loaded configuration structure (to be loaded by subclassed ``_load_config`` method)."
 
-    _config_cache_key: Optional[CacheKey] = field(default=None, init=False, repr=False)
+    _config_cache_key: CacheKey | None = field(default=None, init=False, repr=False)
     "Conditions under which ``_config`` was loaded."
 
     @abstractmethod

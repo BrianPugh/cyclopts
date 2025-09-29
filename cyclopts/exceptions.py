@@ -1,7 +1,8 @@
 import inspect
 import json
+from collections.abc import Callable, Sequence
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Sequence, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Literal, Optional, get_args, get_origin
 
 from attrs import define, field
 
@@ -56,7 +57,7 @@ class CycloptsError(Exception):
     As CycloptsErrors bubble up the Cyclopts call-stack, more information is added to it.
     """
 
-    msg: Optional[str] = None
+    msg: str | None = None
     """
     If set, override automatic message generation.
     """
@@ -67,17 +68,17 @@ class CycloptsError(Exception):
     Defaults to ``False``.
     """
 
-    root_input_tokens: Optional[list[str]] = None
+    root_input_tokens: list[str] | None = None
     """
     The parsed CLI tokens that were initially fed into the :class:`App`.
     """
 
-    unused_tokens: Optional[list[str]] = None
+    unused_tokens: list[str] | None = None
     """
     Leftover tokens after parsing is complete.
     """
 
-    target: Optional[Callable] = None
+    target: Callable | None = None
     """
     The python function associated with the command being parsed.
     """
@@ -87,7 +88,7 @@ class CycloptsError(Exception):
     :class:`Argument` that was matched.
     """
 
-    command_chain: Optional[Sequence[str]] = None
+    command_chain: Sequence[str] | None = None
     """
     List of command that lead to ``target``.
     """
@@ -134,7 +135,7 @@ class ValidationError(CycloptsError):
     exception_message: str = ""
     """Parenting Assertion/Value/Type Error message."""
 
-    group: Optional[Group] = None
+    group: Group | None = None
     """If a group validator caused the exception."""
 
     value: Any = cyclopts.utils.UNSET
@@ -211,7 +212,7 @@ class CoercionError(CycloptsError):
     Input token that couldn't be coerced.
     """
 
-    target_type: Optional[type] = None
+    target_type: type | None = None
     """
     Intended type to coerce into.
     """

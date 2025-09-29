@@ -1,6 +1,6 @@
 import collections.abc
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 import pytest
 
@@ -9,7 +9,7 @@ from cyclopts.exceptions import MissingArgumentError
 
 def test_pos_list(app, assert_parse_args):
     @app.command
-    def foo(a: List[int]):
+    def foo(a: list[int]):
         pass
 
     assert_parse_args(foo, "foo 1 2 3", [1, 2, 3])
@@ -17,7 +17,7 @@ def test_pos_list(app, assert_parse_args):
 
 def test_keyword_list(app, assert_parse_args):
     @app.command
-    def foo(a: List[int]):
+    def foo(a: list[int]):
         pass
 
     assert_parse_args(foo, "foo --a=1 --a=2 --a 3", [1, 2, 3])
@@ -25,7 +25,7 @@ def test_keyword_list(app, assert_parse_args):
 
 def test_keyword_list_mutable_default(app, assert_parse_args):
     @app.command
-    def foo(a: List[int] = []):  # noqa: B006
+    def foo(a: list[int] = []):  # noqa: B006
         pass
 
     assert_parse_args(foo, "foo --a=1 --a=2 --a 3", [1, 2, 3])
@@ -34,7 +34,7 @@ def test_keyword_list_mutable_default(app, assert_parse_args):
 
 def test_keyword_list_pos(app, assert_parse_args):
     @app.command
-    def foo(a: List[int]):
+    def foo(a: list[int]):
         pass
 
     assert_parse_args(foo, "foo 1 2 3", [1, 2, 3])
@@ -42,7 +42,7 @@ def test_keyword_list_pos(app, assert_parse_args):
 
 def test_keyword_optional_list_none_default(app, assert_parse_args):
     @app.command
-    def foo(a: Optional[List[int]] = None):
+    def foo(a: list[int] | None = None):
         pass
 
     assert_parse_args(foo, "foo")
@@ -64,7 +64,7 @@ def test_keyword_list_of_bool(app, assert_parse_args, cmd_expected):
     cmd, expected = cmd_expected
 
     @app.default
-    def foo(*, verbose: Optional[list[bool]] = None):
+    def foo(*, verbose: list[bool] | None = None):
         pass
 
     if expected is None:
@@ -89,7 +89,7 @@ def test_keyword_tuple_of_bool(app, assert_parse_args, cmd_expected):
     cmd, expected = cmd_expected
 
     @app.default
-    def foo(*, verbose: Optional[tuple[bool, ...]] = None):
+    def foo(*, verbose: tuple[bool, ...] | None = None):
         pass
 
     if expected is None:
@@ -115,7 +115,7 @@ def test_keyword_sequence_of_bool(app, assert_parse_args, cmd_expected, hint):
     cmd, expected = cmd_expected
 
     @app.default
-    def foo(*, verbose: Optional[hint] = None):  # pyright: ignore[reportInvalidTypeForm]
+    def foo(*, verbose: hint | None = None):  # pyright: ignore[reportInvalidTypeForm]
         pass
 
     if expected is None:
@@ -134,7 +134,7 @@ def test_list_tuple_missing_arguments_no_arguments(app, cmd):
     """Missing values."""
 
     @app.command
-    def foo(item: List[Tuple[int, str]]):
+    def foo(item: list[tuple[int, str]]):
         pass
 
     with pytest.raises(MissingArgumentError):
@@ -152,7 +152,7 @@ def test_list_tuple_missing_arguments_non_divisible(app, cmd):
     """Missing values."""
 
     @app.command
-    def foo(item: List[Tuple[int, str]], stuff: str = ""):
+    def foo(item: list[tuple[int, str]], stuff: str = ""):
         pass
 
     with pytest.raises(MissingArgumentError):

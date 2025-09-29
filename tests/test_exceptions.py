@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Annotated, Union
+from typing import Annotated
 
 import pytest
 
@@ -272,7 +272,7 @@ def test_exceptions_coercion_error_verbose(app, console):
 
 def test_exceptions_mixed_argument_error(app, console):
     @app.default
-    def foo(bar: Union[int, dict]):
+    def foo(bar: int | dict):
         pass
 
     with console.capture() as capture, pytest.raises(MixedArgumentError):

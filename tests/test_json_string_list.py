@@ -1,5 +1,6 @@
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Iterable, Optional, Sequence
+from typing import Annotated
 
 import pytest
 
@@ -50,7 +51,7 @@ def test_json_list_str_none(app, assert_parse_args, annotation):
 
 def test_json_list_optional_int(app, assert_parse_args):
     @app.default
-    def main(values: list[Optional[int]]):  # pyright: ignore
+    def main(values: list[int | None]):  # pyright: ignore
         pass
 
     assert_parse_args(main, ["[1, null, 2]"], [1, None, 2])
@@ -156,7 +157,7 @@ def test_json_list_of_dataclass_empty_array(app, assert_parse_args):
     """Test empty JSON array for list of dataclasses."""
 
     @app.default
-    def main(values: Optional[list[User]] = None):  # pyright: ignore
+    def main(values: list[User] | None = None):  # pyright: ignore
         pass
 
     assert_parse_args(main, ["--values", "[]"], [])
@@ -317,7 +318,7 @@ def test_json_list_python_none(app):
     @dataclass
     class Config:
         name: str
-        value: Optional[int]
+        value: int | None
 
     @app.default
     def main(values: list[Config]):

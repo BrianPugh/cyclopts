@@ -1,5 +1,3 @@
-from typing import List, Optional, Set
-
 import pytest
 
 
@@ -14,7 +12,7 @@ import pytest
 )
 def test_optional_list_empty_flag_default(app, cmd_str, expected, assert_parse_args):
     @app.default
-    def foo(my_list: Optional[List[int]] = None):
+    def foo(my_list: list[int] | None = None):
         pass
 
     if expected is None:
@@ -34,7 +32,7 @@ def test_optional_list_empty_flag_default(app, cmd_str, expected, assert_parse_a
 )
 def test_optional_set_empty_flag_default(app, cmd_str, expected, assert_parse_args):
     @app.default
-    def foo(my_set: Optional[Set[int]] = None):
+    def foo(my_set: set[int] | None = None):
         pass
 
     if expected is None:

@@ -27,7 +27,7 @@ cyclopts = "cyclopts.cli:app"
 
 [tool.poetry.dependencies]
 # Be as loose as possible if writing a library.
-python = ">=3.9"
+python = ">=3.10"
 typing-extensions = { version = ">=4.8.0", python = "<3.11" }
 attrs = ">=23.1.0"
 rich = ">=13.6.0"
@@ -96,8 +96,6 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 
-    "if sys.version_info < (3, 10):",
-    "if sys.version_info >= (3, 10):",
     "from typing import Annotated",
     "except ImportError:",
 
@@ -113,7 +111,7 @@ venv = ".venv"
 ignore = ["docs/", "tests/test_py3*.py"]
 
 [tool.ruff]
-target-version = 'py38'
+target-version = 'py310'
 line-length = 120
 exclude = [
     "migrations",
@@ -124,6 +122,7 @@ exclude = [
     ".env",
     "venv",
     ".venv",
+    "tests/test_py3*.py",
 ]
 
 [tool.ruff.format]
@@ -148,7 +147,6 @@ select = [
 ]
 
 ignore = [
-    "B905",   # zip strict=True; remove once python <3.10 support is dropped.
     "D100",
     "D101",
     "D102",
@@ -190,6 +188,7 @@ convention = "numpy"
     "S102",   # use of "exec"
     "S106",   # possible hardcoded password.
     "PGH001", # use of "eval"
+    "UP007",  # Use `X | Y` for type annotations; many tests specifically test Union/Optional
 ]
 "docs/*.py" = [
     "F811", # redefinition

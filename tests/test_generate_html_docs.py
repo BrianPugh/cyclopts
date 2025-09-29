@@ -2,7 +2,7 @@
 
 import tempfile
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 from cyclopts import App, Parameter
 
@@ -171,7 +171,7 @@ def test_generate_html_docs_with_meta_app():
     @app.meta.default
     def meta(
         verbose: bool = False,
-        config: Annotated[Optional[str], Parameter(help="Config file")] = None,
+        config: Annotated[str | None, Parameter(help="Config file")] = None,
     ):
         """Meta app for global options.
 

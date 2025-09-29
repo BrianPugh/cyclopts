@@ -1,7 +1,7 @@
 """Test help customization via Group help_formatter."""
 
 from textwrap import dedent
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from rich.box import DOUBLE, SIMPLE, SQUARE
 from rich.console import Console
@@ -1445,7 +1445,7 @@ def test_with_newline_metadata_classmethod(console: Console):
     def main(
         verbose: Annotated[bool, Parameter(help="Enable verbose output", env_var="VERBOSE")] = False,
         config: Annotated[str, Parameter(help="Config file path", env_var=["CONFIG", "CFG"])] = "config.yaml",
-        output: Annotated[Optional[str], Parameter(help="Output file")] = None,
+        output: Annotated[str | None, Parameter(help="Output file")] = None,
     ):
         """Test application with newline metadata."""
         pass

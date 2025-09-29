@@ -1,6 +1,6 @@
 """Documentation generation functions for cyclopts apps."""
 
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from cyclopts.docs.base import BaseDocGenerator
 from cyclopts.help.formatters._shared import extract_plain_text
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 def _collect_commands_for_toc(
     app: "App", include_hidden: bool = False, prefix: str = ""
-) -> List[Tuple[str, str, "App"]]:
+) -> list[tuple[str, str, "App"]]:
     """Recursively collect all commands for table of contents.
 
     Returns a list of (display_name, anchor, app) tuples.
@@ -37,7 +37,7 @@ def _collect_commands_for_toc(
 
 
 def _generate_toc_entries(
-    lines: List[str], commands: List[Tuple[str, str, "App"]], level: int = 0, app_name: Optional[str] = None
+    lines: list[str], commands: list[tuple[str, str, "App"]], level: int = 0, app_name: str | None = None
 ) -> None:
     """Generate TOC entries with proper indentation."""
     for display_name, anchor, _app in commands:
@@ -68,7 +68,7 @@ def generate_markdown_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
-    command_chain: Optional[list[str]] = None,
+    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
 ) -> str:

@@ -65,7 +65,7 @@ class DefaultFormatter:
     table_spec: Optional["TableSpec"] = None
     """Table specification for table styling (borders, padding, column separation, etc)."""
 
-    column_specs: Optional[Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"]] = None
+    column_specs: Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"] | None = None
     """Column specifications or builder function for table columns (width, style, alignment, etc)."""
 
     @classmethod

@@ -1,6 +1,6 @@
 import inspect
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from enum import Enum
 from functools import lru_cache, partial
 from pathlib import Path
@@ -8,10 +8,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Literal,
-    Optional,
-    Sequence,
     get_args,
     get_origin,
 )
@@ -92,16 +89,16 @@ class HelpEntry:
     sort_key: Any = None
     """Custom sorting key for ordering entries."""
 
-    type: Optional[Any] = None
+    type: Any | None = None
     """Type annotation of the parameter."""
 
-    choices: Optional[tuple[str, ...]] = None
+    choices: tuple[str, ...] | None = None
     """Available choices for this parameter."""
 
-    env_var: Optional[tuple[str, ...]] = None
+    env_var: tuple[str, ...] | None = None
     """Environment variable names that can set this parameter."""
 
-    default: Optional[str] = None
+    default: str | None = None
     """Default value for this parameter to display. None means no default to show."""
 
     def copy(self, **kwargs):

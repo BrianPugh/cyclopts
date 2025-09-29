@@ -3,10 +3,10 @@ import itertools
 import os
 import shlex
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Sequence, Union
+from typing import TYPE_CHECKING
 
 from cyclopts._convert import _bool
 from cyclopts.argument import ArgumentCollection
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 CliToken = partial(Token, source="cli")
 
 
-def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> list[str]:
+def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     if tokens is None:
         tokens = sys.argv[1:]  # Remove the executable
     elif isinstance(tokens, str):
@@ -52,7 +52,7 @@ def _common_root_keys(argument_collection) -> tuple[str, ...]:
     for argument in argument_collection[1:]:
         if not argument.keys:
             return ()
-        for i, (common_key, argument_key) in enumerate(zip(common, argument.keys)):
+        for i, (common_key, argument_key) in enumerate(zip(common, argument.keys, strict=False)):
             if common_key != argument_key:
                 if i == 0:
                     return ()
@@ -362,7 +362,7 @@ def create_bound_arguments(
     func: Callable
         Function.
     argument_collection: ArgumentCollection
-    tokens: List[str]
+    tokens: list[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
     configs: Iterable[Callable]
     end_of_options_delimiter: str
@@ -373,7 +373,7 @@ def create_bound_arguments(
     bound: inspect.BoundArguments
         The converted and bound positional and keyword arguments for ``f``.
 
-    unused_tokens: List[str]
+    unused_tokens: list[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
     unused_tokens = tokens

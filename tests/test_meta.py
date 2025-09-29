@@ -95,7 +95,7 @@ def test_meta_app_nested_root_help(nested_meta_app, console, queue):
 
 def test_meta_app_nested_subapp_help(nested_meta_app, console, queue):
     """
-    classical command chain
+    Classical command chain
     app.meta -> app     -> subapp.meta -> subapp -> help
     0        -> MISSING -> 1           -> MISSING -> help
 

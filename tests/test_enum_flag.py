@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import Flag, IntFlag, auto
 from textwrap import dedent
-from typing import Annotated, Optional
+from typing import Annotated
 
 import pytest
 
@@ -52,7 +52,7 @@ def test_int_flag_as_boolean_flags(app, assert_parse_args):
     """Test that IntFlag enum members are exposed as boolean CLI flags."""
 
     @app.default
-    def main(error_on: Optional[HttpStatus] = None):
+    def main(error_on: HttpStatus | None = None):
         pass
 
     assert_parse_args(main, "")

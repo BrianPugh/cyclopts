@@ -4,7 +4,7 @@
 Installation
 ============
 
-Cyclopts requires Python >=3.9 and can be installed from PyPI via:
+Cyclopts requires Python >=3.10 and can be installed from PyPI via:
 
 .. code-block:: bash
 

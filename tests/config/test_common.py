@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 import pytest
 
@@ -11,17 +11,17 @@ from cyclopts.parameter import Parameter
 
 
 class DummyErrorConfigNoMsg(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         raise ValueError
 
 
 class DummyErrorConfigMsg(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         raise ValueError("My exception's message.")
 
 
 class Dummy(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         return {
             "key1": "foo1",
             "key2": "foo2",
@@ -34,7 +34,7 @@ class Dummy(ConfigFromFile):
 
 
 class DummyRootKeys(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         return {
             "tool": {
                 "cyclopts": {
@@ -50,7 +50,7 @@ class DummyRootKeys(ConfigFromFile):
 
 
 class DummySubKeys(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         return {
             "key1": {
                 "subkey1": ["subkey1val1", "subkey1val2"],

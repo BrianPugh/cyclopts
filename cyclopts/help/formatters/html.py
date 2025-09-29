@@ -87,8 +87,8 @@ class HtmlFormatter:
         self,
         heading_level: int = 2,
         include_hidden: bool = False,
-        app_name: Optional[str] = None,
-        command_chain: Optional[list[str]] = None,
+        app_name: str | None = None,
+        command_chain: list[str] | None = None,
     ):
         self.heading_level = heading_level
         self.include_hidden = include_hidden

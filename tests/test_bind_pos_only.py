@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 
 from cyclopts import MissingArgumentError, UnknownOptionError
@@ -84,9 +82,6 @@ def test_pos_only_extended_exceptions(app, cmd_str_e):
         app.parse_args(cmd_str, print_error=False, exit_on_error=False)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 10), reason="https://peps.python.org/pep-0563/ Postponed Evaluation of Annotations"
-)
 @pytest.mark.parametrize(
     "cmd_str",
     [

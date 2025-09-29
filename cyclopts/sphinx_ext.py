@@ -1,7 +1,7 @@
 """Sphinx extension for automatic Cyclopts CLI documentation."""
 
 import importlib
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import attrs
 
@@ -68,8 +68,8 @@ class DirectiveOptions:
     """Configuration for the Cyclopts directive."""
 
     heading_level: int = 2
-    commands: Optional[List[str]] = None
-    exclude_commands: Optional[List[str]] = None
+    commands: list[str] | None = None
+    exclude_commands: list[str] | None = None
 
     # All booleans must have ``False`` default.
     no_recursive: bool = False
@@ -107,7 +107,7 @@ class DirectiveOptions:
         return cls(**kwargs)
 
     @staticmethod
-    def spec() -> Dict[str, Any]:
+    def spec() -> dict[str, Any]:
         """Generate Sphinx option_spec from DirectiveOptions fields."""
         if not SPHINX_AVAILABLE:
             return {}
@@ -135,9 +135,9 @@ class DirectiveOptions:
 
 def _should_include_command(
     command_name: str,
-    command_path: List[str],
-    commands_filter: Optional[List[str]],
-    exclude_commands: Optional[List[str]],
+    command_path: list[str],
+    commands_filter: list[str] | None,
+    exclude_commands: list[str] | None,
 ) -> bool:
     """Check if a command should be included in documentation.
 
@@ -145,11 +145,11 @@ def _should_include_command(
     ----------
     command_name : str
         The name of the command.
-    command_path : List[str]
+    command_path : list[str]
         The full path to the command (including parent commands).
-    commands_filter : Optional[List[str]]
+    commands_filter : list[str] | None
         If specified, only include commands in this list.
-    exclude_commands : Optional[List[str]]
+    exclude_commands : list[str] | None
         If specified, exclude commands in this list.
 
     Returns
@@ -193,9 +193,9 @@ def _should_include_command(
 
 def _filter_commands(
     commands: dict,
-    commands_filter: Optional[List[str]],
-    exclude_commands: Optional[List[str]],
-    parent_path: Optional[List[str]] = None,
+    commands_filter: list[str] | None,
+    exclude_commands: list[str] | None,
+    parent_path: list[str] | None = None,
 ) -> dict:
     """Filter commands based on inclusion/exclusion lists.
 
@@ -226,7 +226,7 @@ def _filter_commands(
     return filtered
 
 
-def _process_rst_content(content: str, skip_title: bool = False) -> List[str]:
+def _process_rst_content(content: str, skip_title: bool = False) -> list[str]:
     """Process RST content to remove problematic elements."""
     lines = content.splitlines()
     processed = []
@@ -257,7 +257,7 @@ def _process_rst_content(content: str, skip_title: bool = False) -> List[str]:
     return processed
 
 
-def _create_section_nodes(lines: List[str], state: Any) -> List["nodes.Node"]:
+def _create_section_nodes(lines: list[str], state: Any) -> list["nodes.Node"]:
     """Create section nodes from RST lines."""
     if not SPHINX_AVAILABLE:
         return []
@@ -347,7 +347,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
     final_argument_whitespace = False
     option_spec = DirectiveOptions.spec()
 
-    def run(self) -> List["nodes.Node"]:
+    def run(self) -> list["nodes.Node"]:
         """Generate documentation nodes for the Cyclopts app."""
         if not SPHINX_AVAILABLE:
             return []
@@ -381,7 +381,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             no_root_title=True,  # Always skip root title in Sphinx context
         )
 
-    def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> List["nodes.Node"]:
+    def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> list["nodes.Node"]:
         """Create docutils nodes from RST content."""
         if not SPHINX_AVAILABLE:
             return []
@@ -391,7 +391,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         # Always use section nodes for better Sphinx integration
         return _create_section_nodes(lines, self.state)
 
-    def _error_node(self, message: str) -> List["nodes.Node"]:
+    def _error_node(self, message: str) -> list["nodes.Node"]:
         """Create an error node with the given message."""
         if not SPHINX_AVAILABLE:
             return []
@@ -403,7 +403,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         return [nodes.error("", nodes.paragraph(text=message))]
 
 
-def setup(app: "Sphinx") -> Dict[str, Any]:
+def setup(app: "Sphinx") -> dict[str, Any]:
     """Setup function for the Sphinx extension."""
     if SPHINX_AVAILABLE:
         app.add_directive("cyclopts", CycloptsDirective)

@@ -25,16 +25,16 @@ class NameRenderer:
 
     Parameters
     ----------
-    max_width : Optional[int]
+    max_width : int | None
         Maximum width for wrapping. If None, no wrapping is applied.
     """
 
-    def __init__(self, max_width: Optional[int] = None):
+    def __init__(self, max_width: int | None = None):
         """Initialize the renderer with formatting options.
 
         Parameters
         ----------
-        max_width : Optional[int]
+        max_width : int | None
             Maximum width for wrapping. If None, no wrapping is applied.
         """
         self.max_width = max_width
@@ -293,25 +293,25 @@ class ColumnSpec:
     Corresponds to the ``overflow`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
-    width: Optional[int] = None
+    width: int | None = None
     """Fixed width for the column in characters.
 
     Corresponds to the ``width`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
-    min_width: Optional[int] = None
+    min_width: int | None = None
     """Minimum width for the column in characters.
 
     Corresponds to the ``min_width`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
-    max_width: Optional[int] = None
+    max_width: int | None = None
     """Maximum width for the column in characters.
 
     Corresponds to the ``max_width`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
-    ratio: Optional[int] = None
+    ratio: int | None = None
     """Relative width ratio compared to other columns.
 
     Corresponds to the ``ratio`` parameter of :meth:`rich.table.Table.add_column`.
@@ -323,7 +323,7 @@ class ColumnSpec:
     Corresponds to the ``no_wrap`` parameter of :meth:`rich.table.Table.add_column`.
     """
 
-    highlight: Optional[bool] = None
+    highlight: bool | None = None
     """Enable automatic highlighting of text in the column.
 
     Corresponds to the ``highlight`` parameter of :meth:`rich.table.Table.add_column`.
@@ -457,13 +457,13 @@ class TableSpec:
     """
 
     # Intrinsic table styling/config
-    title: Optional[str] = None
+    title: str | None = None
     """Title text displayed above the table.
 
     Corresponds to the ``title`` parameter of :class:`~rich.table.Table`.
     """
 
-    caption: Optional[str] = None
+    caption: str | None = None
     """Caption text displayed below the table.
 
     Corresponds to the ``caption`` parameter of :class:`~rich.table.Table`.
@@ -547,19 +547,19 @@ class TableSpec:
     Corresponds to the ``collapse_padding`` parameter of :class:`~rich.table.Table`.
     """
 
-    width: Optional[int] = None
+    width: int | None = None
     """Fixed width for the table in characters.
 
     Corresponds to the ``width`` parameter of :class:`~rich.table.Table`.
     """
 
-    min_width: Optional[int] = None
+    min_width: int | None = None
     """Minimum width for the table in characters.
 
     Corresponds to the ``min_width`` parameter of :class:`~rich.table.Table`.
     """
 
-    safe_box: Optional[bool] = None
+    safe_box: bool | None = None
     """Whether to use ASCII-safe box characters for compatibility.
 
     Corresponds to the ``safe_box`` parameter of :class:`~rich.table.Table`.
@@ -722,19 +722,19 @@ class PanelSpec:
     Corresponds to the ``expand`` parameter of :class:`~rich.panel.Panel`.
     """
 
-    width: Optional[int] = None
+    width: int | None = None
     """Fixed width for the panel in characters.
 
     Corresponds to the ``width`` parameter of :class:`~rich.panel.Panel`.
     """
 
-    height: Optional[int] = None
+    height: int | None = None
     """Fixed height for the panel in lines.
 
     Corresponds to the ``height`` parameter of :class:`~rich.panel.Panel`.
     """
 
-    safe_box: Optional[bool] = None
+    safe_box: bool | None = None
     """Whether to use ASCII-safe box characters for compatibility.
 
     Corresponds to the ``safe_box`` parameter of :class:`~rich.panel.Panel`.

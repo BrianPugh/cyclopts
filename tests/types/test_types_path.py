@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional, Tuple
 
 import pytest
 
@@ -49,7 +48,7 @@ def test_types_existing_file_app_signature_default(app):
 
 def test_types_optional_existing_file_app_signature_default(app):
     @app.default
-    def main(f: Optional[ct.ExistingFile] = Path("this-file-does-not-exist")):
+    def main(f: ct.ExistingFile | None = Path("this-file-does-not-exist")):
         pass
 
     with pytest.raises(ValidationError):
@@ -58,7 +57,7 @@ def test_types_optional_existing_file_app_signature_default(app):
 
 def test_types_optional_existing_file_app_signature_default_none(app, assert_parse_args):
     @app.default
-    def main(f: Optional[ct.ExistingFile] = None):
+    def main(f: ct.ExistingFile | None = None):
         pass
 
     assert_parse_args(main, "")
@@ -180,7 +179,7 @@ def test_types_path_resolve_converter(convert, tmp_path):
     dir1.mkdir()
     dir2.mkdir()
 
-    actual = convert(Tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [dir1.as_posix(), dir2.as_posix()])
+    actual = convert(tuple[ct.ResolvedDirectory, ct.ResolvedDirectory], [dir1.as_posix(), dir2.as_posix()])
     assert (dir1, dir2) == actual
 
 

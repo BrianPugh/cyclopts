@@ -1,7 +1,6 @@
-import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import Annotated, Dict, Optional
+from typing import Annotated
 
 import pytest
 
@@ -17,7 +16,7 @@ from cyclopts.exceptions import (
 class User:
     id: int
     name: str = "John Doe"
-    tastes: Dict[str, int] = field(default_factory=dict)
+    tastes: dict[str, int] = field(default_factory=dict)
 
 
 def test_bind_dataclass(app, assert_parse_args, console):
@@ -66,7 +65,6 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_recursive(app, assert_parse_args, console):
     @dataclass
     class Wheel:
@@ -288,7 +286,7 @@ def test_bind_dataclass_default_factory_help(app, console):
         """Docstring for a."""
 
     @app.default
-    def my_default_command(config: Annotated[Optional[Config], Parameter(name="*")] = None):
+    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
         print(f"{config=}")
 
     with console.capture() as capture:
@@ -311,7 +309,6 @@ def test_bind_dataclass_default_factory_help(app, console):
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app, assert_parse_args):
     @dataclass
     class Config:
@@ -338,7 +335,6 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app,
         app.parse_args("v1 --bar=v2 100 200 --c=300", exit_on_error=False)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(app, assert_parse_args):
     @dataclass
     class Config:
@@ -351,7 +347,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(ap
         c: int = field(default=5, kw_only=True)  # pyright: ignore
 
     @app.default
-    def my_default_command(config: Annotated[Optional[Config], Parameter(name="*")] = None):
+    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
         print(f"{config=}")
 
     with pytest.raises(UnusedCliTokensError):
@@ -390,7 +386,7 @@ def test_bind_dataclass_with_alias_attribute(app, assert_parse_args):
         ] = False
 
     @app.default
-    def main(*, params: Optional[DataclassParameters] = None) -> None:
+    def main(*, params: DataclassParameters | None = None) -> None:
         pass
 
     assert_parse_args(main, "-a", params=DataclassParameters(with_alias=True, with_iterable=False))

@@ -3,11 +3,11 @@ import itertools
 import json
 import operator
 import sys
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from enum import Flag
 from functools import partial, reduce
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Sequence, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Literal, Optional, get_args, get_origin
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -164,10 +164,10 @@ class ArgumentCollection(list["Argument"]):
 
     def get(
         self,
-        term: Union[str, int],
+        term: str | int,
         default: Any = UNSET,
         *,
-        transform: Optional[Callable[[str], str]] = None,
+        transform: Callable[[str], str] | None = None,
         delimiter: str = ".",
     ) -> Optional["Argument"]:
         """Get an :class:`Argument` by name or index.
@@ -177,19 +177,19 @@ class ArgumentCollection(list["Argument"]):
 
         Parameters
         ----------
-        term : Union[str, int]
+        term : str | int
             Either a string keyword or an integer positional index.
         default : Any
             Default value to return if term not found. If :data:`~cyclopts.utils.UNSET` (default),
             will raise :exc:`KeyError`/:exc:`IndexError`.
-        transform : Optional[Callable[[str], str]]
+        transform : Callable[[str], str] | None
             Optional function to transform string terms before matching.
         delimiter : str
             Delimiter for nested field access.
 
         Returns
         -------
-        Optional[:class:`Argument`]
+        Argument | None
             The matched :class:`Argument`, or ``default`` if provided and not found.
 
         Raises
@@ -213,9 +213,9 @@ class ArgumentCollection(list["Argument"]):
 
     def match(
         self,
-        term: Union[str, int],
+        term: str | int,
         *,
-        transform: Optional[Callable[[str], str]] = None,
+        transform: Callable[[str], str] | None = None,
         delimiter: str = ".",
     ) -> tuple["Argument", tuple[str, ...], Any]:
         """Matches CLI keyword or index to their :class:`Argument`.
@@ -238,8 +238,8 @@ class ArgumentCollection(list["Argument"]):
         -------
         Argument
             Matched :class:`Argument`.
-        Tuple[str, ...]
-            Python keys into Argument. Non-empty iff Argument accepts keys.
+        tuple[str, ...]
+            Python keys into :class:`Argument`. Non-empty iff :class:`Argument` accepts keys.
         Any
             Implicit value (if a flag). :obj:`~.UNSET` otherwise.
         """
@@ -278,13 +278,13 @@ class ArgumentCollection(list["Argument"]):
         cls,
         field_info: FieldInfo,
         keys: tuple[str, ...],
-        *default_parameters: Optional[Parameter],
+        *default_parameters: Parameter | None,
         group_lookup: dict[str, Group],
         group_arguments: Group,
         group_parameters: Group,
         parse_docstring: bool = True,
-        docstring_lookup: Optional[dict[tuple[str, ...], Parameter]] = None,
-        positional_index: Optional[int] = None,
+        docstring_lookup: dict[tuple[str, ...], Parameter] | None = None,
+        positional_index: int | None = None,
         _resolve_groups: bool = True,
     ):
         out = cls()  # groups=list(group_lookup.values()))
@@ -468,10 +468,10 @@ class ArgumentCollection(list["Argument"]):
     def _from_callable(
         cls,
         func: Callable,
-        *default_parameters: Optional[Parameter],
-        group_lookup: Optional[dict[str, Group]] = None,
-        group_arguments: Optional[Group] = None,
-        group_parameters: Optional[Group] = None,
+        *default_parameters: Parameter | None,
+        group_lookup: dict[str, Group] | None = None,
+        group_arguments: Group | None = None,
+        group_parameters: Group | None = None,
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
     ):
@@ -542,40 +542,40 @@ class ArgumentCollection(list["Argument"]):
                 yield argument
 
     @property
-    def _max_index(self) -> Optional[int]:
+    def _max_index(self) -> int | None:
         return max((x.index for x in self if x.index is not None), default=None)
 
     def filter_by(
         self,
         *,
-        group: Optional[Group] = None,
-        has_tokens: Optional[bool] = None,
-        has_tree_tokens: Optional[bool] = None,
-        keys_prefix: Optional[tuple[str, ...]] = None,
-        kind: Optional[inspect._ParameterKind] = None,
-        parse: Optional[bool] = None,
-        show: Optional[bool] = None,
-        value_set: Optional[bool] = None,
+        group: Group | None = None,
+        has_tokens: bool | None = None,
+        has_tree_tokens: bool | None = None,
+        keys_prefix: tuple[str, ...] | None = None,
+        kind: inspect._ParameterKind | None = None,
+        parse: bool | None = None,
+        show: bool | None = None,
+        value_set: bool | None = None,
     ) -> "ArgumentCollection":
         """Filter the :class:`ArgumentCollection`.
 
-        All non-:obj:`None` filters will be applied.
+        All non-None filters will be applied.
 
         Parameters
         ----------
-        group: Optional[Group]
+        group: Group | None
             The :class:`.Group` the arguments should be in.
-        has_tokens: Optional[bool]
+        has_tokens: bool | None
             Immediately has tokens (not including children).
-        has_tree_tokens: Optional[bool]
-            Argument and/or it's children have parsed tokens.
-        kind: Optional[inspect._ParameterKind]
+        has_tree_tokens: bool | None
+            :class:`Argument` and/or it's children have parsed tokens.
+        kind: inspect._ParameterKind | None
             The :attr:`~inspect.Parameter.kind` of the argument.
-        parse: Optional[bool]
+        parse: bool | None
             If the argument is intended to be parsed or not.
-        show: Optional[bool]
-            The Argument is intended to be show on the help page.
-        value_set: Optional[bool]
+        show: bool | None
+            The :class:`Argument` is intended to be show on the help page.
+        value_set: bool | None
             The converted value is set.
         """
         ac = self.copy()
@@ -629,7 +629,7 @@ class Argument:
     The type hint for this argument; may be different from :attr:`.FieldInfo.annotation`.
     """
 
-    index: Optional[int] = field(default=None)
+    index: int | None = field(default=None)
     """
     Associated python positional index for argument.
     If ``None``, then cannot be assigned positionally.
@@ -697,11 +697,11 @@ class Argument:
     _mark_converted_override: bool = field(default=False, init=False, repr=False)
 
     # Validator to be called based on builtin type support.
-    _missing_keys_checker: Optional[Callable] = field(default=None, init=False, repr=False)
+    _missing_keys_checker: Callable | None = field(default=None, init=False, repr=False)
 
-    _internal_converter: Optional[Callable] = field(default=None, init=False, repr=False)
+    _internal_converter: Callable | None = field(default=None, init=False, repr=False)
 
-    _enum_flag_type: Optional[Any] = field(default=None, init=False, repr=False)
+    _enum_flag_type: Any | None = field(default=None, init=False, repr=False)
 
     def __attrs_post_init__(self):
         # By definition, self.hint is Not AnnotatedType
@@ -744,7 +744,7 @@ class Argument:
                 self._missing_keys_checker = _missing_keys_factory(_generic_class_field_infos)
                 self._accepts_keywords = True
                 if not hasattr(hint, "__annotations__"):
-                    raise ValueError("Cyclopts cannot handle collections.namedtuple in python <3.10.")
+                    raise ValueError("Cyclopts cannot handle collections.namedtuple without type annotations.")
                 self._update_lookup(field_infos)
             elif is_attrs(hint):
                 self._missing_keys_checker = _missing_keys_factory(_attrs_field_infos)
@@ -833,7 +833,7 @@ class Argument:
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
     @property
-    def show_default(self) -> Union[bool, Callable[[Any], str]]:
+    def show_default(self) -> bool | Callable[[Any], str]:
         """Show the default value on the help page."""
         if self.required:  # By definition, a required parameter cannot have a default.
             return False
@@ -866,7 +866,7 @@ class Argument:
                 raise
             return self._default
 
-    def _should_attempt_json_dict(self, tokens: Optional[Sequence[Union[Token, str]]] = None) -> bool:
+    def _should_attempt_json_dict(self, tokens: Sequence[Token | str] | None = None) -> bool:
         """When parsing, should attempt to parse the token(s) as json dict data."""
         if tokens is None:
             tokens = self.tokens
@@ -896,7 +896,7 @@ class Argument:
         return False
 
     def _should_attempt_json_list(
-        self, tokens: Union[Sequence[Union[Token, str]], Token, str, None] = None, keys: tuple[str, ...] = ()
+        self, tokens: Sequence[Token | str] | Token | str | None = None, keys: tuple[str, ...] = ()
     ) -> bool:
         """When parsing, should attempt to parse the token(s) as json list data."""
         if tokens is None:
@@ -923,9 +923,9 @@ class Argument:
 
     def match(
         self,
-        term: Union[str, int],
+        term: str | int,
         *,
-        transform: Optional[Callable[[str], str]] = None,
+        transform: Callable[[str], str] | None = None,
         delimiter: str = ".",
     ) -> tuple[tuple[str, ...], Any]:
         """Match a name search-term, or a positional integer index.
@@ -937,7 +937,7 @@ class Argument:
 
         Returns
         -------
-        Tuple[str, ...]
+        tuple[str, ...]
             Leftover keys after matching to this argument.
             Used if this argument accepts_arbitrary_keywords.
         Any
@@ -956,7 +956,7 @@ class Argument:
         self,
         term: str,
         *,
-        transform: Optional[Callable[[str], str]] = None,
+        transform: Callable[[str], str] | None = None,
         delimiter: str = ".",
     ) -> tuple[tuple[str, ...], Any]:
         """Check how well this argument matches a token keyword identifier.
@@ -976,7 +976,7 @@ class Argument:
 
         Returns
         -------
-        Tuple[str, ...]
+        tuple[str, ...]
             Leftover keys after matching to this argument.
             Used if this argument accepts_arbitrary_keywords.
         Any
@@ -1097,7 +1097,7 @@ class Argument:
         else:
             return UNSET
 
-    def _convert(self, converter: Optional[Callable] = None):
+    def _convert(self, converter: Callable | None = None):
         if self.parameter.converter:
             converter = self.parameter.converter
         elif converter is None:
@@ -1252,12 +1252,12 @@ class Argument:
 
         return out
 
-    def convert(self, converter: Optional[Callable] = None):
+    def convert(self, converter: Callable | None = None):
         """Converts :attr:`tokens` into :attr:`value`.
 
         Parameters
         ----------
-        converter: Optional[Callable]
+        converter: Callable | None
             Converter function to use. Overrides ``self.parameter.converter``
 
         Returns
@@ -1341,12 +1341,12 @@ class Argument:
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
 
-    def convert_and_validate(self, converter: Optional[Callable] = None):
+    def convert_and_validate(self, converter: Callable | None = None):
         """Converts and validates :attr:`tokens` into :attr:`value`.
 
         Parameters
         ----------
-        converter: Optional[Callable]
+        converter: Callable | None
             Converter function to use. Overrides ``self.parameter.converter``
 
         Returns
@@ -1406,7 +1406,7 @@ class Argument:
         assert isinstance(self.parameter.name, tuple)
         return tuple(itertools.chain(self.parameter.name, self.negatives))
 
-    def env_var_split(self, value: str, delimiter: Optional[str] = None) -> list[str]:
+    def env_var_split(self, value: str, delimiter: str | None = None) -> list[str]:
         """Split a given value with :meth:`.Parameter.env_var_split`."""
         return self.parameter.env_var_split(self.hint, value, delimiter=delimiter)
 
@@ -1486,9 +1486,9 @@ class Argument:
 
 def _resolve_groups_from_callable(
     func: Callable[..., Any],
-    *default_parameters: Optional[Parameter],
-    group_arguments: Optional[Group] = None,
-    group_parameters: Optional[Group] = None,
+    *default_parameters: Parameter | None,
+    group_arguments: Group | None = None,
+    group_parameters: Group | None = None,
 ) -> list[Group]:
     argument_collection = ArgumentCollection._from_callable(
         func,
@@ -1598,7 +1598,7 @@ def _resolve_parameter_name(*argss: tuple[str, ...]) -> tuple[str, ...]:
 
 def _walk_leaves(
     d,
-    parent_keys: Optional[tuple[str, ...]] = None,
+    parent_keys: tuple[str, ...] | None = None,
 ) -> Iterator[tuple[tuple[str, ...], Any]]:
     if parent_keys is None:
         parent_keys = ()
@@ -1631,7 +1631,7 @@ def update_argument_collection(
     config: dict,
     source: str,
     arguments: ArgumentCollection,
-    apps: Optional[Sequence["App"]] = None,
+    apps: Sequence["App"] | None = None,
     *,
     root_keys: Iterable[str],
     allow_unknown: bool,
@@ -1704,7 +1704,7 @@ def update_argument_collection(
 
                         # Check if all keys match, considering aliases at each level
                         all_match = True
-                        for i, (subkey, arg_key) in enumerate(zip(subkeys, arg.keys)):
+                        for i, (subkey, arg_key) in enumerate(zip(subkeys, arg.keys, strict=False)):
                             if subkey == arg_key:
                                 # Exact match at this level
                                 continue
@@ -1769,7 +1769,7 @@ def update_argument_collection(
                     else:
                         # Convert the value back into a string, so it can be re-converted.
                         # For dict/list values (from YAML/TOML), use json.dumps to create valid JSON strings
-                        if isinstance(v, (dict, list)):
+                        if isinstance(v, dict | list):
                             import json
 
                             value_str = json.dumps(v)

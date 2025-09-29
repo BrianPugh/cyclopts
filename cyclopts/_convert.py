@@ -4,7 +4,7 @@ import operator
 import re
 import sys
 import typing
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime, timedelta
 from enum import Enum, Flag
 from functools import partial, reduce
@@ -12,10 +12,7 @@ from inspect import isclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Iterable,
     Literal,
-    Optional,
     Union,
     get_args,
     get_origin,
@@ -185,7 +182,7 @@ def get_enum_member(
 
 def convert_enum_flag(
     enum_type: type[Flag],
-    tokens: Union[Iterable[str], Iterable["Token"]],
+    tokens: Iterable[str] | Iterable["Token"],
     name_transform: Callable[[str], str],
 ) -> Flag:
     """Convert tokens to a Flag enum value.
@@ -194,9 +191,9 @@ def convert_enum_flag(
     ----------
     enum_type : type[Flag]
         The Flag enum type to convert to.
-    tokens : Union[Sequence[str], Sequence[Token]]
-        The tokens to convert. Can be member names or Token objects.
-    name_transform : Optional[Callable[[str], str]]
+    tokens : Iterable[str] | Iterable[Token]
+        The tokens to convert. Can be member names or :class:`Token` objects.
+    name_transform : Callable[[str], str] | None
         Function to transform names for comparison.
 
     Returns
@@ -230,7 +227,7 @@ _converters: dict[Any, Callable] = {
 def _convert_tuple(
     type_: type[Any],
     *tokens: "Token",
-    converter: Optional[Callable[[type, str], Any]],
+    converter: Callable[[type, str], Any] | None,
     name_transform: Callable[[str], str],
 ) -> tuple:
     convert = partial(_convert, converter=converter, name_transform=name_transform)
@@ -266,7 +263,7 @@ def _convert_tuple(
         it = iter(tokens)
         batched = [[next(it) for _ in range(size)] for size in args_per_convert]
         batched = [elem[0] if len(elem) == 1 else elem for elem in batched]
-        out = tuple(convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched))
+        out = tuple(convert(inner_type, arg) for inner_type, arg in zip(inner_types, batched, strict=False))
     return out
 
 
@@ -274,7 +271,7 @@ def _convert_json(
     type_: Any,
     data: dict,
     field_infos: dict,
-    converter: Optional[Callable],
+    converter: Callable | None,
     name_transform: Callable[[str], str],
 ):
     """Convert JSON dict to dataclass with proper type conversion for fields.
@@ -287,7 +284,7 @@ def _convert_json(
         The JSON dictionary containing field values.
     field_infos : dict
         Field information from the dataclass.
-    converter : Optional[Callable]
+    converter : Callable | None
         Optional converter function.
     name_transform : Callable[[str], str]
         Function to transform field names.
@@ -305,7 +302,7 @@ def _convert_json(
             # Convert the value to the proper type
             if value is not None and not is_class_and_subclass(field_info.hint, str):
                 # Create a token for the value and convert it
-                token = Token(value=json.dumps(value) if isinstance(value, (dict, list)) else str(value))
+                token = Token(value=json.dumps(value) if isinstance(value, dict | list) else str(value))
                 # Always attempt conversion, let errors propagate for consistency
                 converted_value = convert(field_info.hint, [token], converter, name_transform)
             else:
@@ -369,14 +366,14 @@ def _create_json_decode_error_message(
     elif "'" in value_str:
         hint = "\n    Hint: JSON requires double quotes, not single quotes"
 
-    return f"Invalid JSON for {type_.__name__}:\n" f"    {snippet}\n" f"    {' ' * marker_pos}^ {error.msg}{hint}"
+    return f"Invalid JSON for {type_.__name__}:\n    {snippet}\n    {' ' * marker_pos}^ {error.msg}{hint}"
 
 
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
     *,
-    converter: Optional[Callable[[Any, str], Any]],
+    converter: Callable[[Any, str], Any] | None,
     name_transform: Callable[[str], str],
 ):
     """Inner recursive conversion function for public ``convert``.
@@ -477,7 +474,7 @@ def _convert(
             # Each token is a complete JSON representation of the dataclass
             gen = token
         elif count > 1:
-            gen = zip(*[iter(token)] * count)
+            gen = zip(*[iter(token)] * count, strict=False)
         else:
             gen = token
         out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
@@ -600,9 +597,9 @@ def _convert(
 
 def convert(
     type_: Any,
-    tokens: Union[Sequence[str], Sequence["Token"], NestedCliArgs],
-    converter: Optional[Callable[[type, str], Any]] = None,
-    name_transform: Optional[Callable[[str], str]] = None,
+    tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
+    converter: Callable[[type, str], Any] | None = None,
+    name_transform: Callable[[str], str] | None = None,
 ):
     """Coerce variables into a specified type.
 

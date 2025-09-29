@@ -3,26 +3,26 @@
 import importlib.util
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Tuple, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cyclopts import App
 
 
-def load_app_from_script(script: Union[str, Path]) -> Tuple["App", str]:
+def load_app_from_script(script: str | Path) -> tuple["App", str]:
     """Load a Cyclopts App object from a Python script.
 
     Parameters
     ----------
-    script : Union[str, Path]
+    script : str | Path
         Python script path, optionally with ``'::app_object'`` notation to specify
-        the App object (only supported with str). If not specified, will search
-        for App objects in the script's global namespace.
+        the :class:`App` object (only supported with str). If not specified, will search
+        for :class:`App` objects in the script's global namespace.
 
     Returns
     -------
-    Tuple[App, str]
-        The loaded App object and its name.
+    tuple[App, str]
+        The loaded :class:`App` object and its name.
 
     Raises
     ------

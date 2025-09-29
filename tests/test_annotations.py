@@ -1,6 +1,6 @@
 import inspect
 from collections import namedtuple
-from typing import Annotated, Any, Dict, List, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
 import pytest
 
@@ -38,15 +38,15 @@ def test_get_hint_name_class_with_name():
 
 
 def test_get_hint_name_typing_with_name():
-    assert get_hint_name(List) == "list"
+    assert get_hint_name(list) == "list"
 
 
 def test_get_hint_name_generic_type():
-    assert get_hint_name(List[int]) == "list[int]"
+    assert get_hint_name(list[int]) == "list[int]"
 
 
 def test_get_hint_name_nested_generic_type():
-    assert get_hint_name(Dict[str, List[int]]) == "dict[str, list[int]]"
+    assert get_hint_name(dict[str, list[int]]) == "dict[str, list[int]]"
 
 
 def test_get_hint_name_optional_type():
@@ -59,7 +59,7 @@ def test_get_hint_name_namedtuple():
 
 
 def test_get_hint_name_complex_union():
-    complex_type = Union[int, str, List[Dict[str, Any]]]
+    complex_type = Union[int, str, list[dict[str, Any]]]
     assert get_hint_name(complex_type) == "int|str|list[dict[str, Any]]"
 
 
@@ -81,8 +81,8 @@ class CustomStr(str):
         (str, str, True),
         (CustomStr, str, True),
         (Union[int, str], str, True),
-        (Annotated[Union[int, str], 1], str, True),
-        (Annotated[Union[Annotated[int, 1], Annotated[str, 1]], 1], str, True),
+        (Annotated[int | str, 1], str, True),
+        (Annotated[Annotated[int, 1] | Annotated[str, 1], 1], str, True),
         (int, str, False),
     ],
 )

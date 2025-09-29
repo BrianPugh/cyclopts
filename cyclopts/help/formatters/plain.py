@@ -2,7 +2,7 @@
 
 import io
 import textwrap
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -73,7 +73,7 @@ class PlainFormatter:
     def __init__(
         self,
         indent_width: int = 2,
-        max_width: Optional[int] = None,
+        max_width: int | None = None,
     ):
         self.indent_width = indent_width
         self.max_width = max_width

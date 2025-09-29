@@ -1,6 +1,6 @@
 """Tests for RST documentation generation."""
 
-from typing import Literal, Optional
+from typing import Literal
 
 from cyclopts import App
 
@@ -121,7 +121,7 @@ def test_generate_rst_docs_with_options():
         name: str,
         count: int = 1,
         verbose: bool = False,
-        output: Optional[str] = None,
+        output: str | None = None,
         choice: Literal["a", "b", "c"] = "a",
     ):
         """Main command with various options.

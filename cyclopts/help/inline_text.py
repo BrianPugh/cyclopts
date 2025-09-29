@@ -1,6 +1,6 @@
 """InlineText class for rich text rendering with appended metadata."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -14,7 +14,7 @@ class InlineText:
         self.force_empty_end = force_empty_end
 
     @classmethod
-    def from_format(cls, content: Optional[str], format: str, *, force_empty_end=False):
+    def from_format(cls, content: str | None, format: str, *, force_empty_end=False):
         if content is None:
             from rich.text import Text
 

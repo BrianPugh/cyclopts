@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from cyclopts.group import Group
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 def _create_or_append(
     group_mapping: list[tuple[Group, list[Any]]],
-    group: Union[str, Group],
+    group: str | Group,
     element: Any,
 ):
     # updates group_mapping inplace.

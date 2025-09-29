@@ -1,16 +1,13 @@
 import collections.abc
 import inspect
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
-from typing import (
+from typing import (  # noqa: UP035
     Any,
-    Callable,
     List,
     Optional,
-    Sequence,
     Tuple,
     TypeVar,
-    Union,
     cast,
     get_args,
     get_origin,
@@ -46,10 +43,10 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
         Iterable[bool],
         Sequence[bool],
         collections.abc.Sequence[bool],
-        List[bool],
         list[bool],
-        Tuple[bool, ...],
+        List[bool],  # noqa: UP006
         tuple[bool, ...],
+        Tuple[bool, ...],  # noqa: UP006
     }
 )
 
@@ -110,39 +107,39 @@ class Parameter:
 
     # This can ONLY ever be a Tuple[str, ...]
     # Usually starts with "--" or "-"
-    name: Union[None, str, Iterable[str]] = field(
+    name: None | str | Iterable[str] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Optional[Callable[[Any, Sequence[Token]], Any]] = field(
+    converter: Callable[[Any, Sequence[Token]], Any] | None = field(
         default=None,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable[[Any, Any], Any], Iterable[Callable[[Any, Any], Any]]] = field(
+    validator: None | Callable[[Any, Any], Any] | Iterable[Callable[[Any, Any], Any]] = field(
         default=(),
         converter=lambda x: cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(x)),
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    alias: Union[None, str, Iterable[str]] = field(
+    alias: None | str | Iterable[str] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
         kw_only=True,
     )
 
     # This can ONLY ever be ``None`` or ``Tuple[str, ...]``
-    negative: Union[None, str, Iterable[str]] = field(
+    negative: None | str | Iterable[str] = field(
         default=None,
         converter=optional_to_tuple_converter,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
-    group: Union[None, Group, str, Iterable[Union[Group, str]]] = field(
+    group: None | Group | str | Iterable[Group | str] = field(
         default=None,
         converter=to_tuple_converter,
         kw_only=True,
@@ -155,13 +152,13 @@ class Parameter:
         kw_only=True,
     )
 
-    _show: Optional[bool] = field(
+    _show: bool | None = field(
         default=None,
         alias="show",
         kw_only=True,
     )
 
-    show_default: Union[None, bool, Callable[[Any], Any]] = field(
+    show_default: None | bool | Callable[[Any], Any] = field(
         default=None,
         kw_only=True,
     )
@@ -172,7 +169,7 @@ class Parameter:
         kw_only=True,
     )
 
-    help: Optional[str] = field(default=None, kw_only=True)
+    help: str | None = field(default=None, kw_only=True)
 
     show_env_var: bool = field(
         default=None,
@@ -181,7 +178,7 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    env_var: Union[None, str, Iterable[str]] = field(
+    env_var: None | str | Iterable[str] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
         kw_only=True,
@@ -193,7 +190,7 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    negative_bool: Union[None, str, Iterable[str]] = field(
+    negative_bool: None | str | Iterable[str] = field(
         default=None,
         converter=_negative_converter(("no-",)),
         validator=_not_hyphen_validator,
@@ -201,7 +198,7 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    negative_iterable: Union[None, str, Iterable[str]] = field(
+    negative_iterable: None | str | Iterable[str] = field(
         default=None,
         converter=_negative_converter(("empty-",)),
         validator=_not_hyphen_validator,
@@ -209,14 +206,14 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    negative_none: Union[None, str, Iterable[str]] = field(
+    negative_none: None | str | Iterable[str] = field(
         default=None,
         converter=_negative_converter(()),
         validator=_not_hyphen_validator,
         kw_only=True,
     )
 
-    required: Optional[bool] = field(
+    required: bool | None = field(
         default=None,
         kw_only=True,
     )
@@ -226,13 +223,13 @@ class Parameter:
         kw_only=True,
     )
 
-    _name_transform: Optional[Callable[[str], str]] = field(
+    _name_transform: Callable[[str], str] | None = field(
         alias="name_transform",
         default=None,
         kw_only=True,
     )
 
-    accepts_keys: Optional[bool] = field(
+    accepts_keys: bool | None = field(
         default=None,
         kw_only=True,
     )
@@ -243,9 +240,9 @@ class Parameter:
         kw_only=True,
     )
 
-    json_dict: Optional[bool] = field(default=None, kw_only=True)
+    json_dict: bool | None = field(default=None, kw_only=True)
 
-    json_list: Optional[bool] = field(default=None, kw_only=True)
+    json_list: bool | None = field(default=None, kw_only=True)
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
@@ -326,7 +323,7 @@ class Parameter:
 
         Parameters
         ----------
-        `*parameters`: Optional[Parameter]
+        *parameters : Parameter | None
              Parameters who's attributes override ``self`` attributes.
              Ordered from least-to-highest attribute priority.
         """
@@ -404,9 +401,7 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
-    # python3.9 functools.partial does not have "__module__" attribute.
-    # TODO: simplify to (f.__module__ or "") once cp3.9 is dropped.
-    if (getattr(f, "__module__", "") or "").startswith("cyclopts"):  # Speed optimization.
+    if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
         return
     for field_info in signature_parameters(f).values():
         # Speed optimization: if no annotation and no cyclopts config, skip validation

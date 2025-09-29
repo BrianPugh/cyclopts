@@ -11,7 +11,7 @@ a valid value for that type, so JSON parsing should be disabled.
 """
 
 from dataclasses import dataclass
-from typing import Annotated, NewType, Optional, Union
+from typing import Annotated, NewType
 
 import pytest
 
@@ -45,7 +45,7 @@ class UserWithNewType:
 
 @dataclass
 class UserWithUnion:
-    name: Union[str, int]
+    name: str | int
     age: int
 
 
@@ -126,12 +126,12 @@ def test_json_list_not_parsed_for_str_like_types(app, assert_parse_args, type_hi
     "type_hint,json_input,expected",
     [
         # Union[str, int] - JSON not parsed
-        (list[Union[str, int]], "[1, 2, 3]", ["[1, 2, 3]"]),
-        (list[Union[str, int]], '["hello", "world"]', ['["hello", "world"]']),
+        (list[str | int], "[1, 2, 3]", ["[1, 2, 3]"]),
+        (list[str | int], '["hello", "world"]', ['["hello", "world"]']),
         # Optional[str] - JSON not parsed
-        (list[Optional[str]], '["hello", null, "world"]', ['["hello", null, "world"]']),
+        (list[str | None], '["hello", null, "world"]', ['["hello", null, "world"]']),
         # Optional[int] - JSON IS parsed (no str in union)
-        (list[Optional[int]], "[1, null, 3]", [1, None, 3]),
+        (list[int | None], "[1, null, 3]", [1, None, 3]),
     ],
     ids=["Union[str,int]-ints", "Union[str,int]-strings", "Optional[str]", "Optional[int]"],
 )
@@ -157,7 +157,7 @@ def test_union_with_str_no_json_parsing(app, assert_parse_args):
     """JSON should NOT be parsed when type is Union[str, ...]."""
 
     @app.default
-    def main(value: Union[str, int]):
+    def main(value: str | int):
         pass
 
     assert_parse_args(
@@ -173,7 +173,7 @@ def test_union_with_str_no_json_parsing_env_var(app, assert_parse_args, monkeypa
     monkeypatch.setenv("VALUE", json_str)
 
     @app.default
-    def main(value: Annotated[Union[str, int], Parameter(env_var="VALUE")]):
+    def main(value: Annotated[str | int, Parameter(env_var="VALUE")]):
         pass
 
     assert_parse_args(main, "", json_str)

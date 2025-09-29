@@ -1,5 +1,3 @@
-from typing import Optional
-
 import typer
 
 import cyclopts
@@ -8,7 +6,7 @@ typer_app = typer.Typer()
 
 
 @typer_app.command()
-def foo(favorite_numbers: Optional[list[int]] = None):
+def foo(favorite_numbers: list[int] | None = None):
     if favorite_numbers is None:
         favorite_numbers = [1, 2, 3]
     print(f"My favorite numbers are: {favorite_numbers}")
@@ -27,7 +25,7 @@ cyclopts_app = cyclopts.App()
 
 
 @cyclopts_app.default()
-def foo(favorite_numbers: Optional[list[int]] = None):
+def foo(favorite_numbers: list[int] | None = None):
     if favorite_numbers is None:
         favorite_numbers = [1, 2, 3]
     print(f"My favorite numbers are: {favorite_numbers}")
