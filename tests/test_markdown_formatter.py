@@ -133,13 +133,13 @@ def test_markdown_formatter_parameter_panel_list():
     formatter(None, None, panel)
     output = formatter.get_output()
 
-    expected = (
-        "## Parameters\n"
-        "\n"
-        "* `-p, --port`: Port number  **[required]**  *[default: 8080]*\n"
-        "* `--verbose`: Enable verbose mode  *[env: VERBOSE]*\n"
-        "\n"
-    )
+    expected = dedent("""\
+        ## Parameters
+
+        * `-p, --port`: Port number  **[required]**  *[default: 8080]*
+        * `--verbose`: Enable verbose mode  *[env: VERBOSE]*
+
+        """)
 
     assert output == expected
 

@@ -65,7 +65,7 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
     assert actual == expected
 
 
-def test_bind_dataclass_recursive(app, assert_parse_args, console):
+def test_bind_dataclass_recursive(app, assert_parse_args, console, normalize_trailing_whitespace):
     @dataclass
     class Wheel:
         diameter: int
@@ -130,7 +130,9 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
 
     expected = dedent(
         """\
-        Usage: test_bind_dataclasses build [OPTIONS]
+        Usage: test_bind_dataclasses build --license-plate STR --car.name STR
+        --car.mileage FLOAT --car.cylinders INT --car.horsepower FLOAT
+        --car.wheel.diameter INT [OPTIONS]
 
         Build a car.
 
@@ -154,7 +156,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         """
     )
 
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
 def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
@@ -263,7 +265,7 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_bind_dataclasses [ARGS] [OPTIONS]
+        Usage: test_bind_dataclasses A [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -295,7 +297,7 @@ def test_bind_dataclass_default_factory_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_bind_dataclasses [ARGS] [OPTIONS]
+        Usage: test_bind_dataclasses [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │

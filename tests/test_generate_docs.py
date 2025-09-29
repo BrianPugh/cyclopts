@@ -36,7 +36,7 @@ def test_generate_docs_simple_app():
         **Usage**:
 
         ```console
-        $ myapp [ARGS] [OPTIONS]
+        $ myapp NAME [ARGS]
         ```
 
         **Arguments**:
@@ -282,7 +282,7 @@ def test_generate_docs_with_required_parameters():
         **Usage**:
 
         ```console
-        $ myapp [ARGS] [OPTIONS]
+        $ myapp REQUIRED [ARGS]
         ```
 
         **Arguments**:
@@ -615,7 +615,7 @@ def test_generate_docs_with_meta_app():
         **Usage**:
 
         ```console
-        $ myapp [ARGS] [OPTIONS]
+        $ myapp INPUT-FILE
         ```
 
         **Arguments**:

@@ -115,7 +115,7 @@ def test_flag_as_boolean_flags_star_name(app, assert_parse_args, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_enum_flag [ARGS] [OPTIONS]
+        Usage: test_enum_flag [OPTIONS]
 
         Manage file permissions.
 
@@ -198,7 +198,7 @@ def test_flag_help_shows_member_docstrings(app, console):
 
     expected = dedent(
         """\
-        Usage: test_enum_flag [ARGS] [OPTIONS]
+        Usage: test_enum_flag [OPTIONS]
 
         Manage file permissions.
 
@@ -233,7 +233,7 @@ def test_flag_help_star_name_shows_member_docstrings(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_enum_flag [ARGS] [OPTIONS]
+        Usage: test_enum_flag [OPTIONS]
 
         Manage file permissions.
 
@@ -293,7 +293,7 @@ def test_flag_in_dataclass_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_enum_flag [ARGS] [OPTIONS]
+        Usage: test_enum_flag [OPTIONS] USER.NAME
 
         Create a user with permissions.
 
@@ -330,7 +330,7 @@ def test_flag_in_dataclass_help_no_negative(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_enum_flag [ARGS] [OPTIONS]
+        Usage: test_enum_flag [OPTIONS] USER.NAME
 
         Create a user with permissions.
 
@@ -372,7 +372,7 @@ def test_flag_in_dataclass_help_no_keywords(app, assert_parse_args, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_enum_flag [ARGS] [OPTIONS]
+        Usage: test_enum_flag USER.NAME [ARGS]
 
         Create a user with permissions.
 

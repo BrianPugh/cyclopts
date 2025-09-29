@@ -48,7 +48,7 @@ def test_group_custom_table_spec(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-            Usage: test_help_customization [ARGS] [OPTIONS]
+            Usage: test_help_customization [ARGS]
 
             ╭─ Commands ─────────────────────────────────────────────────────────╮
             │ --help -h  Display this message and exit.                          │
@@ -94,7 +94,7 @@ def test_group_custom_panel_spec(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -149,7 +149,7 @@ def test_group_custom_columns(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -194,7 +194,7 @@ def test_default_group_with_custom_spec(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -281,7 +281,7 @@ def test_panel_spec_custom_title(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -331,7 +331,7 @@ def test_mixed_groups_with_different_specs(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization NAME [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -378,7 +378,7 @@ def test_table_show_lines_with_box(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -421,7 +421,7 @@ def test_table_headers_with_default_columns(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -470,7 +470,7 @@ def test_table_headers_suppressed_when_all_empty(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -524,7 +524,7 @@ def test_table_headers_with_non_empty_headers(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -637,7 +637,7 @@ def test_custom_help_formatter_basic(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -740,7 +740,7 @@ def test_custom_help_formatter_with_optional_methods(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        [CUSTOM USAGE]  Usage: test_help_customization [ARGS] [OPTIONS]
+        [CUSTOM USAGE]  Usage: test_help_customization [ARGS]
 
         [CUSTOM DESC]
         This is a test application.
@@ -826,7 +826,7 @@ def test_multiple_groups_different_formatters(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -874,7 +874,7 @@ def test_custom_formatter_protocol_validation(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -910,7 +910,7 @@ def test_group_formatter_none_fallback(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         +--------------------------------------------------------------------+
         |                              Commands                              |
@@ -997,7 +997,7 @@ def test_custom_formatter_receives_correct_arguments(console: Console):
 
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -1036,7 +1036,7 @@ def test_plain_formatter_with_rich_text(console: Console):
     # Commands group still uses default formatter, only Plain Options uses PlainFormatter
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -1121,7 +1121,7 @@ def test_plain_formatter_render_methods(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization [ARGS]
 
         Test application with plain formatter.
 
@@ -1173,7 +1173,7 @@ def test_plain_formatter_parameter_with_metadata(console: Console):
     # Commands group uses default formatter
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS] [OPTIONS]
+        Usage: test_help_customization MODE OUTPUT
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │

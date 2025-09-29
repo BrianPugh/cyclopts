@@ -109,7 +109,7 @@ def test_meta_app_nested_subapp_help(nested_meta_app, console, queue):
 
     expected = dedent(
         """\
-        Usage: test_app subapp COMMAND [ARGS]
+        Usage: test_app subapp COMMAND
 
         This is subapp's help.
 
@@ -131,7 +131,7 @@ def test_meta_app_nested_subapp_foo_help(nested_meta_app, console, queue):
 
     expected = dedent(
         """\
-        Usage: test_app subapp foo [ARGS] [OPTIONS]
+        Usage: test_app subapp foo VALUE
 
         Subapp foo help string.
 
@@ -271,7 +271,7 @@ def test_meta_app_help_inconsistency_with_argument_order(app, console):
 
     expected = dedent(
         """\
-        Usage: test_meta foo [ARGS] [OPTIONS]
+        Usage: test_meta foo LOOPS
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  LOOPS --loops  [required]                                       │
