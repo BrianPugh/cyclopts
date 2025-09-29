@@ -166,6 +166,73 @@ def _is_short(s):
     return not s.startswith("--") and s.startswith("-")
 
 
+def _categorize_keyword_arguments(argument_collection: "ArgumentCollection") -> tuple[list, list]:
+    """Categorize keyword arguments by requirement status for usage string formatting.
+
+    Parameters
+    ----------
+    argument_collection : ArgumentCollection
+        Collection of arguments to categorize.
+
+    Returns
+    -------
+    tuple[list, list]
+        (required_keyword, optional_keyword) where:
+        - required_keyword: Required keyword-only parameters
+        - optional_keyword: Optional keyword-only parameters and VAR_KEYWORD
+    """
+    required, optional = [], []
+
+    for argument in argument_collection:
+        if not argument.show:
+            continue
+
+        if argument.field_info.kind in (argument.field_info.VAR_KEYWORD,):
+            optional.append(argument)
+        elif argument.field_info.is_keyword_only:
+            if argument.required:
+                required.append(argument)
+            else:
+                optional.append(argument)
+
+    return required, optional
+
+
+def _categorize_positional_arguments(argument_collection: "ArgumentCollection") -> tuple[list, list]:
+    """Categorize positional arguments by requirement status for usage string formatting.
+
+    Parameters
+    ----------
+    argument_collection : ArgumentCollection
+        Collection of arguments to categorize.
+
+    Returns
+    -------
+    tuple[list, list]
+        (required_positional, optional_positional) where:
+        - required_positional: Required positional and VAR_POSITIONAL parameters
+        - optional_positional: Optional positional and VAR_POSITIONAL parameters
+    """
+    required, optional = [], []
+
+    for argument in argument_collection:
+        if not argument.show:
+            continue
+
+        if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
+            if argument.required:
+                required.append(argument)
+            else:
+                optional.append(argument)
+        elif argument.field_info.is_positional:
+            if argument.required:
+                required.append(argument)
+            else:
+                optional.append(argument)
+
+    return required, optional
+
+
 def format_usage(
     app: "App",
     command_chain: Iterable[str],
@@ -200,30 +267,8 @@ def format_usage(
     if app.default_command:
         argument_collection = app.assemble_argument_collection(parse_docstring=False)
 
-        required_keyword_params, optional_keyword_params = [], []
-        required_positional_args, optional_positional_args = [], []
-
-        for argument in argument_collection:
-            if not argument.show:
-                continue
-
-            if argument.field_info.kind in (argument.field_info.VAR_KEYWORD,):
-                optional_keyword_params.append(argument)
-            elif argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
-                if argument.required:
-                    required_positional_args.append(argument)
-                else:
-                    optional_positional_args.append(argument)
-            elif argument.field_info.is_keyword_only:
-                if argument.required:
-                    required_keyword_params.append(argument)
-                else:
-                    optional_keyword_params.append(argument)
-            elif argument.field_info.is_positional:
-                if argument.required:
-                    required_positional_args.append(argument)
-                else:
-                    optional_positional_args.append(argument)
+        required_keyword_params, optional_keyword_params = _categorize_keyword_arguments(argument_collection)
+        required_positional_args, optional_positional_args = _categorize_positional_arguments(argument_collection)
 
         for argument in required_keyword_params:
             param_name = argument.name
