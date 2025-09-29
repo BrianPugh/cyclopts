@@ -2,9 +2,11 @@ import collections.abc
 import inspect
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
-from typing import (
+from typing import (  # noqa: UP035
     Any,
+    List,
     Optional,
+    Tuple,
     TypeVar,
     cast,
     get_args,
@@ -42,9 +44,9 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
         Sequence[bool],
         collections.abc.Sequence[bool],
         list[bool],
-        list[bool],
+        List[bool],  # noqa: UP006
         tuple[bool, ...],
-        tuple[bool, ...],
+        Tuple[bool, ...],  # noqa: UP006
     }
 )
 

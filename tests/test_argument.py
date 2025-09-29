@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Annotated, Optional, TypedDict, Union
+from typing import Annotated, Dict, Optional, TypedDict, Union  # noqa: UP035
 
 import pytest
 
@@ -75,7 +75,7 @@ def test_argument_collection_basic_annotation():
     assert collection[1]._accepts_keywords is False
 
 
-@pytest.mark.parametrize("type_", [dict, dict])
+@pytest.mark.parametrize("type_", [dict, Dict])  # noqa: UP006
 def test_argument_collection_bare_dict(type_):
     def foo(a: type_, b: int):  # pyright: ignore
         pass
