@@ -1,7 +1,7 @@
 """Sphinx extension for automatic Cyclopts CLI documentation."""
 
 import importlib
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import attrs
 
@@ -69,6 +69,8 @@ class DirectiveOptions:
 
     heading_level: int = 2
     command_prefix: str = ""
+    commands: Optional[List[str]] = None
+    exclude_commands: Optional[List[str]] = None
 
     # All booleans must have ``False`` default.
     no_recursive: bool = False
@@ -90,8 +92,17 @@ class DirectiveOptions:
                     kwargs[field.name] = True
                 # Use default value if not specified
             elif option_name in options:
-                # For non-boolean fields, get the value from options
-                kwargs[field.name] = options[option_name]
+                value = options[option_name]
+                # Handle comma-separated lists for commands and exclude-commands
+                if field.name in ("commands", "exclude_commands"):
+                    # Parse comma-separated list and strip whitespace
+                    if value:
+                        kwargs[field.name] = [cmd.strip() for cmd in value.split(",") if cmd.strip()]
+                    else:
+                        # Empty string means empty list
+                        kwargs[field.name] = []
+                else:
+                    kwargs[field.name] = value
             # If not specified, the dataclass default will be used
 
         return cls(**kwargs)
@@ -113,10 +124,107 @@ class DirectiveOptions:
         option_spec = {}
         for field in attrs.fields(DirectiveOptions):
             option_name = field.name.replace("_", "-")
-            validator = type_mapping.get(field.type, directives.unchanged)
+            # Handle List[str] fields (commands, exclude-commands)
+            if field.name in ("commands", "exclude_commands"):
+                validator = directives.unchanged  # Will be parsed as comma-separated in from_dict
+            else:
+                validator = type_mapping.get(field.type, directives.unchanged)
             option_spec[option_name] = validator
 
         return option_spec
+
+
+def _should_include_command(
+    command_name: str,
+    command_path: List[str],
+    commands_filter: Optional[List[str]],
+    exclude_commands: Optional[List[str]],
+) -> bool:
+    """Check if a command should be included in documentation.
+
+    Parameters
+    ----------
+    command_name : str
+        The name of the command.
+    command_path : List[str]
+        The full path to the command (including parent commands).
+    commands_filter : Optional[List[str]]
+        If specified, only include commands in this list.
+    exclude_commands : Optional[List[str]]
+        If specified, exclude commands in this list.
+
+    Returns
+    -------
+    bool
+        True if the command should be included.
+    """
+    # Build the full command path for nested commands
+    full_path = ".".join(command_path + [command_name])
+
+    # Check exclusion list first
+    if exclude_commands:
+        # Check both the command name and full path
+        if command_name in exclude_commands or full_path in exclude_commands:
+            return False
+        # Check if any parent path is excluded
+        for i in range(len(command_path)):
+            parent_path = ".".join(command_path[: i + 1])
+            if parent_path in exclude_commands:
+                return False
+
+    # Check inclusion list
+    if commands_filter is not None:
+        # If a filter is specified, only include if explicitly listed
+        # Check if command name or full path is in the filter
+        if command_name in commands_filter or full_path in commands_filter:
+            return True
+        # Check if any parent path is included (to include all subcommands)
+        for i in range(len(command_path)):
+            parent_path = ".".join(command_path[: i + 1])
+            if parent_path in commands_filter:
+                return True
+        # Also check if just the base command name matches for top-level commands
+        if not command_path and command_name in commands_filter:
+            return True
+        return False
+
+    # No filter specified, include by default
+    return True
+
+
+def _filter_commands(
+    commands: dict,
+    commands_filter: Optional[List[str]],
+    exclude_commands: Optional[List[str]],
+    parent_path: Optional[List[str]] = None,
+) -> dict:
+    """Filter commands based on inclusion/exclusion lists.
+
+    Parameters
+    ----------
+    commands : dict
+        Dictionary mapping command names to App instances.
+    commands_filter : Optional[List[str]]
+        If specified, only include commands in this list.
+    exclude_commands : Optional[List[str]]
+        If specified, exclude commands in this list.
+    parent_path : List[str]
+        Path to the parent command for nested commands.
+
+    Returns
+    -------
+    dict
+        Filtered commands dictionary.
+    """
+    if parent_path is None:
+        parent_path = []
+
+    filtered = {}
+    for name, app in commands.items():
+        if _should_include_command(name, parent_path, commands_filter, exclude_commands):
+            filtered[name] = app
+
+    return filtered
 
 
 def _process_rst_content(content: str, skip_title: bool = False) -> List[str]:
@@ -270,6 +378,8 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             heading_level=opts.heading_level,
             flatten_commands=opts.flatten_commands,
             command_prefix=opts.command_prefix,
+            commands_filter=opts.commands,
+            exclude_commands=opts.exclude_commands,
             no_root_title=True,  # Always skip root title in Sphinx context
             sections_only=True,  # Always use sections-only mode for better Sphinx integration
         )

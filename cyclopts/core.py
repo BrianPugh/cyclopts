@@ -1917,14 +1917,14 @@ class App:
         >>> # Path("docs/cli.md").write_text(docs)
         """
         from cyclopts.docs import (
-            canonicalize_format,
             generate_markdown_docs,
             generate_rst_docs,
+            normalize_format,
         )
         from cyclopts.docs.html import generate_html_docs
 
-        # Canonicalize the format to handle aliases
-        output_format = canonicalize_format(output_format)
+        # Normalize the format to handle aliases
+        output_format = normalize_format(output_format)
 
         # Generate documentation based on format
         if output_format == "markdown":

@@ -21,13 +21,13 @@ FORMAT_ALIASES: dict[str, CanonicalDocFormat] = {
 }
 
 
-def canonicalize_format(format_value: str) -> CanonicalDocFormat:
-    """Canonicalize format aliases to standard format names.
+def normalize_format(format_value: str) -> CanonicalDocFormat:
+    """Normalize format aliases to standard format names.
 
     Parameters
     ----------
     format_value : str
-        The format string to canonicalize (case-insensitive).
+        The format string to normalize (case-insensitive).
 
     Returns
     -------
@@ -44,7 +44,7 @@ def canonicalize_format(format_value: str) -> CanonicalDocFormat:
 
     if canonical_format is None:
         raise ValueError(
-            f'Unsupported format "{format_value}". ' f'Supported formats: {", ".join(sorted(FORMAT_ALIASES.keys()))}'
+            f'Unsupported format "{format_value}". Supported formats: {", ".join(sorted(FORMAT_ALIASES.keys()))}'
         )
 
     return canonical_format

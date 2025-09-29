@@ -8,7 +8,7 @@ from cyclopts.docs.types import (
     FORMAT_ALIASES,
     CanonicalDocFormat,
     DocFormat,
-    canonicalize_format,
+    normalize_format,
 )
 
 
@@ -87,38 +87,38 @@ def test_file_suffix_handling():
         ), f"Suffix '{suffix_with_period}' should infer format '{expected_canonical}', got '{inferred_format}'"
 
 
-def test_canonicalize_format_with_all_aliases():
-    """Test canonicalize_format works with all defined aliases."""
+def test_normalize_format_with_all_aliases():
+    """Test normalize_format works with all defined aliases."""
     for alias, expected_canonical in FORMAT_ALIASES.items():
         # Test lowercase
-        assert canonicalize_format(alias) == expected_canonical
+        assert normalize_format(alias) == expected_canonical
 
         # Test uppercase
-        assert canonicalize_format(alias.upper()) == expected_canonical
+        assert normalize_format(alias.upper()) == expected_canonical
 
         # Test mixed case
         if len(alias) > 1:
             mixed_case = alias[0].upper() + alias[1:].lower()
-            assert canonicalize_format(mixed_case) == expected_canonical
+            assert normalize_format(mixed_case) == expected_canonical
 
 
-def test_canonicalize_format_invalid():
-    """Test canonicalize_format raises ValueError for invalid formats."""
+def test_normalize_format_invalid():
+    """Test normalize_format raises ValueError for invalid formats."""
     with pytest.raises(ValueError, match='Unsupported format "invalid"'):
-        canonicalize_format("invalid")
+        normalize_format("invalid")
 
     with pytest.raises(ValueError, match='Unsupported format "pdf"'):
-        canonicalize_format("pdf")
+        normalize_format("pdf")
 
 
-def test_all_doc_format_values_have_canonicalization():
-    """Test that all DocFormat literal values can be canonicalized."""
+def test_all_doc_format_values_have_normalization():
+    """Test that all DocFormat literal values can be normalized."""
     doc_format_values = get_args(DocFormat)
 
     for format_value in doc_format_values:
         # Should not raise an exception
-        result = canonicalize_format(format_value)
+        result = normalize_format(format_value)
         # Result should be a canonical format
         assert result in get_args(
             CanonicalDocFormat
-        ), f"canonicalize_format('{format_value}') = '{result}' is not a CanonicalDocFormat"
+        ), f"normalize_format('{format_value}') = '{result}' is not a CanonicalDocFormat"

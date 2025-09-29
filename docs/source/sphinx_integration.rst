@@ -126,6 +126,41 @@ Add a prefix to all command headings in the generated documentation:
 
 This will prefix all command headings with "Command:" (e.g., "Command: deploy", "Command: init"). Useful for consistent formatting or when integrating CLI docs with other content.
 
+``:commands:`` - Filter Specific Commands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Document only specific commands from your CLI application:
+
+.. code-block:: rst
+
+   .. cyclopts:: mypackage.cli:app
+      :commands: init, build, deploy
+
+This will only document the specified commands. You can also use nested command paths with dot notation:
+
+.. code-block:: rst
+
+   .. cyclopts:: mypackage.cli:app
+      :commands: db.migrate, db.backup, api
+
+- ``db.migrate`` - Documents only the ``migrate`` subcommand under ``db``
+- ``db.backup`` - Documents only the ``backup`` subcommand under ``db``
+- ``api`` - Documents the ``api`` command and all its subcommands
+
+You can use either underscore or dash notation in command names - they will be normalized automatically.
+
+``:exclude-commands:`` - Exclude Specific Commands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Exclude specific commands from the documentation:
+
+.. code-block:: rst
+
+   .. cyclopts:: mypackage.cli:app
+      :exclude-commands: debug, internal-test
+
+This is useful for hiding internal or debug commands from user-facing documentation. Like ``:commands:``, this also supports nested command paths with dot notation.
+
 Automatic Reference Labels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -261,6 +296,48 @@ When you want each command to have its own distinct heading for better navigatio
 
    See :ref:`cyclopts-myapp-deploy` for deployment options.
    The :ref:`cyclopts-myapp-init` command sets up your project.
+
+Selective Command Documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Split your CLI documentation across multiple sections or pages:
+
+.. code-block:: rst
+
+   Database Commands
+   =================
+
+   The following commands manage database operations:
+
+   .. cyclopts:: myapp.cli:app
+      :commands: db
+      :recursive: true
+
+   API Management
+   ==============
+
+   Commands for controlling the API server:
+
+   .. cyclopts:: myapp.cli:app
+      :commands: api
+      :recursive: true
+
+   Development Tools
+   =================
+
+   Utilities for development (excluding internal debug commands):
+
+   .. cyclopts:: myapp.cli:app
+      :commands: dev
+      :exclude-commands: dev.debug, dev.internal
+      :recursive: true
+
+This approach allows you to:
+
+- Organize large CLI applications into logical sections
+- Document different command groups on separate pages
+- Exclude internal or debug commands from user documentation
+- Create targeted documentation for different audiences
 
 Output Formats
 --------------

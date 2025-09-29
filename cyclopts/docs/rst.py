@@ -1,13 +1,171 @@
 """RST documentation generation functions for cyclopts apps."""
 
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 if TYPE_CHECKING:
     from cyclopts.core import App
 
 
+def _normalize_command_filters(
+    commands_filter: Optional[List[str]] = None,
+    exclude_commands: Optional[List[str]] = None,
+) -> Tuple[Optional[Set[str]], Optional[Set[str]]]:
+    """Normalize command filter lists by converting underscores to dashes.
+
+    Parameters
+    ----------
+    commands_filter : Optional[List[str]]
+        List of commands to include.
+    exclude_commands : Optional[List[str]]
+        List of commands to exclude.
+
+    Returns
+    -------
+    Tuple[Optional[Set[str]], Optional[Set[str]]]
+        Normalized include and exclude sets for O(1) lookup.
+    """
+    normalized_include = None
+    if commands_filter is not None:
+        normalized_include = {cmd.replace("_", "-") for cmd in commands_filter}
+
+    normalized_exclude = None
+    if exclude_commands:
+        normalized_exclude = {cmd.replace("_", "-") for cmd in exclude_commands}
+
+    return normalized_include, normalized_exclude
+
+
+def _should_include_command(
+    name: str,
+    parent_path: List[str],
+    normalized_commands_filter: Optional[Set[str]],
+    normalized_exclude_commands: Optional[Set[str]],
+    subapp: "App",
+) -> bool:
+    """Determine if a command should be included based on filters.
+
+    Parameters
+    ----------
+    name : str
+        The command name.
+    parent_path : List[str]
+        Path to parent commands.
+    normalized_commands_filter : Optional[Set[str]]
+        Set of commands to include (already normalized).
+    normalized_exclude_commands : Optional[Set[str]]
+        Set of commands to exclude (already normalized).
+    subapp : App
+        The subcommand App instance.
+
+    Returns
+    -------
+    bool
+        True if the command should be included, False otherwise.
+    """
+    # Build the full command path for nested commands
+    full_path = ".".join(parent_path + [name]) if parent_path else name
+
+    # Check exclusion list first
+    if normalized_exclude_commands:
+        # Check both the command name and full path
+        if name in normalized_exclude_commands or full_path in normalized_exclude_commands:
+            return False
+        # Check if any parent path is excluded
+        for i in range(len(parent_path)):
+            parent_segment = ".".join(parent_path[: i + 1])
+            if parent_segment in normalized_exclude_commands:
+                return False
+
+    # Check inclusion list
+    if normalized_commands_filter is not None:
+        # Check if command name or full path is in the filter
+        if name in normalized_commands_filter or full_path in normalized_commands_filter:
+            return True
+
+        # Check if any parent path is included (to include all subcommands)
+        for i in range(len(parent_path)):
+            parent_segment = ".".join(parent_path[: i + 1])
+            if parent_segment in normalized_commands_filter:
+                return True
+
+        # Also check if just the base command name matches for top-level commands
+        if not parent_path and name in normalized_commands_filter:
+            return True
+
+        # Check if any child commands should be included
+        if hasattr(subapp, "_commands") and subapp._commands:
+            # Check if any filter starts with this command's full path
+            for filter_cmd in normalized_commands_filter:
+                if filter_cmd.startswith(full_path + "."):
+                    return True
+
+        return False
+
+    # No filter specified, include by default
+    return True
+
+
+def _adjust_filters_for_subcommand(
+    name: str,
+    normalized_commands_filter: Optional[Set[str]],
+    normalized_exclude_commands: Optional[Set[str]],
+) -> Tuple[Optional[List[str]], Optional[List[str]]]:
+    """Adjust filter lists for subcommand context.
+
+    Parameters
+    ----------
+    name : str
+        The current command name.
+    normalized_commands_filter : Optional[Set[str]]
+        Set of commands to include (already normalized).
+    normalized_exclude_commands : Optional[Set[str]]
+        Set of commands to exclude (already normalized).
+
+    Returns
+    -------
+    Tuple[Optional[List[str]], Optional[List[str]]]
+        Adjusted commands_filter and exclude_commands lists (denormalized).
+    """
+    sub_commands_filter = None
+    if normalized_commands_filter is not None:
+        sub_commands_filter = []
+        for filter_cmd in normalized_commands_filter:
+            # If filter starts with current command name + ".", strip the prefix
+            if filter_cmd.startswith(name + "."):
+                sub_filter = filter_cmd[len(name) + 1 :]
+                # Convert back to original format for recursive call
+                sub_commands_filter.append(sub_filter.replace("-", "_"))
+            # If filter matches exactly, include all subcommands (pass None)
+            elif filter_cmd == name:
+                sub_commands_filter = None
+                break
+
+        # If we have an empty list, no subcommands should be shown
+        if sub_commands_filter == []:
+            sub_commands_filter = []
+
+    sub_exclude_commands = None
+    if normalized_exclude_commands:
+        sub_exclude_commands = []
+        for exclude_cmd in normalized_exclude_commands:
+            # If exclude starts with current command name + ".", strip the prefix
+            if exclude_cmd.startswith(name + "."):
+                sub_exclude = exclude_cmd[len(name) + 1 :]
+                sub_exclude_commands.append(sub_exclude.replace("-", "_"))
+            # Keep other exclusions unchanged (convert back to original)
+            else:
+                sub_exclude_commands.append(exclude_cmd.replace("-", "_"))
+
+    return sub_commands_filter, sub_exclude_commands
+
+
 def _collect_commands_for_toc(
-    app: "App", include_hidden: bool = False, prefix: str = ""
+    app: "App",
+    include_hidden: bool = False,
+    prefix: str = "",
+    commands_filter: Optional[List[str]] = None,
+    exclude_commands: Optional[List[str]] = None,
+    parent_path: Optional[List[str]] = None,
 ) -> List[Tuple[str, str, "App"]]:
     """Recursively collect all commands for table of contents.
 
@@ -17,6 +175,14 @@ def _collect_commands_for_toc(
 
     if not app._commands:
         return commands
+
+    if parent_path is None:
+        parent_path = []
+
+    # Normalize filter lists for efficient lookup
+    normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
+        commands_filter, exclude_commands
+    )
 
     for name, subapp in app._commands.items():
         # Skip built-in commands
@@ -28,6 +194,12 @@ def _collect_commands_for_toc(
             if not include_hidden and not subapp.show:
                 continue
 
+        # Apply command filtering
+        if not _should_include_command(
+            name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
+        ):
+            continue
+
         # Create display name and anchor
         display_name = f"{prefix}{name}" if prefix else name
         # For RST, anchors work differently - they're explicit labels
@@ -36,7 +208,15 @@ def _collect_commands_for_toc(
         commands.append((display_name, anchor, subapp))
 
         # Recursively collect nested commands
-        nested = _collect_commands_for_toc(subapp, include_hidden=include_hidden, prefix=f"{display_name} ")
+        nested_path = parent_path + [name]
+        nested = _collect_commands_for_toc(
+            subapp,
+            include_hidden=include_hidden,
+            prefix=f"{display_name} ",
+            commands_filter=commands_filter,  # Pass original filters, they'll be normalized in recursive call
+            exclude_commands=exclude_commands,  # Pass original filters, they'll be normalized in recursive call
+            parent_path=nested_path,
+        )
         commands.extend(nested)
 
     return commands
@@ -104,6 +284,8 @@ def generate_rst_docs(
     generate_toc: bool = True,
     flatten_commands: bool = False,
     command_prefix: str = "",
+    commands_filter: Optional[list[str]] = None,
+    exclude_commands: Optional[list[str]] = None,
     no_root_title: bool = False,
     sections_only: bool = False,
 ) -> str:
@@ -134,6 +316,14 @@ def generate_rst_docs(
     command_prefix : str
         Prefix to add to command headings (e.g., "Command: ").
         Default is empty string.
+    commands_filter : list[str], optional
+        If specified, only include commands in this list.
+        Supports nested command paths like "db.migrate".
+        Default is None (include all commands).
+    exclude_commands : list[str], optional
+        If specified, exclude commands in this list.
+        Supports nested command paths like "db.migrate".
+        Default is None (no exclusions).
     no_root_title : bool
         If True, skip generating the root application title.
         Useful when embedding in existing documentation with its own title.
@@ -224,7 +414,12 @@ def generate_rst_docs(
     # Skip TOC when sections_only is enabled (sections integrate with Sphinx's toctree)
     if generate_toc and not command_chain and app._commands and not sections_only:
         # Collect all commands recursively for TOC
-        toc_commands = _collect_commands_for_toc(app, include_hidden=include_hidden)
+        toc_commands = _collect_commands_for_toc(
+            app,
+            include_hidden=include_hidden,
+            commands_filter=commands_filter,
+            exclude_commands=exclude_commands,
+        )
         if toc_commands:
             _generate_toc_entries(lines, toc_commands, app_name=app_name)
             lines.append("")
@@ -416,6 +611,13 @@ def generate_rst_docs(
 
     # Recursively document subcommands
     if recursive and app._commands:
+        # Normalize filter lists for efficient lookup
+        normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
+            commands_filter, exclude_commands
+        )
+        # parent_path should be empty at each app's root level, not the command chain
+        parent_path = []
+
         for name, subapp in app._commands.items():
             # Skip built-in commands
             if name in app._help_flags or name in app._version_flags:
@@ -425,6 +627,12 @@ def generate_rst_docs(
             if hasattr(subapp, "show"):
                 if not include_hidden and not subapp.show:
                     continue
+
+            # Apply command filtering
+            if not _should_include_command(
+                name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
+            ):
+                continue
 
             # Add some spacing before subcommand
             lines.append("")
@@ -438,6 +646,11 @@ def generate_rst_docs(
                 # Normal hierarchical mode - don't increment heading_level, let the chain length determine it
                 next_heading_level = heading_level
 
+            # Adjust filters for the subcommand context
+            sub_commands_filter, sub_exclude_commands = _adjust_filters_for_subcommand(
+                name, normalized_commands_filter, normalized_exclude_commands
+            )
+
             subdocs = generate_rst_docs(
                 subapp,
                 recursive=recursive,
@@ -447,6 +660,8 @@ def generate_rst_docs(
                 generate_toc=False,  # Only generate TOC at root level
                 flatten_commands=flatten_commands,
                 command_prefix=command_prefix,
+                commands_filter=sub_commands_filter,
+                exclude_commands=sub_exclude_commands,
                 no_root_title=False,  # Subcommands should have titles
                 sections_only=sections_only,  # Propagate sections_only mode
             )

@@ -7,7 +7,7 @@ from cyclopts.docs.types import (
     FORMAT_ALIASES,
     CanonicalDocFormat,
     DocFormat,
-    canonicalize_format,
+    normalize_format,
 )
 
 __all__ = [
@@ -17,5 +17,5 @@ __all__ = [
     "DocFormat",
     "CanonicalDocFormat",
     "FORMAT_ALIASES",
-    "canonicalize_format",
+    "normalize_format",
 ]
