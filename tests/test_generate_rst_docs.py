@@ -225,3 +225,65 @@ def test_generate_rst_docs_special_characters():
     assert "special chars" in docs
     # Backslashes should be escaped in RST
     assert "default\\\\value" in docs or "default\\value" in docs
+
+
+def test_generate_rst_docs_flatten_commands():
+    """Test flatten_commands option for RST documentation."""
+    app = App(name="myapp", help="Main app")
+
+    sub1 = App(name="sub1", help="First subcommand")
+
+    @sub1.command
+    def nested1():
+        """Nested command 1."""
+        pass
+
+    @sub1.command
+    def nested2():
+        """Nested command 2."""
+        pass
+
+    sub2 = App(name="sub2", help="Second subcommand")
+
+    @sub2.command
+    def nested3():
+        """Nested command 3."""
+        pass
+
+    app.command(sub1)
+    app.command(sub2)
+
+    # Without flatten_commands - hierarchical headings
+    docs_hierarchical = app.generate_docs(output_format="rst", flatten_commands=False)
+
+    # Main app should be level 1 (=====)
+    assert "=====\nmyapp\n=====" in docs_hierarchical
+    # Subcommands should be level 2 (-----)
+    # Note: RST implementation uses short titles (not full command path)
+    assert "sub1\n----" in docs_hierarchical
+    assert "sub2\n----" in docs_hierarchical
+    # Nested commands should be level 3 (^^^^^)
+    assert "sub1 nested1\n^^^^^^^^^^^^" in docs_hierarchical
+    assert "sub1 nested2\n^^^^^^^^^^^^" in docs_hierarchical
+    assert "sub2 nested3\n^^^^^^^^^^^^" in docs_hierarchical
+
+    # With flatten_commands - all at same level
+    docs_flat = app.generate_docs(output_format="rst", flatten_commands=True)
+
+    # Main app should be level 1 (=====)
+    assert "=====\nmyapp\n=====" in docs_flat
+    # All subcommands should also be level 1 (=====)
+    # Note: RST implementation uses short titles (not full command path)
+    assert "====\nsub1\n====" in docs_flat
+    assert "====\nsub2\n====" in docs_flat
+    # All nested commands should also be level 1 (=====)
+    assert "============\nsub1 nested1\n============" in docs_flat
+    assert "============\nsub1 nested2\n============" in docs_flat
+    assert "============\nsub2 nested3\n============" in docs_flat
+    # Should NOT have level 2 or level 3 markers for commands
+    # (Level 2 uses single underline, level 3 uses ^^^^)
+    # Check that subcommands don't use level 2 markers (----)
+    assert "sub1\n----" not in docs_flat
+    assert "sub2\n----" not in docs_flat
+    # Check that nested commands don't use level 3 markers (^^^^)
+    assert "sub1 nested1\n^^^^^^^^^^^^" not in docs_flat

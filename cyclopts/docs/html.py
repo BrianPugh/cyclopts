@@ -327,6 +327,7 @@ def generate_html_docs(
     custom_css: Optional[str] = None,
     command_chain: Optional[list[str]] = None,
     generate_toc: bool = True,
+    flatten_commands: bool = False,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -354,6 +355,9 @@ def generate_html_docs(
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
+    flatten_commands : bool
+        If True, generate all commands at the same heading level instead of nested.
+        Default is False.
 
     Returns
     -------
@@ -454,6 +458,12 @@ def generate_html_docs(
             # Build the command chain for this subcommand
             sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
 
+            # Determine heading level for subcommand
+            if flatten_commands:
+                sub_heading_level = heading_level
+            else:
+                sub_heading_level = heading_level + 1
+
             # Generate subcommand documentation
             lines.append('<section class="command-section">')
             # Create anchor-friendly ID
@@ -463,7 +473,7 @@ def generate_html_docs(
                 else f"{app_name}-{name}".lower()
             )
             lines.append(
-                f'<h{heading_level + 1} id="{anchor_id}" class="command-title"><code>{_escape_html(" ".join(sub_command_chain))}</code></h{heading_level + 1}>'
+                f'<h{sub_heading_level} id="{anchor_id}" class="command-title"><code>{_escape_html(" ".join(sub_command_chain))}</code></h{sub_heading_level}>'
             )
 
             # Get subapp help
@@ -478,7 +488,11 @@ def generate_html_docs(
                 # Generate usage for subcommand
                 sub_usage = BaseDocGenerator.extract_usage(subapp)
                 if sub_usage:
-                    lines.append(f"<h{heading_level + 2}>Usage</h{heading_level + 2}>")
+                    if flatten_commands:
+                        usage_heading_level = heading_level + 1
+                    else:
+                        usage_heading_level = heading_level + 2
+                    lines.append(f"<h{usage_heading_level}>Usage</h{usage_heading_level}>")
                     lines.append('<div class="usage-block">')
                     if isinstance(sub_usage, str):
                         sub_usage_text = sub_usage
@@ -494,8 +508,12 @@ def generate_html_docs(
                     sub_panels = subapp._assemble_help_panels([], sub_help_format)
 
                     # Render subcommand panels
+                    if flatten_commands:
+                        panel_heading_level = heading_level + 1
+                    else:
+                        panel_heading_level = heading_level + 2
                     sub_formatter = HtmlFormatter(
-                        heading_level=heading_level + 2,
+                        heading_level=panel_heading_level,
                         include_hidden=include_hidden,
                         app_name=app_name,
                         command_chain=sub_command_chain,
@@ -528,16 +546,22 @@ def generate_html_docs(
                     for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
                         # Build nested command chain
                         nested_chain = BaseDocGenerator.build_command_chain(sub_command_chain, nested_name, app_name)
+                        # Determine heading level for nested commands
+                        if flatten_commands:
+                            nested_heading_level = heading_level
+                        else:
+                            nested_heading_level = heading_level + 2
                         # Recursively generate docs for nested commands
                         nested_docs = generate_html_docs(
                             nested_app,
                             recursive=recursive,
                             include_hidden=include_hidden,
-                            heading_level=heading_level + 2,
+                            heading_level=nested_heading_level,
                             standalone=False,  # Not standalone for nested
                             custom_css=None,
                             command_chain=nested_chain,  # Pass the command chain
                             generate_toc=False,  # No TOC for nested commands
+                            flatten_commands=flatten_commands,
                         )
                         lines.append(nested_docs)
 

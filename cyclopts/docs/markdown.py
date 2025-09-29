@@ -69,6 +69,7 @@ def generate_markdown_docs(
     heading_level: int = 1,
     command_chain: Optional[list[str]] = None,
     generate_toc: bool = True,
+    flatten_commands: bool = False,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -91,6 +92,9 @@ def generate_markdown_docs(
     generate_toc : bool
         If True, generate a table of contents for multi-command apps.
         Default is True.
+    flatten_commands : bool
+        If True, generate all commands at the same heading level instead of nested.
+        Default is False.
 
     Returns
     -------
@@ -242,8 +246,14 @@ def generate_markdown_docs(
                 # Build the command chain for this subcommand
                 sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
 
+                # Determine heading level for subcommand
+                if flatten_commands:
+                    sub_heading_level = heading_level
+                else:
+                    sub_heading_level = heading_level + 1
+
                 # Generate subcommand documentation in Typer style
-                lines.append(f"{'#' * (heading_level + 1)} `{' '.join(sub_command_chain)}`")
+                lines.append(f"{'#' * sub_heading_level} `{' '.join(sub_command_chain)}`")
                 lines.append("")
 
                 # Get subapp help
@@ -287,8 +297,12 @@ def generate_markdown_docs(
                         sub_command_panels = sub_categorized["commands"]
 
                         # Render panels in Typer order
+                        if flatten_commands:
+                            panel_heading_level = heading_level + 1
+                        else:
+                            panel_heading_level = heading_level + 2
                         sub_formatter = MarkdownFormatter(
-                            heading_level=heading_level + 2, include_hidden=include_hidden, table_style="list"
+                            heading_level=panel_heading_level, include_hidden=include_hidden, table_style="list"
                         )
 
                         # Arguments
@@ -369,14 +383,20 @@ def generate_markdown_docs(
                             nested_command_chain = BaseDocGenerator.build_command_chain(
                                 sub_command_chain, nested_name, app_name
                             )
+                            # Determine heading level for nested commands
+                            if flatten_commands:
+                                nested_heading_level = heading_level
+                            else:
+                                nested_heading_level = heading_level + 1
                             # Recursively generate docs for nested commands
                             nested_docs = generate_markdown_docs(
                                 nested_app,
                                 recursive=recursive,
                                 include_hidden=include_hidden,
-                                heading_level=heading_level + 1,
+                                heading_level=nested_heading_level,
                                 command_chain=nested_command_chain,
                                 generate_toc=False,  # Don't generate TOC for nested commands
+                                flatten_commands=flatten_commands,
                             )
                             # Just append the generated docs - no title replacement
                             lines.append(nested_docs)

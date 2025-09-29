@@ -738,3 +738,58 @@ def test_generate_docs_nested_meta_apps():
     # Check db meta parameters appear with db command
     assert "connection" in docs.lower() or "CONNECTION" in docs
     assert "Database connection string" in docs
+
+
+def test_generate_docs_flatten_commands():
+    """Test flatten_commands option for markdown documentation."""
+    app = App(name="myapp", help="Main app")
+
+    sub1 = App(name="sub1", help="First subcommand")
+
+    @sub1.command
+    def nested1():
+        """Nested command 1."""
+        pass
+
+    @sub1.command
+    def nested2():
+        """Nested command 2."""
+        pass
+
+    sub2 = App(name="sub2", help="Second subcommand")
+
+    @sub2.command
+    def nested3():
+        """Nested command 3."""
+        pass
+
+    app.command(sub1)
+    app.command(sub2)
+
+    # Without flatten_commands - hierarchical headings
+    docs_hierarchical = app.generate_docs(flatten_commands=False)
+
+    # Main app should be h1
+    assert "# myapp" in docs_hierarchical
+    # Subcommands should be h2
+    assert "## `myapp sub1`" in docs_hierarchical
+    assert "## `myapp sub2`" in docs_hierarchical
+    # Nested commands should also be h2 (not h3) in current implementation
+    assert "## `myapp sub1 nested1`" in docs_hierarchical
+    assert "## `myapp sub1 nested2`" in docs_hierarchical
+    assert "## `myapp sub2 nested3`" in docs_hierarchical
+
+    # With flatten_commands - all at same level
+    docs_flat = app.generate_docs(flatten_commands=True)
+
+    # Main app should be h1
+    assert "# myapp" in docs_flat
+    # All subcommands should also be h1 (flattened)
+    assert "# `myapp sub1`" in docs_flat
+    assert "# `myapp sub2`" in docs_flat
+    # All nested commands should also be h1 (flattened)
+    assert "# `myapp sub1 nested1`" in docs_flat
+    assert "# `myapp sub1 nested2`" in docs_flat
+    assert "# `myapp sub2 nested3`" in docs_flat
+    # Should NOT have h2 command headings when flattened
+    assert "## `myapp sub" not in docs_flat

@@ -1924,6 +1924,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                flatten_commands=flatten_commands,
             )
         elif output_format == "html":
             doc = generate_html_docs(
@@ -1931,6 +1932,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                flatten_commands=flatten_commands,
             )
         elif output_format == "rst":
             doc = generate_rst_docs(

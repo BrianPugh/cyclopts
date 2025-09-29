@@ -270,3 +270,59 @@ def test_generate_html_docs_invalid_format():
 
     with pytest.raises(ValueError, match='Unsupported format "latex"'):
         app.generate_docs(output_format="latex")  # type: ignore[arg-type]
+
+
+def test_generate_html_docs_flatten_commands():
+    """Test flatten_commands option for HTML documentation."""
+    app = App(name="myapp", help="Main app")
+
+    sub1 = App(name="sub1", help="First subcommand")
+
+    @sub1.command
+    def nested1():
+        """Nested command 1."""
+        pass
+
+    @sub1.command
+    def nested2():
+        """Nested command 2."""
+        pass
+
+    sub2 = App(name="sub2", help="Second subcommand")
+
+    @sub2.command
+    def nested3():
+        """Nested command 3."""
+        pass
+
+    app.command(sub1)
+    app.command(sub2)
+
+    # Without flatten_commands - hierarchical headings
+    docs_hierarchical = app.generate_docs(output_format="html", flatten_commands=False)
+
+    # Main app should be h1
+    assert '<h1 class="app-title">myapp</h1>' in docs_hierarchical
+    # Subcommands should be h2
+    assert '<h2 id="myapp-sub1" class="command-title">' in docs_hierarchical
+    assert '<h2 id="myapp-sub2" class="command-title">' in docs_hierarchical
+    # Nested commands should be h3
+    assert '<h3 id="myapp-sub1-nested1" class="command-title">' in docs_hierarchical
+    assert '<h3 id="myapp-sub1-nested2" class="command-title">' in docs_hierarchical
+    assert '<h3 id="myapp-sub2-nested3" class="command-title">' in docs_hierarchical
+
+    # With flatten_commands - all at same level
+    docs_flat = app.generate_docs(output_format="html", flatten_commands=True)
+
+    # Main app should be h1
+    assert '<h1 class="app-title">myapp</h1>' in docs_flat
+    # Subcommands should be h1 (flattened)
+    assert '<h1 id="myapp-sub1" class="command-title">' in docs_flat
+    assert '<h1 id="myapp-sub2" class="command-title">' in docs_flat
+    # Nested commands should also be h1 (flattened)
+    assert '<h1 id="myapp-sub1-nested1" class="command-title">' in docs_flat
+    assert '<h1 id="myapp-sub1-nested2" class="command-title">' in docs_flat
+    assert '<h1 id="myapp-sub2-nested3" class="command-title">' in docs_flat
+    # Should NOT have h2 or h3 command headings
+    assert '<h2 id="myapp-sub' not in docs_flat
+    assert '<h3 id="myapp-sub' not in docs_flat
