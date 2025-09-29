@@ -1,6 +1,6 @@
 """RST documentation generation functions for cyclopts apps."""
 
-from typing import TYPE_CHECKING, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING
 
 from cyclopts.docs.base import BaseDocGenerator
 from cyclopts.help.formatters._shared import extract_plain_text, make_rst_section_header
@@ -10,9 +10,9 @@ if TYPE_CHECKING:
 
 
 def _normalize_command_filters(
-    commands_filter: Optional[List[str]] = None,
-    exclude_commands: Optional[List[str]] = None,
-) -> Tuple[Optional[Set[str]], Optional[Set[str]]]:
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
+) -> tuple[set[str] | None, set[str] | None]:
     """Normalize command filter lists by converting underscores to dashes.
 
     Parameters
@@ -40,9 +40,9 @@ def _normalize_command_filters(
 
 def _should_include_command(
     name: str,
-    parent_path: List[str],
-    normalized_commands_filter: Optional[Set[str]],
-    normalized_exclude_commands: Optional[Set[str]],
+    parent_path: list[str],
+    normalized_commands_filter: set[str] | None,
+    normalized_exclude_commands: set[str] | None,
     subapp: "App",
 ) -> bool:
     """Determine if a command should be included based on filters.
@@ -99,9 +99,9 @@ def _should_include_command(
 
 def _adjust_filters_for_subcommand(
     name: str,
-    normalized_commands_filter: Optional[Set[str]],
-    normalized_exclude_commands: Optional[Set[str]],
-) -> Tuple[Optional[List[str]], Optional[List[str]]]:
+    normalized_commands_filter: set[str] | None,
+    normalized_exclude_commands: set[str] | None,
+) -> tuple[list[str] | None, list[str] | None]:
     """Adjust filter lists for subcommand context.
 
     Parameters
@@ -151,10 +151,10 @@ def _collect_commands_for_toc(
     app: "App",
     include_hidden: bool = False,
     prefix: str = "",
-    commands_filter: Optional[List[str]] = None,
-    exclude_commands: Optional[List[str]] = None,
-    parent_path: Optional[List[str]] = None,
-) -> List[Tuple[str, str, "App"]]:
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
+    parent_path: list[str] | None = None,
+) -> list[tuple[str, str, "App"]]:
     """Recursively collect all commands for table of contents.
 
     Returns a list of (display_name, anchor, app) tuples.
@@ -205,7 +205,7 @@ def _collect_commands_for_toc(
 
 
 def _generate_toc_entries(
-    lines: List[str], commands: List[Tuple[str, str, "App"]], app_name: Optional[str] = None
+    lines: list[str], commands: list[tuple[str, str, "App"]], app_name: str | None = None
 ) -> None:
     """Generate TOC entries with proper indentation for RST."""
     if not commands:
@@ -222,11 +222,11 @@ def generate_rst_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
-    command_chain: Optional[list[str]] = None,
+    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
-    commands_filter: Optional[list[str]] = None,
-    exclude_commands: Optional[list[str]] = None,
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
     no_root_title: bool = False,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.

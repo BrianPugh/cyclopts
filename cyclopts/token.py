@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from attrs import evolve, field
 
@@ -9,7 +9,7 @@ from cyclopts.utils import UNSET, frozen
 class Token:
     """Tracks how a user supplied a value to the application."""
 
-    keyword: Optional[str] = None
+    keyword: str | None = None
     value: str = ""
     source: str = ""
     index: int = field(default=0, kw_only=True)

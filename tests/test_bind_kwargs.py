@@ -1,9 +1,6 @@
-from typing import List
-
-
 def test_kwargs_list_int(app, assert_parse_args):
     @app.command
-    def foo(a: int, **kwargs: List[int]):
+    def foo(a: int, **kwargs: list[int]):
         pass
 
     assert_parse_args(foo, "foo 1 --bar=2 --baz=4 --bar 3", 1, bar=[2, 3], baz=[4])

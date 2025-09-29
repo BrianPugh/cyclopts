@@ -5,7 +5,6 @@ from typing import (  # noqa: F401
     Any,
     ClassVar,
     Optional,
-    Sequence,
     get_args,
     get_origin,
     get_type_hints,
@@ -54,7 +53,7 @@ class FieldInfo:
     default: Any = field(default=inspect.Parameter.empty, kw_only=True)
     annotation: Any = field(default=inspect.Parameter.empty, kw_only=True)
 
-    help: Optional[str] = field(default=None, kw_only=True)
+    help: str | None = field(default=None, kw_only=True)
     """Can be populated by additional metadata from another library; e.g. ``pydantic.FieldInfo.description``."""
 
     ###################
@@ -72,7 +71,7 @@ class FieldInfo:
     KEYWORD: ClassVar[frozenset[inspect._ParameterKind]] = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
 
     @classmethod
-    def from_iparam(cls, iparam: inspect.Parameter, *, annotation: Any = UNSET, required: Optional[bool] = None):
+    def from_iparam(cls, iparam: inspect.Parameter, *, annotation: Any = UNSET, required: bool | None = None):
         if required is None:
             required = (
                 iparam.default is iparam.empty
@@ -252,11 +251,7 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
         annotation = type_hints.get(f.name, FieldInfo.empty)
 
-        if sys.version_info < (3, 10):  # pragma: no cover
-            # Python3.9 does not have Field.kw_only attribute.
-            kind = FieldInfo.POSITIONAL_OR_KEYWORD
-        else:
-            kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
+        kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
 
         out[f.name] = FieldInfo(
             names=(f.name,),

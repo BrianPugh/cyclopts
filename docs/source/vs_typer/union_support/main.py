@@ -1,5 +1,3 @@
-from typing import Union
-
 import typer
 
 import cyclopts
@@ -8,7 +6,7 @@ typer_app = typer.Typer()
 
 
 @typer_app.command()
-def foo(value: Union[int, str] = "default_str"):
+def foo(value: int | str = "default_str"):
     print(f"{type(value)=} {value=}")
 
 
@@ -23,7 +21,7 @@ cyclopts_app = cyclopts.App()
 
 
 @cyclopts_app.default
-def foo(value: Union[int, str] = "default_str"):
+def foo(value: int | str = "default_str"):
     print(f"{type(value)=} {value=}")
 
 

@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, Optional, get_args
+from typing import Any, get_args
 
 
 def _is_path(type_) -> bool:
@@ -21,7 +21,7 @@ def env_var_split(
     type_: Any,
     val: str,
     *,
-    delimiter: Optional[str] = None,
+    delimiter: str | None = None,
 ) -> list[str]:
     """Type-dependent environment variable value splitting.
 

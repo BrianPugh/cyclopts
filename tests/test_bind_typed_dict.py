@@ -1,6 +1,6 @@
 import sys
 from textwrap import dedent
-from typing import Annotated, List, TypedDict
+from typing import Annotated, TypedDict
 
 import pytest
 
@@ -17,7 +17,7 @@ class MyDict(TypedDict):
     my_int: int
     my_str: str
     my_list: list
-    my_list_int: List[int]
+    my_list_int: list[int]
 
 
 def test_bind_typed_dict(app, assert_parse_args):
@@ -92,7 +92,7 @@ def test_bind_typed_dict_missing_arg_renamed_no_hyphen(app, console):
         my_int: int
         my_str: str
         my_list: Annotated[list, Parameter(name="your-list")]
-        my_list_int: List[int]
+        my_list_int: list[int]
 
     @app.command
     def foo(d: MyDict):
@@ -123,7 +123,7 @@ def test_bind_typed_dict_missing_arg_renamed_hyphen(app, console):
         my_int: int
         my_str: str
         my_list: Annotated[list, Parameter(name="--your-list")]
-        my_list_int: List[int]
+        my_list_int: list[int]
 
     @app.command
     def foo(d: MyDict):

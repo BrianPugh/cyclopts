@@ -1,6 +1,6 @@
 """HTML documentation generation for cyclopts apps."""
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from cyclopts.docs.base import BaseDocGenerator
 from cyclopts.help.formatters._shared import escape_html, extract_plain_text
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def _generate_html_toc(
-    lines: List[str],
+    lines: list[str],
     app: "App",
     include_hidden: bool,
     app_name: str,
@@ -322,8 +322,8 @@ def generate_html_docs(
     include_hidden: bool = False,
     heading_level: int = 1,
     standalone: bool = True,
-    custom_css: Optional[str] = None,
-    command_chain: Optional[list[str]] = None,
+    custom_css: str | None = None,
+    command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
 ) -> str:

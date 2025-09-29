@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Union
 
 from cyclopts.parameter import validate_command
 
@@ -19,13 +19,13 @@ def test_validate_command():
 
     validate_command(f3)
 
-    def f4(a: Tuple[int, int], b: str):
+    def f4(a: tuple[int, int], b: str):
         pass
 
     validate_command(f4)
 
     # Python automatically deduplicates the double None.
-    def f5(a: Union[None, None]):
+    def f5(a: Union[None, None]):  # noqa: UP007
         pass
 
     validate_command(f5)

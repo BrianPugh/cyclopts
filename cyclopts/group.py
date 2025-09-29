@@ -1,10 +1,9 @@
 import inspect
 import itertools
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
     Optional,
     Union,
@@ -76,7 +75,7 @@ class Group:
     help: str = ""
 
     # All below parameters are keyword-only
-    _show: Optional[bool] = field(default=None, alias="show", kw_only=True)
+    _show: bool | None = field(default=None, alias="show", kw_only=True)
 
     _sort_key: Any = field(
         default=None,
@@ -86,12 +85,10 @@ class Group:
     )
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]] = (
-        field(
-            default=None,
-            converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
-            kw_only=True,
-        )
+    validator: None | Callable[["ArgumentCollection"], Any] | Iterable[Callable[["ArgumentCollection"], Any]] = field(
+        default=None,
+        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+        kw_only=True,
     )
 
     default_parameter: Optional["Parameter"] = field(
@@ -207,8 +204,8 @@ def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group]
     sorted_entries = SortHelper.sort(
         [
             SortHelper(resolve_callables(group._sort_key, group), group.name, (group, attribute))
-            for group, attribute in zip(groups, attributes)
+            for group, attribute in zip(groups, attributes, strict=False)
         ]
     )
-    out_groups, out_attributes = zip(*[x.value for x in sorted_entries])
+    out_groups, out_attributes = zip(*[x.value for x in sorted_entries], strict=False)
     return list(out_groups), list(out_attributes)

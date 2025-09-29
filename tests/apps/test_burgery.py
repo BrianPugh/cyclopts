@@ -1,6 +1,6 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Literal
 
 import cyclopts
 from cyclopts import App, Parameter, validators
@@ -27,7 +27,7 @@ def burger(
     mustard: Annotated[bool, Parameter(group="Condiments")] = True,
     ketchup: Annotated[bool, Parameter(group="Condiments")] = True,
     mayo: Annotated[bool, Parameter(group="Condiments")] = True,
-    custom: Annotated[Optional[List[str]], Parameter(group="Condiments")] = None,
+    custom: Annotated[list[str] | None, Parameter(group="Condiments")] = None,
 ):
     """Create a burger.
 

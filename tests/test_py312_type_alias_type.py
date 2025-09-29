@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Annotated, Literal, Optional, TypeAlias
+from typing import Annotated, Literal, TypeAlias
 
 import pytest
 
@@ -33,7 +33,7 @@ class CompSciProblem(Enum):
 
 
 type AnnotatedEnum = Annotated[CompSciProblem, Parameter(name="foo")]
-type AnnotatedOptionalEnum = Annotated[Optional[CompSciProblem], Parameter(name="foo")]
+type AnnotatedOptionalEnum = Annotated[CompSciProblem | None, Parameter(name="foo")]
 
 type FontSingleFormat = Literal["otf", "woff2", "ttf", "bdf", "pcf"]
 type FontCollectionFormat = Literal["otc", "ttc"]

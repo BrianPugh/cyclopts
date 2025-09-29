@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Annotated, Dict, Optional
+from typing import Annotated
 
 import pytest
 from attrs import define, field
@@ -18,8 +18,8 @@ class Outfit:
 class User:
     id: int
     name: str = "John Doe"
-    tastes: Dict[str, int] = field(factory=dict)
-    outfit: Optional[Outfit] = None
+    tastes: dict[str, int] = field(factory=dict)
+    outfit: Outfit | None = None
     admin: Annotated[bool, Parameter(negative="not-admin")] = False
     vip: Annotated[bool, Parameter(negative="--not-vip")] = False
     staff: Annotated[bool, Parameter(parse=False)] = False

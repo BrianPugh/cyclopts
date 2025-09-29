@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from contextlib import contextmanager
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 from cyclopts.group_extractors import inverse_groups_from_app
 from cyclopts.parameter import Parameter
@@ -20,7 +21,7 @@ class AppStack:
         self.overrides_stack: list[dict[str, Any]] = [{}]
 
     @contextmanager
-    def __call__(self, apps: Union[Sequence["App"], Sequence[str]], overrides: Optional[dict[str, Any]] = None):
+    def __call__(self, apps: Sequence["App"] | Sequence[str], overrides: dict[str, Any] | None = None):
         # set `overrides` default-values with current overrides so that they properly propagate down the call-stack.
         overrides = self.overrides | (overrides or {})
 
@@ -124,12 +125,12 @@ class AppStack:
     def resolve(self, attribute: str, override: V) -> V: ...
 
     @overload
-    def resolve(self, attribute: str, override: Optional[V], fallback: V) -> V: ...
+    def resolve(self, attribute: str, override: V | None, fallback: V) -> V: ...
 
     @overload
-    def resolve(self, attribute: str, override: Optional[V] = None, *, fallback: V) -> V: ...
+    def resolve(self, attribute: str, override: V | None = None, *, fallback: V) -> V: ...
 
-    def resolve(self, attribute: str, override: Optional[V] = None, fallback: Optional[V] = None) -> Optional[V]:
+    def resolve(self, attribute: str, override: V | None = None, fallback: V | None = None) -> V | None:
         """Resolve an attribute from the App hierarchy."""
         if override is not None:
             return override
@@ -160,7 +161,7 @@ class AppStack:
     def command_groups(self) -> list:
         command_app = self.current_frame[-1]
         try:
-            current_app: Optional[App] = self.current_frame[-2]
+            current_app: App | None = self.current_frame[-2]
         except IndexError:
             current_app = None
 

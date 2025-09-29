@@ -2,11 +2,10 @@
 
 import functools
 import inspect
-import sys
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 from attrs import field, frozen
 
@@ -20,231 +19,7 @@ else:
 
     frozen = functools.partial(define, unsafe_hash=True)
 
-if sys.version_info >= (3, 10):  # pragma: no cover
-    from sys import stdlib_module_names
-else:  # pragma: no cover
-    # Copied from python3.11 sys.stdlib_module_names
-    stdlib_module_names = frozenset(
-        {
-            "abc",
-            "aifc",
-            "antigravity",
-            "argparse",
-            "array",
-            "ast",
-            "asynchat",
-            "asyncio",
-            "asyncore",
-            "atexit",
-            "audioop",
-            "base64",
-            "bdb",
-            "binascii",
-            "bisect",
-            "builtins",
-            "bz2",
-            "cProfile",
-            "calendar",
-            "cgi",
-            "cgitb",
-            "chunk",
-            "cmath",
-            "cmd",
-            "code",
-            "codecs",
-            "codeop",
-            "collections",
-            "colorsys",
-            "compileall",
-            "concurrent",
-            "configparser",
-            "contextlib",
-            "contextvars",
-            "copy",
-            "copyreg",
-            "crypt",
-            "csv",
-            "ctypes",
-            "curses",
-            "dataclasses",
-            "datetime",
-            "dbm",
-            "decimal",
-            "difflib",
-            "dis",
-            "distutils",
-            "doctest",
-            "email",
-            "encodings",
-            "ensurepip",
-            "enum",
-            "errno",
-            "faulthandler",
-            "fcntl",
-            "filecmp",
-            "fileinput",
-            "fnmatch",
-            "fractions",
-            "ftplib",
-            "functools",
-            "gc",
-            "genericpath",
-            "getopt",
-            "getpass",
-            "gettext",
-            "glob",
-            "graphlib",
-            "grp",
-            "gzip",
-            "hashlib",
-            "heapq",
-            "hmac",
-            "html",
-            "http",
-            "idlelib",
-            "imaplib",
-            "imghdr",
-            "imp",
-            "importlib",
-            "inspect",
-            "io",
-            "ipaddress",
-            "itertools",
-            "json",
-            "keyword",
-            "lib2to3",
-            "linecache",
-            "locale",
-            "logging",
-            "lzma",
-            "mailbox",
-            "mailcap",
-            "marshal",
-            "math",
-            "mimetypes",
-            "mmap",
-            "modulefinder",
-            "msilib",
-            "msvcrt",
-            "multiprocessing",
-            "netrc",
-            "nis",
-            "nntplib",
-            "nt",
-            "ntpath",
-            "nturl2path",
-            "numbers",
-            "opcode",
-            "operator",
-            "optparse",
-            "os",
-            "ossaudiodev",
-            "pathlib",
-            "pdb",
-            "pickle",
-            "pickletools",
-            "pipes",
-            "pkgutil",
-            "platform",
-            "plistlib",
-            "poplib",
-            "posix",
-            "posixpath",
-            "pprint",
-            "profile",
-            "pstats",
-            "pty",
-            "pwd",
-            "py_compile",
-            "pyclbr",
-            "pydoc",
-            "pydoc_data",
-            "pyexpat",
-            "queue",
-            "quopri",
-            "random",
-            "re",
-            "readline",
-            "reprlib",
-            "resource",
-            "rlcompleter",
-            "runpy",
-            "sched",
-            "secrets",
-            "select",
-            "selectors",
-            "shelve",
-            "shlex",
-            "shutil",
-            "signal",
-            "site",
-            "smtpd",
-            "smtplib",
-            "sndhdr",
-            "socket",
-            "socketserver",
-            "spwd",
-            "sqlite3",
-            "sre_compile",
-            "sre_constants",
-            "sre_parse",
-            "ssl",
-            "stat",
-            "statistics",
-            "string",
-            "stringprep",
-            "struct",
-            "subprocess",
-            "sunau",
-            "symtable",
-            "sys",
-            "sysconfig",
-            "syslog",
-            "tabnanny",
-            "tarfile",
-            "telnetlib",
-            "tempfile",
-            "termios",
-            "textwrap",
-            "this",
-            "threading",
-            "time",
-            "timeit",
-            "tkinter",
-            "token",
-            "tokenize",
-            "tomllib",
-            "trace",
-            "traceback",
-            "tracemalloc",
-            "tty",
-            "turtle",
-            "turtledemo",
-            "types",
-            "typing",
-            "unicodedata",
-            "unittest",
-            "urllib",
-            "uu",
-            "uuid",
-            "venv",
-            "warnings",
-            "wave",
-            "weakref",
-            "webbrowser",
-            "winreg",
-            "winsound",
-            "wsgiref",
-            "xdrlib",
-            "xml",
-            "xmlrpc",
-            "zipapp",
-            "zipfile",
-            "zipimport",
-            "zlib",
-            "zoneinfo",
-        }
-    )
+from sys import stdlib_module_names
 
 
 class SentinelMeta(type):
@@ -285,7 +60,7 @@ def record_init(target: str):
 
 
 def is_iterable(obj) -> bool:
-    if isinstance(obj, (list, tuple, set, dict)):  # Fast path for common types
+    if isinstance(obj, list | tuple | set | dict):  # Fast path for common types
         return True
     return not isinstance(obj, str) and isinstance(obj, Iterable)
 
@@ -312,7 +87,7 @@ def is_class_and_subclass(hint, target_class) -> bool:
         return False
 
 
-def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...]:
+def to_tuple_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...]:
     """Convert a single element or an iterable of elements into a tuple.
 
     Intended to be used in an ``attrs.Field``. If :obj:`None` is provided, returns an empty tuple.
@@ -336,11 +111,11 @@ def to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[Any, ...
         return (value,)
 
 
-def to_list_converter(value: Union[None, Any, Iterable[Any]]) -> list[Any]:
+def to_list_converter(value: None | Any | Iterable[Any]) -> list[Any]:
     return list(to_tuple_converter(value))
 
 
-def optional_to_tuple_converter(value: Union[None, Any, Iterable[Any]]) -> Optional[tuple[Any, ...]]:
+def optional_to_tuple_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...] | None:
     """Convert a string or Iterable or None into an Iterable or None.
 
     Intended to be used in an ``attrs.Field``.
@@ -376,8 +151,8 @@ def sort_key_converter(value: Any) -> Any:
 
 
 def help_formatter_converter(
-    input_value: Union[None, Literal["default", "plain"], Any],
-) -> Optional[Any]:
+    input_value: None | Literal["default", "plain"] | Any,
+) -> Any | None:
     """Convert string literals to help formatter instances.
 
     Parameters
@@ -436,7 +211,7 @@ def default_name_transform(s: str) -> str:
     return s.lower().replace("_", "-").strip("-")
 
 
-def grouper(iterable: Sequence[Any], n: int) -> Iterator[Tuple[Any, ...]]:
+def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:
     """Collect data into non-overlapping fixed-length chunks or blocks.
 
     https://docs.python.org/3/library/itertools.html#itertools-recipes
@@ -451,7 +226,7 @@ def grouper(iterable: Sequence[Any], n: int) -> Iterator[Tuple[Any, ...]]:
     if len(iterable) % n:
         raise ValueError(f"{iterable!r} is not divisible by {n}.")
     iterators = [iter(iterable)] * n
-    return zip(*iterators)
+    return zip(*iterators, strict=False)
 
 
 def is_option_like(token: str, *, allow_numbers=False) -> bool:

@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Annotated, Dict, Literal, Optional
+from typing import Annotated, Literal
 
 import pytest
 
@@ -23,8 +23,8 @@ class User:
         self,
         id: int,
         name: str = "John Doe",
-        tastes: Optional[Dict[str, int]] = None,
-        outfit: Optional[Annotated[Outfit, Parameter(accepts_keys=True)]] = None,
+        tastes: dict[str, int] | None = None,
+        outfit: Annotated[Outfit, Parameter(accepts_keys=True)] | None = None,
     ):
         self.id = id
         self.name = name

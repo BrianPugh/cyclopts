@@ -1,5 +1,6 @@
 import itertools
-from typing import Annotated, Sequence
+from collections.abc import Sequence
+from typing import Annotated
 from unittest.mock import Mock
 
 import pytest

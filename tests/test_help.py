@@ -1,9 +1,9 @@
-import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Annotated, List, Literal, Optional, Sequence, Set, Tuple, Union
+from typing import Annotated, Literal
 
 import pytest
 
@@ -43,7 +43,7 @@ def test_help_mutable_default(app):
     """Ensures it doesn't crash; see issue #215."""
 
     @app.default
-    def main(users: List[str] = ["a", "b"]) -> None:  # noqa: B006
+    def main(users: list[str] = ["a", "b"]) -> None:  # noqa: B006
         print(users)
 
     app(["--help"])
@@ -535,7 +535,7 @@ def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_g
 
 def test_help_format_group_parameters_list_flag(capture_format_group_parameters):
     def cmd(
-        foo: Annotated[Optional[List[int]], Parameter(help="Docstring for foo.")] = None,
+        foo: Annotated[list[int] | None, Parameter(help="Docstring for foo.")] = None,
     ):
         pass
 
@@ -676,9 +676,7 @@ def test_help_format_group_parameters_choices_literal_no_show(capture_format_gro
 
 def test_help_format_group_parameters_choices_literal_union(capture_format_group_parameters):
     def cmd(
-        foo: Annotated[
-            Union[int, Literal["fizz", "buzz"], Literal["bar"]], Parameter(help="Docstring for foo.")
-        ] = "fizz",
+        foo: Annotated[int | Literal["fizz", "buzz"] | Literal["bar"], Parameter(help="Docstring for foo.")] = "fizz",
     ):
         pass
 
@@ -694,7 +692,6 @@ def test_help_format_group_parameters_choices_literal_union(capture_format_group
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(capture_format_group_parameters):
     def cmd(
         foo: Annotated[
@@ -715,7 +712,6 @@ def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(c
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_1(capture_format_group_parameters):
     def cmd(foo: Literal["fizz", "buzz"] | Literal["bar"] = "fizz"):  # pyright: ignore
         pass
@@ -765,7 +761,7 @@ def test_help_format_group_parameters_choices_enum_list(capture_format_group_par
 
     def cmd(
         foo: Annotated[
-            Optional[list[CompSciProblem]],  # pyright: ignore
+            list[CompSciProblem] | None,  # pyright: ignore
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -789,7 +785,7 @@ def test_help_format_group_parameters_choices_enum_list_typing(capture_format_gr
 
     def cmd(
         foo: Annotated[
-            Optional[List[CompSciProblem]],
+            list[CompSciProblem] | None,
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -813,7 +809,7 @@ def test_help_format_group_parameters_choices_enum_sequence(capture_format_group
 
     def cmd(
         foo: Annotated[
-            Optional[Sequence[CompSciProblem]],  # pyright: ignore
+            Sequence[CompSciProblem] | None,  # pyright: ignore
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -833,7 +829,7 @@ def test_help_format_group_parameters_choices_enum_sequence(capture_format_group
 def test_help_format_group_parameters_choices_literal_sequence(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[Sequence[Literal["build", "deploy"]]],  # pyright: ignore
+            Sequence[Literal["build", "deploy"]] | None,  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -855,7 +851,7 @@ def test_help_format_group_parameters_choices_literal_sequence(capture_format_gr
 def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[set[Literal["build", "deploy"]]],  # pyright: ignore
+            set[Literal["build", "deploy"]] | None,  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -874,9 +870,6 @@ def test_help_format_group_parameters_choices_literal_set(capture_format_group_p
     assert actual == expected
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 10), reason="https://peps.python.org/pep-0563/ Postponed Evaluation of Annotations"
-)
 def test_help_parameter_string_annotation(capture_format_group_parameters):
     def cmd(number: "Annotated[int,Parameter(name=['--number','-n'])]"):
         """Print number.
@@ -902,7 +895,7 @@ def test_help_parameter_string_annotation(capture_format_group_parameters):
 def test_help_format_group_parameters_choices_literal_set_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[Set[Literal["build", "deploy"]]],
+            set[Literal["build", "deploy"]] | None,
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -923,7 +916,7 @@ def test_help_format_group_parameters_choices_literal_set_typing(capture_format_
 def test_help_format_group_parameters_choices_literal_tuple(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[tuple[Literal["build", "deploy"]]],  # pyright: ignore
+            tuple[Literal["build", "deploy"]] | None,  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -945,7 +938,7 @@ def test_help_format_group_parameters_choices_literal_tuple(capture_format_group
 def test_help_format_group_parameters_choices_literal_tuple_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Tuple[Literal["build", "deploy"]],
+            tuple[Literal["build", "deploy"]],
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
         ] = ("build",),
     ):
@@ -966,7 +959,7 @@ def test_help_format_group_parameters_choices_literal_tuple_typing(capture_forma
 def test_help_format_group_parameters_choices_literal_tuple_variadic_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Tuple[Literal["build", "deploy"], ...],
+            tuple[Literal["build", "deploy"], ...],
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
         ] = (),
     ):

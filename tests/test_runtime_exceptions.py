@@ -1,5 +1,4 @@
 from textwrap import dedent
-from typing import Optional, Tuple
 
 import pytest
 
@@ -14,7 +13,7 @@ def mock_get_function_info(mocker):
 
 def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_info):
     @app.default
-    def foo(a: Tuple[int, int, int]):
+    def foo(a: tuple[int, int, int]):
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
@@ -36,7 +35,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ MissingArgumentError                                               │
         │ Function defined in file "FILENAME", line 100:                     │
-        │     foo(a: Tuple[int, int, int])                                   │
+        │     foo(a: tuple[int, int, int])                                   │
         │ Root Input Tokens: ['1', '2']                                      │
         │ Parameter "--a" requires 3 positional arguments. Only got 2.       │
         │ Parsed: ['1', '2'].                                                │
@@ -191,7 +190,7 @@ def test_runtime_exception_missing_tuple(app, console):
     @app.default
     def main(
         *,
-        network_delay: Optional[Tuple[int, int]] = None,
+        network_delay: tuple[int, int] | None = None,
     ):
         pass
 

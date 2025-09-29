@@ -1,7 +1,7 @@
 """Shared utilities for help formatters and documentation generators."""
 
 import io
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -58,7 +58,7 @@ def extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_m
     return str(obj).rstrip()
 
 
-def make_rst_section_header(title: str, level: int) -> List[str]:
+def make_rst_section_header(title: str, level: int) -> list[str]:
     """Create an RST section header.
 
     Parameters
@@ -96,7 +96,7 @@ def make_rst_section_header(title: str, level: int) -> List[str]:
         return [title, underline]
 
 
-def escape_rst(text: Optional[str]) -> str:
+def escape_rst(text: str | None) -> str:
     """Escape special reStructuredText characters in text.
 
     Parameters
@@ -114,7 +114,7 @@ def escape_rst(text: Optional[str]) -> str:
     return text.replace("\\", "\\\\")
 
 
-def escape_markdown(text: Optional[str]) -> Optional[str]:
+def escape_markdown(text: str | None) -> str | None:
     """Escape special markdown characters in text.
 
     Parameters
@@ -137,7 +137,7 @@ def escape_markdown(text: Optional[str]) -> Optional[str]:
     return text
 
 
-def escape_html(text: Optional[str]) -> str:
+def escape_html(text: str | None) -> str:
     """Escape special HTML characters in text.
 
     Parameters

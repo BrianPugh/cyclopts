@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Annotated, Union
+from typing import Annotated
 
 import pytest
 
@@ -27,13 +27,13 @@ def test_union_required_implicit_coercion(app, cmd_str, expected, annotated, ass
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Union[None, int, str], Parameter(help="help for a")]):
+        def foo(a: Annotated[None | int | str, Parameter(help="help for a")]):
             pass
 
     else:
 
         @app.command
-        def foo(a: Union[None, int, str]):
+        def foo(a: None | int | str):
             pass
 
     assert_parse_args(foo, cmd_str, expected)
@@ -41,7 +41,7 @@ def test_union_required_implicit_coercion(app, cmd_str, expected, annotated, ass
 
 def test_union_coercion_cannot_coerce_error(app, console):
     @app.default
-    def default(a: Union[None, int, float]):
+    def default(a: None | int | float):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):

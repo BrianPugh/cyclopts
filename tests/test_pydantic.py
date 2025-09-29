@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Annotated, Dict, Literal, Optional, Union
+from typing import Annotated, Literal
 
 import pydantic
 import pytest
@@ -23,9 +23,9 @@ class Outfit(BaseModel):
 class User(BaseModel):
     id: PositiveInt
     name: str = Field(default="John Doe")
-    signup_ts: Union[datetime, None]
-    tastes: Dict[str, PositiveInt]
-    outfit: Optional[Outfit] = None
+    signup_ts: datetime | None
+    tastes: dict[str, PositiveInt]
+    outfit: Outfit | None = None
 
 
 def test_pydantic_error_msg(app, console):
@@ -280,7 +280,7 @@ def test_pydantic_alias_env_var_json(app, assert_parse_args, monkeypatch, env_va
 
     class Spec(BaseK8sModel):
         storage_class: str
-        limit: Optional[int] = None
+        limit: int | None = None
 
     @app.default
     def run(spec: Annotated[Spec, Parameter(env_var="SPEC")]) -> None:
@@ -389,7 +389,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         resolution: tuple[int, int]
         fps: int
 
-    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+    Dataset = Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
 
     @dataclass
     class Config:
@@ -397,7 +397,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
 
     @app.default
     def main(
-        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+        config: Annotated[Config | None, Parameter(name="*")] = None,
     ):
         pass
 
@@ -466,8 +466,8 @@ def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatc
     class Spec(BaseK8sModel):
         storage_class: str
         enable_caching: bool = True
-        database_config: Optional[DatabaseConfig] = None
-        api_key: Optional[str] = None
+        database_config: DatabaseConfig | None = None
+        api_key: str | None = None
 
     # Create a Pydantic model instance with data
     original_spec = Spec(
@@ -525,7 +525,7 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
         resolution: tuple[int, int]
         fps: int
 
-    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+    Dataset = Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
 
     @dataclass_decorator
     class Config:
@@ -533,7 +533,7 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
 
     @app.default
     def main(
-        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+        config: Annotated[Config | None, Parameter(name="*")] = None,
     ):
         pass
 

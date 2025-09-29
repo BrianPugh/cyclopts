@@ -573,7 +573,7 @@ def test_generate_docs_with_aliases():
 
 def test_generate_docs_with_meta_app():
     """Test documentation generation with meta app."""
-    from typing import Annotated, Optional
+    from typing import Annotated
 
     app = App(name="myapp", help="Main application")
 
@@ -591,7 +591,7 @@ def test_generate_docs_with_meta_app():
     @app.meta.default
     def meta(
         verbose: bool = False,
-        config: Annotated[Optional[str], Parameter(help="Config file")] = None,
+        config: Annotated[str | None, Parameter(help="Config file")] = None,
     ):
         """Meta app for global options.
 

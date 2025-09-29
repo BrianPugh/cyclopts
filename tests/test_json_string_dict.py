@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, field
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated
 
 import pytest
 
@@ -11,7 +11,7 @@ from cyclopts import CycloptsError, Parameter
 class User:
     id: int
     name: str = "John Doe"
-    tastes: Dict[str, int] = field(default_factory=dict)
+    tastes: dict[str, int] = field(default_factory=dict)
 
 
 def test_bind_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
@@ -50,7 +50,7 @@ def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
     class Coordinate:
         x: int
         y: int
-        label: Optional[str] = None
+        label: str | None = None
 
     @app.default
     def main(origin: Coordinate):
@@ -66,14 +66,14 @@ def test_nested_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
     class Address:
         street: str
         city: str
-        zipcode: Optional[str] = None
+        zipcode: str | None = None
 
     @dataclass
     class Person:
         name: str
         age: int
         address: Address
-        hobbies: List[str] = field(default_factory=list)
+        hobbies: list[str] = field(default_factory=list)
 
     @app.default
     def main(person: Annotated[Person, Parameter(env_var="PERSON")]):
@@ -106,7 +106,7 @@ def test_list_of_simple_dataclass_from_env(app, assert_parse_args, monkeypatch):
         in_stock: bool = True
 
     @app.default
-    def main(products: Annotated[List[Product], Parameter(env_var="PRODUCTS")]):
+    def main(products: Annotated[list[Product], Parameter(env_var="PRODUCTS")]):
         pass
 
     products_data = [

@@ -1,7 +1,8 @@
 import json
+from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, Sequence
+from typing import TYPE_CHECKING, Annotated, Any
 
 from cyclopts import validators
 from cyclopts.parameter import Parameter

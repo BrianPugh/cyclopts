@@ -1,7 +1,7 @@
 """Generate documentation for Cyclopts applications."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 from cyclopts.cli import app
 from cyclopts.docs.types import (
@@ -62,10 +62,10 @@ format_group = Group(validator=_format_group_validator)
 @app.command(default_parameter=Parameter(negative=""))
 def generate_docs(
     script: str,
-    output: Annotated[Optional[Path], Parameter(alias="-o", group=format_group)] = None,
+    output: Annotated[Path | None, Parameter(alias="-o", group=format_group)] = None,
     *,
     format: Annotated[
-        Optional[DocFormat],
+        DocFormat | None,
         Parameter(alias="-f", group=format_group),
     ] = None,
     include_hidden: bool = False,

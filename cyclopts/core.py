@@ -3,7 +3,7 @@ import inspect
 import os
 import sys
 import traceback
-from collections.abc import Coroutine, Iterable, Iterator, Sequence
+from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
 from contextlib import suppress
 from copy import copy
 from enum import Enum
@@ -15,7 +15,6 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Callable,
     Literal,
     Optional,
     TypeVar,
@@ -144,7 +143,7 @@ def _combined_meta_command_mapping(
 
 def _run_maybe_async_command(
     command: Callable,
-    bound: Optional[inspect.BoundArguments] = None,
+    bound: inspect.BoundArguments | None = None,
     backend: Literal["asyncio", "trio"] = "asyncio",
 ):
     """Run a command, handling both sync and async cases.
@@ -206,7 +205,7 @@ def _walk_metas(app: "App"):
     yield from reversed(meta_list)
 
 
-def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
+def _group_converter(input_value: None | str | Group) -> Group | None:
     if input_value is None:
         return None
     elif isinstance(input_value, str):
@@ -221,42 +220,40 @@ def _group_converter(input_value: Union[None, str, Group]) -> Optional[Group]:
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    _name: Union[None, str, tuple[str, ...]] = field(default=None, alias="name", converter=optional_to_tuple_converter)
+    _name: None | str | tuple[str, ...] = field(default=None, alias="name", converter=optional_to_tuple_converter)
 
-    _help: Optional[str] = field(default=None, alias="help")
+    _help: str | None = field(default=None, alias="help")
 
-    usage: Optional[str] = field(default=None)
+    usage: str | None = field(default=None)
 
     # Everything below must be kw_only
 
-    alias: Union[None, str, tuple[str, ...]] = field(
+    alias: None | str | tuple[str, ...] = field(
         default=None,
         converter=to_tuple_converter,
         kw_only=True,
     )
 
-    default_command: Optional[Callable[..., Any]] = field(
-        default=None, converter=_validate_default_command, kw_only=True
-    )
-    default_parameter: Optional[Parameter] = field(default=None, kw_only=True)
+    default_command: Callable[..., Any] | None = field(default=None, converter=_validate_default_command, kw_only=True)
+    default_parameter: Parameter | None = field(default=None, kw_only=True)
 
     # This can ONLY ever be None or Tuple[Callable, ...]
-    _config: Union[
-        None,
-        Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any],
-        Iterable[Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any]],
-    ] = field(
+    _config: (
+        None
+        | Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any]
+        | Iterable[Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any]]
+    ) = field(
         default=None,
         alias="config",
         converter=optional_to_tuple_converter,
         kw_only=True,
     )
 
-    version: Union[None, str, Callable[..., str], Callable[..., Coroutine[Any, Any, str]]] = field(
+    version: None | str | Callable[..., str] | Callable[..., Coroutine[Any, Any, str]] = field(
         default=None, kw_only=True
     )
     # This can ONLY ever be a Tuple[str, ...]
-    _version_flags: Union[str, Iterable[str]] = field(
+    _version_flags: str | Iterable[str] = field(
         default=["--version"],
         converter=to_tuple_converter,
         alias="version_flags",
@@ -268,57 +265,41 @@ class App:
     _console: Optional["Console"] = field(default=None, kw_only=True, alias="console")
 
     # This can ONLY ever be a Tuple[str, ...]
-    _help_flags: Union[str, Iterable[str]] = field(
+    _help_flags: str | Iterable[str] = field(
         default=["--help", "-h"],
         converter=to_tuple_converter,
         alias="help_flags",
         kw_only=True,
     )
-    help_format: Optional[
-        Literal[
-            "markdown",
-            "md",
-            "plaintext",
-            "restructuredtext",
-            "rst",
-            "rich",
-        ]
-    ] = field(default=None, kw_only=True)
-    help_on_error: Optional[bool] = field(default=None, kw_only=True)
+    help_format: Literal["markdown", "md", "plaintext", "restructuredtext", "rst", "rich"] | None = field(
+        default=None, kw_only=True
+    )
+    help_on_error: bool | None = field(default=None, kw_only=True)
 
-    version_format: Optional[
-        Literal[
-            "markdown",
-            "md",
-            "plaintext",
-            "restructuredtext",
-            "rst",
-            "rich",
-        ]
-    ] = field(default=None, kw_only=True)
+    version_format: Literal["markdown", "md", "plaintext", "restructuredtext", "rst", "rich"] | None = field(
+        default=None, kw_only=True
+    )
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    group: Union[Group, str, tuple[Union[Group, str], ...]] = field(
-        default=None, converter=to_tuple_converter, kw_only=True
-    )
+    group: Group | str | tuple[Group | str, ...] = field(default=None, converter=to_tuple_converter, kw_only=True)
 
     # This can ONLY ever be a Group or None
-    _group_arguments: Union[Group, str, None] = field(
+    _group_arguments: Group | str | None = field(
         alias="group_arguments",
         default=None,
         converter=_group_converter,
         kw_only=True,
     )
     # This can ONLY ever be a Group or None
-    _group_parameters: Union[Group, str, None] = field(
+    _group_parameters: Group | str | None = field(
         alias="group_parameters",
         default=None,
         converter=_group_converter,
         kw_only=True,
     )
     # This can ONLY ever be a Group or None
-    _group_commands: Union[Group, str, None] = field(
+    _group_commands: Group | str | None = field(
         alias="group_commands",
         default=None,
         converter=_group_converter,
@@ -327,7 +308,7 @@ class App:
 
     validator: list[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
 
-    _name_transform: Optional[Callable[[str], str]] = field(
+    _name_transform: Callable[[str], str] | None = field(
         default=None,
         alias="name_transform",
         kw_only=True,
@@ -340,17 +321,17 @@ class App:
         kw_only=True,
     )
 
-    end_of_options_delimiter: Optional[str] = field(default=None, kw_only=True)
+    end_of_options_delimiter: str | None = field(default=None, kw_only=True)
 
-    print_error: Optional[bool] = field(default=None, kw_only=True)
+    print_error: bool | None = field(default=None, kw_only=True)
 
-    exit_on_error: Optional[bool] = field(default=None, kw_only=True)
+    exit_on_error: bool | None = field(default=None, kw_only=True)
 
-    verbose: Optional[bool] = field(default=None, kw_only=True)
+    verbose: bool | None = field(default=None, kw_only=True)
 
     suppress_keyboard_interrupt: bool = field(default=True, kw_only=True)
 
-    backend: Optional[Literal["asyncio", "trio"]] = field(default=None, kw_only=True)
+    backend: Literal["asyncio", "trio"] | None = field(default=None, kw_only=True)
 
     help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
         default=None, converter=help_formatter_converter, kw_only=True
@@ -368,7 +349,7 @@ class App:
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
     # We will populate this attribute ourselves after initialization
-    _instantiating_module: Optional[ModuleType] = field(init=False, default=None)
+    _instantiating_module: ModuleType | None = field(init=False, default=None)
 
     _fallback_console: Optional["Console"] = field(init=False, default=None)
 
@@ -799,7 +780,7 @@ class App:
 
     def parse_commands(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: None | str | Iterable[str] = None,
         *,
         include_parent_meta=True,
     ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
@@ -993,9 +974,9 @@ class App:
     def command(  # pragma: no cover
         self,
         obj: T,
-        name: Union[None, str, Iterable[str]] = None,
+        name: None | str | Iterable[str] = None,
         *,
-        alias: Union[None, str, Iterable[str]] = None,
+        alias: None | str | Iterable[str] = None,
         **kwargs: object,
     ) -> T: ...
 
@@ -1008,20 +989,20 @@ class App:
     def command(  # pragma: no cover
         self,
         obj: None = None,
-        name: Union[None, str, Iterable[str]] = None,
+        name: None | str | Iterable[str] = None,
         *,
-        alias: Union[None, str, Iterable[str]] = None,
+        alias: None | str | Iterable[str] = None,
         **kwargs: object,
     ) -> Callable[[T], T]: ...
 
     def command(
         self,
-        obj: Optional[T] = None,
-        name: Union[None, str, Iterable[str]] = None,
+        obj: T | None = None,
+        name: None | str | Iterable[str] = None,
         *,
-        alias: Union[None, str, Iterable[str]] = None,
+        alias: None | str | Iterable[str] = None,
         **kwargs: object,
-    ) -> Union[T, Callable[[T], T]]:
+    ) -> T | Callable[[T], T]:
         """Decorator to register a function as a CLI command.
 
         Example usage:
@@ -1132,7 +1113,7 @@ class App:
         self,
         obj: T,
         *,
-        validator: Optional[Callable[..., Any]] = None,
+        validator: Callable[..., Any] | None = None,
     ) -> T: ...
 
     # This overload is used in code like:
@@ -1145,15 +1126,15 @@ class App:
         self,
         obj: None = None,
         *,
-        validator: Optional[Callable[..., Any]] = None,
+        validator: Callable[..., Any] | None = None,
     ) -> Callable[[T], T]: ...
 
     def default(
         self,
-        obj: Optional[T] = None,
+        obj: T | None = None,
         *,
-        validator: Optional[Callable[..., Any]] = None,
-    ) -> Union[T, Callable[[T], T]]:
+        validator: Callable[..., Any] | None = None,
+    ) -> T | Callable[[T], T]:
         """Decorator to register a function as the default action handler.
 
         Example usage:
@@ -1196,7 +1177,7 @@ class App:
     def assemble_argument_collection(
         self,
         *,
-        default_parameter: Optional[Parameter] = None,
+        default_parameter: Parameter | None = None,
         parse_docstring: bool = False,
     ) -> ArgumentCollection:
         """Assemble the argument collection for this app.
@@ -1224,10 +1205,10 @@ class App:
 
     def parse_known_args(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
-        end_of_options_delimiter: Optional[str] = None,
+        end_of_options_delimiter: str | None = None,
     ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any]]:
         """Interpret arguments into a registered function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
 
@@ -1272,7 +1253,7 @@ class App:
 
     def _parse_known_args(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: None | str | Iterable[str] = None,
         *,
         raise_on_unused_tokens: bool = False,
     ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any], ArgumentCollection]:
@@ -1400,14 +1381,14 @@ class App:
 
     def parse_args(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
-        print_error: Optional[bool] = None,
-        exit_on_error: Optional[bool] = None,
-        help_on_error: Optional[bool] = None,
-        verbose: Optional[bool] = None,
-        end_of_options_delimiter: Optional[str] = None,
+        print_error: bool | None = None,
+        exit_on_error: bool | None = None,
+        help_on_error: bool | None = None,
+        verbose: bool | None = None,
+        end_of_options_delimiter: str | None = None,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
@@ -1502,15 +1483,15 @@ class App:
 
     def __call__(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
-        print_error: Optional[bool] = None,
-        exit_on_error: Optional[bool] = None,
-        help_on_error: Optional[bool] = None,
-        verbose: Optional[bool] = None,
-        end_of_options_delimiter: Optional[str] = None,
-        backend: Optional[Literal["asyncio", "trio"]] = None,
+        print_error: bool | None = None,
+        exit_on_error: bool | None = None,
+        help_on_error: bool | None = None,
+        verbose: bool | None = None,
+        end_of_options_delimiter: str | None = None,
+        backend: Literal["asyncio", "trio"] | None = None,
     ):
         """Interprets and executes a command.
 
@@ -1585,14 +1566,14 @@ class App:
 
     async def run_async(
         self,
-        tokens: Union[None, str, Iterable[str]] = None,
+        tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
-        help_on_error: Optional[bool] = None,
+        help_on_error: bool | None = None,
         verbose: bool = False,
-        end_of_options_delimiter: Optional[str] = None,
+        end_of_options_delimiter: str | None = None,
     ):
         """Async equivalent of :meth:`__call__` for use within existing event loops.
 
@@ -1692,7 +1673,7 @@ class App:
 
     def help_print(
         self,
-        tokens: Annotated[Union[None, str, Iterable[str]], Parameter(show=False)] = None,
+        tokens: Annotated[None | str | Iterable[str], Parameter(show=False)] = None,
         *,
         console: Annotated[Optional["Console"], Parameter(parse=False)] = None,
     ) -> None:
@@ -1756,7 +1737,7 @@ class App:
 
     def _assemble_help_panels(
         self,
-        tokens: Union[None, str, Iterable[str]],
+        tokens: None | str | Iterable[str],
         help_format,
     ) -> list[tuple[Optional["Group"], "HelpPanel"]]:
         from rich.console import Group as RichGroup
@@ -1852,7 +1833,7 @@ class App:
 
         out = []
         sorted_groups, sorted_panels = sort_groups(groups, help_panels)
-        for group, help_panel in zip(sorted_groups, sorted_panels):
+        for group, help_panel in zip(sorted_groups, sorted_panels, strict=False):
             help_panel._remove_duplicates()
             if help_panel.format == "command":
                 # don't sort format == "parameter" because order may matter there!
@@ -1947,8 +1928,8 @@ class App:
     def interactive_shell(
         self,
         prompt: str = "$ ",
-        quit: Union[None, str, Iterable[str]] = None,
-        dispatcher: Optional[Dispatcher] = None,
+        quit: None | str | Iterable[str] = None,
+        dispatcher: Dispatcher | None = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2043,7 +2024,7 @@ class App:
         return f"{type(self).__name__}({signature})"
 
 
-def _get_help_flag_index(tokens, help_flags) -> Optional[int]:
+def _get_help_flag_index(tokens, help_flags) -> int | None:
     for help_flag in help_flags:
         with suppress(ValueError):
             index = tokens.index(help_flag)

@@ -1,6 +1,6 @@
 """Base utilities for documentation generation."""
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -13,7 +13,7 @@ class BaseDocGenerator:
     """Base class for documentation generators with shared utilities."""
 
     @staticmethod
-    def get_app_info(app: "App", command_chain: Optional[List[str]] = None) -> Tuple[str, str, str]:
+    def get_app_info(app: "App", command_chain: list[str] | None = None) -> tuple[str, str, str]:
         """Get app name, full command path, and title.
 
         Parameters
@@ -40,7 +40,7 @@ class BaseDocGenerator:
         return app_name, full_command, title
 
     @staticmethod
-    def build_command_chain(command_chain: Optional[List[str]], command_name: str, app_name: str) -> List[str]:
+    def build_command_chain(command_chain: list[str] | None, command_name: str, app_name: str) -> list[str]:
         """Build command chain for a subcommand.
 
         Parameters
@@ -94,7 +94,7 @@ class BaseDocGenerator:
         return False
 
     @staticmethod
-    def filter_help_entries(panel: "HelpPanel", include_hidden: bool) -> List[Any]:
+    def filter_help_entries(panel: "HelpPanel", include_hidden: bool) -> list[Any]:
         """Filter help panel entries based on visibility settings.
 
         Parameters
@@ -119,7 +119,7 @@ class BaseDocGenerator:
         ]
 
     @staticmethod
-    def extract_description(app: "App", help_format: str) -> Optional[Any]:
+    def extract_description(app: "App", help_format: str) -> Any | None:
         """Extract app description.
 
         Parameters
@@ -138,7 +138,7 @@ class BaseDocGenerator:
         return description
 
     @staticmethod
-    def extract_usage(app: "App") -> Optional[Any]:
+    def extract_usage(app: "App") -> Any | None:
         """Extract usage string.
 
         Parameters
@@ -158,7 +158,7 @@ class BaseDocGenerator:
         return usage
 
     @staticmethod
-    def format_usage_line(usage_text: str, command_chain: List[str], prefix: str = "$") -> str:
+    def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "$") -> str:
         """Format usage line with proper command path.
 
         Parameters
@@ -195,8 +195,8 @@ class BaseDocGenerator:
 
     @staticmethod
     def categorize_panels(
-        help_panels_with_groups: List[Tuple[Any, "HelpPanel"]], include_hidden: bool = False
-    ) -> Dict[str, List[Tuple[Any, "HelpPanel"]]]:
+        help_panels_with_groups: list[tuple[Any, "HelpPanel"]], include_hidden: bool = False
+    ) -> dict[str, list[tuple[Any, "HelpPanel"]]]:
         """Categorize help panels by type.
 
         Parameters

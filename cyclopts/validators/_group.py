@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -8,7 +8,7 @@ class LimitedChoice:
     def __init__(
         self,
         min: int = 0,
-        max: Optional[int] = None,
+        max: int | None = None,
         allow_none: bool = False,
     ):
         """Group validator that limits the number of selections per group.
