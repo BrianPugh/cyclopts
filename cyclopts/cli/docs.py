@@ -63,10 +63,8 @@ def generate_docs(
     output : Optional[Path]
         Output file path. If not specified, prints to stdout.
     format : Optional[DocFormat]
-        Output format for documentation. Accepts "markdown"/"md", "html"/"htm",
-        or "rst"/"rest"/"restructuredtext". If not specified, inferred from output
-        file extension (.md/.markdown for markdown, .html/.htm for html,
-        .rst/.rest for reStructuredText).
+        Output format for documentation. If not specified, inferred from output
+        file extension.
     recursive : bool
         Include documentation for subcommands recursively.
     include_hidden : bool
