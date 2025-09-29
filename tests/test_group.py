@@ -233,3 +233,114 @@ def test_multiple_anonymous_groups(app, assert_parse_args):
         fizz="fizz",
         buzz="buzz",
     )
+
+
+def test_nameless_group_parameters_in_help(app, console):
+    """Test that parameters assigned to nameless groups still appear in default Parameters group.
+
+    When a parameter is assigned to a nameless Group (where group.show == False),
+    it should still appear in the default "Parameters" group in the help output
+    if it's not assigned to any named group.
+    """
+    nameless_group = Group(validator=lambda args: None)  # Nameless group with validator
+
+    @app.default
+    def default(
+        *,
+        foo: Annotated[str, Parameter(group=nameless_group, help="Parameter in nameless group")] = "",
+        bar: Annotated[str, Parameter(group=nameless_group, help="Another parameter in nameless group")] = "",
+        baz: Annotated[str, Parameter(help="Parameter in default group")] = "",
+    ):
+        """Test function with parameters in nameless and default groups."""
+        pass
+
+    # Get the help output
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    help_output = capture.get()
+
+    # Check that foo and bar parameters appear in the help
+    # They should be in the default "Parameters" group even though assigned to nameless group
+    assert "--foo" in help_output
+    assert "--bar" in help_output
+    assert "--baz" in help_output
+    assert "Parameter in nameless group" in help_output
+    assert "Another parameter in nameless group" in help_output
+    assert "Parameter in default group" in help_output
+
+    # Check that the Parameters group header appears
+    assert "Parameters" in help_output
+
+
+def test_nameless_group_validators_still_work(app, assert_parse_args):
+    """Test that validators in nameless groups still function correctly."""
+
+    def require_both(args: ArgumentCollection) -> None:
+        got_args = args.filter_by(has_tokens=True)
+        if len(got_args) == 1:
+            raise ValueError("Must provide both foo and bar together")
+
+    nameless_group = Group(validator=require_both)
+
+    @app.default
+    def default(
+        *,
+        foo: Annotated[str, Parameter(group=nameless_group)] = "",
+        bar: Annotated[str, Parameter(group=nameless_group)] = "",
+        baz: str = "",
+    ):
+        pass
+
+    # Should work when both are provided
+    assert_parse_args(default, "--foo hello --bar world", foo="hello", bar="world")
+
+    # Should work when neither are provided
+    assert_parse_args(default, "--baz test", baz="test")
+
+    # Should fail when only one is provided
+    with pytest.raises(ValidationError):
+        app("--foo hello", exit_on_error=False)
+
+
+def test_multiple_parameters_mixed_groups(app, console):
+    """Test that multiple parameters with different group configurations work correctly.
+
+    This tests the edge case where resolved_groups accumulation could cause bugs.
+    """
+    nameless_group1 = Group(validator=lambda args: None)  # First nameless group
+    nameless_group2 = Group(validator=lambda args: None)  # Second nameless group
+    named_group = Group(name="Special Options", help="Special configuration options")
+
+    @app.default
+    def default(
+        *,
+        foo: Annotated[str, Parameter(group=nameless_group1, help="First nameless group param")] = "",
+        bar: Annotated[str, Parameter(group=nameless_group2, help="Second nameless group param")] = "",
+        special: Annotated[str, Parameter(group=named_group, help="Named group param")] = "",
+        normal: Annotated[str, Parameter(help="Normal param without explicit group")] = "",
+    ):
+        """Test function with mixed group configurations."""
+        pass
+
+    # Get the help output
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    help_output = capture.get()
+
+    # All parameters should appear in help
+    assert "--foo" in help_output
+    assert "--bar" in help_output
+    assert "--special" in help_output
+    assert "--normal" in help_output
+
+    # Check that both default Parameters group and named group appear
+    assert "Parameters" in help_output
+    assert "Special Options" in help_output
+
+    # Check descriptions appear
+    assert "First nameless group param" in help_output
+    assert "Second nameless group param" in help_output
+    assert "Named group param" in help_output
+    assert "Normal param without explicit group" in help_output
