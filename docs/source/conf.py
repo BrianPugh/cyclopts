@@ -49,6 +49,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.linkcode",
     "sphinx_copybutton",
+    "cyclopts.sphinx_ext",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

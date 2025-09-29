@@ -71,6 +71,7 @@ with suppress(ImportError):
 if TYPE_CHECKING:
     from rich.console import Console
 
+    from cyclopts.docs.types import DocFormat
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
@@ -1858,6 +1859,90 @@ class App:
                 help_panel._sort()
             out.append((group, help_panel))
         return out
+
+    def generate_docs(
+        self,
+        output_format: "DocFormat" = "markdown",
+        recursive: bool = True,
+        include_hidden: bool = False,
+        heading_level: int = 1,
+        flatten_commands: bool = False,
+    ) -> str:
+        """Generate documentation for this CLI application.
+
+        Parameters
+        ----------
+        output_format : DocFormat
+            Output format for the documentation. Accepts "markdown"/"md", "html"/"htm",
+            or "rst"/"rest"/"restructuredtext". Default is "markdown".
+        recursive : bool
+            If True, generate documentation for all subcommands recursively.
+            Default is True.
+        include_hidden : bool
+            If True, include hidden commands/parameters in documentation.
+            Default is False.
+        heading_level : int
+            Starting heading level for the main application title.
+            Default is 1 (single # for markdown, = for RST).
+        flatten_commands : bool
+            If True, generate all commands at the same heading level instead of nested.
+            Default is False.
+
+        Returns
+        -------
+        str
+            The generated documentation.
+
+        Raises
+        ------
+        ValueError
+            If an unsupported output format is specified.
+
+        Examples
+        --------
+        >>> app = App(name="myapp", help="My CLI Application")
+        >>> docs = app.generate_docs()  # Generate markdown as string
+        >>> html_docs = app.generate_docs(output_format="html")  # Generate HTML
+        >>> rst_docs = app.generate_docs(output_format="rst")  # Generate RST
+        >>> # To write to file, caller can do:
+        >>> # Path("docs/cli.md").write_text(docs)
+        """
+        from cyclopts.docs import (
+            generate_markdown_docs,
+            generate_rst_docs,
+            normalize_format,
+        )
+        from cyclopts.docs.html import generate_html_docs
+
+        output_format = normalize_format(output_format)
+
+        if output_format == "markdown":
+            doc = generate_markdown_docs(
+                self,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                heading_level=heading_level,
+                flatten_commands=flatten_commands,
+            )
+        elif output_format == "html":
+            doc = generate_html_docs(
+                self,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                heading_level=heading_level,
+                flatten_commands=flatten_commands,
+            )
+        elif output_format == "rst":
+            doc = generate_rst_docs(
+                self,
+                recursive=recursive,
+                include_hidden=include_hidden,
+                heading_level=heading_level,
+                flatten_commands=flatten_commands,
+                no_root_title=False,  # Default to False for direct API usage
+            )
+
+        return doc
 
     def interactive_shell(
         self,
