@@ -22,15 +22,12 @@ def _generate_html_toc(
         return
 
     for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
-        # Create display name and anchor
         display_name = f"{prefix}{name}" if prefix else name
         full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
 
-        # Add TOC entry
         indent = "  " * (depth + 1)
         lines.append(f'{indent}<li><a href="#{full_path}"><code>{name}</code></a>')
 
-        # Recursively add nested commands
         if subapp._commands:
             lines.append(f"{indent}  <ul>")
             _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)

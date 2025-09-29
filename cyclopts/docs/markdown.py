@@ -116,9 +116,8 @@ def generate_markdown_docs(
     title = f"`{full_command}`" if command_chain else base_title
 
     # Add title for all levels
-    if True:  # Always add title
-        lines.append(f"{'#' * heading_level} {title}")
-        lines.append("")
+    lines.append(f"{'#' * heading_level} {title}")
+    lines.append("")
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")

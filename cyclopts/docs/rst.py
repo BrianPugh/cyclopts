@@ -65,46 +65,35 @@ def _should_include_command(
     bool
         True if the command should be included, False otherwise.
     """
-    # Build the full command path for nested commands
     full_path = ".".join(parent_path + [name]) if parent_path else name
 
-    # Check exclusion list first
     if normalized_exclude_commands:
-        # Check both the command name and full path
         if name in normalized_exclude_commands or full_path in normalized_exclude_commands:
             return False
-        # Check if any parent path is excluded
         for i in range(len(parent_path)):
             parent_segment = ".".join(parent_path[: i + 1])
             if parent_segment in normalized_exclude_commands:
                 return False
 
-    # Check inclusion list
     if normalized_commands_filter is not None:
-        # Check if command name or full path is in the filter
         if name in normalized_commands_filter or full_path in normalized_commands_filter:
             return True
 
-        # Check if any parent path is included (to include all subcommands)
         for i in range(len(parent_path)):
             parent_segment = ".".join(parent_path[: i + 1])
             if parent_segment in normalized_commands_filter:
                 return True
 
-        # Also check if just the base command name matches for top-level commands
         if not parent_path and name in normalized_commands_filter:
             return True
 
-        # Check if any child commands should be included
         if hasattr(subapp, "_commands") and subapp._commands:
-            # Check if any filter starts with this command's full path
             for filter_cmd in normalized_commands_filter:
                 if filter_cmd.startswith(full_path + "."):
                     return True
 
         return False
 
-    # No filter specified, include by default
     return True
 
 
@@ -133,10 +122,8 @@ def _adjust_filters_for_subcommand(
     if normalized_commands_filter is not None:
         sub_commands_filter = []
         for filter_cmd in normalized_commands_filter:
-            # If filter starts with current command name + ".", strip the prefix
             if filter_cmd.startswith(name + "."):
                 sub_filter = filter_cmd[len(name) + 1 :]
-                # Convert back to original format for recursive call
                 sub_commands_filter.append(sub_filter.replace("-", "_"))
             # If filter matches exactly, include all subcommands (pass None)
             elif filter_cmd == name:
@@ -151,11 +138,9 @@ def _adjust_filters_for_subcommand(
     if normalized_exclude_commands:
         sub_exclude_commands = []
         for exclude_cmd in normalized_exclude_commands:
-            # If exclude starts with current command name + ".", strip the prefix
             if exclude_cmd.startswith(name + "."):
                 sub_exclude = exclude_cmd[len(name) + 1 :]
                 sub_exclude_commands.append(sub_exclude.replace("-", "_"))
-            # Keep other exclusions unchanged (convert back to original)
             else:
                 sub_exclude_commands.append(exclude_cmd.replace("-", "_"))
 
@@ -182,42 +167,36 @@ def _collect_commands_for_toc(
     if parent_path is None:
         parent_path = []
 
-    # Normalize filter lists for efficient lookup
     normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
         commands_filter, exclude_commands
     )
 
     for name, subapp in app._commands.items():
-        # Skip built-in commands
         if name in app._help_flags or name in app._version_flags:
             continue
 
-        # Check if this is an App instance (subcommand) and should be shown
         if hasattr(subapp, "show"):
             if not include_hidden and not subapp.show:
                 continue
 
-        # Apply command filtering
         if not _should_include_command(
             name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
         ):
             continue
 
-        # Create display name and anchor
         display_name = f"{prefix}{name}" if prefix else name
         # For RST, anchors work differently - they're explicit labels
         anchor = display_name.replace(" ", "-").lower()
 
         commands.append((display_name, anchor, subapp))
 
-        # Recursively collect nested commands
         nested_path = parent_path + [name]
         nested = _collect_commands_for_toc(
             subapp,
             include_hidden=include_hidden,
             prefix=f"{display_name} ",
-            commands_filter=commands_filter,  # Pass original filters, they'll be normalized in recursive call
-            exclude_commands=exclude_commands,  # Pass original filters, they'll be normalized in recursive call
+            commands_filter=commands_filter,
+            exclude_commands=exclude_commands,
             parent_path=nested_path,
         )
         commands.extend(nested)
@@ -294,14 +273,11 @@ def generate_rst_docs(
     """
     from cyclopts.help.formatters.rst import RstFormatter
 
-    # Build the main documentation
     lines = []
 
-    # Initialize command chain if not provided
     if command_chain is None:
         command_chain = []
 
-    # Determine the app name and full command path
     app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
     # Use clean section headers - remove root command from title for nested commands
     if command_chain:
@@ -310,13 +286,10 @@ def generate_rst_docs(
         title = base_title
 
     # Always generate RST anchor/label with improved namespacing
-    # Create a safe anchor name from the app name and command path
     anchor_parts = ["cyclopts"]
     if command_chain:
-        # For subcommands, include the full hierarchy
         anchor_parts.extend(command_chain)
     else:
-        # For root, just use the app name
         anchor_parts.append(app_name)
     anchor_name = "-".join(anchor_parts).replace(" ", "-").replace("/", "-").lower()
     lines.append(f".. _{anchor_name}:")
@@ -333,13 +306,11 @@ def generate_rst_docs(
         # Normal hierarchical: increment level for nested commands
         effective_heading_level = heading_level + len(command_chain) - 1 if command_chain else heading_level
 
-    # Add title
     if not (no_root_title and not command_chain):
         header_lines = make_rst_section_header(title, effective_heading_level)
         lines.extend(header_lines)
         lines.append("")
 
-    # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
     description = BaseDocGenerator.extract_description(app, help_format)
     if description:
@@ -349,19 +320,6 @@ def generate_rst_docs(
         desc_text = extract_plain_text(description, None, preserve_markup=preserve)
         if desc_text:
             lines.append(desc_text.strip())
-            lines.append("")
-
-    # Skip TOC generation (sections integrate with Sphinx's toctree)
-    if False:  # Previously: generate_toc and not command_chain and app._commands
-        # Collect all commands recursively for TOC
-        toc_commands = _collect_commands_for_toc(
-            app,
-            include_hidden=include_hidden,
-            commands_filter=commands_filter,
-            exclude_commands=exclude_commands,
-        )
-        if toc_commands:
-            _generate_toc_entries(lines, toc_commands, app_name=app_name)
             lines.append("")
 
     # Add usage section - only if we have a parent title
@@ -374,16 +332,13 @@ def generate_rst_docs(
     if not (no_root_title and not command_chain):
         # For subcommands, we need to construct the usage with the full command path
         if command_chain:
-            # Create a mock usage string with the full command path
             from rich.text import Text
 
             usage_parts = ["Usage:"] + list(command_chain)
 
-            # Check if the app has commands
             if any(app[x].show for x in app._registered_commands):
                 usage_parts.append("COMMAND")
 
-            # Check for arguments/options
             help_panels_with_groups = app._assemble_help_panels(
                 [], app.app_stack.resolve("help_format", fallback="restructuredtext")
             )

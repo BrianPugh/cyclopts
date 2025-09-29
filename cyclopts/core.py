@@ -1914,10 +1914,8 @@ class App:
         )
         from cyclopts.docs.html import generate_html_docs
 
-        # Normalize the format to handle aliases
         output_format = normalize_format(output_format)
 
-        # Generate documentation based on format
         if output_format == "markdown":
             doc = generate_markdown_docs(
                 self,

@@ -23,13 +23,11 @@ def _format_group_validator(argument_collection):
         if output_arg.value is UNSET:
             raise ValueError('"--format" must be specified when output path is not provided.')
 
-        # Validate output path exists
         if not output_arg.value or not hasattr(output_arg.value, "suffix"):
             raise ValueError('"--output" must be a valid file path when format is not specified.')
 
         suffix = output_arg.value.suffix.lower()
 
-        # Check for empty suffix
         if not suffix:
             raise ValueError(
                 "Output file must have an extension to infer format (e.g., .md, .html, .rst). "
@@ -39,7 +37,6 @@ def _format_group_validator(argument_collection):
         # Strip the leading period from suffix to look up in FORMAT_ALIASES
         suffix_key = suffix.lstrip(".")
 
-        # Additional validation for suffix_key
         if not suffix_key:
             raise ValueError(
                 "Invalid file extension. Output file must have a valid extension after the period. "

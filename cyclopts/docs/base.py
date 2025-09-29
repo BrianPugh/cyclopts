@@ -29,12 +29,10 @@ class BaseDocGenerator:
             (app_name, full_command, title)
         """
         if not command_chain:
-            # Root level - use app name
             app_name = app.name[0]
             full_command = app_name
             title = app_name
         else:
-            # Nested command - build full path
             app_name = command_chain[0] if command_chain else app.name[0]
             full_command = " ".join(command_chain)
             title = full_command
@@ -84,15 +82,12 @@ class BaseDocGenerator:
         bool
             True if command should be skipped.
         """
-        # Skip built-in help and version commands
         if command_name in parent_app._help_flags or command_name in parent_app._version_flags:
             return True
 
-        # Skip if not an App instance
         if not isinstance(subapp, type(parent_app)):
             return True
 
-        # Skip hidden commands if not including them
         if not include_hidden and not subapp.show:
             return True
 
@@ -183,23 +178,17 @@ class BaseDocGenerator:
         if not usage_text:
             return ""
 
-        # Remove "Usage:" prefix if present
         if "Usage:" in usage_text:
             usage_text = usage_text.replace("Usage:", "").strip()
 
-        # Build the full command path
         full_command = " ".join(command_chain) if command_chain else ""
 
-        # Split to get command and arguments
         parts = usage_text.split(None, 1)
         if len(parts) > 1 and command_chain:
-            # Has arguments
             usage_line = f"{prefix} {full_command} {parts[1]}"
         elif command_chain:
-            # No arguments
             usage_line = f"{prefix} {full_command}"
         else:
-            # Root command
             usage_line = f"{prefix} {usage_text}"
 
         return usage_line.strip()
@@ -225,12 +214,10 @@ class BaseDocGenerator:
         result = {"commands": [], "arguments": [], "options": [], "grouped": []}
 
         for group, panel in help_panels_with_groups:
-            # Skip hidden groups if not including them
             if not include_hidden and group and not group.show:
                 continue
 
             if panel.format == "command":
-                # Filter out help and version commands if not including hidden
                 if not include_hidden:
                     filtered_entries = [
                         e
@@ -248,14 +235,12 @@ class BaseDocGenerator:
                 else:
                     result["commands"].append((group, panel))
             elif panel.format == "parameter":
-                # Check panel title to determine category
                 title = panel.title
                 if title == "Arguments":
                     result["arguments"].append((group, panel))
                 elif title and title not in ["Parameters", "Options"]:
                     result["grouped"].append((group, panel))
                 else:
-                    # Need to separate positional from optional
                     args = []
                     opts = []
                     for entry in panel.entries:
@@ -300,15 +285,12 @@ class BaseDocGenerator:
             return
 
         for name, subapp in app._commands.items():
-            # Skip built-in commands
             if name in app._help_flags or name in app._version_flags:
                 continue
 
-            # Check if it's an App instance
             if not isinstance(subapp, type(app)):
                 continue
 
-            # Skip hidden if not including
             if not include_hidden and not subapp.show:
                 continue
 
