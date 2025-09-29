@@ -96,12 +96,12 @@ def to_tuple_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...]:
 
     Parameters
     ----------
-    value: Optional[Union[Any, Iterable[Any]]]
+    value: Any | Iterable[Any] | None
         An element, an iterable of elements, or None.
 
     Returns
     -------
-    Tuple[Any, ...]: A tuple containing the elements.
+    tuple[Any, ...]: A tuple containing the elements.
     """
     if value is None:
         return ()
@@ -157,12 +157,12 @@ def help_formatter_converter(
 
     Parameters
     ----------
-    input_value : Union[None, Literal["default", "plain"], Any]
+    input_value : None | Literal["default", "plain"] | Any
         The input value to convert. Can be None, "default", "plain", or a formatter instance.
 
     Returns
     -------
-    Optional[Any]
+    Any | None
         None, or a HelpFormatter instance.
 
     Notes

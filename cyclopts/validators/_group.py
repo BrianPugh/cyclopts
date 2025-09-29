@@ -20,7 +20,7 @@ class LimitedChoice:
         min: int
             The minimum (inclusive) number of CLI parameters allowed.
             If negative, then **all** parameters in the group must have CLI values provided.
-        max: Optional[int]
+        max: int | None
             The maximum (inclusive) number of CLI parameters allowed.
             Defaults to ``1`` if ``min==0``, ``min`` otherwise.
         allow_none: bool

@@ -41,9 +41,9 @@ def env_var_split(
         Type hint that we will eventually coerce into.
     val: str
         String to split.
-    delimiter: Optional[str]
+    delimiter: str | None
         Delimiter to split ``val`` on.
-        If ``None``, defaults to whitespace.
+        If None, defaults to whitespace.
 
     Returns
     -------

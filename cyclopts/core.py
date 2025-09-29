@@ -118,7 +118,7 @@ def _combined_meta_command_mapping(
 
     Parameters
     ----------
-    app : Optional[App]
+    app : App | None
         The app to get commands from.
     recurse_meta : bool
         If True, include commands from the app's meta.
@@ -128,7 +128,7 @@ def _combined_meta_command_mapping(
     Returns
     -------
     dict[str, App]
-        Mapping of command names to Apps.
+        Mapping of command names to :class:`App` s.
     """
     if app is None:
         return {}
@@ -154,7 +154,7 @@ def _run_maybe_async_command(
     ----------
     command : Callable
         The command to execute.
-    bound : Optional[inspect.BoundArguments]
+    bound : inspect.BoundArguments | None
         Bound arguments for the command. If None, command is called with no arguments.
     backend : Literal["asyncio", "trio"]
         The async backend to use if the command is async.
@@ -790,7 +790,7 @@ class App:
 
         Parameters
         ----------
-        tokens: Union[None, str, Iterable[str]]
+        tokens: None | str | Iterable[str]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         include_parent_meta: bool
@@ -1033,9 +1033,9 @@ class App:
 
         Parameters
         ----------
-        obj: Optional[Callable]
+        obj: Callable | None
             Function or :class:`App` to be registered as a command.
-        name: Union[None, str, Iterable[str]]
+        name: None | str | Iterable[str]
             Name(s) to register the command to.
             If not provided, defaults to:
 
@@ -1184,7 +1184,7 @@ class App:
 
         Parameters
         ----------
-        default_parameter: Optional[Parameter]
+        default_parameter: Parameter | None
             Default parameter with highest priority.
         parse_docstring: bool
             Parse the docstring of :attr:`default_command`.
@@ -1214,15 +1214,15 @@ class App:
 
         Parameters
         ----------
-        tokens: Union[None, str, Iterable[str]]
+        tokens: None | str | Iterable[str]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
-        end_of_options_delimiter: Optional[str]
+        end_of_options_delimiter: str | None
             All tokens after this delimiter will be force-interpreted as positional arguments.
-            If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
+            If None, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
 
         Returns
@@ -1399,26 +1399,26 @@ class App:
 
         Parameters
         ----------
-        tokens: Union[None, str, Iterable[str]]
+        tokens: None | str | Iterable[str]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
-        print_error: Optional[bool]
+        print_error: bool | None
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
-        exit_on_error: Optional[bool]
+        exit_on_error: bool | None
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
-        help_on_error: Optional[bool]
+        help_on_error: bool | None
             Prints the help-page before printing an error.
             If :obj:`None`, inherits from :attr:`App.help_on_error`, eventually defaulting to :obj:`False`.
-        verbose: Optional[bool]
+        verbose: bool | None
             Populate exception strings with more information intended for developers.
             If :obj:`None`, inherits from :attr:`App.verbose`, eventually defaulting to :obj:`False`.
-        end_of_options_delimiter: Optional[str]
+        end_of_options_delimiter: str | None
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
@@ -1497,30 +1497,30 @@ class App:
 
         Parameters
         ----------
-        tokens : Union[None, str, Iterable[str]]
+        tokens : None | str | Iterable[str]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
-        print_error: Optional[bool]
+        print_error: bool | None
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
-        exit_on_error: Optional[bool]
+        exit_on_error: bool | None
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
-        help_on_error: Optional[bool]
+        help_on_error: bool | None
             Prints the help-page before printing an error.
             If :obj:`None`, inherits from :attr:`App.help_on_error`, eventually defaulting to :obj:`False`.
-        verbose: Optional[bool]
+        verbose: bool | None
             Populate exception strings with more information intended for developers.
             If :obj:`None`, inherits from :attr:`App.verbose`, eventually defaulting to :obj:`False`.
-        end_of_options_delimiter: Optional[str]
+        end_of_options_delimiter: str | None
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
             Set to an empty string to disable.
-        backend: Optional[Literal["asyncio", "trio"]]
+        backend: Literal["asyncio", "trio"] | None
             Override the async backend to use (if an async command is invoked).
             If :obj:`None`, inherits from :attr:`App.backend`, eventually defaulting to "asyncio".
             If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
@@ -1583,7 +1583,7 @@ class App:
 
         Parameters
         ----------
-        tokens : Union[None, str, Iterable[str]]
+        tokens : None | str | Iterable[str]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``.
         console: ~rich.console.Console
@@ -1602,7 +1602,7 @@ class App:
         verbose: bool
             Populate exception strings with more information intended for developers.
             Defaults to :obj:`False`.
-        end_of_options_delimiter: Optional[str]
+        end_of_options_delimiter: str | None
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
@@ -1681,7 +1681,7 @@ class App:
 
         Parameters
         ----------
-        tokens: Union[None, str, Iterable[str]]
+        tokens: None | str | Iterable[str]
             Tokens to interpret for traversing the application command structure.
             If not provided, defaults to ``sys.argv``.
         console: ~rich.console.Console
@@ -1940,10 +1940,10 @@ class App:
         ----------
         prompt: str
             Shell prompt. Defaults to ``"$ "``.
-        quit: Union[str, Iterable[str]]
+        quit: str | Iterable[str]
             String or list of strings that will cause the shell to exit and this method to return.
             Defaults to ``["q", "quit"]``.
-        dispatcher: Optional[Dispatcher]
+        dispatcher: Dispatcher | None
             Optional function that subsequently invokes the command.
             The ``dispatcher`` function must have signature:
 

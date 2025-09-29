@@ -191,9 +191,9 @@ def convert_enum_flag(
     ----------
     enum_type : type[Flag]
         The Flag enum type to convert to.
-    tokens : Union[Sequence[str], Sequence[Token]]
-        The tokens to convert. Can be member names or Token objects.
-    name_transform : Optional[Callable[[str], str]]
+    tokens : Iterable[str] | Iterable[Token]
+        The tokens to convert. Can be member names or :class:`Token` objects.
+    name_transform : Callable[[str], str] | None
         Function to transform names for comparison.
 
     Returns
@@ -284,7 +284,7 @@ def _convert_json(
         The JSON dictionary containing field values.
     field_infos : dict
         Field information from the dataclass.
-    converter : Optional[Callable]
+    converter : Callable | None
         Optional converter function.
     name_transform : Callable[[str], str]
         Function to transform field names.

@@ -145,11 +145,11 @@ def _should_include_command(
     ----------
     command_name : str
         The name of the command.
-    command_path : List[str]
+    command_path : list[str]
         The full path to the command (including parent commands).
-    commands_filter : Optional[List[str]]
+    commands_filter : list[str] | None
         If specified, only include commands in this list.
-    exclude_commands : Optional[List[str]]
+    exclude_commands : list[str] | None
         If specified, exclude commands in this list.
 
     Returns

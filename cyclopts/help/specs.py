@@ -25,7 +25,7 @@ class NameRenderer:
 
     Parameters
     ----------
-    max_width : Optional[int]
+    max_width : int | None
         Maximum width for wrapping. If None, no wrapping is applied.
     """
 
@@ -34,7 +34,7 @@ class NameRenderer:
 
         Parameters
         ----------
-        max_width : Optional[int]
+        max_width : int | None
             Maximum width for wrapping. If None, no wrapping is applied.
         """
         self.max_width = max_width

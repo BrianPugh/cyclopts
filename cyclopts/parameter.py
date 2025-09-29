@@ -323,7 +323,7 @@ class Parameter:
 
         Parameters
         ----------
-        `*parameters`: Optional[Parameter]
+        *parameters : Parameter | None
              Parameters who's attributes override ``self`` attributes.
              Ordered from least-to-highest attribute priority.
         """

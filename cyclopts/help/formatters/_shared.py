@@ -14,7 +14,7 @@ def extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_m
     ----------
     obj : Any
         Object to convert to plain text.
-    console : Optional[Console]
+    console : Console | None
         Console for rendering Rich objects.
     preserve_markup : bool
         If True, preserve original markdown/RST markup when available.
@@ -70,7 +70,7 @@ def make_rst_section_header(title: str, level: int) -> list[str]:
 
     Returns
     -------
-    List[str]
+    list[str]
         RST formatted section header lines.
     """
     markers = {
@@ -101,7 +101,7 @@ def escape_rst(text: str | None) -> str:
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         Text to escape. Can be None.
 
     Returns
@@ -119,12 +119,12 @@ def escape_markdown(text: str | None) -> str | None:
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         Text to escape. Can be None.
 
     Returns
     -------
-    Optional[str]
+    str | None
         Escaped text safe for markdown, or None if input was None.
     """
     if not text:
@@ -142,7 +142,7 @@ def escape_html(text: str | None) -> str:
 
     Parameters
     ----------
-    text : Optional[str]
+    text : str | None
         Text to escape. Can be None.
 
     Returns

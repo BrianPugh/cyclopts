@@ -362,7 +362,7 @@ def create_bound_arguments(
     func: Callable
         Function.
     argument_collection: ArgumentCollection
-    tokens: List[str]
+    tokens: list[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
     configs: Iterable[Callable]
     end_of_options_delimiter: str
@@ -373,7 +373,7 @@ def create_bound_arguments(
     bound: inspect.BoundArguments
         The converted and bound positional and keyword arguments for ``f``.
 
-    unused_tokens: List[str]
+    unused_tokens: list[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
     unused_tokens = tokens

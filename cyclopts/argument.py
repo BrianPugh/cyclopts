@@ -177,19 +177,19 @@ class ArgumentCollection(list["Argument"]):
 
         Parameters
         ----------
-        term : Union[str, int]
+        term : str | int
             Either a string keyword or an integer positional index.
         default : Any
             Default value to return if term not found. If :data:`~cyclopts.utils.UNSET` (default),
             will raise :exc:`KeyError`/:exc:`IndexError`.
-        transform : Optional[Callable[[str], str]]
+        transform : Callable[[str], str] | None
             Optional function to transform string terms before matching.
         delimiter : str
             Delimiter for nested field access.
 
         Returns
         -------
-        Optional[:class:`Argument`]
+        Argument | None
             The matched :class:`Argument`, or ``default`` if provided and not found.
 
         Raises
@@ -238,8 +238,8 @@ class ArgumentCollection(list["Argument"]):
         -------
         Argument
             Matched :class:`Argument`.
-        Tuple[str, ...]
-            Python keys into Argument. Non-empty iff Argument accepts keys.
+        tuple[str, ...]
+            Python keys into :class:`Argument`. Non-empty iff :class:`Argument` accepts keys.
         Any
             Implicit value (if a flag). :obj:`~.UNSET` otherwise.
         """
@@ -559,23 +559,23 @@ class ArgumentCollection(list["Argument"]):
     ) -> "ArgumentCollection":
         """Filter the :class:`ArgumentCollection`.
 
-        All non-:obj:`None` filters will be applied.
+        All non-None filters will be applied.
 
         Parameters
         ----------
-        group: Optional[Group]
+        group: Group | None
             The :class:`.Group` the arguments should be in.
-        has_tokens: Optional[bool]
+        has_tokens: bool | None
             Immediately has tokens (not including children).
-        has_tree_tokens: Optional[bool]
-            Argument and/or it's children have parsed tokens.
-        kind: Optional[inspect._ParameterKind]
+        has_tree_tokens: bool | None
+            :class:`Argument` and/or it's children have parsed tokens.
+        kind: inspect._ParameterKind | None
             The :attr:`~inspect.Parameter.kind` of the argument.
-        parse: Optional[bool]
+        parse: bool | None
             If the argument is intended to be parsed or not.
-        show: Optional[bool]
-            The Argument is intended to be show on the help page.
-        value_set: Optional[bool]
+        show: bool | None
+            The :class:`Argument` is intended to be show on the help page.
+        value_set: bool | None
             The converted value is set.
         """
         ac = self.copy()
@@ -937,7 +937,7 @@ class Argument:
 
         Returns
         -------
-        Tuple[str, ...]
+        tuple[str, ...]
             Leftover keys after matching to this argument.
             Used if this argument accepts_arbitrary_keywords.
         Any
@@ -976,7 +976,7 @@ class Argument:
 
         Returns
         -------
-        Tuple[str, ...]
+        tuple[str, ...]
             Leftover keys after matching to this argument.
             Used if this argument accepts_arbitrary_keywords.
         Any
@@ -1257,7 +1257,7 @@ class Argument:
 
         Parameters
         ----------
-        converter: Optional[Callable]
+        converter: Callable | None
             Converter function to use. Overrides ``self.parameter.converter``
 
         Returns
@@ -1346,7 +1346,7 @@ class Argument:
 
         Parameters
         ----------
-        converter: Optional[Callable]
+        converter: Callable | None
             Converter function to use. Overrides ``self.parameter.converter``
 
         Returns

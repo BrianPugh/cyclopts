@@ -150,17 +150,17 @@ class Group:
         help: str
             Additional documentation shown on the help-page.
             This will be displayed inside the group's panel, above the parameters/commands.
-        show: Optional[bool]
+        show: bool | None
             Show this group on the help-page.
             Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
         sort_key: Any
             If provided, **prepended** to the globally incremented counter value (i.e. has priority during sorting).
 
-        validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]]
+        validator: None | Callable[[ArgumentCollection], Any] | Iterable[Callable[[ArgumentCollection], Any]]
             Group validator to collectively apply.
-        default_parameter: Optional[cyclopts.Parameter]
+        default_parameter: cyclopts.Parameter | None
             Default parameter for elements within the group.
-        help_formatter: Optional[cyclopts.help.protocols.HelpFormatter]
+        help_formatter: cyclopts.help.protocols.HelpFormatter | None
             Custom help formatter for this group's help display.
         """
         count = next(_sort_key_counter)
