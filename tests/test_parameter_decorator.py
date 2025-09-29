@@ -52,7 +52,8 @@ def test_parameter_decorator_dataclass_nested_1(app, decorator, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_parameter_decorator action [OPTIONS]
+        Usage: test_parameter_decorator action --bucket STR --key STR --region
+        STR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --bucket  [required]                                            │

@@ -18,7 +18,6 @@ from attrs import converters, define, evolve, field
 from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union, resolve_annotated
 from cyclopts.core import _get_root_module_name
-from cyclopts.field_info import signature_parameters
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT
@@ -173,6 +172,8 @@ def format_usage(
 ):
     from rich.text import Text
 
+    from cyclopts.annotations import get_hint_name
+
     usage = []
     usage.append("Usage:")
 
@@ -197,17 +198,57 @@ def format_usage(
         usage.append("COMMAND")
 
     if app.default_command:
-        to_show = set()
-        for field_info in signature_parameters(app.default_command).values():
-            if field_info.kind in (
-                field_info.POSITIONAL_ONLY,
-                field_info.VAR_POSITIONAL,
-                field_info.POSITIONAL_OR_KEYWORD,
-            ):
-                to_show.add("[ARGS]")
-            if field_info.kind in (field_info.KEYWORD_ONLY, field_info.VAR_KEYWORD, field_info.POSITIONAL_OR_KEYWORD):
-                to_show.add("[OPTIONS]")
-        usage.extend(sorted(to_show))
+        argument_collection = app.assemble_argument_collection(parse_docstring=False)
+
+        required_keyword_params, optional_keyword_params = [], []
+        required_positional_args, optional_positional_args = [], []
+
+        for argument in argument_collection:
+            if not argument.show:
+                continue
+
+            if argument.field_info.kind in (argument.field_info.VAR_KEYWORD,):
+                optional_keyword_params.append(argument)
+            elif argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
+                if argument.required:
+                    required_positional_args.append(argument)
+                else:
+                    optional_positional_args.append(argument)
+            elif argument.field_info.is_keyword_only:
+                if argument.required:
+                    required_keyword_params.append(argument)
+                else:
+                    optional_keyword_params.append(argument)
+            elif argument.field_info.is_positional:
+                if argument.required:
+                    required_positional_args.append(argument)
+                else:
+                    optional_positional_args.append(argument)
+
+        for argument in required_keyword_params:
+            param_name = argument.name
+            type_name = get_hint_name(argument.hint).upper()
+            usage.append(f"{param_name} {type_name}")
+
+        if optional_keyword_params:
+            usage.append("[OPTIONS]")
+
+        for argument in required_positional_args:
+            if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
+                arg_name = argument.name.lstrip("-").upper()
+                usage.append(f"{arg_name}...")
+            else:
+                arg_name = argument.name.lstrip("-").upper()
+                usage.append(arg_name)
+
+        if optional_positional_args:
+            has_var_positional = any(
+                arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
+            )
+            if has_var_positional:
+                usage.append("[ARGS...]")
+            else:
+                usage.append("[ARGS]")
 
     return Text(" ".join(usage) + "\n", style="bold")
 

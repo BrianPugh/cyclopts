@@ -351,7 +351,7 @@ def test_help_functools_partial_2(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo [ARGS] [OPTIONS]
+        Usage: app foo [OPTIONS] A
 
         Docstring for foo.
 
@@ -388,7 +388,7 @@ def test_format_choices_rich_format(app, console, assert_parse_args):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app REGION
 
         App Help String Line 1.
 
@@ -606,7 +606,7 @@ def test_help_format_dataclass_default_parameter_negative_propagation(app, conso
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app FORCE
 
         App Help String Line 1.
 
@@ -638,7 +638,7 @@ def test_help_format_dataclass_decorated_parameter_negative_propagation(app, con
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app FORCE
 
         App Help String Line 1.
 
@@ -1031,7 +1031,7 @@ def test_help_print_function(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd --bar STR FOO
 
         Cmd help string.
 
@@ -1065,7 +1065,7 @@ def test_help_print_parameter_required(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd --bar STR [ARGS]
 
         Cmd help string.
 
@@ -1096,7 +1096,7 @@ def test_help_print_function_defaults(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd [OPTIONS]
 
         Cmd help string.
 
@@ -1124,7 +1124,7 @@ def test_help_print_function_no_parse(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd FOO
 
         Cmd help string.
 
@@ -1151,7 +1151,7 @@ def test_help_print_parameter_group_description(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd FOO
 
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
         │ Parameter description.                                             │
@@ -1180,7 +1180,7 @@ def test_help_print_parameter_group_no_show(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd FOO BAR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Docstring for foo. [required]                        │
@@ -1272,7 +1272,7 @@ def test_help_print_combined_parameter_command_group(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app VALUE1
 
         App Help String Line 1.
 
@@ -1390,7 +1390,7 @@ def test_help_print_commands_and_function(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app COMMAND --bar STR FOO
 
         App Help String Line 1.
 
@@ -1445,7 +1445,7 @@ def test_help_print_parameters_no_negative_from_default_parameter(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo [OPTIONS]
+        Usage: app foo --flag BOOL
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --flag  [required]                                              │
@@ -1674,7 +1674,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app COMMAND RDP
 
         Root Default Command Short Description.
 
@@ -1705,7 +1705,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app meta-cmd [ARGS] [OPTIONS]
+        Usage: app meta-cmd A
 
         Meta cmd help string.
 
@@ -1717,7 +1717,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     assert actual == expected
 
 
-def test_help_restructuredtext(app, console):
+def test_help_restructuredtext(app, console, normalize_trailing_whitespace):
     description = dedent(
         """\
         This is a long sentence that
@@ -1768,13 +1768,10 @@ def test_help_restructuredtext(app, console):
     )
 
     # Rich sticks a bunch of trailing spaces on lines.
-    expected = "\n".join(x.strip() for x in expected.split("\n"))
-    actual = "\n".join(x.strip() for x in actual.split("\n"))
-
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
-def test_help_markdown(app, console):
+def test_help_markdown(app, console, normalize_trailing_whitespace):
     description = dedent(
         """\
         This is a long sentence that
@@ -1825,13 +1822,10 @@ def test_help_markdown(app, console):
     )
 
     # Rich sticks a bunch of trailing spaces on lines.
-    expected = "\n".join(x.strip() for x in expected.split("\n"))
-    actual = "\n".join(x.strip() for x in actual.split("\n"))
-
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
-def test_help_rich(app, console):
+def test_help_rich(app, console, normalize_trailing_whitespace):
     """Newlines actually get interpreted with rich."""
     description = dedent(
         """\
@@ -1985,7 +1979,7 @@ def test_help_help_on_error(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo [ARGS] [OPTIONS]
+        Usage: app foo COUNT
 
         This is Foo's Help.
 
@@ -2018,7 +2012,7 @@ def test_issue_373_help_space_with_meta_app(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app VALUE
 
         App Help String Line 1.
 
@@ -2070,7 +2064,7 @@ def test_format_plain_formatter(console):
 
     expected = dedent(
         """\
-        Usage: test_app COMMAND [ARGS] [OPTIONS]
+        Usage: test_app COMMAND [ARGS]
 
         Test application for PlainFormatter
 

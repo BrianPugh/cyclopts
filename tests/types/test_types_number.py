@@ -83,7 +83,7 @@ def test_hexuint_help_no_default(app, console):
 
     expected = dedent(
         """\
-        Usage: test_types_number foo [ARGS] [OPTIONS]
+        Usage: test_types_number foo A
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  A --a  [required]                                               │

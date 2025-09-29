@@ -47,6 +47,19 @@ def console():
 
 
 @pytest.fixture
+def normalize_trailing_whitespace():
+    """Remove trailing whitespace from each line while preserving line breaks.
+
+    Useful for comparing console output where text wrapping may add trailing spaces.
+    """
+
+    def _normalize(text: str) -> str:
+        return "\n".join(line.rstrip() for line in text.split("\n"))
+
+    return _normalize
+
+
+@pytest.fixture
 def default_function_groups():
     return (Parameter(), Group("Arguments"), Group("Parameters"))
 

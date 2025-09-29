@@ -153,7 +153,7 @@ def test_bind_pydantic_basemodel_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_pydantic [ARGS] [OPTIONS]
+        Usage: test_pydantic USER.ID USER.SIGNUP-TS USER.TASTES [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -232,7 +232,7 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
 
     expected = dedent(
         """\
-        Usage: test_pydantic foo [ARGS] [OPTIONS]
+        Usage: test_pydantic foo USER.USER-NAME USER.AGE-IN-YEARS
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.USER-NAME         Name of user. [required]                 │
@@ -317,7 +317,7 @@ def test_parameter_decorator_pydantic_nested_1(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_pydantic action [OPTIONS]
+        Usage: test_pydantic action --bucket STR --key STR --area STR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --bucket  [required]                                            │
@@ -418,7 +418,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_pydantic [ARGS] [OPTIONS]
+        Usage: test_pydantic [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │

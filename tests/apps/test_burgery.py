@@ -56,7 +56,7 @@ def test_create_burger_help(console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: burgery create burger [ARGS] [OPTIONS]
+        Usage: burgery create burger [OPTIONS] VARIETY [ARGS]
 
         Create a burger.
 
