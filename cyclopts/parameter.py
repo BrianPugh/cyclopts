@@ -75,7 +75,6 @@ def _negative_converter(default: tuple[str, ...]):
     return converter
 
 
-# TODO: Breaking change; all fields after ``name`` should be ``kw_only=True``.
 @record_init("_provided_args")
 @frozen
 class Parameter:
