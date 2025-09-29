@@ -3,7 +3,8 @@
 from textwrap import dedent
 
 from cyclopts.help import HelpEntry, HelpPanel
-from cyclopts.help.formatters.html import HtmlFormatter, _escape_html, _extract_plain_text
+from cyclopts.help.formatters._shared import escape_html, extract_plain_text
+from cyclopts.help.formatters.html import HtmlFormatter
 
 
 def test_html_formatter_empty_panel():
@@ -165,32 +166,32 @@ def test_html_formatter_reset():
     assert formatter.get_output() == ""
 
 
-def test_escape_html():
+def testescape_html():
     """Test HTML escaping function."""
     # Basic escaping
-    assert _escape_html("<script>alert('XSS')</script>") == "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;"
-    assert _escape_html("foo & bar") == "foo &amp; bar"
-    assert _escape_html('"quoted"') == "&quot;quoted&quot;"
+    assert escape_html("<script>alert('XSS')</script>") == "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;"
+    assert escape_html("foo & bar") == "foo &amp; bar"
+    assert escape_html('"quoted"') == "&quot;quoted&quot;"
 
     # Handle None
-    assert _escape_html(None) == ""
-    assert _escape_html("") == ""
+    assert escape_html(None) == ""
+    assert escape_html("") == ""
 
 
-def test_extract_plain_text():
+def testextract_plain_text():
     """Test plain text extraction from various objects."""
     # Test None
-    assert _extract_plain_text(None) == ""
+    assert extract_plain_text(None) == ""
 
     # Test string
-    assert _extract_plain_text("hello world") == "hello world"
+    assert extract_plain_text("hello world") == "hello world"
 
     # Test object with __str__
     class TestObj:
         def __str__(self):
             return "test object"
 
-    assert _extract_plain_text(TestObj()) == "test object"
+    assert extract_plain_text(TestObj()) == "test object"
 
 
 def test_parameter_table_with_all_metadata():

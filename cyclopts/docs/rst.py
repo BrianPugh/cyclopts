@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 from cyclopts.docs.base import BaseDocGenerator
+from cyclopts.help.formatters._shared import extract_plain_text, make_rst_section_header
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -237,46 +238,6 @@ def _generate_toc_entries(
     lines.append("")
 
 
-def _make_section_header(title: str, level: int) -> List[str]:
-    """Create an RST section header.
-
-    Parameters
-    ----------
-    title : str
-        Section title.
-    level : int
-        Heading level (1-6).
-
-    Returns
-    -------
-    List[str]
-        RST formatted section header lines.
-    """
-    # RST section markers in order
-    markers = {
-        1: "=",
-        2: "-",
-        3: "^",
-        4: '"',
-        5: "'",
-        6: "~",
-    }
-
-    if level < 1:
-        level = 1
-    elif level > 6:
-        level = 6
-
-    marker = markers[level]
-    underline = marker * len(title)
-
-    # Level 1 gets both overline and underline
-    if level == 1:
-        return [underline, title, underline]
-    else:
-        return [title, underline]
-
-
 def generate_rst_docs(
     app: "App",
     recursive: bool = True,
@@ -331,7 +292,7 @@ def generate_rst_docs(
     str
         The generated RST documentation.
     """
-    from cyclopts.help.formatters.rst import RstFormatter, _extract_plain_text
+    from cyclopts.help.formatters.rst import RstFormatter
 
     # Build the main documentation
     lines = []
@@ -374,7 +335,7 @@ def generate_rst_docs(
 
     # Add title
     if not (no_root_title and not command_chain):
-        header_lines = _make_section_header(title, effective_heading_level)
+        header_lines = make_rst_section_header(title, effective_heading_level)
         lines.extend(header_lines)
         lines.append("")
 
@@ -385,7 +346,7 @@ def generate_rst_docs(
         # Extract plain text from description
         # Preserve markup when help_format matches output format (RST)
         preserve = help_format in ("restructuredtext", "rst")
-        desc_text = _extract_plain_text(description, None, preserve_markup=preserve)
+        desc_text = extract_plain_text(description, None, preserve_markup=preserve)
         if desc_text:
             lines.append(desc_text.strip())
             lines.append("")
@@ -452,7 +413,7 @@ def generate_rst_docs(
         if isinstance(usage, str):
             usage_text = usage
         else:
-            usage_text = _extract_plain_text(usage, None, preserve_markup=False)
+            usage_text = extract_plain_text(usage, None, preserve_markup=False)
         if usage_text:
             # Use literal block with double colon
             lines.append("::")

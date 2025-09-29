@@ -3,37 +3,12 @@
 import io
 from typing import TYPE_CHECKING, Any, Optional, Union, get_args, get_origin
 
+from cyclopts.help.formatters._shared import extract_plain_text
+
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpEntry, HelpPanel
-
-
-def _escape_markdown(text: Optional[str]) -> Optional[str]:
-    """Escape special markdown characters in text.
-
-    Parameters
-    ----------
-    text : Optional[str]
-        Text to escape. Can be None.
-
-    Returns
-    -------
-    Optional[str]
-        Escaped text safe for markdown, or None if input was None.
-    """
-    # Escape characters that have special meaning in markdown
-    # But preserve intentional markdown formatting
-    if not text:
-        return text
-
-    # Don't escape if it looks like it already contains markdown formatting
-    if any(pattern in text for pattern in ["**", "*", "`", "[", "]", "#"]):
-        return text
-
-    # Escape pipe characters for table compatibility
-    text = text.replace("|", "\\|")
-    return text
 
 
 def _format_type_name(type_obj: Any) -> str:
@@ -113,67 +88,6 @@ def _format_type_name(type_obj: Any) -> str:
     return type_str
 
 
-def _extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
-    """Extract plain text from Rich renderables or any object.
-
-    Parameters
-    ----------
-    obj : Any
-        Object to convert to plain text.
-    console : Optional[Console]
-        Console for rendering Rich objects.
-    preserve_markup : bool
-        If True, preserve original markdown/RST markup when available.
-        Should be True when input and output formats match.
-
-    Returns
-    -------
-    str
-        Plain text representation.
-    """
-    if obj is None:
-        return ""
-
-    # Handle InlineText objects - check if they contain markdown/RST
-    if hasattr(obj, "primary_renderable"):
-        # For InlineText objects, check if the primary renderable has markup and we want to preserve it
-        if preserve_markup and hasattr(obj.primary_renderable, "markup"):
-            # Return the original markdown/RST text preserved in the markup attribute
-            return obj.primary_renderable.markup.rstrip()
-        # Otherwise extract from the primary renderable
-        return _extract_plain_text(obj.primary_renderable, console, preserve_markup=preserve_markup)
-
-    # Rich Text objects have a .plain property
-    if hasattr(obj, "plain"):
-        return obj.plain.rstrip()
-
-    # For Rich Markdown and RST objects, preserve markup only when requested
-    if preserve_markup and hasattr(obj, "markup"):
-        # Return the original markdown/RST text preserved in the markup attribute
-        return obj.markup.rstrip()
-
-    # For Rich renderables, extract without styles
-    if hasattr(obj, "__rich_console__"):
-        from rich.console import Console
-
-        # Create a plain console for text extraction
-        plain_console = Console(
-            file=io.StringIO(),
-            width=console.width if console else 120,
-            force_terminal=False,
-            no_color=True,
-            highlight=False,
-            markup=False,
-            emoji=False,
-        )
-        with plain_console.capture() as capture:
-            plain_console.print(obj, end="")
-        return capture.get().rstrip()
-
-    # Fallback to string conversion
-    return str(obj).rstrip()
-
-
 class MarkdownFormatter:
     """Markdown documentation formatter.
 
@@ -235,13 +149,13 @@ class MarkdownFormatter:
 
         # Write panel title as heading
         if panel.title:
-            title_text = _extract_plain_text(panel.title, console)
+            title_text = extract_plain_text(panel.title, console)
             heading = "#" * self.heading_level
             self._output.write(f"{heading} {title_text}\n\n")
 
         # Write panel description if present
         if panel.description:
-            desc_text = _extract_plain_text(panel.description, console)
+            desc_text = extract_plain_text(panel.description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
 
@@ -275,7 +189,7 @@ class MarkdownFormatter:
             if names:
                 # Use first name as primary
                 primary_name = names[0]
-                desc = _extract_plain_text(entry.description, console)
+                desc = extract_plain_text(entry.description, console)
 
                 if desc:
                     self._output.write(f"* `{primary_name}`: {desc}")
@@ -329,7 +243,7 @@ class MarkdownFormatter:
                 self._output.write(f"* `{name_str}`: ")
 
                 # Add description
-                desc = _extract_plain_text(entry.description, console)
+                desc = extract_plain_text(entry.description, console)
                 if desc:
                     self._output.write(desc)
 
@@ -353,7 +267,7 @@ class MarkdownFormatter:
                     metadata.append(f"env: {env_str}")
 
                 if entry.default is not None:
-                    default_str = _extract_plain_text(entry.default, console)
+                    default_str = extract_plain_text(entry.default, console)
                     # For boolean flags, format as flag style
                     if entry.type and _format_type_name(entry.type) == "bool":
                         # Find the positive and negative flag names
@@ -402,7 +316,7 @@ class MarkdownFormatter:
             The usage line content.
         """
         if usage:
-            usage_text = _extract_plain_text(usage, console)
+            usage_text = extract_plain_text(usage, console)
             if usage_text:
                 self._output.write(f"```\n{usage_text}\n```\n\n")
 
@@ -424,6 +338,6 @@ class MarkdownFormatter:
             The description content.
         """
         if description:
-            desc_text = _extract_plain_text(description, console)
+            desc_text = extract_plain_text(description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")

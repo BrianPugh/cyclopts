@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, List, Optional
 
 from cyclopts.docs.base import BaseDocGenerator
+from cyclopts.help.formatters._shared import escape_html, extract_plain_text
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -364,7 +365,7 @@ def generate_html_docs(
     str
         The generated HTML documentation.
     """
-    from cyclopts.help.formatters.html import HtmlFormatter, _escape_html, _extract_plain_text
+    from cyclopts.help.formatters.html import HtmlFormatter
 
     # Initialize command chain if not provided
     if command_chain is None:
@@ -394,16 +395,16 @@ def generate_html_docs(
         anchor_id = anchor_id.lower().replace(" ", "-")
         lines.append('<section class="command-section">')
         lines.append(
-            f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{_escape_html(full_command)}</code></h{heading_level}>'
+            f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{heading_level}>'
         )
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
     description = BaseDocGenerator.extract_description(app, help_format)
     if description:
-        desc_text = _extract_plain_text(description, None)
+        desc_text = extract_plain_text(description, None)
         if desc_text:
-            lines.append(f'<div class="app-description">{_escape_html(desc_text)}</div>')
+            lines.append(f'<div class="app-description">{escape_html(desc_text)}</div>')
 
     # Generate table of contents if this is the root level and has commands
     if generate_toc and not command_chain and app._commands:
@@ -422,9 +423,9 @@ def generate_html_docs(
         if isinstance(usage, str):
             usage_text = usage
         else:
-            usage_text = _extract_plain_text(usage, None)
+            usage_text = extract_plain_text(usage, None)
         usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
-        lines.append(f'<pre class="usage">{_escape_html(usage_text)}</pre>')
+        lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
     # Get help panels for the current app
@@ -473,7 +474,7 @@ def generate_html_docs(
                 else f"{app_name}-{name}".lower()
             )
             lines.append(
-                f'<h{sub_heading_level} id="{anchor_id}" class="command-title"><code>{_escape_html(" ".join(sub_command_chain))}</code></h{sub_heading_level}>'
+                f'<h{sub_heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{sub_heading_level}>'
             )
 
             # Get subapp help
@@ -481,9 +482,9 @@ def generate_html_docs(
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
                 if sub_description:
-                    sub_desc_text = _extract_plain_text(sub_description, None)
+                    sub_desc_text = extract_plain_text(sub_description, None)
                     if sub_desc_text:
-                        lines.append(f'<div class="command-description">{_escape_html(sub_desc_text)}</div>')
+                        lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
                 # Generate usage for subcommand
                 sub_usage = BaseDocGenerator.extract_usage(subapp)
@@ -497,9 +498,9 @@ def generate_html_docs(
                     if isinstance(sub_usage, str):
                         sub_usage_text = sub_usage
                     else:
-                        sub_usage_text = _extract_plain_text(sub_usage, None)
+                        sub_usage_text = extract_plain_text(sub_usage, None)
                     sub_usage_text = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
-                    lines.append(f'<pre class="usage">{_escape_html(sub_usage_text)}</pre>')
+                    lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
 
                 # Only show subcommand panels if we're in recursive mode
@@ -589,7 +590,7 @@ def generate_html_docs(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{_escape_html(app_name)} - CLI Documentation</title>
+    <title>{escape_html(app_name)} - CLI Documentation</title>
     <style>
 {css}
     </style>

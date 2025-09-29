@@ -238,37 +238,37 @@ def test_markdown_formatter_reset():
 
 def test_markdown_escape_special_characters():
     """Test that special markdown characters are properly escaped."""
-    from cyclopts.help.formatters.markdown import _escape_markdown
+    from cyclopts.help.formatters._shared import escape_markdown
 
     # Should escape pipe for table compatibility
-    assert _escape_markdown("foo | bar") == "foo \\| bar"
+    assert escape_markdown("foo | bar") == "foo \\| bar"
 
     # Should not escape if it looks like markdown already
-    assert _escape_markdown("**bold**") == "**bold**"
-    assert _escape_markdown("`code`") == "`code`"
-    assert _escape_markdown("[link](url)") == "[link](url)"
+    assert escape_markdown("**bold**") == "**bold**"
+    assert escape_markdown("`code`") == "`code`"
+    assert escape_markdown("[link](url)") == "[link](url)"
 
     # Should handle empty/None
-    assert _escape_markdown("") == ""
-    assert _escape_markdown(None) is None
+    assert escape_markdown("") == ""
+    assert escape_markdown(None) is None
 
 
 def test_extract_plain_text():
     """Test plain text extraction from various objects."""
-    from cyclopts.help.formatters.markdown import _extract_plain_text
+    from cyclopts.help.formatters._shared import extract_plain_text
 
     # Test None
-    assert _extract_plain_text(None) == ""
+    assert extract_plain_text(None) == ""
 
     # Test string
-    assert _extract_plain_text("hello world") == "hello world"
+    assert extract_plain_text("hello world") == "hello world"
 
     # Test object with __str__
     class TestObj:
         def __str__(self):
             return "test object"
 
-    assert _extract_plain_text(TestObj()) == "test object"
+    assert extract_plain_text(TestObj()) == "test object"
 
 
 def test_parameter_table_with_all_metadata():

@@ -1,8 +1,9 @@
 """HTML documentation formatter."""
 
-import html
 import io
 from typing import TYPE_CHECKING, Any, Optional
+
+from cyclopts.help.formatters._shared import escape_html, extract_plain_text
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -10,22 +11,8 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpEntry, HelpPanel
 
 
-def _escape_html(text: Optional[str]) -> str:
-    """Escape special HTML characters in text.
-
-    Parameters
-    ----------
-    text : Optional[str]
-        Text to escape. Can be None.
-
-    Returns
-    -------
-    str
-        Escaped text safe for HTML.
-    """
-    if not text:
-        return ""
-    return html.escape(text)
+# Alias for backward compatibility within this module
+_escape_html = escape_html
 
 
 def _format_type_name(type_obj: Any) -> str:
@@ -76,50 +63,8 @@ def _format_type_name(type_obj: Any) -> str:
     return type_str
 
 
-def _extract_plain_text(obj: Any, console: Optional["Console"] = None) -> str:
-    """Extract plain text from Rich renderables or any object.
-
-    Parameters
-    ----------
-    obj : Any
-        Object to convert to plain text.
-    console : Optional[Console]
-        Console for rendering Rich objects.
-
-    Returns
-    -------
-    str
-        Plain text representation.
-    """
-    if obj is None:
-        return ""
-
-    # Rich Text objects have a .plain property
-    if hasattr(obj, "plain"):
-        return obj.plain.rstrip()
-
-    # For Rich renderables, extract without styles
-    if hasattr(obj, "__rich_console__"):
-        import io
-
-        from rich.console import Console
-
-        # Create a plain console for text extraction
-        plain_console = Console(
-            file=io.StringIO(),
-            width=console.width if console else 120,
-            force_terminal=False,
-            no_color=True,
-            highlight=False,
-            markup=False,
-            emoji=False,
-        )
-        with plain_console.capture() as capture:
-            plain_console.print(obj, end="")
-        return capture.get().rstrip()
-
-    # Fallback to string conversion
-    return str(obj).rstrip()
+# Alias for backward compatibility within this module
+_extract_plain_text = extract_plain_text
 
 
 class HtmlFormatter:

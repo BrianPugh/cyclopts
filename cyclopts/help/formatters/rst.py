@@ -3,140 +3,12 @@
 import io
 from typing import TYPE_CHECKING, Any, Optional
 
+from cyclopts.help.formatters._shared import extract_plain_text, make_rst_section_header
+
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpEntry, HelpPanel
-
-
-def _escape_rst(text: Optional[str]) -> str:
-    """Escape special reStructuredText characters in text.
-
-    Parameters
-    ----------
-    text : Optional[str]
-        Text to escape. Can be None.
-
-    Returns
-    -------
-    str
-        Escaped text safe for RST.
-    """
-    if not text:
-        return ""
-
-    # RST special characters that might need escaping in certain contexts
-    # For now, we'll be conservative and only escape backslashes
-    # Most RST content is fine as-is
-    return text.replace("\\", "\\\\")
-
-
-def _extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
-    """Extract plain text from Rich renderables or any object.
-
-    Parameters
-    ----------
-    obj : Any
-        Object to convert to plain text.
-    console : Optional[Console]
-        Console for rendering Rich objects.
-    preserve_markup : bool
-        If True, preserve original markdown/RST markup when available.
-        Should be True when input and output formats match.
-
-    Returns
-    -------
-    str
-        Plain text representation.
-    """
-    if obj is None:
-        return ""
-
-    # Handle InlineText objects - check if they contain markdown/RST
-    if hasattr(obj, "primary_renderable"):
-        # For InlineText objects, check if the primary renderable has markup and we want to preserve it
-        if preserve_markup and hasattr(obj.primary_renderable, "markup"):
-            # Return the original markdown/RST text preserved in the markup attribute
-            return obj.primary_renderable.markup.rstrip()
-        # Otherwise extract from the primary renderable
-        return _extract_plain_text(obj.primary_renderable, console, preserve_markup=preserve_markup)
-
-    # Rich Text objects have a .plain property
-    if hasattr(obj, "plain"):
-        return obj.plain.rstrip()
-
-    # For Rich Markdown and RST objects, preserve markup only when requested
-    if preserve_markup and hasattr(obj, "markup"):
-        # Return the original markdown/RST text preserved in the markup attribute
-        return obj.markup.rstrip()
-
-    # For Rich renderables, extract without styles
-    if hasattr(obj, "__rich_console__"):
-        from rich.console import Console
-
-        # Create a plain console for text extraction
-        plain_console = Console(
-            file=io.StringIO(),
-            width=console.width if console else 120,
-            force_terminal=False,
-            no_color=True,
-            highlight=False,
-            markup=False,
-            emoji=False,
-        )
-        with plain_console.capture() as capture:
-            plain_console.print(obj, end="")
-        return capture.get().rstrip()
-
-    # Fallback to string conversion
-    return str(obj).rstrip()
-
-
-def _make_section_header(title: str, level: int) -> str:
-    """Create an RST section header.
-
-    Parameters
-    ----------
-    title : str
-        Section title.
-    level : int
-        Heading level (1-6).
-
-    Returns
-    -------
-    str
-        RST formatted section header.
-    """
-    # RST section markers in order
-    # Level 1: ====== (over and under)
-    # Level 2: ------ (under only)
-    # Level 3: ^^^^^^ (under only)
-    # Level 4: """""" (under only)
-    # Level 5: '''''' (under only)
-    # Level 6: ~~~~~~ (under only)
-
-    markers = {
-        1: "=",
-        2: "-",
-        3: "^",
-        4: '"',
-        5: "'",
-        6: "~",
-    }
-
-    if level < 1:
-        level = 1
-    elif level > 6:
-        level = 6
-
-    marker = markers[level]
-    underline = marker * len(title)
-
-    # Level 1 gets both overline and underline
-    if level == 1:
-        return f"{underline}\n{title}\n{underline}"
-    else:
-        return f"{title}\n{underline}"
 
 
 class RstFormatter:
@@ -195,13 +67,13 @@ class RstFormatter:
 
         # Write panel title as heading
         if panel.title:
-            title_text = _extract_plain_text(panel.title, console)
-            header = _make_section_header(title_text, self.heading_level)
+            title_text = extract_plain_text(panel.title, console)
+            header = "\n".join(make_rst_section_header(title_text, self.heading_level))
             self._output.write(f"{header}\n\n")
 
         # Write panel description if present
         if panel.description:
-            desc_text = _extract_plain_text(panel.description, console)
+            desc_text = extract_plain_text(panel.description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
 
@@ -244,7 +116,7 @@ class RstFormatter:
                     and hasattr(entry.description.primary_renderable, "__class__")
                     and "RestructuredText" in entry.description.primary_renderable.__class__.__name__
                 )
-                desc = _extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
+                desc = extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
                 if desc:
                     # Join multi-line descriptions into a single paragraph for proper RST formatting
                     # This prevents each line from being interpreted as a separate blockquote
@@ -294,7 +166,7 @@ class RstFormatter:
                     and hasattr(entry.description.primary_renderable, "__class__")
                     and "RestructuredText" in entry.description.primary_renderable.__class__.__name__
                 )
-                desc = _extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
+                desc = extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
                 if desc:
                     desc_parts.append(desc)
 
@@ -311,7 +183,7 @@ class RstFormatter:
                     metadata.append(f"Choices: {choices_str}")
 
                 if entry.default is not None:
-                    default_str = _extract_plain_text(entry.default, console, preserve_markup=False)
+                    default_str = extract_plain_text(entry.default, console, preserve_markup=False)
                     # For boolean flags, format as flag style
                     if entry.type and "bool" in str(entry.type):
                         # Find the appropriate flag name
@@ -368,7 +240,7 @@ class RstFormatter:
             The usage line content.
         """
         if usage:
-            usage_text = _extract_plain_text(usage, console)
+            usage_text = extract_plain_text(usage, console)
             if usage_text:
                 # Use literal block for usage
                 self._output.write("::\n\n")
@@ -395,6 +267,6 @@ class RstFormatter:
             The description content.
         """
         if description:
-            desc_text = _extract_plain_text(description, console)
+            desc_text = extract_plain_text(description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
