@@ -62,13 +62,12 @@ format_group = Group(validator=_format_group_validator)
 @app.command(default_parameter=Parameter(negative=""))
 def generate_docs(
     script: str,
-    output: Annotated[Optional[Path], Parameter(group=format_group)] = None,
+    output: Annotated[Optional[Path], Parameter(alias="-o", group=format_group)] = None,
     *,
     format: Annotated[
         Optional[DocFormat],
-        Parameter(group=format_group),
+        Parameter(alias="-f", group=format_group),
     ] = None,
-    recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
 ):
@@ -85,8 +84,6 @@ def generate_docs(
     format : Optional[DocFormat]
         Output format for documentation. If not specified, inferred from output
         file extension.
-    recursive : bool
-        Include documentation for subcommands recursively.
     include_hidden : bool
         Include hidden commands in documentation.
     heading_level : int
@@ -98,7 +95,6 @@ def generate_docs(
     app_obj, _ = load_app_from_script(script)
     docs_content = app_obj.generate_docs(
         output_format=format,
-        recursive=recursive,
         include_hidden=include_hidden,
         heading_level=heading_level,
     )
