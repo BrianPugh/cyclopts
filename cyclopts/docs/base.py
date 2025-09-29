@@ -230,7 +230,23 @@ class BaseDocGenerator:
                 continue
 
             if panel.format == "command":
-                result["commands"].append((group, panel))
+                # Filter out help and version commands if not including hidden
+                if not include_hidden:
+                    filtered_entries = [
+                        e
+                        for e in panel.entries
+                        if not (e.names and all(n in ["--help", "--version", "-h"] for n in e.names))
+                    ]
+                    if filtered_entries:
+                        panel_copy = type(panel)(
+                            entries=filtered_entries,
+                            title=panel.title,
+                            description=panel.description,
+                            format=panel.format,
+                        )
+                        result["commands"].append((group, panel_copy))
+                else:
+                    result["commands"].append((group, panel))
             elif panel.format == "parameter":
                 # Check panel title to determine category
                 title = panel.title
@@ -244,11 +260,7 @@ class BaseDocGenerator:
                     opts = []
                     for entry in panel.entries:
                         # Simple heuristic: positional args are required with no default
-                        is_positional = (
-                            entry.required
-                            and entry.default is None
-                            and (not entry.names or not any(n.startswith("-") for n in entry.names))
-                        )
+                        is_positional = entry.required and entry.default is None
                         if is_positional:
                             args.append(entry)
                         else:

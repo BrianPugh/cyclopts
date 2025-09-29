@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from cyclopts.docs.base import BaseDocGenerator
+
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -18,25 +20,17 @@ def _collect_commands_for_toc(
     if not app._commands:
         return commands
 
-    for name, subapp in app._commands.items():
-        # Skip built-in commands
-        if name in app._help_flags or name in app._version_flags:
-            continue
+    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+        # Create display name and anchor
+        display_name = f"{prefix}{name}" if prefix else name
+        # Anchor is the markdown heading converted to lowercase with dashes
+        anchor = display_name.replace(" ", "-").lower()
 
-        if isinstance(subapp, type(app)):  # Check if it's an App instance
-            if not include_hidden and not subapp.show:
-                continue
+        commands.append((display_name, anchor, subapp))
 
-            # Create display name and anchor
-            display_name = f"{prefix}{name}" if prefix else name
-            # Anchor is the markdown heading converted to lowercase with dashes
-            anchor = display_name.replace(" ", "-").lower()
-
-            commands.append((display_name, anchor, subapp))
-
-            # Recursively collect nested commands
-            nested = _collect_commands_for_toc(subapp, include_hidden=include_hidden, prefix=f"{display_name} ")
-            commands.extend(nested)
+        # Recursively collect nested commands
+        nested = _collect_commands_for_toc(subapp, include_hidden=include_hidden, prefix=f"{display_name} ")
+        commands.extend(nested)
 
     return commands
 
@@ -103,7 +97,6 @@ def generate_markdown_docs(
     str
         The generated markdown documentation.
     """
-    from cyclopts.help import format_doc, format_usage
     from cyclopts.help.formatters.markdown import MarkdownFormatter, _extract_plain_text
 
     # Build the main documentation
@@ -114,16 +107,8 @@ def generate_markdown_docs(
         command_chain = []
 
     # Determine the app name and full command path
-    if not command_chain:
-        # Root level - use app name or derive from sys.argv
-        app_name = app.name[0]
-        full_command = app_name
-        title = app_name
-    else:
-        # Nested command - build full path
-        app_name = command_chain[0] if command_chain else app.name[0]
-        full_command = " ".join(command_chain)
-        title = f"`{full_command}`"
+    app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
+    title = f"`{full_command}`" if command_chain else base_title
 
     # Add title for all levels
     if True:  # Always add title
@@ -132,7 +117,7 @@ def generate_markdown_docs(
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = format_doc(app, help_format)
+    description = BaseDocGenerator.extract_description(app, help_format)
     if description:
         # Extract plain text from description
         # Preserve markup when help_format matches output format (markdown)
@@ -153,35 +138,16 @@ def generate_markdown_docs(
             lines.append("")
 
     # Add usage section if not suppressed
-    if app.usage is None:
-        usage = format_usage(app, [])
-        if usage:
-            lines.append("**Usage**:")
-            lines.append("")
-            lines.append("```console")
-            usage_text = _extract_plain_text(usage, None, preserve_markup=False)
-            # Ensure usage starts with $ for console style
-            usage_line = usage_text.strip()
-            if "Usage:" in usage_line:
-                usage_line = usage_line.replace("Usage: ", "")
-            # Replace the app name in usage with full command path
-            parts = usage_line.split(" ", 1)
-            if len(parts) > 1 and not command_chain:
-                usage_line = f"{app_name} {parts[1]}"
-            elif command_chain:
-                usage_line = f"{full_command} {parts[1] if len(parts) > 1 else ''}".strip()
-            if not usage_line.startswith("$"):
-                usage_line = f"$ {usage_line}"
-            lines.append(usage_line)
-            lines.append("```")
-            lines.append("")
-    elif app.usage:  # Non-empty custom usage
+    usage = BaseDocGenerator.extract_usage(app)
+    if usage:
         lines.append("**Usage**:")
         lines.append("")
         lines.append("```console")
-        usage_line = app.usage.strip()
-        if not usage_line.startswith("$"):
-            usage_line = f"$ {usage_line}"
+        if isinstance(usage, str):
+            usage_text = usage
+        else:
+            usage_text = _extract_plain_text(usage, None, preserve_markup=False)
+        usage_line = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
         lines.append(usage_line)
         lines.append("```")
         lines.append("")
@@ -190,58 +156,11 @@ def generate_markdown_docs(
     help_panels_with_groups = app._assemble_help_panels([], help_format)
 
     # Separate panels into categories for organized output
-    command_panels = []
-    argument_panels = []
-    option_panels = []  # Ungrouped options
-    grouped_panels = []  # Options with custom groups
-
-    for group, panel in help_panels_with_groups:
-        if not include_hidden and group and not group.show:
-            continue
-        # Filter out entries based on include_hidden
-        if not include_hidden:
-            panel.entries = [
-                e
-                for e in panel.entries
-                if not (
-                    e.names and all(n.startswith("--help") or n.startswith("--version") or n == "-h" for n in e.names)
-                )
-            ]
-
-        if panel.entries:
-            if panel.format == "command":
-                command_panels.append((group, panel))
-            elif panel.format == "parameter":
-                # Check panel title to determine how to handle it
-                group_name = panel.title
-
-                # Handle "Arguments" panel specially
-                if group_name == "Arguments":
-                    # These are positional arguments
-                    argument_panels.append((group, panel))
-                elif group_name in ["Condiments", "Toppings"] or (
-                    group_name and group_name not in ["Parameters", "Options"]
-                ):
-                    # This is a custom group - keep it as-is
-                    grouped_panels.append((group, panel))
-                else:
-                    # Regular parameters - separate into args and options
-                    args = []
-                    opts = []
-                    for entry in panel.entries:
-                        is_positional = entry.required and entry.default is None
-                        if is_positional:
-                            args.append(entry)
-                        else:
-                            opts.append(entry)
-
-                    if args:
-                        arg_panel = panel.__class__(title="", entries=args, format=panel.format, description=None)
-                        argument_panels.append((group, arg_panel))
-
-                    if opts:
-                        opt_panel = panel.__class__(title="", entries=opts, format=panel.format, description=None)
-                        option_panels.append((group, opt_panel))
+    categorized = BaseDocGenerator.categorize_panels(help_panels_with_groups, include_hidden)
+    command_panels = categorized["commands"]
+    argument_panels = categorized["arguments"]
+    option_panels = categorized["options"]
+    grouped_panels = categorized["grouped"]
 
     # Render panels in Typer order: Arguments, Options, Commands
     formatter = MarkdownFormatter(
@@ -321,7 +240,7 @@ def generate_markdown_docs(
                     continue
 
                 # Build the command chain for this subcommand
-                sub_command_chain = command_chain + [name] if command_chain else [app_name, name]
+                sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
 
                 # Generate subcommand documentation in Typer style
                 lines.append(f"{'#' * (heading_level + 1)} `{' '.join(sub_command_chain)}`")
@@ -332,7 +251,7 @@ def generate_markdown_docs(
                     sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                     # Preserve markup when sub_help_format matches output format (markdown)
                     preserve_sub = sub_help_format in ("markdown", "md")
-                    sub_description = format_doc(subapp, sub_help_format)
+                    sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
                     if sub_description:
                         sub_desc_text = _extract_plain_text(sub_description, None, preserve_markup=preserve_sub)
                         if sub_desc_text:
@@ -340,37 +259,16 @@ def generate_markdown_docs(
                             lines.append("")
 
                     # Generate usage for subcommand
-                    if subapp.usage is None:
-                        # Generate usage for the subcommand
-                        sub_usage = format_usage(subapp, [])
-                        if sub_usage:
-                            lines.append("**Usage**:")
-                            lines.append("")
-                            lines.append("```console")
-                            sub_usage_text = _extract_plain_text(sub_usage, None, preserve_markup=False)
-                            # Build the proper command chain for display
-                            usage_line = sub_usage_text.strip()
-                            if "Usage:" in usage_line:
-                                usage_line = usage_line.replace("Usage: ", "")
-                            # Build the full command path for usage
-                            usage_parts = usage_line.split(" ", 1)
-                            full_cmd = " ".join(sub_command_chain)
-                            if len(usage_parts) > 1:
-                                usage_line = f"{full_cmd} {usage_parts[1]}"
-                            else:
-                                usage_line = full_cmd
-                            if not usage_line.startswith("$"):
-                                usage_line = f"$ {usage_line}"
-                            lines.append(usage_line)
-                            lines.append("```")
-                            lines.append("")
-                    elif subapp.usage:
+                    sub_usage = BaseDocGenerator.extract_usage(subapp)
+                    if sub_usage:
                         lines.append("**Usage**:")
                         lines.append("")
                         lines.append("```console")
-                        usage_line = subapp.usage.strip()
-                        if not usage_line.startswith("$"):
-                            usage_line = f"$ {usage_line}"
+                        if isinstance(sub_usage, str):
+                            sub_usage_text = sub_usage
+                        else:
+                            sub_usage_text = _extract_plain_text(sub_usage, None, preserve_markup=False)
+                        usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
                         lines.append(usage_line)
                         lines.append("```")
                         lines.append("")
@@ -382,66 +280,11 @@ def generate_markdown_docs(
                         sub_panels = subapp._assemble_help_panels([], sub_help_format)
 
                         # Separate panels for organized output
-                        sub_argument_panels = []
-                        sub_option_panels = []  # Ungrouped options
-                        sub_grouped_panels = []  # Options with custom groups
-                        sub_command_panels = []
-
-                        for sub_group, sub_panel in sub_panels:
-                            if not include_hidden and sub_group and not sub_group.show:
-                                continue
-                            # Filter out built-in commands if not including hidden
-                            if not include_hidden:
-                                sub_panel.entries = [
-                                    e
-                                    for e in sub_panel.entries
-                                    if not (
-                                        e.names
-                                        and all(
-                                            n.startswith("--help") or n.startswith("--version") or n == "-h"
-                                            for n in e.names
-                                        )
-                                    )
-                                ]
-
-                            if sub_panel.entries:
-                                if sub_panel.format == "command":
-                                    sub_command_panels.append((sub_group, sub_panel))
-                                elif sub_panel.format == "parameter":
-                                    # Check if this panel has a custom group name
-                                    group_name = sub_panel.title
-
-                                    # Handle "Arguments" panel specially
-                                    if group_name == "Arguments":
-                                        # These are positional arguments
-                                        sub_argument_panels.append((sub_group, sub_panel))
-                                    elif group_name in ["Condiments", "Toppings"] or (
-                                        group_name and group_name not in ["Parameters", "Options"]
-                                    ):
-                                        # This is a custom group - keep it as-is
-                                        sub_grouped_panels.append((sub_group, sub_panel))
-                                    else:
-                                        # Regular parameters - separate into args and options
-                                        args = []
-                                        opts = []
-                                        for entry in sub_panel.entries:
-                                            is_positional = entry.required and entry.default is None
-                                            if is_positional:
-                                                args.append(entry)
-                                            else:
-                                                opts.append(entry)
-
-                                        if args:
-                                            arg_panel = sub_panel.__class__(
-                                                title="", entries=args, format=sub_panel.format, description=None
-                                            )
-                                            sub_argument_panels.append((sub_group, arg_panel))
-
-                                        if opts:
-                                            opt_panel = sub_panel.__class__(
-                                                title="", entries=opts, format=sub_panel.format, description=None
-                                            )
-                                            sub_option_panels.append((sub_group, opt_panel))
+                        sub_categorized = BaseDocGenerator.categorize_panels(sub_panels, include_hidden)
+                        sub_argument_panels = sub_categorized["arguments"]
+                        sub_option_panels = sub_categorized["options"]
+                        sub_grouped_panels = sub_categorized["grouped"]
+                        sub_command_panels = sub_categorized["commands"]
 
                         # Render panels in Typer order
                         sub_formatter = MarkdownFormatter(
@@ -521,31 +364,23 @@ def generate_markdown_docs(
 
                     # Recursively handle nested subcommands
                     if recursive and subapp._commands:
-                        # Filter out built-in commands
-                        nested_commands = {
-                            k: v
-                            for k, v in subapp._commands.items()
-                            if k not in subapp._help_flags and k not in subapp._version_flags
-                        }
-                        if nested_commands:
-                            for nested_name, nested_app in nested_commands.items():
-                                if isinstance(nested_app, type(app)):  # Check if it's an App instance
-                                    if not include_hidden and not nested_app.show:
-                                        continue
-                                    # Build nested command chain
-                                    nested_command_chain = sub_command_chain + [nested_name]
-                                    # Recursively generate docs for nested commands
-                                    nested_docs = generate_markdown_docs(
-                                        nested_app,
-                                        recursive=recursive,
-                                        include_hidden=include_hidden,
-                                        heading_level=heading_level + 1,
-                                        command_chain=nested_command_chain,
-                                        generate_toc=False,  # Don't generate TOC for nested commands
-                                    )
-                                    # Just append the generated docs - no title replacement
-                                    lines.append(nested_docs)
-                                    lines.append("")
+                        for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
+                            # Build nested command chain
+                            nested_command_chain = BaseDocGenerator.build_command_chain(
+                                sub_command_chain, nested_name, app_name
+                            )
+                            # Recursively generate docs for nested commands
+                            nested_docs = generate_markdown_docs(
+                                nested_app,
+                                recursive=recursive,
+                                include_hidden=include_hidden,
+                                heading_level=heading_level + 1,
+                                command_chain=nested_command_chain,
+                                generate_toc=False,  # Don't generate TOC for nested commands
+                            )
+                            # Just append the generated docs - no title replacement
+                            lines.append(nested_docs)
+                            lines.append("")
 
     # Join all lines into final document
     doc = "\n".join(lines).rstrip() + "\n"

@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING, List, Optional
 
+from cyclopts.docs.base import BaseDocGenerator
+
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -18,30 +20,22 @@ def _generate_html_toc(
     if not app._commands:
         return
 
-    for name, subapp in app._commands.items():
-        # Skip built-in commands
-        if name in app._help_flags or name in app._version_flags:
-            continue
+    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+        # Create display name and anchor
+        display_name = f"{prefix}{name}" if prefix else name
+        full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
 
-        if isinstance(subapp, type(app)):  # Check if it's an App instance
-            if not include_hidden and not subapp.show:
-                continue
+        # Add TOC entry
+        indent = "  " * (depth + 1)
+        lines.append(f'{indent}<li><a href="#{full_path}"><code>{name}</code></a>')
 
-            # Create display name and anchor
-            display_name = f"{prefix}{name}" if prefix else name
-            full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
+        # Recursively add nested commands
+        if subapp._commands:
+            lines.append(f"{indent}  <ul>")
+            _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)
+            lines.append(f"{indent}  </ul>")
 
-            # Add TOC entry
-            indent = "  " * (depth + 1)
-            lines.append(f'{indent}<li><a href="#{full_path}"><code>{name}</code></a>')
-
-            # Recursively add nested commands
-            if subapp._commands:
-                lines.append(f"{indent}  <ul>")
-                _generate_html_toc(lines, subapp, include_hidden, app_name, f"{display_name} ", depth + 1)
-                lines.append(f"{indent}  </ul>")
-
-            lines.append(f"{indent}</li>")
+        lines.append(f"{indent}</li>")
 
 
 # CSS styles embedded as a string - clean, modern design
@@ -366,7 +360,6 @@ def generate_html_docs(
     str
         The generated HTML documentation.
     """
-    from cyclopts.help import format_doc, format_usage
     from cyclopts.help.formatters.html import HtmlFormatter, _escape_html, _extract_plain_text
 
     # Initialize command chain if not provided
@@ -402,7 +395,7 @@ def generate_html_docs(
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = format_doc(app, help_format)
+    description = BaseDocGenerator.extract_description(app, help_format)
     if description:
         desc_text = _extract_plain_text(description, None)
         if desc_text:
@@ -418,29 +411,16 @@ def generate_html_docs(
         lines.append("</div>")
 
     # Add usage section if not suppressed
-    if app.usage is None:
-        usage = format_usage(app, [])
-        if usage:
-            lines.append(f"<h{heading_level + 1}>Usage</h{heading_level + 1}>")
-            lines.append('<div class="usage-block">')
-            usage_text = _extract_plain_text(usage, None)
-            # Format usage with correct command path
-            if "Usage:" in usage_text:
-                usage_text = usage_text.replace("Usage: ", "")
-            # Build proper command path
-            parts = usage_text.split(" ", 1)
-            if len(parts) > 1 and not command_chain:
-                usage_text = f"$ {app_name} {parts[1]}"
-            elif command_chain:
-                usage_text = f"$ {full_command} {parts[1] if len(parts) > 1 else ''}".strip()
-            else:
-                usage_text = f"$ {usage_text}" if not usage_text.startswith("$") else usage_text
-            lines.append(f'<pre class="usage">{_escape_html(usage_text)}</pre>')
-            lines.append("</div>")
-    elif app.usage:  # Non-empty custom usage
+    usage = BaseDocGenerator.extract_usage(app)
+    if usage:
         lines.append(f"<h{heading_level + 1}>Usage</h{heading_level + 1}>")
         lines.append('<div class="usage-block">')
-        lines.append(f'<pre class="usage">{_escape_html(app.usage)}</pre>')
+        if isinstance(usage, str):
+            usage_text = usage
+        else:
+            usage_text = _extract_plain_text(usage, None)
+        usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
+        lines.append(f'<pre class="usage">{_escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
     # Get help panels for the current app
@@ -459,13 +439,7 @@ def generate_html_docs(
             continue
         # Filter out entries based on include_hidden
         if not include_hidden:
-            panel.entries = [
-                e
-                for e in panel.entries
-                if not (
-                    e.names and all(n.startswith("--help") or n.startswith("--version") or n == "-h" for n in e.names)
-                )
-            ]
+            panel.entries = BaseDocGenerator.filter_help_entries(panel, include_hidden)
         if panel.entries:  # Only render non-empty panels
             formatter(None, None, panel)
 
@@ -476,132 +450,101 @@ def generate_html_docs(
     # Handle recursive documentation for subcommands
     if app._commands:
         # Iterate through registered commands
-        for name, subapp in app._commands.items():
-            # Skip built-in help and version commands
-            if name in app._help_flags or name in app._version_flags:
-                continue
+        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+            # Build the command chain for this subcommand
+            sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
 
-            if isinstance(subapp, type(app)):  # Check if it's an App instance
-                # Check if subapp should be shown
-                if not include_hidden and not subapp.show:
-                    continue
+            # Generate subcommand documentation
+            lines.append('<section class="command-section">')
+            # Create anchor-friendly ID
+            anchor_id = (
+                f"{app_name}-{'-'.join(sub_command_chain[1:])}".lower()
+                if len(sub_command_chain) > 1
+                else f"{app_name}-{name}".lower()
+            )
+            lines.append(
+                f'<h{heading_level + 1} id="{anchor_id}" class="command-title"><code>{_escape_html(" ".join(sub_command_chain))}</code></h{heading_level + 1}>'
+            )
 
-                # Build the command chain for this subcommand
-                sub_command_chain = command_chain + [name] if command_chain else [app_name, name]
+            # Get subapp help
+            with subapp.app_stack([subapp]):
+                sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
+                sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
+                if sub_description:
+                    sub_desc_text = _extract_plain_text(sub_description, None)
+                    if sub_desc_text:
+                        lines.append(f'<div class="command-description">{_escape_html(sub_desc_text)}</div>')
 
-                # Generate subcommand documentation
-                lines.append('<section class="command-section">')
-                # Create anchor-friendly ID
-                anchor_id = (
-                    f"{app_name}-{'-'.join(sub_command_chain[1:])}".lower()
-                    if len(sub_command_chain) > 1
-                    else f"{app_name}-{name}".lower()
-                )
-                lines.append(
-                    f'<h{heading_level + 1} id="{anchor_id}" class="command-title"><code>{_escape_html(" ".join(sub_command_chain))}</code></h{heading_level + 1}>'
-                )
+                # Generate usage for subcommand
+                sub_usage = BaseDocGenerator.extract_usage(subapp)
+                if sub_usage:
+                    lines.append(f"<h{heading_level + 2}>Usage</h{heading_level + 2}>")
+                    lines.append('<div class="usage-block">')
+                    if isinstance(sub_usage, str):
+                        sub_usage_text = sub_usage
+                    else:
+                        sub_usage_text = _extract_plain_text(sub_usage, None)
+                    sub_usage_text = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
+                    lines.append(f'<pre class="usage">{_escape_html(sub_usage_text)}</pre>')
+                    lines.append("</div>")
 
-                # Get subapp help
-                with subapp.app_stack([subapp]):
-                    sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
-                    sub_description = format_doc(subapp, sub_help_format)
-                    if sub_description:
-                        sub_desc_text = _extract_plain_text(sub_description, None)
-                        if sub_desc_text:
-                            lines.append(f'<div class="command-description">{_escape_html(sub_desc_text)}</div>')
+                # Only show subcommand panels if we're in recursive mode
+                if recursive:
+                    # Get help panels for subcommand
+                    sub_panels = subapp._assemble_help_panels([], sub_help_format)
 
-                    # Generate usage for subcommand
-                    if subapp.usage is None:
-                        sub_usage = format_usage(subapp, [])
-                        if sub_usage:
-                            lines.append(f"<h{heading_level + 2}>Usage</h{heading_level + 2}>")
-                            lines.append('<div class="usage-block">')
-                            sub_usage_text = _extract_plain_text(sub_usage, None)
-                            # Format usage with full command path
-                            if "Usage:" in sub_usage_text:
-                                sub_usage_text = sub_usage_text.replace("Usage: ", "")
-                            # Build the full command path for usage
-                            usage_parts = sub_usage_text.split(" ", 1)
-                            full_cmd = " ".join(sub_command_chain)
-                            if len(usage_parts) > 1:
-                                sub_usage_text = f"$ {full_cmd} {usage_parts[1]}"
-                            else:
-                                sub_usage_text = f"$ {full_cmd}"
-                            lines.append(f'<pre class="usage">{_escape_html(sub_usage_text)}</pre>')
-                            lines.append("</div>")
-                    elif subapp.usage:
-                        lines.append(f"<h{heading_level + 2}>Usage</h{heading_level + 2}>")
-                        lines.append('<div class="usage-block">')
-                        lines.append(f'<pre class="usage">{_escape_html(subapp.usage)}</pre>')
-                        lines.append("</div>")
+                    # Render subcommand panels
+                    sub_formatter = HtmlFormatter(
+                        heading_level=heading_level + 2,
+                        include_hidden=include_hidden,
+                        app_name=app_name,
+                        command_chain=sub_command_chain,
+                    )
+                    for sub_group, sub_panel in sub_panels:
+                        if not include_hidden and sub_group and not sub_group.show:
+                            continue
+                        # Filter out built-in commands if not including hidden
+                        if not include_hidden:
+                            sub_panel.entries = [
+                                e
+                                for e in sub_panel.entries
+                                if not (
+                                    e.names
+                                    and all(
+                                        n.startswith("--help") or n.startswith("--version") or n == "-h"
+                                        for n in e.names
+                                    )
+                                )
+                            ]
+                        if sub_panel.entries:
+                            sub_formatter(None, None, sub_panel)
 
-                    # Only show subcommand panels if we're in recursive mode
-                    if recursive:
-                        # Get help panels for subcommand
-                        sub_panels = subapp._assemble_help_panels([], sub_help_format)
+                    sub_panel_docs = sub_formatter.get_output().strip()
+                    if sub_panel_docs:
+                        lines.append(sub_panel_docs)
 
-                        # Render subcommand panels
-                        sub_formatter = HtmlFormatter(
-                            heading_level=heading_level + 2,
+                # Recursively handle nested subcommands
+                if recursive and subapp._commands:
+                    for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
+                        # Build nested command chain
+                        nested_chain = BaseDocGenerator.build_command_chain(sub_command_chain, nested_name, app_name)
+                        # Recursively generate docs for nested commands
+                        nested_docs = generate_html_docs(
+                            nested_app,
+                            recursive=recursive,
                             include_hidden=include_hidden,
-                            app_name=app_name,
-                            command_chain=sub_command_chain,
+                            heading_level=heading_level + 2,
+                            standalone=False,  # Not standalone for nested
+                            custom_css=None,
+                            command_chain=nested_chain,  # Pass the command chain
+                            generate_toc=False,  # No TOC for nested commands
                         )
-                        for sub_group, sub_panel in sub_panels:
-                            if not include_hidden and sub_group and not sub_group.show:
-                                continue
-                            # Filter out built-in commands if not including hidden
-                            if not include_hidden:
-                                sub_panel.entries = [
-                                    e
-                                    for e in sub_panel.entries
-                                    if not (
-                                        e.names
-                                        and all(
-                                            n.startswith("--help") or n.startswith("--version") or n == "-h"
-                                            for n in e.names
-                                        )
-                                    )
-                                ]
-                            if sub_panel.entries:
-                                sub_formatter(None, None, sub_panel)
+                        lines.append(nested_docs)
 
-                        sub_panel_docs = sub_formatter.get_output().strip()
-                        if sub_panel_docs:
-                            lines.append(sub_panel_docs)
-
-                    # Recursively handle nested subcommands
-                    if recursive and subapp._commands:
-                        # Filter out built-in commands
-                        nested_commands = {
-                            k: v
-                            for k, v in subapp._commands.items()
-                            if k not in subapp._help_flags and k not in subapp._version_flags
-                        }
-                        if nested_commands:
-                            for nested_name, nested_app in nested_commands.items():
-                                if isinstance(nested_app, type(app)):  # Check if it's an App instance
-                                    if not include_hidden and not nested_app.show:
-                                        continue
-                                    # Build nested command chain
-                                    nested_chain = sub_command_chain + [nested_name]
-                                    # Recursively generate docs for nested commands
-                                    nested_docs = generate_html_docs(
-                                        nested_app,
-                                        recursive=recursive,
-                                        include_hidden=include_hidden,
-                                        heading_level=heading_level + 2,
-                                        standalone=False,  # Not standalone for nested
-                                        custom_css=None,
-                                        command_chain=nested_chain,  # Pass the command chain
-                                        generate_toc=False,  # No TOC for nested commands
-                                    )
-                                    lines.append(nested_docs)
-
-                # Add back to top link if we're in a nested section
-                if command_chain:
-                    lines.append('<a href="#top" class="back-to-top">↑ Back to top</a>')
-                lines.append("</section>")
+            # Add back to top link if we're in a nested section
+            if command_chain:
+                lines.append('<a href="#top" class="back-to-top">↑ Back to top</a>')
+            lines.append("</section>")
 
     # Close section if nested command
     if command_chain:

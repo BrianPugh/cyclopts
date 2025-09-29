@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
+from cyclopts.docs.base import BaseDocGenerator
+
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -329,7 +331,6 @@ def generate_rst_docs(
     str
         The generated RST documentation.
     """
-    from cyclopts.help import format_doc, format_usage
     from cyclopts.help.formatters.rst import RstFormatter, _extract_plain_text
 
     # Build the main documentation
@@ -340,15 +341,12 @@ def generate_rst_docs(
         command_chain = []
 
     # Determine the app name and full command path
-    if not command_chain:
-        # Root level - use app name or derive from sys.argv
-        app_name = app.name[0]
-        title = app_name
-    else:
-        # Nested command - build full path
-        app_name = command_chain[0] if command_chain else app.name[0]
-        # Use clean section headers - remove root command from title
+    app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
+    # Use clean section headers - remove root command from title for nested commands
+    if command_chain:
         title = " ".join(command_chain[1:]) if len(command_chain) > 1 else command_chain[-1]
+    else:
+        title = base_title
 
     # Always generate RST anchor/label with improved namespacing
     # Create a safe anchor name from the app name and command path
@@ -382,7 +380,7 @@ def generate_rst_docs(
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = format_doc(app, help_format)
+    description = BaseDocGenerator.extract_description(app, help_format)
     if description:
         # Extract plain text from description
         # Preserve markup when help_format matches output format (RST)
@@ -418,8 +416,6 @@ def generate_rst_docs(
             # Create a mock usage string with the full command path
             from rich.text import Text
 
-            from cyclopts.help import format_usage
-
             usage_parts = ["Usage:"] + list(command_chain)
 
             # Check if the app has commands
@@ -451,9 +447,12 @@ def generate_rst_docs(
 
             usage = Text(" ".join(usage_parts))
         else:
-            # Root command - use format_usage normally
-            usage = format_usage(app, [])
-        usage_text = _extract_plain_text(usage, None, preserve_markup=False)
+            # Root command - use BaseDocGenerator to extract usage
+            usage = BaseDocGenerator.extract_usage(app)
+        if isinstance(usage, str):
+            usage_text = usage
+        else:
+            usage_text = _extract_plain_text(usage, None, preserve_markup=False)
         if usage_text:
             # Use literal block with double colon
             lines.append("::")
@@ -470,54 +469,11 @@ def generate_rst_docs(
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
     # Separate panels into categories
-    command_panels = []
-    argument_panels = []
-    option_panels = []
-    grouped_panels = []
-
-    for group, panel in help_panels_with_groups:
-        if not include_hidden and group and not group.show:
-            continue
-        # Filter out entries based on include_hidden
-        if not include_hidden:
-            panel.entries = [
-                e
-                for e in panel.entries
-                if not (
-                    e.names and all(n.startswith("--help") or n.startswith("--version") or n == "-h" for n in e.names)
-                )
-            ]
-
-        if panel.entries:
-            if panel.format == "command":
-                command_panels.append((group, panel))
-            elif panel.format == "parameter":
-                # Check panel title to determine how to handle it
-                group_name = panel.title
-
-                # Handle "Arguments" panel specially
-                if group_name == "Arguments":
-                    argument_panels.append((group, panel))
-                elif group_name and group_name not in ["Parameters", "Options"]:
-                    grouped_panels.append((group, panel))
-                else:
-                    # Regular parameters - separate into args and options
-                    args = []
-                    opts = []
-                    for entry in panel.entries:
-                        is_positional = entry.required and entry.default is None
-                        if is_positional:
-                            args.append(entry)
-                        else:
-                            opts.append(entry)
-
-                    if args:
-                        arg_panel = panel.__class__(title="", entries=args, format=panel.format, description=None)
-                        argument_panels.append((group, arg_panel))
-
-                    if opts:
-                        opt_panel = panel.__class__(title="", entries=opts, format=panel.format, description=None)
-                        option_panels.append((group, opt_panel))
+    categorized = BaseDocGenerator.categorize_panels(help_panels_with_groups, include_hidden)
+    # Command panels are not rendered in RST mode (sections integrate with Sphinx's toctree)
+    argument_panels = categorized["arguments"]
+    option_panels = categorized["options"]
+    grouped_panels = categorized["grouped"]
 
     # Render panels in order: Arguments, Options, Commands
     # Render arguments
