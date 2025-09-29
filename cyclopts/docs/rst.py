@@ -283,7 +283,6 @@ def generate_rst_docs(
     command_chain: Optional[list[str]] = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
-    command_prefix: str = "",
     commands_filter: Optional[list[str]] = None,
     exclude_commands: Optional[list[str]] = None,
     no_root_title: bool = False,
@@ -312,9 +311,6 @@ def generate_rst_docs(
     flatten_commands : bool
         If True, generate all commands at the same heading level instead of nested.
         Default is False.
-    command_prefix : str
-        Prefix to add to command headings (e.g., "Command: ").
-        Default is empty string.
     commands_filter : list[str], optional
         If specified, only include commands in this list.
         Supports nested command paths like "db.migrate".
@@ -347,18 +343,12 @@ def generate_rst_docs(
     if not command_chain:
         # Root level - use app name or derive from sys.argv
         app_name = app.name[0]
-        full_command = app_name
         title = app_name
     else:
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
-        full_command = " ".join(command_chain)
-        # Use clean section headers
-        title = full_command
-
-    # Add command prefix if specified
-    if command_prefix:
-        title = f"{command_prefix}{title}"
+        # Use clean section headers - remove root command from title
+        title = " ".join(command_chain[1:]) if len(command_chain) > 1 else command_chain[-1]
 
     # Always generate RST anchor/label with improved namespacing
     # Create a safe anchor name from the app name and command path
@@ -622,7 +612,6 @@ def generate_rst_docs(
                 command_chain=subcommand_chain,
                 generate_toc=False,  # Only generate TOC at root level
                 flatten_commands=flatten_commands,
-                command_prefix=command_prefix,
                 commands_filter=sub_commands_filter,
                 exclude_commands=sub_exclude_commands,
                 no_root_title=False,  # Subcommands should have titles

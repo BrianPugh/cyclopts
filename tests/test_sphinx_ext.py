@@ -339,53 +339,6 @@ app.command(sub2)
         finally:
             sys.path.remove(str(tmp_path))
 
-    def test_command_prefix_option(self, tmp_path):
-        """Test command-prefix option adds prefix to command headings."""
-        module_file = tmp_path / "test_prefix_module.py"
-        module_file.write_text("""from cyclopts import App
-
-app = App(name="test-cli", help="Test CLI")
-
-@app.command
-def hello():
-    '''Say hello.'''
-    pass
-""")
-
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.sphinx_ext import CycloptsDirective
-
-            mock_state = MagicMock()
-            mock_state.nested_parse = MagicMock()
-
-            directive = CycloptsDirective(
-                name="cyclopts",
-                arguments=["test_prefix_module:app"],
-                options={"command-prefix": "Command: "},
-                content=StringList(),
-                lineno=1,
-                content_offset=0,
-                block_text="",
-                state=mock_state,
-                state_machine=MagicMock(),
-            )
-
-            result = directive.run()
-            assert len(result) >= 1
-
-            # Check that the result contains expected nodes
-            # Since we have a single command, the result should contain nodes
-            # representing the documentation structure
-            assert len(result) >= 1
-
-            # The directive successfully ran and created nodes
-            # The exact content verification would require checking the actual
-            # node structure, but that's implementation-specific
-
-        finally:
-            sys.path.remove(str(tmp_path))
-
     def test_automatic_anchors(self, tmp_path):
         """Test that RST reference labels are automatically generated."""
         module_file = tmp_path / "test_anchors_module.py"

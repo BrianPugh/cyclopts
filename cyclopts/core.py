@@ -1867,7 +1867,6 @@ class App:
         include_hidden: bool = False,
         heading_level: int = 1,
         flatten_commands: bool = False,
-        command_prefix: str = "",
     ) -> str:
         """Generate documentation for this CLI application.
 
@@ -1888,9 +1887,6 @@ class App:
         flatten_commands : bool
             If True, generate all commands at the same heading level instead of nested.
             Default is False.
-        command_prefix : str
-            Prefix to add to command headings (e.g., "Command: ").
-            Default is empty string.
 
         Returns
         -------
@@ -1943,7 +1939,6 @@ class App:
                 include_hidden=include_hidden,
                 heading_level=heading_level,
                 flatten_commands=flatten_commands,
-                command_prefix=command_prefix,
                 no_root_title=False,  # Default to False for direct API usage
             )
 

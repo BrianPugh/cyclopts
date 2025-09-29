@@ -68,7 +68,6 @@ class DirectiveOptions:
     """Configuration for the Cyclopts directive."""
 
     heading_level: int = 2
-    command_prefix: str = ""
     commands: Optional[List[str]] = None
     exclude_commands: Optional[List[str]] = None
 
@@ -377,7 +376,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             include_hidden=opts.include_hidden,
             heading_level=opts.heading_level,
             flatten_commands=opts.flatten_commands,
-            command_prefix=opts.command_prefix,
             commands_filter=opts.commands,
             exclude_commands=opts.exclude_commands,
             no_root_title=True,  # Always skip root title in Sphinx context
