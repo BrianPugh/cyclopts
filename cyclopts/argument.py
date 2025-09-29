@@ -314,8 +314,29 @@ class ArgumentCollection(list["Argument"]):
                     resolved_groups.append(group)
                     cyclopts_parameters.append(group.default_parameter)
                 cyclopts_parameters.append(cparam)
+
                 if resolved_groups:
-                    cyclopts_parameters.append(Parameter(group=resolved_groups))
+                    has_visible_group = any(g.show for g in resolved_groups)
+                    all_nameless = all(not g.name for g in resolved_groups)
+
+                    if has_visible_group:
+                        # At least one group is visible, use the resolved groups as-is
+                        cyclopts_parameters.append(Parameter(group=resolved_groups))
+                    elif all_nameless:
+                        # All groups are nameless; Include the default group to make
+                        # the parameter appears in the help-page
+                        default_group = (
+                            group_arguments
+                            if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL)
+                            else group_parameters
+                        )
+                        # Combine default group with resolved groups
+                        all_groups = (default_group,) + tuple(resolved_groups)
+                        cyclopts_parameters.append(Parameter(group=all_groups))
+                    else:
+                        # Has explicit show=False groups, don't add default group
+                        # Parameter should be hidden from help
+                        cyclopts_parameters.append(Parameter(group=resolved_groups))
         else:
             cyclopts_parameters = cyclopts_parameters_no_group
 
