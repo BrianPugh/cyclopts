@@ -148,11 +148,13 @@ def test_optional_path_completion(zsh_tester):
 
 
 def test_nested_command_uses_correct_word_index(zsh_tester):
-    """Test that nested commands use $line[depth] not $words[1]."""
+    """Test that nested commands use $words[1] for subcommand dispatch."""
     tester = zsh_tester(app_nested, "nested")
 
-    assert "case $line[1] in" in tester.completion_script
-    assert "case $line[2] in" in tester.completion_script
+    script_lines = tester.completion_script.split("\n")
+    words_checks = [line for line in script_lines if "case $words[1] in" in line]
+
+    assert len(words_checks) >= 2, "Should have multiple case $words[1] checks for nested commands"
 
 
 def test_invalid_prog_name():
@@ -193,3 +195,74 @@ def test_description_escaping(zsh_tester):
     assert "\\`" in tester.completion_script
     assert r"\[" in tester.completion_script
     assert r"\]" in tester.completion_script
+
+
+def test_special_chars_in_literal_choices(zsh_tester):
+    """Test that Literal choices with special characters are properly escaped."""
+    from typing import Annotated, Literal
+
+    from cyclopts import App, Parameter
+
+    app = App(name="special_choices")
+
+    @app.default
+    def main(
+        choice: Annotated[Literal["foo bar", "baz()", "test[1]", "back\\slash"], Parameter()] = "foo bar",
+    ):
+        """Test app with special chars in choices."""
+
+    tester = zsh_tester(app, "special_choices")
+
+    assert r"foo\ bar" in tester.completion_script
+    assert r"baz\(\)" in tester.completion_script
+    assert r"test\[1\]" in tester.completion_script
+    assert r"back\\slash" in tester.completion_script
+
+
+def test_unicode_in_descriptions(zsh_tester):
+    """Test that Unicode characters in descriptions are handled properly."""
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="unicode_test")
+
+    @app.default
+    def main(
+        emoji: Annotated[str, Parameter(help="Enable 🚀 rocket mode")] = "",
+        chinese: Annotated[str, Parameter(help="中文描述")] = "",
+        arabic: Annotated[str, Parameter(help="وصف بالعربية")] = "",
+    ):
+        """Test app with Unicode."""
+
+    tester = zsh_tester(app, "unicode_test")
+
+    assert "🚀" in tester.completion_script or "rocket mode" in tester.completion_script
+    assert tester.validate_script_syntax()
+
+
+def test_deeply_nested_commands(zsh_tester):
+    """Test completion for deeply nested commands (3+ levels)."""
+    from cyclopts import App
+
+    root = App(name="root")
+    level1 = App(name="level1")
+    level2 = App(name="level2")
+    level3 = App(name="level3")
+
+    @level3.command
+    def action(value: str):
+        """Perform action at level 3."""
+        pass
+
+    level2.command(level3)
+    level1.command(level2)
+    root.command(level1)
+
+    tester = zsh_tester(root, "root")
+
+    assert "level1" in tester.completion_script
+    assert "level2" in tester.completion_script
+    assert "level3" in tester.completion_script
+    assert "action" in tester.completion_script
+    assert tester.validate_script_syntax()

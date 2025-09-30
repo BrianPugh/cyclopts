@@ -1,6 +1,42 @@
-"""Zsh completion script generator."""
+"""Zsh completion script generator.
+
+This module generates static zsh completion scripts for Cyclopts applications by
+leveraging the existing help system infrastructure. The completion generator:
+
+1. **Extracts** completion data by calling `app._assemble_help_panels()` recursively
+   for each command path, reusing the help system's parameter and command extraction.
+
+2. **Transforms** the help panel data (HelpEntry objects) into zsh completion primitives:
+   - Commands → _describe 'command' list
+   - Parameters → _arguments specs with descriptions
+   - Literal/Enum choices → completion value lists
+   - Path types → _files action
+   - Negative flags → automatic --no-* variants
+
+3. **Generates** a static zsh completion script using the compsys framework with no
+   runtime Python dependency.
+
+Key Design Decisions
+--------------------
+- **Static Generation**: No runtime Python overhead; fast completion response
+- **Help System Reuse**: Avoids reimplementing parameter/choice extraction
+- **Security First**: Comprehensive escaping prevents shell injection
+- **Recursive Structure**: Naturally handles nested subcommands via state machine
+
+Example
+-------
+>>> from cyclopts import App
+>>> app = App(name="myapp")
+>>> @app.default
+... def main(verbose: bool = False):
+...     '''My application.'''
+...     pass
+>>> script = generate_completion_script(app, "myapp")
+>>> Path("_myapp").write_text(script)  # Install to fpath directory
+"""
 
 import re
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args
@@ -61,7 +97,12 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
     def extract_completion_data(command_path: tuple[str, ...] = ()):
         """Recursively extract completion data for command and subcommands."""
-        help_panels = app._assemble_help_panels(tokens=list(command_path), help_format="plaintext")
+        try:
+            help_panels = app._assemble_help_panels(tokens=list(command_path), help_format="plaintext")
+        except Exception as e:
+            warnings.warn(f"Failed to extract completion data for command path {command_path!r}: {e}", stacklevel=2)
+            completion_data[command_path] = CompletionData(commands=[], parameters=[])
+            return
 
         commands = []
         parameters = []
@@ -173,8 +214,7 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}    ;;")
 
         lines.append(f"{indent_str}  args)")
-        depth = len(command_path) + 1
-        lines.append(f"{indent_str}    case $line[{depth}] in")
+        lines.append(f"{indent_str}    case $words[1] in")
 
         for cmd_entry in commands:
             for cmd_name in cmd_entry.names:
@@ -195,6 +235,28 @@ def _generate_completion_for_path(
     return lines
 
 
+def _escape_completion_choice(choice: str) -> str:
+    """Escape special characters in a completion choice value.
+
+    Parameters
+    ----------
+    choice : str
+        Raw choice value.
+
+    Returns
+    -------
+    str
+        Escaped choice value safe for zsh completion.
+    """
+    choice = choice.replace("\\", "\\\\")
+    choice = choice.replace(" ", "\\ ")
+    choice = choice.replace("(", "\\(")
+    choice = choice.replace(")", "\\)")
+    choice = choice.replace("[", "\\[")
+    choice = choice.replace("]", "\\]")
+    return choice
+
+
 def _generate_parameter_specs(entry: "HelpEntry") -> list[str]:
     """Generate zsh _arguments specs for a parameter.
 
@@ -208,30 +270,49 @@ def _generate_parameter_specs(entry: "HelpEntry") -> list[str]:
     list[str]
         List of zsh argument specs.
     """
+    from cyclopts.annotations import is_union
+    from cyclopts.utils import is_class_and_subclass
+
     specs = []
     desc = _safe_get_description(entry)
 
+    is_flag = True
+    if entry.type:
+        actual_type = entry.type
+        if is_union(actual_type):
+            for arg in get_args(actual_type):
+                if arg is not type(None):
+                    actual_type = arg
+                    break
+        is_flag = actual_type is bool or is_class_and_subclass(actual_type, bool)
+
     action = ""
     if entry.choices:
-        choices_str = " ".join(entry.choices)
+        escaped_choices = [_escape_completion_choice(c) for c in entry.choices]
+        choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
+        is_flag = False
     elif entry.type:
         action = _get_completion_action_from_type(entry.type)
 
     for name in entry.names:
         if not name.startswith("-"):
             continue
-        if action:
+        if is_flag and not action:
+            spec = f"'{name}[{desc}]'"
+        elif action:
             spec = f"'{name}[{desc}]:{name.lstrip('-')}:{action}'"
         else:
-            spec = f"'{name}[{desc}]'"
+            spec = f"'{name}[{desc}]:{name.lstrip('-')}:'"
         specs.append(spec)
 
     for short in entry.shorts:
-        if action:
+        if is_flag and not action:
+            spec = f"'{short}[{desc}]'"
+        elif action:
             spec = f"'{short}[{desc}]:{short.lstrip('-')}:{action}'"
         else:
-            spec = f"'{short}[{desc}]'"
+            spec = f"'{short}[{desc}]:{short.lstrip('-')}:'"
         specs.append(spec)
 
     return specs
