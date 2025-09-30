@@ -138,3 +138,58 @@ def test_end_to_end_completion(zsh_tester):
 
         finally:
             child.close()
+
+
+def test_optional_path_completion(zsh_tester):
+    """Test that Optional[Path] and Path | None generate file completion."""
+    tester = zsh_tester(app_path, "pathapp")
+
+    assert "'--output[Output file]:output:_files'" in tester.completion_script
+
+
+def test_nested_command_uses_correct_word_index(zsh_tester):
+    """Test that nested commands use $line[depth] not $words[1]."""
+    tester = zsh_tester(app_nested, "nested")
+
+    assert "case $line[1] in" in tester.completion_script
+    assert "case $line[2] in" in tester.completion_script
+
+
+def test_invalid_prog_name():
+    """Test that invalid prog names raise ValueError."""
+    from cyclopts.completion import generate_completion_script
+
+    with pytest.raises(ValueError, match="Invalid prog_name"):
+        generate_completion_script(app_basic, "foo bar")
+
+    with pytest.raises(ValueError, match="Invalid prog_name"):
+        generate_completion_script(app_basic, "test;rm -rf /")
+
+    with pytest.raises(ValueError, match="Invalid prog_name"):
+        generate_completion_script(app_basic, "")
+
+
+def test_description_escaping(zsh_tester):
+    """Test that descriptions with special chars are properly escaped."""
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="escape_test")
+
+    @app.default
+    def main(
+        param1: Annotated[str, Parameter(help="Test 'single' quotes")] = "",
+        param2: Annotated[str, Parameter(help='Test "double" quotes')] = "",
+        param3: Annotated[str, Parameter(help="Test $variable and `backticks`")] = "",
+        param4: Annotated[str, Parameter(help="Test [brackets] here")] = "",
+    ):
+        """Test app."""
+
+    tester = zsh_tester(app, "escape_test")
+
+    assert r"'\'' " in tester.completion_script or "'\\''" in tester.completion_script
+    assert "\\$" in tester.completion_script
+    assert "\\`" in tester.completion_script
+    assert r"\[" in tester.completion_script
+    assert r"\]" in tester.completion_script
