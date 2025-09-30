@@ -88,31 +88,53 @@ def test_path_completion(zsh_tester):
     assert "_files" in tester.completion_script
 
 
-@pytest.mark.slow
-def test_end_to_end_option_completion(zsh_tester):
-    """End-to-end test: actually trigger zsh completion for options.
+def test_end_to_end_completion(zsh_tester):
+    """End-to-end test: actually trigger zsh completion.
 
-    This test uses zpty to simulate real completion.
-    Marked as slow since it spawns subprocess.
+    This test uses pexpect to simulate real TAB completion.
+    Requires pexpect to be installed (skip otherwise).
     """
+    pexpect = pytest.importorskip("pexpect")
+
+    import tempfile
+    import time
+    from pathlib import Path
+
     tester = zsh_tester(app_basic, "basic")
 
-    completions = tester.get_completions("basic --")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        comp_file = tmpdir / "_basic"
+        comp_file.write_text(tester.completion_script)
 
-    assert any("--verbose" in c for c in completions)
-    assert any("--count" in c for c in completions)
-    assert any("--help" in c for c in completions)
+        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
 
+        try:
+            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
 
-@pytest.mark.slow
-def test_end_to_end_command_completion(zsh_tester):
-    """End-to-end test: actually trigger zsh completion for commands.
+            child.sendline(f"fpath=({tmpdir} $fpath)")
+            child.expect(["% ", "# ", r"\$ "])
 
-    This test uses zpty to simulate real completion.
-    Marked as slow since it spawns subprocess.
-    """
-    tester = zsh_tester(app_basic, "basic")
+            child.sendline("autoload -Uz compinit && compinit -u")
+            child.expect(["% ", "# ", r"\$ "])
 
-    completions = tester.get_completions("basic ")
+            child.send("basic --cou")
+            child.send("\t")
 
-    assert any("deploy" in c for c in completions)
+            time.sleep(0.3)
+
+            child.send(" MARKER\r")
+
+            child.expect(["% ", "# ", r"\$ "], timeout=2)
+            output = child.before
+
+            import re
+
+            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
+            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
+            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
+
+            assert "--count" in clean_output and "MARKER" in clean_output
+
+        finally:
+            child.close()

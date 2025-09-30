@@ -39,7 +39,7 @@ class ZshCompletionTester:
             return result.returncode == 0
 
     def get_completions(self, partial_command: str) -> list[str]:
-        """Get completion suggestions for partial command using zpty.
+        """Get completion suggestions for partial command using pexpect.
 
         Parameters
         ----------
@@ -49,69 +49,53 @@ class ZshCompletionTester:
         Returns
         -------
         list[str]
-            Completion suggestions
+            Completion suggestions (words that appeared after TAB)
         """
+        try:
+            import pexpect
+        except ImportError:
+            pytest.skip("pexpect not available for end-to-end testing")
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
             comp_file = tmpdir / f"_{self.prog_name}"
             comp_file.write_text(self.completion_script)
 
-            zsh_script = f"""
-            fpath=({tmpdir} $fpath)
-            autoload -Uz compinit && compinit -u
+            child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
 
-            zmodload zsh/zpty
+            try:
+                child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
 
-            comptest () {{
-                zstyle ':completion:*:default' list-colors 'no=<C>' 'lc=' 'rc=' 'ec=</C>'
-                zstyle ':completion:*' group-name ''
+                child.sendline(f"fpath=({tmpdir} $fpath)")
+                child.expect(["% ", "# ", r"\$ "])
 
-                bindkey '^I' complete-word
-                zle -C {{,,}}complete-word
-                complete-word () {{
-                    unset 'compstate[vared]'
-                    compadd -x $'\\C-B'
-                    _main_complete "$@"
-                    compadd -J -last- -x $'\\C-C'
-                    exit
-                }}
+                child.sendline("autoload -Uz compinit && compinit -u")
+                child.expect(["% ", "# ", r"\$ "])
 
-                vared -c tmp
-            }}
+                child.send(partial_command)
+                child.send("\t")
 
-            zpty {{,}}comptest
+                try:
+                    child.expect([r"\r\n", pexpect.TIMEOUT], timeout=0.5)
+                    output = child.before
+                except pexpect.TIMEOUT:
+                    output = child.before or ""
 
-            zpty -w comptest $'{partial_command}\\t'
-            zpty -r comptest REPLY $'*\\C-B'
-            zpty -r comptest REPLY $'*\\C-C'
+                child.sendline("\x03")
 
-            print -r -- "${{REPLY%$'\\C-C'}}"
+                completions = []
+                if output:
+                    for line in output.split("\n"):
+                        line = line.strip()
+                        if line and not line.startswith(partial_command.split()[0]):
+                            words = line.split()
+                            completions.extend(words)
 
-            zpty -d comptest
-            """
+                return completions
 
-            result = subprocess.run(
-                ["zsh", "-c", zsh_script],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-
-            if result.returncode != 0:
-                raise RuntimeError(f"Zsh completion test failed: {result.stderr}")
-
-            output = result.stdout.strip()
-            if not output:
-                return []
-
-            completions = []
-            for line in output.split("\n"):
-                line = line.strip()
-                if line and not line.startswith("<"):
-                    completions.append(line)
-
-            return completions
+            finally:
+                child.close()
 
 
 def _check_zsh_available():
