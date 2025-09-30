@@ -1,7 +1,6 @@
 """Zsh completion script generator."""
 
 import re
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args
@@ -256,6 +255,7 @@ def _get_completion_action_from_type(type_hint: Any) -> str:
     from typing import get_origin
 
     from cyclopts.annotations import is_union
+    from cyclopts.utils import is_class_and_subclass
 
     if is_union(type_hint):
         for arg in get_args(type_hint):
@@ -267,11 +267,8 @@ def _get_completion_action_from_type(type_hint: Any) -> str:
 
     target_type = get_origin(type_hint) or type_hint
 
-    try:
-        if target_type is Path or (isinstance(target_type, type) and issubclass(target_type, Path)):
-            return "_files"
-    except TypeError:
-        pass
+    if target_type is Path or is_class_and_subclass(target_type, Path):
+        return "_files"
 
     return ""
 
@@ -291,32 +288,28 @@ def _safe_get_description(entry: "HelpEntry") -> str:
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    try:
-        if entry.description is None:
-            return ""
-
-        if hasattr(entry.description, "primary_renderable"):
-            text = entry.description.primary_renderable.plain
-        elif hasattr(entry.description, "plain"):
-            text = entry.description.plain
-        else:
-            text = str(entry.description)
-
-        text = re.sub(r"[\x00-\x1f\x7f]", "", text)
-        text = text.replace("\\", "\\\\")
-        text = text.replace("`", "\\`")
-        text = text.replace("$", "\\$")
-        text = text.replace('"', '\\"')
-        text = text.replace("'", r"'\''")
-        text = text.replace("[", r"\[")
-        text = text.replace("]", r"\]")
-
-        text = re.sub(r"\s+", " ", text).strip()
-
-        if len(text) > 80:
-            text = text[:77] + "..."
-
-        return text
-    except Exception as e:
-        warnings.warn(f"Failed to extract description from {entry.names}: {e}", stacklevel=2)
+    if entry.description is None:
         return ""
+
+    if hasattr(entry.description, "primary_renderable"):
+        text = entry.description.primary_renderable.plain
+    elif hasattr(entry.description, "plain"):
+        text = entry.description.plain
+    else:
+        text = str(entry.description)
+
+    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
+    text = text.replace("\\", "\\\\")
+    text = text.replace("`", "\\`")
+    text = text.replace("$", "\\$")
+    text = text.replace('"', '\\"')
+    text = text.replace("'", r"'\''")
+    text = text.replace("[", r"\[")
+    text = text.replace("]", r"\]")
+
+    text = re.sub(r"\s+", " ", text).strip()
+
+    if len(text) > 80:
+        text = text[:77] + "..."
+
+    return text
