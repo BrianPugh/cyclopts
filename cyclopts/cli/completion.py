@@ -42,12 +42,7 @@ def generate_completion(
     """
     app_obj, app_name = load_app_from_script(script)
 
-    if shell == "zsh":
-        from cyclopts.completion.zsh import generate_completion_script
-
-        script_content = generate_completion_script(app_obj, app_name)
-    else:
-        raise ValueError(f"Unsupported shell: {shell}")
+    script_content = app_obj.generate_completion(shell=shell)
 
     if output:
         output.write_text(script_content)

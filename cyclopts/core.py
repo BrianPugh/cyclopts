@@ -1932,6 +1932,49 @@ class App:
 
         return doc
 
+    def generate_completion(
+        self,
+        *,
+        prog_name: str | None = None,
+        shell: Literal["zsh"] = "zsh",
+    ) -> str:
+        """Generate shell completion script for this application.
+
+        Parameters
+        ----------
+        prog_name : str | None
+            Program name for completion. If None, uses first name from app.name.
+        shell : Literal["zsh"]
+            Shell type. Currently only "zsh" supported.
+
+        Returns
+        -------
+        str
+            Complete shell completion script.
+
+        Examples
+        --------
+        >>> app = App(name="myapp")
+        >>> script = app.generate_completion()
+        >>> Path("_myapp").write_text(script)
+
+        Raises
+        ------
+        ValueError
+            If shell type is unsupported or app has no name.
+        """
+        if prog_name is None:
+            if not self.name:
+                raise ValueError("App must have a name to generate completion script")
+            prog_name = self.name[0] if isinstance(self.name, tuple) else self.name
+
+        if shell == "zsh":
+            from cyclopts.completion.zsh import generate_completion_script
+
+            return generate_completion_script(self, prog_name)
+        else:
+            raise ValueError(f"Unsupported shell: {shell}")
+
     def interactive_shell(
         self,
         prompt: str = "$ ",

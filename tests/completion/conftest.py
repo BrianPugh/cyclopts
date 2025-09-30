@@ -146,9 +146,7 @@ def zsh_tester(zsh_available):
         pytest.skip("zsh not available")
 
     def _make_tester(app, prog_name="testapp"):
-        from cyclopts.completion.zsh import generate_completion_script
-
-        script = generate_completion_script(app, prog_name)
+        script = app.generate_completion(prog_name=prog_name)
         return ZshCompletionTester(script, prog_name)
 
     return _make_tester
