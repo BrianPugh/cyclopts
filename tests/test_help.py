@@ -498,6 +498,158 @@ def test_help_format_group_parameters_from_docstring(capture_format_group_parame
     assert actual == expected
 
 
+def test_help_format_group_parameters_sphinx_directives(capture_format_group_parameters):
+    def cmd(foo: str, bar: float = 1.0, baz: int = 5):
+        """
+        Command with Sphinx directives.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+        bar: float
+            Bar parameter
+
+            .. versionadded:: 0.47
+        baz: int
+            Baz parameter
+
+            .. deprecated:: 2.0
+                Use something else instead
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [required]                             │
+        │    BAR --bar  Bar parameter [Added in v0.47] [default: 1.0]        │
+        │    BAZ --baz  Baz parameter [⚠ Deprecated in v2.0] Use something   │
+        │               else instead [default: 5]                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_versionchanged(capture_format_group_parameters):
+    def cmd(foo: str):
+        """
+        Command with versionchanged directive.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. versionchanged:: 1.5
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [Changed in v1.5] [required]           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_note_warning_seealso(capture_format_group_parameters):
+    def cmd(foo: str, bar: str, baz: str):
+        """
+        Command with note, warning, and seealso directives.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. note:: This is important
+        bar: str
+            Bar parameter
+
+            .. warning:: Be careful here
+        baz: str
+            Baz parameter
+
+            .. seealso:: Related function
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter                                        │
+        │                                                                    │
+        │               Note: This is important [required]                   │
+        │ *  BAR --bar  Bar parameter                                        │
+        │                                                                    │
+        │               ⚠ Warning: Be careful here [required]                │
+        │ *  BAZ --baz  Baz parameter                                        │
+        │                                                                    │
+        │               See also: Related function [required]                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_multiple_directives(capture_format_group_parameters):
+    def cmd(foo: str):
+        """
+        Command with multiple directives on one parameter.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. versionadded:: 1.0
+
+            .. versionchanged:: 2.0
+
+            .. note:: Important note
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [Added in v1.0] [Changed in v2.0]      │
+        │                                                                    │
+        │               Note: Important note [required]                      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_deprecated_no_content(capture_format_group_parameters):
+    def cmd(foo: str):
+        """
+        Command with deprecated directive without content.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. deprecated:: 3.0
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [⚠ Deprecated in v3.0] [required]      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_bool_flag(capture_format_group_parameters):
     def cmd(
         foo: Annotated[bool, Parameter(help="Docstring for foo.")] = True,
@@ -2077,6 +2229,90 @@ def test_format_plain_formatter(console):
         Parameters:
           VERBOSE, --verbose, --no-verbose: [default: False]
 
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_only_directives(capture_format_group_parameters):
+    """Test parameters with only directives and no other text."""
+
+    def cmd(foo: str):
+        """
+        Command with directive-only description.
+
+        Parameters
+        ----------
+        foo: str
+            .. versionadded:: 1.0
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  [Added in v1.0] [required]                           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_nested_indentation(capture_format_group_parameters):
+    """Test directives with multi-level indented content."""
+
+    def cmd(foo: str):
+        """
+        Command with nested indentation in directive.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. note::
+                This is a long note
+                that spans multiple lines
+                with consistent indentation
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter                                        │
+        │                                                                    │
+        │               Note: This is a long note that spans multiple lines  │
+        │               with consistent indentation [required]               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_inline_directive_content(capture_format_group_parameters):
+    """Test directive with inline content on same line."""
+
+    def cmd(foo: str):
+        """
+        Command with inline directive content.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. note:: Inline note content
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter                                        │
+        │                                                                    │
+        │               Note: Inline note content [required]                 │
+        ╰────────────────────────────────────────────────────────────────────╯
         """
     )
     assert actual == expected

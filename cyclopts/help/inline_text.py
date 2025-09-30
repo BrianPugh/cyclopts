@@ -30,7 +30,10 @@ class InlineText:
         elif format in ("restructuredtext", "rst"):
             from rich_rst import RestructuredText
 
-            primary_renderable = RestructuredText(content)
+            from cyclopts.help.rst_preprocessor import process_sphinx_directives
+
+            processed_content = process_sphinx_directives(content)
+            primary_renderable = RestructuredText(processed_content)
         elif format == "rich":
             from rich.text import Text
 
