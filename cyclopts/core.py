@@ -1936,7 +1936,7 @@ class App:
         self,
         *,
         prog_name: str | None = None,
-        shell: Literal["zsh"] = "zsh",
+        shell: Literal["zsh", "bash", "fish"] | None = None,
     ) -> str:
         """Generate shell completion script for this application.
 
@@ -1944,8 +1944,9 @@ class App:
         ----------
         prog_name : str | None
             Program name for completion. If None, uses first name from app.name.
-        shell : Literal["zsh"]
-            Shell type. Currently only "zsh" supported.
+        shell : Literal["zsh", "bash", "fish"] | None
+            Shell type. If None, automatically detects current shell.
+            Currently only "zsh" is fully supported.
 
         Returns
         -------
@@ -1954,24 +1955,43 @@ class App:
 
         Examples
         --------
+        Auto-detect shell and generate completion:
+
         >>> app = App(name="myapp")
         >>> script = app.generate_completion()
         >>> Path("_myapp").write_text(script)
 
+        Explicitly specify shell type:
+
+        >>> script = app.generate_completion(shell="zsh")
+
         Raises
         ------
         ValueError
-            If shell type is unsupported or app has no name.
+            If app has no name or shell type is unsupported.
+        ShellDetectionError
+            If shell is None and auto-detection fails.
+        NotImplementedError
+            If shell is "bash" or "fish" (not yet implemented).
         """
         if prog_name is None:
             if not self.name:
                 raise ValueError("App must have a name to generate completion script")
             prog_name = self.name[0] if isinstance(self.name, tuple) else self.name
 
+        if shell is None:
+            from cyclopts.completion import detect_shell
+
+            shell = detect_shell()
+
         if shell == "zsh":
             from cyclopts.completion.zsh import generate_completion_script
 
             return generate_completion_script(self, prog_name)
+        elif shell == "bash":
+            raise NotImplementedError("Bash completion support is not yet implemented")
+        elif shell == "fish":
+            raise NotImplementedError("Fish completion support is not yet implemented")
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
