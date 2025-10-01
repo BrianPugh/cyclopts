@@ -1,22 +1,18 @@
 import inspect
 import sys
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from enum import Enum
-from functools import lru_cache, partial
+from functools import lru_cache
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
-    Annotated,
     Any,
     Literal,
-    get_args,
-    get_origin,
 )
 
 from attrs import converters, define, evolve, field
 
-from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import is_union, resolve_annotated
+from cyclopts.annotations import resolve_annotated
 from cyclopts.core import _get_root_module_name
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
@@ -28,11 +24,6 @@ if TYPE_CHECKING:
 
     from cyclopts.argument import ArgumentCollection
     from cyclopts.core import App
-
-if sys.version_info >= (3, 12):  # pragma: no cover
-    from typing import TypeAliasType
-else:  # pragma: no cover
-    TypeAliasType = None
 
 
 @lru_cache(maxsize=16)
@@ -332,30 +323,6 @@ def format_doc(app: "App", format: str):
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
-def _get_choices(type_: type, name_transform: Callable[[str], str]) -> list[str]:
-    get_choices = partial(_get_choices, name_transform=name_transform)
-    choices = []
-    _origin = get_origin(type_)
-    if is_class_and_subclass(type_, Enum):
-        choices.extend(name_transform(x) for x in type_.__members__)
-    elif is_union(_origin):
-        inner_choices = [get_choices(inner) for inner in get_args(type_)]
-        for x in inner_choices:
-            if x:
-                choices.extend(x)
-    elif _origin is Literal:
-        choices.extend(str(x) for x in get_args(type_))
-    elif _origin in ITERABLE_TYPES:
-        args = get_args(type_)
-        if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
-            choices.extend(get_choices(args[0]))
-    elif _origin is Annotated:
-        choices.extend(get_choices(resolve_annotated(type_)))
-    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
-        choices.extend(get_choices(type_.__value__))
-    return choices
-
-
 def create_parameter_help_panel(
     group: "Group",
     argument_collection: "ArgumentCollection",
@@ -404,11 +371,7 @@ def create_parameter_help_panel(
         help_description = InlineText.from_format(argument.parameter.help, format=format)
 
         # Prepare choices if needed
-        choices = None
-        if argument.parameter.show_choices:
-            choices_list = _get_choices(argument.hint, argument.parameter.name_transform)
-            if choices_list:
-                choices = tuple(choices_list)
+        choices = argument.get_choices()
 
         # Prepare env_var if needed
         env_var = None
