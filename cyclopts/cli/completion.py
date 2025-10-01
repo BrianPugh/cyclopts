@@ -5,47 +5,95 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from cyclopts.cli import app
-from cyclopts.loader import load_app_from_script
+from cyclopts.completion.detect import ShellDetectionError, detect_shell
 from cyclopts.parameter import Parameter
 
 
-@app.command
-def generate_completion(
-    script: Annotated[
-        str,
-        Parameter(help="Python script path with optional '::app_object' notation."),
-    ],
-    shell: Annotated[
-        Literal["zsh"],
-        Parameter(help="Shell type for completion."),
-    ] = "zsh",
-    output: Annotated[
-        Path | None,
-        Parameter(
-            alias="-o",
-            help="Output file. If not specified, prints to stdout.",
-        ),
-    ] = None,
+def _get_completion_install_path(shell: str, prog_name: str) -> Path:
+    """Get the appropriate completion installation path for the given shell."""
+    home = Path.home()
+
+    if shell == "zsh":
+        zfunc_dir = home / ".zfunc"
+        zfunc_dir.mkdir(exist_ok=True)
+        return zfunc_dir / f"_{prog_name}"
+    elif shell == "bash":
+        return home / ".bash_completion"
+    elif shell == "fish":
+        fish_completions = home / ".config" / "fish" / "completions"
+        fish_completions.mkdir(parents=True, exist_ok=True)
+        return fish_completions / f"{prog_name}.fish"
+    else:
+        raise ValueError(f"Unsupported shell: {shell}")
+
+
+@app.command(name="--install-completion")
+def install_completion(
+    *,
+    shell: Annotated[Literal["zsh", "bash", "fish"] | None, Parameter()] = None,
+    output: Annotated[Path | None, Parameter(name=["-o", "--output"])] = None,
 ):
-    """Generate shell completion script for a Cyclopts application.
+    """Install shell completion for cyclopts CLI.
+
+    This command generates and installs the completion script to the appropriate
+    location for your shell. After installation, you may need to restart your
+    shell or source your shell configuration file.
+
+    Parameters
+    ----------
+    shell : Literal["zsh", "bash", "fish"] | None
+        Shell type for completion. If not specified, attempts to auto-detect current shell.
+    output : Path | None
+        Output path for the completion script. If not specified, uses shell-specific default.
 
     Examples
     --------
-    Generate and print to stdout:
-        cyclopts generate-completion myapp.py::app
+    Auto-detect shell and install:
+        cyclopts install-completion
 
-    Save to file:
-        cyclopts generate-completion myapp.py::app -o _myapp
+    Install for specific shell:
+        cyclopts install-completion --shell zsh
 
-    Auto-detect app:
-        cyclopts generate-completion myapp.py
+    Install to custom path:
+        cyclopts install-completion --output /custom/path/to/completion
+
+    Notes
+    -----
+    Installation locations:
+    - zsh: ~/.zfunc/_cyclopts (ensure ~/.zfunc is in your $fpath)
+    - bash: ~/.bash_completion
+    - fish: ~/.config/fish/completions/cyclopts.fish
     """
-    app_obj, app_name = load_app_from_script(script)
+    if shell is None:
+        try:
+            shell = detect_shell()
+        except ShellDetectionError:
+            print(
+                "Could not auto-detect shell. Please specify --shell explicitly.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-    script_content = app_obj.generate_completion(shell=shell)
+    script_content = app.generate_completion(shell=shell)
+    install_path = output if output is not None else _get_completion_install_path(shell, app.name[0])
+    install_path.parent.mkdir(parents=True, exist_ok=True)
+    install_path.write_text(script_content)
 
-    if output:
-        output.write_text(script_content)
-        print(f"Completion script written to {output}", file=sys.stderr)
+    print(f"✓ Completion script installed to {install_path}")
+
+    if shell == "zsh":
+        print("\nTo enable completions, ensure ~/.zfunc is in your $fpath:")
+        print("  Add this to your ~/.zshrc:")
+        print("    fpath=(~/.zfunc $fpath)")
+        print("    autoload -Uz compinit && compinit")
+        print("\nThen restart your shell or run: source ~/.zshrc")
+    elif shell == "bash":
+        print("\nTo enable completions, source the completion file:")
+        print("  Add this to your ~/.bashrc:")
+        print("    [ -f ~/.bash_completion ] && source ~/.bash_completion")
+        print("\nThen restart your shell or run: source ~/.bashrc")
+    elif shell == "fish":
+        print("\nCompletions are automatically loaded in fish.")
+        print("Restart your shell or run: source ~/.config/fish/config.fish")
     else:
-        print(script_content)
+        raise NotImplementedError
