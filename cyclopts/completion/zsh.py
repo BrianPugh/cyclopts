@@ -43,15 +43,15 @@ from typing import TYPE_CHECKING, Any, get_args
 
 if TYPE_CHECKING:
     from cyclopts import App
-    from cyclopts.help import HelpEntry
+    from cyclopts.argument import Argument, ArgumentCollection
 
 
 @dataclass
 class CompletionData:
     """Completion data for a command path."""
 
-    commands: list["HelpEntry"]
-    parameters: list["HelpEntry"]
+    arguments: "ArgumentCollection"
+    commands: list["App"]
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -97,26 +97,39 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
     def extract_completion_data(command_path: tuple[str, ...] = ()):
         """Recursively extract completion data for command and subcommands."""
+        from cyclopts.argument import ArgumentCollection
+        from cyclopts.group_extractors import groups_from_app
+
         try:
-            help_panels = app._assemble_help_panels(tokens=list(command_path), help_format="plaintext")
+            _, execution_path, _ = app.parse_commands(list(command_path))
+            command_app = execution_path[-1]
         except Exception as e:
             warnings.warn(f"Failed to extract completion data for command path {command_path!r}: {e}", stacklevel=2)
-            completion_data[command_path] = CompletionData(commands=[], parameters=[])
+            completion_data[command_path] = CompletionData(arguments=ArgumentCollection(), commands=[])
             return
 
+        # Get arguments from all contributing apps (including meta apps)
+
+        arguments = ArgumentCollection()
+        apps_for_params = app._get_resolution_context(execution_path)
+        for subapp in apps_for_params:
+            if subapp.default_command:
+                app_arguments = subapp.assemble_argument_collection(parse_docstring=True)
+                arguments.extend(app_arguments)
+
+        # Get subcommands
         commands = []
-        parameters = []
+        for group, subapps in groups_from_app(command_app):
+            if group.show:
+                for subapp in subapps:
+                    if subapp.show and subapp not in commands:
+                        commands.append(subapp)
 
-        for _, panel in help_panels:
-            if panel.format == "command":
-                commands.extend(panel.entries)
-            elif panel.format == "parameter":
-                parameters.extend(panel.entries)
+        completion_data[command_path] = CompletionData(arguments=arguments, commands=commands)
 
-        completion_data[command_path] = CompletionData(commands=commands, parameters=parameters)
-
-        for cmd_entry in commands:
-            for cmd_name in cmd_entry.names:
+        # Recurse for subcommands
+        for cmd_app in commands:
+            for cmd_name in cmd_app.name:
                 if not cmd_name.startswith("-"):
                     extract_completion_data(command_path + (cmd_name,))
 
@@ -166,22 +179,38 @@ def _generate_completion_for_path(
     """
     data = completion_data[command_path]
     commands = data.commands
-    parameters = data.parameters
+    arguments = data.arguments
     indent_str = " " * indent
     lines = []
 
     args_specs = []
 
-    for param_entry in parameters:
-        specs = _generate_parameter_specs(param_entry)
+    # Separate positional from keyword arguments
+    positional_args = [arg for arg in arguments if arg.is_positional_only() and arg.show]
+    keyword_args = [arg for arg in arguments if not arg.is_positional_only() and arg.show]
+
+    # Sort positionals by index (should never be None for positional-only args)
+    positional_args.sort(key=lambda a: a.index or 0)
+
+    # Generate keyword argument specs
+    for argument in keyword_args:
+        specs = _generate_keyword_specs(argument)
         args_specs.extend(specs)
 
-    for cmd_entry in commands:
-        if any(name.startswith("-") for name in cmd_entry.names):
-            specs = _generate_parameter_specs(cmd_entry)
+    # Check for flag commands (commands that look like options)
+    for cmd_app in commands:
+        if any(name.startswith("-") for name in cmd_app.name):
+            specs = _generate_keyword_specs_for_command(cmd_app)
             args_specs.extend(specs)
 
-    has_non_flag_commands = any(not cmd_name.startswith("-") for cmd in commands for cmd_name in cmd.names)
+    has_non_flag_commands = any(not cmd_name.startswith("-") for cmd in commands for cmd_name in cmd.name)
+
+    # Generate positional argument specs
+    # Only add positionals if there are no subcommands (they conflict in zsh)
+    if positional_args and not has_non_flag_commands:
+        for argument in positional_args:
+            spec = _generate_positional_spec(argument)
+            args_specs.append(spec)
 
     if has_non_flag_commands:
         args_specs.append("'1: :->cmds'")
@@ -199,10 +228,10 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}  cmds)")
 
         cmd_list = []
-        for cmd_entry in commands:
-            for cmd_name in cmd_entry.names:
+        for cmd_app in commands:
+            for cmd_name in cmd_app.name:
                 if not cmd_name.startswith("-"):
-                    desc = _safe_get_description(cmd_entry)
+                    desc = _safe_get_description_from_app(cmd_app)
                     cmd_list.append(f"'{cmd_name}:{desc}'")
 
         lines.append(f"{indent_str}    local -a commands")
@@ -216,8 +245,8 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}  args)")
         lines.append(f"{indent_str}    case $words[1] in")
 
-        for cmd_entry in commands:
-            for cmd_name in cmd_entry.names:
+        for cmd_app in commands:
+            for cmd_name in cmd_app.name:
                 if cmd_name.startswith("-"):
                     continue
 
@@ -257,45 +286,48 @@ def _escape_completion_choice(choice: str) -> str:
     return choice
 
 
-def _generate_parameter_specs(entry: "HelpEntry") -> list[str]:
-    """Generate zsh _arguments specs for a parameter.
+def _generate_keyword_specs(argument: "Argument") -> list[str]:
+    """Generate zsh _arguments specs for a keyword argument.
 
     Parameters
     ----------
-    entry : HelpEntry
-        Parameter entry from help panel.
+    argument : Argument
+        Argument object from ArgumentCollection.
 
     Returns
     -------
     list[str]
         List of zsh argument specs.
     """
-    from cyclopts.annotations import is_union
+    from cyclopts.annotations import is_union, resolve_annotated
     from cyclopts.utils import is_class_and_subclass
 
     specs = []
-    desc = _safe_get_description(entry)
+    desc = _get_description_from_argument(argument)
 
+    # Determine if this is a flag (boolean)
     is_flag = True
-    if entry.type:
-        actual_type = entry.type
-        if is_union(actual_type):
-            for arg in get_args(actual_type):
-                if arg is not type(None):
-                    actual_type = arg
-                    break
-        is_flag = actual_type is bool or is_class_and_subclass(actual_type, bool)
+    actual_type = resolve_annotated(argument.hint)
+    if is_union(actual_type):
+        for arg_type in get_args(actual_type):
+            if arg_type is not type(None):
+                actual_type = arg_type
+                break
+    is_flag = actual_type is bool or is_class_and_subclass(actual_type, bool)
 
+    # Determine completion action
     action = ""
-    if entry.choices:
-        escaped_choices = [_escape_completion_choice(c) for c in entry.choices]
+    choices = argument.get_choices()
+    if choices:
+        escaped_choices = [_escape_completion_choice(c) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
         is_flag = False
-    elif entry.type:
-        action = _get_completion_action_from_type(entry.type)
+    else:
+        action = _get_completion_action_from_type(argument.hint)
 
-    for name in entry.names:
+    # Generate specs for each name
+    for name in argument.names:
         if not name.startswith("-"):
             continue
         if is_flag and not action:
@@ -306,14 +338,56 @@ def _generate_parameter_specs(entry: "HelpEntry") -> list[str]:
             spec = f"'{name}[{desc}]:{name.lstrip('-')}:'"
         specs.append(spec)
 
-    for short in entry.shorts:
-        if is_flag and not action:
-            spec = f"'{short}[{desc}]'"
-        elif action:
-            spec = f"'{short}[{desc}]:{short.lstrip('-')}:{action}'"
-        else:
-            spec = f"'{short}[{desc}]:{short.lstrip('-')}:'"
-        specs.append(spec)
+    return specs
+
+
+def _generate_positional_spec(argument: "Argument") -> str:
+    """Generate zsh _arguments spec for a positional argument.
+
+    Parameters
+    ----------
+    argument : Argument
+        Positional argument object.
+
+    Returns
+    -------
+    str
+        Zsh positional argument spec.
+    """
+    desc = _get_description_from_argument(argument)
+    action = _get_completion_action_from_type(argument.hint)
+
+    if argument.is_var_positional():
+        # Variadic positional (*args)
+        return f"'*:{desc}:{action}'" if action else f"'*:{desc}:'"
+
+    # Regular positional - zsh uses 1-based indexing
+    # Index should never be None for positional-only arguments
+    assert argument.index is not None, "Positional-only argument missing index"
+    pos = argument.index + 1
+    return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}:'"
+
+
+def _generate_keyword_specs_for_command(cmd_app: "App") -> list[str]:
+    """Generate zsh _arguments specs for a command that looks like a flag.
+
+    Parameters
+    ----------
+    cmd_app : App
+        Command app with flag-like names.
+
+    Returns
+    -------
+    list[str]
+        List of zsh argument specs.
+    """
+    specs = []
+    desc = _safe_get_description_from_app(cmd_app)
+
+    for name in cmd_app.name:
+        if name.startswith("-"):
+            spec = f"'{name}[{desc}]'"
+            specs.append(spec)
 
     return specs
 
@@ -354,30 +428,61 @@ def _get_completion_action_from_type(type_hint: Any) -> str:
     return ""
 
 
-def _safe_get_description(entry: "HelpEntry") -> str:
-    """Extract plain text description, escaping zsh special chars.
-
-    Escapes characters that could cause shell injection or break completion.
+def _get_description_from_argument(argument: "Argument") -> str:
+    """Extract plain text description from Argument, escaping zsh special chars.
 
     Parameters
     ----------
-    entry : HelpEntry
-        Help entry with description.
+    argument : Argument
+        Argument object with parameter help text.
 
     Returns
     -------
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    if entry.description is None:
+    text = argument.parameter.help or ""
+
+    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
+    text = text.replace("\\", "\\\\")
+    text = text.replace("`", "\\`")
+    text = text.replace("$", "\\$")
+    text = text.replace('"', '\\"')
+    text = text.replace("'", r"'\''")
+    text = text.replace("[", r"\[")
+    text = text.replace("]", r"\]")
+
+    text = re.sub(r"\s+", " ", text).strip()
+
+    if len(text) > 80:
+        text = text[:77] + "..."
+
+    return text
+
+
+def _safe_get_description_from_app(cmd_app: "App") -> str:
+    """Extract plain text description from App, escaping zsh special chars.
+
+    Parameters
+    ----------
+    cmd_app : App
+        Command app with help text.
+
+    Returns
+    -------
+    str
+        Escaped plain text description (truncated to 80 chars).
+    """
+    from cyclopts.help.help import docstring_parse
+
+    if not cmd_app.help:
         return ""
 
-    if hasattr(entry.description, "primary_renderable"):
-        text = entry.description.primary_renderable.plain
-    elif hasattr(entry.description, "plain"):
-        text = entry.description.plain
-    else:
-        text = str(entry.description)
+    try:
+        parsed = docstring_parse(cmd_app.help, "plaintext")
+        text = parsed.short_description or ""
+    except Exception:
+        text = str(cmd_app.help)
 
     text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     text = text.replace("\\", "\\\\")

@@ -1472,24 +1472,10 @@ class Argument:
         else:
             return self.parameter.required
 
-    def is_positional(self) -> bool:
-        """Check if this argument is positional.
+    def is_positional_only(self) -> bool:
+        return self.field_info.is_positional_only
 
-        Returns
-        -------
-        bool
-            True if the argument can be provided positionally (has a positional index).
-        """
-        return self.index is not None
-
-    def is_variadic(self) -> bool:
-        """Check if this is a variadic positional argument (*args).
-
-        Returns
-        -------
-        bool
-            True if the argument is VAR_POSITIONAL.
-        """
+    def is_var_positional(self) -> bool:
         return self.field_info.kind == self.field_info.VAR_POSITIONAL
 
     def get_choices(self) -> tuple[str, ...] | None:
