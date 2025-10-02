@@ -318,3 +318,74 @@ def test_deeply_nested_commands(zsh_tester):
     assert "level3" in tester.completion_script
     assert "action" in tester.completion_script
     assert tester.validate_script_syntax()
+
+
+def test_no_trailing_colons_in_specs(zsh_tester):
+    """Test that argument specs don't have trailing colons when action is empty.
+
+    Regression test for issue where specs like '1:description:' or '*:args:'
+    would cause zsh eval errors. When there's no completion action, the spec
+    should be '1:description' or '*:args' (no trailing colon).
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="notrail")
+
+    @app.command
+    def run(
+        pos1: Annotated[str, Parameter(help="First positional")],
+        pos2: Annotated[int, Parameter(help="Second positional")],
+        *args: Annotated[str, Parameter(help="Variadic args")],
+    ):
+        """Command with positionals."""
+        pass
+
+    @app.default
+    def main(
+        flag: Annotated[str, Parameter(help="A non-path option")],
+    ):
+        """Main command."""
+        pass
+
+    tester = zsh_tester(app, "notrail")
+
+    # Check for problematic trailing colons (but not in file/directory actions)
+    for line in tester.completion_script.split("\n"):
+        stripped = line.strip()
+        # Skip comments and lines with valid actions
+        if stripped.startswith("#") or ":_files" in line or ":_directories" in line:
+            continue
+        # Check for trailing :'  patterns (ignoring quote escaping)
+        if line.rstrip().endswith(":'") or line.rstrip().endswith(":' \\"):
+            if "'\\'':" not in line:  # Not part of quote escaping in descriptions
+                raise AssertionError(f"Found trailing colon in spec: {line}")
+
+    assert tester.validate_script_syntax()
+
+
+def test_colon_escaping_in_descriptions(zsh_tester):
+    """Test that colons in descriptions are escaped to prevent field separator issues.
+
+    Regression test for issue where colons in positional argument descriptions
+    like '::app_object' would be treated as field separators in specs like
+    '1:message:action', causing unmatched quote errors.
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="colontest")
+
+    @app.command
+    def run(
+        script: Annotated[str, Parameter(help="Path with '::app' notation")],
+    ):
+        """Command with colon in description."""
+        pass
+
+    tester = zsh_tester(app, "colontest")
+
+    assert r"\:\:" in tester.completion_script
+    assert tester.validate_script_syntax()

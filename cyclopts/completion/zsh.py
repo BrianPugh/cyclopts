@@ -336,7 +336,7 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
         elif action:
             spec = f"'{name}[{desc}]:{name.lstrip('-')}:{action}'"
         else:
-            spec = f"'{name}[{desc}]:{name.lstrip('-')}:'"
+            spec = f"'{name}[{desc}]:{name.lstrip('-')}'"
         specs.append(spec)
 
     return specs
@@ -360,13 +360,13 @@ def _generate_positional_spec(argument: "Argument") -> str:
 
     if argument.is_var_positional():
         # Variadic positional (*args)
-        return f"'*:{desc}:{action}'" if action else f"'*:{desc}:'"
+        return f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
 
     # Regular positional - zsh uses 1-based indexing
     # Index should never be None for positional-only arguments
     assert argument.index is not None, "Positional-only argument missing index"
     pos = argument.index + 1
-    return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}:'"
+    return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
 
 def _generate_keyword_specs_for_command(cmd_app: "App") -> list[str]:
@@ -450,6 +450,7 @@ def _get_description_from_argument(argument: "Argument") -> str:
     text = text.replace("$", "\\$")
     text = text.replace('"', '\\"')
     text = text.replace("'", r"'\''")
+    text = text.replace(":", r"\:")
     text = text.replace("[", r"\[")
     text = text.replace("]", r"\]")
 
@@ -491,6 +492,7 @@ def _safe_get_description_from_app(cmd_app: "App") -> str:
     text = text.replace("$", "\\$")
     text = text.replace('"', '\\"')
     text = text.replace("'", r"'\''")
+    text = text.replace(":", r"\:")
     text = text.replace("[", r"\[")
     text = text.replace("]", r"\]")
 
