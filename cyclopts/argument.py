@@ -1152,8 +1152,9 @@ class Argument:
 
             expanded_tokens = list(expand_tokens(self.tokens))
             for token in expanded_tokens:
+                resolved_hint = resolve_optional(self.hint)
                 if token.implicit_value is not UNSET and isinstance(
-                    token.implicit_value, get_origin(self.hint) or self.hint
+                    token.implicit_value, get_origin(resolved_hint) or resolved_hint
                 ):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
@@ -1448,7 +1449,11 @@ class Argument:
                 if result:
                     out[keys[0]] = result
             elif (get_origin(child.hint) or child.hint) in ITERABLE_TYPES:
-                out.setdefault(keys[-1], []).extend([token.value for token in child.tokens])
+                for token in child.tokens:
+                    if token.implicit_value is not UNSET:
+                        out.setdefault(keys[-1], []).extend(token.implicit_value)
+                    else:
+                        out.setdefault(keys[-1], []).append(token.value)
             else:
                 token = child.tokens[0]
                 out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value
