@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 import pydantic
 import pytest
@@ -547,3 +547,65 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
         "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
         Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),  # pyright: ignore
     )
+
+
+def test_pydantic_list_empty_flag(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/572"""
+
+    @Parameter(name="*")
+    class Config(BaseModel):
+        urls: Annotated[
+            list[str] | None,
+            Field(default=None, description="Optional list of URLs"),
+            Parameter(
+                consume_multiple=True,
+            ),
+        ]
+
+    @app.default
+    def command(config: Optional[Config] = None):
+        pass
+
+    assert_parse_args(command, "--empty-urls", Config(urls=[]))
+
+
+def test_pydantic_list_with_value(app, assert_parse_args):
+    @Parameter(name="*")
+    class Config(BaseModel):
+        urls: Annotated[
+            list[str] | None,
+            Field(default=None, description="Optional list of URLs"),
+            Parameter(
+                consume_multiple=True,
+            ),
+        ]
+
+    @app.default
+    def command(config: Optional[Config] = None):
+        pass
+
+    assert_parse_args(
+        command,
+        "--urls http://example.com http://example2.com",
+        Config(
+            urls=["http://example.com", "http://example2.com"],
+        ),
+    )
+
+
+def test_pydantic_list_omitted(app, assert_parse_args):
+    @Parameter(name="*")
+    class Config(BaseModel):
+        urls: Annotated[
+            list[str] | None,
+            Field(default=None, description="Optional list of URLs"),
+            Parameter(
+                consume_multiple=True,
+            ),
+        ]
+
+    @app.default
+    def command(config: Optional[Config] = None):
+        pass
+
+    assert_parse_args(command, "")
