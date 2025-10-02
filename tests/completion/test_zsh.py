@@ -140,6 +140,58 @@ def test_end_to_end_completion(zsh_tester):
             child.close()
 
 
+def test_command_prefix_completion(zsh_tester):
+    """End-to-end test: verify command name prefix completion works.
+
+    This test verifies that typing "d" and pressing TAB completes to "deploy".
+    Requires pexpect to be installed (skip otherwise).
+    """
+    pexpect = pytest.importorskip("pexpect")
+
+    import tempfile
+    import time
+    from pathlib import Path
+
+    tester = zsh_tester(app_basic, "basic")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        comp_file = tmpdir / "_basic"
+        comp_file.write_text(tester.completion_script)
+
+        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
+
+        try:
+            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
+
+            child.sendline(f"fpath=({tmpdir} $fpath)")
+            child.expect(["% ", "# ", r"\$ "])
+
+            child.sendline("autoload -Uz compinit && compinit -u")
+            child.expect(["% ", "# ", r"\$ "])
+
+            child.send("basic d")
+            child.send("\t")
+
+            time.sleep(0.3)
+
+            child.send(" MARKER\r")
+
+            child.expect(["% ", "# ", r"\$ "], timeout=2)
+            output = child.before
+
+            import re
+
+            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
+            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
+            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
+
+            assert "deploy" in clean_output and "MARKER" in clean_output
+
+        finally:
+            child.close()
+
+
 def test_optional_path_completion(zsh_tester):
     """Test that Optional[Path] and Path | None generate file completion."""
     tester = zsh_tester(app_path, "pathapp")

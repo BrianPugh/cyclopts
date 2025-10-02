@@ -14,9 +14,11 @@ def _get_completion_install_path(shell: str, prog_name: str) -> Path:
     home = Path.home()
 
     if shell == "zsh":
-        zfunc_dir = home / ".zfunc"
-        zfunc_dir.mkdir(exist_ok=True)
-        return zfunc_dir / f"_{prog_name}"
+        # Prefer user's local completion directory
+        # This directory should be added to fpath in .zshrc
+        zsh_completions = home / ".zsh" / "completions"
+        zsh_completions.mkdir(parents=True, exist_ok=True)
+        return zsh_completions / f"_{prog_name}"
     elif shell == "bash":
         return home / ".bash_completion"
     elif shell == "fish":
@@ -60,9 +62,9 @@ def install_completion(
     Notes
     -----
     Installation locations:
-    - zsh: ~/.zfunc/_cyclopts (ensure ~/.zfunc is in your $fpath)
+    - zsh: ~/.zsh/completions/_<prog_name>
     - bash: ~/.bash_completion
-    - fish: ~/.config/fish/completions/cyclopts.fish
+    - fish: ~/.config/fish/completions/<prog_name>.fish
     """
     if shell is None:
         try:
@@ -82,11 +84,12 @@ def install_completion(
     print(f"✓ Completion script installed to {install_path}")
 
     if shell == "zsh":
-        print("\nTo enable completions, ensure ~/.zfunc is in your $fpath:")
-        print("  Add this to your ~/.zshrc:")
-        print("    fpath=(~/.zfunc $fpath)")
+        completion_dir = install_path.parent
+        print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
+        print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
+        print(f"    fpath=({completion_dir} $fpath)")
         print("    autoload -Uz compinit && compinit")
-        print("\nThen restart your shell or run: source ~/.zshrc")
+        print("\nThen restart your shell or run: exec zsh")
     elif shell == "bash":
         print("\nTo enable completions, source the completion file:")
         print("  Add this to your ~/.bashrc:")

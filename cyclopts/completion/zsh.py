@@ -7,7 +7,7 @@ leveraging the existing help system infrastructure. The completion generator:
    for each command path, reusing the help system's parameter and command extraction.
 
 2. **Transforms** the help panel data (HelpEntry objects) into zsh completion primitives:
-   - Commands → _describe 'command' list
+   - Commands → _describe -t commands 'command' list
    - Parameters → _arguments specs with descriptions
    - Literal/Enum choices → completion value lists
    - Path types → _files action
@@ -153,7 +153,7 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         ]
     )
 
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 def _generate_completion_for_path(
@@ -217,7 +217,8 @@ def _generate_completion_for_path(
         args_specs.append("'*::arg:->args'")
 
     if args_specs:
-        lines.append(f"{indent_str}_arguments -C \\")
+        c_flag = "-C " if has_non_flag_commands else ""
+        lines.append(f"{indent_str}_arguments {c_flag}\\")
         for spec in args_specs[:-1]:
             lines.append(f"{indent_str}  {spec} \\")
         lines.append(f"{indent_str}  {args_specs[-1]}")
@@ -239,7 +240,7 @@ def _generate_completion_for_path(
         for cmd in cmd_list:
             lines.append(f"{indent_str}      {cmd}")
         lines.append(f"{indent_str}    )")
-        lines.append(f"{indent_str}    _describe 'command' commands")
+        lines.append(f"{indent_str}    _describe -t commands 'command' commands")
         lines.append(f"{indent_str}    ;;")
 
         lines.append(f"{indent_str}  args)")
