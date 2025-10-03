@@ -1287,7 +1287,6 @@ class App:
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
-            console = command_app.console
 
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
@@ -1305,7 +1304,7 @@ class App:
                     command = self.help_print
                     while meta_parent := meta_parent._meta_parent:
                         command = meta_parent.help_print
-                    bound = inspect.signature(command).bind(tokens, console=console)
+                    bound = inspect.signature(command).bind(tokens, console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 elif any(flag in tokens for flag in command_app.version_flags):
@@ -1313,7 +1312,7 @@ class App:
                     while meta_parent := meta_parent._meta_parent:
                         command = _get_version_command(meta_parent)
 
-                    bound = inspect.signature(command).bind(console=console)
+                    bound = inspect.signature(command).bind(console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 else:
@@ -1356,7 +1355,7 @@ class App:
                             # Running the application with no arguments and no registered
                             # ``default_command`` will default to ``help_print``.
                             command = self.help_print
-                            bound = inspect.signature(command).bind(tokens=tokens, console=console)
+                            bound = inspect.signature(command).bind(tokens=tokens, console=command_app.console)
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
                 if raise_on_unused_tokens and unused_tokens:
@@ -1374,7 +1373,7 @@ class App:
                 if command_chain:
                     e.command_chain = command_chain
                 if e.console is None:
-                    e.console = console
+                    e.console = command_app.console
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
