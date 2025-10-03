@@ -143,7 +143,7 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         "",
     ]
 
-    lines.extend(_generate_completion_for_path(completion_data, ()))
+    lines.extend(_generate_completion_for_path(completion_data, (), prog_name=prog_name))
 
     lines.extend(
         [
@@ -156,10 +156,93 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _generate_run_command_completion(
+    arguments: "ArgumentCollection",
+    indent_str: str,
+    prog_name: str,
+) -> list[str]:
+    """Generate special dynamic completion for the 'run' command.
+
+    The run command loads a Python script dynamically, so we need to call back
+    into Python at completion time to discover available commands and options.
+
+    Parameters
+    ----------
+    arguments : ArgumentCollection
+        Arguments for the run command.
+    indent_str : str
+        Indentation string.
+    prog_name : str
+        Program name for the callback.
+
+    Returns
+    -------
+    list[str]
+        Lines of zsh completion code.
+    """
+    lines = []
+    lines.append(f"{indent_str}local script_path")
+    lines.append(f"{indent_str}local -a completions")
+    lines.append(f"{indent_str}local -a remaining_words")
+    lines.append("")
+    lines.append(f"{indent_str}# If completing first argument (the script path), suggest files")
+    lines.append(f"{indent_str}if [[ $CURRENT -eq 2 ]]; then")
+    lines.append(f"{indent_str}  _files")
+    lines.append(f"{indent_str}  return")
+    lines.append(f"{indent_str}fi")
+    lines.append("")
+    lines.append(f"{indent_str}# Get absolute path to the script file")
+    lines.append(f"{indent_str}script_path=${{words[2]}}")
+    lines.append(f"{indent_str}script_path=${{script_path:a}}")
+    lines.append(f"{indent_str}if [[ -f $script_path ]]; then")
+    lines.append(f"{indent_str}  remaining_words=(${{words[3,-1]}})")
+    lines.append(f"{indent_str}  local result")
+    lines.append(f"{indent_str}  local cmd")
+    lines.append(f"{indent_str}  local project_root")
+    lines.append(f"{indent_str}  ")
+    lines.append(f"{indent_str}  # Find cyclopts command: check global PATH first")
+    lines.append(f"{indent_str}  if command -v {prog_name} &>/dev/null; then")
+    lines.append(f'{indent_str}    cmd="{prog_name}"')
+    lines.append(f"{indent_str}  else")
+    lines.append(f"{indent_str}    # Search parent directories for .venv or poetry project")
+    lines.append(f"{indent_str}    project_root=${{script_path:h}}")
+    lines.append(f"{indent_str}    while [[ $project_root != / ]]; do")
+    lines.append(f"{indent_str}      # Check for virtual environment")
+    lines.append(f'{indent_str}      if [[ -f "$project_root/.venv/bin/{prog_name}" ]]; then')
+    lines.append(f'{indent_str}        cmd="$project_root/.venv/bin/{prog_name}"')
+    lines.append(f"{indent_str}        break")
+    lines.append(f"{indent_str}      # Check for poetry project")
+    lines.append(
+        f'{indent_str}      elif [[ -f "$project_root/pyproject.toml" ]] && command -v poetry &>/dev/null; then'
+    )
+    lines.append(f'{indent_str}        cmd="(cd \\"$project_root\\" && poetry run {prog_name})"')
+    lines.append(f"{indent_str}        break")
+    lines.append(f"{indent_str}      fi")
+    lines.append(f"{indent_str}      project_root=${{project_root:h}}")
+    lines.append(f"{indent_str}    done")
+    lines.append(f"{indent_str}    [[ -z $cmd ]] && return")
+    lines.append(f"{indent_str}  fi")
+    lines.append(f"{indent_str}  # Call back into cyclopts to get dynamic completions from the script")
+    lines.append(
+        f'{indent_str}  result=$(eval $cmd _complete run \\"$script_path\\" "${{remaining_words[@]}}" 2>/dev/null)'
+    )
+    lines.append(f"{indent_str}  if [[ -n $result ]]; then")
+    lines.append(f"{indent_str}    # Parse and display completion results")
+    lines.append(f"{indent_str}    completions=()")
+    lines.append(f"{indent_str}    while IFS= read -r line; do")
+    lines.append(f"{indent_str}      completions+=($line)")
+    lines.append(f"{indent_str}    done <<< $result")
+    lines.append(f"{indent_str}    _describe 'command' completions")
+    lines.append(f"{indent_str}  fi")
+    lines.append(f"{indent_str}fi")
+    return lines
+
+
 def _generate_completion_for_path(
     completion_data: dict[tuple[str, ...], CompletionData],
     command_path: tuple[str, ...],
     indent: int = 2,
+    prog_name: str = "cyclopts",
 ) -> list[str]:
     """Generate zsh completion code for a specific command path.
 
@@ -171,6 +254,8 @@ def _generate_completion_for_path(
         Current command path.
     indent : int
         Indentation level (spaces).
+    prog_name : str
+        Program name for dynamic completion callback.
 
     Returns
     -------
@@ -182,6 +267,10 @@ def _generate_completion_for_path(
     arguments = data.arguments
     indent_str = " " * indent
     lines = []
+
+    if command_path == ("run",):
+        lines.extend(_generate_run_command_completion(arguments, indent_str, prog_name))
+        return lines
 
     args_specs = []
 
@@ -254,7 +343,7 @@ def _generate_completion_for_path(
                 sub_path = command_path + (cmd_name,)
                 if sub_path in completion_data:
                     lines.append(f"{indent_str}      {cmd_name})")
-                    sub_lines = _generate_completion_for_path(completion_data, sub_path, indent + 8)
+                    sub_lines = _generate_completion_for_path(completion_data, sub_path, indent + 8, prog_name)
                     lines.extend(sub_lines)
                     lines.append(f"{indent_str}        ;;")
 
