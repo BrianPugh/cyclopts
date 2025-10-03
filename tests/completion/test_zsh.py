@@ -389,3 +389,47 @@ def test_colon_escaping_in_descriptions(zsh_tester):
 
     assert r"\:\:" in tester.completion_script
     assert tester.validate_script_syntax()
+
+
+def test_run_command_only_special_for_cyclopts(zsh_tester):
+    """Test that 'run' command only gets dynamic completion for cyclopts CLI, not user apps.
+
+    Regression test for issue where any app with a 'run' command would get
+    dynamic completion instead of normal static completion.
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="myapp")
+
+    @app.command
+    def run(
+        script: Annotated[str, Parameter(help="Script to execute")],
+        verbose: Annotated[bool, Parameter(help="Verbose mode")] = False,
+    ):
+        """Run a script."""
+        pass
+
+    tester = zsh_tester(app, "myapp")
+
+    # Should generate normal static completion, not dynamic completion
+    # Dynamic completion has "local script_path", "local -a completions", etc.
+    assert "local script_path" not in tester.completion_script
+    assert "_complete run" not in tester.completion_script
+
+    # Should have normal argument specs for the run command
+    assert "--verbose" in tester.completion_script or "verbose" in tester.completion_script.lower()
+    assert tester.validate_script_syntax()
+
+
+def test_cyclopts_run_command_has_dynamic_completion(zsh_tester):
+    """Test that cyclopts CLI's 'run' command gets dynamic completion."""
+    from cyclopts.cli import app as cyclopts_app
+
+    tester = zsh_tester(cyclopts_app, "cyclopts")
+
+    # Should have dynamic completion for the run command
+    assert "local script_path" in tester.completion_script
+    assert "_complete run" in tester.completion_script
+    assert tester.validate_script_syntax()

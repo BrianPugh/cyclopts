@@ -198,29 +198,11 @@ def _generate_run_command_completion(
     lines.append(f"{indent_str}  remaining_words=(${{words[3,-1]}})")
     lines.append(f"{indent_str}  local result")
     lines.append(f"{indent_str}  local cmd")
-    lines.append(f"{indent_str}  local project_root")
     lines.append(f"{indent_str}  ")
-    lines.append(f"{indent_str}  # Find cyclopts command: check global PATH first")
     lines.append(f"{indent_str}  if command -v {prog_name} &>/dev/null; then")
     lines.append(f'{indent_str}    cmd="{prog_name}"')
     lines.append(f"{indent_str}  else")
-    lines.append(f"{indent_str}    # Search parent directories for .venv or poetry project")
-    lines.append(f"{indent_str}    project_root=${{script_path:h}}")
-    lines.append(f"{indent_str}    while [[ $project_root != / ]]; do")
-    lines.append(f"{indent_str}      # Check for virtual environment")
-    lines.append(f'{indent_str}      if [[ -f "$project_root/.venv/bin/{prog_name}" ]]; then')
-    lines.append(f'{indent_str}        cmd="$project_root/.venv/bin/{prog_name}"')
-    lines.append(f"{indent_str}        break")
-    lines.append(f"{indent_str}      # Check for poetry project")
-    lines.append(
-        f'{indent_str}      elif [[ -f "$project_root/pyproject.toml" ]] && command -v poetry &>/dev/null; then'
-    )
-    lines.append(f'{indent_str}        cmd="(cd \\"$project_root\\" && poetry run {prog_name})"')
-    lines.append(f"{indent_str}        break")
-    lines.append(f"{indent_str}      fi")
-    lines.append(f"{indent_str}      project_root=${{project_root:h}}")
-    lines.append(f"{indent_str}    done")
-    lines.append(f"{indent_str}    [[ -z $cmd ]] && return")
+    lines.append(f"{indent_str}    return")
     lines.append(f"{indent_str}  fi")
     lines.append(f"{indent_str}  # Call back into cyclopts to get dynamic completions from the script")
     lines.append(
@@ -268,7 +250,7 @@ def _generate_completion_for_path(
     indent_str = " " * indent
     lines = []
 
-    if command_path == ("run",):
+    if command_path == ("run",) and prog_name == "cyclopts":
         lines.extend(_generate_run_command_completion(arguments, indent_str, prog_name))
         return lines
 
