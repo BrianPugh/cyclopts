@@ -36,6 +36,7 @@ poetry run cyclopts-demo server start --help
 - **files** - File operations with path and format parameters
 - **deploy** - Deployment with environment, region, and flags
 - **process** - Item processing with lists and validation
+- **install-completion** - Install shell completion (demonstrates `app.register_install_completion()`)
 - **database** - Database management group
   - `connect` - Database connection
   - `migrate` - Run migrations

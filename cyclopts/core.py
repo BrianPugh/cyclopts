@@ -1995,6 +1995,167 @@ class App:
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
+    def install_completion(
+        self,
+        *,
+        shell: Literal["zsh", "bash", "fish"] | None = None,
+        output: Path | None = None,
+    ) -> tuple[Path, Literal["zsh", "bash", "fish"]]:
+        """Install shell completion script to appropriate location.
+
+        Generates and writes the completion script to a shell-specific location.
+
+        Parameters
+        ----------
+        shell : Literal["zsh", "bash", "fish"] | None
+            Shell type for completion. If not specified, attempts to auto-detect current shell.
+        output : Path | None
+            Output path for the completion script. If not specified, uses shell-specific default:
+            - zsh: ~/.zsh/completions/_<prog_name>
+            - bash: ~/.bash_completion
+            - fish: ~/.config/fish/completions/<prog_name>.fish
+
+        Returns
+        -------
+        tuple[Path, Literal["zsh", "bash", "fish"]]
+            Tuple of (install_path, shell_type).
+
+        Examples
+        --------
+        Auto-detect shell and install:
+
+        >>> app = App(name="myapp")
+        >>> path, shell = app.install_completion()
+
+        Install for specific shell:
+
+        >>> path, shell = app.install_completion(shell="zsh")
+
+        Install to custom path:
+
+        >>> path, shell = app.install_completion(output=Path("/custom/path"))
+
+        Raises
+        ------
+        ShellDetectionError
+            If shell is None and auto-detection fails.
+        ValueError
+            If shell type is unsupported.
+        """
+        from cyclopts.completion.detect import detect_shell
+
+        if shell is None:
+            shell = detect_shell()
+
+        script_content = self.generate_completion(shell=shell)
+
+        if output is None:
+            home = Path.home()
+            if shell == "zsh":
+                zsh_completions = home / ".zsh" / "completions"
+                zsh_completions.mkdir(parents=True, exist_ok=True)
+                output = zsh_completions / f"_{self.name[0]}"
+            elif shell == "bash":
+                output = home / ".bash_completion"
+            elif shell == "fish":
+                fish_completions = home / ".config" / "fish" / "completions"
+                fish_completions.mkdir(parents=True, exist_ok=True)
+                output = fish_completions / f"{self.name[0]}.fish"
+            else:
+                raise ValueError(f"Unsupported shell: {shell}")
+
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(script_content)
+
+        return output, shell
+
+    def register_install_completion(
+        self,
+        name: str | Iterable[str] = "--install-completion",
+    ) -> None:
+        """Register a command for installing shell completion.
+
+        This is a convenience method that creates a command which calls
+        :meth:`install_completion`. For more control over the command
+        implementation, users can manually define their own command.
+
+        Parameters
+        ----------
+        name : str | Iterable[str]
+            Command name(s) for the install completion command.
+            Defaults to "--install-completion".
+
+        Examples
+        --------
+        Register install-completion command:
+
+        >>> app = App(name="myapp")
+        >>> app.register_install_completion()
+        >>> app()  # Now responds to: myapp --install-completion
+
+        Use a custom command name:
+
+        >>> app.register_install_completion(name="--setup-completion")
+
+        See Also
+        --------
+        install_completion : The underlying method that performs the installation.
+        """
+
+        def _install_completion_command(
+            *,
+            shell: Annotated[Literal["zsh", "bash", "fish"] | None, Parameter()] = None,
+            output: Annotated[Path | None, Parameter(name=["-o", "--output"])] = None,
+        ):
+            """Install shell completion for this application.
+
+            This command generates and installs the completion script to the appropriate
+            location for your shell. After installation, you may need to restart your
+            shell or source your shell configuration file.
+
+            Parameters
+            ----------
+            shell : Literal["zsh", "bash", "fish"] | None
+                Shell type for completion. If not specified, attempts to auto-detect current shell.
+            output : Path | None
+                Output path for the completion script. If not specified, uses shell-specific default.
+            """
+            from cyclopts.completion.detect import ShellDetectionError
+
+            try:
+                install_path, detected_shell = self.install_completion(shell=shell, output=output)
+            except ShellDetectionError:
+                print(
+                    "Could not auto-detect shell. Please specify --shell explicitly.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            print(f"✓ Completion script installed to {install_path}")
+
+            if detected_shell == "zsh":
+                completion_dir = install_path.parent
+                print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
+                print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
+                print(f"    fpath=({completion_dir} $fpath)")
+                print("    autoload -Uz compinit && compinit")
+                print("\nThen restart your shell or run: exec zsh")
+            elif detected_shell == "bash":
+                print("\nTo enable completions, source the completion file:")
+                print("  Add this to your ~/.bashrc:")
+                print("    [ -f ~/.bash_completion ] && source ~/.bash_completion")
+                print("\nThen restart your shell or run: source ~/.bashrc")
+            elif detected_shell == "fish":
+                print("\nCompletions are automatically loaded in fish.")
+                print("Restart your shell or run: source ~/.config/fish/config.fish")
+
+        self.command(
+            _install_completion_command,
+            name=name,
+            help_flags=[],
+            version_flags=[],
+        )
+
     def interactive_shell(
         self,
         prompt: str = "$ ",
