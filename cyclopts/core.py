@@ -348,8 +348,26 @@ class App:
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
-    # We will populate this attribute ourselves after initialization
-    _instantiating_module: ModuleType | None = field(init=False, default=None)
+    _instantiating_module_name: str | None = field(init=False, default=None, repr=False)
+    """Module name (e.g., '__main__' or 'mypackage.cli') captured during App initialization.
+
+    Captured from the calling frame's __name__ for lazy module resolution and automatic
+    version detection. Populated in __attrs_post_init__ via frame introspection.
+    Used by the _instantiating_module property to lazily resolve the actual module object.
+
+    This optimization avoids the expensive inspect.getmodule() call at init time,
+    deferring it until the module is actually needed (typically for --version).
+    """
+
+    _instantiating_module_cache: ModuleType | None | type[UNSET] = field(init=False, default=UNSET, repr=False)
+    """Cached module object resolved from _instantiating_module_name.
+
+    Starts as UNSET sentinel value. On first access via the _instantiating_module property,
+    the module name is resolved to a module object from sys.modules and cached here.
+    Subsequent accesses return this cached value without re-resolution.
+
+    Set to None if module name was not captured or module is not in sys.modules.
+    """
 
     _fallback_console: Optional["Console"] = field(init=False, default=None)
 
@@ -360,16 +378,17 @@ class App:
         self.help_flags = self._help_flags
         self.version_flags = self._version_flags
 
+        # Capture the module name from the instantiating frame.
+        # This is cheap (just dict lookup) compared to inspect.getmodule().
         # inspect.stack()[2] is needed in attrs class because the call stack is deeper:
         # [0]: __attrs_post_init__
         # [1]: the attrs-generated __init__
         # [2]: the caller who created the instance
         try:
-            # self._instantiating_module = inspect.getmodule(inspect.stack()[2])
-            self._instantiating_module = inspect.getmodule(sys._getframe(2))
-        except IndexError:
-            # Fallback in case the stack is not as deep as expected
-            self._instantiating_module = None
+            frame = sys._getframe(2)
+            self._instantiating_module_name = frame.f_globals.get("__name__")
+        except (IndexError, AttributeError):
+            self._instantiating_module_name = None
 
     ###########
     # Methods #
@@ -559,6 +578,16 @@ class App:
     @console.setter
     def console(self, console: Optional["Console"]):
         self._console = console
+
+    @property
+    def _instantiating_module(self) -> ModuleType | None:
+        """Lazily resolve the module name to a module object."""
+        if self._instantiating_module_cache is UNSET:
+            if self._instantiating_module_name:
+                self._instantiating_module_cache = sys.modules.get(self._instantiating_module_name)
+            else:
+                self._instantiating_module_cache = None
+        return cast(ModuleType | None, self._instantiating_module_cache)
 
     def _get_fallback_version_string(self, default: str = "0.0.0") -> str:
         """Get the version string with multiple fallback strategies.
@@ -2039,7 +2068,7 @@ class TestFramework(str, Enum):
     PYTEST = "pytest"
 
 
-@lru_cache  # Will always be the same for a given session.
+@lru_cache
 def _detect_test_framework() -> TestFramework:
     """Detects if we are currently being ran in a test framework.
 
