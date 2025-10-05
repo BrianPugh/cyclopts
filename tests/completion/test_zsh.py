@@ -433,3 +433,164 @@ def test_cyclopts_run_command_has_dynamic_completion(zsh_tester):
     assert "local script_path" in tester.completion_script
     assert "_complete run" in tester.completion_script
     assert tester.validate_script_syntax()
+
+
+def test_empty_iterable_flag_completion(zsh_tester):
+    """Test that --empty-* flags for list parameters are treated as flags.
+
+    Regression test for issue where --empty-items on list[str] parameters
+    would expect a value instead of being treated as a flag.
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="listapp")
+
+    @app.command
+    def process(
+        items: Annotated[list[str], Parameter(help="Items to process")],
+        tags: Annotated[list[str] | None, Parameter(help="Optional tags")] = None,
+        count: Annotated[int, Parameter(help="Count")] = 1,
+    ):
+        """Process items."""
+        pass
+
+    tester = zsh_tester(app, "listapp")
+
+    # Both positive and negative flags should be present
+    assert "--items" in tester.completion_script
+    assert "--empty-items" in tester.completion_script
+    assert "--tags" in tester.completion_script
+    assert "--empty-tags" in tester.completion_script
+    assert "--count" in tester.completion_script
+
+    # Negative flags should be formatted as flags (no trailing :action)
+    # They should have the format '--empty-items[description]' not '--empty-items[description]:empty-items'
+    assert "'--empty-items[Items to process]'" in tester.completion_script
+    assert "'--empty-tags[Optional tags]'" in tester.completion_script
+
+    # Positive names should expect values (have :action or :name suffix)
+    lines_with_items = [line for line in tester.completion_script.split("\n") if "'--items[" in line]
+    assert any(
+        ":items:" in line or ":items'" in line for line in lines_with_items
+    ), "Positive --items flag should expect a value"
+
+    assert tester.validate_script_syntax()
+
+
+def test_completion_after_empty_flag(zsh_tester):
+    """Test that completion works after using an --empty-* flag.
+
+    Regression test for: cyclopts-demo process --empty-items --<TAB> should show other options.
+    """
+    pexpect = pytest.importorskip("pexpect")
+
+    import tempfile
+    import time
+    from pathlib import Path
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="testapp")
+
+    @app.command
+    def process(
+        items: Annotated[list[str], Parameter(help="Items to process")],
+        count: Annotated[int, Parameter(help="Count")] = 1,
+        verbose: Annotated[bool, Parameter(help="Verbose")] = False,
+    ):
+        """Process items."""
+        pass
+
+    tester = zsh_tester(app, "testapp")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        comp_file = tmpdir / "_testapp"
+        comp_file.write_text(tester.completion_script)
+
+        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
+
+        try:
+            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
+
+            child.sendline(f"fpath=({tmpdir} $fpath)")
+            child.expect(["% ", "# ", r"\$ "])
+
+            child.sendline("autoload -Uz compinit && compinit -u")
+            child.expect(["% ", "# ", r"\$ "])
+
+            # Type: testapp process --empty-items --c<TAB>
+            child.send("testapp process --empty-items --c")
+            child.send("\t")
+
+            time.sleep(0.3)
+
+            child.send(" MARKER\r")
+
+            child.expect(["% ", "# ", r"\$ "], timeout=2)
+            output = child.before
+
+            import re
+
+            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
+            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
+            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
+
+            # Should complete to --count
+            assert (
+                "--count" in clean_output and "MARKER" in clean_output
+            ), f"Expected --count in output, got: {clean_output}"
+
+        finally:
+            child.close()
+
+
+def test_positional_or_keyword_literal_completion(zsh_tester):
+    """Test that POSITIONAL_OR_KEYWORD Literal arguments generate positional completion.
+
+    Regression test for issue where 'cyclopts-demo deploy d<TAB>' should complete
+    to 'dev' but no completions were shown. The environment parameter is
+    POSITIONAL_OR_KEYWORD (not positional-only) and has Literal choices.
+    """
+    from typing import Literal
+
+    from cyclopts import App
+
+    app = App(name="testapp")
+
+    @app.command
+    def deploy(
+        environment: Literal["dev", "staging", "production"],
+        region: Literal["us-east-1", "us-west-2"] = "us-east-1",
+    ):
+        """Deploy to environment.
+
+        Parameters
+        ----------
+        environment : Literal["dev", "staging", "production"]
+            Target environment.
+        region : Literal["us-east-1", "us-west-2"]
+            AWS region.
+        """
+        pass
+
+    tester = zsh_tester(app, "testapp")
+
+    # Should have positional spec for first argument (1-indexed in zsh)
+    assert "'1:Target environment.:(dev staging production)'" in tester.completion_script or (
+        "1:Target environment.:(dev staging production)" in tester.completion_script
+    )
+
+    # Should also have keyword spec for --environment
+    assert "--environment" in tester.completion_script
+    assert "(dev staging production)" in tester.completion_script
+
+    # Should have positional spec for second argument
+    assert "'2:AWS region.:(us-east-1 us-west-2)'" in tester.completion_script or (
+        "2:AWS region.:(us-east-1 us-west-2)" in tester.completion_script
+    )
+
+    assert tester.validate_script_syntax()

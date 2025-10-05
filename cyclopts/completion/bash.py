@@ -43,6 +43,10 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     5. Support option completion with compgen -W
     6. Support file completion with compgen -f
     7. Support choice completion with compgen -W
+    8. Handle negative flags (--empty-*, --no-*) separately from positive names:
+       - Iterate argument.parameter.name for positive flags (use normal logic)
+       - Iterate argument.negatives for negative flags (always treat as flags)
+       - See zsh.py:_generate_keyword_specs() for reference implementation
 
     Parameters
     ----------

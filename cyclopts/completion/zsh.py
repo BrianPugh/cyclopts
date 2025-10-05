@@ -217,7 +217,8 @@ def _generate_completion_for_path(
     args_specs = []
 
     # Separate positional from keyword arguments
-    positional_args = [arg for arg in arguments if arg.is_positional_only() and arg.show]
+    # Include all arguments with an index (both positional-only and positional-or-keyword)
+    positional_args = [arg for arg in arguments if arg.index is not None and arg.show]
     keyword_args = [arg for arg in arguments if not arg.is_positional_only() and arg.show]
 
     # Sort positionals by index (should never be None for positional-only args)
@@ -380,8 +381,8 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
-    # Generate specs for each name
-    for name in argument.names:
+    # Generate specs for positive names (from parameter.name)
+    for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
         if flag and not action:
@@ -390,6 +391,14 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
             spec = f"'{name}[{desc}]:{name.lstrip('-')}:{action}'"
         else:
             spec = f"'{name}[{desc}]:{name.lstrip('-')}'"
+        specs.append(spec)
+
+    # Generate specs for negative names (always flags, consume no tokens)
+    for name in argument.negatives:
+        if not name.startswith("-"):
+            continue
+        # Negative flags always consume zero tokens (e.g., --empty-items, --no-verbose)
+        spec = f"'{name}[{desc}]'"
         specs.append(spec)
 
     return specs
@@ -409,7 +418,15 @@ def _generate_positional_spec(argument: "Argument") -> str:
         Zsh positional argument spec.
     """
     desc = _get_description_from_argument(argument)
-    action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
+
+    # Check for choices first (Literal/Enum types)
+    choices = argument.get_choices()
+    if choices:
+        escaped_choices = [_escape_completion_choice(c) for c in choices]
+        choices_str = " ".join(escaped_choices)
+        action = f"({choices_str})"
+    else:
+        action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
     if argument.is_var_positional():
         # Variadic positional (*args)
