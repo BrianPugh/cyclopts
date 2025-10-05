@@ -205,9 +205,7 @@ def _generate_run_command_completion(
     lines.append(f"{indent_str}    return")
     lines.append(f"{indent_str}  fi")
     lines.append(f"{indent_str}  # Call back into cyclopts to get dynamic completions from the script")
-    lines.append(
-        f'{indent_str}  result=$(eval $cmd _complete run \\"$script_path\\" "${{remaining_words[@]}}" 2>/dev/null)'
-    )
+    lines.append(f'{indent_str}  result=$($cmd _complete run "$script_path" "${{remaining_words[@]}}" 2>/dev/null)')
     lines.append(f"{indent_str}  if [[ -n $result ]]; then")
     lines.append(f"{indent_str}    # Parse and display completion results")
     lines.append(f"{indent_str}    completions=()")
@@ -349,12 +347,21 @@ def _escape_completion_choice(choice: str) -> str:
     str
         Escaped choice value safe for zsh completion.
     """
+    choice = re.sub(r"[\x00-\x1f\x7f]", "", choice)
     choice = choice.replace("\\", "\\\\")
+    choice = choice.replace("'", r"'\''")
+    choice = choice.replace("`", "\\`")
+    choice = choice.replace("$", "\\$")
+    choice = choice.replace('"', '\\"')
     choice = choice.replace(" ", "\\ ")
     choice = choice.replace("(", "\\(")
     choice = choice.replace(")", "\\)")
     choice = choice.replace("[", "\\[")
     choice = choice.replace("]", "\\]")
+    choice = choice.replace(";", "\\;")
+    choice = choice.replace("|", "\\|")
+    choice = choice.replace("&", "\\&")
+    choice = choice.replace(":", "\\:")
     return choice
 
 
@@ -434,8 +441,8 @@ def _generate_positional_spec(argument: "Argument") -> str:
         return f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
 
     # Regular positional - zsh uses 1-based indexing
-    # Index should never be None for positional-only arguments
-    assert argument.index is not None, "Positional-only argument missing index"
+    if argument.index is None:
+        raise ValueError(f"Positional-only argument {argument.names} missing index")
     pos = argument.index + 1
     return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
