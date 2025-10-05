@@ -36,24 +36,23 @@ Example
 """
 
 import re
-import warnings
-from dataclasses import dataclass
-from pathlib import Path
 from textwrap import dedent
 from textwrap import indent as textwrap_indent
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING
+
+from cyclopts.completion._base import (
+    CompletionAction,
+    CompletionData,
+    clean_description_text,
+    extract_completion_data,
+    get_completion_action,
+    is_flag_argument,
+)
+from cyclopts.help.help import docstring_parse
 
 if TYPE_CHECKING:
     from cyclopts import App
     from cyclopts.argument import Argument, ArgumentCollection
-
-
-@dataclass
-class CompletionData:
-    """Completion data for a command path."""
-
-    arguments: "ArgumentCollection"
-    commands: list["App"]
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -95,47 +94,7 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
     if not prog_name or not re.match(r"^[a-zA-Z0-9_-]+$", prog_name):
         raise ValueError(f"Invalid prog_name: {prog_name!r}. Must be alphanumeric with hyphens/underscores.")
 
-    completion_data: dict[tuple[str, ...], CompletionData] = {}
-
-    def extract_completion_data(command_path: tuple[str, ...] = ()):
-        """Recursively extract completion data for command and subcommands."""
-        from cyclopts.argument import ArgumentCollection
-        from cyclopts.group_extractors import groups_from_app
-
-        try:
-            _, execution_path, _ = app.parse_commands(list(command_path))
-            command_app = execution_path[-1]
-        except Exception as e:
-            warnings.warn(f"Failed to extract completion data for command path {command_path!r}: {e}", stacklevel=2)
-            completion_data[command_path] = CompletionData(arguments=ArgumentCollection(), commands=[])
-            return
-
-        # Get arguments from all contributing apps (including meta apps)
-
-        arguments = ArgumentCollection()
-        apps_for_params = app._get_resolution_context(execution_path)
-        for subapp in apps_for_params:
-            if subapp.default_command:
-                app_arguments = subapp.assemble_argument_collection(parse_docstring=True)
-                arguments.extend(app_arguments)
-
-        # Get subcommands
-        commands = []
-        for group, subapps in groups_from_app(command_app):
-            if group.show:
-                for subapp in subapps:
-                    if subapp.show and subapp not in commands:
-                        commands.append(subapp)
-
-        completion_data[command_path] = CompletionData(arguments=arguments, commands=commands)
-
-        # Recurse for subcommands
-        for cmd_app in commands:
-            for cmd_name in cmd_app.name:
-                if not cmd_name.startswith("-"):
-                    extract_completion_data(command_path + (cmd_name,))
-
-    extract_completion_data()
+    completion_data = extract_completion_data(app)
 
     lines = [
         f"#compdef {prog_name}",
@@ -339,7 +298,7 @@ def _generate_completion_for_path(
 
 
 def _escape_completion_choice(choice: str) -> str:
-    """Escape special characters in a completion choice value.
+    """Escape special characters in a completion choice value for zsh.
 
     Parameters
     ----------
@@ -369,6 +328,30 @@ def _escape_completion_choice(choice: str) -> str:
     return choice
 
 
+def _escape_zsh_description(text: str) -> str:
+    """Escape special characters in description text for zsh.
+
+    Parameters
+    ----------
+    text : str
+        Cleaned description text.
+
+    Returns
+    -------
+    str
+        Escaped description safe for zsh completion.
+    """
+    text = text.replace("\\", "\\\\")
+    text = text.replace("`", "\\`")
+    text = text.replace("$", "\\$")
+    text = text.replace('"', '\\"')
+    text = text.replace("'", r"'\''")
+    text = text.replace(":", r"\:")
+    text = text.replace("[", r"\[")
+    text = text.replace("]", r"\]")
+    return text
+
+
 def _generate_keyword_specs(argument: "Argument") -> list[str]:
     """Generate zsh _arguments specs for a keyword argument.
 
@@ -382,21 +365,10 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
     list[str]
         List of zsh argument specs.
     """
-    from cyclopts.annotations import is_union, resolve_annotated
-    from cyclopts.utils import is_class_and_subclass
-
     specs = []
     desc = _get_description_from_argument(argument)
 
-    # Determine if this is a flag (boolean)
-    is_flag = True
-    actual_type = resolve_annotated(argument.hint)
-    if is_union(actual_type):
-        for arg_type in get_args(actual_type):
-            if arg_type is not type(None):
-                actual_type = arg_type
-                break
-    is_flag = actual_type is bool or is_class_and_subclass(actual_type, bool)
+    flag = is_flag_argument(argument)
 
     # Determine completion action
     action = ""
@@ -405,15 +377,15 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
         escaped_choices = [_escape_completion_choice(c) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
-        is_flag = False
+        flag = False
     else:
-        action = _get_completion_action_from_type(argument.hint)
+        action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
     # Generate specs for each name
     for name in argument.names:
         if not name.startswith("-"):
             continue
-        if is_flag and not action:
+        if flag and not action:
             spec = f"'{name}[{desc}]'"
         elif action:
             spec = f"'{name}[{desc}]:{name.lstrip('-')}:{action}'"
@@ -438,7 +410,7 @@ def _generate_positional_spec(argument: "Argument") -> str:
         Zsh positional argument spec.
     """
     desc = _get_description_from_argument(argument)
-    action = _get_completion_action_from_type(argument.hint)
+    action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
     if argument.is_var_positional():
         # Variadic positional (*args)
@@ -475,39 +447,23 @@ def _generate_keyword_specs_for_command(cmd_app: "App") -> list[str]:
     return specs
 
 
-def _get_completion_action_from_type(type_hint: Any) -> str:
-    """Get zsh completion action from type hint.
-
-    Handles Union and Optional types by extracting the non-None type.
+def _map_completion_action_to_zsh(action: CompletionAction) -> str:
+    """Map shell-agnostic completion action to zsh-specific completion command.
 
     Parameters
     ----------
-    type_hint : Any
-        Type annotation.
+    action : CompletionAction
+        Shell-agnostic completion action.
 
     Returns
     -------
     str
-        Zsh completion action (e.g., "_files", "_directories", or "").
+        Zsh completion command (e.g., "_files", "_directories", or "").
     """
-    from typing import get_origin
-
-    from cyclopts.annotations import is_union
-    from cyclopts.utils import is_class_and_subclass
-
-    if is_union(type_hint):
-        for arg in get_args(type_hint):
-            if arg is not type(None):
-                action = _get_completion_action_from_type(arg)
-                if action:
-                    return action
-        return ""
-
-    target_type = get_origin(type_hint) or type_hint
-
-    if target_type is Path or is_class_and_subclass(target_type, Path):
+    if action == CompletionAction.FILES:
         return "_files"
-
+    elif action == CompletionAction.DIRECTORIES:
+        return "_directories"
     return ""
 
 
@@ -524,24 +480,8 @@ def _get_description_from_argument(argument: "Argument") -> str:
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    text = argument.parameter.help or ""
-
-    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
-    text = text.replace("\\", "\\\\")
-    text = text.replace("`", "\\`")
-    text = text.replace("$", "\\$")
-    text = text.replace('"', '\\"')
-    text = text.replace("'", r"'\''")
-    text = text.replace(":", r"\:")
-    text = text.replace("[", r"\[")
-    text = text.replace("]", r"\]")
-
-    text = re.sub(r"\s+", " ", text).strip()
-
-    if len(text) > 80:
-        text = text[:77] + "..."
-
-    return text
+    text = clean_description_text(argument.parameter.help or "")
+    return _escape_zsh_description(text)
 
 
 def _safe_get_description_from_app(cmd_app: "App") -> str:
@@ -557,8 +497,6 @@ def _safe_get_description_from_app(cmd_app: "App") -> str:
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    from cyclopts.help.help import docstring_parse
-
     if not cmd_app.help:
         return ""
 
@@ -568,19 +506,5 @@ def _safe_get_description_from_app(cmd_app: "App") -> str:
     except Exception:
         text = str(cmd_app.help)
 
-    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
-    text = text.replace("\\", "\\\\")
-    text = text.replace("`", "\\`")
-    text = text.replace("$", "\\$")
-    text = text.replace('"', '\\"')
-    text = text.replace("'", r"'\''")
-    text = text.replace(":", r"\:")
-    text = text.replace("[", r"\[")
-    text = text.replace("]", r"\]")
-
-    text = re.sub(r"\s+", " ", text).strip()
-
-    if len(text) > 80:
-        text = text[:77] + "..."
-
-    return text
+    text = clean_description_text(text)
+    return _escape_zsh_description(text)

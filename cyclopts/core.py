@@ -2024,7 +2024,9 @@ class App:
 
             return generate_completion_script(self, prog_name)
         elif shell == "bash":
-            raise NotImplementedError("Bash completion support is not yet implemented")
+            from cyclopts.completion.bash import generate_completion_script
+
+            return generate_completion_script(self, prog_name)
         elif shell == "fish":
             raise NotImplementedError("Fish completion support is not yet implemented")
         else:
@@ -2174,6 +2176,8 @@ class App:
             elif shell == "fish":
                 print("\nCompletions are automatically loaded in fish.")
                 print("Restart your shell or run: source ~/.config/fish/config.fish")
+            else:
+                raise NotImplementedError
 
         self.command(
             _install_completion_command,
