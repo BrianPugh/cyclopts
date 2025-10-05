@@ -216,6 +216,41 @@ def _group_converter(input_value: None | str | Group) -> Group | None:
         raise TypeError
 
 
+def _get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_name: str) -> Path:
+    """Get the default completion script path for a given shell.
+
+    Parameters
+    ----------
+    shell : Literal["zsh", "bash", "fish"]
+        Shell type.
+    prog_name : str
+        Program name for the completion script.
+
+    Returns
+    -------
+    Path
+        Default installation path for the shell.
+
+    Raises
+    ------
+    ValueError
+        If shell type is unsupported.
+    """
+    home = Path.home()
+    if shell == "zsh":
+        zsh_completions = home / ".zsh" / "completions"
+        zsh_completions.mkdir(parents=True, exist_ok=True)
+        return zsh_completions / f"_{prog_name}"
+    elif shell == "bash":
+        return home / ".bash_completion"
+    elif shell == "fish":
+        fish_completions = home / ".config" / "fish" / "completions"
+        fish_completions.mkdir(parents=True, exist_ok=True)
+        return fish_completions / f"{prog_name}.fish"
+    else:
+        raise ValueError(f"Unsupported shell: {shell}")
+
+
 @define
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
@@ -2000,7 +2035,7 @@ class App:
         *,
         shell: Literal["zsh", "bash", "fish"] | None = None,
         output: Path | None = None,
-    ) -> tuple[Path, Literal["zsh", "bash", "fish"]]:
+    ) -> Path:
         """Install shell completion script to appropriate location.
 
         Generates and writes the completion script to a shell-specific location.
@@ -2017,23 +2052,23 @@ class App:
 
         Returns
         -------
-        tuple[Path, Literal["zsh", "bash", "fish"]]
-            Tuple of (install_path, shell_type).
+        Path
+            Path where the completion script was installed.
 
         Examples
         --------
         Auto-detect shell and install:
 
         >>> app = App(name="myapp")
-        >>> path, shell = app.install_completion()
+        >>> path = app.install_completion()
 
         Install for specific shell:
 
-        >>> path, shell = app.install_completion(shell="zsh")
+        >>> path = app.install_completion(shell="zsh")
 
         Install to custom path:
 
-        >>> path, shell = app.install_completion(output=Path("/custom/path"))
+        >>> path = app.install_completion(output=Path("/custom/path"))
 
         Raises
         ------
@@ -2050,24 +2085,12 @@ class App:
         script_content = self.generate_completion(shell=shell)
 
         if output is None:
-            home = Path.home()
-            if shell == "zsh":
-                zsh_completions = home / ".zsh" / "completions"
-                zsh_completions.mkdir(parents=True, exist_ok=True)
-                output = zsh_completions / f"_{self.name[0]}"
-            elif shell == "bash":
-                output = home / ".bash_completion"
-            elif shell == "fish":
-                fish_completions = home / ".config" / "fish" / "completions"
-                fish_completions.mkdir(parents=True, exist_ok=True)
-                output = fish_completions / f"{self.name[0]}.fish"
-            else:
-                raise ValueError(f"Unsupported shell: {shell}")
+            output = _get_default_completion_path(shell, self.name[0])
 
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(script_content)
 
-        return output, shell
+        return output
 
     def register_install_completion(
         self,
@@ -2120,32 +2143,35 @@ class App:
             output : Path | None
                 Output path for the completion script. If not specified, uses shell-specific default.
             """
-            from cyclopts.completion.detect import ShellDetectionError
+            from cyclopts.completion.detect import ShellDetectionError, detect_shell
 
-            try:
-                install_path, detected_shell = self.install_completion(shell=shell, output=output)
-            except ShellDetectionError:
-                print(
-                    "Could not auto-detect shell. Please specify --shell explicitly.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+            if shell is None:
+                try:
+                    shell = detect_shell()
+                except ShellDetectionError:
+                    print(
+                        "Could not auto-detect shell. Please specify --shell explicitly.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+
+            install_path = self.install_completion(shell=shell, output=output)
 
             print(f"✓ Completion script installed to {install_path}")
 
-            if detected_shell == "zsh":
+            if shell == "zsh":
                 completion_dir = install_path.parent
                 print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
                 print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
                 print(f"    fpath=({completion_dir} $fpath)")
                 print("    autoload -Uz compinit && compinit")
                 print("\nThen restart your shell or run: exec zsh")
-            elif detected_shell == "bash":
+            elif shell == "bash":
                 print("\nTo enable completions, source the completion file:")
                 print("  Add this to your ~/.bashrc:")
                 print("    [ -f ~/.bash_completion ] && source ~/.bash_completion")
                 print("\nThen restart your shell or run: source ~/.bashrc")
-            elif detected_shell == "fish":
+            elif shell == "fish":
                 print("\nCompletions are automatically loaded in fish.")
                 print("Restart your shell or run: source ~/.config/fish/config.fish")
 

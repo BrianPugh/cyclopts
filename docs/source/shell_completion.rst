@@ -44,15 +44,15 @@ There are two ways to enable shell completion:
       app = App(name="myapp")
 
       # Install for current shell
-      install_path, shell = app.install_completion()
-      print(f"Installed {shell} completion to {install_path}")
+      install_path = app.install_completion()
+      print(f"Installed completion to {install_path}")
 
       # Install for specific shell
-      install_path, shell = app.install_completion(shell="zsh")
+      install_path = app.install_completion(shell="zsh")
 
       # Install to custom location
       from pathlib import Path
-      install_path, shell = app.install_completion(
+      install_path = app.install_completion(
           shell="bash",
           output=Path("/custom/path/completion.sh")
       )
