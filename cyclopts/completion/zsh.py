@@ -39,6 +39,8 @@ import re
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from textwrap import dedent
+from textwrap import indent as textwrap_indent
 from typing import TYPE_CHECKING, Any, get_args
 
 if TYPE_CHECKING:
@@ -180,42 +182,44 @@ def _generate_run_command_completion(
     list[str]
         Lines of zsh completion code.
     """
-    lines = []
-    lines.append(f"{indent_str}local script_path")
-    lines.append(f"{indent_str}local -a completions")
-    lines.append(f"{indent_str}local -a remaining_words")
-    lines.append("")
-    lines.append(f"{indent_str}# If completing first argument (the script path), suggest files")
-    lines.append(f"{indent_str}if [[ $CURRENT -eq 2 ]]; then")
-    lines.append(f"{indent_str}  _files")
-    lines.append(f"{indent_str}  return")
-    lines.append(f"{indent_str}fi")
-    lines.append("")
-    lines.append(f"{indent_str}# Get absolute path to the script file")
-    lines.append(f"{indent_str}script_path=${{words[2]}}")
-    lines.append(f"{indent_str}script_path=${{script_path:a}}")
-    lines.append(f"{indent_str}if [[ -f $script_path ]]; then")
-    lines.append(f"{indent_str}  remaining_words=(${{words[3,-1]}})")
-    lines.append(f"{indent_str}  local result")
-    lines.append(f"{indent_str}  local cmd")
-    lines.append(f"{indent_str}  ")
-    lines.append(f"{indent_str}  if command -v {prog_name} &>/dev/null; then")
-    lines.append(f'{indent_str}    cmd="{prog_name}"')
-    lines.append(f"{indent_str}  else")
-    lines.append(f"{indent_str}    return")
-    lines.append(f"{indent_str}  fi")
-    lines.append(f"{indent_str}  # Call back into cyclopts to get dynamic completions from the script")
-    lines.append(f'{indent_str}  result=$($cmd _complete run "$script_path" "${{remaining_words[@]}}" 2>/dev/null)')
-    lines.append(f"{indent_str}  if [[ -n $result ]]; then")
-    lines.append(f"{indent_str}    # Parse and display completion results")
-    lines.append(f"{indent_str}    completions=()")
-    lines.append(f"{indent_str}    while IFS= read -r line; do")
-    lines.append(f"{indent_str}      completions+=($line)")
-    lines.append(f"{indent_str}    done <<< $result")
-    lines.append(f"{indent_str}    _describe 'command' completions")
-    lines.append(f"{indent_str}  fi")
-    lines.append(f"{indent_str}fi")
-    return lines
+    template = dedent(f"""\
+        local script_path
+        local -a completions
+        local -a remaining_words
+
+        # If completing first argument (the script path), suggest files
+        if [[ $CURRENT -eq 2 ]]; then
+          _files
+          return
+        fi
+
+        # Get absolute path to the script file
+        script_path=${{words[2]}}
+        script_path=${{script_path:a}}
+        if [[ -f $script_path ]]; then
+          remaining_words=(${{words[3,-1]}})
+          local result
+          local cmd
+
+          if command -v {prog_name} &>/dev/null; then
+            cmd="{prog_name}"
+          else
+            return
+          fi
+          # Call back into cyclopts to get dynamic completions from the script
+          result=$($cmd _complete run "$script_path" "${{remaining_words[@]}}" 2>/dev/null)
+          if [[ -n $result ]]; then
+            # Parse and display completion results
+            completions=()
+            while IFS= read -r line; do
+              completions+=($line)
+            done <<< $result
+            _describe 'command' completions
+          fi
+        fi""")
+
+    indented = textwrap_indent(template, indent_str)
+    return [line.rstrip() for line in indented.split("\n")]
 
 
 def _generate_completion_for_path(
