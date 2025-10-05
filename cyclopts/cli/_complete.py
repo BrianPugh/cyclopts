@@ -83,7 +83,7 @@ def _print_option_completions(app_obj: "App") -> None:
                             print(f"{name}:{desc}")
                         else:
                             print(name)
-    except (AttributeError, ValueError, TypeError):
+    except Exception:
         pass
 
 
@@ -128,5 +128,5 @@ def complete(
             current_app = execution_path[-1]
             _print_subcommand_completions(current_app)
             _print_option_completions(current_app)
-        except (ValueError, IndexError, AttributeError):
+        except Exception:
             pass
