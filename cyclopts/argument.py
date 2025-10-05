@@ -162,10 +162,6 @@ def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]])
     return inner
 
 
-def _identity_converter(type_, token):
-    return token
-
-
 def _get_annotated_discriminator(annotation):
     for meta in get_args(annotation)[1:]:
         try:
@@ -1477,6 +1473,29 @@ class Argument:
 
     def is_var_positional(self) -> bool:
         return self.field_info.kind == self.field_info.VAR_POSITIONAL
+
+    def is_flag(self) -> bool:
+        """Check if this argument is a flag (consumes no CLI tokens).
+
+        Flags are arguments that don't consume command-line tokens after the option name.
+        They typically have implicit values (e.g., `--verbose` for bool, `--no-items` for list).
+
+        Returns
+        -------
+        bool
+            True if the argument consumes zero tokens from the command line.
+
+        Examples
+        --------
+        >>> from cyclopts import Parameter
+        >>> bool_arg = Argument(hint=bool, parameter=Parameter(name="--verbose"))
+        >>> bool_arg.is_flag()
+        True
+        >>> str_arg = Argument(hint=str, parameter=Parameter(name="--name"))
+        >>> str_arg.is_flag()
+        False
+        """
+        return self.token_count() == (0, False)
 
     def get_choices(self) -> tuple[str, ...] | None:
         """Extract completion choices from type hint.

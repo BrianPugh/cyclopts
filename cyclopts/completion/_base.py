@@ -14,14 +14,13 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from cyclopts.annotations import is_union, resolve_annotated
+from cyclopts.annotations import is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.group_extractors import groups_from_app
 from cyclopts.utils import frozen, is_class_and_subclass
 
 if TYPE_CHECKING:
     from cyclopts import App
-    from cyclopts.argument import Argument
 
 
 class CompletionAction(Enum):
@@ -88,28 +87,6 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
 
     _extract()
     return completion_data
-
-
-def is_flag_argument(argument: "Argument") -> bool:
-    """Determine if an argument is a boolean flag.
-
-    Parameters
-    ----------
-    argument : Argument
-        Argument to check.
-
-    Returns
-    -------
-    bool
-        True if the argument is a boolean flag.
-    """
-    actual_type = resolve_annotated(argument.hint)
-    if is_union(actual_type):
-        for arg_type in get_args(actual_type):
-            if arg_type is not type(None):
-                actual_type = arg_type
-                break
-    return actual_type is bool or is_class_and_subclass(actual_type, bool)
 
 
 def get_completion_action(type_hint: Any) -> CompletionAction:

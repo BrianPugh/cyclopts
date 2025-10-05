@@ -46,7 +46,6 @@ from cyclopts.completion._base import (
     clean_description_text,
     extract_completion_data,
     get_completion_action,
-    is_flag_argument,
 )
 from cyclopts.help.help import docstring_parse
 
@@ -368,7 +367,7 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
     specs = []
     desc = _get_description_from_argument(argument)
 
-    flag = is_flag_argument(argument)
+    flag = argument.is_flag()
 
     # Determine completion action
     action = ""
