@@ -8,6 +8,7 @@ generators (zsh, bash, fish). It provides:
 3. Text processing utilities (without shell-specific escaping)
 """
 
+import os
 import re
 import warnings
 from enum import Enum
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from cyclopts.annotations import is_union
 from cyclopts.argument import ArgumentCollection
+from cyclopts.exceptions import CycloptsError
 from cyclopts.group_extractors import groups_from_app
 from cyclopts.utils import frozen, is_class_and_subclass
 
@@ -59,7 +61,9 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
         try:
             _, execution_path, _ = app.parse_commands(list(command_path))
             command_app = execution_path[-1]
-        except Exception as e:
+        except (CycloptsError, ValueError, TypeError, AttributeError) as e:
+            if os.environ.get("CYCLOPTS_COMPLETION_DEBUG"):
+                raise
             warnings.warn(f"Failed to extract completion data for command path {command_path!r}: {e}", stacklevel=2)
             completion_data[command_path] = CompletionData(arguments=ArgumentCollection(), commands=[])
             return

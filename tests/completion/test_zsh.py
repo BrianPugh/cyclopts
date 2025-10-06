@@ -211,7 +211,7 @@ def test_nested_command_uses_correct_word_index(zsh_tester):
 
 def test_invalid_prog_name():
     """Test that invalid prog names raise ValueError."""
-    from cyclopts.completion import generate_completion_script
+    from cyclopts.completion.zsh import generate_completion_script
 
     with pytest.raises(ValueError, match="Invalid prog_name"):
         generate_completion_script(app_basic, "foo bar")
