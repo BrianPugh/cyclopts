@@ -120,6 +120,28 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
     return CompletionAction.NONE
 
 
+def clean_choice_text(text: str) -> str:
+    """Clean choice text without shell-specific escaping.
+
+    Removes control characters and normalizes whitespace.
+    Does NOT truncate (unlike clean_description_text).
+    Shell-specific escaping should be applied after this function.
+
+    Parameters
+    ----------
+    text : str
+        Raw choice text.
+
+    Returns
+    -------
+    str
+        Cleaned text (not escaped for any specific shell).
+    """
+    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def clean_description_text(text: str, max_length: int = 80) -> str:
     """Clean description text without shell-specific escaping.
 

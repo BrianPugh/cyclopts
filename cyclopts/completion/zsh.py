@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
+    clean_choice_text,
     clean_description_text,
     extract_completion_data,
     get_completion_action,
@@ -329,17 +330,19 @@ def _generate_completion_for_path(
 def _escape_completion_choice(choice: str) -> str:
     """Escape special characters in a completion choice value for zsh.
 
+    Choice should already be cleaned via clean_choice_text() before calling this function.
+    This function only applies zsh-specific escaping.
+
     Parameters
     ----------
     choice : str
-        Raw choice value.
+        Cleaned choice value.
 
     Returns
     -------
     str
         Escaped choice value safe for zsh completion.
     """
-    choice = re.sub(r"[\x00-\x1f\x7f]", "", choice)
     choice = choice.replace("\\", "\\\\")
     choice = choice.replace("'", r"'\''")
     choice = choice.replace("`", "\\`")
@@ -403,7 +406,7 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
     action = ""
     choices = argument.get_choices()
     if choices:
-        escaped_choices = [_escape_completion_choice(c) for c in choices]
+        escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
         flag = False
@@ -451,7 +454,7 @@ def _generate_positional_spec(argument: "Argument") -> str:
     # Check for choices first (Literal/Enum types)
     choices = argument.get_choices()
     if choices:
-        escaped_choices = [_escape_completion_choice(c) for c in choices]
+        escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
     else:
