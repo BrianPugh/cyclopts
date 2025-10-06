@@ -594,3 +594,30 @@ def test_positional_or_keyword_literal_completion(zsh_tester):
     )
 
     assert tester.validate_script_syntax()
+
+
+def test_help_version_flags_in_subcommands(zsh_tester):
+    """Test that help and version flags appear in subcommand completions.
+
+    Regression test for issue where --help and --version were only available
+    in the root command but not in subcommands.
+    """
+    tester = zsh_tester(app_basic, "basic")
+
+    script_lines = tester.completion_script.split("\n")
+
+    in_deploy = False
+    deploy_section = []
+    for i, line in enumerate(script_lines):
+        if "deploy)" in line and not in_deploy:
+            in_deploy = True
+        if in_deploy:
+            deploy_section.append(line)
+            if ";;" in line and i > 0:
+                break
+
+    deploy_text = "\n".join(deploy_section)
+
+    assert "--help[Display this message and exit.]" in deploy_text
+    assert "-h[Display this message and exit.]" in deploy_text
+    assert "--version[Display application version.]" in deploy_text

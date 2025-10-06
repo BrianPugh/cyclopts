@@ -103,7 +103,15 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         "",
     ]
 
-    lines.extend(_generate_completion_for_path(completion_data, (), prog_name=prog_name))
+    lines.extend(
+        _generate_completion_for_path(
+            completion_data,
+            (),
+            prog_name=prog_name,
+            help_flags=tuple(app.help_flags) if app.help_flags else (),
+            version_flags=tuple(app.version_flags) if app.version_flags else (),
+        )
+    )
 
     lines.extend(
         [
@@ -185,6 +193,8 @@ def _generate_completion_for_path(
     command_path: tuple[str, ...],
     indent: int = 2,
     prog_name: str = "cyclopts",
+    help_flags: tuple[str, ...] = (),
+    version_flags: tuple[str, ...] = (),
 ) -> list[str]:
     """Generate zsh completion code for a specific command path.
 
@@ -198,6 +208,10 @@ def _generate_completion_for_path(
         Indentation level (spaces).
     prog_name : str
         Program name for dynamic completion callback.
+    help_flags : tuple[str, ...]
+        Help flag names (e.g., ('--help', '-h')).
+    version_flags : tuple[str, ...]
+        Version flag names (e.g., ('--version',)).
 
     Returns
     -------
@@ -230,10 +244,23 @@ def _generate_completion_for_path(
         args_specs.extend(specs)
 
     # Check for flag commands (commands that look like options)
+    flag_command_names = set()
     for cmd_app in commands:
         if any(name.startswith("-") for name in cmd_app.name):
             specs = _generate_keyword_specs_for_command(cmd_app)
             args_specs.extend(specs)
+            flag_command_names.update(cmd_app.name)
+
+    # Add help and version flags to all command paths (if not already added as flag commands)
+    for flag in help_flags:
+        if flag.startswith("-") and flag not in flag_command_names:
+            spec = f"'{flag}[Display this message and exit.]'"
+            args_specs.append(spec)
+
+    for flag in version_flags:
+        if flag.startswith("-") and flag not in flag_command_names:
+            spec = f"'{flag}[Display application version.]'"
+            args_specs.append(spec)
 
     has_non_flag_commands = any(not cmd_name.startswith("-") for cmd in commands for cmd_name in cmd.name)
 
@@ -286,7 +313,9 @@ def _generate_completion_for_path(
                 sub_path = command_path + (cmd_name,)
                 if sub_path in completion_data:
                     lines.append(f"{indent_str}      {cmd_name})")
-                    sub_lines = _generate_completion_for_path(completion_data, sub_path, indent + 8, prog_name)
+                    sub_lines = _generate_completion_for_path(
+                        completion_data, sub_path, indent + 8, prog_name, help_flags, version_flags
+                    )
                     lines.extend(sub_lines)
                     lines.append(f"{indent_str}        ;;")
 
