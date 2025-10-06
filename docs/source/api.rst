@@ -972,6 +972,16 @@ API
          my_file.txt
          my_file.pdf
 
+      When ``consume_multiple=True``, providing the keyword flag without any values will create an empty container, equivalent to using the :attr:`negative_iterable` prefix (e.g., ``--empty-ext``):
+
+      .. code-block:: console
+
+         $ my-program --name "my_file" --ext
+         # No output - ext is an empty list []
+
+         $ my-program --name "my_file" --empty-ext
+         # No output - ext is an empty list []
+
       If the parameter is specified **by keyword** and ``consume_multiple=False`` (the default), only a single element worth of CLI tokens will be consumed.
 
       .. code-block:: python
