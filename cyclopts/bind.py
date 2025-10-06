@@ -6,9 +6,10 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_origin
 
 from cyclopts._convert import _bool
+from cyclopts.annotations import resolve_optional
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -193,11 +194,25 @@ def _parse_kw_and_flags(
                             cli_values.append(token)
                             skip_next_iterations += 1
 
-                if not cli_values or len(cli_values) % tokens_per_element:
+                if not cli_values:
+                    # No values were consumed after the keyword
+                    if consume_all and argument.parameter.consume_multiple:
+                        # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
+                        hint = resolve_optional(argument.hint)
+                        empty_container = (get_origin(hint) or hint)()
+                        argument.append(
+                            CliToken(keyword=cli_option, implicit_value=empty_container, keys=leftover_keys)
+                        )
+                    else:
+                        # Non-iterables or consume_multiple=False require at least one value
+                        raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
+                elif len(cli_values) % tokens_per_element:
+                    # For multi-token elements (e.g., tuples), ensure we have complete sets
                     raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
-
-                for index, cli_value in enumerate(cli_values):
-                    argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
+                else:
+                    # Normal case: append the consumed values
+                    for index, cli_value in enumerate(cli_values):
+                        argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
 
     unused_tokens.extend(positional_only_tokens)
     return unused_tokens
