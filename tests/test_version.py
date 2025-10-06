@@ -118,3 +118,27 @@ def test_version_print_sync_callable_end_to_end(app, console):
         app(["--version"], console=console)
 
     assert "sync-foo\n" == capture.get()
+
+
+def test_help_and_version_flags_together(app, console):
+    """Test that help flag takes priority when both --help and --version are provided.
+
+    Regression test for bug where having both flags caused NameError on Console forward reference.
+    """
+    from pathlib import Path
+    from typing import Optional
+
+    @app.command
+    def files(
+        input_file: Path,
+        output_file: Optional[Path] = None,
+    ):
+        """Work with files."""
+        pass
+
+    with console.capture() as capture:
+        app(["files", "-h", "--version"], console=console)
+
+    output = capture.get()
+    assert "Work with files" in output
+    assert "INPUT-FILE" in output

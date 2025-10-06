@@ -1302,6 +1302,13 @@ class App:
                     if help_flag_index is not None:
                         unused_tokens.pop(help_flag_index)
 
+                    # Remove version flags when help is present to ensure help takes priority
+                    for version_flag in command_app.version_flags:
+                        with suppress(ValueError):
+                            tokens.remove(version_flag)
+                        with suppress(ValueError):
+                            unused_tokens.remove(version_flag)
+
                     command = self.help_print
                     while meta_parent := meta_parent._meta_parent:
                         command = meta_parent.help_print
