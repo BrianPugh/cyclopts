@@ -34,6 +34,7 @@ class CompletionData:
 
     arguments: "ArgumentCollection"
     commands: list["App"]
+    help_format: str
 
 
 def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]:
@@ -60,7 +61,10 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
             if os.environ.get("CYCLOPTS_COMPLETION_DEBUG"):
                 raise
             warnings.warn(f"Failed to extract completion data for command path {command_path!r}: {e}", stacklevel=2)
-            completion_data[command_path] = CompletionData(arguments=ArgumentCollection(), commands=[])
+            help_format = app.app_stack.resolve("help_format", fallback="markdown")
+            completion_data[command_path] = CompletionData(
+                arguments=ArgumentCollection(), commands=[], help_format=help_format
+            )
             return
 
         arguments = ArgumentCollection()
@@ -77,7 +81,9 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                     if subapp.show and subapp not in commands:
                         commands.append(subapp)
 
-        completion_data[command_path] = CompletionData(arguments=arguments, commands=commands)
+        help_format = command_app.app_stack.resolve("help_format", fallback="markdown")
+
+        completion_data[command_path] = CompletionData(arguments=arguments, commands=commands, help_format=help_format)
 
         for cmd_app in commands:
             for cmd_name in cmd_app.name:
@@ -135,25 +141,37 @@ def clean_choice_text(text: str) -> str:
     return text
 
 
-def clean_description_text(text: str, max_length: int = 80) -> str:
-    """Clean and truncate description text without shell-specific escaping.
+def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> str:
+    """Strip markup and render to plain text for shell completions.
+
+    Converts formatted text (markdown/RST/rich) to plain text suitable for
+    shell completion descriptions. Removes control characters, normalizes
+    whitespace, and truncates if needed.
 
     Parameters
     ----------
     text : str
-        Raw description text.
+        Text with markup.
+    format : str
+        Markup format: "markdown", "rst", "rich", or "plaintext".
     max_length : int
-        Maximum length before truncation (default: 80).
+        Maximum length before truncation.
 
     Returns
     -------
     str
-        Cleaned text (not shell-escaped).
+        Plain text (not shell-escaped).
     """
+    from cyclopts._markup import extract_plain_text
+    from cyclopts.help.inline_text import InlineText
+
+    inline = InlineText.from_format(text, format=format)
+    text = extract_plain_text(inline)
+
     text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
 
     if len(text) > max_length:
-        text = text[: max_length - 3] + "..."
+        text = text[: max_length - 1] + "…"
 
     return text

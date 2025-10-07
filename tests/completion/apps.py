@@ -80,3 +80,47 @@ def negative_main(
 ):
     """App with negative flags."""
     pass
+
+
+app_markup = App(name="markupapp")
+
+
+@app_markup.default
+def markup_main(
+    verbose: Annotated[bool, Parameter(help="Enable **verbose** output with `extra` details")] = False,
+    mode: Annotated[
+        Literal["fast", "slow"],
+        Parameter(help="Choose *execution* mode: **fast** or **slow**"),
+    ] = "fast",
+):
+    """App with **markdown** markup in help text.
+
+    This tests that markup is properly stripped in completions.
+    """
+    pass
+
+
+@app_markup.command
+def deploy_markup(
+    env: Annotated[str, Parameter(help="Target `environment` like **dev** or **prod**")],
+):
+    """Deploy to `environment`."""
+    pass
+
+
+app_rst = App(name="rstapp", help_format="rst")
+
+
+@app_rst.default
+def rst_main(
+    verbose: Annotated[bool, Parameter(help="Enable **verbose** output with ``code`` samples")] = False,
+    mode: Annotated[
+        Literal["fast", "slow"],
+        Parameter(help="Choose *execution* mode: **fast** or **slow**"),
+    ] = "fast",
+):
+    """App with **RST** markup in help text.
+
+    This tests that RST markup is properly stripped in completions.
+    """
+    pass

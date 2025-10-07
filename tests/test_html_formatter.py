@@ -2,8 +2,8 @@
 
 from textwrap import dedent
 
+from cyclopts._markup import escape_html, extract_plain_text
 from cyclopts.help import HelpEntry, HelpPanel
-from cyclopts.help.formatters._shared import escape_html, extract_plain_text
 from cyclopts.help.formatters.html import HtmlFormatter
 
 

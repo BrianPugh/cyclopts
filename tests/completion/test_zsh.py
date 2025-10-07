@@ -3,9 +3,11 @@ import pytest
 from .apps import (
     app_basic,
     app_enum,
+    app_markup,
     app_negative,
     app_nested,
     app_path,
+    app_rst,
 )
 
 
@@ -224,7 +226,11 @@ def test_invalid_prog_name():
 
 
 def test_description_escaping(zsh_tester):
-    """Test that descriptions with special chars are properly escaped."""
+    """Test that descriptions with special chars are properly escaped.
+
+    Note: Backticks are now treated as markdown code syntax and stripped,
+    so they no longer appear in the completion script.
+    """
     from typing import Annotated
 
     from cyclopts import App, Parameter
@@ -244,7 +250,9 @@ def test_description_escaping(zsh_tester):
 
     assert r"'\'' " in tester.completion_script or "'\\''" in tester.completion_script
     assert "\\$" in tester.completion_script
-    assert "\\`" in tester.completion_script
+    # Backticks are now stripped as markdown code syntax
+    assert "backticks" in tester.completion_script
+    assert "\\`" not in tester.completion_script
     assert r"\[" in tester.completion_script
     assert r"\]" in tester.completion_script
 
@@ -753,4 +761,54 @@ def test_helper_function_skips_option_values(zsh_tester):
     script = tester.completion_script
 
     assert "--config" in script or "config" in script
+    assert tester.validate_script_syntax()
+
+
+def test_markdown_markup_stripped_from_descriptions(zsh_tester):
+    """Test that markdown markup is stripped from help descriptions.
+
+    Ensures that **bold**, *italic*, `code`, and other markdown syntax
+    is properly removed from completion descriptions.
+    """
+    tester = zsh_tester(app_markup, "markupapp")
+    script = tester.completion_script
+
+    assert "Enable verbose output with extra details" in script, "Should contain plain text version"
+    assert "**verbose**" not in script, "Should not contain markdown bold syntax"
+    assert "`extra`" not in script, "Should not contain markdown code syntax"
+
+    # Note: zsh escapes colons with backslashes in descriptions
+    assert "Choose execution mode" in script and "fast or slow" in script, "Should contain plain text version"
+    assert "*execution*" not in script, "Should not contain markdown italic syntax"
+    assert "**fast**" not in script, "Should not contain markdown bold in mode description"
+    assert "**slow**" not in script, "Should not contain markdown bold in mode description"
+
+    assert "Target environment like dev or prod" in script, "Should contain plain text version"
+    assert "`environment`" not in script, "Should not contain markdown code in env description"
+    assert "**dev**" not in script, "Should not contain markdown bold in env description"
+    assert "**prod**" not in script, "Should not contain markdown bold in env description"
+
+    assert "Deploy to environment" in script, "Should contain plain text command description"
+
+    assert tester.validate_script_syntax()
+
+
+def test_rst_markup_stripped_from_descriptions(zsh_tester):
+    """Test that RST markup is stripped from help descriptions.
+
+    Ensures that **bold**, ``code``, and other RST syntax
+    is properly removed from completion descriptions.
+    """
+    tester = zsh_tester(app_rst, "rstapp")
+    script = tester.completion_script
+
+    assert "Enable verbose output with code samples" in script, "Should contain plain text version"
+    assert "**verbose**" not in script, "Should not contain RST bold syntax"
+    assert "``code``" not in script, "Should not contain RST code syntax (double backticks)"
+
+    assert "Choose execution mode" in script and "fast or slow" in script, "Should contain plain text version"
+    assert "*execution*" not in script, "Should not contain RST italic syntax"
+    assert "**fast**" not in script, "Should not contain RST bold in mode description"
+    assert "**slow**" not in script, "Should not contain RST bold in mode description"
+
     assert tester.validate_script_syntax()

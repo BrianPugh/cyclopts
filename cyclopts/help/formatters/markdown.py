@@ -3,7 +3,7 @@
 import io
 from typing import TYPE_CHECKING, Any, Optional, Union, get_args, get_origin
 
-from cyclopts.help.formatters._shared import extract_plain_text
+from cyclopts._markup import extract_plain_text
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions

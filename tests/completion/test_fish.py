@@ -7,9 +7,11 @@ from cyclopts.completion.fish import generate_completion_script
 from .apps import (
     app_basic,
     app_enum,
+    app_markup,
     app_negative,
     app_nested,
     app_path,
+    app_rst,
 )
 
 
@@ -486,5 +488,55 @@ def test_helper_function_skips_option_values(fish_tester):
 
     skip_check = [line for line in lines if "skip_next" in line]
     assert len(skip_check) > 0, "Helper should use skip_next logic to skip option values"
+
+    assert tester.validate_script_syntax()
+
+
+def test_markdown_markup_stripped_from_descriptions(fish_tester):
+    """Test that markdown markup is stripped from help descriptions.
+
+    Ensures that **bold**, *italic*, `code`, and other markdown syntax
+    is properly removed from completion descriptions.
+    """
+    tester = fish_tester(app_markup, "markupapp")
+    script = tester.completion_script
+
+    assert "Enable verbose output with extra details" in script, "Should contain plain text version"
+    assert "**verbose**" not in script, "Should not contain markdown bold syntax"
+    assert "`extra`" not in script, "Should not contain markdown code syntax"
+
+    assert "Choose execution mode: fast or slow" in script, "Should contain plain text version"
+    assert "*execution*" not in script, "Should not contain markdown italic syntax"
+    assert "**fast**" not in script, "Should not contain markdown bold in mode description"
+    assert "**slow**" not in script, "Should not contain markdown bold in mode description"
+
+    assert "Target environment like dev or prod" in script, "Should contain plain text version"
+    assert "`environment`" not in script, "Should not contain markdown code in env description"
+    assert "**dev**" not in script, "Should not contain markdown bold in env description"
+    assert "**prod**" not in script, "Should not contain markdown bold in env description"
+
+    assert "Deploy to environment" in script, "Should contain plain text command description"
+    assert "`environment`" not in script, "Should not contain markdown code in command description"
+
+    assert tester.validate_script_syntax()
+
+
+def test_rst_markup_stripped_from_descriptions(fish_tester):
+    """Test that RST markup is stripped from help descriptions.
+
+    Ensures that **bold**, ``code``, and other RST syntax
+    is properly removed from completion descriptions.
+    """
+    tester = fish_tester(app_rst, "rstapp")
+    script = tester.completion_script
+
+    assert "Enable verbose output with code samples" in script, "Should contain plain text version"
+    assert "**verbose**" not in script, "Should not contain RST bold syntax"
+    assert "``code``" not in script, "Should not contain RST code syntax (double backticks)"
+
+    assert "Choose execution mode: fast or slow" in script, "Should contain plain text version"
+    assert "*execution*" not in script, "Should not contain RST italic syntax"
+    assert "**fast**" not in script, "Should not contain RST bold in mode description"
+    assert "**slow**" not in script, "Should not contain RST bold in mode description"
 
     assert tester.validate_script_syntax()

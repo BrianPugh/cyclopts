@@ -2,8 +2,8 @@
 
 from typing import TYPE_CHECKING
 
+from cyclopts._markup import escape_html, extract_plain_text
 from cyclopts.docs.base import BaseDocGenerator
-from cyclopts.help.formatters._shared import escape_html, extract_plain_text
 
 if TYPE_CHECKING:
     from cyclopts.core import App

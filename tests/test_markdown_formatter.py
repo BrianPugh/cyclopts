@@ -238,7 +238,7 @@ def test_markdown_formatter_reset():
 
 def test_markdown_escape_special_characters():
     """Test that special markdown characters are properly escaped."""
-    from cyclopts.help.formatters._shared import escape_markdown
+    from cyclopts._markup import escape_markdown
 
     # Should escape pipe for table compatibility
     assert escape_markdown("foo | bar") == "foo \\| bar"
@@ -255,7 +255,7 @@ def test_markdown_escape_special_characters():
 
 def test_extract_plain_text():
     """Test plain text extraction from various objects."""
-    from cyclopts.help.formatters._shared import extract_plain_text
+    from cyclopts._markup import extract_plain_text
 
     # Test None
     assert extract_plain_text(None) == ""

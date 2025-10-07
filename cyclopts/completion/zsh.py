@@ -13,9 +13,9 @@ from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
     clean_choice_text,
-    clean_description_text,
     extract_completion_data,
     get_completion_action,
+    strip_markup,
 )
 from cyclopts.help.help import docstring_parse
 
@@ -191,14 +191,14 @@ def _generate_completion_for_path(
 
     # Generate keyword argument specs
     for argument in keyword_args:
-        specs = _generate_keyword_specs(argument)
+        specs = _generate_keyword_specs(argument, data.help_format)
         args_specs.extend(specs)
 
     # Check for flag commands (commands that look like options)
     flag_command_names = set()
     for cmd_app in commands:
         if any(name.startswith("-") for name in cmd_app.name):
-            specs = _generate_keyword_specs_for_command(cmd_app)
+            specs = _generate_keyword_specs_for_command(cmd_app, data.help_format)
             args_specs.extend(specs)
             flag_command_names.update(cmd_app.name)
 
@@ -219,7 +219,7 @@ def _generate_completion_for_path(
     # Only add positionals if there are no subcommands (they conflict in zsh)
     if positional_args and not has_non_flag_commands:
         for argument in positional_args:
-            spec = _generate_positional_spec(argument)
+            spec = _generate_positional_spec(argument, data.help_format)
             args_specs.append(spec)
 
     if has_non_flag_commands:
@@ -242,7 +242,7 @@ def _generate_completion_for_path(
         for cmd_app in commands:
             for cmd_name in cmd_app.name:
                 if not cmd_name.startswith("-"):
-                    desc = _safe_get_description_from_app(cmd_app)
+                    desc = _safe_get_description_from_app(cmd_app, data.help_format)
                     cmd_list.append(f"'{cmd_name}:{desc}'")
 
         lines.append(f"{indent_str}    local -a commands")
@@ -334,13 +334,15 @@ def _escape_zsh_description(text: str) -> str:
     return text
 
 
-def _generate_keyword_specs(argument: "Argument") -> list[str]:
+def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]:
     """Generate zsh _arguments specs for a keyword argument.
 
     Parameters
     ----------
     argument : Argument
         Argument object from ArgumentCollection.
+    help_format : str
+        Help text format.
 
     Returns
     -------
@@ -348,7 +350,7 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
         List of zsh argument specs.
     """
     specs = []
-    desc = _get_description_from_argument(argument)
+    desc = _get_description_from_argument(argument, help_format)
 
     flag = argument.is_flag()
 
@@ -386,20 +388,22 @@ def _generate_keyword_specs(argument: "Argument") -> list[str]:
     return specs
 
 
-def _generate_positional_spec(argument: "Argument") -> str:
+def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     """Generate zsh _arguments spec for a positional argument.
 
     Parameters
     ----------
     argument : Argument
         Positional argument object.
+    help_format : str
+        Help text format.
 
     Returns
     -------
     str
         Zsh positional argument spec.
     """
-    desc = _get_description_from_argument(argument)
+    desc = _get_description_from_argument(argument, help_format)
 
     # Check for choices first (Literal/Enum types)
     choices = argument.get_choices()
@@ -421,13 +425,15 @@ def _generate_positional_spec(argument: "Argument") -> str:
     return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
 
-def _generate_keyword_specs_for_command(cmd_app: "App") -> list[str]:
+def _generate_keyword_specs_for_command(cmd_app: "App", help_format: str) -> list[str]:
     """Generate zsh _arguments specs for a command that looks like a flag.
 
     Parameters
     ----------
     cmd_app : App
         Command app with flag-like names.
+    help_format : str
+        Help text format.
 
     Returns
     -------
@@ -435,7 +441,7 @@ def _generate_keyword_specs_for_command(cmd_app: "App") -> list[str]:
         List of zsh argument specs.
     """
     specs = []
-    desc = _safe_get_description_from_app(cmd_app)
+    desc = _safe_get_description_from_app(cmd_app, help_format)
 
     for name in cmd_app.name:
         if name.startswith("-"):
@@ -465,30 +471,34 @@ def _map_completion_action_to_zsh(action: CompletionAction) -> str:
     return ""
 
 
-def _get_description_from_argument(argument: "Argument") -> str:
+def _get_description_from_argument(argument: "Argument", help_format: str) -> str:
     """Extract plain text description from Argument, escaping zsh special chars.
 
     Parameters
     ----------
     argument : Argument
         Argument object with parameter help text.
+    help_format : str
+        Help text format.
 
     Returns
     -------
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    text = clean_description_text(argument.parameter.help or "")
+    text = strip_markup(argument.parameter.help or "", format=help_format)
     return _escape_zsh_description(text)
 
 
-def _safe_get_description_from_app(cmd_app: "App") -> str:
+def _safe_get_description_from_app(cmd_app: "App", help_format: str) -> str:
     """Extract plain text description from App, escaping zsh special chars.
 
     Parameters
     ----------
     cmd_app : App
         Command app with help text.
+    help_format : str
+        Help text format.
 
     Returns
     -------
@@ -504,5 +514,5 @@ def _safe_get_description_from_app(cmd_app: "App") -> str:
     except Exception:
         text = str(cmd_app.help)
 
-    text = clean_description_text(text)
+    text = strip_markup(text, format=help_format)
     return _escape_zsh_description(text)

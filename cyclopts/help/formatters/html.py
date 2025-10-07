@@ -3,16 +3,12 @@
 import io
 from typing import TYPE_CHECKING, Any, Optional
 
-from cyclopts.help.formatters._shared import escape_html, extract_plain_text
+from cyclopts._markup import escape_html, extract_plain_text
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpEntry, HelpPanel
-
-
-# Alias for backward compatibility within this module
-_escape_html = escape_html
 
 
 def _format_type_name(type_obj: Any) -> str:
@@ -35,7 +31,7 @@ def _format_type_name(type_obj: Any) -> str:
     if hasattr(type_obj, "plain"):
         type_str = type_obj.plain.rstrip()
     elif hasattr(type_obj, "__rich_console__"):
-        type_str = _extract_plain_text(type_obj, None)
+        type_str = extract_plain_text(type_obj, None)
     else:
         type_str = str(type_obj)
 
@@ -61,10 +57,6 @@ def _format_type_name(type_obj: Any) -> str:
         return type_str[7:]  # Remove "typing." prefix
 
     return type_str
-
-
-# Alias for backward compatibility within this module
-_extract_plain_text = extract_plain_text
 
 
 class HtmlFormatter:
@@ -135,12 +127,12 @@ class HtmlFormatter:
 
         # Write panel title as heading
         if panel.title:
-            title_text = _escape_html(_extract_plain_text(panel.title, console))
+            title_text = escape_html(extract_plain_text(panel.title, console))
             self._output.write(f'<h{self.heading_level} class="panel-title">{title_text}</h{self.heading_level}>\n')
 
         # Write panel description if present
         if panel.description:
-            desc_text = _escape_html(_extract_plain_text(panel.description, console))
+            desc_text = escape_html(extract_plain_text(panel.description, console))
             if desc_text:
                 self._output.write(f'<div class="panel-description">{desc_text}</div>\n')
 
@@ -189,16 +181,16 @@ class HtmlFormatter:
                     anchor_id = f"{self.app_name}-{primary_name}".lower()
 
                 # Create linked command name
-                name_html = f'<a href="#{anchor_id}"><code>{_escape_html(primary_name)}</code></a>'
+                name_html = f'<a href="#{anchor_id}"><code>{escape_html(primary_name)}</code></a>'
                 if len(names) > 1:
                     # Add aliases
-                    aliases = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names[1:])
+                    aliases = ", ".join(f"<code>{escape_html(n)}</code>" for n in names[1:])
                     name_html = f"{name_html}, {aliases}"
             else:
                 # Fallback to non-linked format
-                name_html = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names) if names else ""
+                name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names) if names else ""
 
-            desc_html = _escape_html(_extract_plain_text(entry.description, console))
+            desc_html = escape_html(extract_plain_text(entry.description, console))
 
             self._output.write(f"<li><strong>{name_html}</strong>")
             if desc_html:
@@ -232,7 +224,7 @@ class HtmlFormatter:
                 names.extend(entry.shorts)
 
             # Check if this is a boolean flag with a default
-            default_str = _extract_plain_text(entry.default, console) if entry.default is not None else None
+            default_str = extract_plain_text(entry.default, console) if entry.default is not None else None
             is_bool_flag = False
 
             # Look for --no- prefixed names to determine if this is a boolean flag
@@ -256,9 +248,9 @@ class HtmlFormatter:
             if names:
                 # For boolean flags, show both but emphasize the preferred one
                 if is_bool_flag and len(names) >= 2:
-                    name_html = f"<code>{_escape_html(names[0])}</code>, <code>{_escape_html(names[1])}</code>"
+                    name_html = f"<code>{escape_html(names[0])}</code>, <code>{escape_html(names[1])}</code>"
                 else:
-                    name_html = ", ".join(f"<code>{_escape_html(n)}</code>" for n in names)
+                    name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names)
             else:
                 name_html = ""
 
@@ -266,9 +258,9 @@ class HtmlFormatter:
             self._output.write(f"<li><strong>{name_html}</strong>")
 
             # Add description
-            desc = _extract_plain_text(entry.description, console)
+            desc = extract_plain_text(entry.description, console)
             if desc:
-                self._output.write(f": {_escape_html(desc)}")
+                self._output.write(f": {escape_html(desc)}")
 
             # Add metadata as styled badges
             metadata_items = []
@@ -279,7 +271,7 @@ class HtmlFormatter:
 
             # Add choices
             if entry.choices:
-                choices_str = ", ".join(f"<code>{_escape_html(str(c))}</code>" for c in entry.choices)
+                choices_str = ", ".join(f"<code>{escape_html(str(c))}</code>" for c in entry.choices)
                 metadata_items.append(
                     f'<span class="metadata-item metadata-choices"><span class="metadata-label">choices:</span> {choices_str}</span>'
                 )
@@ -295,26 +287,26 @@ class HtmlFormatter:
                             names[0] if names else "--flag",
                         )
                         metadata_items.append(
-                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(positive_flag)}</code></span>'
+                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(positive_flag)}</code></span>'
                         )
                     elif default_str in ["False", "disabled"]:
                         # Find the negative flag name
                         negative_flag = next((n for n in names if n.startswith("--no-")), "--no-flag")
                         metadata_items.append(
-                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(negative_flag)}</code></span>'
+                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(negative_flag)}</code></span>'
                         )
                     else:
                         metadata_items.append(
-                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(default_str)}</code></span>'
+                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(default_str)}</code></span>'
                         )
                 else:
                     metadata_items.append(
-                        f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{_escape_html(default_str)}</code></span>'
+                        f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(default_str)}</code></span>'
                     )
 
             # Add environment variable
             if entry.env_var:
-                env_html = ", ".join(f"<code>{_escape_html(e)}</code>" for e in entry.env_var)
+                env_html = ", ".join(f"<code>{escape_html(e)}</code>" for e in entry.env_var)
                 metadata_items.append(
                     f'<span class="metadata-item metadata-env"><span class="metadata-label">env:</span> {env_html}</span>'
                 )
@@ -345,7 +337,7 @@ class HtmlFormatter:
             The usage line content.
         """
         if usage:
-            usage_text = _escape_html(_extract_plain_text(usage, console))
+            usage_text = escape_html(extract_plain_text(usage, console))
             if usage_text:
                 self._output.write('<div class="usage-block">\n')
                 self._output.write(f'<pre class="usage">{usage_text}</pre>\n')
@@ -369,6 +361,6 @@ class HtmlFormatter:
             The description content.
         """
         if description:
-            desc_text = _escape_html(_extract_plain_text(description, console))
+            desc_text = escape_html(extract_plain_text(description, console))
             if desc_text:
                 self._output.write(f'<div class="description">{desc_text}</div>\n')

@@ -2,8 +2,9 @@
 
 from typing import TYPE_CHECKING
 
+from cyclopts._markup import extract_plain_text
 from cyclopts.docs.base import BaseDocGenerator
-from cyclopts.help.formatters._shared import extract_plain_text, make_rst_section_header
+from cyclopts.help.formatters._shared import make_rst_section_header
 
 if TYPE_CHECKING:
     from cyclopts.core import App

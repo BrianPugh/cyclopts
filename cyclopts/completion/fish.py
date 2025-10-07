@@ -11,9 +11,9 @@ from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
     clean_choice_text,
-    clean_description_text,
     extract_completion_data,
     get_completion_action,
+    strip_markup,
 )
 
 if TYPE_CHECKING:
@@ -254,8 +254,8 @@ def _generate_completions_for_path(
     if keyword_args or help_flags or version_flags:
         lines.extend(_generate_option_section_header(command_path))
         lines.extend(_generate_help_version_completions(prog_name, condition, help_flags, version_flags))
-        lines.extend(_generate_keyword_arg_completions(keyword_args, prog_name, condition))
-        lines.extend(_generate_command_option_completions(data.commands, prog_name, condition))
+        lines.extend(_generate_keyword_arg_completions(keyword_args, prog_name, condition, data.help_format))
+        lines.extend(_generate_command_option_completions(data.commands, prog_name, condition, data.help_format))
 
     return lines
 
@@ -299,7 +299,7 @@ def _generate_subcommand_completions(
             if cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description_from_app(cmd_app)
+            desc = _get_description_from_app(cmd_app, data.help_format)
             escaped_desc = _escape_fish_description(desc)
             escaped_cmd = _escape_fish_string(cmd_name)
 
@@ -375,6 +375,7 @@ def _generate_keyword_arg_completions(
     keyword_args: list,
     prog_name: str,
     condition: str,
+    help_format: str,
 ) -> list[str]:
     """Generate completions for keyword arguments.
 
@@ -386,6 +387,8 @@ def _generate_keyword_arg_completions(
         Program name.
     condition : str
         Fish condition.
+    help_format : str
+        Help text format.
 
     Returns
     -------
@@ -395,7 +398,7 @@ def _generate_keyword_arg_completions(
     lines = []
 
     for argument in keyword_args:
-        desc = clean_description_text(argument.parameter.help or "")
+        desc = strip_markup(argument.parameter.help or "", format=help_format)
         escaped_desc = _escape_fish_description(desc)
 
         is_flag = argument.is_flag()
@@ -448,6 +451,7 @@ def _generate_command_option_completions(
     commands: list,
     prog_name: str,
     condition: str,
+    help_format: str,
 ) -> list[str]:
     """Generate completions for commands that look like options.
 
@@ -459,6 +463,8 @@ def _generate_command_option_completions(
         Program name.
     condition : str
         Fish condition.
+    help_format : str
+        Help text format.
 
     Returns
     -------
@@ -472,7 +478,7 @@ def _generate_command_option_completions(
             if not cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description_from_app(cmd_app)
+            desc = _get_description_from_app(cmd_app, help_format)
             escaped_desc = _escape_fish_description(desc)
 
             if cmd_name.startswith("--"):
@@ -508,13 +514,15 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
     return f"-n '{func_name} {escaped_commands}'"
 
 
-def _get_description_from_app(cmd_app: "App") -> str:
+def _get_description_from_app(cmd_app: "App", help_format: str) -> str:
     """Extract description from App.
 
     Parameters
     ----------
     cmd_app : App
         Command app.
+    help_format : str
+        Help text format.
 
     Returns
     -------
@@ -532,4 +540,4 @@ def _get_description_from_app(cmd_app: "App") -> str:
     except Exception:
         text = str(cmd_app.help)
 
-    return clean_description_text(text)
+    return strip_markup(text, format=help_format)
