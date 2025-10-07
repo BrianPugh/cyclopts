@@ -1,11 +1,6 @@
-"""Shared completion infrastructure for all shells.
+"""Shared shell completion infrastructure.
 
-This module contains shell-agnostic components used by shell-specific completion
-generators (zsh, bash, fish). It provides:
-
-1. Data extraction from App objects
-2. Type analysis for completion actions
-3. Text processing utilities (without shell-specific escaping)
+Provides data extraction, type analysis, and text processing utilities.
 """
 
 import os
@@ -96,8 +91,6 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
 def get_completion_action(type_hint: Any) -> CompletionAction:
     """Get completion action from type hint.
 
-    Handles Union and Optional types by extracting the non-None type.
-
     Parameters
     ----------
     type_hint : Any
@@ -106,7 +99,7 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
     Returns
     -------
     CompletionAction
-        Completion action for the type.
+        Completion action for type.
     """
     if is_union(type_hint):
         for arg in get_args(type_hint):
@@ -127,10 +120,6 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
 def clean_choice_text(text: str) -> str:
     """Clean choice text without shell-specific escaping.
 
-    Removes control characters and normalizes whitespace.
-    Does NOT truncate (unlike clean_description_text).
-    Shell-specific escaping should be applied after this function.
-
     Parameters
     ----------
     text : str
@@ -139,7 +128,7 @@ def clean_choice_text(text: str) -> str:
     Returns
     -------
     str
-        Cleaned text (not escaped for any specific shell).
+        Cleaned text (not shell-escaped).
     """
     text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
@@ -147,22 +136,19 @@ def clean_choice_text(text: str) -> str:
 
 
 def clean_description_text(text: str, max_length: int = 80) -> str:
-    """Clean description text without shell-specific escaping.
-
-    Removes control characters, normalizes whitespace, and truncates.
-    Shell-specific escaping should be applied after this function.
+    """Clean and truncate description text without shell-specific escaping.
 
     Parameters
     ----------
     text : str
         Raw description text.
     max_length : int
-        Maximum length before truncation (default 80).
+        Maximum length before truncation (default: 80).
 
     Returns
     -------
     str
-        Cleaned text (not escaped for any specific shell).
+        Cleaned text (not shell-escaped).
     """
     text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     text = re.sub(r"\s+", " ", text).strip()

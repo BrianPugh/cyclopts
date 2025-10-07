@@ -1,67 +1,7 @@
-r"""Fish completion script generator.
+"""Fish completion script generator.
 
-This module generates static fish completion scripts for Cyclopts applications.
-The completion generator follows a similar pattern to bash.py and zsh.py:
-
-1. **Extract** completion data using shared infrastructure from _base.py
-2. **Transform** the data into fish completion commands:
-   - Commands → complete -c prog -n '__fish_use_subcommand' -a 'command'
-   - Options with arguments → complete -c prog -s o -l option -r
-   - Options without arguments (flags) → complete -c prog -s f -l flag
-   - Literal/Enum choices → complete -c prog -a 'choice1 choice2'
-   - Path types → complete -c prog -r -F (force file completion)
-3. **Generate** a static fish completion script using the complete command
-
-Key differences from bash/zsh:
-- Uses `complete -c COMMAND` instead of shell functions
-- Each option/command is a separate `complete` statement
-- No need for RC file sourcing - fish auto-loads from ~/.config/fish/completions/
-- Uses `-n` with conditions like `__fish_use_subcommand` and `__fish_seen_subcommand_from`
-- File completion is enabled by default unless `-f` is specified
-
-Fish-Specific Design Decisions
--------------------------------
-
-**Completion Command Structure:**
-Each completion is defined via: `complete -c COMMAND [OPTIONS]`
-- `-c COMMAND`: The command to complete for
-- `-s CHAR`: Short option (e.g., -v)
-- `-l NAME`: Long option (e.g., --verbose)
-- `-a 'ARGS'`: Argument/choice list
-- `-d 'DESC'`: Description text
-- `-r`: Require parameter (for options that take values)
-- `-f`: No file completion
-- `-x`: Exclusive (combines -r and -f)
-- `-n COND`: Conditional (only show if condition is true)
-- `-F`: Force file completion
-
-**Subcommand Handling:**
-Fish uses built-in functions to detect command context:
-- `__fish_use_subcommand`: True if no subcommand has been given yet
-- `__fish_seen_subcommand_from cmd1 cmd2`: True if one of the commands was seen
-
-**Description Handling:**
-Fish natively supports descriptions via the `-d` flag:
-- Descriptions appear in the completion menu next to each option
-- Unlike bash, fish shows these descriptions during completion
-- Descriptions should be concise (truncated to 80 chars in our implementation)
-
-**Escaping Strategy:**
-Fish uses single quotes by default, which prevents most shell expansion:
-- Single quotes with '\'' for embedded single quotes (same as bash)
-- Backslash escaping for special characters when needed
-- Less aggressive escaping than zsh due to fish's simpler quoting rules
-
-**Auto-loading:**
-Fish automatically loads completions from `$fish_complete_path`:
-- Default user location: ~/.config/fish/completions/
-- Files named PROGNAME.fish are auto-loaded for command PROGNAME
-- No need to modify shell RC files (unlike bash/zsh)
-
-**Compatibility:**
-- Targets fish 3.0+ (released in 2018)
-- Fully portable between Linux, macOS, and other Unix systems
-- No external dependencies
+Generates static fish completion scripts using `complete -c COMMAND` statements.
+Completions auto-load from ~/.config/fish/completions/PROGNAME.fish.
 """
 
 import re
@@ -83,26 +23,17 @@ if TYPE_CHECKING:
 def generate_completion_script(app: "App", prog_name: str) -> str:
     """Generate fish completion script.
 
-    Generates static completion script with no runtime Python dependency.
-    Supports:
-    - Commands and subcommands
-    - Options (flags and arguments)
-    - Literal/Enum value completion
-    - Negative flags (--verbose/--no-verbose)
-    - Path/file completion for Path types
-
     Parameters
     ----------
     app : App
         The Cyclopts application to generate completion for.
     prog_name : str
-        Program name for completion.
-        Must be a valid identifier (alphanumeric and underscore/hyphen).
+        Program name for completion (alphanumeric with hyphens/underscores).
 
     Returns
     -------
     str
-        Complete fish completion script ready to use.
+        Complete fish completion script.
 
     Raises
     ------
@@ -134,34 +65,12 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
 
 def _escape_fish_string(text: str) -> str:
-    r"""Escape special characters for fish single-quoted strings.
-
-    Parameters
-    ----------
-    text : str
-        Raw text to escape.
-
-    Returns
-    -------
-    str
-        Escaped text safe for fish single-quoted strings.
-    """
+    r"""Escape single quotes for fish strings."""
     return text.replace("'", r"'\''")
 
 
 def _escape_fish_description(text: str) -> str:
-    """Escape special characters in description text for fish.
-
-    Parameters
-    ----------
-    text : str
-        Cleaned description text.
-
-    Returns
-    -------
-    str
-        Escaped description safe for fish completion descriptions.
-    """
+    """Escape description text for fish."""
     text = text.replace("\n", " ")
     text = text.replace("\r", " ")
     return _escape_fish_string(text)
@@ -171,18 +80,14 @@ def _generate_helper_functions(
     prog_name: str,
     completion_data: dict[tuple[str, ...], CompletionData],
 ) -> list[str]:
-    """Generate helper functions for command path detection.
-
-    Creates a custom function that accurately detects the command path sequence
-    by parsing the command line and extracting non-option words in order,
-    while correctly skipping options and their values.
+    """Generate helper function for command path detection.
 
     Parameters
     ----------
     prog_name : str
         Program name.
     completion_data : dict
-        All extracted completion data (used to identify options that take values).
+        Completion data used to identify options that take values.
 
     Returns
     -------
@@ -248,23 +153,17 @@ def _generate_helper_functions(
 
 
 def _map_completion_action_to_fish(action: CompletionAction) -> str:
-    """Map shell-agnostic completion action to fish completion flags.
-
-    Returns fish-specific flags for different completion types. These flags
-    are appended directly to the completion command.
+    """Map completion action to fish flags.
 
     Parameters
     ----------
     action : CompletionAction
-        Shell-agnostic completion action.
+        Completion action type.
 
     Returns
     -------
     str
-        Fish completion flags ready to append to a complete command:
-        - FILES: "-r -F" (require argument, force file completion)
-        - DIRECTORIES: "-r -a '(__fish_complete_directories)'" (directories only)
-        - Other: "" (empty string, caller should provide default behavior)
+        Fish completion flags ("-r -F" for files, "-r -a '(...)'" for directories, "" otherwise).
     """
     if action == CompletionAction.FILES:
         return "-r -F"
@@ -284,18 +183,18 @@ def _generate_completions(
     Parameters
     ----------
     completion_data : dict
-        All extracted completion data.
+        Extracted completion data.
     prog_name : str
         Program name.
     help_flags : tuple[str, ...]
-        Help flag names.
+        Help flags.
     version_flags : tuple[str, ...]
-        Version flag names.
+        Version flags.
 
     Returns
     -------
     list[str]
-        Lines of fish completion commands.
+        Completion command lines.
     """
     lines = []
 
@@ -322,25 +221,25 @@ def _generate_completions_for_path(
     help_flags: tuple[str, ...],
     version_flags: tuple[str, ...],
 ) -> list[str]:
-    """Generate fish completions for a specific command path.
+    """Generate completions for a specific command path.
 
     Parameters
     ----------
     completion_data : dict
-        All extracted completion data.
+        Extracted completion data.
     command_path : tuple[str, ...]
-        Current command path.
+        Command path.
     prog_name : str
         Program name.
     help_flags : tuple[str, ...]
-        Help flag names.
+        Help flags.
     version_flags : tuple[str, ...]
-        Version flag names.
+        Version flags.
 
     Returns
     -------
     list[str]
-        Lines of fish completion commands for this command path.
+        Completion command lines.
     """
     if command_path not in completion_data:
         return []
@@ -372,18 +271,18 @@ def _generate_subcommand_completions(
     Parameters
     ----------
     data : CompletionData
-        Completion data for current path.
+        Completion data.
     command_path : tuple[str, ...]
-        Current command path.
+        Command path.
     prog_name : str
         Program name.
     condition : str
-        Fish condition string.
+        Fish condition.
 
     Returns
     -------
     list[str]
-        Lines of completion commands for subcommands.
+        Completion command lines.
     """
     commands = [name for cmd in data.commands for name in cmd.name if not name.startswith("-")]
     if not commands:
@@ -415,12 +314,12 @@ def _generate_option_section_header(command_path: tuple[str, ...]) -> list[str]:
     Parameters
     ----------
     command_path : tuple[str, ...]
-        Current command path.
+        Command path.
 
     Returns
     -------
     list[str]
-        Comment line for options section.
+        Comment line.
     """
     if command_path:
         return [f"# Options for: {' '.join(command_path)}"]
@@ -440,16 +339,16 @@ def _generate_help_version_completions(
     prog_name : str
         Program name.
     condition : str
-        Fish condition string.
+        Fish condition.
     help_flags : tuple[str, ...]
-        Help flag names.
+        Help flags.
     version_flags : tuple[str, ...]
-        Version flag names.
+        Version flags.
 
     Returns
     -------
     list[str]
-        Lines of completion commands for help and version flags.
+        Completion command lines.
     """
     lines = []
 
@@ -482,16 +381,16 @@ def _generate_keyword_arg_completions(
     Parameters
     ----------
     keyword_args : list
-        List of keyword arguments.
+        Keyword arguments.
     prog_name : str
         Program name.
     condition : str
-        Fish condition string.
+        Fish condition.
 
     Returns
     -------
     list[str]
-        Lines of completion commands for keyword arguments.
+        Completion command lines.
     """
     lines = []
 
@@ -555,16 +454,16 @@ def _generate_command_option_completions(
     Parameters
     ----------
     commands : list
-        List of command apps.
+        Command apps.
     prog_name : str
         Program name.
     condition : str
-        Fish condition string.
+        Fish condition.
 
     Returns
     -------
     list[str]
-        Lines of completion commands for command-options.
+        Completion command lines.
     """
     lines = []
 
@@ -589,20 +488,17 @@ def _generate_command_option_completions(
 def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> str:
     """Generate fish condition string for a command path.
 
-    Uses a custom helper function to check the exact command sequence,
-    ensuring nested commands are properly disambiguated.
-
     Parameters
     ----------
     command_path : tuple[str, ...]
         Command path (empty for root).
     prog_name : str
-        Program name for helper function naming.
+        Program name.
 
     Returns
     -------
     str
-        Fish condition flag with condition string.
+        Fish condition flag.
     """
     if not command_path:
         return "-n __fish_use_subcommand"
@@ -613,17 +509,17 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
 
 
 def _get_description_from_app(cmd_app: "App") -> str:
-    """Extract plain text description from App.
+    """Extract description from App.
 
     Parameters
     ----------
     cmd_app : App
-        Command app with help text.
+        Command app.
 
     Returns
     -------
     str
-        Plain text description (truncated to 80 chars).
+        Description text.
     """
     from cyclopts.help.help import docstring_parse
 

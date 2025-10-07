@@ -1,58 +1,7 @@
-r"""Bash completion script generator.
+"""Bash completion script generator.
 
-This module generates static bash completion scripts for Cyclopts applications.
-The completion generator follows a similar pattern to zsh.py:
-
-1. **Extract** completion data using shared infrastructure from _base.py
-2. **Transform** the data into bash completion primitives:
-   - Commands → compgen -W "command list"
-   - Parameters → COMPREPLY array
-   - Literal/Enum choices → compgen -W "choice list"
-   - Path types → compgen -f
-3. **Generate** a static bash completion script using complete -F
-
-Key differences from zsh:
-- Uses COMPREPLY array instead of _arguments
-- Uses compgen instead of _describe/_files
-- 0-indexed word arrays instead of 1-indexed (COMP_WORDS[0] is the command)
-- Different escaping rules
-
-Bash-Specific Design Decisions
--------------------------------
-
-**Escaping Strategy:**
-Bash completion requires careful escaping to prevent shell injection. This module uses:
-- Single quotes with '\'' for embedded single quotes (e.g., "don't" → "don'\''t")
-- Backslash escaping for: $ ` \\ " and space
-- No need for printf %q since we control the output format
-- Special characters in choices are escaped before inclusion in compgen -W lists
-
-**Description Handling:**
-Unlike zsh's _describe which shows inline descriptions, bash completion does NOT natively
-support showing help text during completion. Therefore:
-- Descriptions are OMITTED from completion output (not shown to users)
-- Help text is preserved in comments for documentation purposes only
-- Future enhancement: Could use compopt -o nosort with special formatting, but this is
-  not widely supported across bash versions (requires bash 4.4+)
-
-**COMPREPLY Array:**
-The completion function populates the COMPREPLY array with suggestions:
-- COMPREPLY=( $(compgen -W "option1 option2" -- "$current_word") )
-- Bash handles filtering based on the current partial word automatically
-- Each element in COMPREPLY is a completion candidate
-
-**compgen Flags:**
-- compgen -W "word list" → Generate completions from word list
-- compgen -f → Generate file completions
-- compgen -d → Generate directory completions
-- compgen -A file → Alternative file completion syntax
-
-**Compatibility:**
-- Targets bash 3.2+ (macOS default) through bash 5.x
-- Fully portable between Linux, macOS, and other Unix systems
-- No external dependencies (bash-completion package NOT required)
-- Uses only standard bash completion variables: COMP_WORDS, COMP_CWORD, COMPREPLY
-- All constructs tested on bash 3.2+ (arrays, regex, C-style loops, compgen)
+Generates static bash completion scripts using COMPREPLY and compgen.
+Targets bash 3.2+ with no external dependencies.
 """
 
 import re
@@ -73,26 +22,17 @@ if TYPE_CHECKING:
 def generate_completion_script(app: "App", prog_name: str) -> str:
     """Generate bash completion script.
 
-    Generates static completion script with no runtime Python dependency.
-    Supports:
-    - Commands and subcommands
-    - Options (flags)
-    - Literal/Enum value completion
-    - Negative flags (--verbose/--no-verbose)
-    - Path/file completion for Path types
-
     Parameters
     ----------
     app : App
         The Cyclopts application to generate completion for.
     prog_name : str
-        Program name for completion function naming.
-        Must be a valid shell identifier (alphanumeric and underscore).
+        Program name (alphanumeric with hyphens/underscores).
 
     Returns
     -------
     str
-        Complete bash completion script ready to source.
+        Complete bash completion script.
 
     Raises
     ------
@@ -125,51 +65,29 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
 
 def _escape_bash_choice(choice: str) -> str:
-    r"""Escape special characters in a completion choice value for bash.
-
-    Parameters
-    ----------
-    choice : str
-        Raw choice value (should already be cleaned via clean_choice_text).
-
-    Returns
-    -------
-    str
-        Escaped choice value safe for bash completion compgen -W lists.
-    """
+    r"""Escape single quotes for bash strings."""
     return choice.replace("'", "'\\''")
 
 
 def _escape_bash_description(text: str) -> str:
-    r"""Escape special characters in description text for bash comments.
-
-    Parameters
-    ----------
-    text : str
-        Cleaned description text (should already be cleaned via clean_description_text).
-
-    Returns
-    -------
-    str
-        Text safe for bash script comments.
-    """
+    r"""Escape description text for bash comments."""
     text = text.replace("\n", " ")
     text = text.replace("\r", " ")
     return text
 
 
 def _map_completion_action_to_bash(action: CompletionAction) -> str:
-    """Map shell-agnostic completion action to bash-specific compgen flags.
+    """Map completion action to bash compgen flags.
 
     Parameters
     ----------
     action : CompletionAction
-        Shell-agnostic completion action.
+        Completion action type.
 
     Returns
     -------
     str
-        Bash compgen flags (e.g., "-f", "-d", or "").
+        Compgen flags ("-f", "-d", or "").
     """
     if action == CompletionAction.FILES:
         return "-f"

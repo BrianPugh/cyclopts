@@ -1,38 +1,7 @@
 """Zsh completion script generator.
 
-This module generates static zsh completion scripts for Cyclopts applications by
-leveraging the existing help system infrastructure. The completion generator:
-
-1. **Extracts** completion data by calling `app._assemble_help_panels()` recursively
-   for each command path, reusing the help system's parameter and command extraction.
-
-2. **Transforms** the help panel data (HelpEntry objects) into zsh completion primitives:
-   - Commands → _describe -t commands 'command' list
-   - Parameters → _arguments specs with descriptions
-   - Literal/Enum choices → completion value lists
-   - Path types → _files action
-   - Negative flags → automatic --no-* variants
-
-3. **Generates** a static zsh completion script using the compsys framework with no
-   runtime Python dependency.
-
-Key Design Decisions
---------------------
-- **Static Generation**: No runtime Python overhead; fast completion response
-- **Help System Reuse**: Avoids reimplementing parameter/choice extraction
-- **Security First**: Comprehensive escaping prevents shell injection
-- **Recursive Structure**: Naturally handles nested subcommands via state machine
-
-Example
--------
->>> from cyclopts import App
->>> app = App(name="myapp")
->>> @app.default
-... def main(verbose: bool = False):
-...     '''My application.'''
-...     pass
->>> script = generate_completion_script(app, "myapp")
->>> Path("_myapp").write_text(script)  # Install to fpath directory
+Generates static zsh completion scripts using the compsys framework.
+No runtime Python dependency.
 """
 
 import re
@@ -56,35 +25,19 @@ if TYPE_CHECKING:
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
-    """Generate zsh compsys completion script.
-
-    Generates static completion script with no runtime Python dependency.
-    Supports:
-    - Commands and subcommands (including meta apps)
-    - Options with help text descriptions
-    - Literal/Enum value completion (choices pre-extracted)
-    - Negative flags (--verbose/--no-verbose)
-    - Path/file completion for Path types
+    """Generate zsh completion script.
 
     Parameters
     ----------
     app : App
         The Cyclopts application to generate completion for.
     prog_name : str
-        Program name for completion function naming.
-        Must be a valid shell identifier (alphanumeric and underscore).
+        Program name (alphanumeric with hyphens/underscores).
 
     Returns
     -------
     str
-        Complete zsh completion script ready to source.
-
-    Examples
-    --------
-    >>> from cyclopts import App
-    >>> app = App(name="myapp")
-    >>> script = generate_completion_script(app, "myapp")
-    >>> Path("_myapp").write_text(script)
+        Complete zsh completion script.
 
     Raises
     ------
@@ -130,24 +83,21 @@ def _generate_run_command_completion(
     indent_str: str,
     prog_name: str,
 ) -> list[str]:
-    """Generate special dynamic completion for the 'run' command.
-
-    The run command loads a Python script dynamically, so we need to call back
-    into Python at completion time to discover available commands and options.
+    """Generate dynamic completion for the 'run' command.
 
     Parameters
     ----------
     arguments : ArgumentCollection
-        Arguments for the run command.
+        Arguments for run command.
     indent_str : str
         Indentation string.
     prog_name : str
-        Program name for the callback.
+        Program name.
 
     Returns
     -------
     list[str]
-        Lines of zsh completion code.
+        Zsh completion code lines.
     """
     template = dedent(f"""\
         local script_path
@@ -197,27 +147,27 @@ def _generate_completion_for_path(
     help_flags: tuple[str, ...] = (),
     version_flags: tuple[str, ...] = (),
 ) -> list[str]:
-    """Generate zsh completion code for a specific command path.
+    """Generate completion code for a specific command path.
 
     Parameters
     ----------
     completion_data : dict
-        All extracted completion data.
+        Extracted completion data.
     command_path : tuple[str, ...]
-        Current command path.
+        Command path.
     indent : int
-        Indentation level (spaces).
+        Indentation level.
     prog_name : str
-        Program name for dynamic completion callback.
+        Program name.
     help_flags : tuple[str, ...]
-        Help flag names (e.g., ('--help', '-h')).
+        Help flags.
     version_flags : tuple[str, ...]
-        Version flag names (e.g., ('--version',)).
+        Version flags.
 
     Returns
     -------
     list[str]
-        Lines of zsh code.
+        Zsh code lines.
     """
     data = completion_data[command_path]
     commands = data.commands
