@@ -2097,6 +2097,7 @@ class App:
     def register_install_completion(
         self,
         name: str | Iterable[str] = "--install-completion",
+        **kwargs,
     ) -> None:
         """Register a command for installing shell completion.
 
@@ -2109,6 +2110,9 @@ class App:
         name : str | Iterable[str]
             Command name(s) for the install completion command.
             Defaults to "--install-completion".
+        **kwargs
+            Additional keyword arguments to pass to :meth:`command`.
+            Can be used to customize the command registration (e.g., group, help_flags, version_flags).
 
         Examples
         --------
@@ -2121,6 +2125,10 @@ class App:
         Use a custom command name:
 
         >>> app.register_install_completion(name="--setup-completion")
+
+        Customize command registration:
+
+        >>> app.register_install_completion(group="Setup", help_flags=[])
 
         See Also
         --------
@@ -2179,12 +2187,7 @@ class App:
             else:
                 raise NotImplementedError
 
-        self.command(
-            _install_completion_command,
-            name=name,
-            help_flags=[],
-            version_flags=[],
-        )
+        self.command(_install_completion_command, name=name, **kwargs)
 
     def interactive_shell(
         self,
