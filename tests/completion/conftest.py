@@ -1,20 +1,65 @@
 import subprocess
 import tempfile
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 import pytest
 
 
-class BashCompletionTester:
+class CompletionTesterBase(ABC):
+    """Base class for shell completion testers.
+
+    Defines the interface that all shell-specific completion testers must implement.
+    This ensures consistency across bash, zsh, fish, and any future shell implementations.
+    """
+
+    def __init__(self, completion_script: str, prog_name: str):
+        """Initialize the completion tester.
+
+        Parameters
+        ----------
+        completion_script : str
+            The generated completion script to test.
+        prog_name : str
+            Program name for completion.
+        """
+        self.completion_script = completion_script
+        self.prog_name = prog_name
+
+    @abstractmethod
+    def validate_script_syntax(self) -> bool:
+        """Check if the completion script has valid syntax for this shell.
+
+        Returns
+        -------
+        bool
+            True if syntax is valid, False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def get_completions(self, partial_command: str) -> list[str]:
+        """Get completion suggestions for partial command.
+
+        Parameters
+        ----------
+        partial_command : str
+            Partial command line to complete.
+
+        Returns
+        -------
+        list[str]
+            List of completion suggestions.
+        """
+        pass
+
+
+class BashCompletionTester(CompletionTesterBase):
     """Test bash completion by executing real bash subprocess.
 
     Uses actual bash completion system to validate generated scripts.
     Requires bash 3.2+ (macOS) or 4.0+ (Linux) to be installed.
     """
-
-    def __init__(self, completion_script: str, prog_name: str):
-        self.completion_script = completion_script
-        self.prog_name = prog_name
 
     def validate_script_syntax(self) -> bool:
         """Check if the completion script has valid bash syntax.
@@ -95,16 +140,12 @@ class BashCompletionTester:
                 child.close()
 
 
-class ZshCompletionTester:
+class ZshCompletionTester(CompletionTesterBase):
     """Test zsh completion by executing real zsh subprocess.
 
     Uses actual zsh completion system to validate generated scripts.
     Requires zsh 5.0+ to be installed.
     """
-
-    def __init__(self, completion_script: str, prog_name: str):
-        self.completion_script = completion_script
-        self.prog_name = prog_name
 
     def validate_script_syntax(self) -> bool:
         """Check if the completion script has valid zsh syntax.
@@ -296,7 +337,7 @@ def bash_tester(bash_available):
     return _make_tester
 
 
-class FishCompletionTester:
+class FishCompletionTester(CompletionTesterBase):
     """Test fish completion by executing real fish subprocess.
 
     Uses actual fish completion system to validate generated scripts.
@@ -315,10 +356,6 @@ class FishCompletionTester:
     For robust testing, prefer validating the generated script structure
     rather than relying on interactive completion behavior.
     """
-
-    def __init__(self, completion_script: str, prog_name: str):
-        self.completion_script = completion_script
-        self.prog_name = prog_name
 
     def validate_script_syntax(self) -> bool:
         """Check if the completion script has valid fish syntax.

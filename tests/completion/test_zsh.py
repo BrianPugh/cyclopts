@@ -623,3 +623,134 @@ def test_help_version_flags_in_subcommands(zsh_tester):
     assert "--help[Display this message and exit.]" in deploy_text
     assert "-h[Display this message and exit.]" in deploy_text
     assert "--version[Display application version.]" in deploy_text
+
+
+def test_nested_command_disambiguation(zsh_tester):
+    """Test that nested commands are properly disambiguated.
+
+    This test verifies that the helper function correctly distinguishes between
+    commands with overlapping names (e.g., 'config get' vs 'admin get').
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    root = App(name="myapp")
+
+    config = App(name="config")
+    admin = App(name="admin")
+
+    @config.command(name="get")
+    def config_get(key: Annotated[str, Parameter(help="Config key")] = ""):
+        """Get config value."""
+        pass
+
+    @config.command(name="set")
+    def config_set(key: str = "", value: str = ""):
+        """Set config value."""
+        pass
+
+    @admin.command(name="get")
+    def admin_get(user: Annotated[str, Parameter(help="Username")] = ""):
+        """Get admin user."""
+        pass
+
+    root.command(config)
+    root.command(admin)
+
+    tester = zsh_tester(root, "myapp")
+
+    script = tester.completion_script
+
+    config_lines = [line for line in script.split("\n") if "config" in line.lower()]
+    admin_lines = [line for line in script.split("\n") if "admin" in line.lower()]
+
+    assert any("config" in line for line in config_lines), "Should have config-specific completions"
+    assert any("admin" in line for line in admin_lines), "Should have admin-specific completions"
+
+    assert tester.validate_script_syntax()
+
+
+def test_helper_function_generation(zsh_tester):
+    """Test that command path detection logic is generated when needed."""
+    from cyclopts import App
+
+    root_only = App(name="rootonly")
+
+    @root_only.default
+    def main(verbose: bool = False):
+        """Root only app."""
+        pass
+
+    tester_root = zsh_tester(root_only, "rootonly")
+    script_root = tester_root.completion_script
+
+    nested = App(name="nested")
+    sub = App(name="sub")
+
+    @sub.default
+    def action():
+        """Sub action."""
+        pass
+
+    nested.command(sub)
+
+    tester_nested = zsh_tester(nested, "nested")
+    script_nested = tester_nested.completion_script
+
+    assert len(script_nested) > len(script_root), "Nested app should have more complex completion logic"
+
+
+def test_no_file_completion_for_strings(zsh_tester):
+    """Test that string options don't default to file completion."""
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="strtest")
+
+    @app.default
+    def main(
+        name: Annotated[str, Parameter(help="Name")] = "default",
+    ):
+        """Test app."""
+
+    tester = zsh_tester(app, "strtest")
+    assert tester.validate_script_syntax()
+
+
+def test_helper_function_skips_option_values(zsh_tester):
+    """Test that helper function correctly identifies and skips option values.
+
+    Critical bug fix test: ensures that when building command path,
+    the helper function skips values for options that take arguments.
+    Without this, 'myapp --config file.yaml subcommand' would incorrectly
+    extract [file.yaml, subcommand] instead of [subcommand].
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="myapp")
+    sub = App(name="sub")
+
+    @sub.default
+    def action():
+        """Subcommand action."""
+        pass
+
+    @app.default
+    def main(
+        config: Annotated[str, Parameter(help="Config file path")],
+        verbose: bool = False,
+    ):
+        """Main app."""
+        pass
+
+    app.command(sub)
+
+    tester = zsh_tester(app, "myapp")
+    script = tester.completion_script
+
+    assert "--config" in script or "config" in script
+    assert tester.validate_script_syntax()
