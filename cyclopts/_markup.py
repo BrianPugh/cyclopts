@@ -84,6 +84,10 @@ def escape_rst(text: str | None) -> str:
 def escape_markdown(text: str | None) -> str | None:
     """Escape special markdown characters in text.
 
+    If the text appears to already contain markdown formatting (bold, italic,
+    code, links, or headings), it is returned unchanged. Otherwise, pipe
+    characters are escaped for table compatibility.
+
     Parameters
     ----------
     text : str | None
@@ -97,7 +101,7 @@ def escape_markdown(text: str | None) -> str | None:
     if not text:
         return text
 
-    if any(pattern in text for pattern in ["**", "*", "`", "[", "]", "#"]):
+    if any(pattern in text for pattern in ["**", "``", "`", "](", "#"]):
         return text
 
     text = text.replace("|", "\\|")
