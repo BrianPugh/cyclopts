@@ -1,5 +1,6 @@
 """Tests for completion installation functionality."""
 
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -10,7 +11,10 @@ from cyclopts import App
 @pytest.fixture
 def temp_home(tmp_path, monkeypatch):
     """Create a temporary home directory for testing."""
-    monkeypatch.setenv("HOME", str(tmp_path))
+    if sys.platform == "win32":
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    else:
+        monkeypatch.setenv("HOME", str(tmp_path))
     return tmp_path
 
 
