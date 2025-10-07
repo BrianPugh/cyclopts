@@ -135,7 +135,7 @@ All of the following CLI invocations are equivalent:
 Like calling functions in python, positional arguments cannot be specified after a **prior** argument in the function signature was specified via keyword.
 For example, you cannot supply the count value ``"3"`` positionally while the value for ``name`` is specified via keyword:
 
-.. code-block:: bash
+.. code-block:: console
 
    # The following are NOT allowed.
    $ python main.py --name=Alice 3  # invalid python: main(name="Alice", 3)

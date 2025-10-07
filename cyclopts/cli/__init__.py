@@ -4,7 +4,7 @@ import cyclopts
 
 # Create the main CLI app
 app = cyclopts.App(name="cyclopts")
-app.register_install_completion()
+app.register_install_completion_command()
 
 
 # Explicitly import command modules

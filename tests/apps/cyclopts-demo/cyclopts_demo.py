@@ -10,7 +10,7 @@ app = App(
     name="cyclopts-demo",
     help="Demo application for testing Cyclopts completion features.",
 )
-app.register_install_completion()
+app.register_install_completion_command()
 
 
 @app.default

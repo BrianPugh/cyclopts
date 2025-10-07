@@ -2067,12 +2067,13 @@ class App:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(script_content)
 
+        # Fish does not need any startup script changes.
         if add_to_startup and shell in ("bash", "zsh"):
             add_to_rc_file(output, self.name[0], shell)
 
         return output
 
-    def register_install_completion(
+    def register_install_completion_command(
         self,
         name: str | Iterable[str] = "--install-completion",
         add_to_startup: bool = True,
@@ -2101,20 +2102,20 @@ class App:
         Register install-completion command:
 
         >>> app = App(name="myapp")
-        >>> app.register_install_completion()
+        >>> app.register_install_completion_command()
         >>> app()  # Now responds to: myapp --install-completion
 
         Use a custom command name:
 
-        >>> app.register_install_completion(name="--setup-completion")
+        >>> app.register_install_completion_command(name="--setup-completion")
 
         Customize command registration:
 
-        >>> app.register_install_completion(group="Setup", help_flags=[])
+        >>> app.register_install_completion_command(group="Setup", help_flags=[])
 
         Install without modifying RC files:
 
-        >>> app.register_install_completion(add_to_startup=False)
+        >>> app.register_install_completion_command(add_to_startup=False)
 
         See Also
         --------

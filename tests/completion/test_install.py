@@ -127,10 +127,10 @@ def test_install_completion_custom_output_path(temp_home):
     assert str(custom_path) in bashrc_content
 
 
-def test_register_install_completion_default_add_to_startup(temp_home):
-    """Test that register_install_completion defaults to add_to_startup=True."""
+def test_register_install_completion_command_default_add_to_startup(temp_home):
+    """Test that register_install_completion_command defaults to add_to_startup=True."""
     app = App(name="testapp")
-    app.register_install_completion()
+    app.register_install_completion_command()
 
     bashrc = temp_home / ".bashrc"
 
@@ -145,10 +145,10 @@ def test_register_install_completion_default_add_to_startup(temp_home):
     assert "# Load testapp completion" in bashrc_content
 
 
-def test_register_install_completion_add_to_startup_false(temp_home):
-    """Test that register_install_completion respects add_to_startup=False."""
+def test_register_install_completion_command_add_to_startup_false(temp_home):
+    """Test that register_install_completion_command respects add_to_startup=False."""
     app = App(name="testapp")
-    app.register_install_completion(add_to_startup=False)
+    app.register_install_completion_command(add_to_startup=False)
 
     bashrc = temp_home / ".bashrc"
 
