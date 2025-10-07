@@ -27,7 +27,7 @@ from cyclopts.annotations import (
     resolve_annotated,
     resolve_optional,
 )
-from cyclopts.utils import UNSET
+from cyclopts.utils import UNSET, is_builtin
 
 POSITIONAL_OR_KEYWORD = inspect.Parameter.POSITIONAL_OR_KEYWORD
 POSITIONAL_ONLY = inspect.Parameter.POSITIONAL_ONLY
@@ -281,6 +281,11 @@ def _enum_flag_field_infos(enum_flag) -> dict[str, FieldInfo]:
 
 
 def get_field_infos(hint) -> dict[str, FieldInfo]:
+    # Early return for builtin types (int, str, etc.) to avoid expensive introspection.
+    # Provides ~5-6x speedup for argument parsing by skipping signature_parameters() calls.
+    if is_builtin(hint):
+        return {}
+
     if is_dataclass(hint):
         # This must be before ``is_pydantic`` check so that we
         # can handle pydantic dataclasses as vanilla dataclasses.

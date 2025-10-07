@@ -348,8 +348,26 @@ class App:
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
 
-    # We will populate this attribute ourselves after initialization
-    _instantiating_module: ModuleType | None = field(init=False, default=None)
+    _instantiating_module_name: str | None = field(init=False, default=None, repr=False)
+    """Module name (e.g., '__main__' or 'mypackage.cli') captured during App initialization.
+
+    Captured from the calling frame's __name__ for lazy module resolution and automatic
+    version detection. Populated in __attrs_post_init__ via frame introspection.
+    Used by the _instantiating_module property to lazily resolve the actual module object.
+
+    This optimization avoids the expensive inspect.getmodule() call at init time,
+    deferring it until the module is actually needed (typically for --version).
+    """
+
+    _instantiating_module_cache: ModuleType | None | type[UNSET] = field(init=False, default=UNSET, repr=False)
+    """Cached module object resolved from _instantiating_module_name.
+
+    Starts as UNSET sentinel value. On first access via the _instantiating_module property,
+    the module name is resolved to a module object from sys.modules and cached here.
+    Subsequent accesses return this cached value without re-resolution.
+
+    Set to None if module name was not captured or module is not in sys.modules.
+    """
 
     _fallback_console: Optional["Console"] = field(init=False, default=None)
 
@@ -360,16 +378,17 @@ class App:
         self.help_flags = self._help_flags
         self.version_flags = self._version_flags
 
+        # Capture the module name from the instantiating frame.
+        # This is cheap (just dict lookup) compared to inspect.getmodule().
         # inspect.stack()[2] is needed in attrs class because the call stack is deeper:
         # [0]: __attrs_post_init__
         # [1]: the attrs-generated __init__
         # [2]: the caller who created the instance
         try:
-            # self._instantiating_module = inspect.getmodule(inspect.stack()[2])
-            self._instantiating_module = inspect.getmodule(sys._getframe(2))
-        except IndexError:
-            # Fallback in case the stack is not as deep as expected
-            self._instantiating_module = None
+            frame = sys._getframe(2)
+            self._instantiating_module_name = frame.f_globals.get("__name__")
+        except (IndexError, AttributeError):
+            self._instantiating_module_name = None
 
     ###########
     # Methods #
@@ -559,6 +578,16 @@ class App:
     @console.setter
     def console(self, console: Optional["Console"]):
         self._console = console
+
+    @property
+    def _instantiating_module(self) -> ModuleType | None:
+        """Lazily resolve the module name to a module object."""
+        if self._instantiating_module_cache is UNSET:
+            if self._instantiating_module_name:
+                self._instantiating_module_cache = sys.modules.get(self._instantiating_module_name)
+            else:
+                self._instantiating_module_cache = None
+        return cast(ModuleType | None, self._instantiating_module_cache)
 
     def _get_fallback_version_string(self, default: str = "0.0.0") -> str:
         """Get the version string with multiple fallback strategies.
@@ -1293,7 +1322,6 @@ class App:
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
-            console = command_app.console
 
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
@@ -1318,7 +1346,7 @@ class App:
                     command = self.help_print
                     while meta_parent := meta_parent._meta_parent:
                         command = meta_parent.help_print
-                    bound = inspect.signature(command).bind(tokens, console=console)
+                    bound = inspect.signature(command).bind(tokens, console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 elif any(flag in tokens for flag in command_app.version_flags):
@@ -1326,7 +1354,7 @@ class App:
                     while meta_parent := meta_parent._meta_parent:
                         command = _get_version_command(meta_parent)
 
-                    bound = inspect.signature(command).bind(console=console)
+                    bound = inspect.signature(command).bind(console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 else:
@@ -1369,7 +1397,7 @@ class App:
                             # Running the application with no arguments and no registered
                             # ``default_command`` will default to ``help_print``.
                             command = self.help_print
-                            bound = inspect.signature(command).bind(tokens=tokens, console=console)
+                            bound = inspect.signature(command).bind(tokens=tokens, console=command_app.console)
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
                 if raise_on_unused_tokens and unused_tokens:
@@ -1387,7 +1415,7 @@ class App:
                 if command_chain:
                     e.command_chain = command_chain
                 if e.console is None:
-                    e.console = console
+                    e.console = command_app.console
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
@@ -2053,7 +2081,7 @@ class TestFramework(str, Enum):
     PYTEST = "pytest"
 
 
-@lru_cache  # Will always be the same for a given session.
+@lru_cache
 def _detect_test_framework() -> TestFramework:
     """Detects if we are currently being ran in a test framework.
 
