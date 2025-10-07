@@ -25,13 +25,14 @@ def test_generate_completion_script_invalid_prog_name():
         generate_completion_script(app_basic, "prog$name")
 
 
-def test_generate_completion_script_not_implemented():
-    """Test that bash completion raises NotImplementedError until implemented."""
-    with pytest.raises(NotImplementedError, match="Bash completion support is not yet implemented"):
-        generate_completion_script(app_basic, "basic")
+def test_generate_completion_script_creates_script():
+    """Test that bash completion generates a script."""
+    script = generate_completion_script(app_basic, "basic")
+    assert script
+    assert "# Bash completion for basic" in script
+    assert "complete -F _basic basic" in script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_basic_option_completion(bash_tester):
     """Test basic option name completion."""
     tester = bash_tester(app_basic, "basic")
@@ -41,7 +42,6 @@ def test_basic_option_completion(bash_tester):
     assert "--help" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_command_completion(bash_tester):
     """Test command completion."""
     tester = bash_tester(app_basic, "basic")
@@ -49,7 +49,6 @@ def test_command_completion(bash_tester):
     assert "deploy" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_literal_value_completion(bash_tester):
     """Test Literal type value completion."""
     tester = bash_tester(app_basic, "basic")
@@ -59,7 +58,6 @@ def test_literal_value_completion(bash_tester):
     assert "prod" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_enum_value_completion(bash_tester):
     """Test Enum type value completion."""
     tester = bash_tester(app_enum, "enumapp")
@@ -68,7 +66,6 @@ def test_enum_value_completion(bash_tester):
     assert "slow" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_nested_subcommand_completion(bash_tester):
     """Test nested subcommand completion."""
     tester = bash_tester(app_nested, "nested")
@@ -78,7 +75,6 @@ def test_nested_subcommand_completion(bash_tester):
     assert "set" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_path_completion_action(bash_tester):
     """Test that Path types trigger file completion."""
     tester = bash_tester(app_path, "pathapp")
@@ -86,7 +82,6 @@ def test_path_completion_action(bash_tester):
     assert tester.validate_script_syntax()
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_negative_flag_completion(bash_tester):
     """Test negative flag handling."""
     tester = bash_tester(app_negative, "negapp")
@@ -97,7 +92,6 @@ def test_negative_flag_completion(bash_tester):
     assert "--no-colors" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_script_syntax_validation(bash_tester):
     """Test that generated script has valid bash syntax."""
     tester = bash_tester(app_basic, "basic")
@@ -105,7 +99,6 @@ def test_script_syntax_validation(bash_tester):
     assert tester.validate_script_syntax()
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_completion_function_naming(bash_tester):
     """Test that completion function uses correct naming convention."""
     tester = bash_tester(app_basic, "myapp")
@@ -114,7 +107,6 @@ def test_completion_function_naming(bash_tester):
     assert "complete -F" in tester.completion_script
 
 
-@pytest.mark.skip(reason="Bash completion not yet implemented")
 def test_special_characters_in_choices(bash_tester):
     """Test that special characters in choices are properly escaped."""
     from typing import Annotated, Literal

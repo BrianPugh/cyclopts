@@ -82,7 +82,8 @@ When no custom output path is specified, completion scripts are installed to:
   - Note: Ensure ``~/.zsh/completions`` is in your ``$fpath``
 
 **Bash**
-  - Path: ``~/.bash_completion``
+  - Path: ``~/.local/share/bash-completion/completions/<app_name>``
+  - Note: Requires bash-completion v2.8+ for automatic loading
 
 **Fish**
   - Path: ``~/.config/fish/completions/<app_name>.fish``
@@ -95,33 +96,53 @@ After installation, you may need to configure your shell:
 Zsh
 ---
 
-Add to your ``~/.zshrc`` or ``~/.zprofile``:
+By default, Cyclopts adds a source line to your ``~/.zshrc`` to ensure completion works out-of-the-box.
+
+After installation, restart your shell:
+
+.. code-block:: bash
+
+   source ~/.zshrc
+
+**Advanced Configuration:**
+
+If you have your ``$fpath`` properly configured for zsh completions, you can install without modifying your ``~/.zshrc``:
+
+.. code-block:: python
+
+   app.register_install_completion(add_to_startup=False)
+
+Then add to your ``~/.zshrc`` or ``~/.zprofile`` if not already present:
 
 .. code-block:: bash
 
    fpath=(~/.zsh/completions $fpath)
    autoload -Uz compinit && compinit
 
-Then restart your shell:
-
-.. code-block:: bash
-
-   exec zsh
-
 Bash
 ----
 
-Add to your ``~/.bashrc``:
+By default, Cyclopts adds a source line to your ``~/.bashrc`` to ensure completion works out-of-the-box. This approach is compatible with all bash configurations.
 
-.. code-block:: bash
-
-   [ -f ~/.bash_completion ] && source ~/.bash_completion
-
-Then reload your configuration:
+After installation, restart your shell:
 
 .. code-block:: bash
 
    source ~/.bashrc
+
+**Advanced Configuration:**
+
+If you have bash-completion v2.8+ properly configured, completions can auto-load from ``~/.local/share/bash-completion/completions/`` without modifying your ``~/.bashrc``:
+
+.. code-block:: python
+
+   app.register_install_completion(add_to_startup=False)
+
+**Installing bash-completion:**
+
+- **macOS**: ``brew install bash-completion@2``
+- **Debian/Ubuntu**: ``apt install bash-completion``
+- **Fedora/RHEL**: ``dnf install bash-completion``
 
 Fish
 ----

@@ -242,13 +242,59 @@ def _get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_nam
         zsh_completions.mkdir(parents=True, exist_ok=True)
         return zsh_completions / f"_{prog_name}"
     elif shell == "bash":
-        return home / ".bash_completion"
+        bash_completions = home / ".local" / "share" / "bash-completion" / "completions"
+        bash_completions.mkdir(parents=True, exist_ok=True)
+        return bash_completions / prog_name
     elif shell == "fish":
         fish_completions = home / ".config" / "fish" / "completions"
         fish_completions.mkdir(parents=True, exist_ok=True)
         return fish_completions / f"{prog_name}.fish"
     else:
         raise ValueError(f"Unsupported shell: {shell}")
+
+
+def _add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zsh"]) -> bool:
+    """Add source line to shell RC file to ensure completion is loaded.
+
+    Parameters
+    ----------
+    script_path : Path
+        Path to the completion script.
+    prog_name : str
+        Program name for display in comments.
+    shell : Literal["bash", "zsh"]
+        Shell type.
+
+    Returns
+    -------
+    bool
+        True if the source line was added, False if it already existed or on error.
+    """
+    if shell == "bash":
+        rc_file = Path.home() / ".bashrc"
+        source_line = f'[ -f "{script_path}" ] && . "{script_path}"'
+    elif shell == "zsh":
+        rc_file = Path.home() / ".zshrc"
+        source_line = f'[ -f "{script_path}" ] && . "{script_path}"'
+    else:
+        raise NotImplementedError
+
+    rc_file = rc_file.resolve()
+
+    if rc_file.exists():
+        content = rc_file.read_text()
+        if source_line in content:
+            return False
+        needs_newline = content and not content.endswith("\n")
+    else:
+        needs_newline = False
+
+    with rc_file.open("a") as f:
+        if needs_newline:
+            f.write("\n")
+        f.write(f"# Load {prog_name} completion\n{source_line}\n")
+
+    return True
 
 
 @define
@@ -1981,7 +2027,7 @@ class App:
             Program name for completion. If None, uses first name from app.name.
         shell : Literal["zsh", "bash", "fish"] | None
             Shell type. If None, automatically detects current shell.
-            Currently only "zsh" is fully supported.
+            Supported shells: "zsh", "bash".
 
         Returns
         -------
@@ -2037,6 +2083,7 @@ class App:
         *,
         shell: Literal["zsh", "bash", "fish"] | None = None,
         output: Path | None = None,
+        add_to_startup: bool = True,
     ) -> Path:
         """Install shell completion script to appropriate location.
 
@@ -2049,8 +2096,11 @@ class App:
         output : Path | None
             Output path for the completion script. If not specified, uses shell-specific default:
             - zsh: ~/.zsh/completions/_<prog_name>
-            - bash: ~/.bash_completion
+            - bash: ~/.local/share/bash-completion/completions/<prog_name>
             - fish: ~/.config/fish/completions/<prog_name>.fish
+        add_to_startup : bool
+            If True (default), adds source line to shell RC file to ensure completion is loaded.
+            Set to False if completions are already configured to auto-load.
 
         Returns
         -------
@@ -2072,6 +2122,10 @@ class App:
 
         >>> path = app.install_completion(output=Path("/custom/path"))
 
+        Install without modifying RC files:
+
+        >>> path = app.install_completion(shell="bash", add_to_startup=False)
+
         Raises
         ------
         ShellDetectionError
@@ -2092,11 +2146,15 @@ class App:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(script_content)
 
+        if add_to_startup and shell in ("bash", "zsh"):
+            _add_to_rc_file(output, self.name[0], shell)
+
         return output
 
     def register_install_completion(
         self,
         name: str | Iterable[str] = "--install-completion",
+        add_to_startup: bool = True,
         **kwargs,
     ) -> None:
         """Register a command for installing shell completion.
@@ -2110,6 +2168,9 @@ class App:
         name : str | Iterable[str]
             Command name(s) for the install completion command.
             Defaults to "--install-completion".
+        add_to_startup : bool
+            If True (default), adds source line to shell RC file to ensure completion is loaded.
+            Set to False if completions are already configured to auto-load.
         **kwargs
             Additional keyword arguments to pass to :meth:`command`.
             Can be used to customize the command registration (e.g., group, help_flags, version_flags).
@@ -2129,6 +2190,10 @@ class App:
         Customize command registration:
 
         >>> app.register_install_completion(group="Setup", help_flags=[])
+
+        Install without modifying RC files:
+
+        >>> app.register_install_completion(add_to_startup=False)
 
         See Also
         --------
@@ -2165,22 +2230,36 @@ class App:
                     )
                     sys.exit(1)
 
-            install_path = self.install_completion(shell=shell, output=output)
+            install_path = self.install_completion(shell=shell, output=output, add_to_startup=add_to_startup)
 
             print(f"✓ Completion script installed to {install_path}")
 
             if shell == "zsh":
-                completion_dir = install_path.parent
-                print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
-                print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
-                print(f"    fpath=({completion_dir} $fpath)")
-                print("    autoload -Uz compinit && compinit")
-                print("\nThen restart your shell or run: exec zsh")
+                if add_to_startup:
+                    zshrc = Path.home() / ".zshrc"
+                    print(f"✓ Added completion loader to {zshrc}")
+                    print("\nRestart your shell or run: source ~/.zshrc")
+                else:
+                    completion_dir = install_path.parent
+                    print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
+                    print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
+                    print(f"    fpath=({completion_dir} $fpath)")
+                    print("    autoload -Uz compinit && compinit")
+                    print("\nThen restart your shell or run: exec zsh")
             elif shell == "bash":
-                print("\nTo enable completions, source the completion file:")
-                print("  Add this to your ~/.bashrc:")
-                print("    [ -f ~/.bash_completion ] && source ~/.bash_completion")
-                print("\nThen restart your shell or run: source ~/.bashrc")
+                if add_to_startup:
+                    bashrc = Path.home() / ".bashrc"
+                    print(f"✓ Added completion loader to {bashrc}")
+                    print("\nRestart your shell or run: source ~/.bashrc")
+                else:
+                    print("\nCompletions will be automatically loaded by bash-completion.")
+                    print("If completions don't work:")
+                    print("  1. Ensure bash-completion is installed (v2.8+)")
+                    print("  2. Restart your shell or run: exec bash")
+                    print("\nNote: bash-completion is typically installed via:")
+                    print("  - macOS: brew install bash-completion@2")
+                    print("  - Debian/Ubuntu: apt install bash-completion")
+                    print("  - Fedora/RHEL: dnf install bash-completion")
             elif shell == "fish":
                 print("\nCompletions are automatically loaded in fish.")
                 print("Restart your shell or run: source ~/.config/fish/config.fish")
