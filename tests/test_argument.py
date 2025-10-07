@@ -549,3 +549,16 @@ def test_is_typed_dict_true(hint):
 )
 def test_is_typed_dict_false(hint):
     assert not is_typeddict(hint)
+
+
+def test_assemble_argument_collection_no_default_command():
+    from cyclopts import App
+
+    app = App()
+
+    @app.command
+    def foo(loops: int):
+        pass
+
+    with pytest.raises(ValueError, match="Cannot assemble argument collection: no default command is registered"):
+        app.assemble_argument_collection()

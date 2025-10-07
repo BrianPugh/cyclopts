@@ -1195,6 +1195,12 @@ class App:
         ArgumentCollection
             All arguments for this app.
         """
+        if self.default_command is None:
+            raise ValueError(
+                "Cannot assemble argument collection: no default command is registered. "
+                "Use @app.default to register a default command, or access a specific "
+                "subcommand's argument collection via app['command_name'].assemble_argument_collection()."
+            )
         return ArgumentCollection._from_callable(
             self.default_command,  # pyright: ignore
             Parameter.combine(self.app_stack.default_parameter, default_parameter),
