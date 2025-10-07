@@ -1946,7 +1946,7 @@ class App:
             Program name for completion. If None, uses first name from app.name.
         shell : Literal["zsh", "bash", "fish"] | None
             Shell type. If None, automatically detects current shell.
-            Supported shells: "zsh", "bash".
+            Supported shells: "zsh", "bash", "fish".
 
         Returns
         -------
@@ -1971,8 +1971,6 @@ class App:
             If app has no name or shell type is unsupported.
         ShellDetectionError
             If shell is None and auto-detection fails.
-        NotImplementedError
-            If shell is "bash" or "fish" (not yet implemented).
         """
         if prog_name is None:
             if not self.name:
@@ -1993,7 +1991,9 @@ class App:
 
             return generate_completion_script(self, prog_name)
         elif shell == "fish":
-            raise NotImplementedError("Fish completion support is not yet implemented")
+            from cyclopts.completion.fish import generate_completion_script
+
+            return generate_completion_script(self, prog_name)
         else:
             raise ValueError(f"Unsupported shell: {shell}")
 
