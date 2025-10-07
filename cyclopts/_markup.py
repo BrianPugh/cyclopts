@@ -32,9 +32,11 @@ def extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_m
         return ""
 
     if hasattr(obj, "primary_renderable"):
-        if preserve_markup and hasattr(obj.primary_renderable, "markup"):
-            return obj.primary_renderable.markup.rstrip()
-        return extract_plain_text(obj.primary_renderable, console, preserve_markup=preserve_markup)
+        primary = getattr(obj, "primary_renderable", None)
+        if primary is not None:
+            if preserve_markup and hasattr(primary, "markup"):
+                return primary.markup.rstrip()
+            return extract_plain_text(primary, console, preserve_markup=preserve_markup)
 
     if hasattr(obj, "plain"):
         return obj.plain.rstrip()

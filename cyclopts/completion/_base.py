@@ -57,7 +57,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
         try:
             _, execution_path, _ = app.parse_commands(list(command_path))
             command_app = execution_path[-1]
-        except (CycloptsError, ValueError, TypeError, AttributeError) as e:
+        except (CycloptsError, ValueError, TypeError) as e:
             if os.environ.get("CYCLOPTS_COMPLETION_DEBUG"):
                 raise
             warnings.warn(f"Failed to extract completion data for command path {command_path!r}: {e}", stacklevel=2)

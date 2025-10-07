@@ -36,7 +36,7 @@ def run(
     Specify app object:
         cyclopts run myapp.py::app --help
     """
-    if script.name in app.help_flags:  # i.e. only accept the help-flags positionally.
+    if str(script) in app.help_flags:
         app.help_print()
         return
     app_obj, _ = load_app_from_script(script)

@@ -126,7 +126,7 @@ def _get_choices_from_hint(type_: type, name_transform: Callable[[str], str]) ->
     get_choices = partial(_get_choices_from_hint, name_transform=name_transform)
     choices = []
     _origin = get_origin(type_)
-    if is_class_and_subclass(type_, Enum):
+    if isinstance(type_, type) and is_class_and_subclass(type_, Enum):
         choices.extend(name_transform(x) for x in type_.__members__)
     elif is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
