@@ -1579,8 +1579,9 @@ class App:
             Override the async backend to use (if an async command is invoked).
             If :obj:`None`, inherits from :attr:`App.backend`, eventually defaulting to "asyncio".
             If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
-        result_action: Literal[...] | None
-            Controls how command return values are handled.
+        result_action: ResultAction | None
+            Controls how command return values are handled. Can be a predefined literal string
+            or a custom callable that takes the result and returns a processed value.
             If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
             See :attr:`App.result_action` for available modes.
 
@@ -1621,8 +1622,9 @@ class App:
             resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
             try:
                 result = _run_maybe_async_command(command, bound, resolved_backend)
-                resolved_result_action = self.app_stack.resolve(
-                    "result_action", fallback="print_non_int_return_int_as_exit_code"
+                resolved_result_action = cast(
+                    ResultAction,
+                    self.app_stack.resolve("result_action", fallback="print_non_int_return_int_as_exit_code"),
                 )
                 return handle_result_action(result, resolved_result_action)
             except KeyboardInterrupt:
@@ -1674,8 +1676,9 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
-        result_action: Literal[...] | None
-            Controls how command return values are handled.
+        result_action: ResultAction | None
+            Controls how command return values are handled. Can be a predefined literal string
+            or a custom callable that takes the result and returns a processed value.
             If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
             See :attr:`App.result_action` for available modes.
 
@@ -1742,8 +1745,9 @@ class App:
                 else:
                     result = command(*bound.args, **bound.kwargs)
 
-                resolved_result_action = self.app_stack.resolve(
-                    "result_action", fallback="print_non_int_return_int_as_exit_code"
+                resolved_result_action = cast(
+                    ResultAction,
+                    self.app_stack.resolve("result_action", fallback="print_non_int_return_int_as_exit_code"),
                 )
                 return handle_result_action(result, resolved_result_action)
             except KeyboardInterrupt:

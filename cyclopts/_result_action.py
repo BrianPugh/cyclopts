@@ -5,35 +5,43 @@ particularly when installed via console_scripts entry points.
 """
 
 import sys
+from collections.abc import Callable
 from typing import Any, Literal
 
-ResultAction = Literal[
-    "return_value",
-    "print_non_int_return_int_as_exit_code",
-    "print_str_return_int_as_exit_code",
-    "print_str_return_zero",
-    "print_non_none_return_int_as_exit_code",
-    "print_non_none_return_zero",
-    "return_int_as_exit_code_else_zero",
-    "print_non_int_sys_exit",
-]
+ResultAction = (
+    Literal[
+        "return_value",
+        "print_non_int_return_int_as_exit_code",
+        "print_str_return_int_as_exit_code",
+        "print_str_return_zero",
+        "print_non_none_return_int_as_exit_code",
+        "print_non_none_return_zero",
+        "return_int_as_exit_code_else_zero",
+        "print_non_int_sys_exit",
+    ]
+    | Callable[[Any], Any]
+)
 
 
-def handle_result_action(result: Any, action: str) -> Any:
+def handle_result_action(result: Any, action: ResultAction) -> Any:
     """Handle command result based on result_action.
 
     Parameters
     ----------
     result : Any
         The command's return value.
-    action : str
-        The result_action to apply.
+    action : ResultAction
+        The result_action to apply. Can be a predefined literal string or a callable
+        that takes the result and returns a processed value.
 
     Returns
     -------
     Any
         Processed result based on action (may call sys.exit() and not return).
     """
+    if callable(action):
+        return action(result)
+
     match action:
         case "return_value":
             return result

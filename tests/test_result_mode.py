@@ -719,3 +719,117 @@ def test_result_action_with_meta_app_return_mode():
     # Inner command returns "Hello", meta wraps it as "Meta: Hello"
     assert result == 0
     assert buf.getvalue() == "Meta: Hello\n"
+
+
+# ==============================================================================
+# Callable result_action tests
+# ==============================================================================
+
+
+def test_result_action_callable_basic():
+    """Callable result_action: can use custom function."""
+
+    def custom_handler(result):
+        return f"CUSTOM: {result}"
+
+    app = App(result_action=custom_handler)
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    result = app(["greet", "Alice"])
+    assert result == "CUSTOM: Hello Alice!"
+
+
+def test_result_action_callable_with_print():
+    """Callable result_action: can print and return exit code."""
+
+    def custom_handler(result):
+        if result:
+            print(f"SUCCESS: {result}")
+            return 0
+        else:
+            print("FAILED")
+            return 1
+
+    app = App(result_action=custom_handler)
+
+    @app.command
+    def process() -> str:
+        return "Done"
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        exit_code = app(["process"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == "SUCCESS: Done\n"
+
+
+def test_result_action_callable_transforms_result():
+    """Callable result_action: can transform result before returning."""
+
+    def uppercase_handler(result):
+        if isinstance(result, str):
+            return result.upper()
+        return result
+
+    app = App(result_action=uppercase_handler)
+
+    @app.command
+    def greet() -> str:
+        return "hello world"
+
+    result = app(["greet"])
+    assert result == "HELLO WORLD"
+
+
+def test_result_action_callable_handles_none():
+    """Callable result_action: handles None results."""
+
+    def none_handler(result):
+        return result if result is not None else "DEFAULT"
+
+    app = App(result_action=none_handler)
+
+    @app.command
+    def no_return() -> None:
+        pass
+
+    result = app(["no-return"])
+    assert result == "DEFAULT"
+
+
+def test_result_action_callable_override_in_call():
+    """Callable result_action: can be overridden in __call__."""
+
+    def handler1(result):
+        return f"HANDLER1: {result}"
+
+    def handler2(result):
+        return f"HANDLER2: {result}"
+
+    app = App(result_action=handler1)
+
+    @app.command
+    def cmd() -> str:
+        return "test"
+
+    result1 = app(["cmd"])
+    assert result1 == "HANDLER1: test"
+
+    result2 = app(["cmd"], result_action=handler2)
+    assert result2 == "HANDLER2: test"
+
+
+def test_result_action_callable_with_lambda():
+    """Callable result_action: works with lambda functions."""
+    app = App(result_action=lambda x: x * 2 if isinstance(x, int) else x)
+
+    @app.command
+    def double(n: int) -> int:
+        return n
+
+    result = app(["double", "5"])
+    assert result == 10
