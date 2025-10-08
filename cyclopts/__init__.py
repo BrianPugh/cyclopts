@@ -24,6 +24,7 @@ __all__ = [
     "MixedArgumentError",
     "RepeatArgumentError",
     "Parameter",
+    "ResultMode",
     "UnknownOptionError",
     "UnusedCliTokensError",
     "UNSET",
@@ -40,6 +41,7 @@ __all__ = [
 
 from cyclopts._convert import convert
 from cyclopts._env_var import env_var_split
+from cyclopts._result_mode import ResultMode
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App, run
 from cyclopts.exceptions import (

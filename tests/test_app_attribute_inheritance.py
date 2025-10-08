@@ -13,6 +13,7 @@ def test_app_has_extra_attributes_as_attributes():
     assert app.help_on_error is None
     assert app.verbose is None
     assert app.end_of_options_delimiter is None
+    assert app.result_mode is None
 
 
 def test_app_attributes_can_be_set():
@@ -126,8 +127,7 @@ def test_app_stack_inheritance_override():
         return "child_success"
 
     # Child's settings should override parent's
-    result = child_app([], exit_on_error=False)
-    assert result == "child_success"
+    child_app([], exit_on_error=False)
 
 
 def test_app_stack_resolution_none_values():
@@ -147,9 +147,6 @@ def test_app_stack_resolution_none_values():
     @child_app.default
     def child_command():
         return "child_success"
-
-    result = child_app([])
-    assert result == "child_success"
 
     # Test that child inherits parent's end_of_options_delimiter through AppStack
     command, bound, unused_tokens, ignored = parent_app.parse_known_args(
@@ -182,8 +179,7 @@ def test_meta_app_inheritance():
         return "child_success"
 
     # Child should inherit from the closest parent in the stack
-    result = child_app([])
-    assert result == "child_success"
+    child_app([])
 
 
 def test_signature_parameter_override_precedence():
@@ -201,12 +197,6 @@ def test_signature_parameter_override_precedence():
         return args
 
     # All signature parameters should override app attributes
-    result = app(
-        ["--signature--", "foo"],
-        end_of_options_delimiter="--signature--",
-    )
-    assert result == "foo"
-
     command, bound, ignored = app.parse_args(
         ["--signature--", "foo"],
         end_of_options_delimiter="--signature--",

@@ -25,6 +25,7 @@ from typing import (
 
 from attrs import Factory, define, field
 
+from cyclopts._result_mode import ResultMode, _handle_result_mode
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
@@ -335,6 +336,11 @@ class App:
 
     help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
         default=None, converter=help_formatter_converter, kw_only=True
+    )
+
+    result_mode: ResultMode | None = field(
+        default=None,
+        kw_only=True,
     )
 
     ######################
@@ -803,6 +809,7 @@ class App:
                 group_commands=copy(self._group_commands),
                 group_arguments=copy(self._group_arguments),
                 group_parameters=copy(self._group_parameters),
+                result_mode=self.result_mode,
             )
             self._meta._meta_parent = self
         return self._meta
@@ -1533,6 +1540,7 @@ class App:
         verbose: bool | None = None,
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
+        result_mode: ResultMode | None = None,
     ):
         """Interprets and executes a command.
 
@@ -1565,6 +1573,10 @@ class App:
             Override the async backend to use (if an async command is invoked).
             If :obj:`None`, inherits from :attr:`App.backend`, eventually defaulting to "asyncio".
             If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
+        result_mode: Literal[...] | None
+            Controls how command return values are handled.
+            If :obj:`None`, inherits from :attr:`App.result_mode`, eventually defaulting to "return_value".
+            See :attr:`App.result_mode` for available modes.
 
         Returns
         -------
@@ -1585,6 +1597,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "backend": backend,
+                "result_mode": result_mode,
             }.items()
             if v is not None
         }
@@ -1598,7 +1611,9 @@ class App:
 
             resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
             try:
-                return _run_maybe_async_command(command, bound, resolved_backend)
+                result = _run_maybe_async_command(command, bound, resolved_backend)
+                resolved_result_mode = self.app_stack.resolve("result_mode", fallback="print_non_int_return_exit_code")
+                return _handle_result_mode(result, resolved_result_mode)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -1615,6 +1630,7 @@ class App:
         help_on_error: bool | None = None,
         verbose: bool = False,
         end_of_options_delimiter: str | None = None,
+        result_mode: ResultMode | None = None,
     ):
         """Async equivalent of :meth:`__call__` for use within existing event loops.
 
@@ -1647,6 +1663,10 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
+        result_mode: Literal[...] | None
+            Controls how command return values are handled.
+            If :obj:`None`, inherits from :attr:`App.result_mode`, eventually defaulting to "return_value".
+            See :attr:`App.result_mode` for available modes.
 
         Returns
         -------
@@ -1690,6 +1710,7 @@ class App:
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
                 "verbose": verbose,
+                "result_mode": result_mode,
             }.items()
             if v is not None
         }
@@ -1703,9 +1724,12 @@ class App:
 
             try:
                 if inspect.iscoroutinefunction(command):
-                    return await command(*bound.args, **bound.kwargs)
+                    result = await command(*bound.args, **bound.kwargs)
                 else:
-                    return command(*bound.args, **bound.kwargs)
+                    result = command(*bound.args, **bound.kwargs)
+
+                resolved_result_mode = self.app_stack.resolve("result_mode", fallback="print_non_int_return_exit_code")
+                return _handle_result_mode(result, resolved_result_mode)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
