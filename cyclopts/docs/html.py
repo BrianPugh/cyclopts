@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from cyclopts._markup import escape_html, extract_plain_text
+from cyclopts._markup import escape_html, extract_text
 from cyclopts.docs.base import BaseDocGenerator
 
 if TYPE_CHECKING:
@@ -399,7 +399,7 @@ def generate_html_docs(
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
     description = BaseDocGenerator.extract_description(app, help_format)
     if description:
-        desc_text = extract_plain_text(description, None)
+        desc_text = extract_text(description, None)
         if desc_text:
             lines.append(f'<div class="app-description">{escape_html(desc_text)}</div>')
 
@@ -420,7 +420,7 @@ def generate_html_docs(
         if isinstance(usage, str):
             usage_text = usage
         else:
-            usage_text = extract_plain_text(usage, None)
+            usage_text = extract_text(usage, None)
         usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
@@ -479,7 +479,7 @@ def generate_html_docs(
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
                 if sub_description:
-                    sub_desc_text = extract_plain_text(sub_description, None)
+                    sub_desc_text = extract_text(sub_description, None)
                     if sub_desc_text:
                         lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
@@ -495,7 +495,7 @@ def generate_html_docs(
                     if isinstance(sub_usage, str):
                         sub_usage_text = sub_usage
                     else:
-                        sub_usage_text = extract_plain_text(sub_usage, None)
+                        sub_usage_text = extract_text(sub_usage, None)
                     sub_usage_text = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")

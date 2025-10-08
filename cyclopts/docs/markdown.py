@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from cyclopts._markup import extract_plain_text
+from cyclopts._markup import extract_text
 from cyclopts.docs.base import BaseDocGenerator
 
 if TYPE_CHECKING:
@@ -126,7 +126,7 @@ def generate_markdown_docs(
         # Extract plain text from description
         # Preserve markup when help_format matches output format (markdown)
         preserve = help_format in ("markdown", "md")
-        desc_text = extract_plain_text(description, None, preserve_markup=preserve)
+        desc_text = extract_text(description, None, preserve_markup=preserve)
         if desc_text:
             lines.append(desc_text.strip())
             lines.append("")
@@ -150,7 +150,7 @@ def generate_markdown_docs(
         if isinstance(usage, str):
             usage_text = usage
         else:
-            usage_text = extract_plain_text(usage, None, preserve_markup=False)
+            usage_text = extract_text(usage, None, preserve_markup=False)
         usage_line = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
         lines.append(usage_line)
         lines.append("```")
@@ -263,7 +263,7 @@ def generate_markdown_docs(
                     preserve_sub = sub_help_format in ("markdown", "md")
                     sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
                     if sub_description:
-                        sub_desc_text = extract_plain_text(sub_description, None, preserve_markup=preserve_sub)
+                        sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
                         if sub_desc_text:
                             lines.append(sub_desc_text.strip())
                             lines.append("")
@@ -277,7 +277,7 @@ def generate_markdown_docs(
                         if isinstance(sub_usage, str):
                             sub_usage_text = sub_usage
                         else:
-                            sub_usage_text = extract_plain_text(sub_usage, None, preserve_markup=False)
+                            sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
                         usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
                         lines.append(usage_line)
                         lines.append("```")
@@ -357,9 +357,7 @@ def generate_markdown_docs(
                                         if entry.names:
                                             cmd_name = entry.names[0]
                                             desc_text = (
-                                                extract_plain_text(
-                                                    entry.description, None, preserve_markup=preserve_sub
-                                                )
+                                                extract_text(entry.description, None, preserve_markup=preserve_sub)
                                                 if entry.description
                                                 else ""
                                             )

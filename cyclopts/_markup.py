@@ -10,23 +10,23 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
-    """Extract plain text from Rich renderables or any object.
+def extract_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
+    """Extract text from Rich renderables or any object.
 
     Parameters
     ----------
     obj : Any
-        Object to convert to plain text.
+        Object to convert to text.
     console : Console | None
         Console for rendering Rich objects.
     preserve_markup : bool
         If True, preserve original markdown/RST markup when available.
-        Should be True when input and output formats match.
+        When False, always render to plain text.
 
     Returns
     -------
     str
-        Plain text representation.
+        Text representation (plain or with markup preserved).
     """
     if obj is None:
         return ""
@@ -36,7 +36,7 @@ def extract_plain_text(obj: Any, console: Optional["Console"] = None, preserve_m
         if primary is not None:
             if preserve_markup and hasattr(primary, "markup"):
                 return primary.markup.rstrip()
-            return extract_plain_text(primary, console, preserve_markup=preserve_markup)
+            return extract_text(primary, console, preserve_markup=preserve_markup)
 
     if hasattr(obj, "plain"):
         return obj.plain.rstrip()

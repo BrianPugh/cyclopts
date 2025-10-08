@@ -162,11 +162,11 @@ def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> s
     str
         Plain text (not shell-escaped).
     """
-    from cyclopts._markup import extract_plain_text
+    from cyclopts._markup import extract_text
     from cyclopts.help.inline_text import InlineText
 
     inline = InlineText.from_format(text, format=format)
-    text = extract_plain_text(inline)
+    text = extract_text(inline)
 
     text = re.sub(r"[\x00-\x1f\x7f]", "", text)
     text = re.sub(r"\s+", " ", text).strip()

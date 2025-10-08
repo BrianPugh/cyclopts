@@ -3,7 +3,7 @@
 import io
 from typing import TYPE_CHECKING, Any, Optional
 
-from cyclopts._markup import escape_html, extract_plain_text
+from cyclopts._markup import escape_html, extract_text
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -31,7 +31,7 @@ def _format_type_name(type_obj: Any) -> str:
     if hasattr(type_obj, "plain"):
         type_str = type_obj.plain.rstrip()
     elif hasattr(type_obj, "__rich_console__"):
-        type_str = extract_plain_text(type_obj, None)
+        type_str = extract_text(type_obj, None)
     else:
         type_str = str(type_obj)
 
@@ -127,12 +127,12 @@ class HtmlFormatter:
 
         # Write panel title as heading
         if panel.title:
-            title_text = escape_html(extract_plain_text(panel.title, console))
+            title_text = escape_html(extract_text(panel.title, console))
             self._output.write(f'<h{self.heading_level} class="panel-title">{title_text}</h{self.heading_level}>\n')
 
         # Write panel description if present
         if panel.description:
-            desc_text = escape_html(extract_plain_text(panel.description, console))
+            desc_text = escape_html(extract_text(panel.description, console))
             if desc_text:
                 self._output.write(f'<div class="panel-description">{desc_text}</div>\n')
 
@@ -190,7 +190,7 @@ class HtmlFormatter:
                 # Fallback to non-linked format
                 name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names) if names else ""
 
-            desc_html = escape_html(extract_plain_text(entry.description, console))
+            desc_html = escape_html(extract_text(entry.description, console))
 
             self._output.write(f"<li><strong>{name_html}</strong>")
             if desc_html:
@@ -224,7 +224,7 @@ class HtmlFormatter:
                 names.extend(entry.shorts)
 
             # Check if this is a boolean flag with a default
-            default_str = extract_plain_text(entry.default, console) if entry.default is not None else None
+            default_str = extract_text(entry.default, console) if entry.default is not None else None
             is_bool_flag = False
 
             # Look for --no- prefixed names to determine if this is a boolean flag
@@ -258,7 +258,7 @@ class HtmlFormatter:
             self._output.write(f"<li><strong>{name_html}</strong>")
 
             # Add description
-            desc = extract_plain_text(entry.description, console)
+            desc = extract_text(entry.description, console)
             if desc:
                 self._output.write(f": {escape_html(desc)}")
 
@@ -337,7 +337,7 @@ class HtmlFormatter:
             The usage line content.
         """
         if usage:
-            usage_text = escape_html(extract_plain_text(usage, console))
+            usage_text = escape_html(extract_text(usage, console))
             if usage_text:
                 self._output.write('<div class="usage-block">\n')
                 self._output.write(f'<pre class="usage">{usage_text}</pre>\n')
@@ -361,6 +361,6 @@ class HtmlFormatter:
             The description content.
         """
         if description:
-            desc_text = escape_html(extract_plain_text(description, console))
+            desc_text = escape_html(extract_text(description, console))
             if desc_text:
                 self._output.write(f'<div class="description">{desc_text}</div>\n')

@@ -2,7 +2,7 @@
 
 from textwrap import dedent
 
-from cyclopts._markup import escape_html, extract_plain_text
+from cyclopts._markup import escape_html, extract_text
 from cyclopts.help import HelpEntry, HelpPanel
 from cyclopts.help.formatters.html import HtmlFormatter
 
@@ -178,20 +178,20 @@ def testescape_html():
     assert escape_html("") == ""
 
 
-def testextract_plain_text():
-    """Test plain text extraction from various objects."""
+def test_extract_text():
+    """Test text extraction from various objects."""
     # Test None
-    assert extract_plain_text(None) == ""
+    assert extract_text(None) == ""
 
     # Test string
-    assert extract_plain_text("hello world") == "hello world"
+    assert extract_text("hello world") == "hello world"
 
     # Test object with __str__
     class TestObj:
         def __str__(self):
             return "test object"
 
-    assert extract_plain_text(TestObj()) == "test object"
+    assert extract_text(TestObj()) == "test object"
 
 
 def test_parameter_table_with_all_metadata():
