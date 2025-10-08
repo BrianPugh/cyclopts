@@ -1529,6 +1529,12 @@ class App:
 
         return command, bound, ignored
 
+    def _is_nested_call(self) -> bool:
+        """Check if this is a nested call (meta app pattern or same-app recursion)."""
+        return len(self.app_stack.overrides_stack) > 1 or (
+            self._meta is not None and len(self._meta.app_stack.overrides_stack) > 1
+        )
+
     def __call__(
         self,
         tokens: None | str | Iterable[str] = None,
@@ -1601,6 +1607,9 @@ class App:
             }.items()
             if v is not None
         }
+
+        if self._is_nested_call():
+            overrides.setdefault("result_mode", "return_value")
 
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
@@ -1714,6 +1723,9 @@ class App:
             }.items()
             if v is not None
         }
+
+        if self._is_nested_call():
+            overrides.setdefault("result_mode", "return_value")
 
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(

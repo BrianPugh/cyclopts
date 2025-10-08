@@ -559,3 +559,73 @@ def test_result_mode_return_bool_as_exit_code_with_string():
 
     assert result == 0
     assert buf.getvalue() == "Hello Alice!\n"
+
+
+# ==============================================================================
+# Meta app tests
+# ==============================================================================
+
+
+def test_result_mode_with_meta_app_exit_mode(monkeypatch):
+    """result_mode with meta app: exit modes should apply at meta level, not inner level."""
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    app = App(result_mode="print_non_int_call_sys_exit")
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        # Inner call should return value, not exit
+        result = app(tokens)
+        # This should execute (meta function should complete)
+        return f"Meta wrapper: {result}"
+
+    @app.default
+    def command() -> str:
+        return "Hello from command"
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app.meta([])
+
+    # Should print "Meta wrapper: Hello from command"
+    assert buf.getvalue() == "Meta wrapper: Hello from command\n"
+    # Should call sys.exit at meta level
+    assert exit_code == 0
+
+
+def test_result_mode_with_meta_app_return_mode():
+    """result_mode with meta app: non-exit modes should work correctly."""
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    app = App(result_mode="print_non_int_return_exit_code")
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+        # Inner call should return value
+        result = app(tokens)
+        # This should execute (meta function should complete)
+        return f"Meta: {result}"
+
+    @app.default
+    def command() -> str:
+        return "Hello"
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app.meta([])
+
+    # Inner command returns "Hello", meta wraps it as "Meta: Hello"
+    assert result == 0
+    assert buf.getvalue() == "Meta: Hello\n"
