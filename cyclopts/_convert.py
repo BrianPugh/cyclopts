@@ -79,9 +79,13 @@ def _int(s: str) -> int:
         return int(s, 8)
     elif s.startswith("0b"):
         return int(s, 2)
-    else:
+    elif "." in s:
         # Casting to a float first allows for things like "30.0"
+        # We handle this conditionally because very large integers can lose
+        # meaningful precision when cast to a float.
         return int(round(float(s)))
+    else:
+        return int(s)
 
 
 def _bytes(s: str) -> bytes:

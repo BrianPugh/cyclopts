@@ -497,6 +497,27 @@ def test_bind_int_advanced_coercion_error(app):
         app.parse_args("foo", exit_on_error=False)
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "10000000000000001",
+        "10000000000000011",
+        "100000000000000111234",
+    ],
+)
+def test_bind_large_int(app, assert_parse_args, value):
+    """Test that large integers are parsed correctly without precision loss.
+
+    Reproduces bug: https://github.com/BrianPugh/cyclopts/issues/581
+    """
+
+    @app.default
+    def foo(a: int):
+        pass
+
+    assert_parse_args(foo, value, int(value))
+
+
 def test_bind_override_app_groups(app):
     g_commands = Group("Custom Commands")
     g_arguments = Group("Custom Arguments")
