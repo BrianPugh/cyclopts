@@ -38,7 +38,7 @@ def chdir_to_tmp_path(tmp_path, monkeypatch):
 
 @pytest.fixture
 def app():
-    return cyclopts.App(result_mode="return_value")
+    return cyclopts.App(result_action="return_value")
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ def convert():
     """
 
     def inner(type_, cmd):
-        app = cyclopts.App(result_mode="return_value")
+        app = cyclopts.App(result_action="return_value")
 
         if isinstance(cmd, Path):
             cmd = cmd.as_posix()

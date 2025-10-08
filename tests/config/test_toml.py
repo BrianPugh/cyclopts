@@ -55,7 +55,7 @@ def test_duplicate_config_toml_with_meta(config_path):
             Toml("config.toml", root_keys=("this-test",)),
             Toml("config.toml", root_keys=("this-test",)),  # Duplicate configs should still work.
         ),
-        result_mode="return_value",
+        result_action="return_value",
     )
 
     @app.meta.default

@@ -13,7 +13,7 @@ def test_app_has_extra_attributes_as_attributes():
     assert app.help_on_error is None
     assert app.verbose is None
     assert app.end_of_options_delimiter is None
-    assert app.result_mode is None
+    assert app.result_action is None
 
 
 def test_app_attributes_can_be_set():

@@ -1,19 +1,18 @@
-"""Tests for App result_mode parameter with explicit naming.
+"""Tests for App result_action parameter with explicit naming.
 
 Result Mode Behavior Table:
-========================================================================================
-Mode                           | str result  | int result | None | bool result | other
-----------------------------------------------------------------------------------------
-return_value                   | return str  | return int | None | return bool | return
-print_non_int_return_exit_code | print → 0   | return int | 0    | print → 0   | print → 0
-print_str_return_exit_code     | print → 0   | return int | 0    | 0 (silent)  | 0 (silent)
-print_str_return_zero          | print → 0   | 0 (silent) | 0    | 0 (silent)  | 0 (silent)
-print_non_none_return_exit_code| print → 0   | print & int| 0    | print → 0   | print → 0
-print_non_none_return_zero     | print → 0   | print → 0  | 0    | print → 0   | print → 0
-return_exit_code        | 0 (silent)  | return int | 0    | 0 (silent)  | 0 (silent)
-print_non_int_call_sys_exit    | print exit  | sys.exit   | exit | print exit  | print exit
-return_bool_as_exit_code       | print → 0   | return int | 0    | T→0 / F→1   | print → 0
-========================================================================================
+===================================================================================================
+Mode                                    | str result  | int result | None | bool result | other
+---------------------------------------------------------------------------------------------------
+return_value                            | return str  | return int | None | return bool | return
+print_non_int_return_int_as_exit_code   | print → 0   | return int | 0    | T→0 / F→1   | print → 0
+print_str_return_int_as_exit_code       | print → 0   | return int | 0    | T→0 / F→1   | 0 (silent)
+print_str_return_zero                   | print → 0   | 0 (silent) | 0    | print → 0   | 0 (silent)
+print_non_none_return_int_as_exit_code  | print → 0   | print & int| 0    | print & T→0/F→1 | print → 0
+print_non_none_return_zero              | print → 0   | print → 0  | 0    | print → 0   | print → 0
+return_int_as_exit_code_else_zero       | 0 (silent)  | return int | 0    | T→0 / F→1   | 0 (silent)
+print_non_int_sys_exit                  | print exit  | sys.exit   | exit | T→exit0/F→exit1 | print exit
+===================================================================================================
 """
 
 from contextlib import redirect_stdout
@@ -26,9 +25,9 @@ from cyclopts import App
 # ==============================================================================
 
 
-def test_result_mode_return_value_with_string():
+def test_result_action_return_value_with_string():
     """return_value: returns string unchanged."""
-    app = App(result_mode="return_value")
+    app = App(result_action="return_value")
 
     @app.command
     def greet(name: str) -> str:
@@ -38,9 +37,9 @@ def test_result_mode_return_value_with_string():
     assert result == "Hello Alice!"
 
 
-def test_result_mode_return_value_with_int():
+def test_result_action_return_value_with_int():
     """return_value: returns int unchanged."""
-    app = App(result_mode="return_value")
+    app = App(result_action="return_value")
 
     @app.command
     def double(number: int) -> int:
@@ -50,9 +49,9 @@ def test_result_mode_return_value_with_int():
     assert result == 10
 
 
-def test_result_mode_return_value_with_none():
+def test_result_action_return_value_with_none():
     """return_value: returns None unchanged."""
-    app = App(result_mode="return_value")
+    app = App(result_action="return_value")
 
     @app.command
     def do_nothing() -> None:
@@ -63,13 +62,13 @@ def test_result_mode_return_value_with_none():
 
 
 # ==============================================================================
-# print_non_int_return_exit_code tests
+# print_non_int_return_int_as_exit_code tests
 # ==============================================================================
 
 
-def test_result_mode_print_non_int_return_exit_code_with_string():
-    """print_non_int_return_exit_code: prints string and returns 0."""
-    app = App(result_mode="print_non_int_return_exit_code")
+def test_result_action_print_non_int_return_int_as_exit_code_with_string():
+    """print_non_int_return_int_as_exit_code: prints string and returns 0."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
 
     @app.command
     def greet(name: str) -> str:
@@ -83,9 +82,9 @@ def test_result_mode_print_non_int_return_exit_code_with_string():
     assert buf.getvalue() == "Hello Bob!\n"
 
 
-def test_result_mode_print_non_int_return_exit_code_with_int():
-    """print_non_int_return_exit_code: returns int as exit code, no print."""
-    app = App(result_mode="print_non_int_return_exit_code")
+def test_result_action_print_non_int_return_int_as_exit_code_with_int():
+    """print_non_int_return_int_as_exit_code: returns int as exit code, no print."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
 
     @app.command
     def get_exit_code(code: int) -> int:
@@ -99,9 +98,9 @@ def test_result_mode_print_non_int_return_exit_code_with_int():
     assert buf.getvalue() == ""
 
 
-def test_result_mode_print_non_int_return_exit_code_with_none():
-    """print_non_int_return_exit_code: returns 0 for None without printing."""
-    app = App(result_mode="print_non_int_return_exit_code")
+def test_result_action_print_non_int_return_int_as_exit_code_with_none():
+    """print_non_int_return_int_as_exit_code: returns 0 for None without printing."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
 
     @app.command
     def do_nothing() -> None:
@@ -115,9 +114,9 @@ def test_result_mode_print_non_int_return_exit_code_with_none():
     assert buf.getvalue() == ""
 
 
-def test_result_mode_print_non_int_return_exit_code_with_list():
-    """print_non_int_return_exit_code: prints list and returns 0."""
-    app = App(result_mode="print_non_int_return_exit_code")
+def test_result_action_print_non_int_return_int_as_exit_code_with_list():
+    """print_non_int_return_int_as_exit_code: prints list and returns 0."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
 
     @app.command
     def get_list() -> list:
@@ -131,14 +130,46 @@ def test_result_mode_print_non_int_return_exit_code_with_list():
     assert buf.getvalue() == "[1, 2, 3]\n"
 
 
+def test_result_action_print_non_int_return_int_as_exit_code_with_true():
+    """print_non_int_return_int_as_exit_code: True returns 0."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_print_non_int_return_int_as_exit_code_with_false():
+    """print_non_int_return_int_as_exit_code: False returns 1."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 1
+    assert buf.getvalue() == ""
+
+
 # ==============================================================================
-# print_str_return_exit_code tests
+# print_str_return_int_as_exit_code tests
 # ==============================================================================
 
 
-def test_result_mode_print_str_return_exit_code_with_string():
-    """print_str_return_exit_code: prints string and returns 0."""
-    app = App(result_mode="print_str_return_exit_code")
+def test_result_action_print_str_return_int_as_exit_code_with_string():
+    """print_str_return_int_as_exit_code: prints string and returns 0."""
+    app = App(result_action="print_str_return_int_as_exit_code")
 
     @app.command
     def greet(name: str) -> str:
@@ -152,9 +183,9 @@ def test_result_mode_print_str_return_exit_code_with_string():
     assert buf.getvalue() == "Hello Alice!\n"
 
 
-def test_result_mode_print_str_return_exit_code_with_int():
-    """print_str_return_exit_code: returns int as exit code, no print."""
-    app = App(result_mode="print_str_return_exit_code")
+def test_result_action_print_str_return_int_as_exit_code_with_int():
+    """print_str_return_int_as_exit_code: returns int as exit code, no print."""
+    app = App(result_action="print_str_return_int_as_exit_code")
 
     @app.command
     def get_exit_code(code: int) -> int:
@@ -168,9 +199,9 @@ def test_result_mode_print_str_return_exit_code_with_int():
     assert buf.getvalue() == ""
 
 
-def test_result_mode_print_str_return_exit_code_with_list():
-    """print_str_return_exit_code: doesn't print non-string objects, returns 0."""
-    app = App(result_mode="print_str_return_exit_code")
+def test_result_action_print_str_return_int_as_exit_code_with_list():
+    """print_str_return_int_as_exit_code: doesn't print non-string objects, returns 0."""
+    app = App(result_action="print_str_return_int_as_exit_code")
 
     @app.command
     def get_list() -> list:
@@ -184,14 +215,46 @@ def test_result_mode_print_str_return_exit_code_with_list():
     assert buf.getvalue() == ""
 
 
+def test_result_action_print_str_return_int_as_exit_code_with_true():
+    """print_str_return_int_as_exit_code: True returns 0."""
+    app = App(result_action="print_str_return_int_as_exit_code")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_print_str_return_int_as_exit_code_with_false():
+    """print_str_return_int_as_exit_code: False returns 1."""
+    app = App(result_action="print_str_return_int_as_exit_code")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 1
+    assert buf.getvalue() == ""
+
+
 # ==============================================================================
 # print_str_return_zero tests
 # ==============================================================================
 
 
-def test_result_mode_print_str_return_zero_with_string():
+def test_result_action_print_str_return_zero_with_string():
     """print_str_return_zero: prints string and returns 0."""
-    app = App(result_mode="print_str_return_zero")
+    app = App(result_action="print_str_return_zero")
 
     @app.command
     def greet(name: str) -> str:
@@ -205,9 +268,9 @@ def test_result_mode_print_str_return_zero_with_string():
     assert buf.getvalue() == "Hello Alice!\n"
 
 
-def test_result_mode_print_str_return_zero_with_int():
+def test_result_action_print_str_return_zero_with_int():
     """print_str_return_zero: doesn't print int, returns 0."""
-    app = App(result_mode="print_str_return_zero")
+    app = App(result_action="print_str_return_zero")
 
     @app.command
     def get_number() -> int:
@@ -222,13 +285,13 @@ def test_result_mode_print_str_return_zero_with_int():
 
 
 # ==============================================================================
-# print_non_none_return_exit_code tests
+# print_non_none_return_int_as_exit_code tests
 # ==============================================================================
 
 
-def test_result_mode_print_non_none_return_exit_code_with_string():
-    """print_non_none_return_exit_code: prints string and returns 0."""
-    app = App(result_mode="print_non_none_return_exit_code")
+def test_result_action_print_non_none_return_int_as_exit_code_with_string():
+    """print_non_none_return_int_as_exit_code: prints string and returns 0."""
+    app = App(result_action="print_non_none_return_int_as_exit_code")
 
     @app.command
     def greet(name: str) -> str:
@@ -242,9 +305,9 @@ def test_result_mode_print_non_none_return_exit_code_with_string():
     assert buf.getvalue() == "Hello Alice!\n"
 
 
-def test_result_mode_print_non_none_return_exit_code_with_int():
-    """print_non_none_return_exit_code: prints int but returns it as exit code."""
-    app = App(result_mode="print_non_none_return_exit_code")
+def test_result_action_print_non_none_return_int_as_exit_code_with_int():
+    """print_non_none_return_int_as_exit_code: prints int but returns it as exit code."""
+    app = App(result_action="print_non_none_return_int_as_exit_code")
 
     @app.command
     def get_number() -> int:
@@ -258,14 +321,46 @@ def test_result_mode_print_non_none_return_exit_code_with_int():
     assert buf.getvalue() == "42\n"
 
 
+def test_result_action_print_non_none_return_int_as_exit_code_with_true():
+    """print_non_none_return_int_as_exit_code: prints True and returns 0."""
+    app = App(result_action="print_non_none_return_int_as_exit_code")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 0
+    assert buf.getvalue() == "True\n"
+
+
+def test_result_action_print_non_none_return_int_as_exit_code_with_false():
+    """print_non_none_return_int_as_exit_code: prints False and returns 1."""
+    app = App(result_action="print_non_none_return_int_as_exit_code")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 1
+    assert buf.getvalue() == "False\n"
+
+
 # ==============================================================================
 # print_non_none_return_zero tests
 # ==============================================================================
 
 
-def test_result_mode_print_non_none_return_zero_with_string():
+def test_result_action_print_non_none_return_zero_with_string():
     """print_non_none_return_zero: prints string and returns 0."""
-    app = App(result_mode="print_non_none_return_zero")
+    app = App(result_action="print_non_none_return_zero")
 
     @app.command
     def greet(name: str) -> str:
@@ -279,9 +374,9 @@ def test_result_mode_print_non_none_return_zero_with_string():
     assert buf.getvalue() == "Hello Alice!\n"
 
 
-def test_result_mode_print_non_none_return_zero_with_int():
+def test_result_action_print_non_none_return_zero_with_int():
     """print_non_none_return_zero: prints int but returns 0."""
-    app = App(result_mode="print_non_none_return_zero")
+    app = App(result_action="print_non_none_return_zero")
 
     @app.command
     def get_number() -> int:
@@ -296,13 +391,13 @@ def test_result_mode_print_non_none_return_zero_with_int():
 
 
 # ==============================================================================
-# return_exit_code tests
+# return_int_as_exit_code_else_zero tests
 # ==============================================================================
 
 
-def test_result_mode_return_exit_code_with_string():
-    """return_exit_code: doesn't print string, returns 0."""
-    app = App(result_mode="return_exit_code")
+def test_result_action_return_int_as_exit_code_else_zero_with_string():
+    """return_int_as_exit_code_else_zero: doesn't print string, returns 0."""
+    app = App(result_action="return_int_as_exit_code_else_zero")
 
     @app.command
     def greet(name: str) -> str:
@@ -316,9 +411,9 @@ def test_result_mode_return_exit_code_with_string():
     assert buf.getvalue() == ""
 
 
-def test_result_mode_return_exit_code_with_int():
-    """return_exit_code: returns int as exit code, no print."""
-    app = App(result_mode="return_exit_code")
+def test_result_action_return_int_as_exit_code_else_zero_with_int():
+    """return_int_as_exit_code_else_zero: returns int as exit code, no print."""
+    app = App(result_action="return_int_as_exit_code_else_zero")
 
     @app.command
     def get_exit_code(code: int) -> int:
@@ -332,14 +427,46 @@ def test_result_mode_return_exit_code_with_int():
     assert buf.getvalue() == ""
 
 
+def test_result_action_return_int_as_exit_code_else_zero_with_true():
+    """return_int_as_exit_code_else_zero: True returns 0."""
+    app = App(result_action="return_int_as_exit_code_else_zero")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_return_int_as_exit_code_else_zero_with_false():
+    """return_int_as_exit_code_else_zero: False returns 1."""
+    app = App(result_action="return_int_as_exit_code_else_zero")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["check"])
+
+    assert result == 1
+    assert buf.getvalue() == ""
+
+
 # ==============================================================================
-# print_non_int_call_sys_exit tests
+# print_non_int_sys_exit tests
 # ==============================================================================
 
 
-def test_result_mode_print_non_int_call_sys_exit_with_string(monkeypatch):
-    """print_non_int_call_sys_exit: prints and calls sys.exit(0)."""
-    app = App(result_mode="print_non_int_call_sys_exit")
+def test_result_action_print_non_int_sys_exit_with_string(monkeypatch):
+    """print_non_int_sys_exit: prints and calls sys.exit(0)."""
+    app = App(result_action="print_non_int_sys_exit")
 
     @app.command
     def greet(name: str) -> str:
@@ -361,9 +488,9 @@ def test_result_mode_print_non_int_call_sys_exit_with_string(monkeypatch):
     assert buf.getvalue() == "Hello Alice!\n"
 
 
-def test_result_mode_print_non_int_call_sys_exit_with_int(monkeypatch):
-    """print_non_int_call_sys_exit: calls sys.exit with int value."""
-    app = App(result_mode="print_non_int_call_sys_exit")
+def test_result_action_print_non_int_sys_exit_with_int(monkeypatch):
+    """print_non_int_sys_exit: calls sys.exit with int value."""
+    app = App(result_action="print_non_int_sys_exit")
 
     @app.command
     def get_exit_code(code: int) -> int:
@@ -385,8 +512,56 @@ def test_result_mode_print_non_int_call_sys_exit_with_int(monkeypatch):
     assert buf.getvalue() == ""
 
 
-def test_result_mode_default_is_print_non_int_return_exit_code():
-    """Default result_mode should be 'print_non_int_return_exit_code'."""
+def test_result_action_print_non_int_sys_exit_with_true(monkeypatch):
+    """print_non_int_sys_exit: True calls sys.exit(0)."""
+    app = App(result_action="print_non_int_sys_exit")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["check"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_print_non_int_sys_exit_with_false(monkeypatch):
+    """print_non_int_sys_exit: False calls sys.exit(1)."""
+    app = App(result_action="print_non_int_sys_exit")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["check"])
+
+    assert exit_code == 1
+    assert buf.getvalue() == ""
+
+
+def test_result_action_default_is_print_non_int_return_int_as_exit_code():
+    """Default result_action should be 'print_non_int_return_int_as_exit_code'."""
     app = App()
 
     @app.command
@@ -401,9 +576,9 @@ def test_result_mode_default_is_print_non_int_return_exit_code():
     assert buf.getvalue() == "Hello Charlie!\n"
 
 
-def test_result_mode_override_in_call():
-    """result_mode can be overridden in __call__."""
-    app = App(result_mode="return_value")
+def test_result_action_override_in_call():
+    """result_action can be overridden in __call__."""
+    app = App(result_action="return_value")
 
     @app.command
     def greet(name: str) -> str:
@@ -413,26 +588,26 @@ def test_result_mode_override_in_call():
     result = app(["greet", "Alice"])
     assert result == "Hello Alice!"
 
-    # Override to print_non_int_return_exit_code
+    # Override to print_non_int_return_int_as_exit_code
     buf = StringIO()
     with redirect_stdout(buf):
-        result = app(["greet", "Bob"], result_mode="print_non_int_return_exit_code")
+        result = app(["greet", "Bob"], result_action="print_non_int_return_int_as_exit_code")
     assert result == 0
     assert buf.getvalue() == "Hello Bob!\n"
 
-    # Override to return_exit_code
+    # Override to return_int_as_exit_code_else_zero
     buf = StringIO()
     with redirect_stdout(buf):
-        result = app(["greet", "Charlie"], result_mode="return_exit_code")
+        result = app(["greet", "Charlie"], result_action="return_int_as_exit_code_else_zero")
     assert result == 0
     assert buf.getvalue() == ""
 
 
-def test_result_mode_inheritance():
-    """result_mode inherits from parent app when None and called through parent."""
-    parent_app = App(result_mode="return_value")
+def test_result_action_inheritance():
+    """result_action inherits from parent app when None and called through parent."""
+    parent_app = App(result_action="return_value")
 
-    child_app = App(name="child")  # result_mode=None, should inherit
+    child_app = App(name="child")  # result_action=None, should inherit
     parent_app.command(child_app)
 
     @child_app.default
@@ -444,8 +619,8 @@ def test_result_mode_inheritance():
     assert result == "Hello Alice!"
 
     # Test with different parent mode
-    parent_app2 = App(result_mode="return_exit_code")
-    child_app2 = App(name="child2")  # result_mode=None
+    parent_app2 = App(result_action="return_int_as_exit_code_else_zero")
+    child_app2 = App(name="child2")  # result_action=None
     parent_app2.command(child_app2)
 
     @child_app2.default
@@ -460,103 +635,18 @@ def test_result_mode_inheritance():
     assert buf.getvalue() == ""
 
 
-def test_result_mode_none_defaults_to_print_non_int():
-    """result_mode=None defaults to print_non_int_return_exit_code when called standalone."""
-    app = App()  # result_mode=None
+def test_result_action_none_defaults_to_print_non_int():
+    """result_action=None defaults to print_non_int_return_int_as_exit_code when called standalone."""
+    app = App()  # result_action=None
 
     @app.default
     def greet(name: str) -> str:
         return f"Hello {name}!"
 
-    # Should use default fallback: print_non_int_return_exit_code
+    # Should use default fallback: print_non_int_return_int_as_exit_code
     buf = StringIO()
     with redirect_stdout(buf):
         result = app(["Alice"])
-    assert result == 0
-    assert buf.getvalue() == "Hello Alice!\n"
-
-
-# ==============================================================================
-# return_bool_as_exit_code tests
-# ==============================================================================
-
-
-def test_result_mode_return_bool_as_exit_code_with_true():
-    """return_bool_as_exit_code: True returns 0."""
-    app = App(result_mode="return_bool_as_exit_code")
-
-    @app.command
-    def check() -> bool:
-        return True
-
-    buf = StringIO()
-    with redirect_stdout(buf):
-        result = app(["check"])
-
-    assert result == 0
-    assert buf.getvalue() == ""
-
-
-def test_result_mode_return_bool_as_exit_code_with_false():
-    """return_bool_as_exit_code: False returns 1."""
-    app = App(result_mode="return_bool_as_exit_code")
-
-    @app.command
-    def check() -> bool:
-        return False
-
-    buf = StringIO()
-    with redirect_stdout(buf):
-        result = app(["check"])
-
-    assert result == 1
-    assert buf.getvalue() == ""
-
-
-def test_result_mode_return_bool_as_exit_code_with_int():
-    """return_bool_as_exit_code: int returns as exit code, no print."""
-    app = App(result_mode="return_bool_as_exit_code")
-
-    @app.command
-    def get_exit_code(code: int) -> int:
-        return code
-
-    buf = StringIO()
-    with redirect_stdout(buf):
-        result = app(["get-exit-code", "42"])
-
-    assert result == 42
-    assert buf.getvalue() == ""
-
-
-def test_result_mode_return_bool_as_exit_code_with_none():
-    """return_bool_as_exit_code: None returns 0, no print."""
-    app = App(result_mode="return_bool_as_exit_code")
-
-    @app.command
-    def do_nothing() -> None:
-        pass
-
-    buf = StringIO()
-    with redirect_stdout(buf):
-        result = app(["do-nothing"])
-
-    assert result == 0
-    assert buf.getvalue() == ""
-
-
-def test_result_mode_return_bool_as_exit_code_with_string():
-    """return_bool_as_exit_code: string prints and returns 0."""
-    app = App(result_mode="return_bool_as_exit_code")
-
-    @app.command
-    def greet(name: str) -> str:
-        return f"Hello {name}!"
-
-    buf = StringIO()
-    with redirect_stdout(buf):
-        result = app(["greet", "Alice"])
-
     assert result == 0
     assert buf.getvalue() == "Hello Alice!\n"
 
@@ -566,13 +656,13 @@ def test_result_mode_return_bool_as_exit_code_with_string():
 # ==============================================================================
 
 
-def test_result_mode_with_meta_app_exit_mode(monkeypatch):
-    """result_mode with meta app: exit modes should apply at meta level, not inner level."""
+def test_result_action_with_meta_app_exit_mode(monkeypatch):
+    """result_action with meta app: exit modes should apply at meta level, not inner level."""
     from typing import Annotated
 
     from cyclopts import Parameter
 
-    app = App(result_mode="print_non_int_call_sys_exit")
+    app = App(result_action="print_non_int_sys_exit")
 
     @app.meta.default
     def meta(*tokens: Annotated[str, Parameter(allow_leading_hyphen=True)]):
@@ -603,13 +693,13 @@ def test_result_mode_with_meta_app_exit_mode(monkeypatch):
     assert exit_code == 0
 
 
-def test_result_mode_with_meta_app_return_mode():
-    """result_mode with meta app: non-exit modes should work correctly."""
+def test_result_action_with_meta_app_return_mode():
+    """result_action with meta app: non-exit modes should work correctly."""
     from typing import Annotated
 
     from cyclopts import Parameter
 
-    app = App(result_mode="print_non_int_return_exit_code")
+    app = App(result_action="print_non_int_return_int_as_exit_code")
 
     @app.meta.default
     def meta(*tokens: Annotated[str, Parameter(allow_leading_hyphen=True)]):
