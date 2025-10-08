@@ -22,6 +22,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    group_validators.rst
    help.rst
    version.rst
+   shell_completion.rst
    rules.rst
    text_editor.rst
    api

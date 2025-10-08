@@ -10,7 +10,6 @@ __all__ = [
     "format_doc",
     "format_usage",
     "InlineText",
-    "_get_choices",
     "DefaultFormatter",
     "MarkdownFormatter",
     "PlainFormatter",
@@ -23,7 +22,6 @@ from .formatters import DefaultFormatter, MarkdownFormatter, PlainFormatter
 from .help import (
     HelpEntry,
     HelpPanel,
-    _get_choices,
     create_parameter_help_panel,
     format_command_entries,
     format_doc,

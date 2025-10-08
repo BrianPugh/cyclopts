@@ -2,11 +2,34 @@
 
 import importlib.util
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cyclopts import App
+
+
+@contextmanager
+def _suppress_app_execution():
+    """Temporarily disable App.__call__ to prevent execution during module loading.
+
+    This context manager replaces App.__call__ with a no-op function, allowing
+    scripts that call app() at module level to be imported without executing.
+    """
+    from cyclopts import App
+
+    original_call = App.__call__
+
+    def _dummy_call(self, *args, **kwargs):
+        """No-op replacement for App.__call__ during module loading."""
+        return None
+
+    try:
+        App.__call__ = _dummy_call
+        yield
+    finally:
+        App.__call__ = original_call
 
 
 def load_app_from_script(script: str | Path) -> tuple["App", str]:
@@ -61,7 +84,9 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
 
     module = importlib.util.module_from_spec(spec)
     sys.modules["__cyclopts_doc_module"] = module
-    spec.loader.exec_module(module)
+
+    with _suppress_app_execution():
+        spec.loader.exec_module(module)
 
     # Find the App object
     if app_name:

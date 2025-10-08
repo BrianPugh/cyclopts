@@ -3,7 +3,8 @@
 import io
 from typing import TYPE_CHECKING, Any, Optional
 
-from cyclopts.help.formatters._shared import extract_plain_text, make_rst_section_header
+from cyclopts._markup import extract_text
+from cyclopts.help.formatters._shared import make_rst_section_header
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -67,13 +68,13 @@ class RstFormatter:
 
         # Write panel title as heading
         if panel.title:
-            title_text = extract_plain_text(panel.title, console)
+            title_text = extract_text(panel.title, console)
             header = "\n".join(make_rst_section_header(title_text, self.heading_level))
             self._output.write(f"{header}\n\n")
 
         # Write panel description if present
         if panel.description:
-            desc_text = extract_plain_text(panel.description, console)
+            desc_text = extract_text(panel.description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
 
@@ -116,7 +117,7 @@ class RstFormatter:
                     and hasattr(entry.description.primary_renderable, "__class__")
                     and "RestructuredText" in entry.description.primary_renderable.__class__.__name__
                 )
-                desc = extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
+                desc = extract_text(entry.description, console, preserve_markup=preserve_rst_markup)
                 if desc:
                     # Join multi-line descriptions into a single paragraph for proper RST formatting
                     # This prevents each line from being interpreted as a separate blockquote
@@ -166,7 +167,7 @@ class RstFormatter:
                     and hasattr(entry.description.primary_renderable, "__class__")
                     and "RestructuredText" in entry.description.primary_renderable.__class__.__name__
                 )
-                desc = extract_plain_text(entry.description, console, preserve_markup=preserve_rst_markup)
+                desc = extract_text(entry.description, console, preserve_markup=preserve_rst_markup)
                 if desc:
                     desc_parts.append(desc)
 
@@ -183,7 +184,7 @@ class RstFormatter:
                     metadata.append(f"Choices: {choices_str}")
 
                 if entry.default is not None:
-                    default_str = extract_plain_text(entry.default, console, preserve_markup=False)
+                    default_str = extract_text(entry.default, console, preserve_markup=False)
                     # For boolean flags, format as flag style
                     if entry.type and "bool" in str(entry.type):
                         # Find the appropriate flag name
@@ -240,7 +241,7 @@ class RstFormatter:
             The usage line content.
         """
         if usage:
-            usage_text = extract_plain_text(usage, console)
+            usage_text = extract_text(usage, console)
             if usage_text:
                 # Use literal block for usage
                 self._output.write("::\n\n")
@@ -267,6 +268,6 @@ class RstFormatter:
             The description content.
         """
         if description:
-            desc_text = extract_plain_text(description, console)
+            desc_text = extract_text(description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")

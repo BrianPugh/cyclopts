@@ -5,9 +5,9 @@ import operator
 import sys
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
-from enum import Flag
+from enum import Enum, Flag
 from functools import partial, reduce
-from typing import TYPE_CHECKING, Any, Literal, Optional, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, get_args, get_origin
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -60,7 +60,12 @@ from cyclopts.field_info import (
 from cyclopts.group import Group
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter, get_parameters
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, grouper, is_builtin, is_iterable
+from cyclopts.utils import UNSET, grouper, is_builtin, is_class_and_subclass, is_iterable
+
+if sys.version_info >= (3, 12):  # pragma: no cover
+    from typing import TypeAliasType
+else:  # pragma: no cover
+    TypeAliasType = None
 
 # parameter subkeys should not inherit these parameter values from their parent.
 _PARAMETER_SUBKEY_BLOCKER = Parameter(
@@ -101,6 +106,46 @@ _kind_parent_child_reassignment = {
 }
 
 
+def _get_choices_from_hint(type_: type, name_transform: Callable[[str], str]) -> list[str]:
+    """Extract completion choices from a type hint.
+
+    Recursively extracts choices from Literal types, Enum types, and Union types.
+
+    Parameters
+    ----------
+    type_ : type
+        Type annotation to extract choices from.
+    name_transform : Callable[[str], str]
+        Function to transform choice names (e.g., for case conversion).
+
+    Returns
+    -------
+    list[str]
+        List of choice strings extracted from the type hint.
+    """
+    get_choices = partial(_get_choices_from_hint, name_transform=name_transform)
+    choices = []
+    _origin = get_origin(type_)
+    if isinstance(type_, type) and is_class_and_subclass(type_, Enum):
+        choices.extend(name_transform(x) for x in type_.__members__)
+    elif is_union(_origin):
+        inner_choices = [get_choices(inner) for inner in get_args(type_)]
+        for x in inner_choices:
+            if x:
+                choices.extend(x)
+    elif _origin is Literal:
+        choices.extend(str(x) for x in get_args(type_))
+    elif _origin in ITERABLE_TYPES:
+        args = get_args(type_)
+        if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
+            choices.extend(get_choices(args[0]))
+    elif _origin is Annotated:
+        choices.extend(get_choices(resolve_annotated(type_)))
+    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
+        choices.extend(get_choices(type_.__value__))
+    return choices
+
+
 def _startswith(string, prefix):
     def normalize(s):
         return s.replace("_", "-")
@@ -115,10 +160,6 @@ def _missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]])
         return [k for k, v in field_info.items() if (v.required and k not in provided_keys)]
 
     return inner
-
-
-def _identity_converter(type_, token):
-    return token
 
 
 def _get_annotated_discriminator(annotation):
@@ -1426,6 +1467,59 @@ class Argument:
             return self.field_info.required
         else:
             return self.parameter.required
+
+    def is_positional_only(self) -> bool:
+        return self.field_info.is_positional_only
+
+    def is_var_positional(self) -> bool:
+        return self.field_info.kind == self.field_info.VAR_POSITIONAL
+
+    def is_flag(self) -> bool:
+        """Check if this argument is a flag (consumes no CLI tokens).
+
+        Flags are arguments that don't consume command-line tokens after the option name.
+        They typically have implicit values (e.g., `--verbose` for bool, `--no-items` for list).
+
+        Returns
+        -------
+        bool
+            True if the argument consumes zero tokens from the command line.
+
+        Examples
+        --------
+        >>> from cyclopts import Parameter
+        >>> bool_arg = Argument(hint=bool, parameter=Parameter(name="--verbose"))
+        >>> bool_arg.is_flag()
+        True
+        >>> str_arg = Argument(hint=str, parameter=Parameter(name="--name"))
+        >>> str_arg.is_flag()
+        False
+        """
+        return self.token_count() == (0, False)
+
+    def get_choices(self) -> tuple[str, ...] | None:
+        """Extract completion choices from type hint.
+
+        Extracts choices from Literal types, Enum types, and Union types containing them.
+        Respects the Parameter.show_choices setting.
+
+        Returns
+        -------
+        tuple[str, ...] | None
+            Tuple of choice strings if choices exist and should be shown, None otherwise.
+
+        Examples
+        --------
+        >>> from typing import Literal
+        >>> from cyclopts import Parameter
+        >>> argument = Argument(hint=Literal["dev", "staging", "prod"], parameter=Parameter(show_choices=True))
+        >>> argument.get_choices()
+        ('dev', 'staging', 'prod')
+        """
+        if not self.parameter.show_choices:
+            return None
+        choices = _get_choices_from_hint(self.hint, self.parameter.name_transform)
+        return tuple(choices) if choices else None
 
     def _json(self) -> dict:
         """Convert argument to be json-like for pydantic.

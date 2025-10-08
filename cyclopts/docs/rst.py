@@ -2,8 +2,9 @@
 
 from typing import TYPE_CHECKING
 
+from cyclopts._markup import extract_text
 from cyclopts.docs.base import BaseDocGenerator
-from cyclopts.help.formatters._shared import extract_plain_text, make_rst_section_header
+from cyclopts.help.formatters._shared import make_rst_section_header
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -317,7 +318,7 @@ def generate_rst_docs(
         # Extract plain text from description
         # Preserve markup when help_format matches output format (RST)
         preserve = help_format in ("restructuredtext", "rst")
-        desc_text = extract_plain_text(description, None, preserve_markup=preserve)
+        desc_text = extract_text(description, None, preserve_markup=preserve)
         if desc_text:
             lines.append(desc_text.strip())
             lines.append("")
@@ -368,7 +369,7 @@ def generate_rst_docs(
         if isinstance(usage, str):
             usage_text = usage
         else:
-            usage_text = extract_plain_text(usage, None, preserve_markup=False)
+            usage_text = extract_text(usage, None, preserve_markup=False)
         if usage_text:
             # Use literal block with double colon
             lines.append("::")
