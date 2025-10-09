@@ -77,6 +77,26 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
+ResultAction = (
+    Literal[
+        "return_value",
+        "print_non_int_return_int_as_exit_code",
+        "print_str_return_int_as_exit_code",
+        "print_str_return_zero",
+        "print_non_none_return_int_as_exit_code",
+        "print_non_none_return_zero",
+        "return_int_as_exit_code_else_zero",
+        "print_non_int_sys_exit",
+        "sys_exit",
+        "return_none",
+        "return_zero",
+        "print_return_zero",
+        "sys_exit_zero",
+        "print_sys_exit_zero",
+    ]
+    | Callable[[Any], Any]
+)
+
 _DEFAULT_FORMAT = "markdown"
 
 
@@ -335,6 +355,11 @@ class App:
 
     help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
         default=None, converter=help_formatter_converter, kw_only=True
+    )
+
+    result_action: ResultAction | None = field(
+        default=None,
+        kw_only=True,
     )
 
     ######################
@@ -803,6 +828,7 @@ class App:
                 group_commands=copy(self._group_commands),
                 group_arguments=copy(self._group_arguments),
                 group_parameters=copy(self._group_parameters),
+                result_action=self.result_action,
             )
             self._meta._meta_parent = self
         return self._meta
@@ -1522,6 +1548,12 @@ class App:
 
         return command, bound, ignored
 
+    def _is_nested_call(self) -> bool:
+        """Check if this is a nested call (meta app pattern or same-app recursion)."""
+        return len(self.app_stack.overrides_stack) > 1 or (
+            self._meta is not None and len(self._meta.app_stack.overrides_stack) > 1
+        )
+
     def __call__(
         self,
         tokens: None | str | Iterable[str] = None,
@@ -1533,7 +1565,8 @@ class App:
         verbose: bool | None = None,
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
-    ):
+        result_action: ResultAction | None = None,
+    ) -> Any:
         """Interprets and executes a command.
 
         Parameters
@@ -1565,6 +1598,11 @@ class App:
             Override the async backend to use (if an async command is invoked).
             If :obj:`None`, inherits from :attr:`App.backend`, eventually defaulting to "asyncio".
             If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
+        result_action: ResultAction | None
+            Controls how command return values are handled. Can be a predefined literal string
+            or a custom callable that takes the result and returns a processed value.
+            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
+            See :attr:`App.result_action` for available modes.
 
         Returns
         -------
@@ -1585,9 +1623,13 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "backend": backend,
+                "result_action": result_action,
             }.items()
             if v is not None
         }
+
+        if self._is_nested_call():
+            overrides.setdefault("result_action", "return_value")
 
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
@@ -1598,7 +1640,8 @@ class App:
 
             resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
             try:
-                return _run_maybe_async_command(command, bound, resolved_backend)
+                result = _run_maybe_async_command(command, bound, resolved_backend)
+                return self._handle_result_action(result)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -1615,7 +1658,8 @@ class App:
         help_on_error: bool | None = None,
         verbose: bool = False,
         end_of_options_delimiter: str | None = None,
-    ):
+        result_action: ResultAction | None = None,
+    ) -> Any:
         """Async equivalent of :meth:`__call__` for use within existing event loops.
 
         This method should be used when you're already in an async context
@@ -1647,6 +1691,11 @@ class App:
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
             If that is not set, it will default to POSIX-standard ``"--"``.
+        result_action: ResultAction | None
+            Controls how command return values are handled. Can be a predefined literal string
+            or a custom callable that takes the result and returns a processed value.
+            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
+            See :attr:`App.result_action` for available modes.
 
         Returns
         -------
@@ -1690,9 +1739,13 @@ class App:
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
                 "verbose": verbose,
+                "result_action": result_action,
             }.items()
             if v is not None
         }
+
+        if self._is_nested_call():
+            overrides.setdefault("result_action", "return_value")
 
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
@@ -1703,9 +1756,11 @@ class App:
 
             try:
                 if inspect.iscoroutinefunction(command):
-                    return await command(*bound.args, **bound.kwargs)
+                    result = await command(*bound.args, **bound.kwargs)
                 else:
-                    return command(*bound.args, **bound.kwargs)
+                    result = command(*bound.args, **bound.kwargs)
+
+                return self._handle_result_action(result)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -2229,6 +2284,9 @@ class App:
         prompt: str = "$ ",
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
+        console: "Console | None" = None,
+        exit_on_error: bool = False,
+        result_action: ResultAction | None = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2252,6 +2310,15 @@ class App:
                     return command(*bound.args, **bound.kwargs)
 
             The above is the default dispatcher implementation.
+        console: Console | None
+            Rich Console to use for output. If :obj:`None`, uses :attr:`App.console`.
+        exit_on_error: bool
+            Whether to call ``sys.exit`` on parsing errors. Defaults to :obj:`False`.
+        result_action: ResultAction | None
+            How to handle command return values in the interactive shell.
+            Defaults to ``"print_non_int_return_int_as_exit_code"`` which prints non-int results
+            and returns int/bool as exit codes without calling sys.exit.
+            If :obj:`None`, inherits from :attr:`App.result_action`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -2273,7 +2340,11 @@ class App:
         if dispatcher is None:
             dispatcher = default_dispatcher
 
-        kwargs.setdefault("exit_on_error", False)
+        overrides = {}
+        if result_action is not None:
+            overrides["result_action"] = result_action
+        if console is not None:
+            overrides["_console"] = console
 
         while True:
             try:
@@ -2288,13 +2359,118 @@ class App:
                 break
 
             try:
-                command, bound, ignored = self.parse_args(tokens, **kwargs)
-                dispatcher(command, bound, ignored)
+                with self.app_stack(tokens, overrides):
+                    command, bound, ignored = self.parse_args(
+                        tokens, console=console, exit_on_error=exit_on_error, **kwargs
+                    )
+                    result = dispatcher(command, bound, ignored)
+                    self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
             except CycloptsError:
                 # Upstream ``parse_args`` already printed the error
                 pass
             except Exception:
                 print(traceback.format_exc())
+
+    def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
+        """Handle command result based on result_action.
+
+        Parameters
+        ----------
+        result : Any
+            The command's return value.
+        fallback : ResultAction
+            The fallback result_action if none is configured. Defaults to "print_non_int_sys_exit".
+
+        Returns
+        -------
+        Any
+            Processed result based on action (may call sys.exit() and not return).
+        """
+        action = cast(
+            ResultAction,
+            self.app_stack.resolve("result_action", fallback=fallback),
+        )
+
+        if callable(action):
+            return action(result)
+
+        match action:
+            case "print_non_int_sys_exit":
+                if isinstance(result, bool):
+                    sys.exit(0 if result else 1)
+                elif isinstance(result, int):
+                    sys.exit(result)
+                elif result is not None:
+                    self.console.print(result)
+                    sys.exit(0)
+                else:
+                    sys.exit(0)
+            case "return_value":
+                return result
+            case "sys_exit":
+                if isinstance(result, bool):
+                    sys.exit(0 if result else 1)
+                elif isinstance(result, int):
+                    sys.exit(result)
+                else:
+                    sys.exit(0)
+            case "print_non_int_return_int_as_exit_code":
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                elif result is not None:
+                    self.console.print(result)
+                    return 0
+                else:
+                    return 0
+            case "print_str_return_int_as_exit_code":
+                if isinstance(result, str):
+                    self.console.print(result)
+                    return 0
+                elif isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                else:
+                    return 0
+            case "print_str_return_zero":
+                if isinstance(result, str):
+                    self.console.print(result)
+                return 0
+            case "print_non_none_return_int_as_exit_code":
+                if result is not None:
+                    self.console.print(result)
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                return 0
+            case "print_non_none_return_zero":
+                if result is not None:
+                    self.console.print(result)
+                return 0
+            case "return_int_as_exit_code_else_zero":
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                else:
+                    return 0
+            case "return_none":
+                return None
+            case "return_zero":
+                return 0
+            case "print_return_zero":
+                self.console.print(result)
+                return 0
+            case "sys_exit_zero":
+                sys.exit(0)
+            case "print_sys_exit_zero":
+                self.console.print(result)
+                sys.exit(0)
+            case _:
+                raise ValueError
 
     def update(self, app: "App"):
         """Copy over all commands from another :class:`App`.
@@ -2402,15 +2578,25 @@ def _log_framework_warning(framework: TestFramework) -> None:
 
 
 @overload
-def run(callable: Callable[..., Coroutine[None, None, V]], /) -> V: ...
+def run(callable: Callable[..., Coroutine[None, None, V]], /, *, result_action: Literal["return_value"]) -> V: ...
 
 
 @overload
-def run(callable: Callable[..., V], /) -> V: ...
+def run(callable: Callable[..., V], /, *, result_action: Literal["return_value"]) -> V: ...
 
 
-def run(callable, /):
-    """Run the given callable as a CLI command and return its result.
+@overload
+def run(
+    callable: Callable[..., Coroutine[None, None, Any]], /, *, result_action: ResultAction | None = None
+) -> Any: ...
+
+
+@overload
+def run(callable: Callable[..., Any], /, *, result_action: ResultAction | None = None) -> Any: ...
+
+
+def run(callable, /, *, result_action: ResultAction | None = None):
+    """Run the given callable as a CLI command.
 
     The callable may also be a coroutine function.
     This function is syntax sugar for very simple use cases, and is roughly equivalent to:
@@ -2422,6 +2608,15 @@ def run(callable, /):
         app = App()
         app.default(callable)
         app()
+
+    Parameters
+    ----------
+    callable
+        The function to execute as a CLI command.
+    result_action
+        How to handle the command's return value. If not specified, uses the default
+        ``"print_non_int_sys_exit"`` which calls :func:`sys.exit` with the appropriate code.
+        Can be set to ``"return_value"`` to return the result directly for testing/embedding.
 
     Example usage:
 
@@ -2436,6 +2631,6 @@ def run(callable, /):
 
         cyclopts.run(main)
     """
-    app = App()
+    app = App(result_action=result_action)
     app.default(callable)
     return app()

@@ -44,7 +44,7 @@ Test file-caching and chdir after app has been instantiated. See discussion:
     https://github.com/BrianPugh/cyclopts/issues/309
 """
 
-app = App(config=Json("config.json"))
+app = App(config=Json("config.json"), result_action="return_value")
 
 
 @app.command

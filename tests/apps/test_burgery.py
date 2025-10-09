@@ -11,6 +11,7 @@ app = App(
     name="burgery",
     help="Welcome to Cyclopts Burgery!",
     config=cyclopts.config.Toml(config_file),
+    result_action="return_value",  # For testing, return actual values
 )
 app.command(create := App(name="create"))
 

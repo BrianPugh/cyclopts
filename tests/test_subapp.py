@@ -52,7 +52,7 @@ def test_subapp_cannot_be_default(app):
 def test_resolve_default_parameter_1():
     """Test that sub-app inherits default_parameter from parent when it doesn't have its own."""
     # Parent app sets negative_bool=() to disable --no- flags globally
-    parent_app = App(default_parameter=Parameter(negative_bool=()))
+    parent_app = App(default_parameter=Parameter(negative_bool=()), result_action="return_value")
 
     parent_app.command(sub_app := App(name="bar"))
 
@@ -71,7 +71,7 @@ def test_resolve_default_parameter_1():
 def test_resolve_default_parameter_2():
     """Test that sub-app's default_parameter overrides parent's default_parameter."""
     # Parent app disables --no- flags, but sub-app re-enables them with custom prefix
-    parent_app = App(default_parameter=Parameter(negative_bool=()))
+    parent_app = App(default_parameter=Parameter(negative_bool=()), result_action="return_value")
 
     parent_app.command(sub_app := App(name="bar", default_parameter=Parameter(negative_bool="disable-")))
 

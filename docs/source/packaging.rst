@@ -33,19 +33,14 @@ A pretty bare-bones Cyclopts ``mypackage/__main__.py`` will look like:
    def foo(name: str):
        print(f"Hello {name}!")
 
-   def main():
-       app()
-
    if __name__ == "__main__":
-       main()
+       app()
 
 
 .. code-block:: console
 
    $ python -m mypackage World
    Hello World!
-
-In the current state, the :func:`main` function is an unnecessary extra level of indirection (could just directly call :obj:`app`), but it can sometimes offer you additional flexibility in the future if you need it.
 
 -----------
 Entrypoints
@@ -106,6 +101,21 @@ The syntax is very similar to setuptools:
 
    [tool.poetry.scripts]
    my-package = "mypackage.__main__:main"
+
+.. _Result Action:
+
+-------------
+Result Action
+-------------
+
+When using Cyclopts as a CLI application, command return values are automatically handled appropriately. By default, :class:`~cyclopts.App` uses ``"print_non_int_sys_exit"`` mode, which calls :func:`sys.exit` with the appropriate exit code:
+
+- String returns are printed to stdout, then :func:`sys.exit(0) <sys.exit>` is called
+- Integer returns are passed to :func:`sys.exit(int) <sys.exit>` as the exit code
+- Boolean returns are converted: :obj:`True` → :func:`sys.exit(0) <sys.exit>`, :obj:`False` → :func:`sys.exit(1) <sys.exit>`
+- :obj:`None` returns call :func:`sys.exit(0) <sys.exit>`
+
+This default behavior makes Cyclopts applications work consistently whether run directly as scripts or installed via `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_. The :attr:`~cyclopts.App.result_action` can be customized if different behavior is needed:
 
 
 .. _Poetry: https://python-poetry.org

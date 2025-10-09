@@ -11,7 +11,7 @@ def test_meta_app_override_propagation():
     """Test that overrides propagate from parent app to meta app calls."""
     results = []
 
-    app = App()
+    app = App(result_action="return_value")
 
     @app.meta.default
     def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
@@ -34,8 +34,8 @@ def test_nested_app_override_propagation():
     """Test that overrides propagate through nested app invocations."""
     results = []
 
-    root_app = App()
-    sub_app = App(name="sub")
+    root_app = App(result_action="return_value")
+    sub_app = App(name="sub", result_action="return_value")
 
     @root_app.meta.default
     def root_meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
@@ -66,7 +66,7 @@ def test_nested_app_override_propagation():
 
 def test_parse_args_override_propagation():
     """Test that parse_args properly stores and uses overrides."""
-    app = App()
+    app = App(result_action="return_value")
 
     @app.default
     def main(value: int):
@@ -83,7 +83,7 @@ def test_parse_args_override_propagation():
 
 def test_call_override_propagation():
     """Test that __call__ properly stores and uses overrides."""
-    app = App()
+    app = App(result_action="return_value")
     results = []
 
     @app.default
@@ -106,7 +106,7 @@ def test_call_override_propagation():
 
 def test_multiple_override_parameters():
     """Test that all override parameters are properly handled."""
-    app = App()
+    app = App(result_action="return_value")
 
     @app.default
     def main(value: int):

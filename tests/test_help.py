@@ -24,6 +24,7 @@ def app():
     return App(
         name="app",
         help="App Help String Line 1.",
+        result_action="return_value",
     )
 
 
@@ -110,7 +111,7 @@ def test_help_custom_usage_subapp(app, console):
 
 def test_help_default_help_flags(console):
     """Standard help flags."""
-    app = App(name="app", help="App Help String Line 1.")
+    app = App(name="app", help="App Help String Line 1.", result_action="return_value")
     with console.capture() as capture:
         app(["--help"], console=console)
 

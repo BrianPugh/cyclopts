@@ -16,7 +16,7 @@ def test_rich_not_imported_on_happy_path():
         import sys
         import cyclopts
 
-        app = cyclopts.App()
+        app = cyclopts.App(result_action="return_value")
 
         @app.default
         def main(name: str = "world"):
@@ -51,7 +51,7 @@ def test_lazy_modules_not_imported_on_happy_path():
         import sys
         import cyclopts
 
-        app = cyclopts.App()
+        app = cyclopts.App(result_action="return_value")
 
         @app.default
         def main(value: int = 42):
