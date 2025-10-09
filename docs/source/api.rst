@@ -484,13 +484,27 @@ API
       :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit"] | Callable[[Any], Any] | None
       :value: None
 
-      Controls how :meth:`App.__call__` and :meth:`App.run_async` handle command return values. This is especially important when using `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_, which wrap your app with :func:`sys.exit`.
+      Controls how :meth:`App.__call__` and :meth:`App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
 
       Can be a predefined literal string or a custom callable that takes the result and returns a processed value.
 
-      If :obj:`None`, inherits from parent app or eventually defaults to ``"print_non_int_return_int_as_exit_code"``.
-
       Each predefined mode's exact behavior is shown below:
+
+      **"print_non_int_sys_exit"** (default)
+
+         The default CLI mode. Prints non-int values to stdout, then calls :func:`sys.exit` with the appropriate exit code.
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)  # i.e. True is success
+            elif isinstance(result, int):
+                sys.exit(result)
+            elif result is not None:
+                print(result)
+                sys.exit(0)
+            else:
+                sys.exit(0)
 
       **"return_value"**
 
@@ -500,14 +514,27 @@ API
 
             return result
 
-      **"print_non_int_return_int_as_exit_code"** (default when not inherited)
+      **"sys_exit"**
 
-         The default CLI mode. Prints non-int values, returns int/bool as exit codes.
+         Never prints output. Calls :func:`sys.exit` with the appropriate exit code. Useful for CLI apps that handle their own output and just need exit code handling.
 
          .. code-block:: python
 
             if isinstance(result, bool):
-                return 0 if result else 1
+                sys.exit(0 if result else 1)  # i.e. True is success
+            elif isinstance(result, int):
+                sys.exit(result)
+            else:
+                sys.exit(0)
+
+      **"print_non_int_return_int_as_exit_code"**
+
+         Prints non-int values, returns int/bool as exit codes. Useful for testing and embedding.
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
             elif result is not None:
@@ -526,7 +553,7 @@ API
                 print(result)
                 return 0
             elif isinstance(result, bool):
-                return 0 if result else 1
+                return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
             else:
@@ -551,7 +578,7 @@ API
             if result is not None:
                 print(result)
             if isinstance(result, bool):
-                return 0 if result else 1
+                return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
             return 0
@@ -573,27 +600,11 @@ API
          .. code-block:: python
 
             if isinstance(result, bool):
-                return 0 if result else 1
+                return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
             else:
                 return 0
-
-      **"print_non_int_sys_exit"**
-
-         Like ``"print_non_int_return_int_as_exit_code"`` but calls :func:`sys.exit` directly. Use with caution.
-
-         .. code-block:: python
-
-            if isinstance(result, bool):
-                sys.exit(0 if result else 1)
-            elif isinstance(result, int):
-                sys.exit(result)
-            elif result is not None:
-                print(result)
-                sys.exit(0)
-            else:
-                sys.exit(0)
 
       **Custom Callable**
 

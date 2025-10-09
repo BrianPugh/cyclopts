@@ -41,31 +41,28 @@ If a string is passed in, it will be internally converted into a list using `shl
 ------------
 Return Value
 ------------
-The ``app`` invocation processes and returns the command's return value based on :attr:`.App.result_action`. By default, commands that return integers have those integers returned so that they can be passed along to :func:`sys.exit`:
+The ``app`` invocation processes the command's return value based on :attr:`.App.result_action`. By default, Cyclopts calls :func:`sys.exit` with an appropriate exit code:
 
 .. code-block:: python
 
-   import sys
    from cyclopts import App
 
-   app = App()  # Default result_action="print_non_int_return_int_as_exit_code"
+   app = App()  # Default result_action="print_non_int_sys_exit"
 
    @app.command
    def success():
        return 0  # Exit code for success
 
    @app.command
-   def failure():
-       return 1  # Exit code for failure
+   def greet(name: str) -> str:
+       return f"Hello {name}!"  # Prints and exits with 0
 
-   exit_code = app("success")
-   print(f"Exit code: {exit_code}")
-   # Exit code: 0
-   sys.exit(exit_code)
+   if __name__ == "__main__":
+       app()  # Will call sys.exit with the returned 0 error code (success).
 
-When using `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_, you can point directly to the ``app`` to have it automatically exit with the returned code.
+`Installed scripts  <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_ call :func:`sys.exit` with the returned value of the entry point. So the default Cyclopts :attr:`.App.result_action` will have consistent behavior for standalone scripts and installed apps.
 
-For embedding Cyclopts in other Python code or testing, use ``result_action="return_value"`` to get the raw command return value:
+For embedding Cyclopts in other Python code or testing, use ``result_action="return_value"`` to get the raw command return value without calling :func:`sys.exit`:
 
 .. code-block:: python
 
@@ -77,7 +74,7 @@ For embedding Cyclopts in other Python code or testing, use ``result_action="ret
    def foo(a: int, b: int, c: int):
        return a + b + c
 
-   return_value = app("foo 1 2 3")
+   return_value = app("foo 1 2 3")  # no longer exits!
    print(f"The return value was: {return_value}.")
    # The return value was: 6.
 

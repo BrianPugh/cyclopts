@@ -44,8 +44,26 @@ def handle_result_action(result: Any, action: ResultAction) -> Any:
         return action(result)
 
     match action:
+        case "print_non_int_sys_exit":
+            # Default action
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)
+            elif isinstance(result, int):
+                sys.exit(result)
+            elif result is not None:
+                print(result)
+                sys.exit(0)
+            else:
+                sys.exit(0)
         case "return_value":
             return result
+        case "sys_exit":
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)
+            elif isinstance(result, int):
+                sys.exit(result)
+            else:
+                sys.exit(0)
         case "print_non_int_return_int_as_exit_code":
             if isinstance(result, bool):
                 return 0 if result else 1
@@ -89,23 +107,5 @@ def handle_result_action(result: Any, action: ResultAction) -> Any:
                 return result
             else:
                 return 0
-        case "print_non_int_sys_exit":
-            # Default action
-            if isinstance(result, bool):
-                sys.exit(0 if result else 1)
-            elif isinstance(result, int):
-                sys.exit(result)
-            elif result is not None:
-                print(result)
-                sys.exit(0)
-            else:
-                sys.exit(0)
-        case "sys_exit":
-            if isinstance(result, bool):
-                sys.exit(0 if result else 1)
-            elif isinstance(result, int):
-                sys.exit(result)
-            else:
-                sys.exit(0)
         case _:
             raise ValueError
