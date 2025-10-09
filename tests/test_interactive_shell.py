@@ -23,7 +23,7 @@ def test_interactive_shell(app, mocker, console):
         bar_called += 1
 
     with console.capture() as capture:
-        app.interactive_shell(console=console)
+        app.interactive_shell(error_console=console)
 
     actual = capture.get()
 

@@ -284,6 +284,8 @@ class App:
 
     _console: Optional["Console"] = field(default=None, kw_only=True, alias="console")
 
+    _error_console: Optional["Console"] = field(default=None, kw_only=True, alias="error_console")
+
     # This can ONLY ever be a Tuple[str, ...]
     _help_flags: str | Iterable[str] = field(
         default=["--help", "-h"],
@@ -395,6 +397,8 @@ class App:
     """
 
     _fallback_console: Optional["Console"] = field(init=False, default=None)
+
+    _fallback_error_console: Optional["Console"] = field(init=False, default=None)
 
     app_stack: AppStack = field(init=False, default=Factory(AppStack, takes_self=True))
 
@@ -603,6 +607,23 @@ class App:
     @console.setter
     def console(self, console: Optional["Console"]):
         self._console = console
+
+    @property
+    def error_console(self) -> "Console":
+        result = self.app_stack.resolve("_error_console")
+        if result is not None:
+            return result
+
+        if self._fallback_error_console is None:
+            from rich.console import Console
+
+            self._fallback_error_console = Console(stderr=True)
+
+        return self._fallback_error_console
+
+    @error_console.setter
+    def error_console(self, console: Optional["Console"]):
+        self._error_console = console
 
     @property
     def _instantiating_module(self) -> ModuleType | None:
@@ -1269,6 +1290,7 @@ class App:
         tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
+        error_console: Optional["Console"] = None,
         end_of_options_delimiter: str | None = None,
     ) -> tuple[Callable[..., Any], inspect.BoundArguments, list[str], dict[str, Any]]:
         """Interpret arguments into a registered function, :class:`~inspect.BoundArguments`, and any remaining unknown tokens.
@@ -1281,6 +1303,9 @@ class App:
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
+        error_console: ~rich.console.Console
+            Console to print error messages.
+            If not provided, follows the resolution order defined in :attr:`App.error_console`.
         end_of_options_delimiter: str | None
             All tokens after this delimiter will be force-interpreted as positional arguments.
             If None, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
@@ -1304,7 +1329,8 @@ class App:
             Intended to simplify :ref:`meta apps <Meta App>`.
         """
         overrides = {
-            "console": console,
+            "_console": console,
+            "_error_console": error_console,
             "end_of_options_delimiter": end_of_options_delimiter,
         }
         with self.app_stack([], overrides=overrides):
@@ -1441,7 +1467,7 @@ class App:
                 if command_chain:
                     e.command_chain = command_chain
                 if e.console is None:
-                    e.console = command_app.console
+                    e.console = command_app.error_console
                 raise
 
         return command, bound, unused_tokens, ignored, argument_collection
@@ -1451,6 +1477,7 @@ class App:
         tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
+        error_console: Optional["Console"] = None,
         print_error: bool | None = None,
         exit_on_error: bool | None = None,
         help_on_error: bool | None = None,
@@ -1472,6 +1499,9 @@ class App:
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
+        error_console: ~rich.console.Console
+            Console to print error messages.
+            If not provided, follows the resolution order defined in :attr:`App.error_console`.
         print_error: bool | None
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
@@ -1513,6 +1543,7 @@ class App:
             k: v
             for k, v in {
                 "_console": console,
+                "_error_console": error_console,
                 "print_error": print_error,
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
@@ -1559,6 +1590,7 @@ class App:
         tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
+        error_console: Optional["Console"] = None,
         print_error: bool | None = None,
         exit_on_error: bool | None = None,
         help_on_error: bool | None = None,
@@ -1577,6 +1609,9 @@ class App:
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
+        error_console: ~rich.console.Console
+            Console to print error messages.
+            If not provided, follows the resolution order defined in :attr:`App.error_console`.
         print_error: bool | None
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
@@ -1618,6 +1653,7 @@ class App:
             k: v
             for k, v in {
                 "_console": console,
+                "_error_console": error_console,
                 "print_error": print_error,
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
@@ -1653,6 +1689,7 @@ class App:
         tokens: None | str | Iterable[str] = None,
         *,
         console: Optional["Console"] = None,
+        error_console: Optional["Console"] = None,
         print_error: bool = True,
         exit_on_error: bool = True,
         help_on_error: bool | None = None,
@@ -1674,6 +1711,9 @@ class App:
         console: ~rich.console.Console
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
+        error_console: ~rich.console.Console
+            Console to print error messages.
+            If not provided, follows the resolution order defined in :attr:`App.error_console`.
         print_error: bool
             Print a rich-formatted error on error.
             Defaults to :obj:`True`.
@@ -1735,6 +1775,7 @@ class App:
             k: v
             for k, v in {
                 "_console": console,
+                "_error_console": error_console,
                 "print_error": print_error,
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,

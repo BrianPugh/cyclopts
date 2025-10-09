@@ -45,7 +45,7 @@ def test_bind_typed_dict_missing_arg_basic(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
             "foo --d.my-int=5 --d.my-str=bar",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -70,7 +70,7 @@ def test_bind_typed_dict_missing_arg_flatten(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
             "foo",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -101,7 +101,7 @@ def test_bind_typed_dict_missing_arg_renamed_no_hyphen(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
             "foo --d.my-int=5 --d.my-str=bar",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -132,7 +132,7 @@ def test_bind_typed_dict_missing_arg_renamed_hyphen(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
             "foo --d.my-int=5 --d.my-str=bar",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -166,7 +166,7 @@ def test_bind_typed_dict_missing_arg_nested(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app(
             "foo --d.my-int=5 --d.my-str=bar --d.my-user.age=30",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -227,7 +227,7 @@ def test_bind_typed_dict_extra_field(app, console):
     with console.capture() as capture, pytest.raises(UnknownOptionError):
         app.parse_args(
             "foo --d.my-int=5 --d.my-str=bar --d.my-list=a --d.my-list=b --d.my-list-int=1 --d.my-list-int=2 --d.extra-key=10",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 

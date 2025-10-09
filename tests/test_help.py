@@ -2127,7 +2127,7 @@ def test_help_help_on_error(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):
-        app(["foo", "bar"], console=console, exit_on_error=False)
+        app(["foo", "bar"], error_console=console, exit_on_error=False)
 
     actual = capture.get()
     expected = dedent(

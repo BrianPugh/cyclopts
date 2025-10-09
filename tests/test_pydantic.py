@@ -41,7 +41,7 @@ def test_pydantic_error_msg(app, console):
         foo(-1)
 
     with console.capture() as capture, pytest.raises(ValidationError):
-        app(["foo", "-1"], console=console, exit_on_error=False, print_error=True)
+        app(["foo", "-1"], error_console=console, exit_on_error=False, print_error=True)
 
     actual = capture.get()
 
@@ -186,7 +186,7 @@ def test_bind_pydantic_basemodel_missing_arg(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app.parse_args(
             'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt',
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
