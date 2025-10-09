@@ -26,7 +26,7 @@ Typically, a Cyclopts app looks something like:
    6
 
 :meth:`.App.__call__` takes in an optional input that it parses into an action.
-If not specified, Cyclopts defaults to ``sys.argv[1:]``, i.e. the list of command line arguments.
+If not specified, Cyclopts defaults to :data:`sys.argv[1:] <sys.argv>`, i.e. the list of command line arguments.
 An explicit string or list of strings can instead be passed in.
 
 .. code-block:: python
@@ -69,12 +69,12 @@ If you decide you want each command to return an exit code, you could invoke you
 Exception Handling and Exiting
 ------------------------------
 For the most part, Cyclopts is **hands-off** when it comes to handling exceptions and exiting the application.
-However, by default, if there is a **Cyclopts runtime error**, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a ``sys.exit(1)``.
+However, by default, if there is a **Cyclopts runtime error**, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a :func:`sys.exit(1) <sys.exit>`.
 This is to avoid displaying the unformatted, uncaught exception to the CLI user.
 
 These behaviors can be controlled via :class:`.App` attributes or method parameters:
 
-- :attr:`.App.exit_on_error` - Calls ``sys.exit(1)`` on errors (defaults to :obj:`True`)
+- :attr:`.App.exit_on_error` - Calls :func:`sys.exit(1) <sys.exit>` on errors (defaults to :obj:`True`)
 - :attr:`.App.print_error` - Formatted errors are printed (defaults to :obj:`True`)
 - :attr:`.App.help_on_error` - The help-page is printed before errors (defaults to :obj:`False`)
 - :attr:`.App.verbose` - Include verbose error information that might be useful for **developers** using Cyclopts (defaults to :obj:`False`)

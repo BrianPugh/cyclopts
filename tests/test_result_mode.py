@@ -1,19 +1,4 @@
-"""Tests for App result_action parameter with explicit naming.
-
-Result Mode Behavior Table:
-===================================================================================================
-Mode                                    | str result  | int result | None | bool result | other
----------------------------------------------------------------------------------------------------
-return_value                            | return str  | return int | None | return bool | return
-print_non_int_return_int_as_exit_code   | print → 0   | return int | 0    | T→0 / F→1   | print → 0
-print_str_return_int_as_exit_code       | print → 0   | return int | 0    | T→0 / F→1   | 0 (silent)
-print_str_return_zero                   | print → 0   | 0 (silent) | 0    | print → 0   | 0 (silent)
-print_non_none_return_int_as_exit_code  | print → 0   | print & int| 0    | print & T→0/F→1 | print → 0
-print_non_none_return_zero              | print → 0   | print → 0  | 0    | print → 0   | print → 0
-return_int_as_exit_code_else_zero       | 0 (silent)  | return int | 0    | T→0 / F→1   | 0 (silent)
-print_non_int_sys_exit                  | print exit  | sys.exit   | exit | T→exit0/F→exit1 | print exit
-===================================================================================================
-"""
+"""Tests for App result_action parameter with explicit naming."""
 
 from contextlib import redirect_stdout
 from io import StringIO

@@ -107,6 +107,133 @@ The syntax is very similar to setuptools:
    [tool.poetry.scripts]
    my-package = "mypackage.__main__:main"
 
+.. _Result Action:
+
+-------------
+Result Action
+-------------
+
+When using Cyclopts as a CLI application (via `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_), command return values are automatically handled appropriately. By default, :class:`~cyclopts.App` uses ``"print_non_int_return_int_as_exit_code"`` mode, which is designed for CLI usage and works correctly with console scripts out of the box.
+
+Console scripts wrap your entry point with :func:`sys.exit`. Without proper handling:
+
+- Returning a string to :func:`sys.exit("string") <sys.exit>` prints to stderr and exits with code 1 (error)
+- Returning an integer to :func:`sys.exit(int) <sys.exit>` uses it as the exit code
+- Returning :obj:`None` to :func:`sys.exit(None) <sys.exit>` exits with code 0 (success)
+
+The default :attr:`~cyclopts.App.result_action` handles these cases correctly, but can be customized if needed:
+
+^^^^^^^^^^^^^^^^^^
+Boolean Handling
+^^^^^^^^^^^^^^^^^^
+
+All modes that return integers as exit codes automatically handle boolean values intuitively:
+
+- :obj:`True` → exit code ``0`` (success)
+- :obj:`False` → exit code ``1`` (failure)
+
+This applies to: ``print_non_int_return_int_as_exit_code``, ``print_str_return_int_as_exit_code``, ``print_non_none_return_int_as_exit_code``, ``return_int_as_exit_code_else_zero``, and ``print_non_int_sys_exit``.
+
+.. code-block:: python
+
+   import cyclopts
+
+   app = cyclopts.App()  # Uses default: print_non_int_return_int_as_exit_code
+
+   @app.command
+   def is_valid(path: str) -> bool:
+       return Path(path).exists()
+
+   exit_code = app(["is-valid", "/tmp"])  # Returns 0 if exists, 1 if not (no output)
+
+^^^^^^^^^^^^^^^^^^^^^^^^
+Custom Callable Handlers
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can provide a custom callable as :attr:`~cyclopts.App.result_action` that receives the command's return value and can perform any custom processing:
+
+.. code-block:: python
+
+   import cyclopts
+
+   def custom_handler(result):
+       """Custom result handler that logs and transforms results."""
+       if result is None:
+           return 0
+       elif isinstance(result, str):
+           print(f"[OUTPUT] {result}")
+           return 0
+       elif isinstance(result, int):
+           return result
+       else:
+           print(f"[RESULT] {result}")
+           return 0
+
+   app = cyclopts.App(result_action=custom_handler)
+
+   @app.command
+   def process(data: str) -> str:
+       return f"Processed: {data}"
+
+   exit_code = app(["process", "test"])  # Prints "[OUTPUT] Processed: test", returns 0
+
+^^^^^^^^^^^^^^^^^
+Recommended Setup
+^^^^^^^^^^^^^^^^^
+
+For CLI applications installed via `console_scripts <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_, point directly to the :class:`~cyclopts.App` object. The default :attr:`~cyclopts.App.result_action` (``"print_non_int_return_int_as_exit_code"``) handles return values appropriately for CLI usage:
+
+.. code-block:: python
+
+   # mypackage/cli.py
+
+   import cyclopts
+
+   app = cyclopts.App()
+
+   @app.command
+   def greet(name: str) -> str:
+       return f"Hello {name}!"
+
+.. code-block:: toml
+
+   # pyproject.toml
+   [project.scripts]
+   my-package = "mypackage.cli:app"
+
+^^^^^^^^^^^^^^^^^^^^^^^^
+Testing CLI Applications
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+When testing CLI applications with the default :attr:`~cyclopts.App.result_action`, you can:
+
+1. Test CLI behavior by capturing stdout:
+
+   .. code-block:: python
+
+      from io import StringIO
+      from contextlib import redirect_stdout
+
+      def test_greet():
+          buf = StringIO()
+          with redirect_stdout(buf):
+              exit_code = app(["greet", "Alice"])
+          assert buf.getvalue() == "Hello Alice!\n"
+          assert exit_code == 0
+
+2. Create a test-specific :class:`~cyclopts.App` with ``result_action="return_value"``:
+
+   .. code-block:: python
+
+      import cyclopts
+
+      def test_greet_return_value():
+          test_app = cyclopts.App(result_action="return_value")
+          test_app.update(app)  # Copy commands from CLI app
+
+          result = test_app(["greet", "Alice"])
+          assert result == "Hello Alice!"
+
 
 .. _Poetry: https://python-poetry.org
 .. _entrypoint: https://setuptools.pypa.io/en/latest/userguide/entry_point.html#entry-points

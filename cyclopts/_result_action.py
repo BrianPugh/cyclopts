@@ -1,4 +1,4 @@
-"""Result mode handling for CLI applications.
+"""Result handling for CLI applications.
 
 This module defines how command return values are processed when used in CLI contexts,
 particularly when installed via console_scripts entry points.

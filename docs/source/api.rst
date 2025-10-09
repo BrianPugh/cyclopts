@@ -19,7 +19,7 @@ API
       1. User specified :attr:`~.App.name` parameter.
       2. If a :attr:`~.App.default` function has been registered, the name of that function.
       3. If the module name is ``__main__.py``, the name of the encompassing package.
-      4. The value of ``sys.argv[0]``; i.e. the name of the python script.
+      4. The value of :data:`sys.argv[0] <sys.argv>`; i.e. the name of the python script.
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
@@ -162,7 +162,7 @@ API
       :type: Optional[bool]
       :value: None
 
-      If there is an error parsing the CLI tokens, invoke ``sys.exit(1)``.
+      If there is an error parsing the CLI tokens, invoke :func:`sys.exit(1) <sys.exit>`.
       Otherwise, continue to raise the exception.
       If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
 
@@ -479,6 +479,138 @@ API
       .. code-block:: python
 
          app(backend="trio")  # Override the app's backend for this call
+
+   .. attribute:: result_action
+      :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit"] | Callable[[Any], Any] | None
+      :value: None
+
+      Controls how :meth:`App.__call__` and :meth:`App.run_async` handle command return values. This is especially important when using `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_, which wrap your app with :func:`sys.exit`.
+
+      Can be a predefined literal string or a custom callable that takes the result and returns a processed value.
+
+      If :obj:`None`, inherits from parent app or eventually defaults to ``"print_non_int_return_int_as_exit_code"``.
+
+      Each predefined mode's exact behavior is shown below:
+
+      **"return_value"**
+
+         .. code-block:: python
+
+            return result
+
+      **"print_non_int_return_int_as_exit_code"** (default when not inherited)
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                return 0 if result else 1
+            elif isinstance(result, int):
+                return result
+            elif result is not None:
+                print(result)
+                return 0
+            else:
+                return 0
+
+      **"print_str_return_int_as_exit_code"**
+
+         .. code-block:: python
+
+            if isinstance(result, str):
+                print(result)
+                return 0
+            elif isinstance(result, bool):
+                return 0 if result else 1
+            elif isinstance(result, int):
+                return result
+            else:
+                return 0
+
+      **"print_str_return_zero"**
+
+         .. code-block:: python
+
+            if isinstance(result, str):
+                print(result)
+            return 0
+
+      **"print_non_none_return_int_as_exit_code"**
+
+         .. code-block:: python
+
+            if result is not None:
+                print(result)
+            if isinstance(result, bool):
+                return 0 if result else 1
+            elif isinstance(result, int):
+                return result
+            return 0
+
+      **"print_non_none_return_zero"**
+
+         .. code-block:: python
+
+            if result is not None:
+                print(result)
+            return 0
+
+      **"return_int_as_exit_code_else_zero"**
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                return 0 if result else 1
+            elif isinstance(result, int):
+                return result
+            else:
+                return 0
+
+      **"print_non_int_sys_exit"**
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)
+            elif isinstance(result, int):
+                sys.exit(result)
+            elif result is not None:
+                print(result)
+                sys.exit(0)
+            else:
+                sys.exit(0)
+
+      **Custom Callable**
+
+      For custom behavior, provide a callable that receives the result and returns a processed value:
+
+         .. code-block:: python
+
+            def custom_handler(result):
+                if result is None:
+                    return 0
+                elif isinstance(result, str):
+                    print(f"[OUTPUT] {result}")
+                    return 0
+                return result
+
+            app = App(result_action=custom_handler)
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         # For CLI applications with console_scripts entry points
+         app = App(result_action="print_non_int_return_int_as_exit_code")
+
+         @app.command
+         def greet(name: str) -> str:
+             return f"Hello {name}!"
+
+         app()
+
+      See :ref:`Result Action` for detailed examples and usage patterns.
 
 .. autoclass:: cyclopts.Parameter
    :special-members: __call__
