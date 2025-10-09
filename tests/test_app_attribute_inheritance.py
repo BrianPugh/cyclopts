@@ -119,6 +119,7 @@ def test_app_stack_inheritance_override():
         print_error=False,
         exit_on_error=False,
         verbose=True,
+        result_action="return_value",
     )
     parent_app.command(child_app)
 
@@ -171,7 +172,7 @@ def test_meta_app_inheritance():
     parent_app.meta.print_error = True
     parent_app.meta.verbose = False
 
-    child_app = App(name="child")
+    child_app = App(name="child", result_action="return_value")
     parent_app.command(child_app)
 
     @child_app.default

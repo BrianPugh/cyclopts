@@ -545,19 +545,152 @@ def test_result_action_print_non_int_sys_exit_with_false(monkeypatch):
     assert buf.getvalue() == ""
 
 
-def test_result_action_default_is_print_non_int_return_int_as_exit_code():
-    """Default result_action should be 'print_non_int_return_int_as_exit_code'."""
+# ==============================================================================
+# sys_exit tests
+# ==============================================================================
+
+
+def test_result_action_sys_exit_with_string(monkeypatch):
+    """sys_exit: string returns sys.exit(0) without printing."""
+    app = App(result_action="sys_exit")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["greet", "Alice"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == ""  # Should NOT print
+
+
+def test_result_action_sys_exit_with_int(monkeypatch):
+    """sys_exit: calls sys.exit with int value."""
+    app = App(result_action="sys_exit")
+
+    @app.command
+    def get_exit_code(code: int) -> int:
+        return code
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["get-exit-code", "5"])
+
+    assert exit_code == 5
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_with_true(monkeypatch):
+    """sys_exit: True calls sys.exit(0)."""
+    app = App(result_action="sys_exit")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["check"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_with_false(monkeypatch):
+    """sys_exit: False calls sys.exit(1)."""
+    app = App(result_action="sys_exit")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["check"])
+
+    assert exit_code == 1
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_with_none(monkeypatch):
+    """sys_exit: None calls sys.exit(0)."""
+    app = App(result_action="sys_exit")
+
+    @app.command
+    def do_nothing() -> None:
+        pass
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["do-nothing"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == ""
+
+
+# ==============================================================================
+# Default and inheritance tests
+# ==============================================================================
+
+
+def test_result_action_default_is_print_non_int_sys_exit():
+    """Default result_action should be 'print_non_int_sys_exit'."""
+    import pytest
+
     app = App()
 
     @app.command
     def greet(name: str) -> str:
         return f"Hello {name}!"
 
-    # Default mode should print strings and return 0
+    # Default mode should print strings and call sys.exit(0)
     buf = StringIO()
     with redirect_stdout(buf):
-        result = app(["greet", "Charlie"])
-    assert result == 0
+        with pytest.raises(SystemExit) as exc_info:
+            app(["greet", "Charlie"])
+    assert exc_info.value.code == 0
     assert buf.getvalue() == "Hello Charlie!\n"
 
 
@@ -620,19 +753,22 @@ def test_result_action_inheritance():
     assert buf.getvalue() == ""
 
 
-def test_result_action_none_defaults_to_print_non_int():
-    """result_action=None defaults to print_non_int_return_int_as_exit_code when called standalone."""
+def test_result_action_none_defaults_to_print_non_int_sys_exit():
+    """result_action=None defaults to print_non_int_sys_exit when called standalone."""
+    import pytest
+
     app = App()  # result_action=None
 
     @app.default
     def greet(name: str) -> str:
         return f"Hello {name}!"
 
-    # Should use default fallback: print_non_int_return_int_as_exit_code
+    # Should use default fallback: print_non_int_sys_exit
     buf = StringIO()
     with redirect_stdout(buf):
-        result = app(["Alice"])
-    assert result == 0
+        with pytest.raises(SystemExit) as exc_info:
+            app(["Alice"])
+    assert exc_info.value.code == 0
     assert buf.getvalue() == "Hello Alice!\n"
 
 

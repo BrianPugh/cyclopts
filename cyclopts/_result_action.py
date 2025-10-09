@@ -18,6 +18,7 @@ ResultAction = (
         "print_non_none_return_zero",
         "return_int_as_exit_code_else_zero",
         "print_non_int_sys_exit",
+        "sys_exit",
     ]
     | Callable[[Any], Any]
 )
@@ -89,6 +90,7 @@ def handle_result_action(result: Any, action: ResultAction) -> Any:
             else:
                 return 0
         case "print_non_int_sys_exit":
+            # Default action
             if isinstance(result, bool):
                 sys.exit(0 if result else 1)
             elif isinstance(result, int):
@@ -96,6 +98,13 @@ def handle_result_action(result: Any, action: ResultAction) -> Any:
             elif result is not None:
                 print(result)
                 sys.exit(0)
+            else:
+                sys.exit(0)
+        case "sys_exit":
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)
+            elif isinstance(result, int):
+                sys.exit(result)
             else:
                 sys.exit(0)
         case _:

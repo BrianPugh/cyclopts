@@ -1547,7 +1547,7 @@ class App:
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
         result_action: ResultAction | None = None,
-    ):
+    ) -> Any:
         """Interprets and executes a command.
 
         Parameters
@@ -1624,7 +1624,7 @@ class App:
                 result = _run_maybe_async_command(command, bound, resolved_backend)
                 resolved_result_action = cast(
                     ResultAction,
-                    self.app_stack.resolve("result_action", fallback="print_non_int_return_int_as_exit_code"),
+                    self.app_stack.resolve("result_action", fallback="print_non_int_sys_exit"),
                 )
                 return handle_result_action(result, resolved_result_action)
             except KeyboardInterrupt:
@@ -1644,7 +1644,7 @@ class App:
         verbose: bool = False,
         end_of_options_delimiter: str | None = None,
         result_action: ResultAction | None = None,
-    ):
+    ) -> Any:
         """Async equivalent of :meth:`__call__` for use within existing event loops.
 
         This method should be used when you're already in an async context
@@ -1747,7 +1747,7 @@ class App:
 
                 resolved_result_action = cast(
                     ResultAction,
-                    self.app_stack.resolve("result_action", fallback="print_non_int_return_int_as_exit_code"),
+                    self.app_stack.resolve("result_action", fallback="print_non_int_sys_exit"),
                 )
                 return handle_result_action(result, resolved_result_action)
             except KeyboardInterrupt:
@@ -2446,15 +2446,25 @@ def _log_framework_warning(framework: TestFramework) -> None:
 
 
 @overload
-def run(callable: Callable[..., Coroutine[None, None, V]], /) -> V: ...
+def run(callable: Callable[..., Coroutine[None, None, V]], /, *, result_action: Literal["return_value"]) -> V: ...
 
 
 @overload
-def run(callable: Callable[..., V], /) -> V: ...
+def run(callable: Callable[..., V], /, *, result_action: Literal["return_value"]) -> V: ...
 
 
-def run(callable, /):
-    """Run the given callable as a CLI command and return its result.
+@overload
+def run(
+    callable: Callable[..., Coroutine[None, None, Any]], /, *, result_action: ResultAction | None = None
+) -> Any: ...
+
+
+@overload
+def run(callable: Callable[..., Any], /, *, result_action: ResultAction | None = None) -> Any: ...
+
+
+def run(callable, /, *, result_action: ResultAction | None = None):
+    """Run the given callable as a CLI command.
 
     The callable may also be a coroutine function.
     This function is syntax sugar for very simple use cases, and is roughly equivalent to:
@@ -2466,6 +2476,15 @@ def run(callable, /):
         app = App()
         app.default(callable)
         app()
+
+    Parameters
+    ----------
+    callable
+        The function to execute as a CLI command.
+    result_action
+        How to handle the command's return value. If not specified, uses the default
+        ``"print_non_int_sys_exit"`` which calls :func:`sys.exit` with the appropriate code.
+        Can be set to ``"return_value"`` to return the result directly for testing/embedding.
 
     Example usage:
 
@@ -2480,6 +2499,6 @@ def run(callable, /):
 
         cyclopts.run(main)
     """
-    app = App()
+    app = App(result_action=result_action)
     app.default(callable)
     return app()

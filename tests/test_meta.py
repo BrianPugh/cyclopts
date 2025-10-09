@@ -41,7 +41,7 @@ def queue():
 
 @pytest.fixture
 def nested_meta_app(queue, console):
-    subapp = App(console=console)
+    subapp = App(console=console, result_action="return_value")
 
     @subapp.meta.default
     def subapp_meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]) -> None:
@@ -60,7 +60,7 @@ def nested_meta_app(queue, console):
         """
         queue.append(f"subapp foo body {value}")
 
-    app = App(name="test_app", console=console)
+    app = App(name="test_app", console=console, result_action="return_value")
     app.command(subapp.meta, name="subapp")
 
     @app.meta.default
