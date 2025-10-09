@@ -88,6 +88,11 @@ ResultAction = (
         "return_int_as_exit_code_else_zero",
         "print_non_int_sys_exit",
         "sys_exit",
+        "return_none",
+        "return_zero",
+        "print_return_zero",
+        "sys_exit_zero",
+        "print_sys_exit_zero",
     ]
     | Callable[[Any], Any]
 )
@@ -2452,6 +2457,18 @@ class App:
                     return result
                 else:
                     return 0
+            case "return_none":
+                return None
+            case "return_zero":
+                return 0
+            case "print_return_zero":
+                self.console.print(result)
+                return 0
+            case "sys_exit_zero":
+                sys.exit(0)
+            case "print_sys_exit_zero":
+                self.console.print(result)
+                sys.exit(0)
             case _:
                 raise ValueError
 
