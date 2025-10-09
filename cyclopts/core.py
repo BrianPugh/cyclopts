@@ -2279,6 +2279,9 @@ class App:
         prompt: str = "$ ",
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
+        console: "Console | None" = None,
+        exit_on_error: bool = False,
+        result_action: ResultAction | None = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
@@ -2302,6 +2305,15 @@ class App:
                     return command(*bound.args, **bound.kwargs)
 
             The above is the default dispatcher implementation.
+        console: Console | None
+            Rich Console to use for output. If :obj:`None`, uses :attr:`App.console`.
+        exit_on_error: bool
+            Whether to call ``sys.exit`` on parsing errors. Defaults to :obj:`False`.
+        result_action: ResultAction | None
+            How to handle command return values in the interactive shell.
+            Defaults to ``"print_non_int_return_int_as_exit_code"`` which prints non-int results
+            and returns int/bool as exit codes without calling sys.exit.
+            If :obj:`None`, inherits from :attr:`App.result_action`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -2323,7 +2335,11 @@ class App:
         if dispatcher is None:
             dispatcher = default_dispatcher
 
-        kwargs.setdefault("exit_on_error", False)
+        overrides = {}
+        if result_action is not None:
+            overrides["result_action"] = result_action
+        if console is not None:
+            overrides["_console"] = console
 
         while True:
             try:
@@ -2339,7 +2355,9 @@ class App:
 
             try:
                 with self.app_stack(tokens, overrides):
-                    command, bound, ignored = self.parse_args(tokens, **kwargs)
+                    command, bound, ignored = self.parse_args(
+                        tokens, console=console, exit_on_error=exit_on_error, **kwargs
+                    )
                     result = dispatcher(command, bound, ignored)
                     self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
             except CycloptsError:
@@ -2365,7 +2383,7 @@ class App:
         """
         action = cast(
             ResultAction,
-            self.app_stack.resolve("result_action", fallback="print_non_int_sys_exit"),
+            self.app_stack.resolve("result_action", fallback=fallback),
         )
 
         if callable(action):
