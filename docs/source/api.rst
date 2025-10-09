@@ -494,11 +494,15 @@ API
 
       **"return_value"**
 
+         Returns the command's value unchanged. Use for embedding Cyclopts in other Python code or testing.
+
          .. code-block:: python
 
             return result
 
       **"print_non_int_return_int_as_exit_code"** (default when not inherited)
+
+         The default CLI mode. Prints non-int values, returns int/bool as exit codes.
 
          .. code-block:: python
 
@@ -514,6 +518,8 @@ API
 
       **"print_str_return_int_as_exit_code"**
 
+         Only prints string return values. Returns int/bool as exit codes, silently returns 0 for other types.
+
          .. code-block:: python
 
             if isinstance(result, str):
@@ -528,6 +534,8 @@ API
 
       **"print_str_return_zero"**
 
+         Only prints string return values, always returns 0. Useful for simple output-only CLIs.
+
          .. code-block:: python
 
             if isinstance(result, str):
@@ -535,6 +543,8 @@ API
             return 0
 
       **"print_non_none_return_int_as_exit_code"**
+
+         Prints all non-None values (including ints), returns int/bool as exit codes.
 
          .. code-block:: python
 
@@ -548,6 +558,8 @@ API
 
       **"print_non_none_return_zero"**
 
+         Prints all non-None values (including ints), always returns 0.
+
          .. code-block:: python
 
             if result is not None:
@@ -555,6 +567,8 @@ API
             return 0
 
       **"return_int_as_exit_code_else_zero"**
+
+         Never prints output. Returns int/bool as exit codes, 0 for all other types. Useful for silent CLIs.
 
          .. code-block:: python
 
@@ -566,6 +580,8 @@ API
                 return 0
 
       **"print_non_int_sys_exit"**
+
+         Like ``"print_non_int_return_int_as_exit_code"`` but calls :func:`sys.exit` directly. Use with caution.
 
          .. code-block:: python
 
@@ -581,7 +597,7 @@ API
 
       **Custom Callable**
 
-      For custom behavior, provide a callable that receives the result and returns a processed value:
+         Provide a function for fully custom result handling. Receives the command's return value and returns a processed value.
 
          .. code-block:: python
 

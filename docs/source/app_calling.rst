@@ -41,13 +41,37 @@ If a string is passed in, it will be internally converted into a list using `shl
 ------------
 Return Value
 ------------
-The ``app`` invocation returns the value of the called command.
+The ``app`` invocation processes and returns the command's return value based on :attr:`.App.result_action`. By default, commands that return integers have those integers returned so that they can be passed along to :func:`sys.exit`:
+
+.. code-block:: python
+
+   import sys
+   from cyclopts import App
+
+   app = App()  # Default result_action="print_non_int_return_int_as_exit_code"
+
+   @app.command
+   def success():
+       return 0  # Exit code for success
+
+   @app.command
+   def failure():
+       return 1  # Exit code for failure
+
+   exit_code = app("success")
+   print(f"Exit code: {exit_code}")
+   # Exit code: 0
+   sys.exit(exit_code)
+
+When using `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_, you can point directly to the ``app`` to have it automatically exit with the returned code.
+
+For embedding Cyclopts in other Python code or testing, use ``result_action="return_value"`` to get the raw command return value:
 
 .. code-block:: python
 
    from cyclopts import App
 
-   app = App()
+   app = App(result_action="return_value")
 
    @app.command
    def foo(a: int, b: int, c: int):
@@ -57,12 +81,7 @@ The ``app`` invocation returns the value of the called command.
    print(f"The return value was: {return_value}.")
    # The return value was: 6.
 
-If you decide you want each command to return an exit code, you could invoke your app like:
-
-.. code-block:: python
-
-   if __name__ == "__main__":
-       sys.exit(app())
+See :ref:`Result Action` for all available modes and detailed behavior.
 
 
 ------------------------------
