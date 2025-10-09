@@ -25,7 +25,6 @@ from typing import (
 
 from attrs import Factory, define, field
 
-from cyclopts._result_action import ResultAction, handle_result_action
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
@@ -77,6 +76,21 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
+
+ResultAction = (
+    Literal[
+        "return_value",
+        "print_non_int_return_int_as_exit_code",
+        "print_str_return_int_as_exit_code",
+        "print_str_return_zero",
+        "print_non_none_return_int_as_exit_code",
+        "print_non_none_return_zero",
+        "return_int_as_exit_code_else_zero",
+        "print_non_int_sys_exit",
+        "sys_exit",
+    ]
+    | Callable[[Any], Any]
+)
 
 _DEFAULT_FORMAT = "markdown"
 
@@ -1622,11 +1636,7 @@ class App:
             resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
             try:
                 result = _run_maybe_async_command(command, bound, resolved_backend)
-                resolved_result_action = cast(
-                    ResultAction,
-                    self.app_stack.resolve("result_action", fallback="print_non_int_sys_exit"),
-                )
-                return handle_result_action(result, resolved_result_action)
+                return self._handle_result_action(result)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -1745,11 +1755,7 @@ class App:
                 else:
                     result = command(*bound.args, **bound.kwargs)
 
-                resolved_result_action = cast(
-                    ResultAction,
-                    self.app_stack.resolve("result_action", fallback="print_non_int_sys_exit"),
-                )
-                return handle_result_action(result, resolved_result_action)
+                return self._handle_result_action(result)
             except KeyboardInterrupt:
                 if self.suppress_keyboard_interrupt:
                     sys.exit(130)  # Use the same exit code as Python's default KeyboardInterrupt handling.
@@ -2332,13 +2338,104 @@ class App:
                 break
 
             try:
-                command, bound, ignored = self.parse_args(tokens, **kwargs)
-                dispatcher(command, bound, ignored)
+                with self.app_stack(tokens, overrides):
+                    command, bound, ignored = self.parse_args(tokens, **kwargs)
+                    result = dispatcher(command, bound, ignored)
+                    self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
             except CycloptsError:
                 # Upstream ``parse_args`` already printed the error
                 pass
             except Exception:
                 print(traceback.format_exc())
+
+    def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
+        """Handle command result based on result_action.
+
+        Parameters
+        ----------
+        result : Any
+            The command's return value.
+        fallback : ResultAction
+            The fallback result_action if none is configured. Defaults to "print_non_int_sys_exit".
+
+        Returns
+        -------
+        Any
+            Processed result based on action (may call sys.exit() and not return).
+        """
+        action = cast(
+            ResultAction,
+            self.app_stack.resolve("result_action", fallback="print_non_int_sys_exit"),
+        )
+
+        if callable(action):
+            return action(result)
+
+        match action:
+            case "print_non_int_sys_exit":
+                if isinstance(result, bool):
+                    sys.exit(0 if result else 1)
+                elif isinstance(result, int):
+                    sys.exit(result)
+                elif result is not None:
+                    self.console.print(result)
+                    sys.exit(0)
+                else:
+                    sys.exit(0)
+            case "return_value":
+                return result
+            case "sys_exit":
+                if isinstance(result, bool):
+                    sys.exit(0 if result else 1)
+                elif isinstance(result, int):
+                    sys.exit(result)
+                else:
+                    sys.exit(0)
+            case "print_non_int_return_int_as_exit_code":
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                elif result is not None:
+                    self.console.print(result)
+                    return 0
+                else:
+                    return 0
+            case "print_str_return_int_as_exit_code":
+                if isinstance(result, str):
+                    self.console.print(result)
+                    return 0
+                elif isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                else:
+                    return 0
+            case "print_str_return_zero":
+                if isinstance(result, str):
+                    self.console.print(result)
+                return 0
+            case "print_non_none_return_int_as_exit_code":
+                if result is not None:
+                    self.console.print(result)
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                return 0
+            case "print_non_none_return_zero":
+                if result is not None:
+                    self.console.print(result)
+                return 0
+            case "return_int_as_exit_code_else_zero":
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                else:
+                    return 0
+            case _:
+                raise ValueError
 
     def update(self, app: "App"):
         """Copy over all commands from another :class:`App`.
