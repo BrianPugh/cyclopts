@@ -97,6 +97,13 @@ These behaviors can be controlled via :class:`.App` attributes or method paramet
 
 These attributes are inherited by child apps and can be overridden by providing parameters to method calls.
 
+.. note::
+   Cyclopts separates normal output from error messages using two different consoles:
+
+   - :attr:`App.console` - Used for normal output like help messages and version information (defaults to stdout)
+   - :attr:`App.error_console` - Used for error messages like parsing errors and exceptions (defaults to stderr)
+
+
 **Setting at App Level:**
 
 .. code-block:: python

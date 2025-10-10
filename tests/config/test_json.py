@@ -98,7 +98,7 @@ def test_config_invalid_json(tmp_path, console):
     Path("config.json").write_text('{"this is": broken}')
 
     with pytest.raises(CycloptsError), console.capture() as capture:
-        app("create", console=console, exit_on_error=False)
+        app("create", error_console=console, exit_on_error=False)
 
     actual = capture.get()
     expected = dedent(

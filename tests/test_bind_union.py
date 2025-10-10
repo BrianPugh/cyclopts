@@ -45,7 +45,7 @@ def test_union_coercion_cannot_coerce_error(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):
-        app.parse_args("foo", console=console, exit_on_error=False)
+        app.parse_args("foo", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 

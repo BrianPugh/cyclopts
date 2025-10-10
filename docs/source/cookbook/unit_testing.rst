@@ -152,17 +152,20 @@ We also want to make sure that our message is displayed to the user.
 The built-in `capsys`_ fixture gives us access to our application's ``stdout``.
 We can use this to confirm our app prints the correct statement.
 
-Since we're using the ``test_app`` with ``result_action="return_value"``, we can simply check stdout without worrying about :func:`sys.exit`:
+By passing ``result_action="return_value"`` to the app call, we can get the return value directly without :func:`sys.exit` being called:
 
 .. code-block:: python
 
    # test.py - continued from "Exit Codes"
    def test_unavailable_name_with_output(capsys, mock_check_pypi_name_available):
        mock_check_pypi_name_available.return_value = False
-       is_available = test_app("foo")  # Use test_app to avoid sys.exit
+       is_available = app("foo", result_action="return_value")
        mock_check_pypi_name_available.assert_called_once_with("foo")
        assert is_available is False
        assert capsys.readouterr().out == "foo is not available.\n"
+
+.. note::
+   Normal output goes to :attr:`~cyclopts.App.console` (stdout), while errors go to :attr:`~cyclopts.App.error_console` (stderr). Use ``capsys.readouterr().err`` to check error messages, or provide a custom ``error_console`` to capture both streams together.
 
 
 ---------------------
@@ -220,6 +223,7 @@ To explicitly test that configurations from the :ref:`Cyclopts configuration sys
 
    # test.py
    import json
+   from pypi_checker import pypi_checker
 
    @pytest.fixture(autouse=True)
    def chdir_to_tmp_path(tmp_path, monkeypatch):
@@ -236,7 +240,7 @@ To explicitly test that configurations from the :ref:`Cyclopts configuration sys
           json.dump({"name": "bar"}, f)
        command, bound, _ = app.parse_args([])  # An empty list - no CLI arguments passed in.
        assert command == pypi_checker
-       assert bound.arguments['name'] == "foo"
+       assert bound.arguments['name'] == "bar"
 
 ---------
 Help Page
@@ -256,14 +260,16 @@ Since the help-page is just printed to ``stdout``, we will be using the `capsys`
 
 .. code-block:: python
 
+   import pytest
    from textwrap import dedent
 
    def test_help_page(capsys, console):
-       app("--help", console=console)
+       with pytest.raises(SystemExit):
+           app("--help", console=console)
        actual = capsys.readouterr().out
        assert actual == dedent(
            """\
-           Usage: pypi-checker COMMAND [ARGS] [OPTIONS]
+           Usage: pypi_checker COMMAND [ARGS] [OPTIONS]
 
            Check if a package name is available on PyPI.
 

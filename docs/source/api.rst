@@ -338,6 +338,20 @@ API
       #. The parenting :attr:`App.console` (and so on), if not :obj:`None`.
       #. If all values are :obj:`None`, then the default :class:`~rich.console.Console` is used.
 
+   .. attribute:: error_console
+      :type: ~rich.console.Console
+      :value: None
+
+      Default :class:`~rich.console.Console` to use when displaying error messages.
+      Cyclopts error_console resolution is as follows:
+
+      #. Any explicitly passed in error_console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
+      #. The relevant subcommand's :attr:`App.error_console` attribute, if not :obj:`None`.
+      #. The parenting :attr:`App.error_console` (and so on), if not :obj:`None`.
+      #. If all values are :obj:`None`, then a default :class:`~rich.console.Console` with ``stderr=True`` is used.
+
+      This separation of error output from normal output follows Unix conventions, allowing
+      users to redirect error messages independently from normal output (e.g., ``program > output.txt 2> errors.txt``).
 
    .. attribute:: default_parameter
       :type: Parameter

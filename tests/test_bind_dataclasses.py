@@ -51,7 +51,7 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app("123", console=console, exit_on_error=False)
+        app("123", error_console=console, exit_on_error=False)
     actual = capture.get()
 
     expected = dedent(
@@ -197,7 +197,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app.parse_args(
             "build --car.name=ford --car.mileage=500 --car.hp=200 --license-plate=ABCDEFG",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 

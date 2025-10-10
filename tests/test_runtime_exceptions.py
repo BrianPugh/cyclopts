@@ -17,7 +17,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["1", "2"], exit_on_error=False, console=console)
+        app(["1", "2"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -27,7 +27,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
     )
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["1", "2"], exit_on_error=False, console=console, verbose=True)
+        app(["1", "2"], exit_on_error=False, error_console=console, verbose=True)
 
     actual = capture.get()
     assert actual == dedent(
@@ -50,7 +50,7 @@ def test_runtime_exception_missing_parameter(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["1", "2"], exit_on_error=False, console=console)
+        app(["1", "2"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -62,7 +62,7 @@ def test_runtime_exception_missing_parameter(app, console):
 
 def test_runtime_exception_bad_command(app, console):
     with console.capture() as capture, pytest.raises(UnknownCommandError):
-        app(["bad-command", "123"], exit_on_error=False, console=console)
+        app(["bad-command", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -78,7 +78,7 @@ def test_runtime_exception_bad_command_recommend(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(UnknownCommandError):
-        app(["bad-command", "123"], exit_on_error=False, console=console)
+        app(["bad-command", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -103,7 +103,7 @@ def test_runtime_exception_bad_command_recommend_no_show(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(UnknownCommandError):
-        app(["bad-command", "123"], exit_on_error=False, console=console)
+        app(["bad-command", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -131,7 +131,7 @@ def test_runtime_exception_bad_command_list_ellipsis(app, console):
     app.command(name="cmd9")(cmd)
 
     with console.capture() as capture, pytest.raises(UnknownCommandError):
-        app(["cmd", "123"], exit_on_error=False, console=console)
+        app(["cmd", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -150,7 +150,7 @@ def test_runtime_exception_bad_parameter_recommend(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app(["some-command", "--boo", "123"], exit_on_error=False, console=console)
+        app(["some-command", "--boo", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -169,7 +169,7 @@ def test_runtime_exception_repeat_arguments(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["--a=1", "--a=2"], exit_on_error=False, console=console)
+        app(["--a=1", "--a=2"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -195,7 +195,7 @@ def test_runtime_exception_missing_tuple(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app(["--network-delay", "1"], exit_on_error=False, console=console)
+        app(["--network-delay", "1"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
