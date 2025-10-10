@@ -1,4 +1,4 @@
-exclude: ^(poetry.lock|.idea/)
+exclude: ^(uv.lock|.idea/)
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.7.1"

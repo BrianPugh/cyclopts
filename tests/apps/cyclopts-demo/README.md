@@ -15,19 +15,19 @@ Provides a comprehensive CLI application that exercises all major completion sce
 
 ## Usage
 
-Install and run via Poetry:
+Install and run via uv:
 
 ```bash
 # Install dependencies
-poetry install
+uv sync
 
 # Run the demo app
-poetry run cyclopts-demo --help
+uv run cyclopts-demo --help
 
 # Test specific commands
-poetry run cyclopts-demo files --help
-poetry run cyclopts-demo database migrate --help
-poetry run cyclopts-demo server start --help
+uv run cyclopts-demo files --help
+uv run cyclopts-demo database migrate --help
+uv run cyclopts-demo server start --help
 ```
 
 ## Commands

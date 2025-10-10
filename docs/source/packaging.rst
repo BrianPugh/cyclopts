@@ -46,21 +46,29 @@ A pretty bare-bones Cyclopts ``mypackage/__main__.py`` will look like:
 Entrypoints
 -----------
 If you want your application to be callable like a standard bash executable (i.e. ``my-package`` instead of ``python -m mypackage``), we'll need to add an entrypoint_.
-We'll investigate the setuptools solution, and the poetry solution.
 
-^^^^^^^^^^
-Setuptools
-^^^^^^^^^^
-``setup.py`` is a script at the root of your project that gets executed upon installation.
-``setup.cfg`` and ``pyproject.toml`` are two other alternatives that are supported.
+Modern Python projects typically use ``pyproject.toml`` for configuration. The standard way to define console scripts is:
 
-The following are all equivalent, **but should not be used at the same time**.
-It is important that the function specified **takes no arguments**.
+.. code-block:: toml
+
+   # pyproject.toml
+   [project.scripts]
+   my-package = "mypackage.__main__:main"
+
+This creates an executable named ``my-package`` that executes function ``main`` (from the right of the colon) from the python module ``mypackage.__main__``.
+Note that this configuration is independent of any special naming, like ``__main__`` or ``main``.
+
+^^^^^^^^^^^^^^^^^^^^^
+Legacy Configurations
+^^^^^^^^^^^^^^^^^^^^^
+
+For older projects, you may encounter these alternative formats:
+
+**setup.py:**
 
 .. code-block:: python
 
     # setup.py
-
     from setuptools import setup
 
     setup(
@@ -72,11 +80,7 @@ It is important that the function specified **takes no arguments**.
         },
     )
 
-.. code-block:: toml
-
-   # pyproject.toml
-   [project.scripts]
-   my-package = "mypackage.__main__:main"
+**setup.cfg:**
 
 .. code-block:: cfg
 
@@ -85,22 +89,15 @@ It is important that the function specified **takes no arguments**.
     console_scripts =
         my-package = mypackage.__main__:main
 
-All of these represent the same thing: create an executable named ``my-package`` that executes function ``main`` (from the right of the colon) from the python module ``mypackage.__main__``.
-Note that this configuration is independent of any special naming, like ``__main__`` or ``main``.
-The setuptools entrypoint_ documentation goes into further detail.
-
-^^^^^^
-Poetry
-^^^^^^
-Poetry_ is a tool for dependency management and packaging in Python (and what Cyclopts uses).
-The syntax is very similar to setuptools:
+**Poetry:**
 
 .. code-block:: toml
 
    # pyproject.toml
-
    [tool.poetry.scripts]
    my-package = "mypackage.__main__:main"
+
+The setuptools entrypoint_ documentation goes into further detail.
 
 .. _Result Action:
 

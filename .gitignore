@@ -245,9 +245,6 @@ Temporary Items
 cyclopts/_c_extension.c
 cyclopts/*.html
 
-# Poetry
-poetry.toml
-
 # line-profiler
 *.lprof
 
@@ -260,3 +257,6 @@ poetry.toml
 
 # Editor config
 .vscode
+
+poetry.lock
+tests/**/uv.lock
