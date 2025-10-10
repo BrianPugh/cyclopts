@@ -3,12 +3,12 @@ from typing import Annotated, Dict, Optional, TypedDict, Union  # noqa: UP035
 
 import pytest
 
+from cyclopts.annotations import is_typeddict
 from cyclopts.argument import (
     Argument,
     ArgumentCollection,
     _resolve_groups_from_callable,
-    _resolve_parameter_name,
-    is_typeddict,
+    resolve_parameter_name,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
@@ -431,7 +431,7 @@ def test_argument_collection_var_keyword_match():
     ],
 )
 def test_resolve_parameter_name(args, expected):
-    assert _resolve_parameter_name(*args) == expected
+    assert resolve_parameter_name(*args) == expected
 
 
 def test_resolve_groups_from_callable():

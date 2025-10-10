@@ -4,7 +4,7 @@ from typing import Annotated, Literal, TypeAlias
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.argument import _get_choices_from_hint
+from cyclopts.argument import get_choices_from_hint
 
 FontSize: TypeAlias = Literal[10, 12, 16]
 type BoxSize = Literal[10, 12, 16]
@@ -54,7 +54,7 @@ FontPixelFormat: TypeAlias = Literal["bmp"]
     ],
 )
 def test_py312_type_alias_type_help_get_choices(type_, expected):
-    assert expected == _get_choices_from_hint(type_, lambda x: x)
+    assert expected == get_choices_from_hint(type_, lambda x: x)
 
 
 type Numbers = tuple[int, str]
