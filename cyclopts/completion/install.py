@@ -4,8 +4,12 @@ This module handles the installation of completion scripts to shell-specific
 locations and the updating of shell RC files to load completions.
 """
 
+import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
+
+from cyclopts.parameter import Parameter
 
 
 def get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_name: str) -> Path:
@@ -87,3 +91,92 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
         f.write(f"# Load {prog_name} completion\n{source_line}\n")
 
     return True
+
+
+def create_install_completion_command(
+    install_completion_fn: Callable[..., Path],
+    add_to_startup: bool,
+):
+    """Create a command function for installing shell completion.
+
+    Parameters
+    ----------
+    install_completion_fn : Callable
+        Function that performs the actual installation (typically App.install_completion).
+        Should accept (shell, output, add_to_startup) and return the installation path.
+    add_to_startup : bool
+        Whether to add source line to shell RC file.
+
+    Returns
+    -------
+    Callable
+        Command function that can be registered with App.command().
+    """
+
+    def _install_completion_command(
+        *,
+        shell: Annotated[Literal["zsh", "bash", "fish"] | None, Parameter()] = None,
+        output: Annotated[Path | None, Parameter(name=["-o", "--output"])] = None,
+    ):
+        """Install shell completion for this application.
+
+        This command generates and installs the completion script to the appropriate
+        location for your shell. After installation, you may need to restart your
+        shell or source your shell configuration file.
+
+        Parameters
+        ----------
+        shell : Literal["zsh", "bash", "fish"] | None
+            Shell type for completion. If not specified, attempts to auto-detect current shell.
+        output : Path | None
+            Output path for the completion script. If not specified, uses shell-specific default.
+        """
+        from cyclopts.completion.detect import ShellDetectionError, detect_shell
+
+        if shell is None:
+            try:
+                shell = detect_shell()
+            except ShellDetectionError:
+                print(
+                    "Could not auto-detect shell. Please specify --shell explicitly.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+        install_path = install_completion_fn(shell=shell, output=output, add_to_startup=add_to_startup)
+
+        print(f"✓ Completion script installed to {install_path}")
+
+        if shell == "zsh":
+            if add_to_startup:
+                zshrc = Path.home() / ".zshrc"
+                print(f"✓ Added completion loader to {zshrc}")
+                print("\nRestart your shell or run: source ~/.zshrc")
+            else:
+                completion_dir = install_path.parent
+                print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
+                print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
+                print(f"    fpath=({completion_dir} $fpath)")
+                print("    autoload -Uz compinit && compinit")
+                print("\nThen restart your shell or run: exec zsh")
+        elif shell == "bash":
+            if add_to_startup:
+                bashrc = Path.home() / ".bashrc"
+                print(f"✓ Added completion loader to {bashrc}")
+                print("\nRestart your shell or run: source ~/.bashrc")
+            else:
+                print("\nCompletions will be automatically loaded by bash-completion.")
+                print("If completions don't work:")
+                print("  1. Ensure bash-completion is installed (v2.8+)")
+                print("  2. Restart your shell or run: exec bash")
+                print("\nNote: bash-completion is typically installed via:")
+                print("  - macOS: brew install bash-completion@2")
+                print("  - Debian/Ubuntu: apt install bash-completion")
+                print("  - Fedora/RHEL: dnf install bash-completion")
+        elif shell == "fish":
+            print("\nCompletions are automatically loaded in fish.")
+            print("Restart your shell or run: source ~/.config/fish/config.fish")
+        else:
+            raise NotImplementedError
+
+    return _install_completion_command

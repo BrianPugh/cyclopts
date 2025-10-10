@@ -41,8 +41,10 @@ __all__ = [
 
 from cyclopts._convert import convert
 from cyclopts._env_var import env_var_split
+from cyclopts._result_action import ResultAction
+from cyclopts._run import run
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.core import App, ResultAction, run
+from cyclopts.core import App
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,

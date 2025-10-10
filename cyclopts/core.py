@@ -46,6 +46,7 @@ from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
 from cyclopts.utils import (
     UNSET,
+    create_error_console_from_console,
     default_name_transform,
     help_formatter_converter,
     optional_to_tuple_converter,
@@ -55,9 +56,9 @@ from cyclopts.utils import (
 )
 
 if sys.version_info < (3, 11):  # pragma: no cover
-    from typing_extensions import assert_never
+    pass
 else:  # pragma: no cover
-    from typing import assert_never
+    pass
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as importlib_metadata_version
@@ -74,28 +75,11 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
+from cyclopts._result_action import ResultAction
+from cyclopts._run import _run_maybe_async_command
+
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
-
-ResultAction = (
-    Literal[
-        "return_value",
-        "print_non_int_return_int_as_exit_code",
-        "print_str_return_int_as_exit_code",
-        "print_str_return_zero",
-        "print_non_none_return_int_as_exit_code",
-        "print_non_none_return_zero",
-        "return_int_as_exit_code_else_zero",
-        "print_non_int_sys_exit",
-        "sys_exit",
-        "return_none",
-        "return_zero",
-        "print_return_zero",
-        "sys_exit_zero",
-        "print_sys_exit_zero",
-    ]
-    | Callable[[Any], Any]
-)
 
 _DEFAULT_FORMAT = "markdown"
 
@@ -161,58 +145,6 @@ def _combined_meta_command_mapping(
     return command_mapping
 
 
-def _run_maybe_async_command(
-    command: Callable,
-    bound: inspect.BoundArguments | None = None,
-    backend: Literal["asyncio", "trio"] = "asyncio",
-):
-    """Run a command, handling both sync and async cases.
-
-    If the command is async, an async context will be created to run it.
-
-    Parameters
-    ----------
-    command : Callable
-        The command to execute.
-    bound : inspect.BoundArguments | None
-        Bound arguments for the command. If None, command is called with no arguments.
-    backend : Literal["asyncio", "trio"]
-        The async backend to use if the command is async.
-
-    Returns
-    -------
-    return_value: Any
-        The value the command function returns.
-    """
-    if not inspect.iscoroutinefunction(command):
-        # Synchronous command
-        if bound is None:
-            return command()
-        else:
-            return command(*bound.args, **bound.kwargs)
-
-    # Async command - create event loop
-    # We don't use anyio to avoid the dependency for non-async users.
-    # anyio can auto-select the backend when you're already in an async context,
-    # but here we're creating the top-level event loop & must select ourselves.
-    if backend == "asyncio":
-        import asyncio
-
-        if bound is None:
-            return asyncio.run(command())
-        else:
-            return asyncio.run(command(*bound.args, **bound.kwargs))
-    elif backend == "trio":
-        import trio
-
-        if bound is None:
-            return trio.run(command)
-        else:
-            return trio.run(partial(command, *bound.args, **bound.kwargs))
-    else:  # pragma: no cover
-        assert_never(backend)
-
-
 def _walk_metas(app: "App"):
     """Typically the result looks like [app] or [meta_app, app].
 
@@ -234,35 +166,6 @@ def _group_converter(input_value: None | str | Group) -> Group | None:
         return input_value
     else:
         raise TypeError
-
-
-def _create_error_console_from_console(console: "Console") -> "Console":
-    """Create an error console (stderr=True) that inherits settings from a source console."""
-    from rich.console import Console
-
-    color_system = console.color_system or "auto"
-
-    return Console(
-        stderr=True,
-        color_system=color_system,  # type: ignore[arg-type]
-        force_terminal=getattr(console, "_force_terminal", None),
-        force_jupyter=console.is_jupyter or None,
-        force_interactive=console.is_interactive or None,
-        soft_wrap=console.soft_wrap,
-        width=console._width,
-        height=getattr(console, "_height", None),
-        tab_size=console.tab_size,
-        markup=getattr(console, "_markup", True),
-        emoji=getattr(console, "_emoji", True),
-        emoji_variant=getattr(console, "_emoji_variant", None),
-        highlight=getattr(console, "_highlight", True),
-        no_color=console.no_color,
-        legacy_windows=console.legacy_windows,
-        safe_box=console.safe_box,
-        _environ=getattr(console, "_environ", None),
-        get_datetime=getattr(console, "get_datetime", None),
-        get_time=getattr(console, "get_time", None),
-    )
 
 
 @define
@@ -644,7 +547,7 @@ class App:
             return result
 
         if self._fallback_error_console is None:
-            self._fallback_error_console = _create_error_console_from_console(self.console)
+            self._fallback_error_console = create_error_console_from_console(self.console)
 
         return self._fallback_error_console
 
@@ -2278,74 +2181,10 @@ class App:
         --------
         install_completion : The underlying method that performs the installation.
         """
+        from cyclopts.completion.install import create_install_completion_command
 
-        def _install_completion_command(
-            *,
-            shell: Annotated[Literal["zsh", "bash", "fish"] | None, Parameter()] = None,
-            output: Annotated[Path | None, Parameter(name=["-o", "--output"])] = None,
-        ):
-            """Install shell completion for this application.
-
-            This command generates and installs the completion script to the appropriate
-            location for your shell. After installation, you may need to restart your
-            shell or source your shell configuration file.
-
-            Parameters
-            ----------
-            shell : Literal["zsh", "bash", "fish"] | None
-                Shell type for completion. If not specified, attempts to auto-detect current shell.
-            output : Path | None
-                Output path for the completion script. If not specified, uses shell-specific default.
-            """
-            from cyclopts.completion.detect import ShellDetectionError, detect_shell
-
-            if shell is None:
-                try:
-                    shell = detect_shell()
-                except ShellDetectionError:
-                    print(
-                        "Could not auto-detect shell. Please specify --shell explicitly.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-
-            install_path = self.install_completion(shell=shell, output=output, add_to_startup=add_to_startup)
-
-            print(f"✓ Completion script installed to {install_path}")
-
-            if shell == "zsh":
-                if add_to_startup:
-                    zshrc = Path.home() / ".zshrc"
-                    print(f"✓ Added completion loader to {zshrc}")
-                    print("\nRestart your shell or run: source ~/.zshrc")
-                else:
-                    completion_dir = install_path.parent
-                    print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")
-                    print("Add this to your ~/.zshrc or ~/.zprofile if not already present:")
-                    print(f"    fpath=({completion_dir} $fpath)")
-                    print("    autoload -Uz compinit && compinit")
-                    print("\nThen restart your shell or run: exec zsh")
-            elif shell == "bash":
-                if add_to_startup:
-                    bashrc = Path.home() / ".bashrc"
-                    print(f"✓ Added completion loader to {bashrc}")
-                    print("\nRestart your shell or run: source ~/.bashrc")
-                else:
-                    print("\nCompletions will be automatically loaded by bash-completion.")
-                    print("If completions don't work:")
-                    print("  1. Ensure bash-completion is installed (v2.8+)")
-                    print("  2. Restart your shell or run: exec bash")
-                    print("\nNote: bash-completion is typically installed via:")
-                    print("  - macOS: brew install bash-completion@2")
-                    print("  - Debian/Ubuntu: apt install bash-completion")
-                    print("  - Fedora/RHEL: dnf install bash-completion")
-            elif shell == "fish":
-                print("\nCompletions are automatically loaded in fish.")
-                print("Restart your shell or run: source ~/.config/fish/config.fish")
-            else:
-                raise NotImplementedError
-
-        self.command(_install_completion_command, name=name, **kwargs)
+        command_fn = create_install_completion_command(self.install_completion, add_to_startup)
+        self.command(command_fn, name=name, **kwargs)
 
     def interactive_shell(
         self,
@@ -2454,91 +2293,14 @@ class App:
         Any
             Processed result based on action (may call sys.exit() and not return).
         """
+        from cyclopts._result_action import handle_result_action
+
         action = cast(
             ResultAction,
             self.app_stack.resolve("result_action", fallback=fallback),
         )
 
-        if callable(action):
-            return action(result)
-
-        match action:
-            case "print_non_int_sys_exit":
-                if isinstance(result, bool):
-                    sys.exit(0 if result else 1)
-                elif isinstance(result, int):
-                    sys.exit(result)
-                elif result is not None:
-                    self.console.print(result)
-                    sys.exit(0)
-                else:
-                    sys.exit(0)
-            case "return_value":
-                return result
-            case "sys_exit":
-                if isinstance(result, bool):
-                    sys.exit(0 if result else 1)
-                elif isinstance(result, int):
-                    sys.exit(result)
-                else:
-                    sys.exit(0)
-            case "print_non_int_return_int_as_exit_code":
-                if isinstance(result, bool):
-                    return 0 if result else 1
-                elif isinstance(result, int):
-                    return result
-                elif result is not None:
-                    self.console.print(result)
-                    return 0
-                else:
-                    return 0
-            case "print_str_return_int_as_exit_code":
-                if isinstance(result, str):
-                    self.console.print(result)
-                    return 0
-                elif isinstance(result, bool):
-                    return 0 if result else 1
-                elif isinstance(result, int):
-                    return result
-                else:
-                    return 0
-            case "print_str_return_zero":
-                if isinstance(result, str):
-                    self.console.print(result)
-                return 0
-            case "print_non_none_return_int_as_exit_code":
-                if result is not None:
-                    self.console.print(result)
-                if isinstance(result, bool):
-                    return 0 if result else 1
-                elif isinstance(result, int):
-                    return result
-                return 0
-            case "print_non_none_return_zero":
-                if result is not None:
-                    self.console.print(result)
-                return 0
-            case "return_int_as_exit_code_else_zero":
-                if isinstance(result, bool):
-                    return 0 if result else 1
-                elif isinstance(result, int):
-                    return result
-                else:
-                    return 0
-            case "return_none":
-                return None
-            case "return_zero":
-                return 0
-            case "print_return_zero":
-                self.console.print(result)
-                return 0
-            case "sys_exit_zero":
-                sys.exit(0)
-            case "print_sys_exit_zero":
-                self.console.print(result)
-                sys.exit(0)
-            case _:
-                raise ValueError
+        return handle_result_action(result, action, lambda x: self.console.print(x))
 
     def update(self, app: "App"):
         """Copy over all commands from another :class:`App`.
@@ -2626,7 +2388,9 @@ def _log_framework_warning(framework: TestFramework) -> None:
             continue
 
         # The "self" is within the Cyclopts codebase App.ANY_METHOD_HERE,
-        # so this is a safe lookup.
+        # so this is a safe lookup. Skip if self doesn't exist (e.g., standalone functions).
+        if "self" not in frame.f_locals:
+            continue
         called_cyclopts_app_instance = frame.f_locals["self"]
         # Find the variable name in the previous frame that references this object
         candidate_variables = {**f_back.f_globals, **f_back.f_locals}
@@ -2643,62 +2407,3 @@ def _log_framework_warning(framework: TestFramework) -> None:
         message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{var_name}([])"?'
         warnings.warn(UserWarning(message), stacklevel=3)
         break
-
-
-@overload
-def run(callable: Callable[..., Coroutine[None, None, V]], /, *, result_action: Literal["return_value"]) -> V: ...
-
-
-@overload
-def run(callable: Callable[..., V], /, *, result_action: Literal["return_value"]) -> V: ...
-
-
-@overload
-def run(
-    callable: Callable[..., Coroutine[None, None, Any]], /, *, result_action: ResultAction | None = None
-) -> Any: ...
-
-
-@overload
-def run(callable: Callable[..., Any], /, *, result_action: ResultAction | None = None) -> Any: ...
-
-
-def run(callable, /, *, result_action: ResultAction | None = None):
-    """Run the given callable as a CLI command.
-
-    The callable may also be a coroutine function.
-    This function is syntax sugar for very simple use cases, and is roughly equivalent to:
-
-    .. code-block:: python
-
-        from cyclopts import App
-
-        app = App()
-        app.default(callable)
-        app()
-
-    Parameters
-    ----------
-    callable
-        The function to execute as a CLI command.
-    result_action
-        How to handle the command's return value. If not specified, uses the default
-        ``"print_non_int_sys_exit"`` which calls :func:`sys.exit` with the appropriate code.
-        Can be set to ``"return_value"`` to return the result directly for testing/embedding.
-
-    Example usage:
-
-    .. code-block:: python
-
-        import cyclopts
-
-
-        def main(name: str, age: int):
-            print(f"Hello {name}, you are {age} years old.")
-
-
-        cyclopts.run(main)
-    """
-    app = App(result_action=result_action)
-    app.default(callable)
-    return app()

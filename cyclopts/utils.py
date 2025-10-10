@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from json import JSONDecodeError
 
     from attrs import frozen
+    from rich.console import Console
 else:
     from attrs import define
 
@@ -392,3 +393,43 @@ def json_decode_error_verbosifier(decode_error: "JSONDecodeError", context: int 
         f"JSONDecodeError:\n    {prefix_ellipsis}{segment}{suffix_ellipsis}\n    {carat_pointer}\n{str(decode_error)}"
     )
     return response
+
+
+def create_error_console_from_console(console: "Console") -> "Console":
+    """Create an error console (stderr=True) that inherits settings from a source console.
+
+    Parameters
+    ----------
+    console : Console
+        Source Rich Console to copy settings from.
+
+    Returns
+    -------
+    Console
+        New Rich Console with stderr=True and inherited settings.
+    """
+    from rich.console import Console
+
+    color_system = console.color_system or "auto"
+
+    return Console(
+        stderr=True,
+        color_system=color_system,  # type: ignore[arg-type]
+        force_terminal=getattr(console, "_force_terminal", None),
+        force_jupyter=console.is_jupyter or None,
+        force_interactive=console.is_interactive or None,
+        soft_wrap=console.soft_wrap,
+        width=console._width,
+        height=getattr(console, "_height", None),
+        tab_size=console.tab_size,
+        markup=getattr(console, "_markup", True),
+        emoji=getattr(console, "_emoji", True),
+        emoji_variant=getattr(console, "_emoji_variant", None),
+        highlight=getattr(console, "_highlight", True),
+        no_color=console.no_color,
+        legacy_windows=console.legacy_windows,
+        safe_box=console.safe_box,
+        _environ=getattr(console, "_environ", None),
+        get_datetime=getattr(console, "get_datetime", None),
+        get_time=getattr(console, "get_time", None),
+    )
