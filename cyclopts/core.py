@@ -236,6 +236,35 @@ def _group_converter(input_value: None | str | Group) -> Group | None:
         raise TypeError
 
 
+def _create_error_console_from_console(console: "Console") -> "Console":
+    """Create an error console (stderr=True) that inherits settings from a source console."""
+    from rich.console import Console
+
+    color_system = console.color_system or "auto"
+
+    return Console(
+        stderr=True,
+        color_system=color_system,  # type: ignore[arg-type]
+        force_terminal=getattr(console, "_force_terminal", None),
+        force_jupyter=console.is_jupyter or None,
+        force_interactive=console.is_interactive or None,
+        soft_wrap=console.soft_wrap,
+        width=console._width,
+        height=getattr(console, "_height", None),
+        tab_size=console.tab_size,
+        markup=getattr(console, "_markup", True),
+        emoji=getattr(console, "_emoji", True),
+        emoji_variant=getattr(console, "_emoji_variant", None),
+        highlight=getattr(console, "_highlight", True),
+        no_color=console.no_color,
+        legacy_windows=console.legacy_windows,
+        safe_box=console.safe_box,
+        _environ=getattr(console, "_environ", None),
+        get_datetime=getattr(console, "get_datetime", None),
+        get_time=getattr(console, "get_time", None),
+    )
+
+
 @define
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
@@ -615,9 +644,7 @@ class App:
             return result
 
         if self._fallback_error_console is None:
-            from rich.console import Console
-
-            self._fallback_error_console = Console(stderr=True)
+            self._fallback_error_console = _create_error_console_from_console(self.console)
 
         return self._fallback_error_console
 
