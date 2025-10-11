@@ -24,7 +24,7 @@ def run(
     Parameters
     ----------
     script : str
-        Python script path with optional '::app_object' notation.
+        Python script path with optional ':app_object' notation.
     args : str
         Arguments to pass to the loaded application.
 
@@ -34,7 +34,7 @@ def run(
         cyclopts run myapp.py --verbose foo bar
 
     Specify app object:
-        cyclopts run myapp.py::app --help
+        cyclopts run myapp.py:app --help
     """
     if str(script) in app.help_flags:
         app.help_print()

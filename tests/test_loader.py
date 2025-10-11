@@ -58,12 +58,12 @@ def test_load_basic_script(sample_app_script):
 
 
 def test_load_with_explicit_app_name(multi_app_script):
-    """Test loading with explicit app name using :: notation."""
-    app, name = load_app_from_script(f"{multi_app_script}::app1")
+    """Test loading with explicit app name using : notation."""
+    app, name = load_app_from_script(f"{multi_app_script}:app1")
     assert name == "app1"
     assert "first" in app.name
 
-    app, name = load_app_from_script(f"{multi_app_script}::app2")
+    app, name = load_app_from_script(f"{multi_app_script}:app2")
     assert name == "app2"
     assert "second" in app.name
 
@@ -101,7 +101,7 @@ def test_script_without_app(tmp_path):
 def test_invalid_app_name(sample_app_script):
     """Test error handling for invalid app name."""
     with pytest.raises(SystemExit):
-        load_app_from_script(f"{sample_app_script}::nonexistent")
+        load_app_from_script(f"{sample_app_script}:nonexistent")
 
 
 def test_not_an_app_object(tmp_path):
@@ -113,7 +113,7 @@ not_an_app = "I am a string"
 """
     )
     with pytest.raises(SystemExit):
-        load_app_from_script(f"{script}::not_an_app")
+        load_app_from_script(f"{script}:not_an_app")
 
 
 def test_multiple_apps_without_specification(multi_app_script):

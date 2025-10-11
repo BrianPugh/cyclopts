@@ -386,7 +386,7 @@ def test_colon_escaping_in_descriptions(zsh_tester):
     """Test that colons in descriptions are escaped to prevent field separator issues.
 
     Regression test for issue where colons in positional argument descriptions
-    like '::app_object' would be treated as field separators in specs like
+    like ':app_object' would be treated as field separators in specs like
     '1:message:action', causing unmatched quote errors.
     """
     from typing import Annotated
@@ -397,14 +397,14 @@ def test_colon_escaping_in_descriptions(zsh_tester):
 
     @app.command
     def run(
-        script: Annotated[str, Parameter(help="Path with '::app' notation")],
+        script: Annotated[str, Parameter(help="Path with ':app' notation")],
     ):
         """Command with colon in description."""
         pass
 
     tester = zsh_tester(app, "colontest")
 
-    assert r"\:\:" in tester.completion_script
+    assert r"\:" in tester.completion_script
     assert tester.validate_script_syntax()
 
 

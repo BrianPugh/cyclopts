@@ -40,7 +40,7 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
     Parameters
     ----------
     script : str | Path
-        Python script path, optionally with ``'::app_object'`` notation to specify
+        Python script path, optionally with ``':app_object'`` notation to specify
         the :class:`App` object (only supported with str). If not specified, will search
         for :class:`App` objects in the script's global namespace.
 
@@ -60,8 +60,8 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
 
     # Parse the script path and optional app object
     app_name = None
-    if isinstance(script, str) and "::" in script:
-        script_path, app_name = script.split("::", 1)
+    if isinstance(script, str) and ":" in script:
+        script_path, app_name = script.split(":", 1)
         script_path = Path(script_path)
     elif isinstance(script, Path):
         script_path = script
@@ -133,7 +133,7 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
                 names = ", ".join(name for name, _ in app_objects)
                 script_str = str(script) if isinstance(script, Path) else script
                 print(
-                    f"Error: Multiple App objects found: {names}. Please specify one using '{script_str}::app_name'.",
+                    f"Error: Multiple App objects found: {names}. Please specify one using '{script_str}:app_name'.",
                     file=sys.stderr,
                 )
                 sys.exit(1)
