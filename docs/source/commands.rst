@@ -269,3 +269,9 @@ Decorated Function Details
 --------------------------
 Cyclopts **does not modify the decorated function in any way**.
 The returned function is the **exact same function** being decorated and can be used exactly as if it were not decorated by Cyclopts.
+
+--------
+See Also
+--------
+
+For improved CLI startup performance with large applications, see :ref:`Lazy Loading`.

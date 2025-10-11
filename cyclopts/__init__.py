@@ -71,6 +71,7 @@ from cyclopts.utils import UNSET, default_name_transform
 # These modules are only loaded when explicitly accessed by user code
 _LAZY_IMPORTS = {
     # Submodules - opt-in features not needed for basic CLI parsing
+    "config": "cyclopts.config",  # Configuration file parsing (JSON, TOML, YAML, env)
     "types": "cyclopts.types",  # ~3ms - special types like ResolvedExistingPath
     "validators": "cyclopts.validators",  # ~2ms - validators like Number, Path
     # Editor functionality - rarely used
@@ -88,7 +89,7 @@ def __getattr__(name: str):
         import importlib
 
         module_path = _LAZY_IMPORTS[name]
-        if name in ("types", "validators"):
+        if name in ("config", "types", "validators"):
             # These are submodules, import the module itself
             module = importlib.import_module(module_path)
             globals()[name] = module

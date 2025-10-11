@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from cyclopts import App
 
+from cyclopts.command_spec import CommandSpec
+
 
 @contextmanager
 def _suppress_app_execution():
@@ -114,10 +116,12 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
 
         if len(app_objects) > 1:
             # Filter out Apps that are registered as commands to other Apps
+            # Skip CommandSpec - those are lazy imports from other modules, not apps from this file
             registered_apps = []
             for _, app in app_objects:
                 if hasattr(app, "_commands"):
-                    registered_apps.extend(app._commands.values())
+                    # Only include direct App references; CommandSpec entries can't point to apps in this file
+                    registered_apps.extend(cmd for cmd in app._commands.values() if not isinstance(cmd, CommandSpec))
 
             # Keep only Apps that are not registered to others
             filtered_apps = [(name, app) for name, app in app_objects if app not in registered_apps]

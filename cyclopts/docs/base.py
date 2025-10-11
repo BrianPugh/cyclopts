@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from cyclopts.core import App
     from cyclopts.help import HelpPanel
 
+from cyclopts.command_spec import CommandSpec
 from cyclopts.help import format_doc, format_usage
 
 
@@ -267,7 +268,9 @@ class BaseDocGenerator:
 
     @staticmethod
     def iterate_commands(app: "App", include_hidden: bool = False):
-        """Iterate through app commands, yielding valid subapps.
+        """Iterate through app commands, yielding valid resolved subapps.
+
+        Automatically resolves CommandSpec instances to App instances.
 
         Parameters
         ----------
@@ -279,14 +282,17 @@ class BaseDocGenerator:
         Yields
         ------
         Tuple[str, App]
-            (command_name, subapp) for each valid command.
+            (command_name, resolved_subapp) for each valid command.
         """
         if not app._commands:
             return
 
-        for name, subapp in app._commands.items():
+        for name, app_or_spec in app._commands.items():
             if name in app._help_flags or name in app._version_flags:
                 continue
+
+            # Resolve CommandSpec to App
+            subapp = app_or_spec.resolve(app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
 
             if not isinstance(subapp, type(app)):
                 continue
