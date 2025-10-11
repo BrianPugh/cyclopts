@@ -178,3 +178,15 @@ def test_install_completion_path_with_spaces(temp_home):
 
     bashrc_content = bashrc.read_text()
     assert f'[ -f "{custom_path}" ] && . "{custom_path}"' in bashrc_content
+
+
+def test_register_install_completion_command_custom_help():
+    """Test that register_install_completion_command respects custom help parameter."""
+    app = App(name="testapp")
+    custom_help = "My custom installation help text."
+    app.register_install_completion_command(help=custom_help)
+
+    # Get the registered command
+    install_cmd_app = app["--install-completion"]
+
+    assert install_cmd_app.help == custom_help

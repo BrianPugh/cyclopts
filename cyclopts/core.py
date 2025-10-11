@@ -2280,7 +2280,7 @@ class App:
             Set to False if completions are already configured to auto-load.
         **kwargs
             Additional keyword arguments to pass to :meth:`command`.
-            Can be used to customize the command registration (e.g., group, help_flags, version_flags).
+            Can be used to customize the command registration (e.g., `help`, `group`, `help_flags`, `version_flags`).
 
         Examples
         --------
@@ -2293,6 +2293,10 @@ class App:
         Use a custom command name:
 
         >>> app.register_install_completion_command(name="--setup-completion")
+
+        Customize help text:
+
+        >>> app.register_install_completion_command(help="Install shell completion for myapp.")
 
         Customize command registration:
 
