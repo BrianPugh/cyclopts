@@ -17,10 +17,10 @@ To install directly from github, you can run:
 
    python -m pip install git+https://github.com/BrianPugh/cyclopts.git
 
-For Cyclopts development, its recommended to use Poetry:
+For Cyclopts development, its recommended to use uv:
 
 .. code-block:: console
 
    git clone https://github.com/BrianPugh/cyclopts.git
    cd cyclopts
-   poetry install
+   uv sync --all-extras
