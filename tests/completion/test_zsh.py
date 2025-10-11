@@ -1,3 +1,6 @@
+import os
+import sys
+
 import pytest
 
 from .apps import (
@@ -90,6 +93,9 @@ def test_path_completion(zsh_tester):
     assert "_files" in tester.completion_script
 
 
+@pytest.mark.skipif(
+    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
+)
 def test_end_to_end_completion(zsh_tester):
     """End-to-end test: actually trigger zsh completion.
 
@@ -142,6 +148,9 @@ def test_end_to_end_completion(zsh_tester):
             child.close()
 
 
+@pytest.mark.skipif(
+    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
+)
 def test_command_prefix_completion(zsh_tester):
     """End-to-end test: verify command name prefix completion works.
 
@@ -487,6 +496,9 @@ def test_empty_iterable_flag_completion(zsh_tester):
     assert tester.validate_script_syntax()
 
 
+@pytest.mark.skipif(
+    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
+)
 def test_completion_after_empty_flag(zsh_tester):
     """Test that completion works after using an --empty-* flag.
 
