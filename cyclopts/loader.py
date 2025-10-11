@@ -41,8 +41,8 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
     ----------
     script : str | Path
         Python script path, optionally with ``':app_object'`` notation to specify
-        the :class:`App` object (only supported with str). If not specified, will search
-        for :class:`App` objects in the script's global namespace.
+        the :class:`App` object. If not specified, will search for :class:`App`
+        objects in the script's global namespace.
 
     Returns
     -------
@@ -60,11 +60,19 @@ def load_app_from_script(script: str | Path) -> tuple["App", str]:
 
     # Parse the script path and optional app object
     app_name = None
-    if isinstance(script, str) and ":" in script:
-        script_path, app_name = script.split(":", 1)
-        script_path = Path(script_path)
-    elif isinstance(script, Path):
-        script_path = script
+    script_str = str(script)
+    if ":" in script_str:
+        # Split on the last colon
+        script_path_str, potential_app_name = script_str.rsplit(":", 1)
+        # Only treat it as an app name if it looks like a Python identifier
+        # (no path separators), otherwise it may be part of a Windows path like C:\path\to\file.py
+        if potential_app_name and not any(sep in potential_app_name for sep in ["/", "\\"]):
+            # Looks like an app name
+            app_name = potential_app_name
+            script_path = Path(script_path_str)
+        else:
+            # It's part of the path (e.g., Windows drive letter)
+            script_path = Path(script)
     else:
         script_path = Path(script)
 

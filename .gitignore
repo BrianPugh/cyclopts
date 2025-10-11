@@ -260,3 +260,4 @@ cyclopts/*.html
 
 poetry.lock
 tests/**/uv.lock
+/coverage.json

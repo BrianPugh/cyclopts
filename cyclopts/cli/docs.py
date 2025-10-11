@@ -76,7 +76,7 @@ def generate_docs(
     Parameters
     ----------
     script : str
-        Python script path, optionally with ``'::app_object'`` notation to specify
+        Python script path, optionally with ``':app_object'`` notation to specify
         the App object. If not specified, will search for App objects in the
         script's global namespace.
     output : Optional[Path]

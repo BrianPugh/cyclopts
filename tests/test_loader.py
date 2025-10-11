@@ -1,6 +1,7 @@
 """Tests for cyclopts.loader module."""
 
 import sys
+import textwrap
 from pathlib import Path
 from unittest.mock import patch
 
@@ -73,6 +74,20 @@ def test_load_with_path_object(sample_app_script):
     app, name = load_app_from_script(Path(sample_app_script))
     assert name == "app"
     assert "sample" in app.name
+
+
+def test_load_with_path_object_and_app_name(multi_app_script):
+    """Test loading with Path object using : notation."""
+    # Construct a Path object that contains the :app_name notation
+    path_with_app = Path(f"{multi_app_script}:app1")
+    app, name = load_app_from_script(path_with_app)
+    assert name == "app1"
+    assert "first" in app.name
+
+    path_with_app = Path(f"{multi_app_script}:app2")
+    app, name = load_app_from_script(path_with_app)
+    assert name == "app2"
+    assert "second" in app.name
 
 
 def test_nonexistent_file(tmp_path):
@@ -194,6 +209,39 @@ app = App(name="mixed")
     app, name = load_app_from_script(mixed_path)
     assert name == "app"
     assert "mixed" in app.name
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific test")
+def test_windows_path_with_app_name_notation(tmp_path):
+    r"""Test Windows path with :app_name notation (e.g., ``C:\path\to\file.py:app``)."""
+    script = tmp_path / "windows_multi_app.py"
+    script.write_text(
+        textwrap.dedent(
+            """\
+            from cyclopts import App
+
+            app1 = App(name="first")
+            app2 = App(name="second")
+
+            @app1.default
+            def main1():
+                return "app1"
+
+            @app2.default
+            def main2():
+                return "app2"
+            """
+        )
+    )
+    # Test with absolute Windows path including drive letter and :app_name
+    absolute_path = script.resolve()
+    app, name = load_app_from_script(f"{absolute_path}:app1")
+    assert name == "app1"
+    assert "first" in app.name
+
+    app, name = load_app_from_script(f"{absolute_path}:app2")
+    assert name == "app2"
+    assert "second" in app.name
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-specific test")
