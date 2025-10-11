@@ -8,6 +8,7 @@ from attrs import define, field
 
 import cyclopts.utils
 from cyclopts.annotations import get_hint_name
+from cyclopts.command_spec import CommandSpec
 from cyclopts.group import Group
 from cyclopts.token import Token
 from cyclopts.utils import is_option_like, json_decode_error_verbosifier
@@ -271,9 +272,24 @@ class UnknownCommandError(CycloptsError):
         if self.app and self.app._commands:
             import difflib
 
+            # Resolve CommandSpec and filter visible commands
+            visible_commands = []
+            for name, app_or_spec in self.app._commands.items():
+                if name in self.app._help_flags or name in self.app._version_flags:
+                    continue
+
+                # Resolve CommandSpec to App
+                subapp = app_or_spec.resolve(self.app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
+
+                if not isinstance(subapp, type(self.app)):
+                    continue
+
+                if subapp.show:
+                    visible_commands.append(name)
+
             close_matches = difflib.get_close_matches(
                 token,
-                (name for name, command_app in self.app._commands.items() if command_app.show),
+                visible_commands,
                 n=1,
                 cutoff=0.6,
             )
@@ -283,11 +299,7 @@ class UnknownCommandError(CycloptsError):
             # The following is a heuristic to be "maximally helpful" to someone who may have
             # forgotten a command in their CLI call.
             max_commands = 8
-            available_commands = [
-                name
-                for name, command_app in self.app._commands.items()
-                if not name.startswith("-") and command_app.show
-            ]
+            available_commands = [name for name in visible_commands if not name.startswith("-")]
             if available_commands:
                 if len(available_commands) > max_commands:
                     response += f" Available commands: {', '.join(available_commands[:max_commands])}, ..."

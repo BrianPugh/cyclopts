@@ -34,6 +34,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    :maxdepth: 2
    :caption: Advanced Usage
 
+   lazy_loading.rst
    help_customization.rst
    user_classes.rst
    args_and_kwargs.rst

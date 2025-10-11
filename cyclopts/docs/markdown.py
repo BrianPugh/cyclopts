@@ -232,83 +232,133 @@ def generate_markdown_docs(
 
     # Handle recursive documentation for subcommands
     if app._commands:
-        # Iterate through registered commands
-        for name, subapp in app._commands.items():
-            # Skip built-in help and version commands
-            if name in app._help_flags or name in app._version_flags:
-                continue
+        # Iterate through registered commands using iterate_commands helper
+        # This automatically resolves CommandSpec instances
+        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+            # Build the command chain for this subcommand
+            sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
 
-            if isinstance(subapp, type(app)):  # Check if it's an App instance
-                # Check if subapp should be shown
-                if not include_hidden and not subapp.show:
-                    continue
+            # Determine heading level for subcommand
+            if flatten_commands:
+                sub_heading_level = heading_level
+            else:
+                sub_heading_level = heading_level + 1
 
-                # Build the command chain for this subcommand
-                sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
+            # Generate subcommand documentation in Typer style
+            lines.append(f"{'#' * sub_heading_level} `{' '.join(sub_command_chain)}`")
+            lines.append("")
 
-                # Determine heading level for subcommand
-                if flatten_commands:
-                    sub_heading_level = heading_level
-                else:
-                    sub_heading_level = heading_level + 1
+            # Get subapp help
+            with subapp.app_stack([subapp]):
+                sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
+                # Preserve markup when sub_help_format matches output format (markdown)
+                preserve_sub = sub_help_format in ("markdown", "md")
+                sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
+                if sub_description:
+                    sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
+                    if sub_desc_text:
+                        lines.append(sub_desc_text.strip())
+                        lines.append("")
 
-                # Generate subcommand documentation in Typer style
-                lines.append(f"{'#' * sub_heading_level} `{' '.join(sub_command_chain)}`")
-                lines.append("")
+                # Generate usage for subcommand
+                sub_usage = BaseDocGenerator.extract_usage(subapp)
+                if sub_usage:
+                    lines.append("**Usage**:")
+                    lines.append("")
+                    lines.append("```console")
+                    if isinstance(sub_usage, str):
+                        sub_usage_text = sub_usage
+                    else:
+                        sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
+                    usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
+                    lines.append(usage_line)
+                    lines.append("```")
+                    lines.append("")
 
-                # Get subapp help
-                with subapp.app_stack([subapp]):
-                    sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
-                    # Preserve markup when sub_help_format matches output format (markdown)
-                    preserve_sub = sub_help_format in ("markdown", "md")
-                    sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
-                    if sub_description:
-                        sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
-                        if sub_desc_text:
-                            lines.append(sub_desc_text.strip())
+                # Only show subcommand panels if we're in recursive mode
+                # (Otherwise we just show the basic info about this command)
+                if recursive:
+                    # Get help panels for subcommand
+                    sub_panels = subapp._assemble_help_panels([], sub_help_format)
+
+                    # Separate panels for organized output
+                    sub_categorized = BaseDocGenerator.categorize_panels(sub_panels, include_hidden)
+                    sub_argument_panels = sub_categorized["arguments"]
+                    sub_option_panels = sub_categorized["options"]
+                    sub_grouped_panels = sub_categorized["grouped"]
+                    sub_command_panels = sub_categorized["commands"]
+
+                    # Render panels in Typer order
+                    if flatten_commands:
+                        panel_heading_level = heading_level + 1
+                    else:
+                        panel_heading_level = heading_level + 2
+                    sub_formatter = MarkdownFormatter(
+                        heading_level=panel_heading_level, include_hidden=include_hidden, table_style="list"
+                    )
+
+                    # Arguments
+                    if sub_argument_panels:
+                        lines.append("**Arguments**:\n")
+                        for _group, panel in sub_argument_panels:
+                            sub_formatter.reset()
+                            sub_formatter(None, None, panel)
+                            output = sub_formatter.get_output().strip()
+                            if output:
+                                lines.append(output)
+                        lines.append("")
+
+                    # Ungrouped Options
+                    if sub_option_panels:
+                        lines.append("**Options**:\n")
+                        for _group, panel in sub_option_panels:
+                            sub_formatter.reset()
+                            sub_formatter(None, None, panel)
+                            output = sub_formatter.get_output().strip()
+                            if output:
+                                lines.append(output)
+                        lines.append("")
+
+                    # Grouped Options (e.g., Condiments, Toppings)
+                    if sub_grouped_panels:
+                        for _group, panel in sub_grouped_panels:
+                            if panel.title:
+                                lines.append(f"**{panel.title}**:\n")
+                                sub_formatter.reset()
+                                panel_copy = panel.__class__(
+                                    title="",  # Don't show title again in formatter
+                                    entries=panel.entries,
+                                    format=panel.format,
+                                    description=panel.description,
+                                )
+                                sub_formatter(None, None, panel_copy)
+                                output = sub_formatter.get_output().strip()
+                                if output:
+                                    lines.append(output)
+                                lines.append("")
+
+                    # Commands - only show list if not recursively documenting them
+                    if sub_command_panels:
+                        # Check if we'll be recursively documenting these commands
+                        will_recurse = recursive and subapp._commands
+                        if will_recurse:
+                            # Just show a simple command list without the duplicate heading
+                            lines.append("**Commands**:\n")
+                            for _group, panel in sub_command_panels:
+                                for entry in panel.entries:
+                                    if entry.names:
+                                        cmd_name = entry.names[0]
+                                        desc_text = (
+                                            extract_text(entry.description, None, preserve_markup=preserve_sub)
+                                            if entry.description
+                                            else ""
+                                        )
+                                        lines.append(f"* `{cmd_name}`: {desc_text}")
                             lines.append("")
-
-                    # Generate usage for subcommand
-                    sub_usage = BaseDocGenerator.extract_usage(subapp)
-                    if sub_usage:
-                        lines.append("**Usage**:")
-                        lines.append("")
-                        lines.append("```console")
-                        if isinstance(sub_usage, str):
-                            sub_usage_text = sub_usage
                         else:
-                            sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
-                        usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
-                        lines.append(usage_line)
-                        lines.append("```")
-                        lines.append("")
-
-                    # Only show subcommand panels if we're in recursive mode
-                    # (Otherwise we just show the basic info about this command)
-                    if recursive:
-                        # Get help panels for subcommand
-                        sub_panels = subapp._assemble_help_panels([], sub_help_format)
-
-                        # Separate panels for organized output
-                        sub_categorized = BaseDocGenerator.categorize_panels(sub_panels, include_hidden)
-                        sub_argument_panels = sub_categorized["arguments"]
-                        sub_option_panels = sub_categorized["options"]
-                        sub_grouped_panels = sub_categorized["grouped"]
-                        sub_command_panels = sub_categorized["commands"]
-
-                        # Render panels in Typer order
-                        if flatten_commands:
-                            panel_heading_level = heading_level + 1
-                        else:
-                            panel_heading_level = heading_level + 2
-                        sub_formatter = MarkdownFormatter(
-                            heading_level=panel_heading_level, include_hidden=include_hidden, table_style="list"
-                        )
-
-                        # Arguments
-                        if sub_argument_panels:
-                            lines.append("**Arguments**:\n")
-                            for _group, panel in sub_argument_panels:
+                            # Show full command panel if not recursing
+                            lines.append("**Commands**:\n")
+                            for _group, panel in sub_command_panels:
                                 sub_formatter.reset()
                                 sub_formatter(None, None, panel)
                                 output = sub_formatter.get_output().strip()
@@ -316,89 +366,31 @@ def generate_markdown_docs(
                                     lines.append(output)
                             lines.append("")
 
-                        # Ungrouped Options
-                        if sub_option_panels:
-                            lines.append("**Options**:\n")
-                            for _group, panel in sub_option_panels:
-                                sub_formatter.reset()
-                                sub_formatter(None, None, panel)
-                                output = sub_formatter.get_output().strip()
-                                if output:
-                                    lines.append(output)
-                            lines.append("")
-
-                        # Grouped Options (e.g., Condiments, Toppings)
-                        if sub_grouped_panels:
-                            for _group, panel in sub_grouped_panels:
-                                if panel.title:
-                                    lines.append(f"**{panel.title}**:\n")
-                                    sub_formatter.reset()
-                                    panel_copy = panel.__class__(
-                                        title="",  # Don't show title again in formatter
-                                        entries=panel.entries,
-                                        format=panel.format,
-                                        description=panel.description,
-                                    )
-                                    sub_formatter(None, None, panel_copy)
-                                    output = sub_formatter.get_output().strip()
-                                    if output:
-                                        lines.append(output)
-                                    lines.append("")
-
-                        # Commands - only show list if not recursively documenting them
-                        if sub_command_panels:
-                            # Check if we'll be recursively documenting these commands
-                            will_recurse = recursive and subapp._commands
-                            if will_recurse:
-                                # Just show a simple command list without the duplicate heading
-                                lines.append("**Commands**:\n")
-                                for _group, panel in sub_command_panels:
-                                    for entry in panel.entries:
-                                        if entry.names:
-                                            cmd_name = entry.names[0]
-                                            desc_text = (
-                                                extract_text(entry.description, None, preserve_markup=preserve_sub)
-                                                if entry.description
-                                                else ""
-                                            )
-                                            lines.append(f"* `{cmd_name}`: {desc_text}")
-                                lines.append("")
-                            else:
-                                # Show full command panel if not recursing
-                                lines.append("**Commands**:\n")
-                                for _group, panel in sub_command_panels:
-                                    sub_formatter.reset()
-                                    sub_formatter(None, None, panel)
-                                    output = sub_formatter.get_output().strip()
-                                    if output:
-                                        lines.append(output)
-                                lines.append("")
-
-                    # Recursively handle nested subcommands
-                    if recursive and subapp._commands:
-                        for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
-                            # Build nested command chain
-                            nested_command_chain = BaseDocGenerator.build_command_chain(
-                                sub_command_chain, nested_name, app_name
-                            )
-                            # Determine heading level for nested commands
-                            if flatten_commands:
-                                nested_heading_level = heading_level
-                            else:
-                                nested_heading_level = heading_level + 1
-                            # Recursively generate docs for nested commands
-                            nested_docs = generate_markdown_docs(
-                                nested_app,
-                                recursive=recursive,
-                                include_hidden=include_hidden,
-                                heading_level=nested_heading_level,
-                                command_chain=nested_command_chain,
-                                generate_toc=False,  # Don't generate TOC for nested commands
-                                flatten_commands=flatten_commands,
-                            )
-                            # Just append the generated docs - no title replacement
-                            lines.append(nested_docs)
-                            lines.append("")
+            # Recursively handle nested subcommands
+            if recursive and subapp._commands:
+                for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
+                    # Build nested command chain
+                    nested_command_chain = BaseDocGenerator.build_command_chain(
+                        sub_command_chain, nested_name, app_name
+                    )
+                    # Determine heading level for nested commands
+                    if flatten_commands:
+                        nested_heading_level = heading_level
+                    else:
+                        nested_heading_level = heading_level + 1
+                    # Recursively generate docs for nested commands
+                    nested_docs = generate_markdown_docs(
+                        nested_app,
+                        recursive=recursive,
+                        include_hidden=include_hidden,
+                        heading_level=nested_heading_level,
+                        command_chain=nested_command_chain,
+                        generate_toc=False,  # Don't generate TOC for nested commands
+                        flatten_commands=flatten_commands,
+                    )
+                    # Just append the generated docs - no title replacement
+                    lines.append(nested_docs)
+                    lines.append("")
 
     # Join all lines into final document
     doc = "\n".join(lines).rstrip() + "\n"

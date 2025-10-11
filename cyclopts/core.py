@@ -29,6 +29,7 @@ from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
+from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
 from cyclopts.exceptions import (
     CommandCollisionError,
@@ -115,10 +116,49 @@ def _get_version_command(app):
         return app.version_print
 
 
+def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
+    """Apply parent app's group defaults to app if not already set.
+
+    Parameters
+    ----------
+    app : App
+        The app to apply defaults to.
+    parent_app : App
+        The parent app to inherit defaults from.
+    """
+    if app._group_commands is None:
+        app._group_commands = copy(parent_app._group_commands)
+    if app._group_parameters is None:
+        app._group_parameters = copy(parent_app._group_parameters)
+    if app._group_arguments is None:
+        app._group_arguments = copy(parent_app._group_arguments)
+
+
+def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") -> None:
+    """Apply parent app's groups to kwargs dict if not already specified.
+
+    Parameters
+    ----------
+    kwargs : dict
+        Keyword arguments dict to modify.
+    parent_app : App
+        The parent app to inherit groups from.
+    """
+    if "group_commands" not in kwargs:
+        kwargs["group_commands"] = copy(parent_app._group_commands)
+    if "group_parameters" not in kwargs:
+        kwargs["group_parameters"] = copy(parent_app._group_parameters)
+    if "group_arguments" not in kwargs:
+        kwargs["group_arguments"] = copy(parent_app._group_arguments)
+
+
 def _combined_meta_command_mapping(
     app: Optional["App"], recurse_meta=True, recurse_parent_meta=True
-) -> dict[str, "App"]:
-    """Return a mapping of command names to Apps, including meta app commands.
+) -> dict[str, "App | CommandSpec"]:
+    """Return a mapping of command names to Apps or CommandSpecs.
+
+    CommandSpec instances are NOT resolved here - they are resolved lazily
+    only when the command is actually executed, enabling true lazy loading.
 
     Parameters
     ----------
@@ -131,12 +171,12 @@ def _combined_meta_command_mapping(
 
     Returns
     -------
-    dict[str, App]
-        Mapping of command names to :class:`App` s.
+    dict[str, App | CommandSpec]
+        Mapping of command names to :class:`App` or :class:`CommandSpec` instances.
     """
     if app is None:
         return {}
-    command_mapping = copy(app._commands)
+    command_mapping = dict(app._commands)
     if recurse_meta and app._meta:
         command_mapping.update(_combined_meta_command_mapping(app._meta))
     if recurse_parent_meta and app._meta_parent:
@@ -301,8 +341,8 @@ class App:
     ######################
     # `init=False` tells attrs not to include it in the generated __init__
 
-    # Maps CLI-name of a command to a function handle.
-    _commands: dict[str, "App"] = field(init=False, factory=dict)
+    # Maps CLI-name of a command to either an App or a CommandSpec (lazy).
+    _commands: dict[str, "App | CommandSpec"] = field(init=False, factory=dict)
 
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
@@ -693,11 +733,46 @@ class App:
         for k in self:
             yield self[k]
 
+    def resolved_commands(self) -> dict[str, "App"]:
+        """Get all commands as resolved App instances.
+
+        This function resolves any lazy-loaded commands (CommandSpec) into App instances.
+        Note: This will import modules for all lazy-loaded commands, which may impact performance
+        and memory usage. Consider accessing commands individually via ``app["command_name"]`` if
+        you don't need all commands at once.
+
+        Returns
+        -------
+        dict[str, App]
+            Mapping of command names to resolved :class:`App` instances.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            from cyclopts import App
+
+            app = App()
+            app.command("myapp.commands:create")
+            app.command("myapp.commands:delete")
+
+            # Resolve all lazy commands
+            commands = app.resolved_commands()
+            assert "create" in commands
+            assert isinstance(commands["create"], App)
+        """
+        return {
+            name: cmd.resolve(self) if isinstance(cmd, CommandSpec) else cmd for name, cmd in self._commands.items()
+        }
+
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.
 
         All commands get registered to Cyclopts as subapps.
         The actual function handler is at ``app[key].default_command``.
+
+        If the command was registered via lazy loading (import path string),
+        it will be imported and resolved on first access.
 
         Example usage:
 
@@ -716,12 +791,17 @@ class App:
 
             app()
         """
-        return self._get_item(key)
+        cmd = self._get_item(key)
+        # Resolve lazy commands on access
+        if isinstance(cmd, CommandSpec):
+            return cmd.resolve(self)
+        return cmd
 
-    def _get_item(self, key, recurse_meta=True) -> "App":
+    def _get_item(self, key, recurse_meta=True) -> "App | CommandSpec":
+        """Internal getter that returns App or unresolved CommandSpec."""
         if recurse_meta and self._meta:
             with suppress(KeyError):
-                return self.meta[key]
+                return self.meta._get_item(key, recurse_meta=False)
         if self._meta_parent:
             with suppress(KeyError):
                 return self._meta_parent._get_item(key, recurse_meta=False)
@@ -851,7 +931,7 @@ class App:
         while unused_tokens:
             token = unused_tokens[0]
             try:
-                app = command_mapping[token]
+                app_or_spec = command_mapping[token]
             except KeyError:
                 # Token is not a command. Try to consume it as a meta app parameter.
                 # This is only relevant when ``include_parent_meta==True``, because
@@ -864,6 +944,15 @@ class App:
                         continue
                 # Not a command or meta parameter, stop parsing commands
                 break
+
+            # Resolve CommandSpec if needed (lazy loading)
+            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
+            # Pass the current app as parent to inherit its defaults
+            if isinstance(app_or_spec, CommandSpec):
+                parent_app = app  # Save parent before overwriting
+                app = app_or_spec.resolve(parent_app)
+            else:
+                app = app_or_spec
 
             # Found a command - add it to the chain
             add_parent_metas(app)
@@ -1001,14 +1090,27 @@ class App:
         **kwargs: object,
     ) -> Callable[[T], T]: ...
 
-    def command(
+    # This overload is used for lazy loading:
+    #
+    # app.command("mymodule.commands:create_user", name="create")
+    @overload
+    def command(  # pragma: no cover
         self,
-        obj: T | None = None,
+        obj: str,
         name: None | str | Iterable[str] = None,
         *,
         alias: None | str | Iterable[str] = None,
         **kwargs: object,
-    ) -> T | Callable[[T], T]:
+    ) -> None: ...
+
+    def command(
+        self,
+        obj: T | None | str = None,
+        name: None | str | Iterable[str] = None,
+        *,
+        alias: None | str | Iterable[str] = None,
+        **kwargs: object,
+    ) -> T | Callable[[T], T] | None:
         """Decorator to register a function as a CLI command.
 
         Example usage:
@@ -1027,6 +1129,9 @@ class App:
             def bar():
                 print("bar!")
 
+            # Lazy loading via import path
+            app.command("myapp.commands:create_user", name="create")
+
             app()
 
         .. code-block:: console
@@ -1037,21 +1142,53 @@ class App:
             $ my-script buzz
             bar!
 
+            $ my-script create
+            # Imports and runs myapp.commands:create_user
+
         Parameters
         ----------
-        obj: Callable | None
-            Function or :class:`App` to be registered as a command.
+        obj: Callable | App | str | None
+            Function, :class:`App`, or import path string to be registered as a command.
+            For lazy loading, provide a string in format "module.path:function_or_app_name".
         name: None | str | Iterable[str]
             Name(s) to register the command to.
             If not provided, defaults to:
 
             * If registering an :class:`App`, then the app's name.
             * If registering a **function**, then the function's name after applying :attr:`name_transform`.
+            * If registering via **import path**, then the attribute name after applying :attr:`name_transform`.
         `**kwargs`
             Any argument that :class:`App` can take.
         """
         if obj is None:  # Called ``@app.command(...)``
             return partial(self.command, name=name, alias=alias, **kwargs)  # pyright: ignore[reportReturnType]
+
+        # Convert string path to a CommandSpec
+        if isinstance(obj, str):
+            # Determine command name(s)
+            if name is None:
+                # Extract from import path: "myapp.commands:create_user" -> "create-user"
+                _, _, func_name = obj.rpartition(":")
+                name = (self.name_transform(func_name),)
+            else:
+                name = to_tuple_converter(name)
+
+            if alias is None:
+                alias = ()
+            else:
+                alias = to_tuple_converter(alias)
+
+            # Create CommandSpec with the resolved name (first name if multiple)
+            # The name will be used when wrapping functions in an App
+            spec = CommandSpec(import_path=obj, name=name[0] if name else None, app_kwargs=kwargs)
+
+            # Register the CommandSpec
+            for n in name + alias:
+                if n in self:
+                    raise CommandCollisionError(f'Command "{n}" already registered.')
+                self._commands[n] = spec
+
+            return None
 
         if isinstance(obj, App):
             app = obj
@@ -1062,24 +1199,12 @@ class App:
             if kwargs:
                 raise ValueError("Cannot supplied additional configuration when registering a sub-App.")
 
-            if app._group_commands is None:
-                app._group_commands = copy(self._group_commands)
-
-            if app._group_parameters is None:
-                app._group_parameters = copy(self._group_parameters)
-
-            if app._group_arguments is None:
-                app._group_arguments = copy(self._group_arguments)
+            _apply_parent_defaults_to_app(app, self)
         else:
             kwargs.setdefault("help_flags", self.help_flags)
             kwargs.setdefault("version_flags", self.version_flags)
 
-            if "group_commands" not in kwargs:
-                kwargs["group_commands"] = copy(self._group_commands)
-            if "group_parameters" not in kwargs:
-                kwargs["group_parameters"] = copy(self._group_parameters)
-            if "group_arguments" not in kwargs:
-                kwargs["group_arguments"] = copy(self._group_arguments)
+            _apply_parent_groups_to_kwargs(kwargs, self)
             app = type(self)(**kwargs)  # pyright: ignore
             # directly call the default decorator, in case we do additional processing there.
             app.default(obj)

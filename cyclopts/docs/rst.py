@@ -172,14 +172,8 @@ def _collect_commands_for_toc(
         commands_filter, exclude_commands
     )
 
-    for name, subapp in app._commands.items():
-        if name in app._help_flags or name in app._version_flags:
-            continue
-
-        if hasattr(subapp, "show"):
-            if not include_hidden and not subapp.show:
-                continue
-
+    # Use BaseDocGenerator.iterate_commands to automatically resolve CommandSpec
+    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
         if not _should_include_command(
             name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
         ):
@@ -444,16 +438,8 @@ def generate_rst_docs(
         # parent_path should be empty at each app's root level, not the command chain
         parent_path = []
 
-        for name, subapp in app._commands.items():
-            # Skip built-in commands
-            if name in app._help_flags or name in app._version_flags:
-                continue
-
-            # Check if this is an App instance (subcommand) and should be shown
-            if hasattr(subapp, "show"):
-                if not include_hidden and not subapp.show:
-                    continue
-
+        # Use BaseDocGenerator.iterate_commands to automatically resolve CommandSpec
+        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
             # Apply command filtering
             if not _should_include_command(
                 name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
