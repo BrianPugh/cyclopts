@@ -325,45 +325,26 @@ def generate_rst_docs(
 
     # Generate usage line - only if we're documenting a specific command
     if not (no_root_title and not command_chain):
-        # For subcommands, we need to construct the usage with the full command path
-        if command_chain:
-            from rich.text import Text
+        # Extract usage from app
+        usage = BaseDocGenerator.extract_usage(app)
+        usage_text = None
+        if usage:
+            if isinstance(usage, str):
+                usage_text = usage
+            else:
+                usage_text = extract_text(usage, None, preserve_markup=False)
 
-            usage_parts = ["Usage:"] + list(command_chain)
+            # Format usage with command chain if this is a subcommand
+            if command_chain:
+                usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="")
 
-            if any(app[x].show for x in app._registered_commands):
-                usage_parts.append("COMMAND")
+            # Remove "Usage:" prefix if present as we'll add it back in the RST format
+            if "Usage:" in usage_text:
+                usage_text = usage_text.replace("Usage:", "").strip()
 
-            help_panels_with_groups = app._assemble_help_panels(
-                [], app.app_stack.resolve("help_format", fallback="restructuredtext")
-            )
-            has_args = False
-            has_options = False
-            for _, panel in help_panels_with_groups:
-                if panel.format == "parameter":
-                    for entry in panel.entries:
-                        if entry.required and entry.default is None:
-                            has_args = True
-                        else:
-                            has_options = True
+            # Add "Usage:" label
+            usage_text = f"Usage: {usage_text}"
 
-            # Check for default command (only add [ARGS] if no explicit args were found)
-            if app.default_command and not has_args:
-                usage_parts.append("[ARGS]")
-            elif has_args:
-                usage_parts.append("[ARGS]")
-
-            if has_options:
-                usage_parts.append("[OPTIONS]")
-
-            usage = Text(" ".join(usage_parts))
-        else:
-            # Root command - use BaseDocGenerator to extract usage
-            usage = BaseDocGenerator.extract_usage(app)
-        if isinstance(usage, str):
-            usage_text = usage
-        else:
-            usage_text = extract_text(usage, None, preserve_markup=False)
         if usage_text:
             # Use literal block with double colon
             lines.append("::")

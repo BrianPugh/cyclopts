@@ -287,3 +287,113 @@ def test_generate_rst_docs_flatten_commands():
     assert "sub2\n----" not in docs_flat
     # Check that nested commands don't use level 3 markers (^^^^)
     assert "sub1 nested1\n^^^^^^^^^^^^" not in docs_flat
+
+
+def test_generate_rst_docs_usage_strings_match_help():
+    """Test that RST usage strings match the actual help output."""
+    app = App(name="myapp", help="Main CLI application")
+
+    @app.command
+    def serve(host: str = "localhost", port: int = 8000):
+        """Start the development server.
+
+        Parameters
+        ----------
+        host : str
+            Host to bind to.
+        port : int
+            Port to listen on.
+        """
+        pass
+
+    @app.command
+    def build(output: str, verbose: bool = False):
+        """Build the project.
+
+        Parameters
+        ----------
+        output : str
+            Output directory.
+        verbose : bool
+            Enable verbose output.
+        """
+        pass
+
+    # Generate RST docs
+    docs = app.generate_docs(output_format="rst", recursive=True)
+
+    # Verify usage strings are present and correctly formatted
+    # The serve command should show: myapp serve [ARGS]
+    assert "Usage: myapp serve [ARGS]" in docs
+
+    # The build command should show: myapp build OUTPUT [ARGS]
+    # with OUTPUT as a required argument shown explicitly
+    assert "Usage: myapp build OUTPUT [ARGS]" in docs
+
+    # The key thing we're testing is that the usage strings match the actual
+    # help output format, not the old manually-constructed generic patterns
+    # like "myapp serve [ARGS] [OPTIONS]" that were created in the old code
+
+    # Verify that required arguments are shown explicitly by name
+    lines = docs.split("\n")
+    usage_lines = [line.strip() for line in lines if "Usage:" in line]
+
+    # For the build command with required OUTPUT parameter
+    build_usage = [line for line in usage_lines if "myapp build" in line]
+    assert len(build_usage) > 0, "Should have usage line for build command"
+    # Should show OUTPUT explicitly, not hide it in generic [ARGS]
+    assert "OUTPUT" in build_usage[0]
+
+
+def test_generate_rst_docs_usage_with_positional_args():
+    """Test RST usage strings correctly show positional arguments."""
+    app = App(name="tool", help="A tool")
+
+    @app.command
+    def process(input_file: str, output_file: str, verbose: bool = False):
+        """Process files.
+
+        Parameters
+        ----------
+        input_file : str
+            Input file path.
+        output_file : str
+            Output file path.
+        verbose : bool
+            Verbose mode.
+        """
+        pass
+
+    docs = app.generate_docs(output_format="rst")
+
+    # Should show the actual parameter names in usage
+    assert "Usage: tool process" in docs
+    # Should have INPUT-FILE and OUTPUT-FILE explicitly listed
+    # The key point is that required positional args are shown by name
+    assert "INPUT-FILE OUTPUT-FILE" in docs or "INPUT_FILE OUTPUT_FILE" in docs
+
+
+def test_generate_rst_docs_usage_with_varargs():
+    """Test RST usage strings correctly show variable arguments."""
+    app = App(name="cmd", help="Command")
+
+    @app.command
+    def run(script: str, *args: str):
+        """Run a script with arguments.
+
+        Parameters
+        ----------
+        script : str
+            Script to run.
+        args : str
+            Additional arguments.
+        """
+        pass
+
+    docs = app.generate_docs(output_format="rst")
+
+    # Should show SCRIPT and [ARGS...] or similar
+    assert "Usage: cmd run" in docs
+    assert "SCRIPT" in docs
+    # Variable args are typically shown as [ARGS...] or ARGS...
+    assert "[ARGS" in docs or "ARGS" in docs
