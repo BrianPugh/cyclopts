@@ -61,9 +61,6 @@ if sys.version_info < (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     pass
 
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as importlib_metadata_version
-
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
     # Not available on windows
@@ -621,6 +618,9 @@ class App:
         str
             Version string.
         """
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as importlib_metadata_version
+
         if self._instantiating_module is not None:
             full_module_name = self._instantiating_module.__name__
             root_module_name = full_module_name.split(".")[0]
