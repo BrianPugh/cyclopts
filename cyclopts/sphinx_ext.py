@@ -273,8 +273,8 @@ def _create_section_nodes(lines: list[str], state: Any) -> list["nodes.Node"]:
 
         # Check for section header
         if i + 1 < len(lines):
-            next_line = lines[i + 1]
-            if next_line and all(c == "-" for c in next_line.strip()):
+            next_line = lines[i + 1].strip()
+            if next_line and all(c == "-" for c in next_line):
                 # Create section
                 section = nodes.section()
                 title_text = line.strip()
@@ -287,7 +287,8 @@ def _create_section_nodes(lines: list[str], state: Any) -> list["nodes.Node"]:
                 i += 2  # Skip title and underline
 
                 while i < len(lines):
-                    if i + 1 < len(lines) and all(c == "-" for c in lines[i + 1].strip()):
+                    next_line_stripped = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                    if next_line_stripped and all(c == "-" for c in next_line_stripped):
                         break
                     content_lines.append(lines[i])
                     i += 1
@@ -327,13 +328,42 @@ def _create_section_nodes(lines: list[str], state: Any) -> list["nodes.Node"]:
 
             continue
 
-        # Regular content
+        # Regular content - accumulate consecutive lines
         if line.strip():
+            content_lines = [line]
+            i += 1
+
+            # Collect consecutive non-empty lines that aren't section headers or literal blocks
+            while i < len(lines):
+                # Check if this is a section header
+                next_line = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                if next_line and all(c == "-" for c in next_line):
+                    break
+
+                # Check if this is a literal block
+                if lines[i].strip() == "::":
+                    break
+
+                # Check if this is a blank line
+                if not lines[i].strip():
+                    # Include the blank line and continue to see if there's more content
+                    content_lines.append(lines[i])
+                    i += 1
+                    # If the next line is also blank or we're at the end, stop
+                    if i >= len(lines) or not lines[i].strip():
+                        break
+                else:
+                    # Add non-empty line
+                    content_lines.append(lines[i])
+                    i += 1
+
+            # Parse all accumulated lines together
             para = nodes.paragraph()
-            state.nested_parse(StringList([line]), 0, para)
+            state.nested_parse(StringList(content_lines), 0, para)
             if para.children:
                 result.extend(para.children)
-        i += 1
+        else:
+            i += 1
 
     return result
 

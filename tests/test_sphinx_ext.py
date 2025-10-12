@@ -920,3 +920,69 @@ def cmd2():
 
         finally:
             sys.path.remove(str(tmp_path))
+
+
+class TestRstContentParsing:
+    """Test RST content parsing and formatting."""
+
+    def test_consecutive_lines_in_same_paragraph(self, tmp_path):
+        """Test that consecutive non-empty lines are kept in the same paragraph."""
+        module_file = tmp_path / "test_paragraph_module.py"
+        module_file.write_text("""from cyclopts import App
+
+app = App(name="test", help="Test")
+
+@app.command
+def cmd():
+    '''A command with multiline description.
+
+    Shell completion is available. Run once to install (persistent):
+    ``cyclopts --install-completion``
+    '''
+    pass
+""")
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            from cyclopts.sphinx_ext import CycloptsDirective
+
+            mock_state = MagicMock()
+
+            # Track nested_parse calls to inspect generated nodes
+            parsed_content = []
+
+            def capture_nested_parse(string_list, offset, parent):
+                # Capture the content being parsed
+                content = "\n".join(string_list)
+                parsed_content.append(content)
+
+            mock_state.nested_parse = capture_nested_parse
+
+            directive = CycloptsDirective(
+                name="cyclopts",
+                arguments=["test_paragraph_module:app"],
+                options={},
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state,
+                state_machine=MagicMock(),
+            )
+
+            directive.run()
+
+            # The two lines should be parsed together, not separately
+            # This means they should appear in the same nested_parse call
+            # Check that we don't have separate paragraph parsing for these lines
+            consecutive_line_found = False
+            for content in parsed_content:
+                if "Shell completion is available" in content and "cyclopts --install-completion" in content:
+                    consecutive_line_found = True
+                    break
+
+            # The lines should be parsed together in one block
+            assert consecutive_line_found, "Consecutive lines should be parsed together in the same paragraph"
+
+        finally:
+            sys.path.remove(str(tmp_path))
