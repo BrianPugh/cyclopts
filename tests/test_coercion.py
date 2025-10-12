@@ -332,9 +332,19 @@ def test_coerce_parameter_kind_empty():
     assert "foo" == convert(inspect.Parameter.empty, ["foo"])
 
 
-def test_coerce_datetime():
-    expected = datetime.strptime("1956-01-31T10:00:00", "%Y-%m-%dT%H:%M:%S")
-    assert expected == convert(datetime, ["1956-01-31T10:00:00"])
+@pytest.mark.parametrize(
+    "input_string, format_str",
+    [
+        ("1956-01-31", "%Y-%m-%d"),  # ISO 8601 date only
+        ("1956-01-31T10:00:00", "%Y-%m-%dT%H:%M:%S"),  # ISO 8601 with time
+        ("1956-01-31 10:00:00", "%Y-%m-%d %H:%M:%S"),  # Space separator
+        ("1956-01-31T10:00:00.123456", "%Y-%m-%dT%H:%M:%S.%f"),  # With microseconds
+    ],
+)
+def test_coerce_datetime(input_string, format_str):
+    """Test that various datetime formats are supported."""
+    expected = datetime.strptime(input_string, format_str)
+    assert expected == convert(datetime, [input_string])
 
 
 @pytest.mark.parametrize(
@@ -393,7 +403,14 @@ def test_parse_timedelta_invalid(invalid_input):
         convert(timedelta, [invalid_input])
 
 
+def test_coerce_datetime_invalid_format():
+    """Test that invalid datetime format raises CoercionError."""
+    with pytest.raises(CoercionError):
+        convert(datetime, ["not-a-date"])
+
+
 def test_parse_timedelta_equivalence():
+    """Test that equivalent timedelta formats produce the same result."""
     assert convert(timedelta, ["1h"]) == convert(timedelta, ["60m"])
     assert convert(timedelta, ["1d"]) == convert(timedelta, ["24h"])
     assert convert(timedelta, ["1w"]) == convert(timedelta, ["7d"])

@@ -416,3 +416,22 @@ def test_bind_dataclass_star_parameter_better_error_message(app, console):
 
     with pytest.raises(ValueError, match=expected_message):
         app.default(cmd)
+
+
+def test_bind_dataclass_with_varargs_consume_all(app, assert_parse_args):
+    """Test dataclass with *args field that consumes all remaining tokens."""
+
+    @dataclass
+    class FileProcessor:
+        output: str
+        inputs: tuple[str, ...]
+
+    @app.default
+    def process(config: Annotated[FileProcessor, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        process,
+        "out.txt in1.txt in2.txt in3.txt",
+        config=FileProcessor(output="out.txt", inputs=("in1.txt", "in2.txt", "in3.txt")),
+    )

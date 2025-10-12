@@ -945,3 +945,236 @@ def test_result_action_callable_with_lambda():
 
     result = app(["double", "5"])
     assert result == 10
+
+
+# ==============================================================================
+# return_none tests
+# ==============================================================================
+
+
+def test_result_action_return_none_with_string():
+    """return_none: returns None regardless of result."""
+    app = App(result_action="return_none")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["greet", "Alice"])
+
+    assert result is None
+    assert buf.getvalue() == ""
+
+
+def test_result_action_return_none_with_int():
+    """return_none: returns None regardless of result."""
+    app = App(result_action="return_none")
+
+    @app.command
+    def get_number() -> int:
+        return 42
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["get-number"])
+
+    assert result is None
+    assert buf.getvalue() == ""
+
+
+# ==============================================================================
+# return_zero tests
+# ==============================================================================
+
+
+def test_result_action_return_zero_with_string():
+    """return_zero: returns 0 regardless of result."""
+    app = App(result_action="return_zero")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["greet", "Alice"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_return_zero_with_int():
+    """return_zero: returns 0 regardless of result."""
+    app = App(result_action="return_zero")
+
+    @app.command
+    def get_number() -> int:
+        return 42
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["get-number"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+# ==============================================================================
+# print_return_zero tests
+# ==============================================================================
+
+
+def test_result_action_print_return_zero_with_string():
+    """print_return_zero: prints result and returns 0."""
+    app = App(result_action="print_return_zero")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["greet", "Alice"])
+
+    assert result == 0
+    assert buf.getvalue() == "Hello Alice!\n"
+
+
+def test_result_action_print_return_zero_with_int():
+    """print_return_zero: prints result and returns 0."""
+    app = App(result_action="print_return_zero")
+
+    @app.command
+    def get_number() -> int:
+        return 42
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["get-number"])
+
+    assert result == 0
+    assert buf.getvalue() == "42\n"
+
+
+def test_result_action_print_return_zero_with_none():
+    """print_return_zero: prints None and returns 0."""
+    app = App(result_action="print_return_zero")
+
+    @app.command
+    def do_nothing() -> None:
+        pass
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["do-nothing"])
+
+    assert result == 0
+    assert buf.getvalue() == "None\n"
+
+
+# ==============================================================================
+# sys_exit_zero tests
+# ==============================================================================
+
+
+def test_result_action_sys_exit_zero_with_string(monkeypatch):
+    """sys_exit_zero: calls sys.exit(0) regardless of result."""
+    app = App(result_action="sys_exit_zero")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["greet", "Alice"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_zero_with_int(monkeypatch):
+    """sys_exit_zero: calls sys.exit(0) even with int result."""
+    app = App(result_action="sys_exit_zero")
+
+    @app.command
+    def get_number() -> int:
+        return 42
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["get-number"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == ""
+
+
+# ==============================================================================
+# print_sys_exit_zero tests
+# ==============================================================================
+
+
+def test_result_action_print_sys_exit_zero_with_string(monkeypatch):
+    """print_sys_exit_zero: prints result and calls sys.exit(0)."""
+    app = App(result_action="print_sys_exit_zero")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["greet", "Alice"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == "Hello Alice!\n"
+
+
+def test_result_action_print_sys_exit_zero_with_int(monkeypatch):
+    """print_sys_exit_zero: prints result and calls sys.exit(0)."""
+    app = App(result_action="print_sys_exit_zero")
+
+    @app.command
+    def get_number() -> int:
+        return 42
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["get-number"])
+
+    assert exit_code == 0
+    assert buf.getvalue() == "42\n"

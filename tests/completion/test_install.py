@@ -190,3 +190,135 @@ def test_register_install_completion_command_custom_help():
     install_cmd_app = app["--install-completion"]
 
     assert install_cmd_app.help == custom_help
+
+
+def test_install_completion_fish(temp_home):
+    """Test that fish completion installs correctly."""
+    app = App(name="testapp")
+
+    install_path = app.install_completion(shell="fish", add_to_startup=False)
+
+    assert install_path.exists()
+    assert install_path.name == "testapp.fish"
+    assert install_path.parent == temp_home / ".config" / "fish" / "completions"
+
+
+def test_install_completion_command_shell_detection_error(temp_home, monkeypatch, capsys):
+    """Test that install-completion command handles shell detection errors."""
+    from cyclopts.completion.detect import ShellDetectionError
+
+    app = App(name="testapp")
+    app.register_install_completion_command()
+
+    def mock_detect_shell():
+        raise ShellDetectionError("Cannot detect shell")
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", mock_detect_shell)
+
+    with pytest.raises(SystemExit) as exc_info:
+        app(["--install-completion"], exit_on_error=False)
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert "Could not auto-detect shell" in captured.err
+    assert "Please specify --shell explicitly" in captured.err
+
+
+def test_install_completion_command_zsh_with_add_to_startup(temp_home, monkeypatch, capsys):
+    """Test that install-completion command prints zsh instructions with add_to_startup."""
+    app = App(name="testapp")
+    app.register_install_completion_command(add_to_startup=True)
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "zsh")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    captured = capsys.readouterr()
+    assert "Completion script installed" in captured.out
+    assert "Added completion loader to" in captured.out
+    assert ".zshrc" in captured.out
+    assert "source ~/.zshrc" in captured.out
+
+
+def test_install_completion_command_zsh_without_add_to_startup(temp_home, monkeypatch, capsys):
+    """Test that install-completion command prints zsh instructions without add_to_startup."""
+    app = App(name="testapp")
+    app.register_install_completion_command(add_to_startup=False)
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "zsh")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    captured = capsys.readouterr()
+    assert "Completion script installed" in captured.out
+    assert "ensure" in captured.out.lower() and "$fpath" in captured.out
+    assert "fpath=" in captured.out
+    assert "autoload -Uz compinit" in captured.out
+    assert "exec zsh" in captured.out
+
+
+def test_install_completion_command_bash_with_add_to_startup(temp_home, monkeypatch, capsys):
+    """Test that install-completion command prints bash instructions with add_to_startup."""
+    app = App(name="testapp")
+    app.register_install_completion_command(add_to_startup=True)
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "bash")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    captured = capsys.readouterr()
+    assert "Completion script installed" in captured.out
+    assert "Added completion loader to" in captured.out
+    assert ".bashrc" in captured.out
+    assert "source ~/.bashrc" in captured.out
+
+
+def test_install_completion_command_bash_without_add_to_startup(temp_home, monkeypatch, capsys):
+    """Test that install-completion command prints bash instructions without add_to_startup."""
+    app = App(name="testapp")
+    app.register_install_completion_command(add_to_startup=False)
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "bash")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    captured = capsys.readouterr()
+    assert "Completion script installed" in captured.out
+    assert "automatically loaded by bash-completion" in captured.out
+    assert "bash-completion is installed" in captured.out
+    assert "exec bash" in captured.out
+
+
+def test_install_completion_command_fish(temp_home, monkeypatch, capsys):
+    """Test that install-completion command prints fish instructions."""
+    app = App(name="testapp")
+    app.register_install_completion_command()
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "fish")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    captured = capsys.readouterr()
+    assert "Completion script installed" in captured.out
+    assert "automatically loaded in fish" in captured.out
+    assert "source ~/.config/fish/config.fish" in captured.out
