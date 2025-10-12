@@ -1,7 +1,15 @@
 import os
+import re
 import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import Annotated, Literal
 
 import pytest
+
+from cyclopts import App, Parameter
+from cyclopts.completion.zsh import generate_completion_script
 
 from .apps import (
     app_basic,
@@ -104,10 +112,6 @@ def test_end_to_end_completion(zsh_tester):
     """
     pexpect = pytest.importorskip("pexpect")
 
-    import tempfile
-    import time
-    from pathlib import Path
-
     tester = zsh_tester(app_basic, "basic")
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -136,8 +140,6 @@ def test_end_to_end_completion(zsh_tester):
             child.expect(["% ", "# ", r"\$ "], timeout=2)
             output = child.before
 
-            import re
-
             clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
             clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
             clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
@@ -158,10 +160,6 @@ def test_command_prefix_completion(zsh_tester):
     Requires pexpect to be installed (skip otherwise).
     """
     pexpect = pytest.importorskip("pexpect")
-
-    import tempfile
-    import time
-    from pathlib import Path
 
     tester = zsh_tester(app_basic, "basic")
 
@@ -190,8 +188,6 @@ def test_command_prefix_completion(zsh_tester):
 
             child.expect(["% ", "# ", r"\$ "], timeout=2)
             output = child.before
-
-            import re
 
             clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
             clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
@@ -222,8 +218,6 @@ def test_nested_command_uses_correct_word_index(zsh_tester):
 
 def test_invalid_prog_name():
     """Test that invalid prog names raise ValueError."""
-    from cyclopts.completion.zsh import generate_completion_script
-
     with pytest.raises(ValueError, match="Invalid prog_name"):
         generate_completion_script(app_basic, "foo bar")
 
@@ -240,10 +234,6 @@ def test_description_escaping(zsh_tester):
     Note: Backticks are now treated as markdown code syntax and stripped,
     so they no longer appear in the completion script.
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="escape_test")
 
     @app.default
@@ -268,10 +258,6 @@ def test_description_escaping(zsh_tester):
 
 def test_special_chars_in_literal_choices(zsh_tester):
     """Test that Literal choices with special characters are properly escaped."""
-    from typing import Annotated, Literal
-
-    from cyclopts import App, Parameter
-
     app = App(name="special_choices")
 
     @app.default
@@ -290,10 +276,6 @@ def test_special_chars_in_literal_choices(zsh_tester):
 
 def test_unicode_in_descriptions(zsh_tester):
     """Test that Unicode characters in descriptions are handled properly."""
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="unicode_test")
 
     @app.default
@@ -312,8 +294,6 @@ def test_unicode_in_descriptions(zsh_tester):
 
 def test_deeply_nested_commands(zsh_tester):
     """Test completion for deeply nested commands (3+ levels)."""
-    from cyclopts import App
-
     root = App(name="root")
     level1 = App(name="level1")
     level2 = App(name="level2")
@@ -344,10 +324,6 @@ def test_no_trailing_colons_in_specs(zsh_tester):
     would cause zsh eval errors. When there's no completion action, the spec
     should be '1:description' or '*:args' (no trailing colon).
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="notrail")
 
     @app.command
@@ -389,10 +365,6 @@ def test_colon_escaping_in_descriptions(zsh_tester):
     like ':app_object' would be treated as field separators in specs like
     '1:message:action', causing unmatched quote errors.
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="colontest")
 
     @app.command
@@ -414,10 +386,6 @@ def test_run_command_only_special_for_cyclopts(zsh_tester):
     Regression test for issue where any app with a 'run' command would get
     dynamic completion instead of normal static completion.
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="myapp")
 
     @app.command
@@ -458,10 +426,6 @@ def test_empty_iterable_flag_completion(zsh_tester):
     Regression test for issue where --empty-items on list[str] parameters
     would expect a value instead of being treated as a flag.
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="listapp")
 
     @app.command
@@ -509,9 +473,6 @@ def test_completion_after_empty_flag(zsh_tester):
     import tempfile
     import time
     from pathlib import Path
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
 
     app = App(name="testapp")
 
@@ -553,8 +514,6 @@ def test_completion_after_empty_flag(zsh_tester):
             child.expect(["% ", "# ", r"\$ "], timeout=2)
             output = child.before
 
-            import re
-
             clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
             clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
             clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
@@ -578,8 +537,6 @@ def test_positional_or_keyword_literal_completion(zsh_tester):
     POSITIONAL_OR_KEYWORD (not positional-only) and has Literal choices.
     """
     from typing import Literal
-
-    from cyclopts import App
 
     app = App(name="testapp")
 
@@ -651,10 +608,6 @@ def test_nested_command_disambiguation(zsh_tester):
     This test verifies that the helper function correctly distinguishes between
     commands with overlapping names (e.g., 'config get' vs 'admin get').
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     root = App(name="myapp")
 
     config = App(name="config")
@@ -693,8 +646,6 @@ def test_nested_command_disambiguation(zsh_tester):
 
 def test_helper_function_generation(zsh_tester):
     """Test that command path detection logic is generated when needed."""
-    from cyclopts import App
-
     root_only = App(name="rootonly")
 
     @root_only.default
@@ -723,10 +674,6 @@ def test_helper_function_generation(zsh_tester):
 
 def test_no_file_completion_for_strings(zsh_tester):
     """Test that string options don't default to file completion."""
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="strtest")
 
     @app.default
@@ -747,10 +694,6 @@ def test_helper_function_skips_option_values(zsh_tester):
     Without this, 'myapp --config file.yaml subcommand' would incorrectly
     extract [file.yaml, subcommand] instead of [subcommand].
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="myapp")
     sub = App(name="sub")
 

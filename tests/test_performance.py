@@ -41,6 +41,50 @@ def test_rich_not_imported_on_happy_path():
     assert "SUCCESS: Rich not imported" in result.stdout
 
 
+def test_docstring_parser_not_imported_on_happy_path():
+    """Ensure docstring_parser is not imported during happy path execution.
+
+    docstring_parser is only needed when parsing docstrings for help display.
+    For successful CLI execution, it should not be imported to minimize startup time.
+    This test prevents regressions where docstring_parser might accidentally get imported early.
+    """
+    script = textwrap.dedent("""
+        import sys
+        import cyclopts
+
+        app = cyclopts.App(result_action="return_value")
+
+        @app.default
+        def main(name: str = "world"):
+            '''A simple command.
+
+            Parameters
+            ----------
+            name
+                The name to greet.
+            '''
+            return f"Hello, {name}!"
+
+        # Execute happy path
+        sys.argv = ["test", "--name", "Alice"]
+        result = app()
+        assert result == "Hello, Alice!"
+
+        # Check docstring_parser was not imported
+        assert "docstring_parser" not in sys.modules, f"docstring_parser was imported! Modules: {[m for m in sys.modules if 'docstring' in m]}"
+        print("SUCCESS: docstring_parser not imported")
+    """)
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"Script failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    assert "SUCCESS: docstring_parser not imported" in result.stdout
+
+
 def test_lazy_modules_not_imported_on_happy_path():
     """Ensure lazy-loaded modules are not imported during happy path execution.
 

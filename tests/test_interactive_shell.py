@@ -1,3 +1,6 @@
+from cyclopts import App
+
+
 def test_interactive_shell(app, mocker, console):
     mocker.patch(
         "cyclopts.core.input",
@@ -39,8 +42,6 @@ def test_interactive_shell(app, mocker, console):
 
 def test_interactive_shell_result_action_default_string(mocker, console):
     """Test that string returns are printed in interactive shell (default behavior)."""
-    from cyclopts import App
-
     app = App()
 
     mocker.patch(
@@ -148,8 +149,6 @@ def test_interactive_shell_result_action_default_none(app, mocker, console):
 
 def test_interactive_shell_result_action_default_list(mocker, console):
     """Test that list returns are printed in interactive shell."""
-    from cyclopts import App
-
     app = App()
 
     mocker.patch(
@@ -173,8 +172,6 @@ def test_interactive_shell_result_action_default_list(mocker, console):
 
 def test_interactive_shell_result_action_custom_app(app, mocker, console):
     """Test that custom result_action on App is respected in interactive shell."""
-    from cyclopts import App
-
     custom_app = App(result_action="print_non_none_return_int_as_exit_code")
 
     mocker.patch(

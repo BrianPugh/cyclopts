@@ -2,8 +2,11 @@
 
 from contextlib import redirect_stdout
 from io import StringIO
+from typing import Annotated
 
-from cyclopts import App
+import pytest
+
+from cyclopts import App, Parameter
 
 # ==============================================================================
 # return_value tests
@@ -677,8 +680,6 @@ def test_result_action_sys_exit_with_none(monkeypatch):
 
 def test_result_action_default_is_print_non_int_sys_exit():
     """Default result_action should be 'print_non_int_sys_exit'."""
-    import pytest
-
     app = App()
 
     @app.command
@@ -755,8 +756,6 @@ def test_result_action_inheritance():
 
 def test_result_action_none_defaults_to_print_non_int_sys_exit():
     """result_action=None defaults to print_non_int_sys_exit when called standalone."""
-    import pytest
-
     app = App()  # result_action=None
 
     @app.default
@@ -779,10 +778,6 @@ def test_result_action_none_defaults_to_print_non_int_sys_exit():
 
 def test_result_action_with_meta_app_exit_mode(monkeypatch):
     """result_action with meta app: exit modes should apply at meta level, not inner level."""
-    from typing import Annotated
-
-    from cyclopts import Parameter
-
     app = App(result_action="print_non_int_sys_exit")
 
     @app.meta.default
@@ -816,10 +811,6 @@ def test_result_action_with_meta_app_exit_mode(monkeypatch):
 
 def test_result_action_with_meta_app_return_mode():
     """result_action with meta app: non-exit modes should work correctly."""
-    from typing import Annotated
-
-    from cyclopts import Parameter
-
     app = App(result_action="print_non_int_return_int_as_exit_code")
 
     @app.meta.default

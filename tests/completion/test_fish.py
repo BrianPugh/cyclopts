@@ -1,7 +1,10 @@
 """Tests for fish completion script generation."""
 
+from typing import Annotated, Literal
+
 import pytest
 
+from cyclopts import App, Parameter
 from cyclopts.completion.fish import generate_completion_script
 
 from .apps import (
@@ -112,10 +115,6 @@ def test_completion_command_format(fish_tester):
 
 def test_special_characters_in_choices(fish_tester):
     """Test that special characters in choices are properly escaped."""
-    from typing import Annotated, Literal
-
-    from cyclopts import App, Parameter
-
     app = App(name="special")
 
     @app.default
@@ -151,10 +150,6 @@ def test_subcommand_conditions(fish_tester):
 
 def test_description_escaping(fish_tester):
     """Test that descriptions with special chars are properly escaped."""
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="escape_test")
 
     @app.default
@@ -171,10 +166,6 @@ def test_description_escaping(fish_tester):
 
 def test_special_chars_in_literal_choices(fish_tester):
     """Test that Literal choices with special characters are properly escaped."""
-    from typing import Annotated, Literal
-
-    from cyclopts import App, Parameter
-
     app = App(name="special_choices")
 
     @app.default
@@ -189,10 +180,6 @@ def test_special_chars_in_literal_choices(fish_tester):
 
 def test_unicode_in_descriptions(fish_tester):
     """Test that Unicode characters in descriptions are handled properly."""
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="unicode_test")
 
     @app.default
@@ -210,8 +197,6 @@ def test_unicode_in_descriptions(fish_tester):
 
 def test_deeply_nested_commands(fish_tester):
     """Test completion for deeply nested commands (3+ levels)."""
-    from cyclopts import App
-
     root = App(name="root")
     level1 = App(name="level1")
     level2 = App(name="level2")
@@ -241,10 +226,6 @@ def test_nested_command_disambiguation(fish_tester):
     This test verifies that the helper function correctly distinguishes between
     commands with overlapping names (e.g., 'config get' vs 'admin get').
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     root = App(name="myapp")
 
     config = App(name="config")
@@ -293,8 +274,6 @@ def test_nested_command_disambiguation(fish_tester):
 
 def test_helper_function_generation(fish_tester):
     """Test that helper function is only generated when needed."""
-    from cyclopts import App
-
     root_only = App(name="rootonly")
 
     @root_only.default
@@ -324,10 +303,6 @@ def test_flag_vs_option_distinction(fish_tester):
 
     Flags should not have -r (require parameter), while options should.
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="flagtest")
 
     @app.default
@@ -360,10 +335,6 @@ def test_optional_path_completion(fish_tester):
 
 def test_no_file_completion_for_strings(fish_tester):
     """Test that string options don't default to file completion."""
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="strtest")
 
     @app.default
@@ -408,10 +379,6 @@ def test_empty_iterable_flag_completion(fish_tester):
     Regression test for issue where --empty-items on list[str] parameters
     would expect a value instead of being treated as a flag.
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="listapp")
 
     @app.command
@@ -447,10 +414,6 @@ def test_helper_function_skips_option_values(fish_tester):
     Without this, 'myapp --config file.yaml subcommand' would incorrectly
     extract [file.yaml, subcommand] instead of [subcommand].
     """
-    from typing import Annotated
-
-    from cyclopts import App, Parameter
-
     app = App(name="myapp")
     sub = App(name="sub")
 

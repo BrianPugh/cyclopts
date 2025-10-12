@@ -1,6 +1,8 @@
 import sniffio
 import trio
 
+from cyclopts import App
+
 
 def test_async_handler(app):
     @app.command(name="command")
@@ -13,8 +15,6 @@ def test_async_handler(app):
 
 
 def test_async_handler_with_subcommand_works(app):
-    from cyclopts import App
-
     sub_app = App(name="foo")
     app.command(sub_app)
 

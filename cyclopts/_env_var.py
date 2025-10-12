@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 from typing import Any, get_args
 
+from cyclopts._convert import resolve, token_count
+
 
 def _is_path(type_) -> bool:
-    from cyclopts._convert import resolve
-
     if type_ is Path:
         return True
 
@@ -50,8 +50,6 @@ def env_var_split(
     list[str]
         List of individual string tokens.
     """
-    from cyclopts._convert import resolve, token_count
-
     type_ = resolve(type_)
     count, consume_all = token_count(type_)
 

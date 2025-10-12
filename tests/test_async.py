@@ -3,7 +3,7 @@ from typing import Annotated
 
 import sniffio
 
-from cyclopts import Parameter
+from cyclopts import App, Parameter
 
 
 def test_async_handler(app):
@@ -16,8 +16,6 @@ def test_async_handler(app):
 
 
 def test_async_handler_with_subcommand_works(app):
-    from cyclopts import App
-
     sub_app = App(name="foo")
     app.command(sub_app)
 

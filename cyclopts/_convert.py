@@ -124,8 +124,6 @@ def _datetime(s: str) -> datetime:
 
 def _timedelta(s: str) -> timedelta:
     """Parse a timedelta string."""
-    import re
-
     negative = False
     if s.startswith("-"):
         negative = True

@@ -1,3 +1,8 @@
+import asyncio
+from pathlib import Path
+from typing import Optional
+
+
 def test_version_print_console_from_init(app, console):
     app.console = console
 
@@ -84,7 +89,6 @@ def test_version_print_custom_async_callable(app, console):
 
 def test_version_print_async_in_async_context(app, console):
     """Test that async version callables work when called from within an async context."""
-    import asyncio
 
     async def my_async_version():
         # Verify we're in an async context
@@ -125,8 +129,6 @@ def test_help_and_version_flags_together(app, console):
 
     Regression test for bug where having both flags caused NameError on Console forward reference.
     """
-    from pathlib import Path
-    from typing import Optional
 
     @app.command
     def files(

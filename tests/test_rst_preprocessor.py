@@ -2,11 +2,15 @@
 
 from textwrap import dedent
 
+from cyclopts.help.rst_preprocessor import (
+    _gather_indented_block,
+    _skip_indented_block,
+    process_sphinx_directives,
+)
+
 
 def test_process_sphinx_directives_empty_content():
     """Test that empty/None content is handled gracefully."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     assert process_sphinx_directives(None) == ""
     assert process_sphinx_directives("") == ""
     assert process_sphinx_directives("   ") == ""
@@ -14,8 +18,6 @@ def test_process_sphinx_directives_empty_content():
 
 def test_process_sphinx_directives_malformed_directive():
     """Test that malformed directives are handled gracefully."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -31,8 +33,6 @@ def test_process_sphinx_directives_malformed_directive():
 
 def test_process_sphinx_directives_unknown_directive():
     """Test that unknown directives are skipped."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -50,8 +50,6 @@ def test_process_sphinx_directives_unknown_directive():
 
 def test_skip_indented_block():
     """Test _skip_indented_block helper function."""
-    from cyclopts.help.rst_preprocessor import _skip_indented_block
-
     lines = [
         "base line",
         "    indented line 1",
@@ -68,8 +66,6 @@ def test_skip_indented_block():
 
 def test_skip_indented_block_end_of_file():
     """Test _skip_indented_block when reaching end of file."""
-    from cyclopts.help.rst_preprocessor import _skip_indented_block
-
     lines = [
         "base line",
         "    indented line 1",
@@ -81,8 +77,6 @@ def test_skip_indented_block_end_of_file():
 
 def test_gather_indented_block():
     """Test _gather_indented_block helper function preserves paragraph structure."""
-    from cyclopts.help.rst_preprocessor import _gather_indented_block
-
     lines = [
         "base line",
         "    indented line 1",
@@ -103,8 +97,6 @@ def test_gather_indented_block():
 
 def test_gather_indented_block_empty():
     """Test _gather_indented_block with no indented content."""
-    from cyclopts.help.rst_preprocessor import _gather_indented_block
-
     lines = [
         "base line",
         "next base line",
@@ -116,8 +108,6 @@ def test_gather_indented_block_empty():
 
 def test_gather_indented_block_end_of_file():
     """Test _gather_indented_block when reaching end of file."""
-    from cyclopts.help.rst_preprocessor import _gather_indented_block
-
     lines = [
         "base line",
         "    indented line 1",
@@ -130,8 +120,6 @@ def test_gather_indented_block_end_of_file():
 
 def test_process_sphinx_directives_with_options():
     """Test that directive options are ignored (not processed)."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -149,8 +137,6 @@ def test_process_sphinx_directives_with_options():
 
 def test_process_sphinx_directives_with_list_content(normalize_trailing_whitespace):
     """Test directives containing list structures."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -178,8 +164,6 @@ def test_process_sphinx_directives_with_list_content(normalize_trailing_whitespa
 
 def test_process_sphinx_directives_non_ascii_content(normalize_trailing_whitespace):
     """Test directives with non-ASCII characters."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -204,8 +188,6 @@ def test_process_sphinx_directives_non_ascii_content(normalize_trailing_whitespa
 
 def test_process_sphinx_directives_nested_directives(normalize_trailing_whitespace):
     """Test directives that contain other directives (should handle gracefully)."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -232,8 +214,6 @@ def test_process_sphinx_directives_nested_directives(normalize_trailing_whitespa
 
 def test_gather_indented_block_with_multiple_paragraphs():
     """Test _gather_indented_block with multiple paragraphs separated by blank lines."""
-    from cyclopts.help.rst_preprocessor import _gather_indented_block
-
     lines = [
         "base line",
         "    First paragraph line 1",
@@ -256,8 +236,6 @@ def test_gather_indented_block_with_multiple_paragraphs():
 
 def test_process_sphinx_directives_code_block_in_directive(normalize_trailing_whitespace):
     """Test directives containing code block-like content."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         Some text
 
@@ -287,8 +265,6 @@ def test_process_sphinx_directives_code_block_in_directive(normalize_trailing_wh
 
 def test_process_sphinx_directives_version_with_punctuation(normalize_trailing_whitespace):
     """Test version numbers with various punctuation."""
-    from cyclopts.help.rst_preprocessor import process_sphinx_directives
-
     text = dedent("""\
         .. versionadded:: 1.2.3
 
