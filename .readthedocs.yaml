@@ -13,13 +13,17 @@ build:
       # Install uv
       - pip install uv
     post_install:
-      # Install dependencies with 'docs' extra
-      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH uv sync --extra=docs
+      # Install project with 'docs' extra using uv pip
+      - uv pip install -e .[docs]
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: docs/source/conf.py
   fail_on_warning: true
+
+# Prevent ReadTheDocs from installing the package automatically
+python:
+  install: []
 
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 formats:
