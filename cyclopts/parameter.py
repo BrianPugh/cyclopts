@@ -1,11 +1,11 @@
 import collections.abc
 import inspect
+import sys
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from typing import (  # noqa: UP035
     Any,
     List,
-    Optional,
     Tuple,
     TypeVar,
     cast,
@@ -15,6 +15,11 @@ from typing import (  # noqa: UP035
 
 import attrs
 from attrs import define, field
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 import cyclopts._env_var
 from cyclopts._convert import ITERABLE_TYPES
@@ -112,7 +117,7 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Callable[[Any, Sequence[Token]], Any] | None = field(
+    converter: Callable[[type, Sequence[Token]], Any] | None = field(
         default=None,
         kw_only=True,
     )
@@ -318,7 +323,7 @@ class Parameter:
         return f"{type(self).__name__}({content})"
 
     @classmethod
-    def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
+    def combine(cls, *parameters: "Parameter | None") -> "Parameter":
         """Returns a new Parameter with combined values of all provided ``parameters``.
 
         Parameters
@@ -343,7 +348,7 @@ class Parameter:
         return cls(**kwargs)
 
     @classmethod
-    def default(cls) -> "Parameter":
+    def default(cls) -> Self:
         """Create a Parameter with all Cyclopts-default values.
 
         This is different than just :class:`Parameter` because the default
@@ -354,7 +359,7 @@ class Parameter:
         )
 
     @classmethod
-    def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> tuple[Any, "Parameter"]:
+    def from_annotation(cls, type_: Any, *default_parameters: "Parameter | None") -> tuple[Any, "Parameter"]:
         """Resolve the immediate Parameter from a type hint."""
         if type_ is inspect.Parameter.empty:
             if default_parameters:

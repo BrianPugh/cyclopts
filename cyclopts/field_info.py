@@ -13,6 +13,11 @@ from typing import (  # noqa: F401
 import attrs
 from attrs import field
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 from cyclopts.annotations import (
     NotRequired,
     Required,
@@ -71,7 +76,7 @@ class FieldInfo:
     KEYWORD: ClassVar[frozenset[inspect._ParameterKind]] = frozenset({POSITIONAL_OR_KEYWORD, KEYWORD_ONLY, VAR_KEYWORD})
 
     @classmethod
-    def from_iparam(cls, iparam: inspect.Parameter, *, annotation: Any = UNSET, required: bool | None = None):
+    def from_iparam(cls, iparam: inspect.Parameter, *, annotation: Any = UNSET, required: bool | None = None) -> Self:
         if required is None:
             required = (
                 iparam.default is iparam.empty

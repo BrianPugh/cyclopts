@@ -1,5 +1,6 @@
 import inspect
 import itertools
+import sys
 from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
@@ -11,6 +12,11 @@ from typing import (
 )
 
 from attrs import field
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 from cyclopts.utils import (
     UNSET,
@@ -114,15 +120,15 @@ class Group:
         return None if self._sort_key is UNSET else self._sort_key
 
     @classmethod
-    def create_default_arguments(cls, name="Arguments"):
+    def create_default_arguments(cls, name="Arguments") -> Self:
         return cls(name, sort_key=DEFAULT_ARGUMENTS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_default_parameters(cls, name="Parameters"):
+    def create_default_parameters(cls, name="Parameters") -> Self:
         return cls(name, sort_key=DEFAULT_PARAMETERS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_default_commands(cls, name="Commands"):
+    def create_default_commands(cls, name="Commands") -> Self:
         return cls(name, sort_key=DEFAULT_COMMANDS_GROUP_SORT_MARKER)
 
     @classmethod
@@ -136,7 +142,7 @@ class Group:
         validator=None,
         default_parameter=None,
         help_formatter=None,
-    ):
+    ) -> Self:
         """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
         Used to create a group that will be displayed **after** a previously instantiated :meth:`Group.create_ordered` group on the help-page.
