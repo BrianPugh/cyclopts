@@ -17,9 +17,12 @@ def run(
     /,
     *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
 ):
-    """Run a Cyclopts application from a Python script.
+    """Run a Cyclopts application from a Python script with dynamic shell completion.
 
     All arguments after the script path are passed to the loaded application.
+
+    Shell completion is available. Run once to install (persistent):
+    ``cyclopts --install-completion``
 
     Parameters
     ----------
