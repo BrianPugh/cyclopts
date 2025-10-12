@@ -52,10 +52,7 @@ dev = [
     "trio>=0.10.0",
     "pyyaml>=6.0.1",
 ]
-debug = [
-    "ipdb>=0.13.9",
-    "line_profiler>=3.5.1",
-]
+debug = ["ipdb>=0.13.9", "line_profiler>=3.5.1"]
 
 [project.scripts]
 cyclopts = "cyclopts.cli:app"
@@ -68,9 +65,7 @@ Repository = "https://github.com/BrianPugh/cyclopts"
 source = "vcs"
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "/cyclopts",
-]
+include = ["/cyclopts"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["cyclopts"]
@@ -116,6 +111,7 @@ omit = ["cyclopts/protocols.py"]
 venvPath = "."
 venv = ".venv"
 ignore = ["docs/", "tests/test_py3*.py"]
+reportUnsupportedDunderAll = "none"
 
 [tool.ruff]
 target-version = 'py310'
@@ -196,6 +192,7 @@ convention = "numpy"
     "S106",   # possible hardcoded password.
     "PGH001", # use of "eval"
     "UP007",  # Use `X | Y` for type annotations; many tests specifically test Union/Optional
+    "UP045",  # Use `X | None` for type annotations
 ]
 "docs/*.py" = [
     "F811", # redefinition

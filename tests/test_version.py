@@ -1,6 +1,5 @@
 import asyncio
 from pathlib import Path
-from typing import Optional
 
 
 def test_version_print_console_from_init(app, console):
@@ -133,7 +132,7 @@ def test_help_and_version_flags_together(app, console):
     @app.command
     def files(
         input_file: Path,
-        output_file: Optional[Path] = None,
+        output_file: Path | None = None,
     ):
         """Work with files."""
         pass

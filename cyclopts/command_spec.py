@@ -74,7 +74,7 @@ class CommandSpec:
         module_path, _, attr_name = self.import_path.rpartition(":")
         if not module_path or not attr_name:
             raise ValueError(
-                f"Invalid import path: {self.import_path!r}. " f"Expected format: 'module.path:attribute_name'"
+                f"Invalid import path: {self.import_path!r}. Expected format: 'module.path:attribute_name'"
             )
 
         # Import the module and get the attribute
@@ -87,7 +87,7 @@ class CommandSpec:
             target = getattr(module, attr_name)
         except AttributeError as e:
             raise AttributeError(
-                f"Module {module_path!r} has no attribute {attr_name!r} " f"(from import path {self.import_path!r})"
+                f"Module {module_path!r} has no attribute {attr_name!r} (from import path {self.import_path!r})"
             ) from e
 
         # Wrap in App if needed

@@ -1,14 +1,14 @@
 exclude: ^(uv.lock|.idea/)
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.7.1"
+    rev: "v0.14.0"
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -32,23 +32,23 @@ repos:
         exclude: \.(html|svg)$
 
   - repo: https://github.com/fredrikaverpil/creosote.git
-    rev: v3.1.0
+    rev: v4.1.0
     hooks:
       - id: creosote
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
         additional_dependencies:
           - tomli
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.26.8
+    rev: v1.38.1
     hooks:
       - id: typos
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.387
+    rev: v1.1.406
     hooks:
       - id: pyright

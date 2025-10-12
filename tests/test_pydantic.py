@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 import pydantic
 import pytest
@@ -563,7 +563,7 @@ def test_pydantic_list_empty_flag(app, assert_parse_args):
         ]
 
     @app.default
-    def command(config: Optional[Config] = None):
+    def command(config: Config | None = None):
         pass
 
     assert_parse_args(command, "--empty-urls", Config(urls=[]))
@@ -581,7 +581,7 @@ def test_pydantic_list_with_value(app, assert_parse_args):
         ]
 
     @app.default
-    def command(config: Optional[Config] = None):
+    def command(config: Config | None = None):
         pass
 
     assert_parse_args(
@@ -605,7 +605,7 @@ def test_pydantic_list_omitted(app, assert_parse_args):
         ]
 
     @app.default
-    def command(config: Optional[Config] = None):
+    def command(config: Config | None = None):
         pass
 
     assert_parse_args(command, "")

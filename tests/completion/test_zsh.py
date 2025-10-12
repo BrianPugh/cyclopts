@@ -453,9 +453,9 @@ def test_empty_iterable_flag_completion(zsh_tester):
 
     # Positive names should expect values (have :action or :name suffix)
     lines_with_items = [line for line in tester.completion_script.split("\n") if "'--items[" in line]
-    assert any(
-        ":items:" in line or ":items'" in line for line in lines_with_items
-    ), "Positive --items flag should expect a value"
+    assert any(":items:" in line or ":items'" in line for line in lines_with_items), (
+        "Positive --items flag should expect a value"
+    )
 
     assert tester.validate_script_syntax()
 
@@ -521,9 +521,9 @@ def test_completion_after_empty_flag(zsh_tester):
             # Should complete to --count
             # Note: MARKER may be corrupted by terminal escape sequences during completion display,
             # so we check for MARK (prefix) instead of full MARKER string
-            assert (
-                "--count" in clean_output and "MARK" in clean_output
-            ), f"Expected --count and MARK in output, got: {clean_output}"
+            assert "--count" in clean_output and "MARK" in clean_output, (
+                f"Expected --count and MARK in output, got: {clean_output}"
+            )
 
         finally:
             child.close()

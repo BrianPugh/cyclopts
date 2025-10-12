@@ -502,7 +502,7 @@ def _convert(
                 if token.implicit_value is not UNSET:
                     out = token.implicit_value
                 elif converter is None:
-                    out = _converters.get(type_, type_)(token.value)
+                    out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
                 elif converter_needs_token:
                     out = converter(type_, token)  # pyright: ignore[reportArgumentType]
                 else:

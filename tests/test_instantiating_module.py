@@ -48,12 +48,12 @@ def test_instantiating_module_lazy_property():
 
     # The module name should be captured at init - this is the KEY test
     # If this fails, the optimization broke the feature
-    assert (
-        app._instantiating_module_name is not None
-    ), "Module name was not captured during App initialization. This breaks version detection!"
-    assert (
-        app._instantiating_module_name == __name__
-    ), f"Expected module name '{__name__}', got '{app._instantiating_module_name}'"
+    assert app._instantiating_module_name is not None, (
+        "Module name was not captured during App initialization. This breaks version detection!"
+    )
+    assert app._instantiating_module_name == __name__, (
+        f"Expected module name '{__name__}', got '{app._instantiating_module_name}'"
+    )
 
     # The module object should be lazy (uses UNSET sentinel before first access)
     from cyclopts.utils import UNSET

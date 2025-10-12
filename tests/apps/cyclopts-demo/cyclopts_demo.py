@@ -2,7 +2,7 @@
 """Cyclopts Demo Application - Testing completion features."""
 
 from pathlib import Path
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 from cyclopts import App, Parameter, validators
 
@@ -16,7 +16,7 @@ app.register_install_completion_command()
 @app.default
 def main(
     verbose: bool = False,
-    config: Optional[Path] = None,
+    config: Path | None = None,
 ):
     """Main command.
 
@@ -33,7 +33,7 @@ def main(
 @app.command
 def files(
     input_file: Path,
-    output_file: Optional[Path] = None,
+    output_file: Path | None = None,
     directory: Annotated[
         Path, Parameter(validator=validators.Path(exists=True, dir_okay=True, file_okay=False))
     ] = Path(),
@@ -86,8 +86,8 @@ def process(
     items: list[str],
     count: Annotated[int, Parameter(validator=validators.Number(gt=0, lte=100))] = 1,
     threshold: float = 0.5,
-    tags: Optional[list[str]] = None,
-    exclude: Optional[list[str]] = None,
+    tags: list[str] | None = None,
+    exclude: list[str] | None = None,
 ):
     """Process items.
 
@@ -118,7 +118,7 @@ def connect(
     host: str = "localhost",
     port: int = 5432,
     username: str = "admin",
-    password: Optional[str] = None,
+    password: str | None = None,
     ssl: bool = True,
 ):
     """Connect to database.
@@ -143,7 +143,7 @@ def connect(
 def migrate(
     direction: Literal["up", "down"] = "up",
     steps: int = 1,
-    target: Optional[str] = None,
+    target: str | None = None,
     force: bool = False,
 ):
     """Run database migrations.
@@ -165,7 +165,7 @@ def migrate(
 @database_app.command
 def backup(
     output: Path,
-    tables: Optional[list[str]] = None,
+    tables: list[str] | None = None,
     compress: bool = True,
     encryption: Literal["none", "aes256", "rsa"] = "none",
 ):

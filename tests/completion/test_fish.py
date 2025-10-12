@@ -261,13 +261,13 @@ def test_nested_command_disambiguation(fish_tester):
     config_get_lines = [line for line in script.split("\n") if "config" in line.lower() and "get" in line.lower()]
     admin_get_lines = [line for line in script.split("\n") if "admin" in line.lower() and "get" in line.lower()]
 
-    assert any(
-        "config key" in line.lower() or "config" in line for line in config_get_lines
-    ), "Config get should have config-specific completions"
+    assert any("config key" in line.lower() or "config" in line for line in config_get_lines), (
+        "Config get should have config-specific completions"
+    )
 
-    assert any(
-        "username" in line.lower() or "admin" in line for line in admin_get_lines
-    ), "Admin get should have admin-specific completions"
+    assert any("username" in line.lower() or "admin" in line for line in admin_get_lines), (
+        "Admin get should have admin-specific completions"
+    )
 
     assert tester.validate_script_syntax()
 

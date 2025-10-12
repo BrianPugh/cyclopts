@@ -1741,9 +1741,9 @@ def test_help_print_commands_sort_key_generator(app, console):
     bob_pos = actual.index("bob")
     charlie_pos = actual.index("charlie")
 
-    assert (
-        alice_pos < bob_pos < charlie_pos
-    ), f"Commands not in expected order. Positions: alice={alice_pos}, bob={bob_pos}, charlie={charlie_pos}"
+    assert alice_pos < bob_pos < charlie_pos, (
+        f"Commands not in expected order. Positions: alice={alice_pos}, bob={bob_pos}, charlie={charlie_pos}"
+    )
 
 
 def test_help_print_commands_plus_meta_short(app, console):

@@ -21,9 +21,9 @@ def test_format_aliases_sync_with_docformat():
     format_alias_keys = set(FORMAT_ALIASES.keys())
 
     # Ensure all FORMAT_ALIASES keys are in DocFormat
-    assert (
-        format_alias_keys == doc_format_values
-    ), f"FORMAT_ALIASES keys {format_alias_keys} must match DocFormat values {doc_format_values}"
+    assert format_alias_keys == doc_format_values, (
+        f"FORMAT_ALIASES keys {format_alias_keys} must match DocFormat values {doc_format_values}"
+    )
 
 
 def test_format_aliases_values_are_canonical():
@@ -31,9 +31,9 @@ def test_format_aliases_values_are_canonical():
     canonical_values = set(get_args(CanonicalDocFormat))
 
     for alias, canonical in FORMAT_ALIASES.items():
-        assert (
-            canonical in canonical_values
-        ), f"FORMAT_ALIASES['{alias}'] = '{canonical}' is not a valid CanonicalDocFormat"
+        assert canonical in canonical_values, (
+            f"FORMAT_ALIASES['{alias}'] = '{canonical}' is not a valid CanonicalDocFormat"
+        )
 
 
 def test_common_suffixes_have_format_aliases():
@@ -75,16 +75,16 @@ def test_file_suffix_handling():
         assert key in FORMAT_ALIASES, f"Key '{key}' should be in FORMAT_ALIASES"
 
         # Test that it maps to the correct canonical format
-        assert (
-            FORMAT_ALIASES[key] == expected_canonical
-        ), f"FORMAT_ALIASES['{key}'] should be '{expected_canonical}', got '{FORMAT_ALIASES[key]}'"
+        assert FORMAT_ALIASES[key] == expected_canonical, (
+            f"FORMAT_ALIASES['{key}'] should be '{expected_canonical}', got '{FORMAT_ALIASES[key]}'"
+        )
 
         # Test that this is consistent with file suffix inference
         # (simulating how the system would infer format from a file extension)
         inferred_format = FORMAT_ALIASES.get(key)
-        assert (
-            inferred_format == expected_canonical
-        ), f"Suffix '{suffix_with_period}' should infer format '{expected_canonical}', got '{inferred_format}'"
+        assert inferred_format == expected_canonical, (
+            f"Suffix '{suffix_with_period}' should infer format '{expected_canonical}', got '{inferred_format}'"
+        )
 
 
 def test_normalize_format_with_all_aliases():
@@ -119,6 +119,6 @@ def test_all_doc_format_values_have_normalization():
         # Should not raise an exception
         result = normalize_format(format_value)
         # Result should be a canonical format
-        assert result in get_args(
-            CanonicalDocFormat
-        ), f"normalize_format('{format_value}') = '{result}' is not a CanonicalDocFormat"
+        assert result in get_args(CanonicalDocFormat), (
+            f"normalize_format('{format_value}') = '{result}' is not a CanonicalDocFormat"
+        )
