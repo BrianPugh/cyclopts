@@ -31,10 +31,10 @@ Lets make a small application that checks PyPI_ if a library name is available:
    )
 
    @app.default
-   def pypi_checker(name: str, *, silent: bool = False):
+   def pypi_checker(name: str, *, silent: bool = False) -> bool:
        """Check if a package name is available on PyPI.
 
-       Exit code 0 on success; non-zero otherwise.
+       Returns True if available; False otherwise.
 
        Parameters
        ----------
@@ -49,7 +49,7 @@ Lets make a small application that checks PyPI_ if a library name is available:
                print(f"{name} is available.")
            else:
                print(f"{name} is not available.")
-      sys.exit(not is_available)
+       return is_available
 
    if __name__ == "__main__":
        app()
@@ -63,16 +63,17 @@ Running the app from the console:
 
    Check if a package name is available on PyPI.
 
-   Exit code 0 on success; non-zero otherwise.
+   Returns True if available; False otherwise.
 
-   ╭─ Commands ────────────────────────────────────────────────────────────────────╮
-   │ --help -h  Display this message and exit.                                     │
-   │ --version  Display application version.                                       │
-   ╰───────────────────────────────────────────────────────────────────────────────╯
-   ╭─ Parameters ──────────────────────────────────────────────────────────────────╮
-   │ *  NAME --name           Name of the package to check. [required]             │
-   │    --silent --no-silent  Do not print anything to stdout. [default: False]    │
-   ╰───────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Commands ────────────────────────────────────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                                                         │
+   │ --version  Display application version.                                                           │
+   ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ──────────────────────────────────────────────────────────────────────────────────────╮
+   │ *  NAME --name           Name of the package to check. [env var: PYPI_CHECKER_NAME] [required]    │
+   │    --silent --no-silent  Do not print anything to stdout. [env var: PYPI_CHECKER_SILENT]          │
+   │                          [default: False]                                                         │
+   ╰───────────────────────────────────────────────────────────────────────────────────────────────────╯
 
    $ python pypi_checker.py cyclopts
    cyclopts is not available.
@@ -113,18 +114,19 @@ This will be demonstrated in the next section.
 ----------
 Exit Codes
 ----------
-Our app directly calls :func:`sys.exit`.
-Internal to python, this causes the :exc:`SystemExit` exception to be raised.
-We can catch this with the :func:`pytest.raises` context manager, and check the resulting error-code.
+Our command function returns a boolean. By default, Cyclopts uses :attr:`~cyclopts.App.result_action` of ``"print_non_int_sys_exit"``, which calls :func:`sys.exit` with the appropriate code: :obj:`True` → ``0`` (success), :obj:`False` → ``1`` (failure).
 
 .. code-block:: python
 
-   def test_unavailable_name(mock_check_pypi_name_available):
+   import pytest
+
+   def test_unavailable_name_cli_behavior(mock_check_pypi_name_available):
+       # Set the mock return_value to False (i.e. the name is NOT available).
        mock_check_pypi_name_available.return_value = False
-       with pytest.raises(SystemExit) as e:
-           app("foo")  # Invoke our app, passing in package-name "foo"
-       mock_check_pypi_name_available.assert_called_once_with("foo")  # assert that our mock was called.
-       assert e.value.code != 0  # assert the exit code is non-zero (i.e. not successful)
+       with pytest.raises(SystemExit) as exc_info:
+           app("foo")  # Default result_action calls sys.exit
+       mock_check_pypi_name_available.assert_called_once_with("foo")
+       assert exc_info.value.code == 1  # Package unavailable exits with code 1
 
 We can then run pytest on this file:
 
@@ -142,28 +144,6 @@ We can then run pytest on this file:
 
    =============================== 1 passed in 0.05s ===============================
 
-.. note::
-   Alternatively, we could have avoided using :func:`sys.exit` within our commands, and have our commands instead return an integer error-code.
-
-   .. code-block:: python
-
-      # pypi_checker.py
-
-      @app.default
-      def pypi_checker(name: str, *, silent: bool = False):
-         ...
-         return not is_available
-
-      if __name__ == "__main__":
-          sys.exit(app())
-
-   With this setup, our unit-test would just have to check:
-
-   .. code-block:: python
-
-      # test.py
-      assert app("foo") != 0
-
 
 ---------------
 Checking stdout
@@ -172,16 +152,20 @@ We also want to make sure that our message is displayed to the user.
 The built-in `capsys`_ fixture gives us access to our application's ``stdout``.
 We can use this to confirm our app prints the correct statement.
 
+By passing ``result_action="return_value"`` to the app call, we can get the return value directly without :func:`sys.exit` being called:
+
 .. code-block:: python
 
-   # test.py - continued from "Mocking"
-   def test_unavailable_name(capsys, mock_check_pypi_name_available):
+   # test.py - continued from "Exit Codes"
+   def test_unavailable_name_with_output(capsys, mock_check_pypi_name_available):
        mock_check_pypi_name_available.return_value = False
-       with pytest.raises(SystemExit) as e:
-           app("foo")  # Invoke our app, passing in package-name "foo"
-       mock_check_pypi_name_available.assert_called_once_with("foo")  # assert that our mock was called.
-       assert e.value.code != 0  # assert the exit code is non-zero (i.e. not successful)
+       is_available = app("foo", result_action="return_value")
+       mock_check_pypi_name_available.assert_called_once_with("foo")
+       assert is_available is False
        assert capsys.readouterr().out == "foo is not available.\n"
+
+.. note::
+   Normal output goes to :attr:`~cyclopts.App.console` (stdout), while errors go to :attr:`~cyclopts.App.error_console` (stderr). Use ``capsys.readouterr().err`` to check error messages, or provide a custom ``error_console`` to capture both streams together.
 
 
 ---------------------
@@ -239,6 +223,7 @@ To explicitly test that configurations from the :ref:`Cyclopts configuration sys
 
    # test.py
    import json
+   from pypi_checker import pypi_checker
 
    @pytest.fixture(autouse=True)
    def chdir_to_tmp_path(tmp_path, monkeypatch):
@@ -255,7 +240,7 @@ To explicitly test that configurations from the :ref:`Cyclopts configuration sys
           json.dump({"name": "bar"}, f)
        command, bound, _ = app.parse_args([])  # An empty list - no CLI arguments passed in.
        assert command == pypi_checker
-       assert bound.arguments['name'] == "foo"
+       assert bound.arguments['name'] == "bar"
 
 ---------
 Help Page
@@ -275,18 +260,20 @@ Since the help-page is just printed to ``stdout``, we will be using the `capsys`
 
 .. code-block:: python
 
+   import pytest
    from textwrap import dedent
 
    def test_help_page(capsys, console):
-       app("--help", console=console)
+       with pytest.raises(SystemExit):
+           app("--help", console=console)
        actual = capsys.readouterr().out
        assert actual == dedent(
            """\
-           Usage: pypi-checker COMMAND [ARGS] [OPTIONS]
+           Usage: pypi_checker COMMAND [ARGS] [OPTIONS]
 
            Check if a package name is available on PyPI.
 
-           Exit code 0 on success; non-zero otherwise.
+           Returns True if available; False otherwise.
 
            ╭─ Commands ─────────────────────────────────────────────────────────╮
            │ --help -h  Display this message and exit.                          │

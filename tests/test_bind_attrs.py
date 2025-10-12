@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Annotated, Dict, Optional
+from typing import Annotated
 
 import pytest
 from attrs import define, field
@@ -18,8 +18,8 @@ class Outfit:
 class User:
     id: int
     name: str = "John Doe"
-    tastes: Dict[str, int] = field(factory=dict)
-    outfit: Optional[Outfit] = None
+    tastes: dict[str, int] = field(factory=dict)
+    outfit: Outfit | None = None
     admin: Annotated[bool, Parameter(negative="not-admin")] = False
     vip: Annotated[bool, Parameter(negative="--not-vip")] = False
     staff: Annotated[bool, Parameter(parse=False)] = False
@@ -48,7 +48,7 @@ def test_bind_attrs(app, assert_parse_args, console):
 
     expected = dedent(
         """\
-        Usage: test_bind_attrs foo [ARGS] [OPTIONS]
+        Usage: test_bind_attrs foo USER.ID [ARGS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.ID --user.id      [required]                               │
@@ -88,7 +88,7 @@ def test_bind_attrs_flatten(app, assert_parse_args, console):
 
     expected = dedent(
         """\
-        Usage: test_bind_attrs foo [ARGS] [OPTIONS]
+        Usage: test_bind_attrs foo ID [ARGS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  ID --id              [required]                                 │
@@ -124,7 +124,7 @@ def test_bind_attrs_accepts_keys_false(app, assert_parse_args, console):
 
     expected = dedent(
         """\
-        Usage: test_bind_attrs foo [ARGS] [OPTIONS]
+        Usage: test_bind_attrs foo EXAMPLE
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  EXAMPLE --example  [required]                                   │

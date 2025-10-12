@@ -1,14 +1,14 @@
 from collections import namedtuple
-from typing import Annotated, Dict, List, Optional, TypedDict, Union
+from typing import Annotated, Dict, Optional, TypedDict, Union  # noqa: UP035
 
 import pytest
 
+from cyclopts.annotations import is_typeddict
 from cyclopts.argument import (
     Argument,
     ArgumentCollection,
     _resolve_groups_from_callable,
-    _resolve_parameter_name,
-    is_typeddict,
+    resolve_parameter_name,
 )
 from cyclopts.group import Group
 from cyclopts.parameter import Parameter
@@ -75,7 +75,7 @@ def test_argument_collection_basic_annotation():
     assert collection[1]._accepts_keywords is False
 
 
-@pytest.mark.parametrize("type_", [dict, Dict])
+@pytest.mark.parametrize("type_", [dict, Dict])  # noqa: UP006
 def test_argument_collection_bare_dict(type_):
     def foo(a: type_, b: int):  # pyright: ignore
         pass
@@ -99,7 +99,7 @@ def test_argument_collection_bare_dict(type_):
 
 
 def test_argument_collection_typing_dict():
-    def foo(a: Dict[str, int], b: int):
+    def foo(a: dict[str, int], b: int):
         pass
 
     collection = ArgumentCollection._from_callable(foo)
@@ -107,7 +107,7 @@ def test_argument_collection_typing_dict():
     assert len(collection) == 2
 
     assert collection[0].field_info.name == "a"
-    assert collection[0].hint == Dict[str, int]
+    assert collection[0].hint == dict[str, int]
     assert collection[0].keys == ()
     assert collection[0]._accepts_keywords is True
     assert collection[0]._accepts_arbitrary_keywords is True
@@ -431,7 +431,7 @@ def test_argument_collection_var_keyword_match():
     ],
 )
 def test_resolve_parameter_name(args, expected):
-    assert _resolve_parameter_name(*args) == expected
+    assert resolve_parameter_name(*args) == expected
 
 
 def test_resolve_groups_from_callable():
@@ -445,7 +445,7 @@ def test_resolve_groups_from_callable():
         config2: Annotated[str, Parameter()],
         flag1: Annotated[bool, Parameter(group="Flags")] = False,
         flag2: Annotated[bool, Parameter(group=("Flags", "Other Flags"))] = False,
-        user: Optional[User] = None,
+        user: User | None = None,
     ):
         pass
 
@@ -460,7 +460,7 @@ def test_resolve_groups_from_callable():
 
 def test_argument_convert():
     argument = Argument(
-        hint=List[int],
+        hint=list[int],
         tokens=[
             Token(value="42", source="test"),
             Token(value="70", source="test"),
@@ -470,7 +470,7 @@ def test_argument_convert():
 
 
 def test_argument_convert_dict():
-    def foo(bar: Dict[str, int]):
+    def foo(bar: dict[str, int]):
         pass
 
     collection = ArgumentCollection._from_callable(foo)
@@ -543,9 +543,22 @@ def test_is_typed_dict_true(hint):
     [
         list,
         dict,
-        Dict,
-        Dict[str, int],
+        dict,
+        dict[str, int],
     ],
 )
 def test_is_typed_dict_false(hint):
     assert not is_typeddict(hint)
+
+
+def test_assemble_argument_collection_no_default_command():
+    from cyclopts import App
+
+    app = App()
+
+    @app.command
+    def foo(loops: int):
+        pass
+
+    with pytest.raises(ValueError, match="Cannot assemble argument collection: no default command is registered"):
+        app.assemble_argument_collection()

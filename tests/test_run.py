@@ -13,4 +13,4 @@ def test_run(monkeypatch: MonkeyPatch):
 
     monkeypatch.setitem(run.__globals__, "App", TestApp)
 
-    assert run(main) == 4
+    assert run(main, result_action="return_value") == 4

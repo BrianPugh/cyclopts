@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Annotated, List
+from typing import Annotated
 
 from cyclopts import Parameter
 from cyclopts.config import Env, Toml
@@ -26,7 +26,7 @@ def test_config_end2end(app, tmp_path, assert_parse_args):
     app.config = Toml(config_fn, root_keys=["tool", "cyclopts"])
 
     @app.default
-    def default(key1, key2, *, list1: List[int]):
+    def default(key1, key2, *, list1: list[int]):
         pass
 
     @app.command
@@ -65,7 +65,7 @@ def test_config_env_help(app, assert_parse_args, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: default [ARGS] [OPTIONS]
+        Usage: test_end2end FOO
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │

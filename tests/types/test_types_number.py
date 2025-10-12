@@ -1,5 +1,4 @@
 from textwrap import dedent
-from typing import Optional
 
 import pytest
 
@@ -25,7 +24,7 @@ def test_nested_annotated_validator(app, assert_parse_args):
 
 def test_nested_list_annotated_validator(app, assert_parse_args):
     @app.default
-    def default(color: Optional[list[tuple[UInt8, UInt8, UInt8]]] = None):
+    def default(color: list[tuple[UInt8, UInt8, UInt8]] | None = None):
         pass
 
     assert_parse_args(
@@ -84,7 +83,7 @@ def test_hexuint_help_no_default(app, console):
 
     expected = dedent(
         """\
-        Usage: test_types_number foo [ARGS] [OPTIONS]
+        Usage: test_types_number foo A
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  A --a  [required]                                               │

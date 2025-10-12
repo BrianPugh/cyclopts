@@ -1,6 +1,5 @@
-import sys
 from functools import partial
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import pytest
 
@@ -9,9 +8,9 @@ from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
     CombinedShortOptionError,
-    InvalidCommandError,
     MissingArgumentError,
     RepeatArgumentError,
+    UnknownCommandError,
     UnknownOptionError,
     UnusedCliTokensError,
 )
@@ -115,7 +114,7 @@ def test_command_delete(app, assert_parse_args):
 
     del app["foo"]
 
-    with pytest.raises(InvalidCommandError):
+    with pytest.raises(UnknownCommandError):
         assert_parse_args(foo, "foo")
 
 
@@ -207,7 +206,7 @@ def test_short_flag_combining(app, assert_parse_args):
     def main(
         foo: Annotated[bool, Parameter(name=("--foo", "-f"))] = False,
         bar: Annotated[bool, Parameter(name=("--bar", "-b"))] = False,
-        my_list: Annotated[Optional[list], Parameter(negative=("--empty-my-list", "-e"))] = None,
+        my_list: Annotated[list | None, Parameter(negative=("--empty-my-list", "-e"))] = None,
     ):
         pass
 
@@ -287,19 +286,18 @@ def test_optional_nonrequired_implicit_coercion(app, cmd_str, annotated, assert_
     if annotated:
 
         @app.command
-        def foo(a: Annotated[Optional[int], Parameter(help="help for a")] = None):
+        def foo(a: Annotated[int | None, Parameter(help="help for a")] = None):
             pass
 
     else:
 
         @app.command
-        def foo(a: Optional[int] = None):
+        def foo(a: int | None = None):
             pass
 
     assert_parse_args(foo, cmd_str, 1)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 @pytest.mark.parametrize(
     "cmd_str",
     [
@@ -497,6 +495,27 @@ def test_bind_int_advanced_coercion_error(app):
 
     with pytest.raises(CoercionError):
         app.parse_args("foo", exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "10000000000000001",
+        "10000000000000011",
+        "100000000000000111234",
+    ],
+)
+def test_bind_large_int(app, assert_parse_args, value):
+    """Test that large integers are parsed correctly without precision loss.
+
+    Reproduces bug: https://github.com/BrianPugh/cyclopts/issues/581
+    """
+
+    @app.default
+    def foo(a: int):
+        pass
+
+    assert_parse_args(foo, value, int(value))
 
 
 def test_bind_override_app_groups(app):

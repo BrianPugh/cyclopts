@@ -33,13 +33,13 @@ Groups can be created in two ways:
    If there exists a :class:`.Group` object with the same name within the command/parameter context, it will join that group.
 
    .. warning::
-      While convenient and terse, mistyping a group name as a string will unintentionally create a new group!
+      While convenient and terse, mistyping a group name will unintentionally create a new group!
 
 Every command and parameter belongs to at least one group.
 
 Group(s) can be provided to the ``group`` keyword argument of :meth:`app.command <cyclopts.App.command>` and :class:`.Parameter`.
 Like :class:`.Parameter`, the :class:`.Group` class itself only marks objects with metadata; the group does **not** contain direct references to it's members.
-This means that groups can be re-used across commands.
+This means that groups can be reused across commands.
 
 --------------
 Command Groups

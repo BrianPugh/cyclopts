@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
@@ -8,7 +8,7 @@ class LimitedChoice:
     def __init__(
         self,
         min: int = 0,
-        max: Optional[int] = None,
+        max: int | None = None,
         allow_none: bool = False,
     ):
         """Group validator that limits the number of selections per group.
@@ -20,7 +20,7 @@ class LimitedChoice:
         min: int
             The minimum (inclusive) number of CLI parameters allowed.
             If negative, then **all** parameters in the group must have CLI values provided.
-        max: Optional[int]
+        max: int | None
             The maximum (inclusive) number of CLI parameters allowed.
             Defaults to ``1`` if ``min==0``, ``min`` otherwise.
         allow_none: bool

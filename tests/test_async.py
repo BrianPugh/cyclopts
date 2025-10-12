@@ -6,9 +6,7 @@ import sniffio
 from cyclopts import App, Parameter
 
 
-def test_async_handler():
-    app = App()
-
+def test_async_handler(app):
     @app.command(name="command")
     async def async_handler():
         assert sniffio.current_async_library() == "asyncio"
@@ -17,9 +15,7 @@ def test_async_handler():
     assert app("command") == "Async handler works"
 
 
-def test_async_handler_with_subcommand_works():
-    app = App()
-
+def test_async_handler_with_subcommand_works(app):
     sub_app = App(name="foo")
     app.command(sub_app)
 
@@ -31,9 +27,7 @@ def test_async_handler_with_subcommand_works():
     assert app("foo bar") == "Async handler works"
 
 
-def test_handler():
-    app = App()
-
+def test_handler(app):
     @app.command(name="command")
     def sync_handler():
         return "Sync handler works"
@@ -41,8 +35,7 @@ def test_handler():
     assert app("command") == "Sync handler works"
 
 
-def test_async_meta_with_async_command():
-    app = App()
+def test_async_meta_with_async_command(app):
     results = []
 
     @app.command
@@ -65,8 +58,7 @@ def test_async_meta_with_async_command():
     assert results == ["Meta initialized", "Async command executed with 42", "Meta finished"]
 
 
-def test_async_meta_with_sync_command():
-    app = App()
+def test_async_meta_with_sync_command(app):
     results = []
 
     @app.command
@@ -89,8 +81,7 @@ def test_async_meta_with_sync_command():
     assert results == ["Meta initialized", "Sync command executed with 42", "Meta finished"]
 
 
-def test_async_meta_with_nested_async():
-    app = App()
+def test_async_meta_with_nested_async(app):
     results = []
 
     @app.default

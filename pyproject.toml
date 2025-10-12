@@ -1,78 +1,79 @@
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.1"]
-build-backend = "poetry_dynamic_versioning.backend"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-style = "semver"
-
-[tool.poetry]
+[project]
 name = "cyclopts"
-version = "0.0.0"  # Do not change, let poetry-dynamic-versioning handle it.
-homepage = "https://github.com/BrianPugh/cyclopts"
-repository = "https://github.com/BrianPugh/cyclopts"
-license = "Apache-2.0"
+dynamic = ["version"]
 description = "Intuitive, easy CLIs based on type hints."
-authors = ["Brian Pugh"]
 readme = "README.md"
-packages = [{include = "cyclopts"}]
-include = ["cyclopts/*.so", "cyclopts/*.pyd"]  # Compiled extensions
+license = "Apache-2.0"
+authors = [{ name = "Brian Pugh" }]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "attrs>=23.1.0",
+    "rich>=13.6.0",
+    "docstring-parser>=0.15,<4.0",
+    "rich-rst>=1.3.1,<2.0.0",
+    "typing-extensions>=4.8.0; python_version<'3.11'",
+    "tomli>=2.0.0; python_version<'3.11'",
+]
 
-[tool.poetry.build]
-generate-setup-file = false
+[project.optional-dependencies]
+toml = ["tomli>=2.0.0; python_version<'3.11'"]
+trio = ["trio>=0.10.0"]
+yaml = ["pyyaml>=6.0.1"]
+docs = [
+    "sphinx~=7.4.7",
+    "sphinx_rtd_theme>=3.0.0,<4.0.0",
+    "gitpython>=3.1.31",
+    "sphinx-copybutton>=0.5,<1.0",
+    "myst-parser[linkify]>=3.0.1,<4.0.0",
+    "sphinx-autodoc-typehints>=1.25.2,<3.0.0",
+    "sphinx-rtd-dark-mode>=1.3.0,<2.0.0",
+]
+dev = [
+    "coverage[toml]>=5.1",
+    "pre_commit>=2.16.0",
+    "pytest>=8.2.0",
+    "pytest-cov>=3.0.0",
+    "pytest-mock>=3.7.0",
+    "pydantic>=2.11.2,<3.0.0",
+    "toml>=0.10.2,<1.0.0",
+    "trio>=0.10.0",
+    "pyyaml>=6.0.1",
+]
+debug = ["ipdb>=0.13.9", "line_profiler>=3.5.1"]
 
-[tool.poetry.scripts]
+[project.scripts]
+cyclopts = "cyclopts.cli:app"
 
-[tool.poetry.dependencies]
-# Be as loose as possible if writing a library.
-python = ">=3.9"
-typing-extensions = { version = ">=4.8.0", python = "<3.11" }
-attrs = ">=23.1.0"
-rich = ">=13.6.0"
-docstring-parser = {version=">=0.15", python = "<4.0"}
-rich-rst = "^1.3.1"
-trio = {version = ">=0.10.0", optional = true}
-tomli = {version = ">=2.0.0", python = "<3.11", optional = true}
-pyyaml = {version = ">=6.0.1", optional = true}
+[project.urls]
+Homepage = "https://github.com/BrianPugh/cyclopts"
+Repository = "https://github.com/BrianPugh/cyclopts"
 
-[tool.poetry.group.docs.dependencies]
-sphinx = "~7.4.7"
-sphinx_rtd_theme = ">=3.0.0,<4.0.0"
-gitpython = ">=3.1.31"
-sphinx-copybutton = "^0.5"
-myst-parser = {extras = ["linkify"], version = "^3.0.1"}
-sphinx-autodoc-typehints = ">=1.25.2,<3.0.0"
-sphinx-rtd-dark-mode = "^1.3.0"
+[tool.hatch.version]
+source = "vcs"
 
-[tool.poetry.group.dev.dependencies]
-coverage = {extras = ["toml"], version = ">=5.1"}
-pre_commit = ">=2.16.0"
-pytest = ">=8.2.0"
-pytest-cov = ">=3.0.0"
-pytest-mock = ">=3.7.0"
-pydantic = "^2.11.2"
-toml = "^0.10.2"
-trio = ">=0.10.0"
-pyyaml = ">=6.0.1"
+[tool.hatch.build.targets.sdist]
+include = ["/cyclopts"]
 
-[tool.poetry.group.debug]
-optional = true
-
-[tool.poetry.group.debug.dependencies]
-ipdb = ">=0.13.9"
-line_profiler = ">=3.5.1"
-
-[tool.poetry.extras]
-toml = ["tomli"]
-trio = ["trio"]
-yaml = ["pyyaml"]
+[tool.hatch.build.targets.wheel]
+packages = ["cyclopts"]
+artifacts = ["cyclopts/*.so", "cyclopts/*.pyd"]
 
 [tool.coverage.run]
 branch = true
-omit = [
-    "tests/*",
-]
+omit = ["tests/*"]
 source = ["cyclopts"]
 
 [tool.coverage.report]
@@ -97,8 +98,6 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 
-    "if sys.version_info < (3, 10):",
-    "if sys.version_info >= (3, 10):",
     "from typing import Annotated",
     "except ImportError:",
 
@@ -106,17 +105,16 @@ exclude_lines = [
     "@overload",
 ]
 
-omit = [
-    "cyclopts/protocols.py"
-]
+omit = ["cyclopts/protocols.py"]
 
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
 ignore = ["docs/", "tests/test_py3*.py"]
+reportUnsupportedDunderAll = "none"
 
 [tool.ruff]
-target-version = 'py38'
+target-version = 'py310'
 line-length = 120
 exclude = [
     "migrations",
@@ -127,6 +125,7 @@ exclude = [
     ".env",
     "venv",
     ".venv",
+    "tests/test_py3*.py",
 ]
 
 [tool.ruff.format]
@@ -134,24 +133,23 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 select = [
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "D",  # pydocstyle
-    "E",  # Error
-    "F",  # pyflakes
-    "I",  # isort
-    "N",  # pep8-naming
-    "PGH",  # pygrep-hooks
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "D",   # pydocstyle
+    "E",   # Error
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "PGH", # pygrep-hooks
     "PTH", # flake8-use-pathlib
-    "Q",  # flake8-quotes
-    "TRY",  # tryceratops
+    "Q",   # flake8-quotes
+    "TRY", # tryceratops
     "UP",  # pyupgrade
-    "W",  # Warning
+    "W",   # Warning
     "YTT", # flake8-2020
 ]
 
 ignore = [
-    "B905",  # zip strict=True; remove once python <3.10 support is dropped.
     "D100",
     "D101",
     "D102",
@@ -164,23 +162,20 @@ ignore = [
     "D401",
     "E402",
     "E501",
-    "PGH003",  # Use specific rule codes when ignoring type issues
-    "TRY003",  # Avoid specifying messages outside exception class; overly strict, especially for ValueError
-    "TRY300",  # Consider moving this statement to an `else` block
+    "PGH003", # Use specific rule codes when ignoring type issues
+    "TRY003", # Avoid specifying messages outside exception class; overly strict, especially for ValueError
+    "TRY300", # Consider moving this statement to an `else` block
 ]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = [
-    "chr",
-    "typer.Argument",
-    "typer.Option",
-]
+extend-immutable-calls = ["chr", "typer.Argument", "typer.Option"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = [
+    "B011",   # Do not `assert False`
     "D100",
     "D101",
     "D102",
@@ -192,37 +187,36 @@ convention = "numpy"
     "D205",
     "D400",
     "D404",
-    "N806",  # Variable in function should be lowercase
-    "S102",  # use of "exec"
-    "S106",  # possible hardcoded password.
-    "PGH001",  # use of "eval"
+    "N806",   # Variable in function should be lowercase
+    "S102",   # use of "exec"
+    "S106",   # possible hardcoded password.
+    "PGH001", # use of "eval"
+    "UP007",  # Use `X | Y` for type annotations; many tests specifically test Union/Optional
+    "UP045",  # Use `X | None` for type annotations
 ]
 "docs/*.py" = [
-    "F811",  # redefinition
+    "F811", # redefinition
 ]
 "cyclopts/config/*.py" = [
-    "PTH123",  # `open()` should be replaced by `Path.open()`. Pyright doesn't understand that it must be a Path.
+    "PTH123", # `open()` should be replaced by `Path.open()`. Pyright doesn't understand that it must be a Path.
 ]
 
 [tool.ruff.lint.pep8-naming]
-staticmethod-decorators = [
-    "pydantic.validator",
-    "pydantic.root_validator",
-]
+staticmethod-decorators = ["pydantic.validator", "pydantic.root_validator"]
 
 [tool.codespell]
-skip = 'poetry.lock,'
+skip = 'uv.lock,'
 
 [tool.creosote]
-venvs=[".venv"]
-paths=["cyclopts"]
-deps-file="pyproject.toml"
-sections=["tool.poetry.dependencies"]
-exclude-deps =[
-  "typing-extensions",
-  "docstring-parser",  # Not detected due to deferred import.
-  "rich-rst",  # Not detected due to deferred import.
-  "rich",  # Not detected due to deferred import.
-  "tomli",  # Not detected due to optional feature.
-  "trio",  # Not detected due to optional feature.
+venvs = [".venv"]
+paths = ["cyclopts"]
+deps-file = "pyproject.toml"
+sections = ["project.dependencies"]
+exclude-deps = [
+    "typing-extensions",
+    "docstring-parser",  # Not detected due to deferred import.
+    "rich-rst",          # Not detected due to deferred import.
+    "rich",              # Not detected due to deferred import.
+    "tomli",             # Not detected due to optional feature.
+    "trio",              # Not detected due to optional feature.
 ]

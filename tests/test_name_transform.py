@@ -149,7 +149,7 @@ def test_parameter_name_transform_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: foo [OPTIONS]
+        Usage: test_name_transform --b_a_r INT
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -184,7 +184,7 @@ def test_parameter_name_transform_help_enum(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_name_transform cmd [ARGS] [OPTIONS]
+        Usage: test_name_transform cmd [ARGS]
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ FOO --foo  Docstring for foo. [choices: FIZZ, BUZZ] [default:      │

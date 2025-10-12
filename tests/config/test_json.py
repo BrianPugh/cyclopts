@@ -44,7 +44,7 @@ Test file-caching and chdir after app has been instantiated. See discussion:
     https://github.com/BrianPugh/cyclopts/issues/309
 """
 
-app = App(config=Json("config.json"))
+app = App(config=Json("config.json"), result_action="return_value")
 
 
 @app.command
@@ -98,7 +98,7 @@ def test_config_invalid_json(tmp_path, console):
     Path("config.json").write_text('{"this is": broken}')
 
     with pytest.raises(CycloptsError), console.capture() as capture:
-        app("create", console=console, exit_on_error=False)
+        app("create", error_console=console, exit_on_error=False)
 
     actual = capture.get()
     expected = dedent(

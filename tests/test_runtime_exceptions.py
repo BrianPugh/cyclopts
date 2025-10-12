@@ -1,10 +1,9 @@
 from textwrap import dedent
-from typing import Optional, Tuple
 
 import pytest
 
 from cyclopts import CycloptsError
-from cyclopts.exceptions import InvalidCommandError, MissingArgumentError
+from cyclopts.exceptions import MissingArgumentError, UnknownCommandError
 
 
 @pytest.fixture
@@ -14,11 +13,11 @@ def mock_get_function_info(mocker):
 
 def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_info):
     @app.default
-    def foo(a: Tuple[int, int, int]):
+    def foo(a: tuple[int, int, int]):
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["1", "2"], exit_on_error=False, console=console)
+        app(["1", "2"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -28,7 +27,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
     )
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["1", "2"], exit_on_error=False, console=console, verbose=True)
+        app(["1", "2"], exit_on_error=False, error_console=console, verbose=True)
 
     actual = capture.get()
     assert actual == dedent(
@@ -36,7 +35,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
         ╭─ Error ────────────────────────────────────────────────────────────╮
         │ MissingArgumentError                                               │
         │ Function defined in file "FILENAME", line 100:                     │
-        │     foo(a: Tuple[int, int, int])                                   │
+        │     foo(a: tuple[int, int, int])                                   │
         │ Root Input Tokens: ['1', '2']                                      │
         │ Parameter "--a" requires 3 positional arguments. Only got 2.       │
         │ Parsed: ['1', '2'].                                                │
@@ -51,7 +50,7 @@ def test_runtime_exception_missing_parameter(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["1", "2"], exit_on_error=False, console=console)
+        app(["1", "2"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -62,8 +61,8 @@ def test_runtime_exception_missing_parameter(app, console):
 
 
 def test_runtime_exception_bad_command(app, console):
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
-        app(["bad-command", "123"], exit_on_error=False, console=console)
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        app(["bad-command", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -78,8 +77,8 @@ def test_runtime_exception_bad_command_recommend(app, console):
     def mad_command():
         pass
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
-        app(["bad-command", "123"], exit_on_error=False, console=console)
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        app(["bad-command", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -103,8 +102,8 @@ def test_runtime_exception_bad_command_recommend_no_show(app, console):
     def other_command():
         pass
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
-        app(["bad-command", "123"], exit_on_error=False, console=console)
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        app(["bad-command", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -131,8 +130,8 @@ def test_runtime_exception_bad_command_list_ellipsis(app, console):
     app.command(name="cmd8")(cmd)
     app.command(name="cmd9")(cmd)
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
-        app(["cmd", "123"], exit_on_error=False, console=console)
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        app(["cmd", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -151,7 +150,7 @@ def test_runtime_exception_bad_parameter_recommend(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app(["some-command", "--boo", "123"], exit_on_error=False, console=console)
+        app(["some-command", "--boo", "123"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
@@ -170,7 +169,7 @@ def test_runtime_exception_repeat_arguments(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CycloptsError):
-        app(["--a=1", "--a=2"], exit_on_error=False, console=console)
+        app(["--a=1", "--a=2"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == (
@@ -191,12 +190,12 @@ def test_runtime_exception_missing_tuple(app, console):
     @app.default
     def main(
         *,
-        network_delay: Optional[Tuple[int, int]] = None,
+        network_delay: tuple[int, int] | None = None,
     ):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app(["--network-delay", "1"], exit_on_error=False, console=console)
+        app(["--network-delay", "1"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(

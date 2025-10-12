@@ -1,9 +1,9 @@
-import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Annotated, List, Literal, Optional, Sequence, Set, Tuple, Union
+from typing import Annotated, Literal
 
 import pytest
 
@@ -16,6 +16,7 @@ from cyclopts.help import (
     format_command_entries,
     format_usage,
 )
+from cyclopts.help.formatters import DefaultFormatter, PlainFormatter
 
 
 @pytest.fixture
@@ -23,14 +24,17 @@ def app():
     return App(
         name="app",
         help="App Help String Line 1.",
+        result_action="return_value",
     )
 
 
 def test_empty_help_panel_rich_silent(console):
     help_panel = HelpPanel(format="command", title="test")
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(help_panel, console, console.options)
 
     with console.capture() as capture:
-        console.print(help_panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == ""
@@ -40,7 +44,7 @@ def test_help_mutable_default(app):
     """Ensures it doesn't crash; see issue #215."""
 
     @app.default
-    def main(users: List[str] = ["a", "b"]) -> None:  # noqa: B006
+    def main(users: list[str] = ["a", "b"]) -> None:  # noqa: B006
         print(users)
 
     app(["--help"])
@@ -107,7 +111,7 @@ def test_help_custom_usage_subapp(app, console):
 
 def test_help_default_help_flags(console):
     """Standard help flags."""
-    app = App(name="app", help="App Help String Line 1.")
+    app = App(name="app", help="App Help String Line 1.", result_action="return_value")
     with console.capture() as capture:
         app(["--help"], console=console)
 
@@ -163,8 +167,10 @@ def test_format_commands_docstring(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -196,8 +202,10 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == dedent(
@@ -251,8 +259,10 @@ def test_format_commands_explicit_help(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -273,8 +283,10 @@ def test_format_commands_explicit_name(app, console):
 
     panel = HelpPanel(title="Commands", format="command")
     panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
+    formatter = DefaultFormatter()
+    rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
-        console.print(panel)
+        console.print(rendered)
 
     actual = capture.get()
     assert actual == (
@@ -340,7 +352,7 @@ def test_help_functools_partial_2(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo [ARGS] [OPTIONS]
+        Usage: app foo [OPTIONS] A
 
         Docstring for foo.
 
@@ -377,7 +389,7 @@ def test_format_choices_rich_format(app, console, assert_parse_args):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app REGION
 
         App Help String Line 1.
 
@@ -405,7 +417,10 @@ def capture_format_group_parameters(console, default_function_groups):
         with console.capture() as capture:
             group = argument_collection.groups[0]
             group_argument_collection = argument_collection.filter_by(group=group)
-            console.print(create_parameter_help_panel(group, group_argument_collection, "restructuredtext"))
+            panel = create_parameter_help_panel(group, group_argument_collection, "restructuredtext")
+            formatter = DefaultFormatter()
+            rendered = formatter._render_panel(panel, console, console.options)
+            console.print(rendered)
 
         return capture.get()
 
@@ -452,7 +467,7 @@ def test_help_format_group_parameters_short_name(capture_format_group_parameters
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO --foo  -f  Docstring for foo. [required]                    │
+        │ *  FOO --foo -f  Docstring for foo. [required]                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -478,6 +493,158 @@ def test_help_format_group_parameters_from_docstring(capture_format_group_parame
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Docstring for foo. [required]                        │
         │ *  BAR --bar  Docstring for bar. [required]                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_directives(capture_format_group_parameters):
+    def cmd(foo: str, bar: float = 1.0, baz: int = 5):
+        """
+        Command with Sphinx directives.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+        bar: float
+            Bar parameter
+
+            .. versionadded:: 0.47
+        baz: int
+            Baz parameter
+
+            .. deprecated:: 2.0
+                Use something else instead
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [required]                             │
+        │    BAR --bar  Bar parameter [Added in v0.47] [default: 1.0]        │
+        │    BAZ --baz  Baz parameter [⚠ Deprecated in v2.0] Use something   │
+        │               else instead [default: 5]                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_versionchanged(capture_format_group_parameters):
+    def cmd(foo: str):
+        """
+        Command with versionchanged directive.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. versionchanged:: 1.5
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [Changed in v1.5] [required]           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_note_warning_seealso(capture_format_group_parameters):
+    def cmd(foo: str, bar: str, baz: str):
+        """
+        Command with note, warning, and seealso directives.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. note:: This is important
+        bar: str
+            Bar parameter
+
+            .. warning:: Be careful here
+        baz: str
+            Baz parameter
+
+            .. seealso:: Related function
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter                                        │
+        │                                                                    │
+        │               Note: This is important [required]                   │
+        │ *  BAR --bar  Bar parameter                                        │
+        │                                                                    │
+        │               ⚠ Warning: Be careful here [required]                │
+        │ *  BAZ --baz  Baz parameter                                        │
+        │                                                                    │
+        │               See also: Related function [required]                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_multiple_directives(capture_format_group_parameters):
+    def cmd(foo: str):
+        """
+        Command with multiple directives on one parameter.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. versionadded:: 1.0
+
+            .. versionchanged:: 2.0
+
+            .. note:: Important note
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [Added in v1.0] [Changed in v2.0]      │
+        │                                                                    │
+        │               Note: Important note [required]                      │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_deprecated_no_content(capture_format_group_parameters):
+    def cmd(foo: str):
+        """
+        Command with deprecated directive without content.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. deprecated:: 3.0
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter [⚠ Deprecated in v3.0] [required]      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -521,7 +688,7 @@ def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_g
 
 def test_help_format_group_parameters_list_flag(capture_format_group_parameters):
     def cmd(
-        foo: Annotated[Optional[List[int]], Parameter(help="Docstring for foo.")] = None,
+        foo: Annotated[list[int] | None, Parameter(help="Docstring for foo.")] = None,
     ):
         pass
 
@@ -592,7 +759,7 @@ def test_help_format_dataclass_default_parameter_negative_propagation(app, conso
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app FORCE
 
         App Help String Line 1.
 
@@ -624,7 +791,7 @@ def test_help_format_dataclass_decorated_parameter_negative_propagation(app, con
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app FORCE
 
         App Help String Line 1.
 
@@ -662,9 +829,7 @@ def test_help_format_group_parameters_choices_literal_no_show(capture_format_gro
 
 def test_help_format_group_parameters_choices_literal_union(capture_format_group_parameters):
     def cmd(
-        foo: Annotated[
-            Union[int, Literal["fizz", "buzz"], Literal["bar"]], Parameter(help="Docstring for foo.")
-        ] = "fizz",
+        foo: Annotated[int | Literal["fizz", "buzz"] | Literal["bar"], Parameter(help="Docstring for foo.")] = "fizz",
     ):
         pass
 
@@ -680,7 +845,6 @@ def test_help_format_group_parameters_choices_literal_union(capture_format_group
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(capture_format_group_parameters):
     def cmd(
         foo: Annotated[
@@ -701,7 +865,6 @@ def test_help_format_group_parameters_choices_literal_union_python310_syntax_0(c
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Pipe Typing Syntax")
 def test_help_format_group_parameters_choices_literal_union_python310_syntax_1(capture_format_group_parameters):
     def cmd(foo: Literal["fizz", "buzz"] | Literal["bar"] = "fizz"):  # pyright: ignore
         pass
@@ -751,7 +914,7 @@ def test_help_format_group_parameters_choices_enum_list(capture_format_group_par
 
     def cmd(
         foo: Annotated[
-            Optional[list[CompSciProblem]],  # pyright: ignore
+            list[CompSciProblem] | None,  # pyright: ignore
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -775,7 +938,7 @@ def test_help_format_group_parameters_choices_enum_list_typing(capture_format_gr
 
     def cmd(
         foo: Annotated[
-            Optional[List[CompSciProblem]],
+            list[CompSciProblem] | None,
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -799,7 +962,7 @@ def test_help_format_group_parameters_choices_enum_sequence(capture_format_group
 
     def cmd(
         foo: Annotated[
-            Optional[Sequence[CompSciProblem]],  # pyright: ignore
+            Sequence[CompSciProblem] | None,  # pyright: ignore
             Parameter(help="Docstring for foo.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -819,7 +982,7 @@ def test_help_format_group_parameters_choices_enum_sequence(capture_format_group
 def test_help_format_group_parameters_choices_literal_sequence(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[Sequence[Literal["build", "deploy"]]],  # pyright: ignore
+            Sequence[Literal["build", "deploy"]] | None,  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -841,7 +1004,7 @@ def test_help_format_group_parameters_choices_literal_sequence(capture_format_gr
 def test_help_format_group_parameters_choices_literal_set(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[set[Literal["build", "deploy"]]],  # pyright: ignore
+            set[Literal["build", "deploy"]] | None,  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -860,9 +1023,6 @@ def test_help_format_group_parameters_choices_literal_set(capture_format_group_p
     assert actual == expected
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 10), reason="https://peps.python.org/pep-0563/ Postponed Evaluation of Annotations"
-)
 def test_help_parameter_string_annotation(capture_format_group_parameters):
     def cmd(number: "Annotated[int,Parameter(name=['--number','-n'])]"):
         """Print number.
@@ -876,7 +1036,7 @@ def test_help_parameter_string_annotation(capture_format_group_parameters):
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  NUMBER --number  -n  A number to print. [required]              │
+        │ *  NUMBER --number -n  A number to print. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -888,7 +1048,7 @@ def test_help_parameter_string_annotation(capture_format_group_parameters):
 def test_help_format_group_parameters_choices_literal_set_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[Set[Literal["build", "deploy"]]],
+            set[Literal["build", "deploy"]] | None,
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -909,7 +1069,7 @@ def test_help_format_group_parameters_choices_literal_set_typing(capture_format_
 def test_help_format_group_parameters_choices_literal_tuple(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Optional[tuple[Literal["build", "deploy"]]],  # pyright: ignore
+            tuple[Literal["build", "deploy"]] | None,  # pyright: ignore
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_default=False, show_choices=True),
         ] = None,
     ):
@@ -931,7 +1091,7 @@ def test_help_format_group_parameters_choices_literal_tuple(capture_format_group
 def test_help_format_group_parameters_choices_literal_tuple_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Tuple[Literal["build", "deploy"]],
+            tuple[Literal["build", "deploy"]],
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
         ] = ("build",),
     ):
@@ -952,7 +1112,7 @@ def test_help_format_group_parameters_choices_literal_tuple_typing(capture_forma
 def test_help_format_group_parameters_choices_literal_tuple_variadic_typing(capture_format_group_parameters):
     def cmd(
         steps_to_skip: Annotated[
-            Tuple[Literal["build", "deploy"], ...],
+            tuple[Literal["build", "deploy"], ...],
             Parameter(help="Docstring for steps_to_skip.", negative_iterable=(), show_choices=True),
         ] = (),
     ):
@@ -1024,7 +1184,7 @@ def test_help_print_function(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd --bar STR FOO
 
         Cmd help string.
 
@@ -1058,7 +1218,7 @@ def test_help_print_parameter_required(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd --bar STR [ARGS]
 
         Cmd help string.
 
@@ -1089,7 +1249,7 @@ def test_help_print_function_defaults(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd [OPTIONS]
 
         Cmd help string.
 
@@ -1117,7 +1277,7 @@ def test_help_print_function_no_parse(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd FOO
 
         Cmd help string.
 
@@ -1144,7 +1304,7 @@ def test_help_print_parameter_group_description(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd FOO
 
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
         │ Parameter description.                                             │
@@ -1173,7 +1333,7 @@ def test_help_print_parameter_group_no_show(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app cmd [ARGS] [OPTIONS]
+        Usage: app cmd FOO BAR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Docstring for foo. [required]                        │
@@ -1265,7 +1425,7 @@ def test_help_print_combined_parameter_command_group(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app VALUE1
 
         App Help String Line 1.
 
@@ -1273,8 +1433,8 @@ def test_help_print_combined_parameter_command_group(app, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
-        │ *  VALUE1 --value1      [required]                                 │
-        │    --help           -h  Display this message and exit.             │
+        │ *  VALUE1 --value1  [required]                                     │
+        │    --help -h        Display this message and exit.                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1383,7 +1543,7 @@ def test_help_print_commands_and_function(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app COMMAND --bar STR FOO
 
         App Help String Line 1.
 
@@ -1438,7 +1598,7 @@ def test_help_print_parameters_no_negative_from_default_parameter(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo [OPTIONS]
+        Usage: app foo --flag BOOL
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --flag  [required]                                              │
@@ -1545,6 +1705,47 @@ def test_help_print_commands_sort_key(app, console):
     assert actual == expected
 
 
+def test_help_print_commands_sort_key_generator(app, console):
+    """Test that App.sort_key accepts and processes generators."""
+
+    def sort_key_gen():
+        yield 2
+
+    @app.command(sort_key=(x for x in [1]))  # Generator expression in constructor
+    def alice():
+        pass
+
+    @app.command
+    def bob():
+        pass
+
+    # Test setting via property setter with generator function
+    app["bob"].sort_key = sort_key_gen()
+
+    @app.command(sort_key=3)
+    def charlie():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+
+    # Check that the commands are sorted correctly (alice=1, bob=2, charlie=3)
+    assert "│ alice" in actual
+    assert "│ bob" in actual
+    assert "│ charlie" in actual
+
+    # Verify the order by checking their positions
+    alice_pos = actual.index("alice")
+    bob_pos = actual.index("bob")
+    charlie_pos = actual.index("charlie")
+
+    assert alice_pos < bob_pos < charlie_pos, (
+        f"Commands not in expected order. Positions: alice={alice_pos}, bob={bob_pos}, charlie={charlie_pos}"
+    )
+
+
 def test_help_print_commands_plus_meta_short(app, console):
     app.help = None
 
@@ -1602,7 +1803,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │ *  --hostname -n  Hostname to connect to. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1626,7 +1827,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND [ARGS] [OPTIONS]
+        Usage: app COMMAND RDP
 
         Root Default Command Short Description.
 
@@ -1644,7 +1845,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  -n  Hostname to connect to. [required]              │
+        │ *  --hostname -n  Hostname to connect to. [required]               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1657,7 +1858,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app meta-cmd [ARGS] [OPTIONS]
+        Usage: app meta-cmd A
 
         Meta cmd help string.
 
@@ -1669,7 +1870,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     assert actual == expected
 
 
-def test_help_restructuredtext(app, console):
+def test_help_restructuredtext(app, console, normalize_trailing_whitespace):
     description = dedent(
         """\
         This is a long sentence that
@@ -1720,13 +1921,10 @@ def test_help_restructuredtext(app, console):
     )
 
     # Rich sticks a bunch of trailing spaces on lines.
-    expected = "\n".join(x.strip() for x in expected.split("\n"))
-    actual = "\n".join(x.strip() for x in actual.split("\n"))
-
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
-def test_help_markdown(app, console):
+def test_help_markdown(app, console, normalize_trailing_whitespace):
     description = dedent(
         """\
         This is a long sentence that
@@ -1777,13 +1975,10 @@ def test_help_markdown(app, console):
     )
 
     # Rich sticks a bunch of trailing spaces on lines.
-    expected = "\n".join(x.strip() for x in expected.split("\n"))
-    actual = "\n".join(x.strip() for x in actual.split("\n"))
-
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
-def test_help_rich(app, console):
+def test_help_rich(app, console, normalize_trailing_whitespace):
     """Newlines actually get interpreted with rich."""
     description = dedent(
         """\
@@ -1932,12 +2127,12 @@ def test_help_help_on_error(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):
-        app(["foo", "bar"], console=console, exit_on_error=False)
+        app(["foo", "bar"], error_console=console, exit_on_error=False)
 
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo [ARGS] [OPTIONS]
+        Usage: app foo COUNT
 
         This is Foo's Help.
 
@@ -1970,7 +2165,7 @@ def test_issue_373_help_space_with_meta_app(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS] [OPTIONS]
+        Usage: app VALUE
 
         App Help String Line 1.
 
@@ -1981,6 +2176,143 @@ def test_issue_373_help_space_with_meta_app(app, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  VALUE --value  [required]                                       │
         │    --meta-value   [default: 3]                                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_format_plain_formatter(console):
+    """Test that PlainFormatter produces correct plain text output."""
+    app = App(
+        name="test_app",
+        help="Test application for PlainFormatter",
+        help_formatter=PlainFormatter(),
+    )
+
+    @app.command
+    def cmd1(arg: str = "default"):
+        """First test command."""
+        print(f"cmd1 with {arg}")
+
+    @app.command
+    def cmd2(required: int, optional: bool = False):
+        """Second test command."""
+        print(f"cmd2 with {required} and {optional}")
+
+    @app.default
+    def main(verbose: bool = False):
+        """Main function with a parameter."""
+        print(f"verbose={verbose}")
+
+    # Capture the help output
+    with console.capture() as capture:
+        try:
+            app(["--help"], console=console)
+        except SystemExit:
+            # Help normally exits, which is expected
+            pass
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        Usage: test_app COMMAND [ARGS]
+
+        Test application for PlainFormatter
+
+        Commands:
+          cmd1: First test command.
+          cmd2: Second test command.
+          --help, -h: Display this message and exit.
+          --version: Display application version.
+
+        Parameters:
+          VERBOSE, --verbose, --no-verbose: [default: False]
+
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_only_directives(capture_format_group_parameters):
+    """Test parameters with only directives and no other text."""
+
+    def cmd(foo: str):
+        """
+        Command with directive-only description.
+
+        Parameters
+        ----------
+        foo: str
+            .. versionadded:: 1.0
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  [Added in v1.0] [required]                           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_nested_indentation(capture_format_group_parameters):
+    """Test directives with multi-level indented content."""
+
+    def cmd(foo: str):
+        """
+        Command with nested indentation in directive.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. note::
+                This is a long note
+                that spans multiple lines
+                with consistent indentation
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter                                        │
+        │                                                                    │
+        │               Note: This is a long note that spans multiple lines  │
+        │               with consistent indentation [required]               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_sphinx_inline_directive_content(capture_format_group_parameters):
+    """Test directive with inline content on same line."""
+
+    def cmd(foo: str):
+        """
+        Command with inline directive content.
+
+        Parameters
+        ----------
+        foo: str
+            Foo parameter
+
+            .. note:: Inline note content
+        """
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo  Foo parameter                                        │
+        │                                                                    │
+        │               Note: Inline note content [required]                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

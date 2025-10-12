@@ -1,7 +1,6 @@
-import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import Annotated, Dict, Optional
+from typing import Annotated
 
 import pytest
 
@@ -17,7 +16,7 @@ from cyclopts.exceptions import (
 class User:
     id: int
     name: str = "John Doe"
-    tastes: Dict[str, int] = field(default_factory=dict)
+    tastes: dict[str, int] = field(default_factory=dict)
 
 
 def test_bind_dataclass(app, assert_parse_args, console):
@@ -52,7 +51,7 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app("123", console=console, exit_on_error=False)
+        app("123", error_console=console, exit_on_error=False)
     actual = capture.get()
 
     expected = dedent(
@@ -66,8 +65,7 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
-def test_bind_dataclass_recursive(app, assert_parse_args, console):
+def test_bind_dataclass_recursive(app, assert_parse_args, console, normalize_trailing_whitespace):
     @dataclass
     class Wheel:
         diameter: int
@@ -132,7 +130,9 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
 
     expected = dedent(
         """\
-        Usage: test_bind_dataclasses build [OPTIONS]
+        Usage: test_bind_dataclasses build --license-plate STR --car.name STR
+        --car.mileage FLOAT --car.cylinders INT --car.horsepower FLOAT
+        --car.wheel.diameter INT [OPTIONS]
 
         Build a car.
 
@@ -156,7 +156,7 @@ def test_bind_dataclass_recursive(app, assert_parse_args, console):
         """
     )
 
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
 def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
@@ -197,7 +197,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app.parse_args(
             "build --car.name=ford --car.mileage=500 --car.hp=200 --license-plate=ABCDEFG",
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -247,7 +247,7 @@ def test_bind_dataclass_double_name_override_no_hyphen(app, assert_parse_args, c
 def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     @dataclass
     class Config:
-        a: int = 1
+        a: int = field()  # intentionally empty field to make sure stuff doesn't assume this field has a default.
         """Docstring for a."""
 
         b: Annotated[int, Parameter(name="bar")] = 2
@@ -265,16 +265,16 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: my-default-command [ARGS] [OPTIONS]
+        Usage: test_bind_dataclasses A [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ A --a      Docstring for a. [default: 1]                           │
-        │ BAR --bar  This is the docstring for python parameter "b".         │
-        │            [default: 2]                                            │
+        │ *  A --a      Docstring for a. [required]                          │
+        │    BAR --bar  This is the docstring for python parameter "b".      │
+        │               [default: 2]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -288,7 +288,7 @@ def test_bind_dataclass_default_factory_help(app, console):
         """Docstring for a."""
 
     @app.default
-    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
         print(f"{config=}")
 
     with console.capture() as capture:
@@ -297,7 +297,7 @@ def test_bind_dataclass_default_factory_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: my-default-command [ARGS] [OPTIONS]
+        Usage: test_bind_dataclasses [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -311,7 +311,6 @@ def test_bind_dataclass_default_factory_help(app, console):
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app, assert_parse_args):
     @dataclass
     class Config:
@@ -338,7 +337,6 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_no_default(app,
         app.parse_args("v1 --bar=v2 100 200 --c=300", exit_on_error=False)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="field(kw_only=True) doesn't exist.")
 def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(app, assert_parse_args):
     @dataclass
     class Config:
@@ -351,7 +349,7 @@ def test_bind_dataclass_positionally_with_keyword_only_exception_with_default(ap
         c: int = field(default=5, kw_only=True)  # pyright: ignore
 
     @app.default
-    def my_default_command(config: Annotated[Config, Parameter(name="*")]):
+    def my_default_command(config: Annotated[Config | None, Parameter(name="*")] = None):
         print(f"{config=}")
 
     with pytest.raises(UnusedCliTokensError):
@@ -390,8 +388,50 @@ def test_bind_dataclass_with_alias_attribute(app, assert_parse_args):
         ] = False
 
     @app.default
-    def main(*, params: Optional[DataclassParameters] = None) -> None:
+    def main(*, params: DataclassParameters | None = None) -> None:
         pass
 
     assert_parse_args(main, "-a", params=DataclassParameters(with_alias=True, with_iterable=False))
     assert_parse_args(main, "--with-alias", params=DataclassParameters(with_alias=True, with_iterable=False))
+
+
+def test_bind_dataclass_star_parameter_better_error_message(app, console):
+    """Test that Parameter(name="*") raises ValueError at app setup time when parameter has no default."""
+
+    @Parameter(name="*")
+    @dataclass
+    class Foo:
+        bar: int = 12
+
+    def cmd(foo: Foo):
+        print(foo)
+
+    expected_message = (
+        r'Parameter "foo" in function .* has all optional values, uses Parameter\(name="\*"\), but itself has no default value\. Consider either:\n'
+        r'    1\) If immutable, providing a default value "foo: Foo = Foo\(\)"\n'
+        r'    2\) Otherwise, declaring it optional like "foo: Foo \| None = None" and instanting the foo object in the function body:\n'
+        r"           if foo is None:\n"
+        r"               foo = Foo\(\)"
+    )
+
+    with pytest.raises(ValueError, match=expected_message):
+        app.default(cmd)
+
+
+def test_bind_dataclass_with_varargs_consume_all(app, assert_parse_args):
+    """Test dataclass with *args field that consumes all remaining tokens."""
+
+    @dataclass
+    class FileProcessor:
+        output: str
+        inputs: tuple[str, ...]
+
+    @app.default
+    def process(config: Annotated[FileProcessor, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        process,
+        "out.txt in1.txt in2.txt in3.txt",
+        config=FileProcessor(output="out.txt", inputs=("in1.txt", "in2.txt", "in3.txt")),
+    )

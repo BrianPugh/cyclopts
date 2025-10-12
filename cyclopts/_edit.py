@@ -1,8 +1,8 @@
 import os
 import tempfile
 import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence, Union
 
 
 class EditorError(Exception):
@@ -29,7 +29,7 @@ def edit(
     *,
     fallback_editors: Sequence[str] = ("nano", "vim", "notepad", "gedit"),
     editor_args: Sequence[str] = (),
-    path: Union[str, Path] = "",
+    path: str | Path = "",
     encoding: str = "utf-8",
     save: bool = True,
     required: bool = True,

@@ -1,10 +1,10 @@
 from enum import Enum
-from typing import Annotated, Literal, Optional, TypeAlias
+from typing import Annotated, Literal, TypeAlias
 
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.help import _get_choices
+from cyclopts.argument import get_choices_from_hint
 
 FontSize: TypeAlias = Literal[10, 12, 16]
 type BoxSize = Literal[10, 12, 16]
@@ -33,7 +33,7 @@ class CompSciProblem(Enum):
 
 
 type AnnotatedEnum = Annotated[CompSciProblem, Parameter(name="foo")]
-type AnnotatedOptionalEnum = Annotated[Optional[CompSciProblem], Parameter(name="foo")]
+type AnnotatedOptionalEnum = Annotated[CompSciProblem | None, Parameter(name="foo")]
 
 type FontSingleFormat = Literal["otf", "woff2", "ttf", "bdf", "pcf"]
 type FontCollectionFormat = Literal["otc", "ttc"]
@@ -54,7 +54,7 @@ FontPixelFormat: TypeAlias = Literal["bmp"]
     ],
 )
 def test_py312_type_alias_type_help_get_choices(type_, expected):
-    assert expected == _get_choices(type_, lambda x: x)
+    assert expected == get_choices_from_hint(type_, lambda x: x)
 
 
 type Numbers = tuple[int, str]

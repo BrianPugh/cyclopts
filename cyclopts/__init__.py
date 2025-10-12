@@ -1,4 +1,4 @@
-# Don't manually change, let poetry-dynamic-versioning handle it.
+# Don't manually change, let hatch-vcs handle it.
 __version__ = "0.0.0"
 
 __all__ = [
@@ -19,11 +19,12 @@ __all__ = [
     "EditorDidNotSaveError",
     "EditorDidNotChangeError",
     "Group",
-    "InvalidCommandError",
+    "UnknownCommandError",
     "MissingArgumentError",
     "MixedArgumentError",
     "RepeatArgumentError",
     "Parameter",
+    "ResultAction",
     "UnknownOptionError",
     "UnusedCliTokensError",
     "UNSET",
@@ -39,10 +40,11 @@ __all__ = [
 ]
 
 from cyclopts._convert import convert
-from cyclopts._edit import EditorDidNotChangeError, EditorDidNotSaveError, EditorError, EditorNotFoundError, edit
 from cyclopts._env_var import env_var_split
+from cyclopts._result_action import ResultAction
+from cyclopts._run import run
 from cyclopts.argument import Argument, ArgumentCollection
-from cyclopts.core import App, run
+from cyclopts.core import App
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -50,19 +52,52 @@ from cyclopts.exceptions import (
     CommandCollisionError,
     CycloptsError,
     DocstringError,
-    InvalidCommandError,
     MissingArgumentError,
     MixedArgumentError,
     RepeatArgumentError,
+    UnknownCommandError,
     UnknownOptionError,
     UnusedCliTokensError,
     ValidationError,
 )
 from cyclopts.group import Group
-from cyclopts.help import CycloptsPanel
+from cyclopts.panel import CycloptsPanel
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, default_name_transform
 
-from . import config, types, validators
+# Lazy imports for opt-in features (saves ~6ms on import)
+# These modules are only loaded when explicitly accessed by user code
+_LAZY_IMPORTS = {
+    # Submodules - opt-in features not needed for basic CLI parsing
+    "config": "cyclopts.config",  # Configuration file parsing (JSON, TOML, YAML, env)
+    "types": "cyclopts.types",  # ~3ms - special types like ResolvedExistingPath
+    "validators": "cyclopts.validators",  # ~2ms - validators like Number, Path
+    # Editor functionality - rarely used
+    "edit": "cyclopts._edit",  # ~4ms
+    "EditorError": "cyclopts._edit",
+    "EditorNotFoundError": "cyclopts._edit",
+    "EditorDidNotSaveError": "cyclopts._edit",
+    "EditorDidNotChangeError": "cyclopts._edit",
+}
+
+
+def __getattr__(name: str):
+    """Lazy-load opt-in features and rarely-used functionality."""
+    if name in _LAZY_IMPORTS:
+        import importlib
+
+        module_path = _LAZY_IMPORTS[name]
+        if name in ("config", "types", "validators"):
+            # These are submodules, import the module itself
+            module = importlib.import_module(module_path)
+            globals()[name] = module
+            return module
+        else:
+            # These are attributes from modules (e.g., edit, EditorError)
+            module = importlib.import_module(module_path)
+            value = getattr(module, name)
+            globals()[name] = value
+            return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

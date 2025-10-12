@@ -1,9 +1,11 @@
+import inspect
 import itertools
-from collections.abc import Iterable
+import sys
+from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
+    Literal,
     Optional,
     Union,
     cast,
@@ -11,10 +13,26 @@ from typing import (
 
 from attrs import field
 
-from cyclopts.utils import UNSET, Sentinel, SortHelper, frozen, is_iterable, resolve_callables, to_tuple_converter
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
+from cyclopts.utils import (
+    UNSET,
+    Sentinel,
+    SortHelper,
+    frozen,
+    help_formatter_converter,
+    is_iterable,
+    resolve_callables,
+    sort_key_converter,
+    to_tuple_converter,
+)
 
 if TYPE_CHECKING:
     from cyclopts.argument import ArgumentCollection
+    from cyclopts.help.protocols import HelpFormatter
     from cyclopts.parameter import Parameter
 
 
@@ -63,28 +81,30 @@ class Group:
     help: str = ""
 
     # All below parameters are keyword-only
-    _show: Optional[bool] = field(default=None, alias="show", kw_only=True)
+    _show: bool | None = field(default=None, alias="show", kw_only=True)
 
     _sort_key: Any = field(
         default=None,
         alias="sort_key",
-        converter=lambda x: UNSET if x is None else x,
+        converter=sort_key_converter,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]] = (
-        field(
-            default=None,
-            converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
-            kw_only=True,
-        )
+    validator: None | Callable[["ArgumentCollection"], Any] | Iterable[Callable[["ArgumentCollection"], Any]] = field(
+        default=None,
+        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+        kw_only=True,
     )
 
     default_parameter: Optional["Parameter"] = field(
         default=None,
         validator=_group_default_parameter_must_be_none,
         kw_only=True,
+    )
+
+    help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
+        default=None, converter=help_formatter_converter, kw_only=True
     )
 
     @property
@@ -100,19 +120,29 @@ class Group:
         return None if self._sort_key is UNSET else self._sort_key
 
     @classmethod
-    def create_default_arguments(cls, name="Arguments"):
+    def create_default_arguments(cls, name="Arguments") -> Self:
         return cls(name, sort_key=DEFAULT_ARGUMENTS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_default_parameters(cls, name="Parameters"):
+    def create_default_parameters(cls, name="Parameters") -> Self:
         return cls(name, sort_key=DEFAULT_PARAMETERS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_default_commands(cls, name="Commands"):
+    def create_default_commands(cls, name="Commands") -> Self:
         return cls(name, sort_key=DEFAULT_COMMANDS_GROUP_SORT_MARKER)
 
     @classmethod
-    def create_ordered(cls, name="", help="", *, show=None, sort_key=None, validator=None, default_parameter=None):
+    def create_ordered(
+        cls,
+        name="",
+        help="",
+        *,
+        show=None,
+        sort_key=None,
+        validator=None,
+        default_parameter=None,
+        help_formatter=None,
+    ) -> Self:
         """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
         Used to create a group that will be displayed **after** a previously instantiated :meth:`Group.create_ordered` group on the help-page.
@@ -126,18 +156,22 @@ class Group:
         help: str
             Additional documentation shown on the help-page.
             This will be displayed inside the group's panel, above the parameters/commands.
-        show: Optional[bool]
+        show: bool | None
             Show this group on the help-page.
             Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
         sort_key: Any
             If provided, **prepended** to the globally incremented counter value (i.e. has priority during sorting).
 
-        validator: Union[None, Callable[["ArgumentCollection"], Any], Iterable[Callable[["ArgumentCollection"], Any]]]
+        validator: None | Callable[[ArgumentCollection], Any] | Iterable[Callable[[ArgumentCollection], Any]]
             Group validator to collectively apply.
-        default_parameter: Optional[cyclopts.Parameter]
+        default_parameter: cyclopts.Parameter | None
             Default parameter for elements within the group.
+        help_formatter: cyclopts.help.protocols.HelpFormatter | None
+            Custom help formatter for this group's help display.
         """
         count = next(_sort_key_counter)
+        if inspect.isgenerator(sort_key):
+            sort_key = next(sort_key)
         if sort_key is None:
             sort_key = (UNSET, count)
         elif is_iterable(sort_key):
@@ -151,6 +185,7 @@ class Group:
             sort_key=sort_key,
             validator=validator,
             default_parameter=default_parameter,
+            help_formatter=help_formatter,
         )
 
 
@@ -175,8 +210,8 @@ def sort_groups(groups: list[Group], attributes: list[Any]) -> tuple[list[Group]
     sorted_entries = SortHelper.sort(
         [
             SortHelper(resolve_callables(group._sort_key, group), group.name, (group, attribute))
-            for group, attribute in zip(groups, attributes)
+            for group, attribute in zip(groups, attributes, strict=False)
         ]
     )
-    out_groups, out_attributes = zip(*[x.value for x in sorted_entries])
+    out_groups, out_attributes = zip(*[x.value for x in sorted_entries], strict=False)
     return list(out_groups), list(out_attributes)

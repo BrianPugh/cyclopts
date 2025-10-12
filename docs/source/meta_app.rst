@@ -20,8 +20,8 @@ Typically, a Cyclopts application is launched by calling the :class:`.App` objec
    app()  # Run the app
 
 To change how the primary app is run, you can use the meta-app feature of Cyclopts.
-The meta app is just like a normal Cyclopts :class:`.App`, the only thing special about
-it is that it's help-page gets merged in with it's parenting app.
+The meta app is a special :class:`.App` that inherits configuration from its parent
+and has its help-page merged with the parent app's help.
 
 .. code-block:: python
 
@@ -56,8 +56,8 @@ it is that it's help-page gets merged in with it's parenting app.
 The variable positional ``*tokens`` will aggregate all remaining tokens, including those starting with a hyphen (typically options).
 We can then pass them along to the primary ``app``.
 
-The ``meta`` app is mostly a normal Cyclopts app; the only thing special about it is that it will
-be additionally scanned when generate help screens
+The ``meta`` app inherits many configuration values from its parent app and is
+additionally scanned when generating help screens.
 ``*tokens`` is annotated with ``show=False`` since we do not want this variable to show up in the help screen.
 
 .. code-block:: console

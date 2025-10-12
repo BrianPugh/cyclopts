@@ -1,6 +1,6 @@
 from dataclasses import KW_ONLY, dataclass  # pyright: ignore[reportAttributeAccessIssue]
 from pathlib import Path
-from typing import Annotated, Literal, NamedTuple, Union
+from typing import Annotated, Literal, NamedTuple
 
 import cyclopts
 from cyclopts import App, Parameter
@@ -79,7 +79,7 @@ def elliptic_curve(
 @app.command
 def circle(
     center: Coordinate,
-    radius: Union[Literal["unit"], float],
+    radius: Literal["unit"] | float,
     *,
     config: Config,
 ):

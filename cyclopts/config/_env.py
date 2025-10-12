@@ -17,7 +17,7 @@ def _transform(s: str) -> str:
 class Env:
     prefix: str = ""
     command: bool = field(default=True, kw_only=True)
-    show: bool = True
+    show: bool = field(default=True, kw_only=True)
 
     def _prefix(self, commands: tuple[str, ...]) -> str:
         prefix = self.prefix
@@ -33,7 +33,7 @@ class Env:
         """
         return self._prefix(commands) + _transform(argument.name)
 
-    def __call__(self, apps: list["App"], commands: tuple[str, ...], arguments: "ArgumentCollection"):
+    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
         added_tokens = set()
 
         prefix = self._prefix(commands)

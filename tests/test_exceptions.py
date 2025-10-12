@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Annotated, Union
+from typing import Annotated
 
 import pytest
 
@@ -8,11 +8,11 @@ from cyclopts import (
     Argument,
     ArgumentOrderError,
     CoercionError,
-    InvalidCommandError,
     MissingArgumentError,
     MixedArgumentError,
     Parameter,
     Token,
+    UnknownCommandError,
     ValidationError,
 )
 
@@ -35,7 +35,7 @@ def test_exceptions_missing_argument_single(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app("foo", console=console, exit_on_error=False)
+        app("foo", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -56,7 +56,7 @@ def test_exceptions_missing_argument_flag(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app("foo", console=console, exit_on_error=False)
+        app("foo", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -205,7 +205,7 @@ def test_exceptions_coercion_error_from_positional_cli(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):
-        app("foo fizz", console=console, exit_on_error=False)
+        app("foo fizz", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -226,7 +226,7 @@ def test_exceptions_coercion_error_from_keyword_cli(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):
-        app("foo -b fizz", console=console, exit_on_error=False)
+        app("foo -b fizz", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -247,7 +247,7 @@ def test_exceptions_coercion_error_verbose(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(CoercionError):
-        app("foo fizz", console=console, exit_on_error=False, verbose=True)
+        app("foo fizz", error_console=console, exit_on_error=False, verbose=True)
 
     actual = capture.get()
 
@@ -272,11 +272,11 @@ def test_exceptions_coercion_error_verbose(app, console):
 
 def test_exceptions_mixed_argument_error(app, console):
     @app.default
-    def foo(bar: Union[int, dict]):
+    def foo(bar: int | dict):
         pass
 
     with console.capture() as capture, pytest.raises(MixedArgumentError):
-        app("--bar 5 --bar.baz fizz", console=console, exit_on_error=False)
+        app("--bar 5 --bar.baz fizz", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -295,8 +295,8 @@ def test_exceptions_unknown_command(app, console):
     def foo(bar: int):
         pass
 
-    with console.capture() as capture, pytest.raises(InvalidCommandError):
-        app("bar fizz", console=console, exit_on_error=False)
+    with console.capture() as capture, pytest.raises(UnknownCommandError):
+        app("bar fizz", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -317,7 +317,7 @@ def test_exceptions_argument_order_error_singular(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(ArgumentOrderError):
-        app("foo --b=5 1 2", console=console, exit_on_error=False)
+        app("foo --b=5 1 2", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -340,7 +340,7 @@ def test_exceptions_argument_order_error_plural(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(ArgumentOrderError):
-        app("foo --a=1 --b=5 3", console=console, exit_on_error=False)
+        app("foo --a=1 --b=5 3", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 

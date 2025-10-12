@@ -22,13 +22,6 @@ Attempts have been made to improve Cyclopts support, but there are the following
 `Original discussion on GitHub. <https://github.com/BrianPugh/cyclopts/issues/439>`_
 
 
-Shell Completion
-^^^^^^^^^^^^^^^^
-
-Currently Cyclopts does not support shell-completion/autocompletion/tab-completion.
-It is a `much-requested-feature <https://github.com/BrianPugh/cyclopts/issues/89>`_
-It is a high-priority feature to add, but it's also a difficult feature to implement/test.
-Any developer help here would be appreciated!
 
 .. _PEP-0563: https://peps.python.org/563
 .. _PEP-0649: https://peps.python.org/649

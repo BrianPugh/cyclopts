@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import pytest
 
 from cyclopts.exceptions import MissingArgumentError
@@ -16,7 +14,7 @@ from cyclopts.exceptions import MissingArgumentError
 )
 def test_bind_tuple_basic(app, cmd_str, assert_parse_args):
     @app.default
-    def foo(coordinates: Tuple[int, int], color: Tuple[int, int, int]):
+    def foo(coordinates: tuple[int, int], color: tuple[int, int, int]):
         pass
 
     assert_parse_args(foo, cmd_str, (1, 2), (80, 160, 255))
@@ -32,7 +30,7 @@ def test_bind_tuple_basic(app, cmd_str, assert_parse_args):
 )
 def test_bind_tuple_nested(app, cmd_str, assert_parse_args):
     @app.default
-    def foo(coordinates: Tuple[int, int], data: Tuple[Tuple[str, int], int]):
+    def foo(coordinates: tuple[int, int], data: tuple[tuple[str, int], int]):
         pass
 
     assert_parse_args(foo, cmd_str, (1, 2), (("alice", 100), 200))
@@ -48,7 +46,7 @@ def test_bind_tuple_nested(app, cmd_str, assert_parse_args):
 )
 def test_bind_tuple_ellipsis(app, cmd_str, assert_parse_args):
     @app.default
-    def foo(coordinates: Tuple[int, int], data: Tuple[Tuple[str, int], ...]):
+    def foo(coordinates: tuple[int, int], data: tuple[tuple[str, int], ...]):
         pass
 
     assert_parse_args(foo, cmd_str, (1, 2), (("alice", 100), ("bob", 200)))
@@ -63,7 +61,7 @@ def test_bind_tuple_ellipsis(app, cmd_str, assert_parse_args):
 )
 def test_bind_tuple_no_inner_types(app, cmd_str, assert_parse_args):
     @app.default
-    def foo(values: Tuple):
+    def foo(values: tuple):
         pass
 
     # Interpreted as a string because:
@@ -83,7 +81,7 @@ def test_bind_tuple_no_inner_types(app, cmd_str, assert_parse_args):
 )
 def test_bind_tuple_insufficient_tokens(app, cmd_str):
     @app.default
-    def foo(coordinates: Tuple[int, int]):
+    def foo(coordinates: tuple[int, int]):
         pass
 
     with pytest.raises(MissingArgumentError):
@@ -100,7 +98,7 @@ def test_bind_tuple_insufficient_tokens(app, cmd_str):
 )
 def test_bind_list_of_tuple(app, cmd_str, assert_parse_args):
     @app.default
-    def foo(coordinates: List[Tuple[int, int]], color: Tuple[int, int, int]):
+    def foo(coordinates: list[tuple[int, int]], color: tuple[int, int, int]):
         pass
 
     assert_parse_args(foo, cmd_str, [(1, 2), (3, 4)], (80, 160, 255))

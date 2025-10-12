@@ -1,3 +1,7 @@
+import asyncio
+from pathlib import Path
+
+
 def test_version_print_console_from_init(app, console):
     app.console = console
 
@@ -84,7 +88,6 @@ def test_version_print_custom_async_callable(app, console):
 
 def test_version_print_async_in_async_context(app, console):
     """Test that async version callables work when called from within an async context."""
-    import asyncio
 
     async def my_async_version():
         # Verify we're in an async context
@@ -118,3 +121,25 @@ def test_version_print_sync_callable_end_to_end(app, console):
         app(["--version"], console=console)
 
     assert "sync-foo\n" == capture.get()
+
+
+def test_help_and_version_flags_together(app, console):
+    """Test that help flag takes priority when both --help and --version are provided.
+
+    Regression test for bug where having both flags caused NameError on Console forward reference.
+    """
+
+    @app.command
+    def files(
+        input_file: Path,
+        output_file: Path | None = None,
+    ):
+        """Work with files."""
+        pass
+
+    with console.capture() as capture:
+        app(["files", "-h", "--version"], console=console)
+
+    output = capture.get()
+    assert "Work with files" in output
+    assert "INPUT-FILE" in output

@@ -1,16 +1,13 @@
 import collections.abc
 import inspect
-from collections.abc import Iterable
+import sys
+from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
-from typing import (
+from typing import (  # noqa: UP035
     Any,
-    Callable,
     List,
-    Optional,
-    Sequence,
     Tuple,
     TypeVar,
-    Union,
     cast,
     get_args,
     get_origin,
@@ -19,11 +16,23 @@ from typing import (
 import attrs
 from attrs import define, field
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 import cyclopts._env_var
-import cyclopts.utils
 from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import NoneType, is_annotated, is_nonetype, is_union, resolve_annotated, resolve_optional
-from cyclopts.field_info import signature_parameters
+from cyclopts.annotations import (
+    NoneType,
+    is_annotated,
+    is_nonetype,
+    is_union,
+    resolve,
+    resolve_annotated,
+    resolve_optional,
+)
+from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
 from cyclopts.token import Token
 from cyclopts.utils import (
@@ -39,10 +48,10 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
         Iterable[bool],
         Sequence[bool],
         collections.abc.Sequence[bool],
-        List[bool],
         list[bool],
-        Tuple[bool, ...],
+        List[bool],  # noqa: UP006
         tuple[bool, ...],
+        Tuple[bool, ...],  # noqa: UP006
     }
 )
 
@@ -68,7 +77,6 @@ def _negative_converter(default: tuple[str, ...]):
     return converter
 
 
-# TODO: Breaking change; all fields after ``name`` should be ``kw_only=True``.
 @record_init("_provided_args")
 @frozen
 class Parameter:
@@ -104,34 +112,39 @@ class Parameter:
 
     # This can ONLY ever be a Tuple[str, ...]
     # Usually starts with "--" or "-"
-    name: Union[None, str, Iterable[str]] = field(
+    name: None | str | Iterable[str] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Optional[Callable[[Any, Sequence[Token]], Any]] = field(default=None)
+    converter: Callable[[type, Sequence[Token]], Any] | None = field(
+        default=None,
+        kw_only=True,
+    )
 
     # This can ONLY ever be a Tuple[Callable, ...]
-    validator: Union[None, Callable[[Any, Any], Any], Iterable[Callable[[Any, Any], Any]]] = field(
+    validator: None | Callable[[Any, Any], Any] | Iterable[Callable[[Any, Any], Any]] = field(
         default=(),
         converter=lambda x: cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(x)),
+        kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    alias: Union[None, str, Iterable[str]] = field(
+    alias: None | str | Iterable[str] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
+        kw_only=True,
     )
 
     # This can ONLY ever be ``None`` or ``Tuple[str, ...]``
-    negative: Union[None, str, Iterable[str]] = field(
+    negative: None | str | Iterable[str] = field(
         default=None,
         converter=optional_to_tuple_converter,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
-    group: Union[None, Group, str, Iterable[Union[Group, str]]] = field(
+    group: None | Group | str | Iterable[Group | str] = field(
         default=None,
         converter=to_tuple_converter,
         kw_only=True,
@@ -144,13 +157,13 @@ class Parameter:
         kw_only=True,
     )
 
-    _show: Optional[bool] = field(
+    _show: bool | None = field(
         default=None,
         alias="show",
         kw_only=True,
     )
 
-    show_default: Union[None, bool, Callable[[Any], Any]] = field(
+    show_default: None | bool | Callable[[Any], Any] = field(
         default=None,
         kw_only=True,
     )
@@ -161,7 +174,7 @@ class Parameter:
         kw_only=True,
     )
 
-    help: Optional[str] = field(default=None, kw_only=True)
+    help: str | None = field(default=None, kw_only=True)
 
     show_env_var: bool = field(
         default=None,
@@ -170,7 +183,7 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    env_var: Union[None, str, Iterable[str]] = field(
+    env_var: None | str | Iterable[str] = field(
         default=None,
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
         kw_only=True,
@@ -182,7 +195,7 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    negative_bool: Union[None, str, Iterable[str]] = field(
+    negative_bool: None | str | Iterable[str] = field(
         default=None,
         converter=_negative_converter(("no-",)),
         validator=_not_hyphen_validator,
@@ -190,7 +203,7 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    negative_iterable: Union[None, str, Iterable[str]] = field(
+    negative_iterable: None | str | Iterable[str] = field(
         default=None,
         converter=_negative_converter(("empty-",)),
         validator=_not_hyphen_validator,
@@ -198,14 +211,14 @@ class Parameter:
     )
 
     # This can ONLY ever be a Tuple[str, ...]
-    negative_none: Union[None, str, Iterable[str]] = field(
+    negative_none: None | str | Iterable[str] = field(
         default=None,
         converter=_negative_converter(()),
         validator=_not_hyphen_validator,
         kw_only=True,
     )
 
-    required: Optional[bool] = field(
+    required: bool | None = field(
         default=None,
         kw_only=True,
     )
@@ -215,13 +228,13 @@ class Parameter:
         kw_only=True,
     )
 
-    _name_transform: Optional[Callable[[str], str]] = field(
+    _name_transform: Callable[[str], str] | None = field(
         alias="name_transform",
         default=None,
         kw_only=True,
     )
 
-    accepts_keys: Optional[bool] = field(
+    accepts_keys: bool | None = field(
         default=None,
         kw_only=True,
     )
@@ -232,9 +245,9 @@ class Parameter:
         kw_only=True,
     )
 
-    json_dict: Optional[bool] = field(default=None, kw_only=True)
+    json_dict: bool | None = field(default=None, kw_only=True)
 
-    json_list: Optional[bool] = field(default=None, kw_only=True)
+    json_list: bool | None = field(default=None, kw_only=True)
 
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
@@ -310,12 +323,12 @@ class Parameter:
         return f"{type(self).__name__}({content})"
 
     @classmethod
-    def combine(cls, *parameters: Optional["Parameter"]) -> "Parameter":
+    def combine(cls, *parameters: "Parameter | None") -> "Parameter":
         """Returns a new Parameter with combined values of all provided ``parameters``.
 
         Parameters
         ----------
-        `*parameters`: Optional[Parameter]
+        *parameters : Parameter | None
              Parameters who's attributes override ``self`` attributes.
              Ordered from least-to-highest attribute priority.
         """
@@ -335,7 +348,7 @@ class Parameter:
         return cls(**kwargs)
 
     @classmethod
-    def default(cls) -> "Parameter":
+    def default(cls) -> Self:
         """Create a Parameter with all Cyclopts-default values.
 
         This is different than just :class:`Parameter` because the default
@@ -346,7 +359,7 @@ class Parameter:
         )
 
     @classmethod
-    def from_annotation(cls, type_: Any, *default_parameters: Optional["Parameter"]) -> tuple[Any, "Parameter"]:
+    def from_annotation(cls, type_: Any, *default_parameters: "Parameter | None") -> tuple[Any, "Parameter"]:
         """Resolve the immediate Parameter from a type hint."""
         if type_ is inspect.Parameter.empty:
             if default_parameters:
@@ -393,19 +406,44 @@ def validate_command(f: Callable):
     ValueError
         Function has naming or parameter/signature inconsistencies.
     """
-    # python3.9 functools.partial does not have "__module__" attribute.
-    # TODO: simplify to (f.__module__ or "") once cp3.9 is dropped.
-    if (getattr(f, "__module__", "") or "").startswith("cyclopts"):  # Speed optimization.
+    if (f.__module__ or "").startswith("cyclopts"):  # Speed optimization.
         return
     for field_info in signature_parameters(f).values():
-        # Speed optimization: if an object is not annotated, then there's nothing
-        # to validate. Checking if there's an annotation is significantly faster
-        # than instantiating a cyclopts.Parameter object.
-        if not is_annotated(field_info.annotation):
+        # Speed optimization: if no annotation and no cyclopts config, skip validation
+        field_info_is_annotated = is_annotated(field_info.annotation)
+        if not field_info_is_annotated and not getattr(field_info.annotation, "__cyclopts__", None):
+            # There is no annotation, so there is nothing to validate.
             continue
+
+        # Check both annotated parameters and classes with __cyclopts__ attribute
         _, cparam = Parameter.from_annotation(field_info.annotation)
+
         if not cparam.parse and field_info.kind is not field_info.KEYWORD_ONLY:
             raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+
+        # Check for Parameter(name="*") without a default value when ALL class fields are optional
+        # This is confusing for CLI users who expect the dataclass to be instantiated automatically
+        if (
+            "*" in cparam.name  # pyright: ignore[reportOperatorIssue]
+            and field_info.default is field_info.empty
+        ):
+            # Get field info for the class to check if all fields have defaults
+            annotated = field_info.annotation
+            annotated = resolve(annotated)
+            class_field_infos = get_field_infos(annotated)
+            all_fields_optional = all(not field_info.required for field_info in class_field_infos.values())
+
+            if all_fields_optional:
+                param_name = field_info.names[0] if field_info.names else ""
+                quoted_param_name = f'"{param_name}" ' if param_name else ""
+                raise ValueError(
+                    f'Parameter {quoted_param_name}in function {f} has all optional values, uses Parameter(name="*"), but itself has no default value. '
+                    "Consider either:\n"
+                    f'    1) If immutable, providing a default value "{param_name}: {field_info.annotation.__name__} = {field_info.annotation.__name__}()"\n'
+                    f'    2) Otherwise, declaring it optional like "{param_name}: {field_info.annotation.__name__} | None = None" and instanting the {param_name} object in the function body:\n'
+                    f"           if {param_name} is None:\n"
+                    f"               {param_name} = {field_info.annotation.__name__}()"
+                )
 
 
 def get_parameters(hint: T) -> tuple[T, list[Parameter]]:

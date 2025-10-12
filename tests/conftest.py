@@ -16,6 +16,21 @@ def pytest_ignore_collect(collection_path):
 
 
 @pytest.fixture(autouse=True)
+def patch_sys_argv(request, monkeypatch):
+    """Ensure consistent sys.argv[0] regardless of how pytest is invoked.
+
+    When tests run, cyclopts derives app names from sys.argv[0].
+    This can vary based on how pytest is invoked:
+    - `pytest`: sys.argv[0] is the pytest executable path
+    - `python -m pytest`: sys.argv[0] is the pytest module's __main__.py
+
+    We patch it to always be the test module's __main__.py to trigger
+    consistent stack-based name derivation.
+    """
+    monkeypatch.setattr(sys, "argv", ["__main__.py"] + sys.argv[1:])
+
+
+@pytest.fixture(autouse=True)
 def chdir_to_tmp_path(tmp_path, monkeypatch):
     """Automatically change current directory to tmp_path"""
     monkeypatch.chdir(tmp_path)
@@ -23,12 +38,25 @@ def chdir_to_tmp_path(tmp_path, monkeypatch):
 
 @pytest.fixture
 def app():
-    return cyclopts.App()
+    return cyclopts.App(result_action="return_value")
 
 
 @pytest.fixture
 def console():
     return Console(width=70, force_terminal=True, highlight=False, color_system=None, legacy_windows=False)
+
+
+@pytest.fixture
+def normalize_trailing_whitespace():
+    """Remove trailing whitespace from each line while preserving line breaks.
+
+    Useful for comparing console output where text wrapping may add trailing spaces.
+    """
+
+    def _normalize(text: str) -> str:
+        return "\n".join(line.rstrip() for line in text.split("\n"))
+
+    return _normalize
 
 
 @pytest.fixture
@@ -80,7 +108,7 @@ def convert():
     """
 
     def inner(type_, cmd):
-        app = cyclopts.App()
+        app = cyclopts.App(result_action="return_value")
 
         if isinstance(cmd, Path):
             cmd = cmd.as_posix()

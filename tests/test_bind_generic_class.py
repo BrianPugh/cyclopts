@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Annotated, Dict, Literal, Optional
+from typing import Annotated, Literal
 
 import pytest
 
@@ -23,8 +23,8 @@ class User:
         self,
         id: int,
         name: str = "John Doe",
-        tastes: Optional[Dict[str, int]] = None,
-        outfit: Optional[Annotated[Outfit, Parameter(accepts_keys=True)]] = None,
+        tastes: dict[str, int] | None = None,
+        outfit: Annotated[Outfit, Parameter(accepts_keys=True)] | None = None,
     ):
         self.id = id
         self.name = name
@@ -77,7 +77,7 @@ def test_bind_generic_class_accepts_keys_none_1_args(app, assert_parse_args, con
 
     expected = dedent(
         """\
-        Usage: test_bind_generic_class foo [ARGS] [OPTIONS]
+        Usage: test_bind_generic_class foo USER.AGE
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.AGE --user.age  [required]                                 │
@@ -111,7 +111,7 @@ def test_bind_generic_class_accepts_keys_false_1_args(app, assert_parse_args, co
 
     expected = dedent(
         """\
-        Usage: test_bind_generic_class foo [ARGS] [OPTIONS]
+        Usage: test_bind_generic_class foo USER
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER --user  [required]                                         │
@@ -140,7 +140,9 @@ class Coordinates:
         return self.x == other.x and self.y == other.y and self.color == other.color
 
 
-def test_bind_generic_class_accepts_default_multiple_args(app, assert_parse_args, console):
+def test_bind_generic_class_accepts_default_multiple_args(
+    app, assert_parse_args, console, normalize_trailing_whitespace
+):
     @app.command
     def foo(coords: Coordinates, priority: int):
         pass
@@ -154,7 +156,8 @@ def test_bind_generic_class_accepts_default_multiple_args(app, assert_parse_args
 
     expected = dedent(
         """\
-        Usage: test_bind_generic_class foo [ARGS] [OPTIONS]
+        Usage: test_bind_generic_class foo [OPTIONS] COORDS.X COORDS.Y
+        PRIORITY
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  COORDS.X --coords.x  [required]                                 │
@@ -165,7 +168,7 @@ def test_bind_generic_class_accepts_default_multiple_args(app, assert_parse_args
         """
     )
 
-    assert actual == expected
+    assert normalize_trailing_whitespace(actual) == expected
 
 
 def test_bind_generic_class_accepts_false_multiple_args(app, assert_parse_args, console):
@@ -182,7 +185,7 @@ def test_bind_generic_class_accepts_false_multiple_args(app, assert_parse_args, 
 
     expected = dedent(
         """\
-        Usage: test_bind_generic_class foo [ARGS] [OPTIONS]
+        Usage: test_bind_generic_class foo COORDS
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  COORDS --coords  [required]                                     │
@@ -217,10 +220,9 @@ def test_bind_generic_class_keyword_with_positional_only_subkeys(app, console, a
 
     actual = capture.get()
 
-    # No arguments/parameters
     expected = dedent(
         """\
-        Usage: test_bind_generic_class foo [OPTIONS]
+        Usage: test_bind_generic_class foo --user USER
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --user  [required]                                              │

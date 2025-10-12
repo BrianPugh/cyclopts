@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
-from typing import Any, Optional, get_args
+from typing import Any, get_args
+
+from cyclopts._convert import resolve, token_count
 
 
 def _is_path(type_) -> bool:
-    from cyclopts._convert import resolve
-
     if type_ is Path:
         return True
 
@@ -21,7 +21,7 @@ def env_var_split(
     type_: Any,
     val: str,
     *,
-    delimiter: Optional[str] = None,
+    delimiter: str | None = None,
 ) -> list[str]:
     """Type-dependent environment variable value splitting.
 
@@ -41,17 +41,15 @@ def env_var_split(
         Type hint that we will eventually coerce into.
     val: str
         String to split.
-    delimiter: Optional[str]
+    delimiter: str | None
         Delimiter to split ``val`` on.
-        If ``None``, defaults to whitespace.
+        If None, defaults to whitespace.
 
     Returns
     -------
     list[str]
         List of individual string tokens.
     """
-    from cyclopts._convert import resolve, token_count
-
     type_ = resolve(type_)
     count, consume_all = token_count(type_)
 

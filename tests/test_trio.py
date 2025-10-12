@@ -4,9 +4,7 @@ import trio
 from cyclopts import App
 
 
-def test_async_handler():
-    app = App()
-
+def test_async_handler(app):
     @app.command(name="command")
     async def async_handler():
         assert sniffio.current_async_library() == "trio"
@@ -16,9 +14,7 @@ def test_async_handler():
     assert app("command", backend="trio") == "Async handler works"
 
 
-def test_async_handler_with_subcommand_works():
-    app = App()
-
+def test_async_handler_with_subcommand_works(app):
     sub_app = App(name="foo")
     app.command(sub_app)
 
@@ -31,9 +27,7 @@ def test_async_handler_with_subcommand_works():
     assert app("foo bar", backend="trio") == "Async handler works"
 
 
-def test_handler():
-    app = App()
-
+def test_handler(app):
     @app.command(name="command")
     def sync_handler():
         return "Sync handler works"

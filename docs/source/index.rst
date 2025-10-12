@@ -22,9 +22,11 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    group_validators.rst
    help.rst
    version.rst
+   shell_completion.rst
    rules.rst
    text_editor.rst
    api
+   cli_reference.rst
    known_issues.rst
 
 
@@ -32,9 +34,12 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    :maxdepth: 2
    :caption: Advanced Usage
 
+   lazy_loading.rst
+   help_customization.rst
    user_classes.rst
    args_and_kwargs.rst
    config_file.rst
+   sphinx_integration.rst
    packaging.rst
    app_calling.rst
    meta_app.rst

@@ -5,7 +5,7 @@ API
 ===
 
 .. autoclass:: cyclopts.App
-   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args, assemble_argument_collection, update
+   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args, run_async, assemble_argument_collection, update, generate_docs, generate_completion, install_completion, register_install_completion_command
    :special-members: __call__, __getitem__, __iter__
 
    Cyclopts Application.
@@ -19,7 +19,7 @@ API
       1. User specified :attr:`~.App.name` parameter.
       2. If a :attr:`~.App.default` function has been registered, the name of that function.
       3. If the module name is ``__main__.py``, the name of the encompassing package.
-      4. The value of ``sys.argv[0]``; i.e. the name of the python script.
+      4. The value of :data:`sys.argv[0] <sys.argv>`; i.e. the name of the python script.
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
@@ -110,13 +110,67 @@ API
 
       The markup language used in function docstring.
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
-      If no :attr:`~.App.help_format` is defined, falls back to ``"restructuredtext"``.
+      If no :attr:`~.App.help_format` is defined, falls back to ``"markdown"``.
+
+   .. attribute:: help_formatter
+      :type: Union[None, Literal["default", "plain"], HelpFormatter]
+      :value: None
+
+      Help formatter to use for rendering help panels.
+
+      * If :obj:`None` (default), inherits from parent :class:`App`, eventually defaulting to :class:`~cyclopts.help.DefaultFormatter`.
+
+      * If ``"default"``, uses :class:`~cyclopts.help.DefaultFormatter`.
+
+      * If ``"plain"``, uses :class:`~cyclopts.help.PlainFormatter` for no-frills plain text output.
+
+      * If a callable (see :class:`~cyclopts.help.protocols.HelpFormatter` protocol), uses the provided formatter.
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+         from cyclopts.help import DefaultFormatter, PlainFormatter, PanelSpec
+
+         # Use plain text formatter
+         app = App(help_formatter="plain")
+
+         # Use default formatter with customization
+         app = App(help_formatter=DefaultFormatter(
+             panel_spec=PanelSpec(border_style="blue")
+         ))
+
+      See :ref:`Help Customization` for detailed examples and advanced usage.
+
 
    .. attribute:: help_on_error
       :type: Optional[bool]
       :value: None
 
       Prints the help-page before printing an error.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
+
+   .. attribute:: print_error
+      :type: Optional[bool]
+      :value: None
+
+      Print a rich-formatted error on error.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+
+   .. attribute:: exit_on_error
+      :type: Optional[bool]
+      :value: None
+
+      If there is an error parsing the CLI tokens, invoke :func:`sys.exit(1) <sys.exit>`.
+      Otherwise, continue to raise the exception.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+
+   .. attribute:: verbose
+      :type: Optional[bool]
+      :value: None
+
+      Populate exception strings with more information intended for developers.
       If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
 
    .. attribute:: version_format
@@ -179,12 +233,14 @@ API
 
       Modifies command display order on the help-page.
 
-      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(app)`` and apply the returned value to (2) if :obj:`None`, (3) otherwise.
+      1. If :attr:`sort_key` is a generator, it will be consumed immediately with :func:`next` to get the actual value.
 
-      2. For all commands with ``sort_key==None`` (default value), sort them alphabetically.
-         These sorted commands will be displayed **after** ``sort_key != None`` list (see 3).
+      2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(app)`` and apply the returned value to (3) if :obj:`None`, (4) otherwise.
 
-      3. For all commands with ``sort_key!=None``, sort them by ``(sort_key, app.name)``.
+      3. For all commands with ``sort_key==None`` (default value), sort them alphabetically.
+         These sorted commands will be displayed **after** ``sort_key != None`` list (see 4).
+
+      4. For all commands with ``sort_key!=None``, sort them by ``(sort_key, app.name)``.
          It is the user's responsibility that ``sort_key`` s are comparable.
 
       Example usage:
@@ -223,6 +279,37 @@ API
          │ --version  Display application version.                     │
          ╰─────────────────────────────────────────────────────────────╯
 
+      Using generators (e.g., :func:`itertools.count`):
+
+      .. code-block:: python
+
+         import itertools
+         from cyclopts import App
+
+         app = App()
+         counter = itertools.count()
+
+         @app.command(sort_key=counter)
+         def beta():
+             """Beta help description."""
+
+         @app.command(sort_key=counter)
+         def alpha():
+             """Alpha help description."""
+
+         app()
+
+      .. code-block:: text
+
+         Usage: demo.py COMMAND
+
+         ╭─ Commands ──────────────────────────────────────────────────╮
+         │ beta       Beta help description.                           │
+         │ alpha      Alpha help description.                          │
+         │ --help -h  Display this message and exit.                   │
+         │ --version  Display application version.                     │
+         ╰─────────────────────────────────────────────────────────────╯
+
    .. attribute:: version
       :type: Union[None, str, Callable]
       :value: None
@@ -240,10 +327,10 @@ API
       Defaults to ``["--version"]``.
 
    .. attribute:: console
-      :type: rich.console.Console
+      :type: ~rich.console.Console
       :value: None
 
-      Default :class:`rich.console.Console` to use when displaying runtime messages.
+      Default :class:`~rich.console.Console` to use when displaying runtime messages.
       Cyclopts console resolution is as follows:
 
       #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
@@ -251,6 +338,20 @@ API
       #. The parenting :attr:`App.console` (and so on), if not :obj:`None`.
       #. If all values are :obj:`None`, then the default :class:`~rich.console.Console` is used.
 
+   .. attribute:: error_console
+      :type: ~rich.console.Console
+      :value: None
+
+      Default :class:`~rich.console.Console` to use when displaying error messages.
+      Cyclopts error_console resolution is as follows:
+
+      #. Any explicitly passed in error_console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
+      #. The relevant subcommand's :attr:`App.error_console` attribute, if not :obj:`None`.
+      #. The parenting :attr:`App.error_console` (and so on), if not :obj:`None`.
+      #. If all values are :obj:`None`, then a default :class:`~rich.console.Console` with ``stderr=True`` is used.
+
+      This separation of error output from normal output follows Unix conventions, allowing
+      users to redirect error messages independently from normal output (e.g., ``program > output.txt 2> errors.txt``).
 
    .. attribute:: default_parameter
       :type: Parameter
@@ -334,14 +435,13 @@ API
 
       .. code-block:: python
 
-         def config(apps: list["App"], commands: Tuple[str, ...], arguments: ArgumentCollection):
+         def config(app: "App", commands: Tuple[str, ...], arguments: ArgumentCollection):
              """Modifies given mapping inplace with some injected values.
 
              Parameters
              ----------
-             apps: Tuple[App, ...]
-                The application hierarchy that led to the current command function.
-                The current command app is the last element of this tuple.
+             app: App
+                The current command app being executed.
              commands: Tuple[str, ...]
                 The CLI strings that led to the current command function.
              arguments: ArgumentCollection
@@ -357,7 +457,7 @@ API
       :value: None
 
       All tokens after this delimiter will be force-interpreted as positional arguments.
-      If no ``end_of_options_delimiter`` is set, it will default to POSIX-standard ``"--"``.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
    .. attribute:: suppress_keyboard_interrupt
@@ -366,6 +466,234 @@ API
 
       If the application receives a keyboard interrupt (Ctrl-C), suppress the error message and exit gracefully.
       Set to :obj:`False` to let :class:`KeyboardInterrupt` propagate normally.
+
+   .. attribute:: backend
+      :type: Optional[Literal["asyncio", "trio"]]
+      :value: None
+
+      The async backend to use when executing async commands.
+      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to ``"asyncio"``.
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(backend="asyncio")
+
+         @app.default
+         async def main():
+             await some_async_operation()
+
+         app()
+
+      The backend can also be overridden on a per-call basis:
+
+      .. code-block:: python
+
+         app(backend="trio")  # Override the app's backend for this call
+
+   .. attribute:: result_action
+      :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | None
+      :value: None
+
+      Controls how :meth:`App.__call__` and :meth:`App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
+
+      Can be a predefined literal string or a custom callable that takes the result and returns a processed value.
+
+      Each predefined mode's exact behavior is shown below:
+
+      **"print_non_int_sys_exit"** (default)
+
+         The default CLI mode. Prints non-int values to stdout, then calls :func:`sys.exit` with the appropriate exit code.
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)  # i.e. True is success
+            elif isinstance(result, int):
+                sys.exit(result)
+            elif result is not None:
+                print(result)
+                sys.exit(0)
+            else:
+                sys.exit(0)
+
+      **"return_value"**
+
+         Returns the command's value unchanged. Use for embedding Cyclopts in other Python code or testing.
+
+         .. code-block:: python
+
+            return result
+
+      **"sys_exit"**
+
+         Never prints output. Calls :func:`sys.exit` with the appropriate exit code. Useful for CLI apps that handle their own output and just need exit code handling.
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                sys.exit(0 if result else 1)  # i.e. True is success
+            elif isinstance(result, int):
+                sys.exit(result)
+            else:
+                sys.exit(0)
+
+      **"print_non_int_return_int_as_exit_code"**
+
+         Prints non-int values, returns int/bool as exit codes. Useful for testing and embedding.
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                return 0 if result else 1  # i.e. True is success
+            elif isinstance(result, int):
+                return result
+            elif result is not None:
+                print(result)
+                return 0
+            else:
+                return 0
+
+      **"print_str_return_int_as_exit_code"**
+
+         Only prints string return values. Returns int/bool as exit codes, silently returns 0 for other types.
+
+         .. code-block:: python
+
+            if isinstance(result, str):
+                print(result)
+                return 0
+            elif isinstance(result, bool):
+                return 0 if result else 1  # i.e. True is success
+            elif isinstance(result, int):
+                return result
+            else:
+                return 0
+
+      **"print_str_return_zero"**
+
+         Only prints string return values, always returns 0. Useful for simple output-only CLIs.
+
+         .. code-block:: python
+
+            if isinstance(result, str):
+                print(result)
+            return 0
+
+      **"print_non_none_return_int_as_exit_code"**
+
+         Prints all non-None values (including ints), returns int/bool as exit codes.
+
+         .. code-block:: python
+
+            if result is not None:
+                print(result)
+            if isinstance(result, bool):
+                return 0 if result else 1  # i.e. True is success
+            elif isinstance(result, int):
+                return result
+            return 0
+
+      **"print_non_none_return_zero"**
+
+         Prints all non-None values (including ints), always returns 0.
+
+         .. code-block:: python
+
+            if result is not None:
+                print(result)
+            return 0
+
+      **"return_int_as_exit_code_else_zero"**
+
+         Never prints output. Returns int/bool as exit codes, 0 for all other types. Useful for silent CLIs.
+
+         .. code-block:: python
+
+            if isinstance(result, bool):
+                return 0 if result else 1  # i.e. True is success
+            elif isinstance(result, int):
+                return result
+            else:
+                return 0
+
+      **"return_none"**
+
+         Always returns None, regardless of the command's return value.
+
+         .. code-block:: python
+
+            return None
+
+      **"return_zero"**
+
+         Always returns 0, regardless of the command's return value.
+
+         .. code-block:: python
+
+            return 0
+
+      **"print_return_zero"**
+
+         Always prints the result (even None), then always returns 0.
+
+         .. code-block:: python
+
+            print(result)
+            return 0
+
+      **"sys_exit_zero"**
+
+         Always calls :func:`sys.exit(0) <sys.exit>`, regardless of the command's return value.
+
+         .. code-block:: python
+
+            sys.exit(0)
+
+      **"print_sys_exit_zero"**
+
+         Always prints the result (even None), then calls :func:`sys.exit(0) <sys.exit>`.
+
+         .. code-block:: python
+
+            print(result)
+            sys.exit(0)
+
+      **Custom Callable**
+
+         Provide a function for fully custom result handling. Receives the command's return value and returns a processed value.
+
+         .. code-block:: python
+
+            def custom_handler(result):
+                if result is None:
+                    return 0
+                elif isinstance(result, str):
+                    print(f"[OUTPUT] {result}")
+                    return 0
+                return result
+
+            app = App(result_action=custom_handler)
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         # For CLI applications with console_scripts entry points
+         app = App(result_action="print_non_int_return_int_as_exit_code")
+
+         @app.command
+         def greet(name: str) -> str:
+             return f"Hello {name}!"
+
+         app()
+
+      See :ref:`Result Action` for detailed examples and usage patterns.
 
 .. autoclass:: cyclopts.Parameter
    :special-members: __call__
@@ -859,6 +1187,16 @@ API
          my_file.txt
          my_file.pdf
 
+      When ``consume_multiple=True``, providing the keyword flag without any values will create an empty container, equivalent to using the :attr:`negative_iterable` prefix (e.g., ``--empty-ext``):
+
+      .. code-block:: console
+
+         $ my-program --name "my_file" --ext
+         # No output - ext is an empty list []
+
+         $ my-program --name "my_file" --empty-ext
+         # No output - ext is an empty list []
+
       If the parameter is specified **by keyword** and ``consume_multiple=False`` (the default), only a single element worth of CLI tokens will be consumed.
 
       .. code-block:: python
@@ -939,15 +1277,64 @@ API
       Show this group on the help-page.
       Defaults to :obj:`None`, which will only show the group if a ``name`` is provided.
 
+   .. attribute:: help_formatter
+      :type: Union[None, Literal["default", "plain"], HelpFormatter]
+      :value: None
+
+      Help formatter to use for rendering this group's help panel.
+
+      * If :obj:`None` (default), inherits from the :class:`App`'s :attr:`~App.help_formatter`.
+
+      * If ``"default"``, uses :class:`~cyclopts.help.DefaultFormatter`.
+
+      * If ``"plain"``, uses :class:`~cyclopts.help.PlainFormatter` for no-frills plain text output.
+
+      * If a callable (see :class:`~cyclopts.help.protocols.HelpFormatter` protocol), uses the provided formatter.
+
+      This allows per-group customization of help appearance:
+
+      .. code-block:: python
+
+         from cyclopts import App, Group, Parameter
+         from cyclopts.help import DefaultFormatter, PanelSpec
+         from typing import Annotated
+
+         app = App()
+
+         # Using string literal
+         simple_group = Group(
+             "Simple Options",
+             help_formatter="plain"
+         )
+
+         # Using custom formatter instance
+         custom_group = Group(
+             "Custom Options",
+             help_formatter=DefaultFormatter(
+                 panel_spec=PanelSpec(border_style="red")
+             )
+         )
+
+         @app.default
+         def main(
+             opt1: Annotated[str, Parameter(group=simple_group)],
+             opt2: Annotated[str, Parameter(group=custom_group)]
+         ):
+             pass
+
+      See :ref:`Help Customization` for detailed examples.
+
    .. attribute:: sort_key
       :type: Any
       :value: None
 
       Modifies group-panel display order on the help-page.
 
-      1. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
+      1. If :attr:`sort_key` is a generator, it will be consumed immediately with :func:`next` to get the actual value.
 
-      2. The :class:`App` default groups (:attr:`App.group_command`, :attr:`App.group_arguments`, :attr:`App.group_parameters`) will be displayed first.
+      2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
+
+      3. The :class:`App` default groups (:attr:`App.group_command`, :attr:`App.group_arguments`, :attr:`App.group_parameters`) will be displayed first.
          If you want to further customize the ordering of these default groups, you can define custom values and they will be treated like any other group:
 
          .. code-block:: python
@@ -985,11 +1372,11 @@ API
             │ --version  Display application version.                               │
             ╰───────────────────────────────────────────────────────────────────────╯
 
-      2. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
+      4. For all groups with ``sort_key!=None``, sort them by ``(sort_key, group.name)``.
          That is, sort them by their ``sort_key``, and then break ties alphabetically.
          It is the user's responsibility that ``sort_key`` are comparable.
 
-      3. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (2), :attr:`App.group_commands`, :attr:`App.group_arguments`, and :attr:`.App.group_parameters`.
+      5. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (4), :attr:`App.group_commands`, :attr:`App.group_arguments`, and :attr:`.App.group_parameters`.
 
       Example usage:
 
@@ -1341,6 +1728,59 @@ Annotated types for common web-related values.
 
 .. autodata:: cyclopts.types.URL
 
+---------------
+Help Formatting
+---------------
+Cyclopts provides a flexible help formatting system for customizing the help-page's appearance.
+
+.. autoclass:: cyclopts.help.protocols.HelpFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.DefaultFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.PlainFormatter
+   :members:
+
+
+.. autoclass:: cyclopts.help.protocols.ColumnSpecBuilder
+   :members:
+
+
+.. autoclass:: cyclopts.help.PanelSpec
+   :members:
+
+
+.. autoclass:: cyclopts.help.TableSpec
+   :members:
+
+
+.. autoclass:: cyclopts.help.ColumnSpec
+   :members:
+
+
+.. autoclass:: cyclopts.help.NameRenderer
+   :members:
+
+
+.. autoclass:: cyclopts.help.DescriptionRenderer
+   :members:
+
+
+.. autoclass:: cyclopts.help.AsteriskRenderer
+   :members:
+
+
+.. autoclass:: cyclopts.help.HelpPanel
+   :members:
+
+
+.. autoclass:: cyclopts.help.HelpEntry
+   :members:
+
+
 ------
 Config
 ------
@@ -1594,7 +2034,7 @@ Exceptions
    :show-inheritance:
    :members:
 
-.. autoexception:: cyclopts.InvalidCommandError
+.. autoexception:: cyclopts.UnknownCommandError
    :show-inheritance:
    :members:
 

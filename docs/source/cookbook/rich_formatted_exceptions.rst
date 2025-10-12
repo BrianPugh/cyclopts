@@ -47,20 +47,20 @@ To create a more visually appealing and informative traceback, you can use the `
     import sys
     from cyclopts import App
     from rich.console import Console
+    from rich.traceback import install as install_rich_traceback
 
-    console = Console()
-    app = App(console=console)  # Use same Console object for Cyclopts operations.
+    error_console = Console(stderr=True)
+    app = App(console=console, error_console=error_console)
+
+    # Install rich traceback handler using the error console
+    install_rich_traceback(console=error_console)
 
     @app.default
     def main(name: str):
         print(name + 3)
 
     if __name__ == "__main__":
-        try:
-            app()
-        except Exception:
-            console.print_exception()
-            sys.exit(1)
+        app()
 
 Now, running the updated script will display a rich-formatted traceback:
 

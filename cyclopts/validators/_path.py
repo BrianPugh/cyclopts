@@ -1,12 +1,13 @@
 import pathlib
-from typing import Any, Iterable, Sequence, Union
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 from attrs import field
 
 from cyclopts.utils import frozen, to_tuple_converter
 
 
-def ext_converter(value: Union[None, Any, Iterable[Any]]) -> tuple[str, ...]:
+def ext_converter(value: None | Any | Iterable[Any]) -> tuple[str, ...]:
     return tuple(e.lower().lstrip(".") for e in to_tuple_converter(value))
 
 
@@ -77,7 +78,7 @@ class Path:
     """
 
     # Can only ever really be a tuple[str, ...]
-    ext: Union[str, Sequence[str]] = field(default=None, converter=ext_converter)
+    ext: str | Sequence[str] = field(default=None, converter=ext_converter)
     """
     Supplied path must have this extension (case insensitive).
     May or may not include the ".".

@@ -1,16 +1,12 @@
 import inspect
 import sys
-from inspect import isclass
-from typing import Annotated, Any, Optional, Union, get_args, get_origin
+from enum import Flag
+from types import UnionType
+from typing import Annotated, Any, Union, get_args, get_origin
 
 import attrs
 
-_IS_PYTHON_3_8 = sys.version_info[:2] == (3, 8)
-
-if sys.version_info >= (3, 10):  # pragma: no cover
-    from types import UnionType
-else:
-    UnionType = object()
+from cyclopts.utils import is_class_and_subclass
 
 if sys.version_info < (3, 11):  # pragma: no cover
     from typing_extensions import NotRequired, Required
@@ -26,7 +22,7 @@ def is_nonetype(hint):
     return hint is NoneType
 
 
-def is_union(type_: Optional[type]) -> bool:
+def is_union(type_: type | None) -> bool:
     """Checks if a type is a union."""
     # Direct checks are faster than checking if the type is in a set that contains the union-types.
     if type_ is Union or type_ is UnionType:
@@ -49,11 +45,16 @@ def is_dataclass(hint) -> bool:
 
 
 def is_namedtuple(hint) -> bool:
-    return isclass(hint) and issubclass(hint, tuple) and hasattr(hint, "_fields")
+    return is_class_and_subclass(hint, tuple) and hasattr(hint, "_fields")
 
 
 def is_attrs(hint) -> bool:
     return attrs.has(hint)
+
+
+def is_enum_flag(hint) -> bool:
+    """Check if a type hint is an enum.Flag subclass."""
+    return is_class_and_subclass(hint, Flag)
 
 
 def is_annotated(hint) -> bool:
@@ -69,7 +70,7 @@ def contains_hint(hint, target_type) -> bool:
     if is_union(hint):
         return any(contains_hint(x, target_type) for x in get_args(hint))
     else:
-        return isclass(hint) and issubclass(hint, target_type)
+        return is_class_and_subclass(hint, target_type)
 
 
 def is_typeddict(hint) -> bool:
@@ -83,25 +84,14 @@ def is_typeddict(hint) -> bool:
     if is_union(hint):
         return any(is_typeddict(x) for x in get_args(hint))
 
-    if not (isclass(hint) and issubclass(hint, dict)):
+    if not is_class_and_subclass(hint, dict):
         return False
 
     return (
-        # This "dict" subclass defines these "TypedDict" attributes *AND*...
         hasattr(hint, "__annotations__")
         and hasattr(hint, "__total__")
-        and
-        # Either...
-        (
-            # The active Python interpreter targets exactly Python 3.8 and
-            # thus fails to unconditionally define the remaining attributes
-            # *OR*...
-            _IS_PYTHON_3_8
-            or
-            # The active Python interpreter targets any other Python version
-            # and thus unconditionally defines the remaining attributes.
-            (hasattr(hint, "__required_keys__") and hasattr(hint, "__optional_keys__"))
-        )
+        and hasattr(hint, "__required_keys__")
+        and hasattr(hint, "__optional_keys__")
     )
 
 
@@ -137,7 +127,7 @@ def resolve_optional(type_: Any) -> Any:
     elif len(non_none_types) == 1:
         type_ = non_none_types[0]
     elif len(non_none_types) > 1:
-        return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore
+        return Union[tuple(resolve_optional(x) for x in non_none_types)]  # pyright: ignore  # noqa: UP007
     else:
         raise NotImplementedError
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Literal
 
 import cyclopts
 from cyclopts import App, Parameter, validators
@@ -11,6 +11,7 @@ app = App(
     name="burgery",
     help="Welcome to Cyclopts Burgery!",
     config=cyclopts.config.Toml(config_file),
+    result_action="return_value",  # For testing, return actual values
 )
 app.command(create := App(name="create"))
 
@@ -27,7 +28,7 @@ def burger(
     mustard: Annotated[bool, Parameter(group="Condiments")] = True,
     ketchup: Annotated[bool, Parameter(group="Condiments")] = True,
     mayo: Annotated[bool, Parameter(group="Condiments")] = True,
-    custom: Annotated[Optional[List[str]], Parameter(group="Condiments")] = None,
+    custom: Annotated[list[str] | None, Parameter(group="Condiments")] = None,
 ):
     """Create a burger.
 
@@ -56,7 +57,7 @@ def test_create_burger_help(console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: burgery create burger [ARGS] [OPTIONS]
+        Usage: burgery create burger [OPTIONS] VARIETY [ARGS]
 
         Create a burger.
 

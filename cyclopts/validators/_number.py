@@ -1,4 +1,5 @@
-from typing import Any, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
 from cyclopts.utils import frozen
 
@@ -40,19 +41,19 @@ class Number:
         ╰───────────────────────────────────────────────────────────────╯
     """
 
-    lt: Union[int, float, None] = None
+    lt: int | float | None = None
     """Input value must be **less than** this value."""
 
-    lte: Union[int, float, None] = None
+    lte: int | float | None = None
     """Input value must be **less than or equal** this value."""
 
-    gt: Union[int, float, None] = None
+    gt: int | float | None = None
     """Input value must be **greater than** this value."""
 
-    gte: Union[int, float, None] = None
+    gte: int | float | None = None
     """Input value must be **greater than or equal** this value."""
 
-    modulo: Union[int, float, None] = None
+    modulo: int | float | None = None
     """Input value must be a multiple of this value."""
 
     def __call__(self, type_: Any, value: Any):
@@ -62,7 +63,7 @@ class Number:
             for v in value:
                 self(type_, v)
         else:
-            if not isinstance(value, (int, float)):
+            if not isinstance(value, int | float):
                 return
 
             if self.lt is not None and value >= self.lt:

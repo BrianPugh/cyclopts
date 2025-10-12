@@ -1,27 +1,27 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any, Dict
+from typing import Annotated, Any
 
 import pytest
 
-from cyclopts.argument import ArgumentCollection, Token
+from cyclopts.argument import Token
 from cyclopts.config._common import ConfigFromFile
 from cyclopts.exceptions import CycloptsError
 from cyclopts.parameter import Parameter
 
 
 class DummyErrorConfigNoMsg(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         raise ValueError
 
 
 class DummyErrorConfigMsg(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         raise ValueError("My exception's message.")
 
 
 class Dummy(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         return {
             "key1": "foo1",
             "key2": "foo2",
@@ -34,7 +34,7 @@ class Dummy(ConfigFromFile):
 
 
 class DummyRootKeys(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         return {
             "tool": {
                 "cyclopts": {
@@ -50,7 +50,7 @@ class DummyRootKeys(ConfigFromFile):
 
 
 class DummySubKeys(ConfigFromFile):
-    def _load_config(self, path: Path) -> Dict[str, Any]:
+    def _load_config(self, path: Path) -> dict[str, Any]:
         return {
             "key1": {
                 "subkey1": ["subkey1val1", "subkey1val2"],
@@ -80,19 +80,13 @@ def config_sub_keys(tmp_path):
 
 
 @pytest.fixture
-def argument_collection():
-    def foo(key1, key2):
-        pass
-
-    out = ArgumentCollection._from_callable(foo)
-    out[0].append(Token(keyword="--key1", value="cli1", source="cli"))
-    return out
-
-
-@pytest.fixture
-def apps(app):
+def configured_app(app):
     @app.command
     def function1():
+        pass
+
+    @app.default
+    def foo(key1, key2):
         pass
 
     @app.meta.default
@@ -102,20 +96,25 @@ def apps(app):
     ):
         pass
 
-    return [app]
+    return app
 
 
-def test_config_common_root_keys_empty(apps, config, argument_collection):
+def test_config_common_root_keys_empty(configured_app, config):
     config.path.touch()
-    config(apps, (), argument_collection)
+    configured_app.config = config
+    _, _, _, _, argument_collection = configured_app._parse_known_args("--key1 cli1")
+    assert len(argument_collection) == 2
     assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
     assert argument_collection[1].tokens == [Token(keyword="[key2]", value="foo2", source=str(config.path))]
 
 
-def test_config_common_root_keys_populated(apps, config_root_keys, argument_collection):
+def test_config_common_root_keys_populated(configured_app, config_root_keys):
+    configured_app.config = config_root_keys
     config_root_keys.path.touch()
     config_root_keys.root_keys = ["tool", "cyclopts"]
-    config_root_keys(apps, (), argument_collection)
+    _, _, _, _, argument_collection = configured_app._parse_known_args("--key1 cli1")
+
+    assert len(argument_collection) == 2
     assert argument_collection[0].tokens == [Token(keyword="--key1", value="cli1", source="cli")]
     assert argument_collection[1].tokens == [
         Token(keyword="[tool][cyclopts][key2]", value="foo2", source=str(config_root_keys.path))
@@ -200,34 +199,50 @@ def test_config_common_must_exist_false_search_parents_true_missing(tmp_path, co
     spy_load_config.assert_not_called()
 
 
-def test_config_common_kwargs(apps, config):
+def test_config_common_kwargs(app, config):
+    """Make sure that we don't look for the string "kwargs" as a key."""
+    app.config = config
     config.path.touch()
 
+    @app.default
     def foo(key1, **kwargs):
         pass
 
-    argument_collection = ArgumentCollection._from_callable(foo)
-    config(apps, (), argument_collection)
+    # Define these commands so that their corresponding keys in the config do not get interpreted for kwargs.
+    @app.command
+    def function1():
+        pass
 
-    # Don't parse ``kwargs`` from config.
+    @app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        meta_param: Annotated[int, Parameter(negative=())] = 42,
+    ):
+        pass
+
+    _, _, _, _, argument_collection = app._parse_known_args("--key1 foo1")
+
+    # Don't attempt to parse the key ``"kwargs"`` from config.
+    assert len(argument_collection) == 2
     assert argument_collection[-1].tokens == [
         Token(keyword="[key2]", value="foo2", source=str(config.path.absolute()), index=0, keys=("key2",)),
     ]
 
 
-def test_config_common_subkeys(apps, config_sub_keys):
+def test_config_common_subkeys(app, config_sub_keys):
     config_sub_keys.path.touch()
+    app.config = config_sub_keys
 
     @dataclass
     class Example:
         subkey1: list[str]
         subkey2: list[str]
 
+    @app.default
     def foo(key1: Example, key2):
         pass
 
-    argument_collection = ArgumentCollection._from_callable(foo)
-    config_sub_keys(apps, (), argument_collection)
+    _, _, _, _, argument_collection = app._parse_known_args("")
 
     assert len(argument_collection) == 4
 

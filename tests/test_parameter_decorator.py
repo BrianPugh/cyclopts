@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Annotated, Optional
+from typing import Annotated
 
 import pytest
 from attrs import define
@@ -18,7 +18,7 @@ def test_parameter_decorator_dataclass(app, assert_parse_args, decorator):
         age: int
 
     @app.command
-    def create(*, user: Optional[User] = None):
+    def create(*, user: User | None = None):
         pass
 
     assert_parse_args(create, "create")
@@ -52,7 +52,8 @@ def test_parameter_decorator_dataclass_nested_1(app, decorator, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_parameter_decorator action [OPTIONS]
+        Usage: test_parameter_decorator action --bucket STR --key STR --region
+        STR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --bucket  [required]                                            │
@@ -79,7 +80,7 @@ def test_parameter_decorator_dataclass_inheritance(app, assert_parse_args):
         privileged: bool = True
 
     @app.command
-    def create(*, user: Optional[User] = None, admin: Optional[Admin] = None):
+    def create(*, user: User | None = None, admin: Admin | None = None):
         pass
 
     assert_parse_args(create, "create --person.name=Bob --person.age=100", user=User("Bob", 100))

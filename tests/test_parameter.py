@@ -1,6 +1,7 @@
 import inspect
-from typing import Annotated, List, Optional, Set
+from typing import Annotated, Optional
 
+import attrs
 import pytest
 
 from cyclopts import Parameter
@@ -11,25 +12,25 @@ def test_parameter_get_negatives_bool_default():
     assert ("--no-foo", "--no-bar") == p.get_negatives(bool)
 
 
-@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+@pytest.mark.parametrize("type_", [list, set, list[str], set[str]])
 def test_parameter_get_negatives_iterable_default(type_):
     p = Parameter(name=("--foo", "--bar"))
     assert ("--empty-foo", "--empty-bar") == p.get_negatives(type_)
 
 
-@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+@pytest.mark.parametrize("type_", [list, set, list[str], set[str]])
 def test_parameter_get_negatives_iterable_custom_prefix(type_):
     p = Parameter(negative_iterable="vacant-", name=("--foo", "--bar"))
     assert ("--vacant-foo", "--vacant-bar") == p.get_negatives(type_)
 
 
-@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+@pytest.mark.parametrize("type_", [list, set, list[str], set[str]])
 def test_parameter_get_negatives_iterable_empty_string_prefix(type_):
     p = Parameter(negative_iterable="", name=("--foo", "--bar"))
     assert () == p.get_negatives(type_)
 
 
-@pytest.mark.parametrize("type_", [list, set, List[str], Set[str]])
+@pytest.mark.parametrize("type_", [list, set, list[str], set[str]])
 def test_parameter_get_negatives_iterable_custom_prefix_list(type_):
     p = Parameter(negative_iterable=["vacant-", "blank-"], name=("--foo", "--bar"))
     assert {"--vacant-foo", "--vacant-bar", "--blank-foo", "--blank-bar"} == set(p.get_negatives(type_))
@@ -139,3 +140,16 @@ def test_parameter_default():
     assert p1._provided_args == ()
     # Just testing a few
     assert {"name", "converter", "validator"}.issubset(p2._provided_args)
+
+
+def test_parameter_attributes_are_kw_only():
+    """Test that all Parameter attributes except 'name' are keyword-only."""
+    attrs_fields = attrs.fields(Parameter)
+
+    for field in attrs_fields:
+        if field.name == "name":
+            # The 'name' field should NOT be keyword-only
+            assert not field.kw_only, "Field 'name' should not be keyword-only"
+        elif field.init:  # Only check fields that are part of __init__
+            # All other init fields should be keyword-only
+            assert field.kw_only, f"Field '{field.name}' should be keyword-only"

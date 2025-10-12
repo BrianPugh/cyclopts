@@ -3,12 +3,13 @@ import itertools
 import os
 import shlex
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Callable, Sequence, Union
+from typing import TYPE_CHECKING, get_origin
 
 from cyclopts._convert import _bool
+from cyclopts.annotations import resolve_optional
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 CliToken = partial(Token, source="cli")
 
 
-def normalize_tokens(tokens: Union[None, str, Iterable[str]]) -> list[str]:
+def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     if tokens is None:
         tokens = sys.argv[1:]  # Remove the executable
     elif isinstance(tokens, str):
@@ -52,7 +53,7 @@ def _common_root_keys(argument_collection) -> tuple[str, ...]:
     for argument in argument_collection[1:]:
         if not argument.keys:
             return ()
-        for i, (common_key, argument_key) in enumerate(zip(common, argument.keys)):
+        for i, (common_key, argument_key) in enumerate(zip(common, argument.keys, strict=False)):
             if common_key != argument_key:
                 if i == 0:
                     return ()
@@ -68,6 +69,7 @@ def _parse_kw_and_flags(
     tokens: Sequence[str],
     *,
     end_of_options_delimiter: str = "--",
+    stop_at_first_unknown: bool = False,
 ):
     unused_tokens, positional_only_tokens = [], []
     skip_next_iterations = 0
@@ -86,6 +88,10 @@ def _parse_kw_and_flags(
             continue
 
         if not is_option_like(token, allow_numbers=True):
+            if stop_at_first_unknown:
+                # Stop parsing and return all remaining tokens as unused
+                unused_tokens.extend(tokens[i:])
+                break
             unused_tokens.append(token)
             continue
 
@@ -117,8 +123,16 @@ def _parse_kw_and_flags(
                     try:
                         matches.append(argument_collection.match(flag))
                     except ValueError:
+                        if stop_at_first_unknown:
+                            # Can't parse this flag combination, stop here
+                            unused_tokens.extend(tokens[i:])
+                            return unused_tokens
                         unused_tokens.append(flag)
             else:
+                if stop_at_first_unknown:
+                    # Unknown option, stop parsing and return all remaining tokens
+                    unused_tokens.extend(tokens[i:])
+                    return unused_tokens
                 unused_tokens.append(token)
                 continue
         for argument, leftover_keys, implicit_value in matches:
@@ -146,7 +160,6 @@ def _parse_kw_and_flags(
                 else:
                     argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
             elif len(matches) != 1:
-                # TODO: more specific exception?
                 raise CombinedShortOptionError(msg=f"Cannot combine flags and short-options in token {cli_option}")
             else:
                 tokens_per_element, consume_all = argument.token_count(leftover_keys)
@@ -181,11 +194,25 @@ def _parse_kw_and_flags(
                             cli_values.append(token)
                             skip_next_iterations += 1
 
-                if not cli_values or len(cli_values) % tokens_per_element:
+                if not cli_values:
+                    # No values were consumed after the keyword
+                    if consume_all and argument.parameter.consume_multiple:
+                        # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
+                        hint = resolve_optional(argument.hint)
+                        empty_container = (get_origin(hint) or hint)()
+                        argument.append(
+                            CliToken(keyword=cli_option, implicit_value=empty_container, keys=leftover_keys)
+                        )
+                    else:
+                        # Non-iterables or consume_multiple=False require at least one value
+                        raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
+                elif len(cli_values) % tokens_per_element:
+                    # For multi-token elements (e.g., tuples), ensure we have complete sets
                     raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
-
-                for index, cli_value in enumerate(cli_values):
-                    argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
+                else:
+                    # Normal case: append the consumed values
+                    for index, cli_value in enumerate(cli_values):
+                        argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
 
     unused_tokens.extend(positional_only_tokens)
     return unused_tokens
@@ -350,7 +377,7 @@ def create_bound_arguments(
     func: Callable
         Function.
     argument_collection: ArgumentCollection
-    tokens: List[str]
+    tokens: list[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
     configs: Iterable[Callable]
     end_of_options_delimiter: str
@@ -361,7 +388,7 @@ def create_bound_arguments(
     bound: inspect.BoundArguments
         The converted and bound positional and keyword arguments for ``f``.
 
-    unused_tokens: List[str]
+    unused_tokens: list[str]
         Remaining tokens that couldn't be matched to ``f``'s signature.
     """
     unused_tokens = tokens

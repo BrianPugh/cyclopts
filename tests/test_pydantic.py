@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from textwrap import dedent
-from typing import Annotated, Dict, Literal, Optional, Union
+from typing import Annotated, Literal
 
 import pydantic
 import pytest
@@ -23,9 +23,9 @@ class Outfit(BaseModel):
 class User(BaseModel):
     id: PositiveInt
     name: str = Field(default="John Doe")
-    signup_ts: Union[datetime, None]
-    tastes: Dict[str, PositiveInt]
-    outfit: Optional[Outfit] = None
+    signup_ts: datetime | None
+    tastes: dict[str, PositiveInt]
+    outfit: Outfit | None = None
 
 
 def test_pydantic_error_msg(app, console):
@@ -41,7 +41,7 @@ def test_pydantic_error_msg(app, console):
         foo(-1)
 
     with console.capture() as capture, pytest.raises(ValidationError):
-        app(["foo", "-1"], console=console, exit_on_error=False, print_error=True)
+        app(["foo", "-1"], error_console=console, exit_on_error=False, print_error=True)
 
     actual = capture.get()
 
@@ -153,7 +153,7 @@ def test_bind_pydantic_basemodel_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: foo [ARGS] [OPTIONS]
+        Usage: test_pydantic USER.ID USER.SIGNUP-TS USER.TASTES [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -186,7 +186,7 @@ def test_bind_pydantic_basemodel_missing_arg(app, console):
     with console.capture() as capture, pytest.raises(MissingArgumentError):
         app.parse_args(
             'foo --user.id=123 --user.signup-ts="2019-06-01 12:22" --user.tastes.wine=9 --user.tastes.cheese=7 --user.tastes.cabbage=1 --user.outfit.body=t-shirt',
-            console=console,
+            error_console=console,
             exit_on_error=False,
         )
 
@@ -232,7 +232,7 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
 
     expected = dedent(
         """\
-        Usage: test_pydantic foo [ARGS] [OPTIONS]
+        Usage: test_pydantic foo USER.USER-NAME USER.AGE-IN-YEARS
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.USER-NAME         Name of user. [required]                 │
@@ -261,6 +261,8 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
         '{"storageclass": "longhorn"}',
         # check for incorrectly parsing "null" as a string
         '{"storage_class": "longhorn", "limit": null}',
+        # Test the actual Pydantic camelCase alias
+        '{"storageClass": "longhorn"}',
     ],
 )
 def test_pydantic_alias_env_var_json(app, assert_parse_args, monkeypatch, env_var):
@@ -278,7 +280,7 @@ def test_pydantic_alias_env_var_json(app, assert_parse_args, monkeypatch, env_va
 
     class Spec(BaseK8sModel):
         storage_class: str
-        limit: Optional[int] = None
+        limit: int | None = None
 
     @app.default
     def run(spec: Annotated[Spec, Parameter(env_var="SPEC")]) -> None:
@@ -315,7 +317,7 @@ def test_parameter_decorator_pydantic_nested_1(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_pydantic action [OPTIONS]
+        Usage: test_pydantic action --bucket STR --key STR --area STR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --bucket  [required]                                            │
@@ -387,7 +389,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         resolution: tuple[int, int]
         fps: int
 
-    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+    Dataset = Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
 
     @dataclass
     class Config:
@@ -395,7 +397,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
 
     @app.default
     def main(
-        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+        config: Annotated[Config | None, Parameter(name="*")] = None,
     ):
         pass
 
@@ -416,7 +418,7 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: main [ARGS] [OPTIONS]
+        Usage: test_pydantic [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help -h  Display this message and exit.                          │
@@ -436,6 +438,68 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         """
     )
     assert actual == expected
+
+
+def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatch):
+    """
+    Test that Pydantic's own JSON serialization (which uses aliases by default)
+    can be round-tripped through cyclopts environment variable loading.
+
+    This ensures that if a user saves a Pydantic model to JSON and then loads it
+    back through cyclopts, it works correctly.
+    """
+    import json
+
+    class BaseK8sModel(BaseModel):
+        model_config = ConfigDict(
+            alias_generator=to_camel,
+            populate_by_name=True,
+            from_attributes=True,
+        )
+
+    class DatabaseConfig(BaseK8sModel):
+        host: str = "localhost"
+        port: int = 5432
+        connection_timeout: int = 30
+        max_pool_size: int = 10
+
+    class Spec(BaseK8sModel):
+        storage_class: str
+        enable_caching: bool = True
+        database_config: DatabaseConfig | None = None
+        api_key: str | None = None
+
+    # Create a Pydantic model instance with data
+    original_spec = Spec(
+        storage_class="fast-ssd",
+        enable_caching=False,
+        database_config=DatabaseConfig(host="db.example.com", port=3306, connection_timeout=60, max_pool_size=50),
+        api_key="secret123",
+    )
+
+    # Serialize to JSON using Pydantic's model_dump_json with by_alias=True
+    # This will use the camelCase aliases
+    json_str = original_spec.model_dump_json(by_alias=True)
+
+    # Verify the JSON has the expected camelCase structure
+    json_data = json.loads(json_str)
+    expected_json = {
+        "storageClass": "fast-ssd",
+        "enableCaching": False,
+        "databaseConfig": {"host": "db.example.com", "port": 3306, "connectionTimeout": 60, "maxPoolSize": 50},
+        "apiKey": "secret123",
+    }
+    assert json_data == expected_json
+
+    # Now set this as environment variable and parse with cyclopts
+    monkeypatch.setenv("SPEC", json_str)
+
+    @app.default
+    def run(spec: Annotated[Spec, Parameter(env_var="SPEC")]) -> None:
+        pass
+
+    # Should parse back to the exact same object
+    assert_parse_args(run, "", original_spec)
 
 
 @pytest.mark.parametrize(
@@ -461,7 +525,7 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
         resolution: tuple[int, int]
         fps: int
 
-    Dataset = Annotated[Union[DatasetImage, DatasetVideo], pydantic.Field(discriminator="type")]
+    Dataset = Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
 
     @dataclass_decorator
     class Config:
@@ -469,7 +533,7 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
 
     @app.default
     def main(
-        config: Annotated[Optional[Config], Parameter(name="*")] = None,
+        config: Annotated[Config | None, Parameter(name="*")] = None,
     ):
         pass
 
@@ -483,3 +547,65 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
         "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
         Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),  # pyright: ignore
     )
+
+
+def test_pydantic_list_empty_flag(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/572"""
+
+    @Parameter(name="*")
+    class Config(BaseModel):
+        urls: Annotated[
+            list[str] | None,
+            Field(default=None, description="Optional list of URLs"),
+            Parameter(
+                consume_multiple=True,
+            ),
+        ]
+
+    @app.default
+    def command(config: Config | None = None):
+        pass
+
+    assert_parse_args(command, "--empty-urls", Config(urls=[]))
+
+
+def test_pydantic_list_with_value(app, assert_parse_args):
+    @Parameter(name="*")
+    class Config(BaseModel):
+        urls: Annotated[
+            list[str] | None,
+            Field(default=None, description="Optional list of URLs"),
+            Parameter(
+                consume_multiple=True,
+            ),
+        ]
+
+    @app.default
+    def command(config: Config | None = None):
+        pass
+
+    assert_parse_args(
+        command,
+        "--urls http://example.com http://example2.com",
+        Config(
+            urls=["http://example.com", "http://example2.com"],
+        ),
+    )
+
+
+def test_pydantic_list_omitted(app, assert_parse_args):
+    @Parameter(name="*")
+    class Config(BaseModel):
+        urls: Annotated[
+            list[str] | None,
+            Field(default=None, description="Optional list of URLs"),
+            Parameter(
+                consume_multiple=True,
+            ),
+        ]
+
+    @app.default
+    def command(config: Config | None = None):
+        pass
+
+    assert_parse_args(command, "")
