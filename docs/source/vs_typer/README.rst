@@ -16,7 +16,8 @@ This makes it difficult for newcomers to figure out which elements are Typer-rel
 It's also hard to tell whether the following criticisms stem from Typer, or the underlying Click.
 For better-or-worse, Cyclopts uses its own internal parsing strategy, gaining complete control over the process.
 
-This section was written about the current version of Typer: ``v0.9.0``.
+This section was originally written about Typer ``v0.9.0`` (May 2023).
+Some criticisms have been addressed in later Typer versions; updates are noted in the respective sections below.
 
 .. toctree::
    :maxdepth: 1

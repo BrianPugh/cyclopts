@@ -3,12 +3,11 @@
 ==================
 Argument vs Option
 ==================
-In Typer, the actual difference between the ``Argument`` and ``Option`` classes aren't very clear.
-Generally, it can be said that:
+In Typer, there are two primary classes for providing CLI parameter configuration:
 
-* Arguments are **required** and provided as positional arguments.
+* ``Argument`` results in a positional CLI argument.
 
-* Options are **optional** and are provided as keyword arguments, generally preceded with a ``--``.
+* ``Option`` results in a keyword CLI argument, preceded with a ``--``.
 
 With more modern python type annotations, this distinction is unnecessary, because parameters (positional or keyword) can be determined directly from the function signature.
 

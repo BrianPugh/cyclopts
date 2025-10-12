@@ -54,7 +54,11 @@ Literal
 Enums don't work well with everyone's workflow.
 Many people prefer to directly use strings for their functions' options.
 The much more intuitive, convenient method of doing this is with the :obj:`~typing.Literal` type annotation.
-Unfortuneately, Typer has not provided support, despite `a feature request dating back to early 2020`_
+
+.. note::
+
+   Typer added support for :obj:`~typing.Literal` in version 0.19.0 (September 2025), resolving `a feature request from early 2020`_.
+
 Cyclopts has builtin support for :obj:`~typing.Literal`, see :ref:`Coercion Rules - Literal <Coercion Rules - Literal>`.
 
 .. code-block:: python
@@ -75,4 +79,4 @@ Cyclopts has builtin support for :obj:`~typing.Literal`, see :ref:`Coercion Rule
    cyclopts_app(cmd)
    # Using: staging
 
-.. _a feature request dating back to early 2020: https://github.com/tiangolo/typer/issues/76
+.. _a feature request from early 2020: https://github.com/tiangolo/typer/issues/76

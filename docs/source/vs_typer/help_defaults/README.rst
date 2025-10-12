@@ -3,6 +3,10 @@ Help Defaults
 =============
 In Typer's ``--help`` display, default values are unhelpfully shown for required arguments.
 
+.. note::
+
+   This was fixed in Typer 0.17.2 (August 2025) when using Rich for help display.
+
 .. code-block:: python
 
    import typer
