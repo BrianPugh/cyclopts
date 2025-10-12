@@ -630,6 +630,7 @@ class Argument:
                 return UNSET
         else:
             data = {}
+            out = UNSET
 
             if self._enum_flag_type:
                 out = self._enum_flag_type(0)
