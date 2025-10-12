@@ -71,7 +71,6 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         [
             "}",
             "",
-            f'_{prog_name} "$@"',
         ]
     )
 

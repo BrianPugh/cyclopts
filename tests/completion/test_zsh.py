@@ -767,3 +767,30 @@ def test_rst_markup_stripped_from_descriptions(zsh_tester):
     assert "**slow**" not in script, "Should not contain RST bold in mode description"
 
     assert tester.validate_script_syntax()
+
+
+def test_no_direct_function_call(zsh_tester):
+    """Test that completion script doesn't call the completion function directly.
+
+    Regression test for issue where the script ended with '_progname "$@"' which
+    caused "_arguments:comparguments:327: can only be called from completion function"
+    error when the completion file was sourced during shell startup.
+
+    The #compdef directive is sufficient to register the completion function;
+    a direct call is unnecessary and causes errors since _arguments can only be
+    called within a completion context.
+    """
+    tester = zsh_tester(app_basic, "basic")
+    script = tester.completion_script
+
+    # Should not have a direct call to the completion function
+    assert '_basic "$@"' not in script, "Should not directly call the completion function"
+
+    # Script should end with the closing brace and empty line
+    lines = script.rstrip().split("\n")
+    assert lines[-1] == "}", "Script should end with closing brace"
+
+    # Should still have the #compdef directive
+    assert script.startswith("#compdef basic"), "Should have #compdef directive"
+
+    assert tester.validate_script_syntax()
