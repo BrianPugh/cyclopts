@@ -37,7 +37,7 @@ docs = [
     "sphinx_rtd_theme>=3.0.0,<4.0.0",
     "gitpython>=3.1.31",
     "sphinx-copybutton>=0.5,<1.0",
-    "myst-parser[linkify]>=3.0.1,<4.0.0",
+    "myst-parser[linkify]>=3.0.1,<5.0.0",
     "sphinx-autodoc-typehints>=1.25.2,<3.0.0",
     "sphinx-rtd-dark-mode>=1.3.0,<2.0.0",
 ]
