@@ -101,3 +101,109 @@ def test_async_meta_with_nested_async(app):
     result = app.meta([])
     assert result == "Default result"
     assert results == ["Meta handler", "Default handler", "Meta complete"]
+
+
+def test_run_async_inherits_app_parameters():
+    """Test that run_async inherits parameters from App instance when not specified."""
+    app = App(
+        print_error=False,
+        exit_on_error=False,
+        verbose=True,
+        backend="asyncio",
+        result_action="return_value",
+    )
+
+    @app.default
+    async def handler():
+        return "test"
+
+    # These should inherit from the app instance
+    async def run_test():
+        result = await app.run_async([])
+        return result
+
+    result = asyncio.run(run_test())
+    assert result == "test"
+
+
+def test_run_async_overrides_app_parameters():
+    """Test that run_async can override App instance parameters."""
+    app = App(
+        print_error=True,
+        exit_on_error=True,
+        verbose=False,
+        result_action="return_value",
+    )
+
+    @app.default
+    async def handler():
+        return "test"
+
+    # Override the app-level settings
+    async def run_test():
+        result = await app.run_async(
+            [],
+            print_error=False,
+            exit_on_error=False,
+            verbose=True,
+        )
+        return result
+
+    result = asyncio.run(run_test())
+    assert result == "test"
+
+
+def test_run_async_backend_parameter(app):
+    """Test that run_async accepts and respects backend parameter."""
+
+    @app.default
+    async def handler():
+        # Verify we're using asyncio
+        assert sniffio.current_async_library() == "asyncio"
+        return "test"
+
+    async def run_test():
+        # Explicitly specify asyncio backend
+        result = await app.run_async([], backend="asyncio")
+        return result
+
+    result = asyncio.run(run_test())
+    assert result == "test"
+
+
+def test_run_async_with_none_parameters(app):
+    """Test that run_async handles None parameters correctly."""
+
+    @app.default
+    async def handler():
+        return "test"
+
+    async def run_test():
+        # All None parameters should inherit from app defaults
+        result = await app.run_async(
+            [],
+            print_error=None,
+            exit_on_error=None,
+            verbose=None,
+            backend=None,
+        )
+        return result
+
+    result = asyncio.run(run_test())
+    assert result == "test"
+
+
+def test_run_async_with_result_action(app):
+    """Test that run_async properly handles result_action parameter."""
+
+    @app.default
+    async def handler():
+        return 42
+
+    async def run_test():
+        # With result_action="return_value", should return the value directly
+        result = await app.run_async([], result_action="return_value")
+        return result
+
+    result = asyncio.run(run_test())
+    assert result == 42
