@@ -118,6 +118,22 @@ Parameter names (and their short forms) can be manually specified:
 Manually set names via :attr:`Parameter.name <cyclopts.Parameter.name>` are not subject to :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`.
 Alternatively, additional names can be added to the Cyclopts-derived names (instead of completely overriding them) with :attr:`Parameter.alias <cyclopts.Parameter.alias>`.
 
+.. note::
+    Docstrings should always use the **Python variable name** from the function signature.
+
+    .. code-block:: python
+
+        @app.default
+        def main(internal_name: Annotated[str, Parameter(name="external-name")]):
+            """Command description.
+
+            Parameters
+            ----------
+            internal_name:            # Use the Python variable name
+                Help text here.
+            """
+
+    This follows standard Python documentation conventions; the parameter will still appear as ``--external-name`` on the CLI.
 
 ^^^^^^^^^^^^^^
 Name Transform

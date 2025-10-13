@@ -71,6 +71,22 @@ The source resolution order is as follows (as applicable):
       def foo_handler():
           """This will be shown for the "foo" command."""
 
+   .. note::
+      Docstrings should always use the **Python variable name** from the function signature.
+
+      .. code-block:: python
+
+         @app.default
+         def main(internal_name: Annotated[str, Parameter(name="external-name")]):
+             """Command description.
+
+             Parameters
+             ----------
+             internal_name:            # Use the Python variable name
+                 Help text here.
+             """
+
+      This follows standard Python documentation conventions; the parameter will still appear as ``--external-name`` on the CLI.
 
 4. This resolution order, but of the :ref:`Meta App`.
 
