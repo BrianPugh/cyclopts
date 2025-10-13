@@ -1745,11 +1745,12 @@ class App:
         *,
         console: Optional["Console"] = None,
         error_console: Optional["Console"] = None,
-        print_error: bool = True,
-        exit_on_error: bool = True,
+        print_error: bool | None = None,
+        exit_on_error: bool | None = None,
         help_on_error: bool | None = None,
-        verbose: bool = False,
+        verbose: bool | None = None,
         end_of_options_delimiter: str | None = None,
+        backend: Literal["asyncio", "trio"] | None = None,
         result_action: ResultAction | None = None,
     ) -> Any:
         """Async equivalent of :meth:`__call__` for use within existing event loops.
@@ -1769,23 +1770,27 @@ class App:
         error_console: ~rich.console.Console
             Console to print error messages.
             If not provided, follows the resolution order defined in :attr:`App.error_console`.
-        print_error: bool
+        print_error: bool | None
             Print a rich-formatted error on error.
-            Defaults to :obj:`True`.
-        exit_on_error: bool
+            If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
+        exit_on_error: bool | None
             If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
             Otherwise, continue to raise the exception.
-            Defaults to ``True``.
-        help_on_error: bool
-            Prints the help-page before printing an error, overriding :attr:`App.help_on_error`.
-            Defaults to :obj:`None` (interpret from :class:`.App`, eventually defaulting to :obj:`False`).
-        verbose: bool
+            If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
+        help_on_error: bool | None
+            Prints the help-page before printing an error.
+            If :obj:`None`, inherits from :attr:`App.help_on_error`, eventually defaulting to :obj:`False`.
+        verbose: bool | None
             Populate exception strings with more information intended for developers.
-            Defaults to :obj:`False`.
+            If :obj:`None`, inherits from :attr:`App.verbose`, eventually defaulting to :obj:`False`.
         end_of_options_delimiter: str | None
             All tokens after this delimiter will be force-interpreted as positional arguments.
-            If :obj:`None`, fallback to :class:`App.end_of_options_delimiter`.
-            If that is not set, it will default to POSIX-standard ``"--"``.
+            If :obj:`None`, inherits from :attr:`App.end_of_options_delimiter`, eventually defaulting to POSIX-standard ``"--"``.
+            Set to an empty string to disable.
+        backend: Literal["asyncio", "trio"] | None
+            Override the async backend to use (if an async command is invoked).
+            If :obj:`None`, inherits from :attr:`App.backend`, eventually defaulting to "asyncio".
+            If passing backend="trio", ensure trio is installed via the extra: `cyclopts[trio]`.
         result_action: ResultAction | None
             Controls how command return values are handled. Can be a predefined literal string
             or a custom callable that takes the result and returns a processed value.
@@ -1835,6 +1840,7 @@ class App:
                 "exit_on_error": exit_on_error,
                 "help_on_error": help_on_error,
                 "verbose": verbose,
+                "backend": backend,
                 "result_action": result_action,
             }.items()
             if v is not None
