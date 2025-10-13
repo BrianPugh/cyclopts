@@ -3,7 +3,7 @@
 =================
 Default Parameter
 =================
-The default values of :class:`Parameter` for an app can be configured via :attr:`.App.default_parameter`.
+The default values of :class:`.Parameter` for an app can be configured via :attr:`.App.default_parameter`.
 
 For example, to disable the :attr:`~.Parameter.negative` flag feature across your entire app:
 

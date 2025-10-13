@@ -100,8 +100,8 @@ These attributes are inherited by child apps and can be overridden by providing 
 .. note::
    Cyclopts separates normal output from error messages using two different consoles:
 
-   - :attr:`App.console` - Used for normal output like help messages and version information (defaults to stdout)
-   - :attr:`App.error_console` - Used for error messages like parsing errors and exceptions (defaults to stderr)
+   - :attr:`.App.console` - Used for normal output like help messages and version information (defaults to stdout)
+   - :attr:`.App.error_console` - Used for error messages like parsing errors and exceptions (defaults to stderr)
 
 
 **Setting at App Level:**

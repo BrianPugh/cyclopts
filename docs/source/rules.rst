@@ -192,7 +192,7 @@ Positional
 ^^^^^^^^^^
 When arguments are provided positionally:
 
-* If :attr:`Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will stop parsing for this parameter.
+* If :attr:`.Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will stop parsing for this parameter.
   If the number of consumed tokens is not a multiple of the required number of tokens to create an element of the list, a :exc:`MissingArgumentError` will be raised.
 
   .. code-block:: python
@@ -225,7 +225,7 @@ When arguments are provided positionally:
      │ Only got 1.                                                 │
      ╰─────────────────────────────────────────────────────────────╯
 
-* If :attr:`Parameter.allow_leading_hyphen` is :obj:`True`, CLI tokens will be consumed unconditionally until exhausted.
+* If :attr:`.Parameter.allow_leading_hyphen` is :obj:`True`, CLI tokens will be consumed unconditionally until exhausted.
 
   .. code-block:: python
 
@@ -270,7 +270,7 @@ When arguments are provided by keyword:
 
 * The keyword can be specified multiple times.
 
-* If :attr:`Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will raise :exc:`MissingArgumentError` if insufficient tokens have been parsed.
+* If :attr:`.Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will raise :exc:`MissingArgumentError` if insufficient tokens have been parsed.
 
   .. code-block:: python
 
@@ -303,7 +303,7 @@ When arguments are provided by keyword:
      ╰─────────────────────────────────────────────────────────────╯
 
 
-* If :attr:`Parameter.consume_multiple` is :obj:`True`, all remaining tokens will be consumed (until an option-like token is reached if :attr:`Parameter.allow_leading_hyphen` is :obj:`False`)
+* If :attr:`.Parameter.consume_multiple` is :obj:`True`, all remaining tokens will be consumed (until an option-like token is reached if :attr:`.Parameter.allow_leading_hyphen` is :obj:`False`)
 
   .. code-block:: python
 

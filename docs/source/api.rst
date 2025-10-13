@@ -118,7 +118,7 @@ API
 
       Help formatter to use for rendering help panels.
 
-      * If :obj:`None` (default), inherits from parent :class:`App`, eventually defaulting to :class:`~cyclopts.help.DefaultFormatter`.
+      * If :obj:`None` (default), inherits from parent :class:`.App`, eventually defaulting to :class:`~cyclopts.help.DefaultFormatter`.
 
       * If ``"default"``, uses :class:`~cyclopts.help.DefaultFormatter`.
 
@@ -149,14 +149,14 @@ API
       :value: None
 
       Prints the help-page before printing an error.
-      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`False`.
 
    .. attribute:: print_error
       :type: Optional[bool]
       :value: None
 
       Print a rich-formatted error on error.
-      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`True`.
 
    .. attribute:: exit_on_error
       :type: Optional[bool]
@@ -164,14 +164,14 @@ API
 
       If there is an error parsing the CLI tokens, invoke :func:`sys.exit(1) <sys.exit>`.
       Otherwise, continue to raise the exception.
-      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`True`.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`True`.
 
    .. attribute:: verbose
       :type: Optional[bool]
       :value: None
 
       Populate exception strings with more information intended for developers.
-      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to :obj:`False`.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`False`.
 
    .. attribute:: version_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
@@ -315,7 +315,7 @@ API
       :value: None
 
       Version to be displayed when a :attr:`version_flags` is parsed.
-      Defaults to the version of the package instantiating :class:`App`.
+      Defaults to the version of the package instantiating :class:`.App`.
       If a :obj:`~typing.Callable`, it will be invoked with no arguments when version is queried.
 
    .. attribute:: version_flags
@@ -333,9 +333,9 @@ API
       Default :class:`~rich.console.Console` to use when displaying runtime messages.
       Cyclopts console resolution is as follows:
 
-      #. Any explicitly passed in console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
-      #. The relevant subcommand's :attr:`App.console` attribute, if not :obj:`None`.
-      #. The parenting :attr:`App.console` (and so on), if not :obj:`None`.
+      #. Any explicitly passed in console to methods like :meth:`.App.__call__`, :meth:`.App.parse_args`, etc.
+      #. The relevant subcommand's :attr:`.App.console` attribute, if not :obj:`None`.
+      #. The parenting :attr:`.App.console` (and so on), if not :obj:`None`.
       #. If all values are :obj:`None`, then the default :class:`~rich.console.Console` is used.
 
    .. attribute:: error_console
@@ -345,9 +345,9 @@ API
       Default :class:`~rich.console.Console` to use when displaying error messages.
       Cyclopts error_console resolution is as follows:
 
-      #. Any explicitly passed in error_console to methods like :meth:`App.__call__`, :meth:`App.parse_args`, etc.
-      #. The relevant subcommand's :attr:`App.error_console` attribute, if not :obj:`None`.
-      #. The parenting :attr:`App.error_console` (and so on), if not :obj:`None`.
+      #. Any explicitly passed in error_console to methods like :meth:`.App.__call__`, :meth:`.App.parse_args`, etc.
+      #. The relevant subcommand's :attr:`.App.error_console` attribute, if not :obj:`None`.
+      #. The parenting :attr:`.App.error_console` (and so on), if not :obj:`None`.
       #. If all values are :obj:`None`, then a default :class:`~rich.console.Console` with ``stderr=True`` is used.
 
       This separation of error output from normal output follows Unix conventions, allowing
@@ -357,7 +357,7 @@ API
       :type: Parameter
       :value: None
 
-      Default :class:`Parameter` configuration. Unspecified values of command-annotated :class:`Parameter` will inherit these values.
+      Default :class:`.Parameter` configuration. Unspecified values of command-annotated :class:`.Parameter` will inherit these values.
       See :ref:`Default Parameter` for more details.
 
    .. attribute:: group
@@ -368,28 +368,28 @@ API
 
       * If :obj:`None`, defaults to the ``"Commands"`` group.
 
-      * If :obj:`str`, use an existing :class:`Group` (from neighboring sub-commands) with name,
-        **or** create a :class:`Group` with provided name if it does not exist.
+      * If :obj:`str`, use an existing :class:`.Group` (from neighboring sub-commands) with name,
+        **or** create a :class:`.Group` with provided name if it does not exist.
 
-      * If :class:`Group`, directly use it.
+      * If :class:`.Group`, directly use it.
 
    .. attribute:: group_commands
       :type: Group
       :value: Group("Commands")
 
-      The default :class:`Group` that sub-commands are assigned to.
+      The default :class:`.Group` that sub-commands are assigned to.
 
    .. attribute:: group_arguments
       :type: Group
       :value: Group("Arguments")
 
-      The default :class:`Group` that positional-only parameters are assigned to.
+      The default :class:`.Group` that positional-only parameters are assigned to.
 
    .. attribute:: group_parameters
       :type: Group
       :value: Group("Parameters")
 
-      The default :class:`Group` that non-positional-only parameters are assigned to.
+      The default :class:`.Group` that non-positional-only parameters are assigned to.
 
    .. attribute:: validator
       :type: Union[None, Callable, list[Callable]]
@@ -406,7 +406,7 @@ API
          def validator(**kwargs):
              "Raise an exception if something is invalid."
 
-      This validator runs **after** :class:`Parameter` and :class:`Group` validators.
+      This validator runs **after** :class:`.Parameter` and :class:`.Group` validators.
 
    .. attribute:: name_transform
       :type: Optional[Callable[[str], str]]
@@ -457,7 +457,7 @@ API
       :value: None
 
       All tokens after this delimiter will be force-interpreted as positional arguments.
-      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to POSIX-standard ``"--"``.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
    .. attribute:: suppress_keyboard_interrupt
@@ -472,7 +472,7 @@ API
       :value: None
 
       The async backend to use when executing async commands.
-      If not set, attempts to inherit from parenting :class:`App`, eventually defaulting to ``"asyncio"``.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to ``"asyncio"``.
 
       Example:
 
@@ -498,7 +498,7 @@ API
       :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | None
       :value: None
 
-      Controls how :meth:`App.__call__` and :meth:`App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
+      Controls how :meth:`.App.__call__` and :meth:`.App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
 
       Can be a predefined literal string or a custom callable that takes the result and returns a processed value.
 
@@ -829,7 +829,7 @@ API
            $ python my-script.py 7 12
            coordinates=(14, 24)
 
-      * A ``dict`` of :class:`Token` if keys are specified in the CLI. E.g.
+      * A ``dict`` of :class:`.Token` if keys are specified in the CLI. E.g.
 
         .. code-block:: console
 
@@ -1156,9 +1156,9 @@ API
       :type: Optional[bool]
       :value: None
 
-      Lists use `different parsing rules <rules.html#list>`__ depending on whether the values are provided positionally or by keyword. If the parameter is specified **positionally**, :attr:`Parameter.consume_multiple` is ignored.
+      Lists use `different parsing rules <rules.html#list>`__ depending on whether the values are provided positionally or by keyword. If the parameter is specified **positionally**, :attr:`.Parameter.consume_multiple` is ignored.
 
-      If the parameter is specified **by keyword** and ``consume_multiple=True``, all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token (typically a keyword) is reached (unless :attr:`Parameter.allow_leading_hyphen` is :obj:`True`, in which case it will also be consumed).
+      If the parameter is specified **by keyword** and ``consume_multiple=True``, all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token (typically a keyword) is reached (unless :attr:`.Parameter.allow_leading_hyphen` is :obj:`True`, in which case it will also be consumed).
 
       .. code-block:: python
 
@@ -1283,7 +1283,7 @@ API
 
       Help formatter to use for rendering this group's help panel.
 
-      * If :obj:`None` (default), inherits from the :class:`App`'s :attr:`~App.help_formatter`.
+      * If :obj:`None` (default), inherits from the :class:`.App`'s :attr:`~.App.help_formatter`.
 
       * If ``"default"``, uses :class:`~cyclopts.help.DefaultFormatter`.
 
@@ -1334,7 +1334,7 @@ API
 
       2. If :attr:`sort_key`, or any of it's contents, are ``Callable``, then invoke it ``sort_key(group)`` and apply the rules below.
 
-      3. The :class:`App` default groups (:attr:`App.group_command`, :attr:`App.group_arguments`, :attr:`App.group_parameters`) will be displayed first.
+      3. The :class:`.App` default groups (:attr:`.App.group_command`, :attr:`.App.group_arguments`, :attr:`.App.group_parameters`) will be displayed first.
          If you want to further customize the ordering of these default groups, you can define custom values and they will be treated like any other group:
 
          .. code-block:: python
@@ -1376,7 +1376,7 @@ API
          That is, sort them by their ``sort_key``, and then break ties alphabetically.
          It is the user's responsibility that ``sort_key`` are comparable.
 
-      5. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (4), :attr:`App.group_commands`, :attr:`App.group_arguments`, and :attr:`.App.group_parameters`.
+      5. For all groups with ``sort_key==None`` (default value), sort them alphabetically after (4), :attr:`.App.group_commands`, :attr:`.App.group_arguments`, and :attr:`.App.group_parameters`.
 
       Example usage:
 
@@ -1434,8 +1434,8 @@ API
       :type: Optional[Parameter]
       :value: None
 
-      Default :class:`Parameter` in the parameter-resolution-stack that goes between :attr:`.App.default_parameter` and the function signature's :obj:`Annotated` :class:`.Parameter`.
-      The provided :class:`Parameter` is not allowed to have a :attr:`~Parameter.group` value.
+      Default :class:`.Parameter` in the parameter-resolution-stack that goes between :attr:`.App.default_parameter` and the function signature's :obj:`Annotated` :class:`.Parameter`.
+      The provided :class:`.Parameter` is not allowed to have a :attr:`~.Parameter.group` value.
 
    .. attribute:: validator
       :type: Optional[Callable]

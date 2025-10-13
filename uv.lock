@@ -329,7 +329,7 @@ requires-dist = [
     { name = "gitpython", marker = "extra == 'docs'", specifier = ">=3.1.31" },
     { name = "ipdb", marker = "extra == 'debug'", specifier = ">=0.13.9" },
     { name = "line-profiler", marker = "extra == 'debug'", specifier = ">=3.5.1" },
-    { name = "myst-parser", extras = ["linkify"], marker = "extra == 'docs'", specifier = ">=3.0.1,<4.0.0" },
+    { name = "myst-parser", extras = ["linkify"], marker = "extra == 'docs'", specifier = ">=3.0.1,<5.0.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=2.16.0" },
     { name = "pydantic", marker = "extra == 'dev'", specifier = ">=2.11.2,<3.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2.0" },
