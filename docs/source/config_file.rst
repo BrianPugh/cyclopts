@@ -165,3 +165,37 @@ By exporting a value to ``CHAR_COUNTER_COUNT_CHARACTER``, that value will now be
    380
    $ python character-counter.py count README.md --character=q
    3
+
+--------------
+In-Memory Dict
+--------------
+For configurations that come from sources other than files, use :class:`cyclopts.config.Dict`.
+
+.. code-block:: python
+
+   # character-counter.py
+   import json
+   import cyclopts
+   from pathlib import Path
+
+   def fetch_config():
+       """Simulate fetching configuration from an API."""
+       return {"count": {"character": "e"}}
+
+   config_data = fetch_config_from_api()
+
+   app = cyclopts.App(
+       name="character-counter",
+       config=cyclopts.config.Dict(
+           fetch_config,
+           # Optional: provide custom source identifier for better error messages
+           source="api",
+       ),
+   )
+
+   @app.command
+   def count(filename: Path, *, character="-"):
+       print(filename.read_text().count(character))
+
+   if __name__ == "__main__":
+       app()
