@@ -5,7 +5,7 @@ import re
 import sys
 import typing
 from collections.abc import Callable, Iterable, Sequence
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum, Flag
 from functools import partial, reduce
 from inspect import isclass
@@ -94,6 +94,16 @@ def _bytes(s: str) -> bytes:
 
 def _bytearray(s: str) -> bytearray:
     return bytearray(_bytes(s))
+
+
+def _date(s: str) -> date:
+    """Parse a date string.
+
+    Returns
+    -------
+    datetime.date
+    """
+    return date.fromisoformat(s)
 
 
 def _datetime(s: str) -> datetime:
@@ -221,6 +231,7 @@ _converters: dict[Any, Callable] = {
     int: _int,
     bytes: _bytes,
     bytearray: _bytearray,
+    date: _date,
     datetime: _datetime,
     timedelta: _timedelta,
 }

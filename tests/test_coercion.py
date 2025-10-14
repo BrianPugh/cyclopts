@@ -1,7 +1,7 @@
 import inspect
 import sys
 from collections.abc import Iterable, Sequence
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Union
@@ -332,6 +332,17 @@ def test_coerce_parameter_kind_empty():
     assert "foo" == convert(inspect.Parameter.empty, ["foo"])
 
 
+def test_coerce_date():
+    expected = date(year=1956, month=1, day=31)
+    assert expected == convert(date, ["1956-01-31"])
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="Not implemented in stdlib")
+def test_coerce_date_other_iso_formats():
+    expected = date(year=2021, month=1, day=4)
+    assert expected == convert(date, ["2021-W01-1"])
+
+
 @pytest.mark.parametrize(
     "input_string, format_str",
     [
@@ -401,6 +412,12 @@ def test_parse_timedelta_valid(input_string, expected_output):
 def test_parse_timedelta_invalid(invalid_input):
     with pytest.raises(CoercionError):
         convert(timedelta, [invalid_input])
+
+
+def test_coerce_date_invalid_format():
+    """Test that invalid date format raises CoercionError."""
+    with pytest.raises(CoercionError):
+        convert(date, ["not-a-date"])
 
 
 def test_coerce_datetime_invalid_format():

@@ -654,6 +654,14 @@ Leading/Trailing underscores will be stripped.
 .. _Coercion Rules - Dataclasses:
 
 ********
+date
+********
+
+Cyclopts supports parsing dates into a :class:`~datetime.date` object. It uses :meth:`~datetime.date.fromisoformat` under the hood, so the only supported format is ``%Y-%m-%d`` (e.g. 1956-01-31).
+However, if you use newer Python (>= 3.11), it also supports other formats such as ``%Y%m%d`` (e.g., 20191204), 2021-W01-1, etc, defined by ISO 8601.
+
+
+********
 datetime
 ********
 
