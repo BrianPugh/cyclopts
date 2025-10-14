@@ -20,7 +20,14 @@ class InlineText:
         self.force_empty_end = force_empty_end
 
     @classmethod
-    def from_format(cls, content: str | None, format: str, *, force_empty_end=False) -> Self:
+    def from_format(
+        cls,
+        content: str | None,
+        format: str,
+        *,
+        force_empty_end: bool = False,
+        show_errors: bool = False,
+    ) -> Self:
         if content is None:
             from rich.text import Text
 
@@ -39,7 +46,7 @@ class InlineText:
             from cyclopts.help.rst_preprocessor import process_sphinx_directives
 
             processed_content = process_sphinx_directives(content)
-            primary_renderable = RestructuredText(processed_content)
+            primary_renderable = RestructuredText(processed_content, show_errors=show_errors)
         elif format == "rich":
             from rich.text import Text
 
