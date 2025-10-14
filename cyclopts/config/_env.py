@@ -16,6 +16,7 @@ def _transform(s: str) -> str:
 @define
 class Env:
     prefix: str = ""
+    source: str = field(default="env", kw_only=True)
     command: bool = field(default=True, kw_only=True)
     show: bool = field(default=True, kw_only=True)
 
@@ -63,6 +64,6 @@ class Env:
 
             remaining_keys = tuple(x.lower() for x in remaining_keys)
             for i, value in enumerate(argument.env_var_split(os.environ[candidate_env_key])):
-                token = Token(keyword=candidate_env_key, value=value, source="env", index=i, keys=remaining_keys)
+                token = Token(keyword=candidate_env_key, value=value, source=self.source, index=i, keys=remaining_keys)
                 argument.append(token)
                 added_tokens.add(token)

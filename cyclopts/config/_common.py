@@ -17,7 +17,52 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
-class CacheKey:
+@define(kw_only=True)
+class ConfigBase(ABC):
+    """Base class for configuration sources.
+
+    Handles the common logic of processing configuration dictionaries
+    and updating ArgumentCollections.
+    """
+
+    root_keys: Iterable[str] = field(default=(), converter=to_tuple_converter)
+    allow_unknown: bool = field(default=False)
+    use_commands_as_keys: bool = field(default=True)
+    _source: str | None = field(default=None, alias="source")
+
+    @property
+    @abstractmethod
+    def config(self) -> dict[str, Any]:
+        """Return the configuration dictionary."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def source(self) -> str:
+        """Return a string identifying the configuration source for error messages."""
+        raise NotImplementedError
+
+    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
+        config: dict[str, Any] = self.config.copy()
+        try:
+            for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
+                config = config[key]
+        except KeyError:
+            return
+
+        config = {k: v for k, v in config.items() if k not in app}
+
+        update_argument_collection(
+            config,
+            self.source,
+            arguments,
+            app.app_stack.stack[-1],
+            root_keys=self.root_keys,
+            allow_unknown=self.allow_unknown,
+        )
+
+
+class FileCacheKey:
     """Abstraction to quickly check if a file needs to be read again.
 
     If a newly instantiated ``CacheKey`` doesn't equal a previously instantiated ``CacheKey``,
@@ -42,19 +87,20 @@ class CacheKey:
 
 
 @define
-class ConfigFromFile(ABC):
-    path: str | Path = field(converter=Path)
+class ConfigFromFile(ConfigBase):
+    """Configuration source that loads from a file.
 
-    root_keys: Iterable[str] = field(default=(), converter=to_tuple_converter)
+    Supports file caching and parent directory searching.
+    """
+
+    path: str | Path = field(converter=Path)
     must_exist: bool = field(default=False, kw_only=True)
     search_parents: bool = field(default=False, kw_only=True)
-    allow_unknown: bool = field(default=False, kw_only=True)
-    use_commands_as_keys: bool = field(default=True, kw_only=True)
 
     _config: dict[str, Any] | None = field(default=None, init=False, repr=False)
     "Loaded configuration structure (to be loaded by subclassed ``_load_config`` method)."
 
-    _config_cache_key: CacheKey | None = field(default=None, init=False, repr=False)
+    _config_cache_key: FileCacheKey | None = field(default=None, init=False, repr=False)
     "Conditions under which ``_config`` was loaded."
 
     @abstractmethod
@@ -81,7 +127,7 @@ class ConfigFromFile(ABC):
         for parent in self.path.expanduser().resolve().absolute().parents:
             candidate = parent / self.path.name
             if candidate.exists():
-                cache_key = CacheKey(candidate)
+                cache_key = FileCacheKey(candidate)
                 if self._config_cache_key == cache_key:
                     return self._config or {}
 
@@ -114,27 +160,37 @@ class ConfigFromFile(ABC):
 
     @property
     def source(self) -> str:
-        return str(self.path)
-
-    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
-        config: dict[str, Any] = self.config.copy()
-        try:
-            for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
-                config = config[key]
-        except KeyError:
-            return
-
-        # Ignore keys that represent subcommands
-        config = {k: v for k, v in config.items() if k not in app}
-
+        """Return a string identifying the configuration source for error messages."""
+        if self._source is not None:
+            return self._source
         assert isinstance(self.path, Path)
-        source = str(self.path.absolute())
+        return str(self.path.absolute())
 
-        update_argument_collection(
-            config,
-            source,
-            arguments,
-            app.app_stack.stack[-1],
-            root_keys=self.root_keys,
-            allow_unknown=self.allow_unknown,
-        )
+    @source.setter
+    def source(self, value: str) -> None:
+        self._source = value
+
+
+@define
+class Dict(ConfigBase):
+    """Configuration source from an in-memory dictionary.
+
+    Useful for programmatically generated configurations.
+    """
+
+    data: dict[str, Any]
+
+    @property
+    def config(self) -> dict[str, Any]:
+        return self.data
+
+    @property
+    def source(self) -> str:
+        """Return a string identifying the configuration source for error messages."""
+        if self._source is not None:
+            return self._source
+        return "dict"
+
+    @source.setter
+    def source(self, value: str) -> None:
+        self._source = value
