@@ -124,3 +124,64 @@ def rst_main(
     This tests that RST markup is properly stripped in completions.
     """
     pass
+
+
+app_positional_literal = App(name="poslit")
+
+
+@app_positional_literal.command
+def command(param: Literal["foo", "bar", "baz"], /):
+    """Simple command with positional literal.
+
+    Parameters
+    ----------
+    param : Literal["foo", "bar", "baz"]
+        Literal param.
+    """
+    pass
+
+
+app_multiple_positionals = App(name="multipos")
+
+
+@app_multiple_positionals.command
+def command_multi(
+    first: Literal["red", "blue"],
+    second: Literal["cat", "dog"],
+    /,
+):
+    """Command with multiple positionals with distinct choices.
+
+    Parameters
+    ----------
+    first : Literal["red", "blue"]
+        Color choice.
+    second : Literal["cat", "dog"]
+        Animal choice.
+    """
+    pass
+
+
+app_deploy = App(name="deploy")
+
+
+@app_deploy.command
+def deploy_project(
+    project: Literal["web", "api", "worker"],
+    /,
+    *,
+    environment: Literal["dev", "staging", "prod"],
+    branch: str = "main",
+):
+    """Deploy a project to an environment.
+
+    Parameters
+    ----------
+    project : Literal["web", "api", "worker"]
+        Project to deploy.
+    environment : Literal["dev", "staging", "prod"]
+        Target environment.
+    branch : str
+        Git branch.
+    """
+    pass
