@@ -16,6 +16,7 @@ from .apps import (
     app_nested,
     app_path,
     app_positional_literal,
+    app_positional_path,
 )
 
 
@@ -611,4 +612,18 @@ fi
     )
 
     assert result.returncode == 0, f"Completion test failed: {result.stdout}\n{result.stderr}"
+    assert tester.validate_script_syntax()
+
+
+def test_positional_path_completion(bash_tester):
+    """Test that positional Path arguments generate file completion.
+
+    Regression test: positional Path arguments should use file completion
+    (compgen -f) instead of empty completion.
+    """
+    tester = bash_tester(app_positional_path, "pathpos")
+    script = tester.completion_script
+
+    # Should have file completion flag for positional Path
+    assert "compgen -f" in script
     assert tester.validate_script_syntax()

@@ -185,3 +185,21 @@ def deploy_project(
         Git branch.
     """
     pass
+
+
+app_positional_path = App(name="pathpos")
+
+
+@app_positional_path.command
+def process(
+    input_file: Path,
+    /,
+):
+    """Process a file.
+
+    Parameters
+    ----------
+    input_file : Path
+        Input file to process.
+    """
+    pass
