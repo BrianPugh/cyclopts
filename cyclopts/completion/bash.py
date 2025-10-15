@@ -133,6 +133,17 @@ def _generate_completion_function_body(
 def _generate_command_path_detection(completion_data: dict[tuple[str, ...], CompletionData]) -> list[str]:
     """Generate bash code to detect the current command path.
 
+    This function generates two passes through COMP_WORDS:
+    1. First pass builds cmd_path by identifying valid command names
+    2. Second pass counts positionals (non-option words after the command path)
+
+    The two-pass approach is necessary because we need to know the full command
+    path length before we can correctly identify which words are positionals.
+
+    Note: all_commands is built globally across all command levels. If a positional
+    argument value happens to match a command name from a different level, it could
+    be incorrectly classified (though this represents poor CLI design).
+
     Parameters
     ----------
     completion_data : dict
@@ -144,12 +155,19 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
         Lines of bash code for command path detection.
     """
     options_with_values = set()
+    all_commands = set()
+
     for data in completion_data.values():
         for argument in data.arguments:
             if not argument.is_flag() and argument.parameter.name:
                 for name in argument.parameter.name:
                     if name.startswith("-"):
                         options_with_values.add(name)
+
+        for cmd_app in data.commands:
+            for cmd_name in cmd_app.name:
+                if not cmd_name.startswith("-"):
+                    all_commands.add(cmd_name)
 
     lines = []
     lines.append("  # Build list of options that take values (to skip their arguments)")
@@ -159,8 +177,18 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
         lines.append(f"  local options_with_values='{opts_str}'")
     else:
         lines.append("  local options_with_values=''")
+
     lines.append("")
-    lines.append("  # Detect command path by collecting non-option words")
+    lines.append("  # Build list of all valid command names (to distinguish from positionals)")
+    if all_commands:
+        escaped_cmds = [_escape_bash_choice(cmd) for cmd in sorted(all_commands)]
+        cmds_str = " ".join(escaped_cmds)
+        lines.append(f"  local all_commands='{cmds_str}'")
+    else:
+        lines.append("  local all_commands=''")
+
+    lines.append("")
+    lines.append("  # Detect command path by collecting valid command words only")
     lines.append("  local -a cmd_path=()")
     lines.append("  local i skip_next=0")
     lines.append("  for ((i=1; i<COMP_CWORD; i++)); do")
@@ -175,8 +203,37 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
     lines.append("        skip_next=1")
     lines.append("      fi")
     lines.append("    else")
-    lines.append("      # Non-option word is a command")
-    lines.append('      cmd_path+=("$word")')
+    lines.append("      # Non-option word - only add to cmd_path if it's a valid command")
+    lines.append('      if [[ " $all_commands " =~ " $word " ]]; then')
+    lines.append('        cmd_path+=("$word")')
+    lines.append("      fi")
+    lines.append("    fi")
+    lines.append("  done")
+    lines.append("")
+    lines.append("  # Count positionals (non-option words after command path)")
+    lines.append("  local positional_count=0")
+    lines.append("  local cmd_path_len=${#cmd_path[@]}")
+    lines.append("  skip_next=0")
+    lines.append("  local cmd_depth=0")
+    lines.append("  for ((i=1; i<COMP_CWORD; i++)); do")
+    lines.append('    local word="${COMP_WORDS[i]}"')
+    lines.append("    if [[ $skip_next -eq 1 ]]; then")
+    lines.append("      skip_next=0")
+    lines.append("      continue")
+    lines.append("    fi")
+    lines.append("    if [[ $word =~ ^- ]]; then")
+    lines.append('      if [[ " $options_with_values " =~ " $word " ]]; then')
+    lines.append("        skip_next=1")
+    lines.append("      fi")
+    lines.append("    else")
+    lines.append("      # Non-option word")
+    lines.append("      if [[ $cmd_depth -lt $cmd_path_len ]]; then")
+    lines.append("        # Still in command path")
+    lines.append("        ((cmd_depth++))")
+    lines.append("      else")
+    lines.append("        # Past command path, this is a positional")
+    lines.append("        ((positional_count++))")
+    lines.append("      fi")
     lines.append("    fi")
     lines.append("  done")
     return lines
@@ -310,6 +367,9 @@ def _generate_completions_for_path(
             if not cmd_name.startswith("-"):
                 commands.append(cmd_name)
 
+    positional_args = [arg for arg in data.arguments if arg.index is not None and arg.show]
+    positional_args.sort(key=lambda a: a.index if a.index is not None else 0)
+
     lines.append(f"{indent}if [[ ${{cur}} == -* ]]; then")
 
     if options:
@@ -324,16 +384,70 @@ def _generate_completions_for_path(
     needs_value_completion = _check_if_prev_needs_value(data.arguments)
 
     if needs_value_completion:
-        value_completion_lines = _generate_value_completion_for_prev(data.arguments, commands, f"{indent}  ")
+        value_completion_lines = _generate_value_completion_for_prev(
+            data.arguments, commands, positional_args, f"{indent}  "
+        )
         lines.extend(value_completion_lines)
     elif commands:
         escaped_commands = [_escape_bash_choice(cmd) for cmd in commands]
         commands_str = " ".join(escaped_commands)
         lines.append(f"{indent}  COMPREPLY=( $(compgen -W '{commands_str}' -- \"${{cur}}\") )")
+    elif positional_args:
+        lines.extend(_generate_positional_completion(positional_args, f"{indent}  "))
     else:
         lines.append(f"{indent}  COMPREPLY=()")
 
     lines.append(f"{indent}fi")
+
+    return lines
+
+
+def _generate_positional_completion(positional_args, indent: str) -> list[str]:
+    """Generate position-aware positional argument completion.
+
+    Parameters
+    ----------
+    positional_args : list
+        List of positional arguments sorted by index.
+    indent : str
+        Indentation string.
+
+    Returns
+    -------
+    list[str]
+        Lines of bash code for position-aware positional completion.
+    """
+    lines = []
+
+    if len(positional_args) == 1:
+        # Single positional - simple case
+        choices = positional_args[0].get_choices()
+        if choices:
+            escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
+            choices_str = " ".join(escaped_choices)
+            lines.append(f"{indent}COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
+        else:
+            lines.append(f"{indent}COMPREPLY=()")
+    else:
+        # Multiple positionals - use case statement for position-aware completion
+        lines.append(f"{indent}case ${{positional_count}} in")
+
+        for idx, argument in enumerate(positional_args):
+            choices = argument.get_choices()
+            lines.append(f"{indent}  {idx})")
+            if choices:
+                escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
+                choices_str = " ".join(escaped_choices)
+                lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
+            else:
+                lines.append(f"{indent}    COMPREPLY=()")
+            lines.append(f"{indent}    ;;")
+
+        # Default case for positions beyond defined positionals
+        lines.append(f"{indent}  *)")
+        lines.append(f"{indent}    COMPREPLY=()")
+        lines.append(f"{indent}    ;;")
+        lines.append(f"{indent}esac")
 
     return lines
 
@@ -359,7 +473,7 @@ def _check_if_prev_needs_value(arguments) -> bool:
     return False
 
 
-def _generate_value_completion_for_prev(arguments, commands: list[str], indent: str) -> list[str]:
+def _generate_value_completion_for_prev(arguments, commands: list[str], positional_args, indent: str) -> list[str]:
     """Generate value completion based on previous word.
 
     Parameters
@@ -368,6 +482,8 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], indent: 
         Arguments with potential values.
     commands : list[str]
         Available commands at this level.
+    positional_args : list
+        List of positional arguments sorted by index.
     indent : str
         Indentation string.
 
@@ -414,6 +530,8 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], indent: 
             escaped_commands = [_escape_bash_choice(cmd) for cmd in commands]
             commands_str = " ".join(escaped_commands)
             lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{commands_str}' -- \"${{cur}}\") )")
+        elif positional_args:
+            lines.extend(_generate_positional_completion(positional_args, f"{indent}    "))
         else:
             lines.append(f"{indent}    COMPREPLY=()")
         lines.append(f"{indent}    ;;")
@@ -424,6 +542,8 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], indent: 
             escaped_commands = [_escape_bash_choice(cmd) for cmd in commands]
             commands_str = " ".join(escaped_commands)
             lines.append(f"{indent}COMPREPLY=( $(compgen -W '{commands_str}' -- \"${{cur}}\") )")
+        elif positional_args:
+            lines.extend(_generate_positional_completion(positional_args, indent))
         else:
             lines.append(f"{indent}COMPREPLY=()")
 

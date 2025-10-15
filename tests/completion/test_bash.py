@@ -9,10 +9,13 @@ from cyclopts.completion.bash import generate_completion_script
 
 from .apps import (
     app_basic,
+    app_deploy,
     app_enum,
+    app_multiple_positionals,
     app_negative,
     app_nested,
     app_path,
+    app_positional_literal,
 )
 
 
@@ -396,4 +399,216 @@ def test_helper_function_skips_option_values(bash_tester):
     skip_check = [line for line in lines if "skip_next" in line]
     assert len(skip_check) > 0, "Helper should use skip_next logic to skip option values"
 
+    assert tester.validate_script_syntax()
+
+
+def test_positional_literal_completion(bash_tester):
+    """Test that positional Literal arguments generate completions.
+
+    Regression test for issue #605: positional Literal arguments should
+    suggest their choices in bash completion.
+    """
+    tester = bash_tester(app_positional_literal, "poslit")
+
+    assert "foo" in tester.completion_script
+    assert "bar" in tester.completion_script
+    assert "baz" in tester.completion_script
+    assert tester.validate_script_syntax()
+
+
+def test_multiple_positional_literal_position_aware(bash_tester):
+    """Test that multiple positional Literals complete position-aware choices.
+
+    When a command has multiple positional arguments with distinct choice sets,
+    the completion should only suggest choices for the current position, not
+    all choices from all positionals.
+
+    This test validates that the generated bash script uses a case statement
+    to provide position-aware completion rather than combining all choices.
+    """
+    tester = bash_tester(app_multiple_positionals, "multipos")
+    script = tester.completion_script
+
+    # Should use positional_count variable for position tracking
+    assert "positional_count" in script
+
+    # Should use case statement for position-aware completion
+    assert "case ${positional_count} in" in script
+
+    # Position 0 should offer first parameter choices
+    assert "0)" in script
+    # Should have first positional choices in position 0
+    lines = script.split("\n")
+    in_case_0 = False
+    found_first_choices = False
+    for i, line in enumerate(lines):
+        if "case ${positional_count}" in line:
+            in_case_0 = True
+        elif in_case_0 and "0)" in line:
+            # Check lines until we hit ";;"
+            case_content = []
+            for j in range(i + 1, min(i + 10, len(lines))):
+                if ";;" in lines[j]:
+                    break
+                case_content.append(lines[j])
+            case_str = "\n".join(case_content)
+
+            if "red" in case_str and "blue" in case_str:
+                found_first_choices = True
+                # Make sure cat/dog aren't in the same case
+                assert "cat" not in case_str
+                assert "dog" not in case_str
+            break
+
+    assert found_first_choices, "First positional choices not found in position 0"
+
+    # Position 1 should offer second parameter choices
+    assert "1)" in script
+    in_case_1 = False
+    found_second_choices = False
+    for i, line in enumerate(lines):
+        if in_case_1 and "1)" in line:
+            # Check lines until we hit ";;"
+            case_content = []
+            for j in range(i + 1, min(i + 10, len(lines))):
+                if ";;" in lines[j]:
+                    break
+                case_content.append(lines[j])
+            case_str = "\n".join(case_content)
+
+            if "cat" in case_str and "dog" in case_str:
+                found_second_choices = True
+                # Make sure red/blue aren't in the same case
+                assert "red" not in case_str
+                assert "blue" not in case_str
+            break
+        elif "case ${positional_count}" in line:
+            in_case_1 = True
+
+    assert found_second_choices, "Second positional choices not found in position 1"
+
+    assert tester.validate_script_syntax()
+
+
+def test_positional_with_keyword_options(bash_tester):
+    """Test positional completion when command also has keyword-only options.
+
+    Regression test: When a command has both positional arguments and keyword-only
+    options that take values (like --environment), completion after the command name
+    should suggest the positional choices, not empty.
+
+    For example:
+    - 'deploy deploy <TAB>' should suggest ['web', 'api', 'worker']
+    - 'deploy deploy --environment <TAB>' should suggest ['dev', 'staging', 'prod']
+
+    This ensures the case "$prev" default (*) case handles positionals correctly.
+    """
+    tester = bash_tester(app_deploy, "deploy")
+    script = tester.completion_script
+
+    # Should have a case statement for $prev (because --environment takes a value)
+    assert 'case "$prev"' in script or 'case "${prev}"' in script
+
+    # Should suggest positional choices in the script
+    assert "web" in script
+    assert "api" in script
+    assert "worker" in script
+
+    # Should also have environment option completion
+    assert "--environment" in script
+    assert "dev" in script
+    assert "staging" in script
+    assert "prod" in script
+
+    assert tester.validate_script_syntax()
+
+
+def test_positional_not_treated_as_command(bash_tester):
+    """Test that positional argument values are not mistaken for subcommands.
+
+    Regression test: When a command takes positional arguments, those argument
+    values should not be added to cmd_path (command hierarchy). For example,
+    'deploy production us-east' should be recognized as the 'deploy' command
+    with two positionals, NOT as command path ['deploy', 'production'].
+
+    This was a critical bug where the second positional would fail to complete
+    because 'production' was incorrectly treated as a subcommand.
+    """
+    import subprocess
+    from typing import Literal
+
+    app = App(name="deploy")
+
+    @app.command
+    def deploy(
+        environment: Literal["production", "staging"],
+        region: Literal["us-east", "us-west", "eu"],
+        /,
+    ):
+        """Deploy to environment and region."""
+        pass
+
+    tester = bash_tester(app, "cyclopts-demo")
+    script = tester.completion_script
+
+    # Should have all_commands list that only includes "deploy"
+    assert "all_commands" in script
+    assert "deploy" in script
+
+    # Test that 'production' and 'staging' are NOT in all_commands
+    # (they're positional values, not commands)
+    lines = script.split("\n")
+    all_commands_line = None
+    for line in lines:
+        if "local all_commands=" in line:
+            all_commands_line = line
+            break
+
+    assert all_commands_line is not None
+    assert "production" not in all_commands_line
+    assert "staging" not in all_commands_line
+    assert "us-east" not in all_commands_line
+
+    # Verify the completion actually works with a bash subprocess test
+    test_script = f"""
+source /dev/stdin << 'COMPLETION_SCRIPT'
+{script}
+COMPLETION_SCRIPT
+
+# Simulate: cyclopts-demo deploy production <TAB>
+COMP_WORDS=(cyclopts-demo deploy production "")
+COMP_CWORD=3
+_cyclopts_demo
+
+# Should get region completions
+if [ ${{#COMPREPLY[@]}} -eq 0 ]; then
+    echo "FAIL: No completions"
+    exit 1
+fi
+
+# Check that we got the expected completions
+found_useast=0
+found_uswest=0
+found_eu=0
+for item in "${{COMPREPLY[@]}}"; do
+    if [ "$item" = "us-east" ]; then found_useast=1; fi
+    if [ "$item" = "us-west" ]; then found_uswest=1; fi
+    if [ "$item" = "eu" ]; then found_eu=1; fi
+done
+
+if [ $found_useast -eq 1 ] && [ $found_uswest -eq 1 ] && [ $found_eu -eq 1 ]; then
+    exit 0
+else
+    echo "FAIL: Missing expected completions"
+    exit 1
+fi
+"""
+
+    result = subprocess.run(
+        ["bash", "-c", test_script],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"Completion test failed: {result.stdout}\n{result.stderr}"
     assert tester.validate_script_syntax()
