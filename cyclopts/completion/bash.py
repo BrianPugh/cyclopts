@@ -422,25 +422,35 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
     if len(positional_args) == 1:
         # Single positional - simple case
         choices = positional_args[0].get_choices()
+        action = get_completion_action(positional_args[0].hint)
         if choices:
             escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
             choices_str = " ".join(escaped_choices)
             lines.append(f"{indent}COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
         else:
-            lines.append(f"{indent}COMPREPLY=()")
+            compgen_flag = _map_completion_action_to_bash(action)
+            if compgen_flag:
+                lines.append(f'{indent}COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )')
+            else:
+                lines.append(f"{indent}COMPREPLY=()")
     else:
         # Multiple positionals - use case statement for position-aware completion
         lines.append(f"{indent}case ${{positional_count}} in")
 
         for idx, argument in enumerate(positional_args):
             choices = argument.get_choices()
+            action = get_completion_action(argument.hint)
             lines.append(f"{indent}  {idx})")
             if choices:
                 escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
                 choices_str = " ".join(escaped_choices)
                 lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
             else:
-                lines.append(f"{indent}    COMPREPLY=()")
+                compgen_flag = _map_completion_action_to_bash(action)
+                if compgen_flag:
+                    lines.append(f'{indent}    COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )')
+                else:
+                    lines.append(f"{indent}    COMPREPLY=()")
             lines.append(f"{indent}    ;;")
 
         # Default case for positions beyond defined positionals
