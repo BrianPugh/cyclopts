@@ -174,6 +174,13 @@ def _combined_meta_command_mapping(
     if app is None:
         return {}
     command_mapping = dict(app._commands)
+
+    # Add flattened subapp commands (parent commands take precedence)
+    for subapp in app._flattened_subapps:
+        for cmd_name in subapp:
+            if cmd_name not in command_mapping:
+                command_mapping[cmd_name] = subapp[cmd_name]
+
     if recurse_meta and app._meta:
         command_mapping.update(_combined_meta_command_mapping(app._meta))
     if recurse_parent_meta and app._meta_parent:
@@ -340,6 +347,9 @@ class App:
 
     # Maps CLI-name of a command to either an App or a CommandSpec (lazy).
     _commands: dict[str, "App | CommandSpec"] = field(init=False, factory=dict)
+
+    # Subapps whose commands should be flattened into this app (registered via name="*")
+    _flattened_subapps: list["App"] = field(init=False, factory=list)
 
     _meta: Optional["App"] = field(init=False, default=None)
     _meta_parent: Optional["App"] = field(init=False, default=None)
@@ -549,7 +559,10 @@ class App:
 
     @property
     def _registered_commands(self) -> dict[str, "App"]:
-        """Commands that are not help or version commands."""
+        """Commands that are not help or version commands.
+
+        This includes commands from flattened subapps.
+        """
         out = {}
         for x in self:
             if x in self.help_flags or x in self.version_flags:
@@ -761,9 +774,17 @@ class App:
             assert "create" in commands
             assert isinstance(commands["create"], App)
         """
-        return {
+        resolved = {
             name: cmd.resolve(self) if isinstance(cmd, CommandSpec) else cmd for name, cmd in self._commands.items()
         }
+
+        # Add flattened subapp commands (parent commands take precedence)
+        for subapp in self._flattened_subapps:
+            for cmd_name in subapp:
+                if cmd_name not in resolved:
+                    resolved[cmd_name] = subapp[cmd_name]
+
+        return resolved
 
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.
@@ -805,7 +826,17 @@ class App:
         if self._meta_parent:
             with suppress(KeyError):
                 return self._meta_parent._get_item(key, recurse_meta=False)
-        return self._commands[key]
+
+        # Check local commands first
+        if key in self._commands:
+            return self._commands[key]
+
+        # Check flattened subapps
+        for subapp in self._flattened_subapps:
+            with suppress(KeyError):
+                return subapp._get_item(key, recurse_meta=False)
+
+        raise KeyError(key)
 
     def __delitem__(self, key: str):
         del self._commands[key]
@@ -814,7 +845,11 @@ class App:
         if k in self._commands:
             return True
         if self._meta_parent:
-            return k in self._meta_parent
+            if k in self._meta_parent:
+                return True
+        for subapp in self._flattened_subapps:
+            if k in subapp:
+                return True
         return False
 
     def __iter__(self) -> Iterator[str]:
@@ -845,10 +880,18 @@ class App:
         commands = list(self._commands)
         yield from commands
         commands = set(commands)
+
         if self._meta_parent:
             for command in self._meta_parent:
                 if command not in commands:
                     yield command
+                    commands.add(command)
+
+        for subapp in self._flattened_subapps:
+            for command in subapp:
+                if command not in commands:
+                    yield command
+                    commands.add(command)
 
     @property
     def meta(self) -> "App":
@@ -1157,11 +1200,27 @@ class App:
             * If registering an :class:`App`, then the app's name.
             * If registering a **function**, then the function's name after applying :attr:`name_transform`.
             * If registering via **import path**, then the attribute name after applying :attr:`name_transform`.
+
+            Special value ``"*"`` flattens all sub-App commands into this app (App instances only).
+            See :ref:`Flattening SubCommands` for details.
         `**kwargs`
             Any argument that :class:`App` can take.
         """
         if obj is None:  # Called ``@app.command(...)``
             return partial(self.command, name=name, alias=alias, **kwargs)  # pyright: ignore[reportReturnType]
+
+        # Handle flattening: app.command(subapp, name="*")
+        if name == "*":
+            if not isinstance(obj, App):
+                raise TypeError(
+                    'Flattening (name="*") is only supported for App instances, not functions or import paths.'
+                )
+            if kwargs:
+                raise ValueError('Cannot supply additional configuration when flattening a sub-App (name="*").')
+
+            _apply_parent_defaults_to_app(obj, self)
+            self._flattened_subapps.append(obj)
+            return obj  # pyright: ignore[reportReturnType]
 
         # Convert string path to a CommandSpec
         if isinstance(obj, str):

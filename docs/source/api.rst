@@ -23,6 +23,8 @@ API
 
       Multiple names can be provided in the case of a subcommand, but this is relatively unusual.
 
+      Special value ``"*"`` can be used when registering sub-apps with :meth:`~.App.command` to flatten all commands from the sub-app into the parent app. See :ref:`Flattening SubCommands` for details.
+
       Example:
 
       .. code-block:: python

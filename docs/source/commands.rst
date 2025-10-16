@@ -94,6 +94,54 @@ The :meth:`app.command <cyclopts.App.command>` method can also register another 
 The subcommand may have their own registered ``default`` action.
 Cyclopts's command structure is fully recursive.
 
+.. _Flattening SubCommands:
+
+-----------------------
+Flattening SubCommands
+-----------------------
+Sometimes you want to make all commands from a sub-app directly accessible from the parent app,
+without requiring users to type the intermediate subcommand name.
+
+You can flatten a sub-app by registering it with the special ``name="*"``:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+   tools_app = App(name="tools")
+
+   @tools_app.command
+   def compress(file: str):
+       print(f"Compressing {file}")
+
+   @tools_app.command
+   def extract(file: str):
+       print(f"Extracting {file}")
+
+   # Flatten: make all tools_app commands directly accessible
+   app.command(tools_app, name="*")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script compress data.txt
+   Compressing data.txt
+
+   $ my-script extract archive.zip
+   Extracting archive.zip
+
+Caveats of flattening:
+
+- Parent app commands take precedence over flattened commands if there are name collisions.
+- Multiple sub-apps can be flattened into the same parent app.
+- You cannot supply additional configuration kwargs when using ``name="*"``.
+- Only :class:`.App` instances can be flattened (not functions or import paths).
+
+Flattening is useful for organizing related commands into logical groups in your code while keeping
+the CLI interface simple and flat.
+
 ------------------------
 SubCommand Configuration
 ------------------------
