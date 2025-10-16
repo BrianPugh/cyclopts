@@ -45,14 +45,14 @@ def _print_subcommand_completions(app_obj: "App") -> None:
     """
     from cyclopts.group_extractors import groups_from_app
 
-    for _, subapps in groups_from_app(app_obj):
-        for subapp in subapps:
-            if subapp.show:
-                for name in subapp.name:
+    for _, registered_commands in groups_from_app(app_obj):
+        for registered_command in registered_commands:
+            if registered_command.app.show:
+                for name in registered_command.names:
                     if not name.startswith("-"):
                         short_desc = ""
-                        if subapp.help:
-                            short_desc = _extract_short_description(subapp.help)
+                        if registered_command.app.help:
+                            short_desc = _extract_short_description(registered_command.app.help)
 
                         if short_desc:
                             print(f"{name}:{short_desc}")

@@ -10,6 +10,7 @@ import pytest
 from cyclopts import App, Group, Parameter
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CoercionError, MissingArgumentError
+from cyclopts.group_extractors import RegisteredCommand
 from cyclopts.help import (
     HelpPanel,
     create_parameter_help_panel,
@@ -166,7 +167,7 @@ def test_format_commands_docstring(app, console):
         """
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    panel.entries.extend(format_command_entries((RegisteredCommand(("foo",), app["foo"]),), format="restructuredtext"))
     formatter = DefaultFormatter()
     rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
@@ -201,7 +202,7 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
         """  # noqa: D404
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    panel.entries.extend(format_command_entries((RegisteredCommand(("foo",), app["foo"]),), format="restructuredtext"))
     formatter = DefaultFormatter()
     rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
@@ -258,7 +259,7 @@ def test_format_commands_explicit_help(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["foo"],), format="restructuredtext"))
+    panel.entries.extend(format_command_entries((RegisteredCommand(("foo",), app["foo"]),), format="restructuredtext"))
     formatter = DefaultFormatter()
     rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:
@@ -282,7 +283,7 @@ def test_format_commands_explicit_name(app, console):
         pass
 
     panel = HelpPanel(title="Commands", format="command")
-    panel.entries.extend(format_command_entries((app["bar"],), format="restructuredtext"))
+    panel.entries.extend(format_command_entries((RegisteredCommand(("bar",), app["bar"]),), format="restructuredtext"))
     formatter = DefaultFormatter()
     rendered = formatter._render_panel(panel, console, console.options)
     with console.capture() as capture:

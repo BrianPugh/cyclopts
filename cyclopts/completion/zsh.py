@@ -195,11 +195,13 @@ def _generate_completion_for_path(
 
     # Check for flag commands (commands that look like options)
     flag_command_names = set()
-    for cmd_app in commands:
-        if any(name.startswith("-") for name in cmd_app.name):
-            specs = _generate_keyword_specs_for_command(cmd_app, data.help_format)
+    for registered_command in commands:
+        if any(name.startswith("-") for name in registered_command.names):
+            specs = _generate_keyword_specs_for_command(
+                registered_command.names, registered_command.app, data.help_format
+            )
             args_specs.extend(specs)
-            flag_command_names.update(cmd_app.name)
+            flag_command_names.update(registered_command.names)
 
     # Add help and version flags to all command paths (if not already added as flag commands)
     for flag in help_flags:
@@ -212,7 +214,9 @@ def _generate_completion_for_path(
             spec = f"'{flag}[Display application version.]'"
             args_specs.append(spec)
 
-    has_non_flag_commands = any(not cmd_name.startswith("-") for cmd in commands for cmd_name in cmd.name)
+    has_non_flag_commands = any(
+        not cmd_name.startswith("-") for registered_command in commands for cmd_name in registered_command.names
+    )
 
     # Generate positional argument specs
     # Only add positionals if there are no subcommands (they conflict in zsh)
@@ -238,10 +242,10 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}  cmds)")
 
         cmd_list = []
-        for cmd_app in commands:
-            for cmd_name in cmd_app.name:
+        for registered_command in commands:
+            for cmd_name in registered_command.names:
                 if not cmd_name.startswith("-"):
-                    desc = _safe_get_description_from_app(cmd_app, data.help_format)
+                    desc = _safe_get_description_from_app(registered_command.app, data.help_format)
                     cmd_list.append(f"'{cmd_name}:{desc}'")
 
         lines.append(f"{indent_str}    local -a commands")
@@ -255,8 +259,8 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}  args)")
         lines.append(f"{indent_str}    case $words[1] in")
 
-        for cmd_app in commands:
-            for cmd_name in cmd_app.name:
+        for registered_command in commands:
+            for cmd_name in registered_command.names:
                 if cmd_name.startswith("-"):
                     continue
 
@@ -424,11 +428,13 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
 
-def _generate_keyword_specs_for_command(cmd_app: "App", help_format: str) -> list[str]:
+def _generate_keyword_specs_for_command(names: tuple[str, ...], cmd_app: "App", help_format: str) -> list[str]:
     """Generate zsh _arguments specs for a command that looks like a flag.
 
     Parameters
     ----------
+    names : tuple[str, ...]
+        Registered names for the command.
     cmd_app : App
         Command app with flag-like names.
     help_format : str
@@ -442,7 +448,7 @@ def _generate_keyword_specs_for_command(cmd_app: "App", help_format: str) -> lis
     specs = []
     desc = _safe_get_description_from_app(cmd_app, help_format)
 
-    for name in cmd_app.name:
+    for name in names:
         if name.startswith("-"):
             spec = f"'{name}[{desc}]'"
             specs.append(spec)

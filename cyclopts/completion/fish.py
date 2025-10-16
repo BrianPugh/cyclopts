@@ -284,7 +284,9 @@ def _generate_subcommand_completions(
     list[str]
         Completion command lines.
     """
-    commands = [name for cmd in data.commands for name in cmd.name if not name.startswith("-")]
+    commands = [
+        name for registered_command in data.commands for name in registered_command.names if not name.startswith("-")
+    ]
     if not commands:
         return []
 
@@ -294,12 +296,12 @@ def _generate_subcommand_completions(
     else:
         lines.append("# Root-level commands")
 
-    for cmd_app in data.commands:
-        for cmd_name in cmd_app.name:
+    for registered_command in data.commands:
+        for cmd_name in registered_command.names:
             if cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description_from_app(cmd_app, data.help_format)
+            desc = _get_description_from_app(registered_command.app, data.help_format)
             escaped_desc = _escape_fish_description(desc)
             escaped_cmd = _escape_fish_string(cmd_name)
 
@@ -458,7 +460,7 @@ def _generate_command_option_completions(
     Parameters
     ----------
     commands : list
-        Command apps.
+        List of RegisteredCommand tuples.
     prog_name : str
         Program name.
     condition : str
@@ -473,12 +475,12 @@ def _generate_command_option_completions(
     """
     lines = []
 
-    for cmd_app in commands:
-        for cmd_name in cmd_app.name:
+    for registered_command in commands:
+        for cmd_name in registered_command.names:
             if not cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description_from_app(cmd_app, help_format)
+            desc = _get_description_from_app(registered_command.app, help_format)
             escaped_desc = _escape_fish_description(desc)
 
             if cmd_name.startswith("--"):

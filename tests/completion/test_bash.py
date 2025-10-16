@@ -656,4 +656,28 @@ def test_literal_with_show_choices_false(bash_tester):
     assert "staging" in script
     assert "prod" in script
 
+
+def test_command_with_multiple_names_and_aliases(bash_tester):
+    """Test that commands registered with multiple names/aliases all appear in completions.
+
+    Regression test for groups_from_app() deduplication - ensures all registered
+    names are included in completion scripts.
+    """
+    app = App(name="myapp")
+    sub = App()
+
+    @sub.default
+    def action(value: str = ""):
+        """Perform an action."""
+        pass
+
+    app.command(sub, name="foo", alias=["bar", "baz"])
+
+    tester = bash_tester(app, "myapp")
+    script = tester.completion_script
+
+    assert "foo" in script, "Primary name should be in completion script"
+    assert "bar" in script, "First alias should be in completion script"
+    assert "baz" in script, "Second alias should be in completion script"
+
     assert tester.validate_script_syntax()
