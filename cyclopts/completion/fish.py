@@ -402,7 +402,7 @@ def _generate_keyword_arg_completions(
         escaped_desc = _escape_fish_description(desc)
 
         is_flag = argument.is_flag()
-        choices = argument.get_choices()
+        choices = argument.get_choices(force=True)
         action = get_completion_action(argument.hint)
 
         for name in argument.parameter.name or []:

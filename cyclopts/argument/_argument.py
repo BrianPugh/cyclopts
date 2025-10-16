@@ -886,11 +886,17 @@ class Argument:
         """
         return self.token_count() == (0, False)
 
-    def get_choices(self) -> tuple[str, ...] | None:
+    def get_choices(self, force: bool = False) -> tuple[str, ...] | None:
         """Extract completion choices from type hint.
 
         Extracts choices from Literal types, Enum types, and Union types containing them.
-        Respects the Parameter.show_choices setting.
+        Respects the Parameter.show_choices setting unless force=True.
+
+        Parameters
+        ----------
+        force : bool
+            If True, return choices even when show_choices=False.
+            Used by shell completion to always provide choices.
 
         Returns
         -------
@@ -899,13 +905,15 @@ class Argument:
 
         Examples
         --------
-        >>> from typing import Literal
-        >>> from cyclopts import Parameter
         >>> argument = Argument(hint=Literal["dev", "staging", "prod"], parameter=Parameter(show_choices=True))
         >>> argument.get_choices()
         ('dev', 'staging', 'prod')
+        >>> argument = Argument(hint=Literal["dev", "staging", "prod"], parameter=Parameter(show_choices=False))
+        >>> argument.get_choices()  # Returns None for help text
+        >>> argument.get_choices(force=True)  # Returns choices for completion
+        ('dev', 'staging', 'prod')
         """
-        if not self.parameter.show_choices:
+        if not force and not self.parameter.show_choices:
             return None
         choices = get_choices_from_hint(self.hint, self.parameter.name_transform)
         return tuple(choices) if choices else None

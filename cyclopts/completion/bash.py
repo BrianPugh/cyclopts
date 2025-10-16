@@ -421,7 +421,7 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
 
     if len(positional_args) == 1:
         # Single positional - simple case
-        choices = positional_args[0].get_choices()
+        choices = positional_args[0].get_choices(force=True)
         action = get_completion_action(positional_args[0].hint)
         if choices:
             escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
@@ -438,7 +438,7 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
         lines.append(f"{indent}case ${{positional_count}} in")
 
         for idx, argument in enumerate(positional_args):
-            choices = argument.get_choices()
+            choices = argument.get_choices(force=True)
             action = get_completion_action(argument.hint)
             lines.append(f"{indent}  {idx})")
             if choices:
@@ -515,7 +515,7 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
             continue
 
         has_cases = True
-        choices = argument.get_choices()
+        choices = argument.get_choices(force=True)
         action = get_completion_action(argument.hint)
 
         for name in names:
