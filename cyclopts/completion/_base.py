@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from cyclopts.annotations import is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
-from cyclopts.group_extractors import groups_from_app
+from cyclopts.group_extractors import RegisteredCommand, groups_from_app
 from cyclopts.utils import frozen, is_class_and_subclass
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class CompletionData:
     """Completion data for a command path."""
 
     arguments: "ArgumentCollection"
-    commands: list["App"]
+    commands: list[RegisteredCommand]
     help_format: str
 
 
@@ -75,18 +75,18 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                 arguments.extend(app_arguments)
 
         commands = []
-        for group, subapps in groups_from_app(command_app):
+        for group, registered_commands in groups_from_app(command_app):
             if group.show:
-                for subapp in subapps:
-                    if subapp.show and subapp not in commands:
-                        commands.append(subapp)
+                for registered_command in registered_commands:
+                    if registered_command.app.show and registered_command not in commands:
+                        commands.append(registered_command)
 
         help_format = command_app.app_stack.resolve("help_format", fallback="markdown")
 
         completion_data[command_path] = CompletionData(arguments=arguments, commands=commands, help_format=help_format)
 
-        for cmd_app in commands:
-            for cmd_name in cmd_app.name:
+        for registered_command in commands:
+            for cmd_name in registered_command.names:
                 if not cmd_name.startswith("-"):
                     _extract(command_path + (cmd_name,))
 

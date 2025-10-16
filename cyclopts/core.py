@@ -1218,18 +1218,16 @@ class App:
         if name is None:
             name = app.name
         else:
-            name = app._name = to_tuple_converter(name)
+            name = to_tuple_converter(name)
 
         if alias is None:
             alias = ()
         else:
-            app.alias = alias = to_tuple_converter(alias)
+            alias = to_tuple_converter(alias)
 
         for n in name + alias:  # pyright: ignore[reportOperatorIssue]
             if n in self:
                 raise CommandCollisionError(f'Command "{n}" already registered.')
-
-            # Warning: app._name may not align with command name
             self._commands[n] = app
 
         return obj  # pyright: ignore[reportReturnType]
@@ -1417,7 +1415,11 @@ class App:
         # We don't want the command_app to be the version/help handler; we handle those specially
         command_app = execution_apps[-1]
         with suppress(IndexError):
-            if set(command_app.name) & set(execution_apps[-2].help_flags + execution_apps[-2].version_flags):  # pyright: ignore
+            # command_chain can be empty when app is invoked at root level with no commands (e.g., "myapp --help")
+            # Check what the user actually typed (command_chain) rather than the app's declared name
+            if command_chain and command_chain[-1] in set(
+                execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
+            ):
                 execution_apps = execution_apps[:-1]
 
         command_app = execution_apps[-1]
@@ -1959,7 +1961,7 @@ class App:
         # Handle commands first; there's an off chance they may be "upgraded"
         # to an argument/parameter panel.
         for subapp in _walk_metas(command_app):
-            for group, subapps in groups_from_app(subapp):
+            for group, apps_with_names in groups_from_app(subapp):
                 if not group.show:
                     continue
 
@@ -1979,7 +1981,7 @@ class App:
                         command_panel.description = group_help
 
                 # Add the command to the group's help panel.
-                command_panel.entries.extend(format_command_entries(subapps, format=help_format))
+                command_panel.entries.extend(format_command_entries(apps_with_names, format=help_format))
 
         # Handle Arguments/Parameters
         # We have to combine all the help-pages of the command-app and it's meta apps.

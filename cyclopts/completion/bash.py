@@ -164,8 +164,8 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
                     if name.startswith("-"):
                         options_with_values.add(name)
 
-        for cmd_app in data.commands:
-            for cmd_name in cmd_app.name:
+        for registered_command in data.commands:
+            for cmd_name in registered_command.names:
                 if not cmd_name.startswith("-"):
                     all_commands.add(cmd_name)
 
@@ -346,8 +346,8 @@ def _generate_completions_for_path(
                 options.append(name)
 
     flag_commands = []
-    for cmd_app in data.commands:
-        for name in cmd_app.name:
+    for registered_command in data.commands:
+        for name in registered_command.names:
             if name.startswith("-"):
                 flag_commands.append(name)
 
@@ -362,8 +362,8 @@ def _generate_completions_for_path(
     options.extend(flag_commands)
 
     commands = []
-    for cmd_app in data.commands:
-        for cmd_name in cmd_app.name:
+    for registered_command in data.commands:
+        for cmd_name in registered_command.names:
             if not cmd_name.startswith("-"):
                 commands.append(cmd_name)
 

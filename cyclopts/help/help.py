@@ -411,13 +411,29 @@ def create_parameter_help_panel(
     return help_panel
 
 
-def format_command_entries(apps: Iterable["App"], format: str) -> list[HelpEntry]:
+def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpEntry]:
+    """Format command entries for help display.
+
+    Parameters
+    ----------
+    apps_with_names : Iterable[RegisteredCommand]
+        Iterable of RegisteredCommand tuples.
+    format : str
+        Help text format.
+
+    Returns
+    -------
+    list[HelpEntry]
+        List of formatted help entries.
+    """
     entries = []
-    for app in apps:
+    for registered_command in apps_with_names:
+        names = registered_command.names
+        app = registered_command.app
         if not app.show:
             continue
         short_names, long_names = [], []
-        for name in app.name:
+        for name in names:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
         entry = HelpEntry(
