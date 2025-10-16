@@ -2317,3 +2317,18 @@ def test_help_format_group_parameters_sphinx_inline_directive_content(capture_fo
         """
     )
     assert actual == expected
+
+
+def test_help_flag_after_end_of_options_delimiter(app):
+    """Help flags after '--' should not trigger help display."""
+
+    @app.default
+    def main(*args: str):
+        """Main function that accepts variadic arguments."""
+        return args
+
+    result = app(["--", "--help"])
+    assert result == ("--help",)
+
+    result = app(["foo", "--", "--help", "-h"])
+    assert result == ("foo", "--help", "-h")
