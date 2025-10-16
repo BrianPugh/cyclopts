@@ -503,3 +503,33 @@ def test_rst_markup_stripped_from_descriptions(fish_tester):
     assert "**slow**" not in script, "Should not contain RST bold in mode description"
 
     assert tester.validate_script_syntax()
+
+
+def test_literal_with_show_choices_false(fish_tester):
+    """Test that Literal with show_choices=False still provides completions.
+
+    Regression test: When show_choices=False is set on a Literal parameter,
+    the choices should still be available for shell completion, even though
+    they are hidden from the help text.
+    """
+    app = App(name="deploy")
+
+    @app.default
+    def main(
+        env: Annotated[
+            Literal["dev", "staging", "prod"],
+            Parameter(help="Environment to deploy to", show_choices=False),
+        ],
+    ):
+        """Deploy to environment."""
+        pass
+
+    tester = fish_tester(app, "deploy")
+    script = tester.completion_script
+
+    # Choices should be in completion script even with show_choices=False
+    assert "dev" in script
+    assert "staging" in script
+    assert "prod" in script
+
+    assert tester.validate_script_syntax()

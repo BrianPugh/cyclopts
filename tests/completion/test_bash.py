@@ -627,3 +627,33 @@ def test_positional_path_completion(bash_tester):
     # Should have file completion flag for positional Path
     assert "compgen -f" in script
     assert tester.validate_script_syntax()
+
+
+def test_literal_with_show_choices_false(bash_tester):
+    """Test that Literal with show_choices=False still provides completions.
+
+    Regression test: When show_choices=False is set on a Literal parameter,
+    the choices should still be available for shell completion, even though
+    they are hidden from the help text.
+    """
+    app = App(name="deploy")
+
+    @app.default
+    def main(
+        env: Annotated[
+            Literal["dev", "staging", "prod"],
+            Parameter(help="Environment to deploy to", show_choices=False),
+        ],
+    ):
+        """Deploy to environment."""
+        pass
+
+    tester = bash_tester(app, "deploy")
+    script = tester.completion_script
+
+    # Choices should be in completion script even with show_choices=False
+    assert "dev" in script
+    assert "staging" in script
+    assert "prod" in script
+
+    assert tester.validate_script_syntax()

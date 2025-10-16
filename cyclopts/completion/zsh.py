@@ -355,7 +355,7 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
 
     # Determine completion action
     action = ""
-    choices = argument.get_choices()
+    choices = argument.get_choices(force=True)
     if choices:
         escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
@@ -405,7 +405,7 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     desc = _get_description_from_argument(argument, help_format)
 
     # Check for choices first (Literal/Enum types)
-    choices = argument.get_choices()
+    choices = argument.get_choices(force=True)
     if choices:
         escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
