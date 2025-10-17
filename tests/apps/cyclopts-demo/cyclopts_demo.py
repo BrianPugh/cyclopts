@@ -30,29 +30,150 @@ def main(
     print(f"Main command: verbose={verbose}, config={config}")
 
 
-@app.command
-def files(
-    input_file: Path,
-    output_file: Path | None = None,
-    directory: Annotated[
-        Path, Parameter(validator=validators.Path(exists=True, dir_okay=True, file_okay=False))
-    ] = Path(),
-    format: Literal["json", "yaml", "toml", "xml"] = "json",
+files_app = App(name="files", help="File operations commands.")
+app.command(files_app)
+
+
+@files_app.command
+def cp(
+    source: Path,
+    destination: Path,
+    /,
+    *,
+    recursive: Annotated[bool, Parameter(help="Copy directories recursively")] = False,
+    preserve: Annotated[bool, Parameter(help="Preserve file attributes")] = False,
+    verbose: bool = False,
 ):
-    """Work with files.
+    """Copy files or directories.
 
     Parameters
     ----------
-    input_file : Path
-        Input file to process.
-    output_file : Path, optional
-        Output file path.
-    directory : Path
-        Working directory.
-    format : Literal["json", "yaml", "toml", "xml"]
-        Output format.
+    source : Path
+        Source file or directory.
+    destination : Path
+        Destination file or directory.
+    recursive : bool
+        Copy directories recursively.
+    preserve : bool
+        Preserve file attributes (timestamps, permissions).
+    verbose : bool
+        Show verbose output.
     """
-    print(f"Files: input={input_file}, output={output_file}, dir={directory}, format={format}")
+    print(f"Copy: {source} -> {destination} (recursive={recursive}, preserve={preserve}, verbose={verbose})")
+
+
+@files_app.command
+def mv(
+    source: Path,
+    destination: Path,
+    /,
+    *,
+    force: Annotated[bool, Parameter(help="Force overwrite if destination exists")] = False,
+    backup: Annotated[bool, Parameter(help="Create backup of existing destination")] = False,
+    verbose: bool = False,
+):
+    """Move files or directories.
+
+    Parameters
+    ----------
+    source : Path
+        Source file or directory.
+    destination : Path
+        Destination file or directory.
+    force : bool
+        Force overwrite if destination exists.
+    backup : bool
+        Create backup of existing destination files.
+    verbose : bool
+        Show verbose output.
+    """
+    print(f"Move: {source} -> {destination} (force={force}, backup={backup}, verbose={verbose})")
+
+
+@files_app.command
+def ls(
+    path: Path = Path(),
+    /,
+    *,
+    all: Annotated[bool, Parameter(help="Show hidden files")] = False,
+    long: Annotated[bool, Parameter(help="Use long listing format")] = False,
+    sort_by: Literal["name", "size", "time", "extension"] = "name",
+    reverse: bool = False,
+):
+    """List directory contents.
+
+    Parameters
+    ----------
+    path : Path
+        Directory path to list (defaults to current directory).
+    all : bool
+        Show hidden files and directories.
+    long : bool
+        Use long listing format with details.
+    sort_by : Literal["name", "size", "time", "extension"]
+        Sort order.
+    reverse : bool
+        Reverse sort order.
+    """
+    print(f"List: {path} (all={all}, long={long}, sort_by={sort_by}, reverse={reverse})")
+
+
+@files_app.command
+def find(
+    pattern: str,
+    /,
+    *,
+    path: Path = Path(),
+    type: Literal["file", "directory", "symlink", "any"] = "any",
+    case_sensitive: bool = True,
+    max_depth: int | None = None,
+):
+    """Find files matching a pattern.
+
+    Parameters
+    ----------
+    pattern : str
+        Search pattern (supports wildcards).
+    path : Path
+        Root directory to search from.
+    type : Literal["file", "directory", "symlink", "any"]
+        Type of filesystem entry to find.
+    case_sensitive : bool
+        Case-sensitive pattern matching.
+    max_depth : int, optional
+        Maximum search depth (None for unlimited).
+    """
+    print(f"Find: pattern={pattern}, path={path}, type={type}, case_sensitive={case_sensitive}, max_depth={max_depth}")
+
+
+@app.command
+def positional_choice(param: Literal["foo", "bar", "baz"], /):
+    """Test positional-only parameter with Literal choices.
+
+    Parameters
+    ----------
+    param : Literal["foo", "bar", "baz"]
+        Choose one: foo, bar, or baz.
+    """
+    print(f"Called with: {param}")
+
+
+@app.command
+def multi_positional(
+    first: Literal["alpha", "beta", "gamma"],
+    second: Literal["red", "green", "blue"],
+    /,
+):
+    """Test multiple positional-only parameters with Literal choices.
+
+    Parameters
+    ----------
+    first : Literal["alpha", "beta", "gamma"]
+        First choice: Greek letters.
+    second : Literal["red", "green", "blue"]
+        Second choice: colors.
+    """
+    print(f"Called with: first={first}, second={second}")
 
 
 @app.command
