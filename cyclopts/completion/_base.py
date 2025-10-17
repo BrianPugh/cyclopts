@@ -115,7 +115,16 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
                     return action
         return CompletionAction.NONE
 
-    target_type = get_origin(type_hint) or type_hint
+    origin = get_origin(type_hint)
+
+    # For variadic positionals, unwrap tuple[T, ...] to get element type
+    if origin is tuple:
+        args = get_args(type_hint)
+        if args and len(args) >= 1:
+            # tuple[Path, ...] -> check first arg
+            return get_completion_action(args[0])
+
+    target_type = origin or type_hint
 
     if target_type is Path or is_class_and_subclass(target_type, Path):
         return CompletionAction.FILES
