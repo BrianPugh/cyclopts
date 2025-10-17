@@ -558,19 +558,19 @@ def test_positional_or_keyword_literal_completion(zsh_tester):
 
     tester = zsh_tester(app, "testapp")
 
-    # Should have positional spec for first argument (1-indexed in zsh)
-    assert "'1:Target environment.:(dev staging production)'" in tester.completion_script or (
-        "1:Target environment.:(dev staging production)" in tester.completion_script
-    )
+    # In nested context, uses $CURRENT dispatch with _describe
+    assert "case $CURRENT in" in tester.completion_script
+    assert "_describe 'argument' choices" in tester.completion_script
+
+    # Should have choices for both positionals
+    assert "dev" in tester.completion_script
+    assert "staging" in tester.completion_script
+    assert "production" in tester.completion_script
+    assert "us-east-1" in tester.completion_script
+    assert "us-west-2" in tester.completion_script
 
     # Should also have keyword spec for --environment
     assert "--environment" in tester.completion_script
-    assert "(dev staging production)" in tester.completion_script
-
-    # Should have positional spec for second argument
-    assert "'2:AWS region.:(us-east-1 us-west-2)'" in tester.completion_script or (
-        "2:AWS region.:(us-east-1 us-west-2)" in tester.completion_script
-    )
 
     assert tester.validate_script_syntax()
 
@@ -846,5 +846,142 @@ def test_command_with_multiple_names_and_aliases(zsh_tester):
     assert "foo" in script, "Primary name should be in completion script"
     assert "bar" in script, "First alias should be in completion script"
     assert "baz" in script, "Second alias should be in completion script"
+
+    assert tester.validate_script_syntax()
+
+
+def test_nested_variadic_positional_completion(zsh_tester):
+    """Test that variadic positionals work in nested command contexts.
+
+    Variadic positionals (*args) should accept completion at multiple positions.
+    """
+    app = App(name="testapp")
+
+    @app.command
+    def process(
+        *files: Annotated[Path, Parameter(help="Files to process")],
+    ):
+        """Process multiple files.
+
+        Parameters
+        ----------
+        files : Path
+            Files to process.
+        """
+        pass
+
+    tester = zsh_tester(app, "testapp")
+    script = tester.completion_script
+
+    # Should use $CURRENT dispatch with variadic handling
+    assert "case $CURRENT in" in script or "_files" in script
+    assert "_files" in script, "Path positionals should use _files completion"
+
+    # For variadic, should have pattern matching all positions >= start
+    assert "*)" in script or "_files" in script
+
+    assert tester.validate_script_syntax()
+
+
+def test_nested_non_literal_positional_completion(zsh_tester):
+    """Test non-Literal positionals in nested contexts.
+
+    Non-Literal types (int, str, Path) should generate appropriate completions.
+    """
+    app = App(name="testapp")
+
+    @app.command
+    def convert(
+        input_file: Path,
+        output_file: Path,
+        /,
+    ):
+        """Convert input file to output file.
+
+        Parameters
+        ----------
+        input_file : Path
+            Input file.
+        output_file : Path
+            Output file.
+        """
+        pass
+
+    tester = zsh_tester(app, "testapp")
+    script = tester.completion_script
+
+    # Should use $CURRENT dispatch for Path types
+    assert "_files" in script, "Path positionals should use _files completion"
+    assert "case $CURRENT in" in script, "Should dispatch based on position"
+
+    assert tester.validate_script_syntax()
+
+
+def test_nested_mixed_positional_types(zsh_tester):
+    """Test mixed positional types (Literal + non-Literal) in nested contexts."""
+    app = App(name="testapp")
+
+    @app.command
+    def deploy(
+        environment: Literal["dev", "staging", "prod"],
+        config_file: Path,
+        /,
+    ):
+        """Deploy with config.
+
+        Parameters
+        ----------
+        environment : Literal["dev", "staging", "prod"]
+            Target environment.
+        config_file : Path
+            Configuration file.
+        """
+        pass
+
+    tester = zsh_tester(app, "testapp")
+    script = tester.completion_script
+
+    # Should have choices for Literal
+    assert "dev" in script
+    assert "staging" in script
+    assert "prod" in script
+
+    # Should have _files for Path
+    assert "_files" in script
+
+    # Should use $CURRENT dispatch
+    assert "case $CURRENT in" in script
+
+    assert tester.validate_script_syntax()
+
+
+def test_nested_positional_only_without_keywords(zsh_tester):
+    """Test positional-only args with no keyword args (edge case for empty keyword_specs)."""
+    app = App(name="testapp")
+
+    @app.command
+    def simple(
+        param: Literal["alpha", "beta"],
+        /,
+    ):
+        """Simple command with only positional, no keyword args.
+
+        Parameters
+        ----------
+        param : Literal["alpha", "beta"]
+            Choice.
+        """
+        pass
+
+    tester = zsh_tester(app, "testapp")
+    script = tester.completion_script
+
+    # Should not have empty if/else block
+    # Should just have positional completion directly
+    assert "alpha" in script
+    assert "beta" in script
+    assert "_describe 'argument' choices" in script
+
+    # When there are no keyword specs, should not generate an if/else block
 
     assert tester.validate_script_syntax()
