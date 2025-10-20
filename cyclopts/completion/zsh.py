@@ -138,96 +138,71 @@ def _generate_run_command_completion(
     return [line.rstrip() for line in indented.split("\n")]
 
 
-def _generate_nested_positional_completion(
+def _generate_nested_positional_specs(
     positional_args: list["Argument"],
-    keyword_specs: list[str],
     help_format: str,
-    indent_str: str,
 ) -> list[str]:
-    """Generate completion for positional args in nested command context.
+    """Generate positional argument specs for nested command context.
 
-    In nested contexts (after *::arg:->args), positional completion uses
-    $CURRENT to check cursor position and _describe to provide completions.
-
-    Separates option completions (words starting with -) from positional
-    completions to avoid mixing them.
+    In nested contexts (after *::arg:->args), word indexing is shifted:
+    - words[1] = subcommand name
+    - words[2] = first positional argument
+    - words[3] = second positional argument, etc.
 
     Parameters
     ----------
     positional_args : list[Argument]
-        Positional arguments to generate completion for.
-    keyword_specs : list[str]
-        Keyword argument specs to include.
+        Positional arguments to generate specs for.
     help_format : str
         Help text format.
-    indent_str : str
-        Indentation string.
 
     Returns
     -------
     list[str]
-        Zsh completion code lines.
+        List of zsh positional argument specs.
     """
-    lines = []
+    specs = []
 
-    # If current word starts with '-', complete options only (if any exist)
-    if keyword_specs:
-        lines.append(f"{indent_str}if [[ $words[$CURRENT] == -* ]]; then")
-        lines.append(f"{indent_str}  _arguments \\")
-        for spec in keyword_specs[:-1]:
-            lines.append(f"{indent_str}    {spec} \\")
-        lines.append(f"{indent_str}    {keyword_specs[-1]}")
-        lines.append(f"{indent_str}else")
-
-    # Generate positional completion using $CURRENT dispatch
-    # In nested context (inside "case $words[1] in" after *::arg:->args):
-    #   words[1] = subcommand name (guaranteed by the case statement we're inside)
-    #   words[2] = first positional argument
-    #   words[3] = second positional argument, etc.
-    # Therefore: $CURRENT=2 for first positional, $CURRENT=3 for second, etc.
-
-    # Adjust indentation based on whether we're inside an if/else block
-    pos_indent = indent_str + "  " if keyword_specs else indent_str
-
-    # Check if we have variadic positionals (these match any position >= their index)
+    # Check if we have variadic positionals
     variadic_args = [arg for arg in positional_args if arg.is_var_positional()]
     non_variadic_args = [arg for arg in positional_args if not arg.is_var_positional()]
 
-    if len(non_variadic_args) == 1 and not variadic_args:
-        # Single non-variadic positional: simpler case, no dispatch needed
-        arg = non_variadic_args[0]
-        lines.extend(_generate_describe_completion(arg, help_format, pos_indent))
-    elif non_variadic_args or variadic_args:
-        # Multiple positionals or variadic: dispatch based on $CURRENT
-        lines.append(f"{pos_indent}case $CURRENT in")
+    # Generate specs for non-variadic positionals
+    for arg in non_variadic_args:
+        # Position in nested context: After *::arg:->args, $words[1] is the subcommand
+        # So positionals start at position 1 (not 2)
+        # Use 1-based indexing: first positional is '1:', second is '2:', etc.
+        pos = 1 + (arg.index or 0)
+        desc = _get_description_from_argument(arg, help_format)
 
-        # Handle non-variadic positionals first (exact position matches)
-        for arg in non_variadic_args:
-            # Position in $CURRENT: 2 + arg.index (words[1] is subcommand)
-            cursor_pos = 2 + (arg.index or 0)
-            lines.append(f"{pos_indent}  {cursor_pos})")
-            lines.extend(_generate_describe_completion(arg, help_format, pos_indent + "    "))
-            lines.append(f"{pos_indent}    ;;")
+        # Check for choices first (Literal/Enum types)
+        choices = arg.get_choices(force=True)
+        if choices:
+            escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+            choices_str = " ".join(escaped_choices)
+            action = f"({choices_str})"
+        else:
+            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
 
-        # Handle variadic positionals (match all positions >= their index)
-        if variadic_args:
-            for arg in variadic_args:
-                # Variadic matches all positions from its start position onward
-                start_pos = 2 + (arg.index or 0)
-                lines.append(f"{pos_indent}  *)")
-                lines.append(f"{pos_indent}    if (( $CURRENT >= {start_pos} )); then")
-                lines.extend(_generate_describe_completion(arg, help_format, pos_indent + "      "))
-                lines.append(f"{pos_indent}    fi")
-                lines.append(f"{pos_indent}    ;;")
+        spec = f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
+        specs.append(spec)
 
-        lines.append(f"{pos_indent}esac")
+    # Generate specs for variadic positionals
+    for arg in variadic_args:
+        desc = _get_description_from_argument(arg, help_format)
 
-    if keyword_specs:
-        lines.append(f"{indent_str}fi")
+        choices = arg.get_choices(force=True)
+        if choices:
+            escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+            choices_str = " ".join(escaped_choices)
+            action = f"({choices_str})"
+        else:
+            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
 
-    lines.append("")
+        spec = f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
+        specs.append(spec)
 
-    return lines
+    return specs
 
 
 def _generate_describe_completion(
@@ -318,6 +293,7 @@ def _generate_completion_for_path(
         return lines
 
     args_specs = []
+    positional_specs = []
 
     # Separate positional from keyword arguments
     # Include all arguments with an index (both positional-only and positional-or-keyword)
@@ -361,12 +337,16 @@ def _generate_completion_for_path(
     # Only add positionals if there are no subcommands (they conflict in zsh)
     if positional_args and not has_non_flag_commands:
         if command_path:
-            return _generate_nested_positional_completion(positional_args, args_specs, data.help_format, indent_str)
+            # Nested context: use shifted positional indexing (words[1] is subcommand)
+            positional_specs = _generate_nested_positional_specs(positional_args, data.help_format)
         else:
             # Root context: standard _arguments works fine
             for argument in positional_args:
                 spec = _generate_positional_spec(argument, data.help_format)
-                args_specs.append(spec)
+                positional_specs.append(spec)
+
+        # Add positionals BEFORE options to prioritize them in completion
+        args_specs = positional_specs + args_specs
 
     if has_non_flag_commands:
         args_specs.append("'1: :->cmds'")
