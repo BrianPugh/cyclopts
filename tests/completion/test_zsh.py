@@ -558,9 +558,11 @@ def test_positional_or_keyword_literal_completion(zsh_tester):
 
     tester = zsh_tester(app, "testapp")
 
-    # In nested context, uses $CURRENT dispatch with _describe
-    assert "case $CURRENT in" in tester.completion_script
-    assert "_describe 'argument' choices" in tester.completion_script
+    # In nested context, positionals are now included as specs in _arguments
+    # Positions are '1:' and '2:' (not '2:' and '3:') because after *::arg:->args,
+    # $words[1] is the subcommand and positionals start at position 1
+    assert "'1:Target environment.:(dev staging production)'" in tester.completion_script
+    assert "'2:AWS region.:(us-east-1 us-west-2)'" in tester.completion_script
 
     # Should have choices for both positionals
     assert "dev" in tester.completion_script
@@ -873,12 +875,11 @@ def test_nested_variadic_positional_completion(zsh_tester):
     tester = zsh_tester(app, "testapp")
     script = tester.completion_script
 
-    # Should use $CURRENT dispatch with variadic handling
-    assert "case $CURRENT in" in script or "_files" in script
+    # Should use _files completion for Path positionals
     assert "_files" in script, "Path positionals should use _files completion"
 
-    # For variadic, should have pattern matching all positions >= start
-    assert "*)" in script or "_files" in script
+    # For variadic, should have '*:desc:_files' spec
+    assert "'*:" in script, "Variadic positionals should use * spec"
 
     assert tester.validate_script_syntax()
 
@@ -910,9 +911,11 @@ def test_nested_non_literal_positional_completion(zsh_tester):
     tester = zsh_tester(app, "testapp")
     script = tester.completion_script
 
-    # Should use $CURRENT dispatch for Path types
+    # Should use _files completion for Path positionals
     assert "_files" in script, "Path positionals should use _files completion"
-    assert "case $CURRENT in" in script, "Should dispatch based on position"
+
+    # Should have positional specs with _files action
+    assert "'2:" in script and "'3:" in script, "Should have positional specs for both arguments"
 
     assert tester.validate_script_syntax()
 
@@ -949,8 +952,9 @@ def test_nested_mixed_positional_types(zsh_tester):
     # Should have _files for Path
     assert "_files" in script
 
-    # Should use $CURRENT dispatch
-    assert "case $CURRENT in" in script
+    # Should have positional specs in _arguments
+    assert "'2:" in script, "Should have first positional spec"
+    assert "'3:" in script, "Should have second positional spec"
 
     assert tester.validate_script_syntax()
 
@@ -976,12 +980,12 @@ def test_nested_positional_only_without_keywords(zsh_tester):
     tester = zsh_tester(app, "testapp")
     script = tester.completion_script
 
-    # Should not have empty if/else block
-    # Should just have positional completion directly
+    # Should have positional spec in _arguments
     assert "alpha" in script
     assert "beta" in script
-    assert "_describe 'argument' choices" in script
+    assert "'2:Choice.:(alpha beta)'" in script
 
-    # When there are no keyword specs, should not generate an if/else block
+    # Should use _arguments with positional specs
+    assert "_arguments" in script
 
     assert tester.validate_script_syntax()
