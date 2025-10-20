@@ -921,7 +921,9 @@ class Argument:
     def _json(self) -> dict:
         """Convert argument to be json-like for pydantic.
 
-        All values will be str/list/dict.
+        All values will be str/list/dict. JSON-serialized strings (from sources
+        like config files or environment variables) are deserialized back to their
+        original dict/list structure.
         """
         out = {}
         if self._accepts_keywords:
@@ -944,7 +946,14 @@ class Argument:
                     if token.implicit_value is not UNSET:
                         out.setdefault(keys[-1], []).extend(token.implicit_value)
                     else:
-                        out.setdefault(keys[-1], []).append(token.value)
+                        value = token.value
+                        # Deserialize JSON strings (from update_argument_collection) back to dict/list
+                        if isinstance(value, str) and value.strip() and value.strip()[0] in ("{", "["):
+                            try:
+                                value = json.loads(value)
+                            except json.JSONDecodeError:
+                                pass
+                        out.setdefault(keys[-1], []).append(value)
             else:
                 token = child.tokens[0]
                 out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value

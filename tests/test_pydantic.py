@@ -609,3 +609,37 @@ def test_pydantic_list_omitted(app, assert_parse_args):
         pass
 
     assert_parse_args(command, "")
+
+
+def test_pydantic_nested_list_json(app):
+    """Test that nested lists with JSON-serialized dicts are correctly parsed.
+
+    Regression test for issue where JSON dict strings in lists were not being
+    deserialized, causing Pydantic validation errors.
+    Related to https://github.com/BrianPugh/cyclopts/issues/507
+    """
+
+    class SimpleConfig(BaseModel):
+        bar: str
+
+    class NestedConfig(BaseModel):
+        foo: str
+        simple_list: list[SimpleConfig]
+
+    @app.command
+    def nested_cmd(config: NestedConfig) -> NestedConfig:
+        return config
+
+    result = app(
+        [
+            "nested-cmd",
+            "--config",
+            '{"foo": "test", "simple_list": [{"bar": "simple1"}]}',
+        ],
+        exit_on_error=False,
+    )
+
+    assert result == NestedConfig(
+        foo="test",
+        simple_list=[SimpleConfig(bar="simple1")],
+    )
