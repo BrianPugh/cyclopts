@@ -643,3 +643,47 @@ def test_pydantic_nested_list_json(app):
         foo="test",
         simple_list=[SimpleConfig(bar="simple1")],
     )
+
+
+def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):
+    """Test that Pydantic SecretStr works with environment variables.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/619
+    """
+    from pydantic import SecretStr
+
+    monkeypatch.setenv("SOME_SECRET", "cycloptsIsAmazing")
+
+    class ScriptSettings(BaseModel):
+        some_secret: SecretStr
+
+    @app.command
+    def test_cmd(s: Annotated[ScriptSettings, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        test_cmd,
+        "test-cmd",
+        ScriptSettings(some_secret=SecretStr("cycloptsIsAmazing")),
+    )
+
+
+def test_pydantic_secretstr_explicit_value(app, assert_parse_args):
+    """Test that Pydantic SecretStr works with explicit CLI values.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/619
+    """
+    from pydantic import SecretStr
+
+    class ScriptSettings(BaseModel):
+        some_secret: SecretStr
+
+    @app.command
+    def test_cmd(s: Annotated[ScriptSettings, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        test_cmd,
+        "test-cmd --some-secret mySecretValue",
+        ScriptSettings(some_secret=SecretStr("mySecretValue")),
+    )
