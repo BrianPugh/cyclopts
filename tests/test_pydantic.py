@@ -655,7 +655,7 @@ def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):
     monkeypatch.setenv("SOME_SECRET", "cycloptsIsAmazing")
 
     class ScriptSettings(BaseModel):
-        some_secret: SecretStr
+        some_secret: Annotated[SecretStr, Parameter(env_var="SOME_SECRET")]
 
     @app.command
     def test_cmd(s: Annotated[ScriptSettings, Parameter(name="*")]):
@@ -686,4 +686,25 @@ def test_pydantic_secretstr_explicit_value(app, assert_parse_args):
         test_cmd,
         "test-cmd --some-secret mySecretValue",
         ScriptSettings(some_secret=SecretStr("mySecretValue")),
+    )
+
+
+def test_pydantic_secretbytes(app, assert_parse_args):
+    """Test that Pydantic SecretBytes works with explicit CLI values.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/619
+    """
+    from pydantic import SecretBytes
+
+    class ScriptSettings(BaseModel):
+        some_secret: SecretBytes
+
+    @app.command
+    def test_cmd(s: Annotated[ScriptSettings, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        test_cmd,
+        "test-cmd --some-secret mySecretBytes",
+        ScriptSettings(some_secret=SecretBytes(b"mySecretBytes")),
     )

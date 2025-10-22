@@ -40,6 +40,16 @@ def is_pydantic(hint) -> bool:
     return hasattr(hint, "__pydantic_core_schema__")
 
 
+def is_pydantic_secret(hint) -> bool:
+    """Check if a type is a Pydantic secret type (SecretStr, SecretBytes, Secret, etc.)."""
+    return (
+        hasattr(hint, "__module__")
+        and hint.__module__ == "pydantic.types"
+        and hasattr(hint, "get_secret_value")
+        and callable(getattr(hint, "get_secret_value", None))
+    )
+
+
 def is_dataclass(hint) -> bool:
     return hasattr(hint, "__dataclass_fields__")
 
