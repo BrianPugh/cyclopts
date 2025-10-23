@@ -136,7 +136,9 @@ def _parse_kw_and_flags(
                 unused_tokens.append(token)
                 continue
         for argument, leftover_keys, implicit_value in matches:
-            if implicit_value is not UNSET:
+            if argument.parameter.count:
+                argument.append(CliToken(keyword=cli_option, implicit_value=1))
+            elif implicit_value is not UNSET:
                 # A flag was parsed
                 if cli_values:
                     try:

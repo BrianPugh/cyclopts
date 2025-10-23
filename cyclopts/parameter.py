@@ -249,6 +249,12 @@ class Parameter:
 
     json_list: bool | None = field(default=None, kw_only=True)
 
+    count: bool = field(
+        default=None,
+        converter=attrs.converters.default_if_none(False),
+        kw_only=True,
+    )
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
 
@@ -261,6 +267,9 @@ class Parameter:
         return self._name_transform if self._name_transform else default_name_transform
 
     def get_negatives(self, type_) -> tuple[str, ...]:
+        if self.count and self.negative is None:
+            return ()
+
         type_ = resolve_annotated(type_)
         if is_union(type_):
             out = []
