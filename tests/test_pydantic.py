@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 import pydantic
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator, validate_call
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretBytes, SecretStr, model_validator, validate_call
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
@@ -642,4 +642,52 @@ def test_pydantic_nested_list_json(app):
     assert result == NestedConfig(
         foo="test",
         simple_list=[SimpleConfig(bar="simple1")],
+    )
+
+
+def test_pydantic_secretstr_from_env(app, assert_parse_args, monkeypatch):
+    """Test that Pydantic SecretStr works with environment variables.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/619
+    """
+    monkeypatch.setenv("SOME_SECRET", "cycloptsIsAmazing")
+
+    class ScriptSettings(BaseModel):
+        some_secret: Annotated[SecretStr, Parameter(env_var="SOME_SECRET")]
+
+    @app.command
+    def test_cmd(s: Annotated[ScriptSettings, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        test_cmd,
+        "test-cmd",
+        ScriptSettings(some_secret=SecretStr("cycloptsIsAmazing")),
+    )
+
+
+@pytest.mark.parametrize(
+    "secret_type,value,expected_value",
+    [
+        (SecretStr, "mySecretValue", SecretStr("mySecretValue")),
+        (SecretBytes, "mySecretBytes", SecretBytes(b"mySecretBytes")),
+    ],
+)
+def test_pydantic_secret_explicit_value(app, assert_parse_args, secret_type, value, expected_value):
+    """Test that Pydantic secret types work with explicit CLI values.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/619
+    """
+
+    class ScriptSettings(BaseModel):
+        some_secret: secret_type  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.command
+    def test_cmd(s: Annotated[ScriptSettings, Parameter(name="*")]):
+        pass
+
+    assert_parse_args(
+        test_cmd,
+        f"test-cmd --some-secret {value}",
+        ScriptSettings(some_secret=expected_value),
     )

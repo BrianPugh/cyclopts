@@ -27,6 +27,7 @@ from cyclopts.annotations import (
     is_enum_flag,
     is_namedtuple,
     is_pydantic,
+    is_pydantic_secret,
     is_typeddict,
     resolve,
     resolve_annotated,
@@ -289,6 +290,10 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
     # Early return for builtin types (int, str, etc.) to avoid expensive introspection.
     # Provides ~5-6x speedup for argument parsing by skipping signature_parameters() calls.
     if is_builtin(hint):
+        return {}
+
+    # Pydantic secret types (SecretStr, SecretBytes) should be treated as simple types
+    if is_pydantic_secret(hint):
         return {}
 
     if is_dataclass(hint):
