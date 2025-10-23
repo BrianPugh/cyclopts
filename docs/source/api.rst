@@ -1248,6 +1248,42 @@ API
 
       2. The first character of the token is a ``[``.
 
+   .. attribute:: count
+      :type: bool
+      :value: False
+
+      If :obj:`True`, count the number of times the flag appears instead of parsing a value.
+      Each occurrence increments the count by 1 (e.g., ``-vvv`` results in ``3``).
+
+      Requirements and behavior:
+
+      * The parameter **must** have an :obj:`int` type hint (or ``Optional[int]``).
+      * Short flags can be concatenated: ``-vvv`` is equivalent to ``-v -v -v``.
+      * Long flags can be repeated: ``--verbose --verbose`` results in ``2``.
+      * Negative flag variants (e.g., ``--no-verbose``) are **not** generated.
+
+      Common use case: verbosity levels.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(verbose: Annotated[int, Parameter(name="-v", count=True)] = 0):
+            print(f"Verbosity level: {verbose}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script -vvv
+         Verbosity level: 3
+
+      See :ref:`Coercion Rules` for more details.
+
    .. automethod:: combine
 
    .. automethod:: default

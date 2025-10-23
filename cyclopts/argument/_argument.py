@@ -170,6 +170,18 @@ class Argument:
         hint = resolve(self.hint)
         hints = get_args(hint) if is_union(hint) else (hint,)
 
+        if self.parameter.count:
+            # Perform type-annotation validation.
+            resolved_hint = resolve_optional(hint)
+            # Technically, bool is a subclass of int, so we need to explicitly check.
+            if resolved_hint is bool or not (
+                resolved_hint is int or (isinstance(resolved_hint, type) and issubclass(resolved_hint, int))
+            ):
+                raise ValueError(
+                    f"Parameter(count=True) requires an int type hint, got {self.hint}. "
+                    f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
+                )
+
         if not self.parameter.parse:
             return
 
@@ -504,7 +516,7 @@ class Argument:
 
         if any(x.address == token.address for x in self.tokens):
             _, consume_all = self.token_count(token.keys)
-            if not consume_all:
+            if not consume_all and not self.parameter.count:
                 raise RepeatArgumentError(token=token)
 
         if self.tokens:
@@ -564,6 +576,8 @@ class Argument:
 
         if not self.parameter.parse:
             out = UNSET
+        elif self.parameter.count:
+            out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
         elif not self.children:
             positional: list[Token] = []
             keyword = {}
@@ -808,6 +822,9 @@ class Argument:
         consume_all: bool
             :obj:`True` if this data type is iterable.
         """
+        if self.parameter.count:
+            return 0, False
+
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:
