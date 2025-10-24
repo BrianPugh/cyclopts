@@ -129,6 +129,8 @@ class CommandSpec:
 
             app_kwargs.setdefault("help_flags", parent_app.help_flags)
             app_kwargs.setdefault("version_flags", parent_app.version_flags)
+            if "version" not in app_kwargs and parent_app.version is not None:
+                app_kwargs["version"] = parent_app.version
 
             _apply_parent_groups_to_kwargs(app_kwargs, parent_app)
 
