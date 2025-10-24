@@ -182,3 +182,57 @@ def test_group_validator_complete_argument_collection(app, mocker):
     custom_validator.assert_called_once()
     argument_collection_names = [x.name for x in custom_validator.call_args_list[0][0][0]]
     assert argument_collection_names == ["--car", "--motorcycle"]
+
+
+def test_limited_choice_negative_flag_error_message(app):
+    """Test for Issue #631: Error message should show the actual flag the user typed.
+
+    When a mutually exclusive validation error occurs, the error message should display
+    the exact flags the user provided, not alternative names for the same parameter.
+
+    This tests that negative flags (--neg) appear in error messages when used,
+    rather than showing the positive flag name (--affirm).
+    """
+    group = Group(show=False, validator=LimitedChoice())
+
+    @app.default
+    def cmd(
+        *,
+        param: Annotated[bool, Parameter(name=("--affirm", "-a"), negative=("--neg", "-n"), group=group)] = False,
+        opt: Annotated[int, Parameter(group=group)] = 0,
+    ):
+        pass
+
+    # Test with negative flag
+    with pytest.raises(ValidationError) as exc_info:
+        app("--neg --opt 10", exit_on_error=False)
+
+    error_message = str(exc_info.value)
+    assert "--neg" in error_message
+    assert "--opt" in error_message
+    assert "--affirm" not in error_message
+
+    # Test with positive flag
+    with pytest.raises(ValidationError) as exc_info:
+        app("--affirm --opt 10", exit_on_error=False)
+
+    error_message = str(exc_info.value)
+    assert "--affirm" in error_message
+    assert "--opt" in error_message
+    assert "--neg" not in error_message
+
+    # Test with short negative flag
+    with pytest.raises(ValidationError) as exc_info:
+        app("-n --opt 10", exit_on_error=False)
+
+    error_message = str(exc_info.value)
+    assert "-n" in error_message
+    assert "--opt" in error_message
+
+    # Test with short positive flag
+    with pytest.raises(ValidationError) as exc_info:
+        app("-a --opt 10", exit_on_error=False)
+
+    error_message = str(exc_info.value)
+    assert "-a" in error_message
+    assert "--opt" in error_message
