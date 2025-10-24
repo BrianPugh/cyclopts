@@ -4,7 +4,7 @@ import inspect
 import itertools
 import json
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, SupportsIndex, Union, overload
+from typing import TYPE_CHECKING, Any, SupportsIndex, overload
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -40,17 +40,17 @@ class ArgumentCollection(list[Argument]):
     def copy(self) -> "ArgumentCollection":
         """Returns a shallow copy of the :class:`ArgumentCollection`."""
         return type(self)(self)
-    
+
     @overload
     def __getitem__(self, term: SupportsIndex, /) -> Argument: ...
     @overload
-    def __getitem__(self, term: slice[Any, Any, Any], /) -> list[Argument]: ...
+    def __getitem__(self, term: slice, /) -> list[Argument]: ...
     @overload
     def __getitem__(self, term: str, /) -> Argument: ...
     def __getitem__(
         self,
-        term: Union[str, SupportsIndex, slice],
-    ) -> Union[Argument, list[Argument]]:
+        term: str | SupportsIndex | slice,
+    ) -> Argument | list[Argument]:
         if isinstance(term, (SupportsIndex, slice)):
             return super().__getitem__(term)
 
