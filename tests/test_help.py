@@ -687,6 +687,26 @@ def test_help_format_group_parameters_bool_flag_custom_negative(capture_format_g
     assert actual == expected
 
 
+@pytest.mark.parametrize("negative_str", ["--negative", "negative"])
+def test_help_format_group_parameters_bool_or_none_custom_negative(capture_format_group_parameters, negative_str):
+    """Test that custom negative doesn't appear twice for bool | None."""
+
+    def cmd(
+        param: Annotated[bool | None, Parameter(negative=negative_str, help="Docstring for param.")] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ PARAM --param --negative  Docstring for param.                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_list_flag(capture_format_group_parameters):
     def cmd(
         foo: Annotated[list[int] | None, Parameter(help="Docstring for foo.")] = None,
