@@ -102,9 +102,12 @@ class ArgumentCollection(list[Argument]):
         try:
             argument, _, _ = self.match(term, transform=transform, delimiter=delimiter)
             return argument
-        except (KeyError, IndexError):
+        except ValueError:
             if default is UNSET:
-                raise
+                if isinstance(term, str):
+                    raise KeyError(f"No such Argument: {term}") from None
+                else:
+                    raise IndexError(f"Argument index {term} out of range") from None
             return default
 
     def match(

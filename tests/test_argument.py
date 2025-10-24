@@ -562,3 +562,88 @@ def test_assemble_argument_collection_no_default_command():
 
     with pytest.raises(ValueError, match="Cannot assemble argument collection: no default command is registered"):
         app.assemble_argument_collection()
+
+
+def test_argument_collection_getitem_by_string():
+    def foo(alpha: int, beta: str):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    assert collection["--alpha"].field_info.name == "alpha"
+    assert collection["--alpha"].hint is int
+    assert collection["--beta"].field_info.name == "beta"
+    assert collection["--beta"].hint is str
+
+
+@pytest.mark.parametrize(
+    "slice_obj, expected_names",
+    [
+        (slice(1, 3), ["beta", "gamma"]),
+        (slice(5, 10), []),
+        (slice(-2, None), ["beta", "gamma"]),
+    ],
+)
+def test_argument_collection_getitem_by_slice(slice_obj, expected_names):
+    def foo(alpha: int, beta: str, gamma: float):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+    subset = collection[slice_obj]
+    assert isinstance(subset, list)
+    assert [arg.field_info.name for arg in subset] == expected_names
+
+
+def test_argument_collection_getitem_by_int():
+    def foo(alpha: int, beta: str, gamma: float):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    assert collection[0].field_info.name == "alpha"
+    assert collection[1].field_info.name == "beta"
+    assert collection[2].field_info.name == "gamma"
+
+
+@pytest.mark.parametrize(
+    "term, default, expected",
+    [
+        ("--nonexistent", "my_default", "my_default"),
+        (10, "my_default", "my_default"),
+    ],
+)
+def test_argument_collection_get_with_default(term, default, expected):
+    def foo(alpha: int, beta: str):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+    assert collection.get(term, default=default) == expected
+
+
+@pytest.mark.parametrize(
+    "term, exception_type, match_pattern",
+    [
+        ("--nonexistent", KeyError, "No such Argument: --nonexistent"),
+        (10, IndexError, "Argument index 10 out of range"),
+    ],
+)
+def test_argument_collection_get_not_found(term, exception_type, match_pattern):
+    def foo(alpha: int, beta: str):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+    with pytest.raises(exception_type, match=match_pattern):
+        collection.get(term)
+
+
+def test_argument_collection_getitem_not_found():
+    def foo(alpha: int, beta: str):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    with pytest.raises(KeyError, match="No such Argument: --nonexistent"):
+        _ = collection["--nonexistent"]
+
+    with pytest.raises(IndexError):
+        _ = collection[10]
