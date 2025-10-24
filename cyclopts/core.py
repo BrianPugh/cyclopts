@@ -273,6 +273,7 @@ class App:
         default=None, kw_only=True
     )
     help_on_error: bool | None = field(default=None, kw_only=True)
+    help_epilogue: str | None = field(default=None, kw_only=True)
 
     version_format: Literal["markdown", "md", "plaintext", "restructuredtext", "rst", "rich"] | None = field(
         default=None, kw_only=True
@@ -1995,6 +1996,14 @@ class App:
                     formatter = default_formatter
                 formatter = cast("HelpFormatter", formatter)
                 formatter(console, console.options, panel)
+
+            # Render epilogue
+            if help_epilogue := executing_app.app_stack.resolve("help_epilogue"):
+                from cyclopts.help import InlineText
+
+                console.print()  # Add blank line before epilogue
+                epilogue = InlineText.from_format(help_epilogue, format=help_format)
+                console.print(epilogue)
 
     def _assemble_help_panels(
         self,
