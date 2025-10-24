@@ -2333,3 +2333,201 @@ def test_help_flag_after_end_of_options_delimiter(app):
 
     result = app(["foo", "--", "--help", "-h"])
     assert result == ("foo", "--help", "-h")
+
+
+def test_help_epilogue_basic(app, console):
+    """Test basic epilogue rendering."""
+    app.help_epilogue = "This is an epilogue."
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+
+        This is an epilogue.
+        """
+    )
+    assert actual == expected
+
+
+def test_help_epilogue_multiline(app, console):
+    """Test epilogue with multiple lines using markdown double newlines."""
+    app.help_epilogue = "Line 1\n\nLine 2\n\nLine 3"
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    # With markdown (default), double newlines create separate paragraphs
+    assert "Line 1" in actual
+    assert "Line 2" in actual
+    assert "Line 3" in actual
+
+
+def test_help_epilogue_none(app, console):
+    """Test that None epilogue doesn't add extra lines."""
+    app.help_epilogue = None
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_epilogue_empty_string(app, console):
+    """Test that empty string epilogue doesn't render."""
+    app.help_epilogue = ""
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help -h  Display this message and exit.                          │
+        │ --version  Display application version.                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_epilogue_markdown(app, console):
+    """Test epilogue with markdown formatting."""
+    app.help_epilogue = "**Version 1.0.0**\n\nFor more info, visit *https://example.com*"
+    app.help_format = "markdown"
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    assert "Version 1.0.0" in actual
+    assert "https://example.com" in actual
+
+
+def test_help_epilogue_subcommand(app, console):
+    """Test that subcommands can have their own epilogue."""
+    subapp = App(
+        name="sub",
+        help="Subcommand help.",
+        help_epilogue="Subcommand epilogue.",
+    )
+    app.command(subapp)
+
+    with console.capture() as capture:
+        app(["sub"], console=console)
+
+    actual = capture.get()
+    assert "Subcommand epilogue." in actual
+    assert actual.endswith("Subcommand epilogue.\n")
+
+
+def test_help_epilogue_with_parameters(app, console):
+    """Test epilogue with parameters in help output."""
+
+    @app.default
+    def main(verbose: bool = False, count: int = 1):
+        """Main function."""
+        pass
+
+    app.help_epilogue = "Footer text here."
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    assert "verbose" in actual.lower()
+    assert "count" in actual.lower()
+    assert "Footer text here." in actual
+    # Note: With parameters, the epilogue should still appear at the end
+    assert "Footer text here." in actual
+
+
+def test_help_epilogue_inheritance(console):
+    """Test that epilogue inherits from parent to child (like help_format)."""
+    parent = App(
+        name="parent",
+        help="Parent help.",
+        help_epilogue="Parent epilogue.",
+        result_action="return_value",
+    )
+
+    child = App(
+        name="child",
+        help="Child help.",
+        # No help_epilogue - should inherit parent's epilogue
+    )
+
+    parent.command(child)
+
+    # Parent should show its epilogue
+    with console.capture() as capture:
+        parent(["--help"], console=console)
+
+    actual = capture.get()
+    assert "Parent epilogue." in actual
+
+    # Child should inherit and show parent's epilogue
+    with console.capture() as capture:
+        parent(["child", "--help"], console=console)
+
+    actual = capture.get()
+    assert "Parent epilogue." in actual
+    assert "Child help." in actual
+
+
+def test_help_epilogue_override(console):
+    """Test that child can override parent's epilogue."""
+    parent = App(
+        name="parent",
+        help="Parent help.",
+        help_epilogue="Parent epilogue.",
+        result_action="return_value",
+    )
+
+    child = App(
+        name="child",
+        help="Child help.",
+        help_epilogue="Child epilogue (overrides parent).",
+    )
+
+    parent.command(child)
+
+    # Parent shows its epilogue
+    with console.capture() as capture:
+        parent(["--help"], console=console)
+
+    actual = capture.get()
+    assert "Parent epilogue." in actual
+    assert "Child epilogue" not in actual
+
+    # Child shows its own epilogue (not parent's)
+    with console.capture() as capture:
+        parent(["child", "--help"], console=console)
+
+    actual = capture.get()
+    assert "Child epilogue (overrides parent)." in actual
+    assert "Parent epilogue." not in actual

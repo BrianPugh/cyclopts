@@ -145,6 +145,43 @@ API
 
       See :ref:`Help Customization` for detailed examples and advanced usage.
 
+   .. attribute:: help_epilogue
+      :type: Optional[str]
+      :value: None
+
+      Text to display at the end of the help screen, after all help panels.
+      Commonly used for version information, contact details, or additional notes.
+      If :obj:`None`, no epilogue is displayed.
+      If not set, attempts to inherit from parenting :class:`.App`.
+
+      The epilogue supports the same formatting as :attr:`help` based on :attr:`help_format` (markdown, plaintext, restructuredtext, or rich).
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(
+             name="myapp",
+             help="My application help.",
+             help_epilogue="Support: support@example.com"
+         )
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: myapp COMMAND
+
+         My application help.
+
+         ╭─ Commands ────────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                             │
+         │ --version  Display application version.                               │
+         ╰───────────────────────────────────────────────────────────────────────╯
+
+         Support: support@example.com
 
    .. attribute:: help_on_error
       :type: Optional[bool]
