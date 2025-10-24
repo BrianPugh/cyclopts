@@ -129,6 +129,8 @@ def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
         app._group_parameters = copy(parent_app._group_parameters)
     if app._group_arguments is None:
         app._group_arguments = copy(parent_app._group_arguments)
+    if app.version is None and parent_app.version is not None:
+        app.version = parent_app.version
 
 
 def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") -> None:
@@ -1263,6 +1265,8 @@ class App:
         else:
             kwargs.setdefault("help_flags", self.help_flags)
             kwargs.setdefault("version_flags", self.version_flags)
+            if "version" not in kwargs and self.version is not None:
+                kwargs["version"] = self.version
 
             _apply_parent_groups_to_kwargs(kwargs, self)
             app = type(self)(**kwargs)  # pyright: ignore
@@ -1521,7 +1525,7 @@ class App:
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
                 elif any(flag in tokens for flag in command_app.version_flags):
-                    command = _get_version_command(self)
+                    command = _get_version_command(command_app)
                     while meta_parent := meta_parent._meta_parent:
                         command = _get_version_command(meta_parent)
 
