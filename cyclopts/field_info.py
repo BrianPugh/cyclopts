@@ -234,7 +234,11 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
             required = False
             default = attribute.default
 
-        out[field_info.name] = field_info.evolve(names=(attribute.alias,), required=required, default=default)
+        help = attribute.metadata.get("help") if attribute.metadata else None
+
+        out[field_info.name] = field_info.evolve(
+            names=(attribute.alias,), required=required, default=default, help=help
+        )
     return out
 
 
@@ -259,12 +263,15 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
         kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
 
+        help = f.metadata.get("help") if f.metadata else None
+
         out[f.name] = FieldInfo(
             names=(f.name,),
             kind=kind,
             required=required,
             annotation=annotation,
             default=default,
+            help=help,
         )
     return out
 

@@ -180,3 +180,40 @@ def test_bind_attrs_alias(app, assert_parse_args):
 
     with pytest.raises(UnknownOptionError):
         app("--engine.cylinders 4 --engine.volume 100", exit_on_error=False)
+
+
+def test_attrs_field_metadata_help(app, console):
+    """Test that attrs field metadata={"help": "..."} is used for help text."""
+
+    @define
+    class Config:
+        name: str = field(default="default", metadata={"help": "Help from metadata."})
+
+        age: Annotated[int, Parameter(help="Parameter help takes precedence.")] = field(
+            default=25, metadata={"help": "This metadata help is ignored."}
+        )
+
+        count: int = field(default=10)
+        """Docstring for count."""
+
+        size: int = field(default=5, metadata={"help": "Metadata help overrides docstring."})
+        """This docstring is ignored."""
+
+    @app.default
+    def main(config: Config):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    assert "Help from metadata." in actual
+
+    assert "Parameter help takes precedence." in actual
+    assert "This metadata help is ignored." not in actual
+
+    assert "Docstring for count." in actual
+
+    assert "Metadata help overrides docstring." in actual
+    assert "This docstring is ignored." not in actual
