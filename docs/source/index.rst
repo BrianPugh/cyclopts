@@ -40,6 +40,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    args_and_kwargs.rst
    config_file.rst
    sphinx_integration.rst
+   mkdocs_integration.rst
    packaging.rst
    app_calling.rst
    meta_app.rst
