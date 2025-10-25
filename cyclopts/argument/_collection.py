@@ -56,9 +56,7 @@ class ArgumentCollection(list[Argument]):
         if isinstance(term, (SupportsIndex, slice)):
             return super().__getitem__(term)
 
-        if (item := self.get(term)) is None:
-            raise KeyError(f"No such Argument: {term}")
-        return item
+        return self.get(term)
 
     @overload
     def get(
