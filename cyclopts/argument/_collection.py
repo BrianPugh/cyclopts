@@ -4,7 +4,7 @@ import inspect
 import itertools
 import json
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, SupportsIndex, overload
+from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -29,6 +29,8 @@ from .utils import (
     to_cli_option_name,
     walk_leaves,
 )
+
+T = TypeVar("T")
 
 
 class ArgumentCollection(list[Argument]):
@@ -58,6 +60,24 @@ class ArgumentCollection(list[Argument]):
             raise KeyError(f"No such Argument: {term}")
         return item
 
+    @overload
+    def get(
+        self,
+        term: str | int,
+        default: type[UNSET] = ...,
+        *,
+        transform: Callable[[str], str] | None = None,
+        delimiter: str = ".",
+    ) -> Argument: ...
+    @overload
+    def get(
+        self,
+        term: str | int,
+        default: T,
+        *,
+        transform: Callable[[str], str] | None = None,
+        delimiter: str = ".",
+    ) -> Argument | T: ...
     def get(
         self,
         term: str | int,
@@ -65,7 +85,7 @@ class ArgumentCollection(list[Argument]):
         *,
         transform: Callable[[str], str] | None = None,
         delimiter: str = ".",
-    ) -> Argument | None:
+    ) -> Argument | Any:
         """Get an :class:`Argument` by name or index.
 
         This is a convenience wrapper around :meth:`match` that returns just
