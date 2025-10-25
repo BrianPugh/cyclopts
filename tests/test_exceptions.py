@@ -8,7 +8,6 @@ from cyclopts import (
     Argument,
     ArgumentOrderError,
     CoercionError,
-    CombinedShortOptionError,
     MissingArgumentError,
     MixedArgumentError,
     Parameter,
@@ -80,7 +79,8 @@ def test_exceptions_missing_argument_with_short_flag(app, console):
         pass
 
     with console.capture() as capture, pytest.raises(MissingArgumentError):
-        app("foo -o1", error_console=console, exit_on_error=False)
+        # Use just -o without a value (GNU-style -o1 now works)
+        app("foo -o", error_console=console, exit_on_error=False)
 
     actual = capture.get()
 
@@ -383,27 +383,20 @@ def test_exceptions_argument_order_error_plural(app, console):
 
 
 def test_exceptions_combined_short_option_error(app, console):
-    """Error message should reference the combined token the user typed, not individual flags."""
+    """With GNU-style support, -bo is now valid: -b with value 'o'.
+
+    The CombinedShortOptionError for mixing value-taking options is no longer possible
+    because the first value-taking option consumes the rest of the string as its value.
+    This test now verifies that GNU-style combinations work correctly.
+    """
 
     @app.command
     def foo(
         *,
-        flag: Annotated[bool, Parameter(name=("--flag", "-f"))] = False,
         bar: Annotated[str, Parameter(name=("--bar", "-b"))],
     ):
         pass
 
-    with console.capture() as capture, pytest.raises(CombinedShortOptionError):
-        app("foo -fb", error_console=console, exit_on_error=False)
-
-    actual = capture.get()
-
-    expected = dedent(
-        """\
-        ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Cannot combine flags and short-options in token -fb                │
-        ╰────────────────────────────────────────────────────────────────────╯
-        """
-    )
-
-    assert actual == expected
+    # -bo is now valid GNU-style: -b with value "o"
+    _, bound, _ = app.parse_args("foo -bo", exit_on_error=False)
+    assert bound.arguments["bar"] == "o"

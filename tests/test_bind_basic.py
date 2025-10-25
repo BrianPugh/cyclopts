@@ -7,7 +7,6 @@ from cyclopts import Parameter
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
-    CombinedShortOptionError,
     MissingArgumentError,
     RepeatArgumentError,
     UnknownCommandError,
@@ -236,9 +235,13 @@ def test_short_flag_combining_with_short_option(app, assert_parse_args):
     ):
         pass
 
-    with pytest.raises(CombinedShortOptionError):
-        # The flag "-e" is unknown
+    # With GNU-style support, -fb is now valid: -f (flag) + -b (needs value from next token)
+    # Since no next token exists, should raise MissingArgumentError
+    with pytest.raises(MissingArgumentError):
         app("-fb", exit_on_error=False)
+
+    # But -fb with a value should work
+    assert_parse_args(main, "-fb value", foo=True, bar="value")
 
 
 def test_short_integer_flag(app, assert_parse_args):
@@ -625,3 +628,320 @@ def test_end_of_options_delimiter_override(app, assert_parse_args_config):
         pass
 
     assert_parse_args_config({"end_of_options_delimiter": "DELIMIT"}, foo, "1 DELIMIT --2 3 4", 1, "--2", (3, 4))
+
+
+# ============================================================================
+# GNU-style combined short options tests
+# Tests for the feature where short options can be combined with their values
+# in a single token, similar to GNU getopt behavior.
+#
+# Examples:
+#     -o9         →  -o with value "9"
+#     -iuroot     →  -i (flag), -u with value "root"
+#     -fvbfile    →  -f (flag), -v (flag), -b with value "file"
+# ============================================================================
+
+
+def test_single_short_option_with_attached_value(app, assert_parse_args):
+    """Test that -o9 is equivalent to -o 9."""
+
+    @app.default
+    def main(output: Annotated[str, Parameter(name=("-o", "--output"))]):
+        pass
+
+    # Traditional syntax should still work
+    assert_parse_args(main, "-o 9", output="9")
+    assert_parse_args(main, "-o=9", output="9")
+
+    # NEW: Attached value should work
+    assert_parse_args(main, "-o9", output="9")
+
+
+def test_single_short_option_with_attached_string_value(app, assert_parse_args):
+    """Test that -ofile.txt works for string values."""
+
+    @app.default
+    def main(output: Annotated[str, Parameter(name=("-o", "--output"))]):
+        pass
+
+    # Traditional syntax
+    assert_parse_args(main, "-o file.txt", output="file.txt")
+
+    # NEW: Attached string value
+    assert_parse_args(main, "-ofile.txt", output="file.txt")
+    assert_parse_args(main, "-oroot", output="root")
+
+
+def test_combined_flags_before_option_with_value(app, assert_parse_args):
+    """Test sudo -iuroot style: flags followed by option with attached value."""
+
+    @app.default
+    def main(
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+        interactive: Annotated[bool, Parameter(name=("-i", "--interactive"))] = False,
+    ):
+        pass
+
+    # Traditional syntax
+    assert_parse_args(main, "-i -u root", interactive=True, user="root")
+
+    # NEW: GNU-style combined
+    assert_parse_args(main, "-iuroot", interactive=True, user="root")
+
+
+def test_multiple_flags_before_option_with_value(app, assert_parse_args):
+    """Test multiple flags combined with an option that takes a value."""
+
+    @app.default
+    def main(
+        output: Annotated[str, Parameter(name=("-o", "--output"))],
+        force: Annotated[bool, Parameter(name=("-f", "--force"))] = False,
+        verbose: Annotated[bool, Parameter(name=("-v", "--verbose"))] = False,
+    ):
+        pass
+
+    # Traditional syntax
+    assert_parse_args(main, "-f -v -o file.txt", force=True, verbose=True, output="file.txt")
+
+    # NEW: GNU-style combined
+    assert_parse_args(main, "-fvofile.txt", force=True, verbose=True, output="file.txt")
+    assert_parse_args(main, "-vfofile.txt", verbose=True, force=True, output="file.txt")
+
+
+def test_option_with_value_at_end_consumes_next_token(app, assert_parse_args):
+    """Test that -fu (without attached value) consumes next token."""
+
+    @app.default
+    def main(
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+        force: Annotated[bool, Parameter(name=("-f", "--force"))] = False,
+    ):
+        pass
+
+    # When -u is at the end without attached value, next token is the value
+    assert_parse_args(main, "-fu root", force=True, user="root")
+
+
+def test_option_with_value_in_middle_stops_processing(app, assert_parse_args):
+    """Test that once we hit an option with a value, rest is consumed as the value."""
+
+    @app.default
+    def main(
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+        force: Annotated[bool, Parameter(name=("-f", "--force"))] = False,
+        verbose: Annotated[bool, Parameter(name=("-v", "--verbose"))] = False,
+    ):
+        pass
+
+    # -fuvroot should be: -f (flag), -u with value "vroot"
+    # The 'v' is NOT treated as a flag, it's part of the value
+    assert_parse_args(main, "-fuvroot", force=True, user="vroot")
+
+
+def test_combined_short_options_numeric_value(app, assert_parse_args):
+    """Test numeric values attached to short options."""
+
+    @app.default
+    def main(
+        port: Annotated[int, Parameter(name=("-p", "--port"))],
+        verbose: Annotated[bool, Parameter(name=("-v", "--verbose"))] = False,
+    ):
+        pass
+
+    # Traditional syntax
+    assert_parse_args(main, "-v -p 8080", verbose=True, port=8080)
+
+    # NEW: Attached numeric value
+    assert_parse_args(main, "-vp8080", verbose=True, port=8080)
+    assert_parse_args(main, "-p8080", port=8080)
+
+
+def test_gnu_backward_compatibility_all_flags(app, assert_parse_args):
+    """Test that combining only flags still works (no regression)."""
+
+    @app.default
+    def main(
+        force: Annotated[bool, Parameter(name=("-f", "--force"))] = False,
+        verbose: Annotated[bool, Parameter(name=("-v", "--verbose"))] = False,
+        quiet: Annotated[bool, Parameter(name=("-q", "--quiet"))] = False,
+    ):
+        pass
+
+    # This should continue to work as before
+    assert_parse_args(main, "-fvq", force=True, verbose=True, quiet=True)
+    assert_parse_args(main, "-qvf", quiet=True, verbose=True, force=True)
+
+
+def test_gnu_backward_compatibility_space_separated(app, assert_parse_args):
+    """Ensure traditional space-separated syntax still works."""
+
+    @app.default
+    def main(
+        output: Annotated[str, Parameter(name=("-o", "--output"))],
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+    ):
+        pass
+
+    # Traditional syntax must still work
+    assert_parse_args(main, "-o file.txt -u root", output="file.txt", user="root")
+
+
+def test_gnu_backward_compatibility_equals_syntax(app, assert_parse_args):
+    """Ensure equals syntax still works."""
+
+    @app.default
+    def main(
+        output: Annotated[str, Parameter(name=("-o", "--output"))],
+    ):
+        pass
+
+    # Equals syntax must still work
+    assert_parse_args(main, "-o=file.txt", output="file.txt")
+    assert_parse_args(main, "--output=file.txt", output="file.txt")
+
+
+def test_empty_string_value_attached(app, assert_parse_args):
+    """Test edge case: can we have an empty attached value?"""
+
+    @app.default
+    def main(
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+        force: Annotated[bool, Parameter(name=("-f", "--force"))] = False,
+    ):
+        pass
+
+    # -fu with no characters after should consume next token
+    # This is actually the same as test_option_with_value_at_end_consumes_next_token
+    assert_parse_args(main, "-fu root", force=True, user="root")
+
+
+def test_counting_parameter_combined(app, assert_parse_args):
+    """Test that counting parameters work in combinations."""
+
+    @app.default
+    def main(
+        output: Annotated[str, Parameter(name=("-o", "--output"))],
+        verbose: Annotated[int, Parameter(name=("-v", "--verbose"), count=True)] = 0,
+    ):
+        pass
+
+    # Multiple v's for verbosity levels, then option with value
+    assert_parse_args(main, "-vvvofile.txt", verbose=3, output="file.txt")
+    assert_parse_args(main, "-vvofile.txt", verbose=2, output="file.txt")
+
+
+def test_only_option_no_flags(app, assert_parse_args):
+    """Test single option with attached value (simplest case)."""
+
+    @app.default
+    def main(
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+    ):
+        pass
+
+    assert_parse_args(main, "-uroot", user="root")
+    assert_parse_args(main, "-u root", user="root")
+
+
+def test_long_option_should_not_be_split(app, assert_parse_args):
+    """Test that long options (--) are NOT affected by this feature."""
+
+    @app.default
+    def main(
+        output: Annotated[str, Parameter(name=("--output",))],
+    ):
+        pass
+
+    # Long options should still require space or equals
+    assert_parse_args(main, "--output file.txt", output="file.txt")
+    assert_parse_args(main, "--output=file.txt", output="file.txt")
+
+    # --outputfile.txt should NOT be split into --output with value file.txt
+    # It should be treated as an unknown option "--outputfile.txt"
+    # (This maintains current behavior)
+
+
+def test_hyphenated_value_attached(app, assert_parse_args):
+    """Test that hyphenated values work when attached."""
+
+    @app.default
+    def main(
+        output: Annotated[str, Parameter(name=("-o", "--output"))],
+    ):
+        pass
+
+    # Value containing hyphens
+    assert_parse_args(main, "-omy-file.txt", output="my-file.txt")
+    assert_parse_args(main, "-o--weird-value", output="--weird-value")
+
+
+def test_special_characters_in_attached_value(app, assert_parse_args):
+    """Test special characters in attached values."""
+
+    @app.default
+    def main(
+        pattern: Annotated[str, Parameter(name=("-p", "--pattern"))],
+    ):
+        pass
+
+    # Special characters should be preserved
+    assert_parse_args(main, "-p*.txt", pattern="*.txt")
+    assert_parse_args(main, "-p[a-z]+", pattern="[a-z]+")
+    # Note: For short options with GNU-style attachment, = is part of the value
+    # Use -p "file=value" or --pattern=file for splitting on =
+    assert_parse_args(main, "-pfile=value", pattern="file=value")
+
+
+def test_multiple_options_only_first_gets_attached_value(app, assert_parse_args):
+    """Test behavior when multiple value-taking options are combined.
+
+    Only the first option can have an attached value. Once we hit a value-taking
+    option, everything after is the value.
+    """
+
+    @app.default
+    def main(
+        user: Annotated[str, Parameter(name=("-u", "--user"))],
+        password: Annotated[str | None, Parameter(name=("-p", "--password"))] = None,
+    ):
+        pass
+
+    # -uprootpass should be: -u with value "prootpass"
+    # The 'p' is NOT treated as another option, it's part of the value
+    assert_parse_args(main, "-uprootpass", user="prootpass")
+
+    # To set both, use separate options or space
+    assert_parse_args(main, "-uroot -ppass", user="root", password="pass")
+
+
+@pytest.mark.parametrize(
+    "cmd,expected_output",
+    [
+        ("-o9", "9"),
+        ("-o99", "99"),
+        ("-o123abc", "123abc"),
+        ("-oabc123", "abc123"),
+    ],
+)
+def test_various_attached_values(app, assert_parse_args, cmd, expected_output):
+    """Parametrized test for various value formats."""
+
+    @app.default
+    def main(output: Annotated[str, Parameter(name=("-o", "--output"))]):
+        pass
+
+    assert_parse_args(main, cmd, output=expected_output)
+
+
+def test_single_char_option_with_negative_value(app, assert_parse_args):
+    """Test that -o-5 treats -5 as the value for -o."""
+
+    @app.default
+    def main(
+        offset: Annotated[int, Parameter(name=("-o", "--offset"))],
+    ):
+        pass
+
+    # -o-5 should be: -o with value "-5"
+    # This tests that the "-5" part is treated as a value, not as a separate option
+    assert_parse_args(main, "-o-5", offset=-5)

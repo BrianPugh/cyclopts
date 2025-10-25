@@ -117,33 +117,69 @@ def _parse_kw_and_flags(
         # startswith("-") is redundant, but it's cheap safety.
         allow_combined_flags = token.startswith("-") and not token.startswith("--")
 
+        # Try splitting on "=" for long options or short options that match exactly
         if "=" in token:
             cli_option, cli_value = token.split("=", 1)
-            cli_values.append(cli_value)
-            consume_count -= 1
-
-            # Cannot have combined flags when an "=" is parsed.
-            allow_combined_flags = False
+            # Try to match the part before "="
+            try:
+                argument_collection.match(cli_option)
+                # Matched! Use the split
+                cli_values.append(cli_value)
+                consume_count -= 1
+                allow_combined_flags = False
+            except ValueError:
+                # No match - might be GNU-style like "-pfile=value"
+                # Don't split, treat whole token as the option
+                cli_option = token
         else:
             cli_option = token
 
         matches: list[_KeywordMatch] = []
+        attached_value: str | None = None  # Track value attached to a GNU-style combined option
         try:
             matches.append(_KeywordMatch(cli_option, *argument_collection.match(cli_option)))
         except ValueError:
             # Length has to be greater than 2 (hyphen + character) to be exploded.
             if allow_combined_flags and len(token) > 2:
-                # since no direct match was found, try to see if this was a combination of short flags.
-                flags = [f"-{x}" for x in cli_option.lstrip("-")]
-                for flag in flags:
+                # GNU-style combined short options: process left-to-right
+                # Once we hit an option that takes a value, the rest is the value
+                chars = cli_option.lstrip("-")
+                position = 0
+
+                while position < len(chars):
+                    char = chars[position]
+                    test_flag = f"-{char}"
+
                     try:
-                        matches.append(_KeywordMatch(flag, *argument_collection.match(flag)))
+                        arg, keys, implicit = argument_collection.match(test_flag)
+
+                        if implicit is not UNSET or arg.parameter.count:
+                            # This is a flag (boolean or counting) - consume just this character
+                            matches.append(_KeywordMatch(test_flag, arg, keys, implicit))
+                            position += 1
+                        else:
+                            # This option takes a value - rest of the string is the value
+                            remainder = chars[position + 1 :]
+                            matches.append(_KeywordMatch(test_flag, arg, keys, implicit))
+                            if remainder:
+                                # Value is attached: -uroot or -fvuroot
+                                # Store it separately, will be added to cli_values when processing this match
+                                attached_value = remainder
+                                consume_count -= 1
+                            # Stop processing further characters
+                            break
+
                     except ValueError:
+                        # Unknown flag
                         if stop_at_first_unknown:
-                            # Can't parse this flag combination, stop here
                             unused_tokens.extend(tokens[i:])
                             return unused_tokens
-                        unused_tokens.append(flag)
+                        unused_tokens.append(test_flag)
+                        position += 1
+
+                if not matches:
+                    # No valid matches found at all
+                    continue
             else:
                 if stop_at_first_unknown:
                     # Unknown option, stop parsing and return all remaining tokens
@@ -151,7 +187,12 @@ def _parse_kw_and_flags(
                     return unused_tokens
                 unused_tokens.append(token)
                 continue
-        for match in matches:
+        for match_index, match in enumerate(matches):
+            # For GNU-style combined options, add the attached value only when processing
+            # the last match (the value-taking option), not for preceding flags
+            if attached_value is not None and match_index == len(matches) - 1:
+                cli_values.append(attached_value)
+
             if match.argument.parameter.count:
                 match.argument.append(CliToken(keyword=match.matched_token, implicit_value=1))
             elif match.implicit_value is not UNSET:
@@ -181,9 +222,20 @@ def _parse_kw_and_flags(
                             pass
                 else:
                     match.argument.append(CliToken(keyword=match.matched_token, implicit_value=match.implicit_value))
-            elif len(matches) != 1:
-                raise CombinedShortOptionError(msg=f"Cannot combine flags and short-options in token {cli_option}")
             else:
+                # This is a value-taking option (not a flag or counting parameter)
+                # Error only if we're trying to combine multiple value-taking options without values
+                # (e.g., -fu where both -f and -u take values would be invalid)
+                # But -fu where -f is a flag and -u takes a value is valid (GNU-style)
+                if len(matches) > 1:
+                    # Count how many value-taking options we have
+                    value_taking_count = sum(
+                        1 for m in matches if m.implicit_value is UNSET and not m.argument.parameter.count
+                    )
+                    if value_taking_count > 1:
+                        raise CombinedShortOptionError(
+                            msg=f"Cannot combine multiple value-taking options in token {cli_option}"
+                        )
                 tokens_per_element, consume_all = match.argument.token_count(match.keys)
 
                 # Consume the appropriate number of tokens
