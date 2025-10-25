@@ -4,7 +4,7 @@ import inspect
 import itertools
 import json
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -30,6 +30,8 @@ from .utils import (
     walk_leaves,
 )
 
+T = TypeVar("T")
+
 
 class ArgumentCollection(list[Argument]):
     """A list-like container for :class:`Argument`."""
@@ -41,6 +43,39 @@ class ArgumentCollection(list[Argument]):
         """Returns a shallow copy of the :class:`ArgumentCollection`."""
         return type(self)(self)
 
+    @overload
+    def __getitem__(self, term: SupportsIndex, /) -> Argument: ...
+    @overload
+    def __getitem__(self, term: slice, /) -> list[Argument]: ...
+    @overload
+    def __getitem__(self, term: str, /) -> Argument: ...
+    def __getitem__(
+        self,
+        term: str | SupportsIndex | slice,
+    ) -> Argument | list[Argument]:
+        if isinstance(term, (SupportsIndex, slice)):
+            return super().__getitem__(term)
+
+        return self.get(term)
+
+    @overload
+    def get(
+        self,
+        term: str | int,
+        default: type[UNSET] = ...,
+        *,
+        transform: Callable[[str], str] | None = None,
+        delimiter: str = ".",
+    ) -> Argument: ...
+    @overload
+    def get(
+        self,
+        term: str | int,
+        default: T,
+        *,
+        transform: Callable[[str], str] | None = None,
+        delimiter: str = ".",
+    ) -> Argument | T: ...
     def get(
         self,
         term: str | int,
@@ -48,7 +83,7 @@ class ArgumentCollection(list[Argument]):
         *,
         transform: Callable[[str], str] | None = None,
         delimiter: str = ".",
-    ) -> Argument | None:
+    ) -> Argument | Any:
         """Get an :class:`Argument` by name or index.
 
         This is a convenience wrapper around :meth:`match` that returns just
@@ -85,9 +120,12 @@ class ArgumentCollection(list[Argument]):
         try:
             argument, _, _ = self.match(term, transform=transform, delimiter=delimiter)
             return argument
-        except (KeyError, IndexError):
+        except ValueError:
             if default is UNSET:
-                raise
+                if isinstance(term, str):
+                    raise KeyError(f"No such Argument: {term}") from None
+                else:
+                    raise IndexError(f"Argument index {term} out of range") from None
             return default
 
     def match(
