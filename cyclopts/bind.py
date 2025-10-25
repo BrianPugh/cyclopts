@@ -182,9 +182,7 @@ def _parse_kw_and_flags(
                 else:
                     match.argument.append(CliToken(keyword=match.matched_token, implicit_value=match.implicit_value))
             elif len(matches) != 1:
-                raise CombinedShortOptionError(
-                    msg=f"Cannot combine flags and short-options in token {match.matched_token}"
-                )
+                raise CombinedShortOptionError(msg=f"Cannot combine flags and short-options in token {cli_option}")
             else:
                 tokens_per_element, consume_all = match.argument.token_count(match.keys)
 
