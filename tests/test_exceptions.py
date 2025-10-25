@@ -8,6 +8,7 @@ from cyclopts import (
     Argument,
     ArgumentOrderError,
     CoercionError,
+    CombinedShortOptionError,
     MissingArgumentError,
     MixedArgumentError,
     Parameter,
@@ -374,6 +375,33 @@ def test_exceptions_argument_order_error_plural(app, console):
         │ previously specified keywords ['--a', '--b']. ['--a', '--b'] must  │
         │ either be passed positionally, or '3' must be passed as a keyword  │
         │ to '--c'.                                                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
+def test_exceptions_combined_short_option_error(app, console):
+    """Error message should reference the combined token the user typed, not individual flags."""
+
+    @app.command
+    def foo(
+        *,
+        flag: Annotated[bool, Parameter(name=("--flag", "-f"))] = False,
+        bar: Annotated[str, Parameter(name=("--bar", "-b"))],
+    ):
+        pass
+
+    with console.capture() as capture, pytest.raises(CombinedShortOptionError):
+        app("foo -fb", error_console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Cannot combine flags and short-options in token -fb                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
