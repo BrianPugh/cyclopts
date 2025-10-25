@@ -325,6 +325,9 @@ class MissingArgumentError(CycloptsError):
     tokens_so_far: list[str] = field(factory=list)
     """If the matched parameter requires multiple tokens, these are the ones we have parsed so far."""
 
+    keyword: str | None = None
+    """The keyword that was used when the error was raised (e.g., '-o' instead of '--option')."""
+
     def __str__(self):
         assert self.argument is not None
         strings = []
@@ -350,12 +353,21 @@ class MissingArgumentError(CycloptsError):
             if close_matches and close_matches[0] not in self.argument.names:
                 close_match_string = f'Did you mean "{self.argument.name}" instead of "{close_matches[0]}"?'
 
+        param_name = self.argument.name
+        if self.keyword is not None:
+            param_name = self.keyword
+        elif self.argument.tokens:
+            for token in reversed(self.argument.tokens):
+                if token.keyword is not None:
+                    param_name = token.keyword
+                    break
+
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{self.argument.name}" {required_string}.{only_got_string}'
+                f'Command "{" ".join(self.command_chain)}" parameter "{param_name}" {required_string}.{only_got_string}'
             )
         else:
-            strings.append(f'Parameter "{self.argument.name}" {required_string}.{only_got_string}')
+            strings.append(f'Parameter "{param_name}" {required_string}.{only_got_string}')
 
         if close_match_string:
             strings.append(close_match_string)

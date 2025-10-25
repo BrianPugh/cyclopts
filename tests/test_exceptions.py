@@ -71,6 +71,29 @@ def test_exceptions_missing_argument_flag(app, console):
     assert actual == expected
 
 
+def test_exceptions_missing_argument_with_short_flag(app, console):
+    """Error message should reference the flag actually used, not the canonical name."""
+
+    @app.command
+    def foo(option: Annotated[int, Parameter(alias="-o")]):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        app("foo -o1", error_console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "-o" requires an argument.                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
 def test_exceptions_validation_error_cli_single_positional(app, console):
     argument = Argument(
         hint=int,
