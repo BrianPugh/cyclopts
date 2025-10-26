@@ -145,6 +145,49 @@ def test_help_and_version_flags_together(app, console):
     assert "INPUT-FILE" in output
 
 
+def test_version_and_help_flags_together(console):
+    """Test that help flag takes priority when --version --help are provided (version first).
+
+    Regression test for issue #645 where having multiple --version/--help flags caused
+    NameError: name 'Console' is not defined.
+    """
+    import pytest
+
+    from cyclopts import App
+
+    # Create app without result_action override to reproduce the issue
+    app = App(name="myapp", version="1.0.0")
+
+    @app.command
+    def files(
+        input_file: Path,
+        output_file: Path | None = None,
+    ):
+        """Work with files."""
+        pass
+
+    # Test with multiple help/version flags - should show help and exit cleanly
+    # The issue occurs when more than one help/version flag is present
+    with console.capture() as capture:
+        with pytest.raises(SystemExit) as exc_info:
+            app(["files", "--version", "--help", "--help"], console=console)
+        assert exc_info.value.code == 0
+
+    output = capture.get()
+    assert "Work with files" in output
+    assert "INPUT-FILE" in output
+
+    # Test with different combinations
+    with console.capture() as capture:
+        with pytest.raises(SystemExit) as exc_info:
+            app(["files", "--help", "--version", "--version"], console=console)
+        assert exc_info.value.code == 0
+
+    output = capture.get()
+    assert "Work with files" in output
+    assert "INPUT-FILE" in output
+
+
 def test_subcommand_version(console):
     """Test that subcommands display their own version, not the parent's version.
 

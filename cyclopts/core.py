@@ -1479,12 +1479,15 @@ class App:
         # We don't want the command_app to be the version/help handler; we handle those specially
         command_app = execution_apps[-1]
         with suppress(IndexError):
-            # command_chain can be empty when app is invoked at root level with no commands (e.g., "myapp --help")
-            # Check what the user actually typed (command_chain) rather than the app's declared name
-            if command_chain and command_chain[-1] in set(
+            # Remove trailing help/version commands from the execution chain.
+            # When users provide multiple flags (e.g., "myapp cmd --help --help"), the parser
+            # may treat trailing help/version flags as commands in the chain. We must remove ALL
+            # such trailing commands and keep command_chain synchronized with execution_apps.
+            while command_chain and command_chain[-1] in set(
                 execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
             ):
                 execution_apps = execution_apps[:-1]
+                command_chain = command_chain[:-1]
 
         command_app = execution_apps[-1]
         del execution_apps  # Always use AppStack from here-on.
@@ -1503,20 +1506,13 @@ class App:
 
             try:
                 if help_flag_index is not None:
-                    tokens.pop(help_flag_index)
-
-                    help_flag_index = _get_help_flag_index(
-                        unused_tokens, command_app.help_flags, end_of_options_delimiter
-                    )
-                    if help_flag_index is not None:
-                        unused_tokens.pop(help_flag_index)
-
-                    # Remove version flags when help is present to ensure help takes priority
-                    for version_flag in command_app.version_flags:
-                        with suppress(ValueError):
-                            tokens.remove(version_flag)
-                        with suppress(ValueError):
-                            unused_tokens.remove(version_flag)
+                    # Remove ALL help and version flags from both token lists.
+                    # Users can provide multiple flags (e.g., "myapp --help --help --version").
+                    # When help is requested, it takes priority over version, so we remove all
+                    # occurrences of both flag types to prevent downstream parsing errors.
+                    flags_to_remove = set(command_app.help_flags + command_app.version_flags)  # pyright: ignore[reportOperatorIssue]
+                    tokens[:] = [t for t in tokens if t not in flags_to_remove]
+                    unused_tokens[:] = [t for t in unused_tokens if t not in flags_to_remove]
 
                     command = self.help_print
                     while meta_parent := meta_parent._meta_parent:
