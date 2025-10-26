@@ -427,8 +427,8 @@ class App:
 
     @version_flags.setter
     def version_flags(self, value):
-        self._version_flags = value
         self._delete_commands(self._version_flags)
+        self._version_flags = value
         if self._version_flags:
             self.command(
                 self.version_print,
@@ -445,8 +445,8 @@ class App:
 
     @help_flags.setter
     def help_flags(self, value):
-        self._help_flags = value
         self._delete_commands(self._help_flags)
+        self._help_flags = value
         if self._help_flags:
             self.command(
                 self.help_print,
