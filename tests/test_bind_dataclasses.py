@@ -472,3 +472,39 @@ def test_dataclass_field_metadata_help(app, console):
 
     assert "Metadata help overrides docstring." in actual
     assert "This docstring is ignored." not in actual
+
+
+def test_bind_dataclass_direct_parent_match_issue_647(app, assert_parse_args):
+    """Test that --foo bar baz correctly converts to Foo(name="bar", age=25).
+
+    Previously, parent arguments with children would match directly (e.g., --foo),
+    consume tokens, but then fail to properly construct the object because
+    children had no tokens. The fix allows parent arguments to convert their
+    tokens as positional arguments to the structured type.
+
+    See: https://github.com/BrianPugh/cyclopts/issues/647
+    """
+
+    @dataclass
+    class Foo:
+        name: str
+        age: int
+
+    @app.default
+    def cmd(*, foo: Annotated[Foo, Parameter()] = Foo(name="default", age=0)):  # noqa: B008
+        return foo
+
+    # This should work: directly provide values after parent name (positional-style)
+    assert_parse_args(cmd, "--foo bar 25", foo=Foo(name="bar", age=25))
+
+    # This should also still work: explicit nested keys
+    assert_parse_args(cmd, "--foo.name baz --foo.age 30", foo=Foo(name="baz", age=30))
+
+    # Mix of parent positional and nested key should work
+    assert_parse_args(cmd, "--foo alice 42", foo=Foo(name="alice", age=42))
+
+    # No arguments should use the function default (tested separately)
+    _, bound, _ = app.parse_args("", print_error=False, exit_on_error=False)
+    assert "foo" not in bound.arguments
+    result = cmd(**bound.arguments)
+    assert result == Foo(name="default", age=0)

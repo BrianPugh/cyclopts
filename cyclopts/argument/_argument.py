@@ -671,6 +671,11 @@ class Argument:
             if self._use_pydantic_type_adapter:
                 return self._convert_pydantic()
 
+            if self.tokens and not self._enum_flag_type:
+                positional_tokens = [token for token in self.tokens if not token.keys]
+                if positional_tokens:
+                    return safe_converter(self.hint, tuple(positional_tokens))
+
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child.has_tokens:
