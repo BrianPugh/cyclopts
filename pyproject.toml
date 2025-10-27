@@ -64,6 +64,9 @@ Repository = "https://github.com/BrianPugh/cyclopts"
 [tool.hatch.version]
 source = "vcs"
 
+[tool.hatch.build.hooks.vcs]
+version-file = "cyclopts/_version.py"
+
 [tool.hatch.build.targets.sdist]
 include = ["/cyclopts"]
 

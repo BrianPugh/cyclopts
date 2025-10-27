@@ -245,6 +245,9 @@ Temporary Items
 cyclopts/_c_extension.c
 cyclopts/*.html
 
+# Auto-generated version file (only exists after build)
+cyclopts/_version.py
+
 # line-profiler
 *.lprof
 
