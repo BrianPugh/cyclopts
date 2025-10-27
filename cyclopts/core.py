@@ -691,7 +691,7 @@ class App:
 
     def version_print(
         self,
-        console: Optional["Console"] = None,
+        console: Annotated[Optional["Console"], Parameter(parse=False)] = None,
     ) -> None:
         """Print the application version.
 
@@ -717,7 +717,7 @@ class App:
 
     async def _version_print_async(
         self,
-        console: Optional["Console"] = None,
+        console: Annotated[Optional["Console"], Parameter(parse=False)] = None,
     ) -> None:
         """Async version of version_print for handling async version callables.
 
