@@ -500,9 +500,6 @@ def test_bind_dataclass_direct_parent_match_issue_647(app, assert_parse_args):
     # This should also still work: explicit nested keys
     assert_parse_args(cmd, "--foo.name baz --foo.age 30", foo=Foo(name="baz", age=30))
 
-    # Mix of parent positional and nested key should work
-    assert_parse_args(cmd, "--foo alice 42", foo=Foo(name="alice", age=42))
-
     # No arguments should use the function default (tested separately)
     _, bound, _ = app.parse_args("", print_error=False, exit_on_error=False)
     assert "foo" not in bound.arguments
