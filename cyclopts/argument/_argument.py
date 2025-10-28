@@ -13,6 +13,7 @@ from attrs import define, field
 from cyclopts._convert import (
     ITERABLE_TYPES,
     convert,
+    instantiate_from_dict,
     token_count,
 )
 from cyclopts.annotations import (
@@ -696,7 +697,7 @@ class Argument:
                 if not out:
                     out = UNSET
             elif data:
-                out = self.hint(**data)
+                out = instantiate_from_dict(self.hint, data)
             elif self.required:
                 raise MissingArgumentError(argument=self)  # pragma: no cover
             else:
