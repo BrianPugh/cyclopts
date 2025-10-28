@@ -16,7 +16,7 @@ from cyclopts.annotations import resolve_annotated
 from cyclopts.core import _get_root_module_name
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
-from cyclopts.help.silent import SILENT
+from cyclopts.help.silent import SILENT, SilentRich
 from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
 
 if TYPE_CHECKING:
@@ -304,7 +304,7 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
-def format_doc(app: "App", format: str):
+def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     raw_doc_string = app.help
 
     if not raw_doc_string:

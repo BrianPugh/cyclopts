@@ -2,12 +2,14 @@
 
 import functools
 import inspect
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from attrs import field, frozen
+
+T = TypeVar("T")
 
 # https://threeofwands.com/attra-iv-zero-overhead-frozen-attrs-classes/
 if TYPE_CHECKING:
@@ -40,10 +42,10 @@ class UNSET(Sentinel):
     """Special sentinel value indicating that no data was provided. **Do not instantiate**."""
 
 
-def record_init(target: str):
+def record_init(target: str) -> Callable[[type[T]], type[T]]:
     """Class decorator that records init argument names as a tuple to ``target``."""
 
-    def decorator(cls):
+    def decorator(cls: type[T]) -> type[T]:
         original_init = cls.__init__
         function_signature = inspect.signature(original_init)
         param_names = tuple(name for name in function_signature.parameters if name != "self")

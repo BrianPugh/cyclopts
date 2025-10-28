@@ -118,7 +118,9 @@ def startswith(string, prefix):
     return normalize(string).startswith(normalize(prefix))
 
 
-def missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
+def missing_keys_factory(
+    get_field_info: Callable[[Any], dict[str, FieldInfo]],
+) -> Callable[["Argument", dict[str, Any]], list[str]]:
     def inner(argument: "Argument", data: dict[str, Any]) -> list[str]:
         provided_keys = set(data)
         field_info = get_field_info(argument.hint)
