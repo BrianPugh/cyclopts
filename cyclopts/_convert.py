@@ -12,6 +12,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
+    TypeVar,
     Union,
     get_args,
     get_origin,
@@ -35,6 +36,8 @@ else:  # pragma: no cover
 if TYPE_CHECKING:
     from cyclopts.argument import Token
 
+
+T = TypeVar("T")
 
 _implicit_iterable_type_mapping: dict[type, type] = {
     Iterable: list[str],
@@ -381,7 +384,7 @@ def _create_json_decode_error_message(
     return f"Invalid JSON for {type_.__name__}:\n    {snippet}\n    {' ' * marker_pos}^ {error.msg}{hint}"
 
 
-def instantiate_from_dict(type_: type, data: dict[str, Any]) -> Any:
+def instantiate_from_dict(type_: type[T], data: dict[str, Any]) -> T:
     """Instantiate a type with proper handling of parameter kinds.
 
     Respects POSITIONAL_ONLY, KEYWORD_ONLY, and POSITIONAL_OR_KEYWORD parameter kinds
@@ -395,14 +398,14 @@ def instantiate_from_dict(type_: type, data: dict[str, Any]) -> Any:
 
     Parameters
     ----------
-    type_ : type
+    type_ : type[T]
         The type to instantiate.
     data : dict[str, Any]
         Dictionary mapping field names to values.
 
     Returns
     -------
-    Any
+    T
         Instance of type_ constructed from data.
     """
     field_infos = get_field_infos(type_)
