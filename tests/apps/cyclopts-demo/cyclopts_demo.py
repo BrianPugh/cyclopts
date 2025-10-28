@@ -230,6 +230,29 @@ def process(
     print(f"Process: items={items}, count={count}, threshold={threshold}, tags={tags}, exclude={exclude}")
 
 
+@app.command
+def concat(
+    files: Annotated[list[Path], Parameter(help="Files to concatenate")],
+    output: Annotated[Path | None, Parameter(help="Output file (defaults to stdout)")] = None,
+    add_separators: bool = False,
+):
+    """Concatenate multiple files.
+
+    This command demonstrates list[Path] completion (issue #654).
+    Try tab-completing after --files to see file completion work!
+
+    Parameters
+    ----------
+    files : list[Path]
+        Files to concatenate together.
+    output : Path, optional
+        Output file path. If not specified, prints to stdout.
+    add_separators : bool
+        Add separator lines between files.
+    """
+    print(f"Concat: files={files}, output={output}, add_separators={add_separators}")
+
+
 database_app = App(name="database", help="Database commands.")
 app.command(database_app)
 

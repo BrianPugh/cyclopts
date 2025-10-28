@@ -11,6 +11,7 @@ from .apps import (
     app_basic,
     app_deploy,
     app_enum,
+    app_list_path,
     app_multiple_positionals,
     app_negative,
     app_nested,
@@ -680,4 +681,17 @@ def test_command_with_multiple_names_and_aliases(bash_tester):
     assert "bar" in script, "First alias should be in completion script"
     assert "baz" in script, "Second alias should be in completion script"
 
+    assert tester.validate_script_syntax()
+
+
+def test_list_path_completion(bash_tester):
+    """Test that list[Path] arguments generate file completion.
+
+    Regression test for issue #654: list[Path] arguments should use
+    file completion (compgen -f) just like Path arguments.
+    """
+    tester = bash_tester(app_list_path, "listpath")
+    script = tester.completion_script
+
+    assert "compgen -f" in script, "list[Path] should generate file completion"
     assert tester.validate_script_syntax()
