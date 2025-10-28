@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+E = TypeVar("E", bound=Enum)
+F = TypeVar("F", bound=Flag)
 
 _implicit_iterable_type_mapping: dict[type, type] = {
     Iterable: list[str],
@@ -172,10 +174,10 @@ def _timedelta(s: str) -> timedelta:
 
 
 def get_enum_member(
-    type_: Any,
+    type_: type[E],
     token: Union["Token", str],
     name_transform: Callable[[str], str],
-):
+) -> E:
     """Match a token's value to an enum's member.
 
     Applies ``name_transform`` to both the value and the member.
@@ -195,15 +197,15 @@ def get_enum_member(
 
 
 def convert_enum_flag(
-    enum_type: type[Flag],
+    enum_type: type[F],
     tokens: Iterable[str] | Iterable["Token"],
     name_transform: Callable[[str], str],
-) -> Flag:
+) -> F:
     """Convert tokens to a Flag enum value.
 
     Parameters
     ----------
-    enum_type : type[Flag]
+    enum_type : type[F]
         The Flag enum type to convert to.
     tokens : Iterable[str] | Iterable[Token]
         The tokens to convert. Can be member names or :class:`Token` objects.
@@ -212,7 +214,7 @@ def convert_enum_flag(
 
     Returns
     -------
-    Flag
+    F
         The combined flag value.
 
     Raises
@@ -430,11 +432,11 @@ def instantiate_from_dict(type_: type[T], data: dict[str, Any]) -> T:
 
 
 def _convert_structured_type(
-    type_: type,
+    type_: type[T],
     token: Sequence["Token"],
     field_infos: dict[str, "FieldInfo"],
     convert: Callable,
-) -> Any:
+) -> T:
     """Convert tokens to a structured type with proper positional/keyword argument handling.
 
     Respects the parameter kind of each field:
@@ -445,7 +447,7 @@ def _convert_structured_type(
 
     Parameters
     ----------
-    type_ : type
+    type_ : type[T]
         The target structured type to instantiate.
     token : Sequence[Token]
         The tokens to convert.
@@ -456,7 +458,7 @@ def _convert_structured_type(
 
     Returns
     -------
-    Any
+    T
         Instance of type_ constructed from the tokens.
     """
     i = 0
@@ -542,7 +544,7 @@ def _convert(
         out = convert(_implicit_iterable_type_mapping[type_], token)
     elif origin_type in (collections.abc.Iterable, collections.abc.Sequence):
         assert len(inner_types) == 1
-        out = convert(list[inner_types[0]], token)  # pyright: ignore[reportGeneralTypeIssues]
+        out = convert(list[inner_types[0]], token)
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
@@ -601,7 +603,7 @@ def _convert(
             gen = zip(*[iter(token)] * count, strict=False)
         else:
             gen = token
-        out = origin_type(convert(inner_types[0], e) for e in gen)  # pyright: ignore[reportOptionalCall]
+        out = origin_type(convert(inner_types[0], e) for e in gen)
     elif is_class_and_subclass(type_, Flag):
         # TODO: this might never execute since enum.Flag is now handled in ``convert``.
         out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
@@ -772,7 +774,7 @@ def convert(
         dict_converted = {
             k: convert(value_type, v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
         }
-        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)  # pyright: ignore
+        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
     elif is_enum_flag(maybe_origin_type):
