@@ -322,7 +322,7 @@ class ArgumentCollection(list[Argument]):
             hint_docstring_lookup.update(docstring_lookup)
 
             for sub_field_name, sub_field_info in argument._lookup.items():
-                updated_kind = KIND_PARENT_CHILD_REASSIGNMENT[(argument.field_info.kind, sub_field_info.kind)]  # pyright: ignore
+                updated_kind = KIND_PARENT_CHILD_REASSIGNMENT[(argument.field_info.kind, sub_field_info.kind)]
                 if updated_kind is None:
                     continue
 
