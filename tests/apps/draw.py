@@ -50,7 +50,7 @@ def line(
     start: Coordinate,
     end: Coordinate,
     *,
-    config: Config,
+    config: Config | None = None,
 ):
     """Draw a line.
 
@@ -61,6 +61,9 @@ def line(
     end: Coordinate
         End of line.
     """
+    if config is None:
+        config = Config()
+
     print(f"Drawing a line with from {start} to {end} {config.units} in {config.color=}.")
 
 
@@ -71,7 +74,7 @@ def elliptic_curve(
     r1: float,
     r2: float,
     *,
-    config: Config,
+    config: Config | None = None,
 ):
     """Draw a elliptical curve."""
 
@@ -81,7 +84,7 @@ def circle(
     center: Coordinate,
     radius: Literal["unit"] | float,
     *,
-    config: Config,
+    config: Config | None = None,
 ):
     """Draw a circle.
 
@@ -96,13 +99,16 @@ def circle(
     radius: float
         Radius of the circle.
     """
+    if config is None:
+        config = Config()
+
     if radius == "unit":
         radius = 1.0
     print(f"Drawing a circle with {radius=} {config.units} at {center=}")
 
 
 @app.command
-def polygon(*vertices: Annotated[Coordinate, Parameter(required=True)], config: Config):
+def polygon(*vertices: Annotated[Coordinate, Parameter(required=True)], config: Config | None = None):
     """Draw a polygon.
 
     Parameters
@@ -110,11 +116,13 @@ def polygon(*vertices: Annotated[Coordinate, Parameter(required=True)], config: 
     vertices: Coordinate
         List of (x, y) coordinates that make up the polygon.
     """
+    if config is None:
+        config = Config()
     print(f"Drawing a polygon with {vertices=} {config.units} in {config.color=}.")
 
 
 @app.command
-def polygon2(vertices: list[Coordinate], /, *, config: Config):
+def polygon2(vertices: list[Coordinate], /, *, config: Config | None = None):
     """Draw a polygon (alternative implementation).
 
     Parameters
@@ -122,6 +130,8 @@ def polygon2(vertices: list[Coordinate], /, *, config: Config):
     vertices: Coordinate
         List of (x, y) coordinates that make up the polygon.
     """
+    if config is None:
+        config = Config()
     print(f"Drawing a polygon with {vertices=} {config.units} in {config.color=}.")
 
 
