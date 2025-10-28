@@ -81,7 +81,7 @@ class Argument:
     Additional information about the parameter from surrounding python syntax.
     """
 
-    parameter: Parameter = field(factory=Parameter)  # pyright: ignore
+    parameter: Parameter = field(factory=Parameter)
     """
     Fully resolved user-provided :class:`.Parameter`.
     """
@@ -260,7 +260,7 @@ class Argument:
                 if existing_field_info == field_info:
                     pass
                 elif discriminator and discriminator in field_info.names and discriminator in existing_field_info.names:
-                    existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]  # pyright: ignore
+                    existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]
                     existing_field_info.default = FieldInfo.empty
                 else:
                     raise NotImplementedError
@@ -482,7 +482,7 @@ class Argument:
                             implicit_value = None
                         else:
                             hint = resolve_optional(hint)
-                            implicit_value = (get_origin(hint) or hint)()  # pyright: ignore[reportAbstractUsage]
+                            implicit_value = (get_origin(hint) or hint)()
                         if trailing:
                             if trailing[0] == delimiter:
                                 trailing = trailing[1:]
@@ -568,7 +568,7 @@ class Argument:
                     raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
             else:
                 try:
-                    return converter(hint, tokens)  # pyright: ignore
+                    return converter(hint, tokens)
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(
@@ -652,7 +652,7 @@ class Argument:
 
             if self._enum_flag_type and self.tokens:
                 converted_flags = safe_converter(self._enum_flag_type, self.tokens)
-                out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags  # pyright: ignore
+                out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
             if self._should_attempt_json_dict():
                 while self.tokens:
@@ -693,7 +693,7 @@ class Argument:
             self._run_missing_keys_checker(data)
 
             if self._enum_flag_type:
-                out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)  # pyright: ignore[reportPossiblyUnboundVariable]
+                out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)
                 if not out:
                     out = UNSET
             elif data:
