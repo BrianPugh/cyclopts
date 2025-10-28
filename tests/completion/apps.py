@@ -203,3 +203,14 @@ def process(
         Input file to process.
     """
     pass
+
+
+app_list_path = App(name="listpath")
+
+
+@app_list_path.default
+def list_path_main(
+    files: Annotated[list[Path], Parameter(help="List of files")],
+):
+    """App with list[Path] parameter."""
+    pass

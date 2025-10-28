@@ -10,6 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
+from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
@@ -117,11 +118,11 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
 
     origin = get_origin(type_hint)
 
-    # For variadic positionals, unwrap tuple[T, ...] to get element type
-    if origin is tuple:
+    # For collection types, unwrap to get element type
+    if is_class_and_subclass(origin, tuple(ITERABLE_TYPES)):
         args = get_args(type_hint)
         if args and len(args) >= 1:
-            # tuple[Path, ...] -> check first arg
+            # list[Path], set[Path], tuple[Path, ...] -> check first arg
             return get_completion_action(args[0])
 
     target_type = origin or type_hint

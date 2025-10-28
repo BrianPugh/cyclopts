@@ -14,6 +14,7 @@ from cyclopts.completion.zsh import generate_completion_script
 from .apps import (
     app_basic,
     app_enum,
+    app_list_path,
     app_markup,
     app_negative,
     app_nested,
@@ -881,4 +882,17 @@ def test_nested_variadic_positional_completion(zsh_tester):
     # For variadic, should have '*:desc:_files' spec
     assert "'*:" in script, "Variadic positionals should use * spec"
 
+    assert tester.validate_script_syntax()
+
+
+def test_list_path_completion(zsh_tester):
+    """Test that list[Path] arguments generate file completion.
+
+    Regression test for issue #654: list[Path] arguments should use
+    file completion (_files) just like Path arguments.
+    """
+    tester = zsh_tester(app_list_path, "listpath")
+    script = tester.completion_script
+
+    assert "_files" in script, "list[Path] should generate file completion"
     assert tester.validate_script_syntax()
