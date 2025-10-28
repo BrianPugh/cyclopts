@@ -42,7 +42,12 @@ class ConfigBase(ABC):
         """Return a string identifying the configuration source for error messages."""
         raise NotImplementedError
 
-    def __call__(self, app: "App", commands: tuple[str, ...], arguments: ArgumentCollection):
+    def __call__(
+        self,
+        app: "App",
+        commands: tuple[str, ...],
+        arguments: ArgumentCollection,
+    ):
         config: dict[str, Any] = self.config.copy()
         try:
             for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
@@ -50,7 +55,12 @@ class ConfigBase(ABC):
         except KeyError:
             return
 
-        config = {k: v for k, v in config.items() if k not in app}
+        # Hierarchical config uses current app; flat config uses root app to filter sibling commands
+        if self.use_commands_as_keys:
+            filter_app = app
+        else:
+            filter_app = next((a for a in app.app_stack.current_frame if not a._meta_parent), app)
+        config = {k: v for k, v in config.items() if k not in filter_app}
 
         update_argument_collection(
             config,
