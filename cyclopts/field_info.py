@@ -303,6 +303,11 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
     if is_pydantic_secret(hint):
         return {}
 
+    # NewType is a runtime identity function that returns its argument unchanged.
+    # Use the field_infos of the underlying supertype instead of NewType's misleading __init__.
+    if hasattr(hint, "__supertype__"):
+        return get_field_infos(hint.__supertype__)
+
     if is_dataclass(hint):
         # This must be before ``is_pydantic`` check so that we
         # can handle pydantic dataclasses as vanilla dataclasses.

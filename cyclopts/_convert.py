@@ -8,11 +8,11 @@ from collections.abc import Callable, Iterable, Sequence
 from datetime import date, datetime, timedelta
 from enum import Enum, Flag
 from functools import partial, reduce
-from inspect import isclass
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
+    TypeVar,
     Union,
     get_args,
     get_origin,
@@ -25,7 +25,7 @@ else:
 
 from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
-from cyclopts.field_info import get_field_infos
+from cyclopts.field_info import FieldInfo, get_field_infos
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
 
 if sys.version_info >= (3, 12):  # pragma: no cover
@@ -36,6 +36,8 @@ else:  # pragma: no cover
 if TYPE_CHECKING:
     from cyclopts.argument import Token
 
+
+T = TypeVar("T")
 
 _implicit_iterable_type_mapping: dict[type, type] = {
     Iterable: list[str],
@@ -382,6 +384,115 @@ def _create_json_decode_error_message(
     return f"Invalid JSON for {type_.__name__}:\n    {snippet}\n    {' ' * marker_pos}^ {error.msg}{hint}"
 
 
+def instantiate_from_dict(type_: type[T], data: dict[str, Any]) -> T:
+    """Instantiate a type with proper handling of parameter kinds.
+
+    Respects POSITIONAL_ONLY, KEYWORD_ONLY, and POSITIONAL_OR_KEYWORD parameter kinds
+    when constructing the object.
+
+    This function is necessary because `inspect.signature().bind(**data)` has the same
+    limitation we're solving: it cannot accept positional-only parameters as keyword
+    arguments. For example, `def __init__(self, a, /, b)` requires `a` to be passed
+    positionally, but when we have a dict `{"a": 1, "b": 2}`, we need to transform
+    this into the call `type_(1, b=2)`.
+
+    Parameters
+    ----------
+    type_ : type[T]
+        The type to instantiate.
+    data : dict[str, Any]
+        Dictionary mapping field names to values.
+
+    Returns
+    -------
+    T
+        Instance of type_ constructed from data.
+    """
+    field_infos = get_field_infos(type_)
+    if not field_infos:
+        return type_(**data)
+
+    pos_args = []
+    kwargs = {}
+
+    for field_name, value in data.items():
+        field_info = field_infos.get(field_name)
+        if field_info and field_info.kind == FieldInfo.POSITIONAL_ONLY:
+            pos_args.append((field_name, value))
+        else:
+            kwargs[field_name] = value
+
+    # Sort positional args by their order in field_infos
+    field_names_order = list(field_infos.keys())
+    pos_args.sort(key=lambda x: field_names_order.index(x[0]))
+
+    return type_(*(v for _, v in pos_args), **kwargs)
+
+
+def _convert_structured_type(
+    type_: type,
+    token: Sequence["Token"],
+    field_infos: dict[str, "FieldInfo"],
+    convert: Callable,
+) -> Any:
+    """Convert tokens to a structured type with proper positional/keyword argument handling.
+
+    Respects the parameter kind of each field:
+    - POSITIONAL_ONLY: passed as positional argument
+    - KEYWORD_ONLY or POSITIONAL_OR_KEYWORD: passed as keyword argument
+
+    This correctly handles types with keyword-only fields (e.g., dataclasses with kw_only=True).
+
+    Parameters
+    ----------
+    type_ : type
+        The target structured type to instantiate.
+    token : Sequence[Token]
+        The tokens to convert.
+    field_infos : dict[str, FieldInfo]
+        Field information for the structured type.
+    convert : Callable
+        Conversion function for nested types.
+
+    Returns
+    -------
+    Any
+        Instance of type_ constructed from the tokens.
+    """
+    i = 0
+    data = {}
+    hint = type_
+
+    for field_name, field_info in field_infos.items():
+        hint = field_info.hint
+
+        # Convert the token(s) for this field
+        if is_class_and_subclass(hint, str):  # Avoids infinite recursion
+            value = token[i].value
+            i += 1
+            should_break = False
+        else:
+            tokens_per_element, consume_all = token_count(hint)
+            if tokens_per_element == 1:
+                value = convert(hint, token[i])
+                i += 1
+            else:
+                value = convert(hint, token[i : i + tokens_per_element])
+                i += tokens_per_element
+            should_break = consume_all
+
+        data[field_name] = value
+
+        # Handle consume_all or end of tokens
+        if should_break:
+            break
+        if i == len(token):
+            break
+
+    assert i == len(token)
+    return instantiate_from_dict(type_, data)
+
+
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
@@ -545,54 +656,12 @@ def _convert(
                     # Fall back to positional argument parsing
                     if not isinstance(token, Sequence):
                         token = [token]
-                    i = 0
-                    pos_values = []
-                    hint = type_
-                    for field_info in field_infos.values():
-                        hint = field_info.hint
-                        if is_class_and_subclass(hint, str):  # Avoids infinite recursion
-                            pos_values.append(token[i].value)
-                            i += 1
-                        else:
-                            tokens_per_element, consume_all = token_count(hint)
-                            if tokens_per_element == 1:
-                                pos_values.append(convert(hint, token[i]))
-                                i += 1
-                            else:
-                                pos_values.append(convert(hint, token[i : i + tokens_per_element]))
-                                i += tokens_per_element
-                            if consume_all:
-                                break
-                        if i == len(token):
-                            break
-                    assert i == len(token)
-                    out = type_(*pos_values)
+                    out = _convert_structured_type(type_, token, field_infos, convert)
             else:
                 # Standard positional argument parsing
                 if not isinstance(token, Sequence):
                     token = [token]
-                i = 0
-                pos_values = []
-                hint = type_
-                for field_info in field_infos.values():
-                    hint = field_info.hint
-                    if isclass(hint) and issubclass(hint, str):  # Avoids infinite recursion
-                        pos_values.append(token[i].value)
-                        i += 1
-                    else:
-                        tokens_per_element, consume_all = token_count(hint)
-                        if tokens_per_element == 1:
-                            pos_values.append(convert(hint, token[i]))
-                            i += 1
-                        else:
-                            pos_values.append(convert(hint, token[i : i + tokens_per_element]))
-                            i += tokens_per_element
-                        if consume_all:
-                            break
-                    if i == len(token):
-                        break
-                assert i == len(token)
-                out = type_(*pos_values)
+                out = _convert_structured_type(type_, token, field_infos, convert)
 
     if cparam:
         # An inner type may have an independent Parameter annotation;

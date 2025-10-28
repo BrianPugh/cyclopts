@@ -505,3 +505,23 @@ def test_bind_dataclass_direct_parent_match_issue_647(app, assert_parse_args):
     assert "foo" not in bound.arguments
     result = cmd(**bound.arguments)
     assert result == Foo(name="default", age=0)
+
+
+def test_bind_dataclass_kw_only_with_accepts_keys_false_issue_648(app, assert_parse_args):
+    """Test that kw_only dataclass with accepts_keys=False works.
+
+    When a dataclass is kw_only=True, it cannot accept positional arguments.
+    With accepts_keys=False, Cyclopts should still pass values as keyword arguments.
+
+    See: https://github.com/BrianPugh/cyclopts/issues/648
+    """
+
+    @dataclass(kw_only=True)
+    class Foo:
+        name: str
+
+    @app.default
+    def cmd(*, foo: Annotated[Foo, Parameter(accepts_keys=False)]) -> Foo:
+        return foo
+
+    assert_parse_args(cmd, "--foo Alice", foo=Foo(name="Alice"))
