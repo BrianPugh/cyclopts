@@ -355,6 +355,19 @@ def create_parameter_help_panel(
         help_components = []
         options = list(argument.names)
 
+        # Deduplicate options based on their transformed names for display.
+        # E.g., both "userName" and "user_name" transform to "user-name"
+        # This prevents duplicate help entries while keeping all name variants
+        # in field_info.names for CLI/JSON/env var matching.
+        seen_transformed = set()
+        unique_options = []
+        for option in options:
+            transformed = argument.parameter.name_transform(option)
+            if transformed not in seen_transformed:
+                seen_transformed.add(transformed)
+                unique_options.append(option)
+        options = unique_options
+
         # Add an all-uppercase name if it's an argument
         if argument.index is not None:
             arg_name = options[0].lstrip("-").upper()

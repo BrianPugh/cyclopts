@@ -237,10 +237,8 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.USER-NAME         Name of user. [required]                 │
         │      --user.user-name                                              │
-        │      --user.user-name                                              │
         │      --user.username                                               │
         │ *  USER.AGE-IN-YEARS      Age of user in years. [required]         │
-        │      --user.age-in-years                                           │
         │      --user.age-in-years                                           │
         │      --user.ageinyears                                             │
         ╰────────────────────────────────────────────────────────────────────╯
