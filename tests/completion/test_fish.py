@@ -9,6 +9,7 @@ from cyclopts.completion.fish import generate_completion_script
 
 from .apps import (
     app_basic,
+    app_disabled_negative,
     app_enum,
     app_list_path,
     app_markup,
@@ -98,6 +99,16 @@ def test_negative_flag_completion(fish_tester):
     assert "--no-verbose" in script or "-l no-verbose" in script
     assert "--colors" in script or "-l colors" in script
     assert "--no-colors" in script or "-l no-colors" in script
+
+
+def test_disabled_negative_flag_completion(fish_tester):
+    """Test that negative flags are not generated when disabled via App default_parameter."""
+    tester = fish_tester(app_disabled_negative, "disabledneg")
+
+    script = tester.completion_script
+    assert "--param" in script or "-l param" in script
+    assert "--empty-param" not in script
+    assert "-l empty-param" not in script
 
 
 def test_script_syntax_validation(fish_tester):

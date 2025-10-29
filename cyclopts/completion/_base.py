@@ -70,10 +70,11 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
 
         arguments = ArgumentCollection()
         apps_for_params = app._get_resolution_context(execution_path)
-        for subapp in apps_for_params:
-            if subapp.default_command:
-                app_arguments = subapp.assemble_argument_collection(parse_docstring=True)
-                arguments.extend(app_arguments)
+        with app.app_stack(execution_path):
+            for subapp in apps_for_params:
+                if subapp.default_command:
+                    app_arguments = subapp.assemble_argument_collection(parse_docstring=True)
+                    arguments.extend(app_arguments)
 
         commands = []
         for group, registered_commands in groups_from_app(command_app):
