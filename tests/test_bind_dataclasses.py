@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Annotated
@@ -525,3 +526,54 @@ def test_bind_dataclass_kw_only_with_accepts_keys_false_issue_648(app, assert_pa
         return foo
 
     assert_parse_args(cmd, "--foo Alice", foo=Foo(name="Alice"))
+
+
+@pytest.mark.skipif(sys.version_info < (3, 14), reason="Requires Python 3.14+ for field(doc=...)")
+def test_dataclass_field_doc_parameter_help(app, console):
+    """Test that Python 3.14's dataclass field(doc=...) parameter is used for help text."""
+
+    @dataclass
+    class Config:
+        name: str = field(default="default", doc="Help from doc parameter.")  # type: ignore[call-arg]
+
+        age: Annotated[int, Parameter(help="Parameter help takes precedence.")] = field(
+            default=25,
+            doc="This doc is ignored.",  # type: ignore[call-arg]
+        )
+
+        count: int = field(default=10, doc="Doc parameter help.")  # type: ignore[call-arg]
+
+        size: int = field(
+            default=5,
+            metadata={"help": "Metadata help takes precedence over doc."},
+            doc="This doc is ignored.",  # type: ignore[call-arg]
+        )
+
+        height: int = field(default=8)
+        """Docstring for height."""
+
+        width: int = field(default=12, doc="Doc parameter overrides docstring.")  # type: ignore[call-arg]
+        """This docstring is ignored."""
+
+    @app.default
+    def main(config: Config):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    assert "Help from doc parameter." in actual
+
+    assert "Parameter help takes precedence." in actual
+    assert "This doc is ignored." not in actual
+
+    assert "Doc parameter help." in actual
+
+    assert "Metadata help takes precedence" in actual
+
+    assert "Docstring for height." in actual
+
+    assert "Doc parameter overrides docstring." in actual
+    assert "This docstring is ignored." not in actual

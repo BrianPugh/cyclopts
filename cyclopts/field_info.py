@@ -263,7 +263,15 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
         kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
 
-        help = f.metadata.get("help") if f.metadata else None
+        # Extract help text with precedence order:
+        # 1. metadata["help"] - explicit help in metadata
+        # 2. metadata["doc"] - doc stored in metadata
+        # 3. f.doc - Python 3.14+ field(doc=...) parameter
+        help = None
+        if f.metadata:
+            help = f.metadata.get("help") or f.metadata.get("doc")
+        if not help and hasattr(f, "doc"):
+            help = f.doc  # type: ignore[attr-defined]
 
         out[f.name] = FieldInfo(
             names=(f.name,),
