@@ -1,8 +1,10 @@
 import sys
-from collections.abc import Callable
-from typing import Any, Literal
+from collections.abc import Callable, Iterable
+from typing import Any, Literal, cast
 
-ResultAction = (
+from cyclopts.utils import is_iterable
+
+ResultActionSingle = (
     Literal[
         "return_value",
         "print_non_int_return_int_as_exit_code",
@@ -22,6 +24,8 @@ ResultAction = (
     | Callable[[Any], Any]
 )
 
+ResultAction = ResultActionSingle | Iterable[ResultActionSingle]
+
 
 def handle_result_action(
     result: Any,
@@ -30,12 +34,19 @@ def handle_result_action(
 ) -> Any:
     """Handle command result based on result_action.
 
+    When ``action`` is a sequence, actions are applied left-to-right in a pipeline,
+    where each action receives the result of the previous action. For example,
+    with ``result_action=[uppercase, add_greeting]``:
+
+        result → uppercase(result) → add_greeting(uppercase(result))
+
     Parameters
     ----------
     result : Any
         The command's return value.
     action : ResultAction
-        The action to take with the result.
+        The action (or sequence of actions) to take with the result.
+        If a sequence, actions are chained left-to-right.
     print_fn : Callable[[Any], None]
         Function to call to print output (e.g., console.print).
 
@@ -44,6 +55,11 @@ def handle_result_action(
     Any
         Processed result based on action (may call sys.exit() and not return).
     """
+    if is_iterable(action):
+        for single_action in cast(Iterable[ResultActionSingle], action):
+            result = handle_result_action(result, single_action, print_fn)
+        return result
+
     if callable(action):
         return action(result)
 

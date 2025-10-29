@@ -1178,3 +1178,49 @@ def test_result_action_print_sys_exit_zero_with_int(monkeypatch):
 
     assert exit_code == 0
     assert buf.getvalue() == "42\n"
+
+
+# ==============================================================================
+# Sequence result_action tests
+# ==============================================================================
+
+
+def test_result_action_sequence_single_element():
+    """Sequence with single element should work like single value."""
+    app = App(result_action=["return_value"])
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    result = app(["greet", "Alice"])
+    assert result == "Hello Alice!"
+
+
+def test_result_action_sequence_multiple_callables():
+    """Sequence with multiple callables should chain results."""
+    call_order = []
+
+    def handler1(result):
+        call_order.append("handler1")
+        return f"[1:{result}]"
+
+    def handler2(result):
+        call_order.append("handler2")
+        return f"[2:{result}]"
+
+    app = App(result_action=[handler1, handler2])
+
+    @app.command
+    def cmd() -> str:
+        return "test"
+
+    result = app(["cmd"])
+    assert result == "[2:[1:test]]"
+    assert call_order == ["handler1", "handler2"]
+
+
+def test_result_action_empty_sequence_raises_error():
+    """Empty sequence should raise ValueError."""
+    with pytest.raises(ValueError, match="result_action cannot be an empty sequence"):
+        App(result_action=[])

@@ -534,12 +534,12 @@ API
          app(backend="trio")  # Override the app's backend for this call
 
    .. attribute:: result_action
-      :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | None
+      :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | Iterable[Literal[...] | Callable[[Any], Any]] | None
       :value: None
 
       Controls how :meth:`.App.__call__` and :meth:`.App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
 
-      Can be a predefined literal string or a custom callable that takes the result and returns a processed value.
+      Can be a predefined literal string, a custom callable that takes the result and returns a processed value, or a **sequence of actions** to be applied left-to-right in a pipeline.
 
       Each predefined mode's exact behavior is shown below:
 
@@ -716,6 +716,30 @@ API
                 return result
 
             app = App(result_action=custom_handler)
+
+      **Sequence of Actions**
+
+         Provide a sequence (list or tuple) of actions to create a result-processing pipeline. Actions are applied left-to-right, with each action receiving the result of the previous action.
+
+         .. code-block:: python
+
+            def uppercase(result):
+                return result.upper() if isinstance(result, str) else result
+
+            def add_prefix(result):
+                return f"[OUTPUT] {result}" if isinstance(result, str) else result
+
+            # Pipeline: result → uppercase → add_prefix → return
+            app = App(result_action=[uppercase, add_prefix, "return_value"])
+
+            @app.command
+            def greet(name: str) -> str:
+                return f"hello {name}"
+
+            result = app(["greet", "world"])
+            # result == "[OUTPUT] HELLO WORLD"
+
+         Actions in a sequence can be any combination of predefined literal strings and custom callables. Empty sequences raise a ``ValueError`` at app initialization.
 
       Example:
 

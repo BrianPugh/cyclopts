@@ -82,6 +82,23 @@ V = TypeVar("V")
 _DEFAULT_FORMAT = "markdown"
 
 
+def _result_action_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...] | None:
+    """Convert result_action value, ensuring non-empty sequences.
+
+    Intended to be used in an ``attrs.Field`` for result_action.
+    Raises ValueError if an empty iterable is provided.
+    """
+    if value is None:
+        return None
+
+    result = to_tuple_converter(value)
+
+    if not result:
+        raise ValueError("result_action cannot be an empty sequence")
+
+    return result
+
+
 class _CannotDeriveCallingModuleNameError(Exception):
     pass
 
@@ -340,6 +357,7 @@ class App:
 
     result_action: ResultAction | None = field(
         default=None,
+        converter=_result_action_converter,
         kw_only=True,
     )
 
