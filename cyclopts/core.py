@@ -168,6 +168,31 @@ def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") ->
         kwargs["group_arguments"] = copy(parent_app._group_arguments)
 
 
+def _normalize_for_matching(s: str) -> str:
+    """Normalize a string for fuzzy command matching.
+
+    Removes hyphens, underscores, and converts to lowercase (e.g.,
+    'mycommand' matches 'my-command').
+
+    .. warning::
+        This fuzzy matching is primarily for backward compatibility with the
+        introduction of ``_pascal_to_snake`` in ``default_name_transform``.
+        It should **probably be removed in v5** once users have migrated their
+        camelCase command names.
+
+    Parameters
+    ----------
+    s : str
+        String to normalize.
+
+    Returns
+    -------
+    str
+        Normalized string with hyphens/underscores removed and lowercased.
+    """
+    return s.replace("-", "").replace("_", "").lower()
+
+
 def _combined_meta_command_mapping(
     app: Optional["App"], recurse_meta=True, recurse_parent_meta=True
 ) -> dict[str, "App | CommandSpec"]:
@@ -994,9 +1019,28 @@ class App:
         unused_tokens = tokens
         while unused_tokens:
             token = unused_tokens[0]
-            try:
+            app_or_spec = None
+
+            # Try exact match first; O(1)
+            if token in command_mapping:
                 app_or_spec = command_mapping[token]
-            except KeyError:
+            else:
+                # Try fuzzy match (backward compatibility for camelCase commands) O(n).
+                # NOTE: This fuzzy matching is for v4 backward compatibility with
+                # _pascal_to_snake introduction. Consider removing in v5.
+                normalized_token = _normalize_for_matching(token)
+                matches = [
+                    cmd_name for cmd_name in command_mapping if _normalize_for_matching(cmd_name) == normalized_token
+                ]
+
+                if len(matches) == 1:
+                    # Single fuzzy match found
+                    app_or_spec = command_mapping[matches[0]]
+                elif len(matches) > 1:
+                    # Ambiguous match - multiple commands match after normalization
+                    raise ValueError(f"Ambiguous command '{token}'. Could match: {', '.join(sorted(matches))}.")
+
+            if app_or_spec is None:
                 # Token is not a command. Try to consume it as a meta app parameter.
                 # This is only relevant when ``include_parent_meta==True``, because
                 # otherwise it will be handled by the natural parsing process.

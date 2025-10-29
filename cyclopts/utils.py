@@ -2,6 +2,7 @@
 
 import functools
 import inspect
+import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
@@ -190,14 +191,26 @@ def help_formatter_converter(
         return input_value
 
 
+def _pascal_to_snake(s: str) -> str:
+    # (Borrowed from pydantic)
+    # Handle the sequence of uppercase letters followed by a lowercase letter
+    snake = re.sub(r"([A-Z]+)([A-Z][a-z])", lambda m: f"{m.group(1)}_{m.group(2)}", s)
+    # Insert an underscore between a lowercase letter and an uppercase letter
+    snake = re.sub(r"([a-z])([A-Z])", lambda m: f"{m.group(1)}_{m.group(2)}", snake)
+    # Insert an underscore between a digit and an uppercase letter
+    snake = re.sub(r"([0-9])([A-Z])", lambda m: f"{m.group(1)}_{m.group(2)}", snake)
+    return snake.lower()
+
+
 def default_name_transform(s: str) -> str:
     """Converts a python identifier into a CLI token.
 
     Performs the following operations (in order):
 
-    1. Convert the string to all lowercase.
-    2. Replace ``_`` with ``-``.
-    3. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 2).
+    1. Convert PascalCase to snake_case.
+    2. Convert the string to all lowercase.
+    3. Replace ``_`` with ``-``.
+    4. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 3).
 
     Intended to be used with :attr:`App.name_transform` and :attr:`Parameter.name_transform`.
 
@@ -211,7 +224,7 @@ def default_name_transform(s: str) -> str:
     str
         Transformed name.
     """
-    return s.lower().replace("_", "-").strip("-")
+    return _pascal_to_snake(s).lower().replace("_", "-").strip("-")
 
 
 def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:
