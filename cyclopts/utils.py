@@ -2,6 +2,7 @@
 
 import functools
 import inspect
+import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
@@ -188,6 +189,17 @@ def help_formatter_converter(
     else:
         # Assume it's already a HelpFormatter instance
         return input_value
+
+
+def _pascal_to_snake(s: str) -> str:
+    # (Borrowed from pydantic)
+    # Handle the sequence of uppercase letters followed by a lowercase letter
+    snake = re.sub(r"([A-Z]+)([A-Z][a-z])", lambda m: f"{m.group(1)}_{m.group(2)}", s)
+    # Insert an underscore between a lowercase letter and an uppercase letter
+    snake = re.sub(r"([a-z])([A-Z])", lambda m: f"{m.group(1)}_{m.group(2)}", snake)
+    # Insert an underscore between a digit and an uppercase letter
+    snake = re.sub(r"([0-9])([A-Z])", lambda m: f"{m.group(1)}_{m.group(2)}", snake)
+    return snake.lower()
 
 
 def default_name_transform(s: str) -> str:
