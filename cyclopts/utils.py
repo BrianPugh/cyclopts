@@ -207,9 +207,10 @@ def default_name_transform(s: str) -> str:
 
     Performs the following operations (in order):
 
-    1. Convert the string to all lowercase.
-    2. Replace ``_`` with ``-``.
-    3. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 2).
+    1. Convert PascalCase to snake_case.
+    2. Convert the string to all lowercase.
+    3. Replace ``_`` with ``-``.
+    4. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 3).
 
     Intended to be used with :attr:`App.name_transform` and :attr:`Parameter.name_transform`.
 
@@ -223,7 +224,7 @@ def default_name_transform(s: str) -> str:
     str
         Transformed name.
     """
-    return s.lower().replace("_", "-").strip("-")
+    return _pascal_to_snake(s).lower().replace("_", "-").strip("-")
 
 
 def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:

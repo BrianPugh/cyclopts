@@ -237,8 +237,10 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.USER-NAME         Name of user. [required]                 │
         │      --user.user-name                                              │
+        │      --user.user-name                                              │
         │      --user.username                                               │
         │ *  USER.AGE-IN-YEARS      Age of user in years. [required]         │
+        │      --user.age-in-years                                           │
         │      --user.age-in-years                                           │
         │      --user.ageinyears                                             │
         ╰────────────────────────────────────────────────────────────────────╯
@@ -247,10 +249,17 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
 
     assert actual == expected
 
+    # Test both the new canonical form and legacy form work
     assert_parse_args(
         foo,
-        "foo --user.username='Bob Smith' --user.age_in_years=100",
+        "foo --user.user-name='Bob Smith' --user.age-in-years=100",
         user=User(user_name="Bob Smith", age_in_years=100),
+    )
+
+    assert_parse_args(
+        foo,
+        "foo --user.username='Alice Jones' --user.ageinyears=50",
+        user=User(user_name="Alice Jones", age_in_years=50),
     )
 
 
@@ -258,7 +267,7 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
     "env_var",
     [
         '{"storage_class": "longhorn"}',
-        '{"storageclass": "longhorn"}',
+        '{"storageclass": "longhorn"}',  # Legacy form of camelCase alias
         # check for incorrectly parsing "null" as a string
         '{"storage_class": "longhorn", "limit": null}',
         # Test the actual Pydantic camelCase alias

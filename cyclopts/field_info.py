@@ -173,6 +173,14 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
             if model.model_config.get("populate_by_name", False):
                 names.append(python_name)
             names.append(pydantic_field.alias)
+
+            # Add legacy-compatible CLI form if not already present.
+            # This allows both "user-name" (new) and "username" (legacy) to work as CLI options.
+            # Old transform behavior: alias.lower() (no pascal_to_snake)
+            # New transform behavior: _pascal_to_snake(alias).lower()
+            legacy_form = pydantic_field.alias.lower()
+            if legacy_form not in names:
+                names.append(legacy_form)
         else:
             names.append(python_name)
 
