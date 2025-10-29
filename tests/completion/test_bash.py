@@ -10,6 +10,7 @@ from cyclopts.completion.bash import generate_completion_script
 from .apps import (
     app_basic,
     app_deploy,
+    app_disabled_negative,
     app_enum,
     app_list_path,
     app_multiple_positionals,
@@ -98,6 +99,14 @@ def test_negative_flag_completion(bash_tester):
     assert "--no-verbose" in tester.completion_script
     assert "--colors" in tester.completion_script
     assert "--no-colors" in tester.completion_script
+
+
+def test_disabled_negative_flag_completion(bash_tester):
+    """Test that negative flags are not generated when disabled via App default_parameter."""
+    tester = bash_tester(app_disabled_negative, "disabledneg")
+
+    assert "--param" in tester.completion_script
+    assert "--empty-param" not in tester.completion_script
 
 
 def test_script_syntax_validation(bash_tester):

@@ -214,3 +214,12 @@ def list_path_main(
 ):
     """App with list[Path] parameter."""
     pass
+
+
+app_disabled_negative = App(name="disabledneg", default_parameter=Parameter(negative=""))
+
+
+@app_disabled_negative.command
+def build(param: list[Literal["apple", "banana", "cherry"]]):
+    """Build command with list parameter."""
+    pass

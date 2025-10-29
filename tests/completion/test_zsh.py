@@ -13,6 +13,7 @@ from cyclopts.completion.zsh import generate_completion_script
 
 from .apps import (
     app_basic,
+    app_disabled_negative,
     app_enum,
     app_list_path,
     app_markup,
@@ -71,6 +72,14 @@ def test_negative_flag_completion(zsh_tester):
 
     assert "--no-verbose" in tester.completion_script
     assert "--no-colors" in tester.completion_script
+
+
+def test_disabled_negative_flag_completion(zsh_tester):
+    """Test that negative flags are not generated when disabled via App default_parameter."""
+    tester = zsh_tester(app_disabled_negative, "disabledneg")
+
+    assert "--param" in tester.completion_script
+    assert "--empty-param" not in tester.completion_script
 
 
 def test_help_descriptions(zsh_tester):
