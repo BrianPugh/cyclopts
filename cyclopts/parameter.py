@@ -256,7 +256,7 @@ class Parameter:
     )
 
     # Populated by the record_attrs_init_args decorator.
-    _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
+    _provided_args: tuple[str, ...] = field(factory=tuple, init=False, eq=False)
 
     @property
     def show(self) -> bool:

@@ -1,7 +1,7 @@
 exclude: ^(uv.lock|.idea/)
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.14.0"
+    rev: "v0.14.2"
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -44,11 +44,11 @@ repos:
           - tomli
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.38.1
+    rev: v1
     hooks:
       - id: typos
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.406
+    rev: v1.1.407
     hooks:
       - id: pyright
