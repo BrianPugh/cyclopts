@@ -534,7 +534,7 @@ API
          app(backend="trio")  # Override the app's backend for this call
 
    .. attribute:: result_action
-      :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | Iterable[Literal[...] | Callable[[Any], Any]] | None
+      :type: Literal["return_value", "call_if_callable", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | Iterable[Literal[...] | Callable[[Any], Any]] | None
       :value: None
 
       Controls how :meth:`.App.__call__` and :meth:`.App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
@@ -566,6 +566,16 @@ API
          .. code-block:: python
 
             return result
+
+      **"call_if_callable"**
+
+         Calls the result if it's callable (with no arguments), otherwise returns it unchanged. Useful for the dataclass command pattern where commands return class instances with ``__call__`` methods. Intended to be used in composition with other result actions (e.g., ``["call_if_callable", "print_non_int_sys_exit"]``).
+
+         .. code-block:: python
+
+            return result() if callable(result) else result
+
+         See :ref:`Dataclass Commands` for usage examples.
 
       **"sys_exit"**
 

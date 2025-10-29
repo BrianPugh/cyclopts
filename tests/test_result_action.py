@@ -1181,6 +1181,75 @@ def test_result_action_print_sys_exit_zero_with_int(monkeypatch):
 
 
 # ==============================================================================
+# call_if_callable tests
+# ==============================================================================
+
+
+def test_result_action_call_if_callable_with_callable():
+    """call_if_callable: calls the result if it's callable."""
+    app = App(result_action="call_if_callable")
+
+    @app.command
+    def get_greeter(name: str):
+        def greeter():
+            return f"Hello {name}!"
+
+        return greeter
+
+    result = app(["get-greeter", "Alice"])
+    assert result == "Hello Alice!"
+
+
+def test_result_action_call_if_callable_with_non_callable():
+    """call_if_callable: returns non-callable result as-is."""
+    app = App(result_action="call_if_callable")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    result = app(["greet", "Bob"])
+    assert result == "Hello Bob!"
+
+
+def test_result_action_call_if_callable_with_none():
+    """call_if_callable: returns None as-is."""
+    app = App(result_action="call_if_callable")
+
+    @app.command
+    def do_nothing() -> None:
+        pass
+
+    result = app(["do-nothing"])
+    assert result is None
+
+
+def test_result_action_call_if_callable_with_dataclass():
+    """call_if_callable: works with dataclass __call__ pattern."""
+    import dataclasses as dc
+
+    app = App(result_action="call_if_callable")
+
+    @app.command
+    @dc.dataclass
+    class Hello:
+        """Say hello."""
+
+        name: str = "World"
+        _: dc.KW_ONLY
+        formal: bool = False
+
+        def __call__(self):
+            return f"{'Hello' if self.formal else 'Hey'} {self.name}."
+
+    result = app(["hello", "Jude"])
+    assert result == "Hey Jude."
+
+    result = app(["hello", "Sir", "--formal"])
+    assert result == "Hello Sir."
+
+
+# ==============================================================================
 # Sequence result_action tests
 # ==============================================================================
 
@@ -1224,3 +1293,37 @@ def test_result_action_empty_sequence_raises_error():
     """Empty sequence should raise ValueError."""
     with pytest.raises(ValueError, match="result_action cannot be an empty sequence"):
         App(result_action=[])
+
+
+def test_result_action_call_if_callable_composition(monkeypatch):
+    """Composition: call_if_callable with print_non_int_sys_exit for dataclass pattern."""
+    import dataclasses as dc
+
+    app = App(result_action=["call_if_callable", "print_non_int_sys_exit"])
+
+    @app.command
+    @dc.dataclass
+    class Hello:
+        """Say hello."""
+
+        name: str = "World"
+        _: dc.KW_ONLY
+        formal: bool = False
+
+        def __call__(self):
+            return f"{'Hello' if self.formal else 'Hey'} {self.name}."
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["hello", "Jude"])
+
+    assert buf.getvalue() == "Hey Jude.\n"
+    assert exit_code == 0
