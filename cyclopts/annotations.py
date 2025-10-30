@@ -13,6 +13,11 @@ if sys.version_info < (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     from typing import NotRequired, Required
 
+if sys.version_info >= (3, 12):  # pragma: no cover
+    from typing import TypeAliasType
+else:  # pragma: no cover
+    TypeAliasType = None
+
 # from types import NoneType is available >=3.10
 NoneType = type(None)
 AnnotatedType = type(Annotated[int, 0])
@@ -115,6 +120,7 @@ def resolve(
     type_prev = None
     while type_ != type_prev:
         type_prev = type_
+        type_ = resolve_type_alias(type_)
         type_ = resolve_annotated(type_)
         type_ = resolve_optional(type_)
         type_ = resolve_required(type_)
@@ -124,6 +130,7 @@ def resolve(
 
 def resolve_optional(type_: Any) -> Any:
     """Only resolves Union's of None + one other type (i.e. Optional)."""
+    type_ = resolve_type_alias(type_)
     # Python will automatically flatten out nested unions when possible.
     # So we don't need to loop over resolution.
     if not is_union(type_):
@@ -145,6 +152,7 @@ def resolve_optional(type_: Any) -> Any:
 
 
 def resolve_annotated(type_: Any) -> type:
+    type_ = resolve_type_alias(type_)
     if type(type_) is AnnotatedType:
         type_ = get_args(type_)[0]
     return type_
@@ -161,6 +169,13 @@ def resolve_new_type(type_: Any) -> type:
         return resolve_new_type(type_.__supertype__)
     except AttributeError:
         return type_
+
+
+def resolve_type_alias(type_: Any) -> Any:
+    """Resolve TypeAliasType (Python 3.12+ 'type' statement) to its underlying type."""
+    if TypeAliasType is not None and isinstance(type_, TypeAliasType):
+        return type_.__value__
+    return type_
 
 
 def get_hint_name(hint) -> str:
