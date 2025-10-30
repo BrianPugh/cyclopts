@@ -14,6 +14,10 @@ def pytest_ignore_collect(collection_path):
         if sys.version_info < (3, minor) and collection_path.stem.startswith(f"test_py3{minor}_"):
             return True
 
+    # Ignore py312/ directory on Python < 3.12
+    if sys.version_info < (3, 12) and "py312" in collection_path.parts:
+        return True
+
 
 @pytest.fixture(autouse=True)
 def patch_sys_argv(request, monkeypatch):

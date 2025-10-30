@@ -113,7 +113,7 @@ omit = ["cyclopts/protocols.py"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-ignore = ["docs/", "tests/test_py3*.py"]
+ignore = ["docs/", "tests/py312/"]
 reportUnsupportedDunderAll = "none"
 
 [tool.ruff]
@@ -128,7 +128,7 @@ exclude = [
     ".env",
     "venv",
     ".venv",
-    "tests/test_py3*.py",
+    "tests/py312/",
 ]
 
 [tool.ruff.format]
