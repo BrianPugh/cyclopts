@@ -7,6 +7,7 @@ from cyclopts.utils import is_iterable
 ResultActionSingle = (
     Literal[
         "return_value",
+        "call_if_callable",
         "print_non_int_return_int_as_exit_code",
         "print_str_return_int_as_exit_code",
         "print_str_return_zero",
@@ -75,6 +76,10 @@ def handle_result_action(
             else:
                 sys.exit(0)
         case "return_value":
+            return result
+        case "call_if_callable":
+            if callable(result):
+                return result()
             return result
         case "sys_exit":
             if isinstance(result, bool):
