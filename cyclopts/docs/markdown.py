@@ -9,8 +9,149 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
+def _normalize_command_filters(
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
+) -> tuple[set[str] | None, set[str] | None]:
+    """Normalize command filter lists by converting underscores to dashes.
+
+    Parameters
+    ----------
+    commands_filter : list[str] | None
+        List of commands to include.
+    exclude_commands : list[str] | None
+        List of commands to exclude.
+
+    Returns
+    -------
+    tuple[set[str] | None, set[str] | None]
+        Normalized include and exclude sets for O(1) lookup.
+    """
+    normalized_include = None
+    if commands_filter is not None:
+        normalized_include = {cmd.replace("_", "-") for cmd in commands_filter}
+
+    normalized_exclude = None
+    if exclude_commands:
+        normalized_exclude = {cmd.replace("_", "-") for cmd in exclude_commands}
+
+    return normalized_include, normalized_exclude
+
+
+def _should_include_command(
+    name: str,
+    parent_path: list[str],
+    normalized_commands_filter: set[str] | None,
+    normalized_exclude_commands: set[str] | None,
+    subapp: "App",
+) -> bool:
+    """Determine if a command should be included based on filters.
+
+    Parameters
+    ----------
+    name : str
+        The command name.
+    parent_path : list[str]
+        Path to parent commands.
+    normalized_commands_filter : set[str] | None
+        Set of commands to include (already normalized).
+    normalized_exclude_commands : set[str] | None
+        Set of commands to exclude (already normalized).
+    subapp : App
+        The subcommand App instance.
+
+    Returns
+    -------
+    bool
+        True if the command should be included, False otherwise.
+    """
+    full_path = ".".join(parent_path + [name]) if parent_path else name
+
+    if normalized_exclude_commands:
+        if name in normalized_exclude_commands or full_path in normalized_exclude_commands:
+            return False
+        for i in range(len(parent_path)):
+            parent_segment = ".".join(parent_path[: i + 1])
+            if parent_segment in normalized_exclude_commands:
+                return False
+
+    if normalized_commands_filter is not None:
+        if name in normalized_commands_filter or full_path in normalized_commands_filter:
+            return True
+
+        for i in range(len(parent_path)):
+            parent_segment = ".".join(parent_path[: i + 1])
+            if parent_segment in normalized_commands_filter:
+                return True
+
+        if not parent_path and name in normalized_commands_filter:
+            return True
+
+        if hasattr(subapp, "_commands") and subapp._commands:
+            for filter_cmd in normalized_commands_filter:
+                if filter_cmd.startswith(full_path + "."):
+                    return True
+
+        return False
+
+    return True
+
+
+def _adjust_filters_for_subcommand(
+    name: str,
+    normalized_commands_filter: set[str] | None,
+    normalized_exclude_commands: set[str] | None,
+) -> tuple[list[str] | None, list[str] | None]:
+    """Adjust filter lists for subcommand context.
+
+    Parameters
+    ----------
+    name : str
+        The current command name.
+    normalized_commands_filter : set[str] | None
+        Set of commands to include (already normalized).
+    normalized_exclude_commands : set[str] | None
+        Set of commands to exclude (already normalized).
+
+    Returns
+    -------
+    tuple[list[str] | None, list[str] | None]
+        Adjusted commands_filter and exclude_commands lists (denormalized).
+    """
+    sub_commands_filter = None
+    if normalized_commands_filter is not None:
+        sub_commands_filter = []
+        for filter_cmd in normalized_commands_filter:
+            if filter_cmd.startswith(name + "."):
+                sub_filter = filter_cmd[len(name) + 1 :]
+                sub_commands_filter.append(sub_filter.replace("-", "_"))
+            elif filter_cmd == name:
+                sub_commands_filter = None
+                break
+
+        if sub_commands_filter == []:
+            sub_commands_filter = []
+
+    sub_exclude_commands = None
+    if normalized_exclude_commands:
+        sub_exclude_commands = []
+        for exclude_cmd in normalized_exclude_commands:
+            if exclude_cmd.startswith(name + "."):
+                sub_exclude = exclude_cmd[len(name) + 1 :]
+                sub_exclude_commands.append(sub_exclude.replace("-", "_"))
+            else:
+                sub_exclude_commands.append(exclude_cmd.replace("-", "_"))
+
+    return sub_commands_filter, sub_exclude_commands
+
+
 def _collect_commands_for_toc(
-    app: "App", include_hidden: bool = False, prefix: str = ""
+    app: "App",
+    include_hidden: bool = False,
+    prefix: str = "",
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
+    parent_path: list[str] | None = None,
 ) -> list[tuple[str, str, "App"]]:
     """Recursively collect all commands for table of contents.
 
@@ -21,16 +162,33 @@ def _collect_commands_for_toc(
     if not app._commands:
         return commands
 
+    if parent_path is None:
+        parent_path = []
+
+    normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
+        commands_filter, exclude_commands
+    )
+
     for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
-        # Create display name and anchor
+        if not _should_include_command(
+            name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
+        ):
+            continue
+
         display_name = f"{prefix}{name}" if prefix else name
-        # Anchor is the markdown heading converted to lowercase with dashes
         anchor = display_name.replace(" ", "-").lower()
 
         commands.append((display_name, anchor, subapp))
 
-        # Recursively collect nested commands
-        nested = _collect_commands_for_toc(subapp, include_hidden=include_hidden, prefix=f"{display_name} ")
+        nested_path = parent_path + [name]
+        nested = _collect_commands_for_toc(
+            subapp,
+            include_hidden=include_hidden,
+            prefix=f"{display_name} ",
+            commands_filter=commands_filter,
+            exclude_commands=exclude_commands,
+            parent_path=nested_path,
+        )
         commands.extend(nested)
 
     return commands
@@ -49,17 +207,19 @@ def _generate_toc_entries(
         cmd_name = display_name.split()[-1]
 
         # Create the TOC entry with markdown link
-        # The anchor for markdown headings with backticks
-        # ## `burgery create` becomes #burgery-create
-        if app_name and depth == 0:
-            full_name = f"{app_name} {display_name}"
-        elif app_name:
-            full_name = f"{app_name} {display_name}"
+        # For root-level commands (depth == 0), the anchor is just the command name
+        # For nested commands, the anchor includes the full path
+        if depth == 0:
+            # Root-level command: anchor is just the command name
+            anchor = display_name.lower().replace(" ", "-")
         else:
-            full_name = display_name
+            # Nested command: anchor includes app name and full path
+            if app_name:
+                full_name = f"{app_name} {display_name}"
+            else:
+                full_name = display_name
+            anchor = full_name.lower().replace(" ", "-")
 
-        # Convert to anchor format (lowercase, replace spaces with dashes)
-        anchor = full_name.lower().replace(" ", "-")
         lines.append(f"{indent}- [`{cmd_name}`](#{anchor})")
 
 
@@ -71,6 +231,9 @@ def generate_markdown_docs(
     command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
+    no_root_title: bool = False,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -96,6 +259,17 @@ def generate_markdown_docs(
     flatten_commands : bool
         If True, generate all commands at the same heading level instead of nested.
         Default is False.
+    commands_filter : list[str] | None
+        If specified, only include commands in this list.
+        Supports nested command paths like "db.migrate".
+        Default is None (include all commands).
+    exclude_commands : list[str] | None
+        If specified, exclude commands in this list.
+        Supports nested command paths like "db.migrate".
+        Default is None (no exclusions).
+    no_root_title : bool
+        If True, skip the root application title. Used for plugin contexts.
+        Default is False.
 
     Returns
     -------
@@ -108,6 +282,7 @@ def generate_markdown_docs(
     lines = []
 
     # Initialize command chain if not provided
+    is_root = command_chain is None
     if command_chain is None:
         command_chain = []
 
@@ -115,9 +290,10 @@ def generate_markdown_docs(
     app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
     title = f"`{full_command}`" if command_chain else base_title
 
-    # Add title for all levels
-    lines.append(f"{'#' * heading_level} {title}")
-    lines.append("")
+    # Add title for all levels (unless skipping root title)
+    if not (no_root_title and is_root):
+        lines.append(f"{'#' * heading_level} {title}")
+        lines.append("")
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
@@ -134,7 +310,12 @@ def generate_markdown_docs(
     # Generate table of contents if this is the root level and has commands
     if generate_toc and not command_chain and app._commands:
         # Collect all commands recursively for TOC
-        toc_commands = _collect_commands_for_toc(app, include_hidden=include_hidden)
+        toc_commands = _collect_commands_for_toc(
+            app,
+            include_hidden=include_hidden,
+            commands_filter=commands_filter,
+            exclude_commands=exclude_commands,
+        )
         if toc_commands:
             lines.append("## Table of Contents")
             lines.append("")
@@ -217,24 +398,75 @@ def generate_markdown_docs(
                     lines.append(output)
                 lines.append("")
 
+    # Normalize filter lists for efficient lookup (used for both panels and recursive docs)
+    normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
+        commands_filter, exclude_commands
+    )
+    parent_path = []
+
+    # Build a mapping of command names to App objects for filtering
+    command_map = {}
+    if app._commands:
+        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden=True):
+            command_map[name] = subapp
+
     # Render commands
     if command_panels:
-        lines.append("**Commands**:\n")
+        # First, collect all filtered panels
+        filtered_panels_output = []
         for _group, panel in command_panels:
-            formatter.reset()
-            # Don't show panel title for commands
-            panel.title = ""
-            formatter(None, None, panel)
-            output = formatter.get_output().strip()
-            if output:
+            # Filter command entries based on commands_filter and exclude_commands
+            filtered_entries = []
+            for entry in panel.entries:
+                if entry.names:
+                    cmd_name = entry.names[0]
+                    # Get the App object for this command
+                    subapp = command_map.get(cmd_name)
+                    # If there's no subapp (e.g., --help, --version), include it if no filters are specified
+                    if subapp is None:
+                        # Non-command entries (like --help, --version) are included if no filters are specified
+                        if normalized_commands_filter is None and normalized_exclude_commands is None:
+                            filtered_entries.append(entry)
+                    else:
+                        # Check if this command should be included based on filters
+                        if _should_include_command(
+                            cmd_name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
+                        ):
+                            filtered_entries.append(entry)
+
+            # Only render if there are filtered entries
+            if filtered_entries:
+                formatter.reset()
+                # Create a new panel with filtered entries
+                filtered_panel = panel.__class__(
+                    title="",  # Don't show panel title for commands
+                    entries=filtered_entries,
+                    format=panel.format,
+                    description=panel.description,
+                )
+                formatter(None, None, filtered_panel)
+                output = formatter.get_output().strip()
+                if output:
+                    filtered_panels_output.append(output)
+
+        # Only add header if there are panels to render
+        if filtered_panels_output:
+            lines.append("**Commands**:\n")
+            for output in filtered_panels_output:
                 lines.append(output)
-        lines.append("")
+            lines.append("")
 
     # Handle recursive documentation for subcommands
     if app._commands:
         # Iterate through registered commands using iterate_commands helper
         # This automatically resolves CommandSpec instances
         for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+            # Apply command filtering
+            if not _should_include_command(
+                name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
+            ):
+                continue
+
             # Build the command chain for this subcommand
             sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
 
@@ -245,7 +477,14 @@ def generate_markdown_docs(
                 sub_heading_level = heading_level + 1
 
             # Generate subcommand documentation in Typer style
-            lines.append(f"{'#' * sub_heading_level} `{' '.join(sub_command_chain)}`")
+            # For root-level commands, show just the command name (not the app name)
+            if command_chain:
+                # Nested command: show full path
+                display_name = " ".join(sub_command_chain)
+            else:
+                # Root-level command: show just the command name
+                display_name = name
+            lines.append(f"{'#' * sub_heading_level} `{display_name}`")
             lines.append("")
 
             # Get subapp help
@@ -270,7 +509,14 @@ def generate_markdown_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
-                    usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
+                    # For root-level commands, use just the command name in usage
+                    if command_chain:
+                        # Nested command: show full command chain
+                        usage_command_chain = sub_command_chain
+                    else:
+                        # Root-level command: show just the command name
+                        usage_command_chain = [name]
+                    usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, usage_command_chain, prefix="$")
                     lines.append(usage_line)
                     lines.append("```")
                     lines.append("")
@@ -343,7 +589,8 @@ def generate_markdown_docs(
                         will_recurse = recursive and subapp._commands
                         if will_recurse:
                             # Just show a simple command list without the duplicate heading
-                            lines.append("**Commands**:\n")
+                            # Collect entries first to check if there are any
+                            command_entries = []
                             for _group, panel in sub_command_panels:
                                 for entry in panel.entries:
                                     if entry.names:
@@ -353,21 +600,35 @@ def generate_markdown_docs(
                                             if entry.description
                                             else ""
                                         )
-                                        lines.append(f"* `{cmd_name}`: {desc_text}")
-                            lines.append("")
+                                        command_entries.append(f"* `{cmd_name}`: {desc_text}")
+                            # Only add header if there are entries
+                            if command_entries:
+                                lines.append("**Commands**:\n")
+                                lines.extend(command_entries)
+                                lines.append("")
                         else:
                             # Show full command panel if not recursing
-                            lines.append("**Commands**:\n")
+                            # Collect output first to check if there's anything to render
+                            panel_outputs = []
                             for _group, panel in sub_command_panels:
                                 sub_formatter.reset()
                                 sub_formatter(None, None, panel)
                                 output = sub_formatter.get_output().strip()
                                 if output:
-                                    lines.append(output)
-                            lines.append("")
+                                    panel_outputs.append(output)
+                            # Only add header if there's output
+                            if panel_outputs:
+                                lines.append("**Commands**:\n")
+                                lines.extend(panel_outputs)
+                                lines.append("")
 
             # Recursively handle nested subcommands
             if recursive and subapp._commands:
+                # Adjust filters for this subcommand context
+                sub_commands_filter, sub_exclude_commands = _adjust_filters_for_subcommand(
+                    name, normalized_commands_filter, normalized_exclude_commands
+                )
+
                 for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
                     # Build nested command chain
                     nested_command_chain = BaseDocGenerator.build_command_chain(
@@ -387,6 +648,8 @@ def generate_markdown_docs(
                         command_chain=nested_command_chain,
                         generate_toc=False,  # Don't generate TOC for nested commands
                         flatten_commands=flatten_commands,
+                        commands_filter=sub_commands_filter,
+                        exclude_commands=sub_exclude_commands,
                     )
                     # Just append the generated docs - no title replacement
                     lines.append(nested_docs)
