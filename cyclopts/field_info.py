@@ -27,6 +27,7 @@ from cyclopts.annotations import (
     is_enum_flag,
     is_namedtuple,
     is_pydantic,
+    is_pydantic_secret,
     is_typeddict,
     resolve,
     resolve_annotated,
@@ -172,6 +173,14 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
             if model.model_config.get("populate_by_name", False):
                 names.append(python_name)
             names.append(pydantic_field.alias)
+
+            # Add legacy-compatible CLI form if not already present.
+            # This allows both "user-name" (new) and "username" (legacy) to work as CLI options.
+            # Old transform behavior: alias.lower() (no pascal_to_snake)
+            # New transform behavior: _pascal_to_snake(alias).lower()
+            legacy_form = pydantic_field.alias.lower()
+            if legacy_form not in names:
+                names.append(legacy_form)
         else:
             names.append(python_name)
 
@@ -233,7 +242,11 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
             required = False
             default = attribute.default
 
-        out[field_info.name] = field_info.evolve(names=(attribute.alias,), required=required, default=default)
+        help = attribute.metadata.get("help") if attribute.metadata else None
+
+        out[field_info.name] = field_info.evolve(
+            names=(attribute.alias,), required=required, default=default, help=help
+        )
     return out
 
 
@@ -258,12 +271,23 @@ def _dataclass_field_infos(hint) -> dict[str, FieldInfo]:
 
         kind = FieldInfo.KEYWORD_ONLY if f.kw_only else FieldInfo.POSITIONAL_OR_KEYWORD
 
+        # Extract help text with precedence order:
+        # 1. metadata["help"] - explicit help in metadata
+        # 2. metadata["doc"] - doc stored in metadata
+        # 3. f.doc - Python 3.14+ field(doc=...) parameter
+        help = None
+        if f.metadata:
+            help = f.metadata.get("help") or f.metadata.get("doc")
+        if not help and hasattr(f, "doc"):
+            help = f.doc  # type: ignore[attr-defined]
+
         out[f.name] = FieldInfo(
             names=(f.name,),
             kind=kind,
             required=required,
             annotation=annotation,
             default=default,
+            help=help,
         )
     return out
 
@@ -290,6 +314,15 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
     # Provides ~5-6x speedup for argument parsing by skipping signature_parameters() calls.
     if is_builtin(hint):
         return {}
+
+    # Pydantic secret types (SecretStr, SecretBytes) should be treated as simple types
+    if is_pydantic_secret(hint):
+        return {}
+
+    # NewType is a runtime identity function that returns its argument unchanged.
+    # Use the field_infos of the underlying supertype instead of NewType's misleading __init__.
+    if hasattr(hint, "__supertype__"):
+        return get_field_infos(hint.__supertype__)
 
     if is_dataclass(hint):
         # This must be before ``is_pydantic`` check so that we

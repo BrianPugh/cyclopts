@@ -318,6 +318,92 @@ To disable the help-page entirely, set ``help_flags`` to an empty string or iter
    app = cyclopts.App(help_flags="")
    app = cyclopts.App(help_flags=[])
 
+-------------
+Help Epilogue
+-------------
+An epilogue is text displayed at the end of the help screen, after all command and parameter panels.
+This is commonly used for version information, support contact details, or additional notes.
+
+The epilogue is set via the :attr:`.App.help_epilogue` attribute:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(
+       name="myapp",
+       help="My application description.",
+       help_epilogue="Support: support@example.com"
+   )
+
+   @app.default
+   def main():
+       """Main command."""
+       pass
+
+   app()
+
+.. code-block:: console
+
+   $ myapp --help
+   Usage: myapp [ARGS]
+
+   My application description.
+
+   ╭─ Commands ────────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                             │
+   │ --version  Display application version.                               │
+   ╰───────────────────────────────────────────────────────────────────────╯
+
+   Support: support@example.com
+
+Like :attr:`.App.help_format`, epilogues inherit from parent to child apps.
+This allows you to set a single epilogue that applies across your entire application:
+
+.. code-block:: python
+
+   parent = App(
+       name="myapp",
+       help_epilogue="Version 1.0.0 | support@example.com"
+   )
+
+   # Child inherits parent's epilogue
+   child = App(name="process", help="Process data files.")
+   parent.command(child)
+
+   # Another child overrides with its own epilogue
+   admin = App(
+       name="admin",
+       help="Admin commands.",
+       help_epilogue="Admin Tools v2.0 | USE WITH CAUTION"
+   )
+   parent.command(admin)
+
+   parent()
+
+.. code-block:: console
+
+   $ myapp process --help
+   Usage: myapp process
+
+   Process data files.
+
+   Version 1.0.0 | support@example.com    # Inherited from parent
+
+   $ myapp admin --help
+   Usage: myapp admin
+
+   Admin commands.
+
+   Admin Tools v2.0 | USE WITH CAUTION    # Overridden by child
+
+To disable the epilogue for a specific subcommand, set it to an empty string:
+
+.. code-block:: python
+
+   no_epilogue = App(name="internal", help_epilogue="")
+   parent.command(no_epilogue)
+
 --------------------
 Help Customization
 --------------------

@@ -5,10 +5,12 @@ from collections.abc import Callable, Iterator
 from contextlib import suppress
 from enum import Enum, Flag
 from functools import partial
-from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar, get_args, get_origin
 
 if TYPE_CHECKING:
     from cyclopts.argument._argument import Argument
+
+F = TypeVar("F", bound=Flag)
 
 from cyclopts._convert import ITERABLE_TYPES, convert_enum_flag
 from cyclopts.annotations import (
@@ -116,7 +118,9 @@ def startswith(string, prefix):
     return normalize(string).startswith(normalize(prefix))
 
 
-def missing_keys_factory(get_field_info: Callable[[Any], dict[str, FieldInfo]]):
+def missing_keys_factory(
+    get_field_info: Callable[[Any], dict[str, FieldInfo]],
+) -> Callable[["Argument", dict[str, Any]], list[str]]:
     def inner(argument: "Argument", data: dict[str, Any]) -> list[str]:
         provided_keys = set(data)
         field_info = get_field_info(argument.hint)
@@ -135,22 +139,22 @@ def get_annotated_discriminator(annotation):
 
 
 def enum_flag_from_dict(
-    enum_type: type[Flag],
+    enum_type: type[F],
     data: dict[str, bool],
     name_transform: Callable[[str], str],
-) -> Flag:
+) -> F:
     """Convert a dictionary of boolean flags to a Flag enum value.
 
     Parameters
     ----------
-    enum_type : type[Flag]
+    enum_type : type[F]
         The Flag enum type to convert to.
     data : dict[str, bool]
         Dictionary mapping flag names to boolean values.
 
     Returns
     -------
-    Flag
+    F
         The combined flag value.
     """
     return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)

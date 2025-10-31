@@ -71,6 +71,30 @@ def test_exceptions_missing_argument_flag(app, console):
     assert actual == expected
 
 
+def test_exceptions_missing_argument_with_short_flag(app, console):
+    """Error message should reference the flag actually used, not the canonical name."""
+
+    @app.command
+    def foo(option: Annotated[int, Parameter(alias="-o")]):
+        pass
+
+    with console.capture() as capture, pytest.raises(MissingArgumentError):
+        # Use just -o without a value (GNU-style -o1 now works)
+        app("foo -o", error_console=console, exit_on_error=False)
+
+    actual = capture.get()
+
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ Command "foo" parameter "-o" requires an argument.                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert actual == expected
+
+
 def test_exceptions_validation_error_cli_single_positional(app, console):
     argument = Argument(
         hint=int,
@@ -356,3 +380,23 @@ def test_exceptions_argument_order_error_plural(app, console):
     )
 
     assert actual == expected
+
+
+def test_exceptions_combined_short_option_error(app, console):
+    """With GNU-style support, -bo is now valid: -b with value 'o'.
+
+    The CombinedShortOptionError for mixing value-taking options is no longer possible
+    because the first value-taking option consumes the rest of the string as its value.
+    This test now verifies that GNU-style combinations work correctly.
+    """
+
+    @app.command
+    def foo(
+        *,
+        bar: Annotated[str, Parameter(name=("--bar", "-b"))],
+    ):
+        pass
+
+    # -bo is now valid GNU-style: -b with value "o"
+    _, bound, _ = app.parse_args("foo -bo", exit_on_error=False)
+    assert bound.arguments["bar"] == "o"

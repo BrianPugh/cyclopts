@@ -73,6 +73,235 @@ def test_config_dict_use_commands_as_keys_false():
     assert result == "Alice is 30 years old."
 
 
+def test_config_dict_use_commands_as_keys_false_with_sibling_commands():
+    """Test Dict config filters sibling command sections when use_commands_as_keys=False.
+
+    Regression test for issue where config filtering used command_app instead of parent app,
+    causing sibling command sections in the config to not be properly filtered out.
+
+    This reproduces the bug fixed in core.py where executing "polygon 1 2 3 4" would fail
+    because the "line" section in the config wasn't being filtered correctly.
+    """
+    from dataclasses import KW_ONLY, dataclass
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    config_data = {
+        "units": "meters",
+        "line": {"color": "red"},
+        "polygon": {"color": "blue"},
+        "circle": {"color": "green"},
+    }
+
+    app = App(config=Dict(config_data, use_commands_as_keys=False), result_action="return_value")
+
+    @Parameter(name="*")
+    @dataclass
+    class DrawConfig:
+        _: KW_ONLY
+        units: str = "meters"
+        color: str = "black"
+
+    @app.command
+    def line(start: tuple[float, float], end: tuple[float, float], config: DrawConfig | None = None):
+        if config is None:
+            config = DrawConfig()
+        return f"line: {start} to {end} in {config.units}, color={config.color}"
+
+    @app.command
+    def polygon(*vertices: Annotated[tuple[float, float], Parameter(required=True)], config: DrawConfig | None = None):
+        if config is None:
+            config = DrawConfig()
+        return f"polygon: {len(vertices)} vertices in {config.units}, color={config.color}"
+
+    @app.command
+    def circle(center: tuple[float, float], radius: float, config: DrawConfig | None = None):
+        if config is None:
+            config = DrawConfig()
+        return f"circle: center={center} radius={radius} in {config.units}, color={config.color}"
+
+    result = app("line 0 0 10 10")
+    assert result == "line: (0.0, 0.0) to (10.0, 10.0) in meters, color=black"
+
+    result = app("polygon 1 2 3 4 5 6")
+    assert result == "polygon: 3 vertices in meters, color=black"
+
+    result = app("circle 0 0 5")
+    assert result == "circle: center=(0.0, 0.0) radius=5.0 in meters, color=black"
+
+
+def test_config_dict_nested_commands_with_use_commands_as_keys_true():
+    """Test Dict config with nested commands using default use_commands_as_keys=True.
+
+    Regression test to ensure that when use_commands_as_keys=True (default), the filtering
+    uses command_app (not root_app) so that subcommand sections at the command's config level
+    are properly filtered out.
+
+    Without the correct fix, this would fail with "Unknown option" errors because cmd1/cmd2
+    sections wouldn't be filtered when executing the sub default command.
+    """
+    config_data = {
+        "sub": {
+            "shared_param": "shared_value",
+            "cmd1": {"cmd1_param": "cmd1_value"},
+            "cmd2": {"cmd2_param": "cmd2_value"},
+        }
+    }
+
+    app = App(config=Dict(config_data), result_action="return_value")
+    sub_app = App()
+    app.command(sub_app, name="sub")
+
+    @sub_app.default
+    def sub_default(shared_param: str):
+        return f"sub_default: {shared_param}"
+
+    @sub_app.command
+    def cmd1(cmd1_param: str):
+        return f"cmd1: {cmd1_param}"
+
+    @sub_app.command
+    def cmd2(cmd2_param: str):
+        return f"cmd2: {cmd2_param}"
+
+    result = app("sub")
+    assert result == "sub_default: shared_value"
+
+    result = app("sub cmd1")
+    assert result == "cmd1: cmd1_value"
+
+    result = app("sub cmd2")
+    assert result == "cmd2: cmd2_value"
+
+
+def test_config_dict_nested_commands_with_use_commands_as_keys_false():
+    """Test Dict config with nested App commands using use_commands_as_keys=False.
+
+    With use_commands_as_keys=False, config stays at root level and is shared
+    across all commands, including nested App commands and their subcommands.
+    """
+    config_data = {
+        "global_setting": "shared_value",
+    }
+
+    app = App(config=Dict(config_data, use_commands_as_keys=False), result_action="return_value")
+    sub_app = App()
+    app.command(sub_app, name="sub")
+
+    @sub_app.default
+    def sub_default(global_setting: str):
+        return f"sub_default: {global_setting}"
+
+    @sub_app.command
+    def cmd1(global_setting: str):
+        return f"cmd1: {global_setting}"
+
+    result = app("sub")
+    assert result == "sub_default: shared_value"
+
+    result = app("sub cmd1")
+    assert result == "cmd1: shared_value"
+
+
+def test_config_dict_deeply_nested_with_use_commands_as_keys_false():
+    """Test Dict config with deeply nested commands and use_commands_as_keys=False.
+
+    Ensures that even with multiple levels of nesting, flat config is shared
+    across all command levels.
+    """
+    config_data = {
+        "shared": "value",
+        "another": 42,
+    }
+
+    app = App(config=Dict(config_data, use_commands_as_keys=False), result_action="return_value")
+    level1_app = App()
+    level2_app = App()
+
+    app.command(level1_app, name="level1")
+    level1_app.command(level2_app, name="level2")
+
+    @level2_app.default
+    def deeply_nested(shared: str, another: int):
+        return f"deeply_nested: {shared}, {another}"
+
+    result = app("level1 level2")
+    assert result == "deeply_nested: value, 42"
+
+
+def test_config_dict_mixed_nested_and_flat_commands():
+    """Test Dict config with mix of nested apps and flat config.
+
+    This tests that both simple commands and nested App commands can share
+    the same flat config when use_commands_as_keys=False.
+    """
+    config_data = {
+        "base_value": "base",
+        "count": 10,
+    }
+
+    app = App(config=Dict(config_data, use_commands_as_keys=False), result_action="return_value")
+
+    @app.command
+    def simple(base_value: str, count: int):
+        return f"simple: {base_value}, count={count}"
+
+    nested_app = App()
+    app.command(nested_app, name="nested")
+
+    @nested_app.default
+    def nested_default(base_value: str, count: int):
+        return f"nested: {base_value}, count={count}"
+
+    result = app("simple")
+    assert result == "simple: base, count=10"
+
+    result = app("nested")
+    assert result == "nested: base, count=10"
+
+
+def test_config_dict_use_commands_as_keys_true_filters_subcommands():
+    """Test that use_commands_as_keys=True correctly filters sibling subcommands.
+
+    When navigating into a command's config section, sibling command sections at that
+    level should be filtered using the command's app (not root app). This ensures
+    that "create" and "delete" sections are filtered when executing each other.
+    """
+    config_data = {
+        "db": {
+            "timeout": 30,
+            "create": {"timeout": 10, "operation": "create_op"},
+            "delete": {"timeout": 20, "operation": "delete_op"},
+        }
+    }
+
+    app = App(config=Dict(config_data, use_commands_as_keys=True), result_action="return_value")
+    db_app = App()
+    app.command(db_app, name="db")
+
+    @db_app.default
+    def db_default(timeout: int):
+        return f"db: timeout={timeout}"
+
+    @db_app.command
+    def create(timeout: int, operation: str):
+        return f"create: timeout={timeout}, operation={operation}"
+
+    @db_app.command
+    def delete(timeout: int, operation: str):
+        return f"delete: timeout={timeout}, operation={operation}"
+
+    result = app("db")
+    assert result == "db: timeout=30"
+
+    result = app("db create")
+    assert result == "create: timeout=10, operation=create_op"
+
+    result = app("db delete")
+    assert result == "delete: timeout=20, operation=delete_op"
+
+
 def test_config_dict_allow_unknown():
     """Test Dict config with allow_unknown=True."""
     config_data = {

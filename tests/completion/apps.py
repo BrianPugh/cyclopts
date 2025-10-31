@@ -203,3 +203,23 @@ def process(
         Input file to process.
     """
     pass
+
+
+app_list_path = App(name="listpath")
+
+
+@app_list_path.default
+def list_path_main(
+    files: Annotated[list[Path], Parameter(help="List of files")],
+):
+    """App with list[Path] parameter."""
+    pass
+
+
+app_disabled_negative = App(name="disabledneg", default_parameter=Parameter(negative=""))
+
+
+@app_disabled_negative.command
+def build(param: list[Literal["apple", "banana", "cherry"]]):
+    """Build command with list parameter."""
+    pass

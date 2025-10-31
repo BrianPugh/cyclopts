@@ -54,7 +54,14 @@ class LimitedChoice:
         elif self.min <= n_arguments <= self.max:
             return
         else:
-            offenders = "{" + ", ".join(a.name for a in populated_argument_collection) + "}"
+            offenders = (
+                "{"
+                + ", ".join(
+                    a.tokens[0].keyword if (a.tokens and a.tokens[0].keyword) else a.name
+                    for a in populated_argument_collection
+                )
+                + "}"
+            )
             if self.min == 0 and self.max == 1:
                 raise ValueError(f"Mutually exclusive arguments: {offenders}")
             else:

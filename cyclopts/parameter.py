@@ -249,8 +249,14 @@ class Parameter:
 
     json_list: bool | None = field(default=None, kw_only=True)
 
+    count: bool = field(
+        default=None,
+        converter=attrs.converters.default_if_none(False),
+        kw_only=True,
+    )
+
     # Populated by the record_attrs_init_args decorator.
-    _provided_args: tuple[str] = field(factory=tuple, init=False, eq=False)
+    _provided_args: tuple[str, ...] = field(factory=tuple, init=False, eq=False)
 
     @property
     def show(self) -> bool:
@@ -261,11 +267,21 @@ class Parameter:
         return self._name_transform if self._name_transform else default_name_transform
 
     def get_negatives(self, type_) -> tuple[str, ...]:
+        if self.count and self.negative is None:
+            return ()
+
         type_ = resolve_annotated(type_)
         if is_union(type_):
-            out = []
-            for x in get_args(type_):
-                out.extend(self.get_negatives(x))
+            union_args = get_args(type_)
+            # Sort union members by priority: non-None types first, then None/NoneType
+            # This ensures that if bool | None both produce the same custom negative,
+            # we only include it once from the higher-priority type (bool).
+            sorted_args = sorted(union_args, key=lambda x: (is_nonetype(x) or x is None))
+            out: list[str] = []
+            for x in sorted_args:
+                for neg in self.get_negatives(x):
+                    if neg not in out:
+                        out.append(neg)
             return tuple(out)
 
         origin = get_origin(type_)

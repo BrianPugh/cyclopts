@@ -143,3 +143,189 @@ def test_help_and_version_flags_together(app, console):
     output = capture.get()
     assert "Work with files" in output
     assert "INPUT-FILE" in output
+
+
+def test_version_and_help_flags_together(console):
+    """Test that help flag takes priority when --version --help are provided (version first).
+
+    Regression test for issue #645 where having multiple --version/--help flags caused
+    NameError: name 'Console' is not defined.
+    """
+    import pytest
+
+    from cyclopts import App
+
+    # Create app without result_action override to reproduce the issue
+    app = App(name="myapp", version="1.0.0")
+
+    @app.command
+    def files(
+        input_file: Path,
+        output_file: Path | None = None,
+    ):
+        """Work with files."""
+        pass
+
+    # Test with multiple help/version flags - should show help and exit cleanly
+    # The issue occurs when more than one help/version flag is present
+    with console.capture() as capture:
+        with pytest.raises(SystemExit) as exc_info:
+            app(["files", "--version", "--help", "--help"], console=console)
+        assert exc_info.value.code == 0
+
+    output = capture.get()
+    assert "Work with files" in output
+    assert "INPUT-FILE" in output
+
+    # Test with different combinations
+    with console.capture() as capture:
+        with pytest.raises(SystemExit) as exc_info:
+            app(["files", "--help", "--version", "--version"], console=console)
+        assert exc_info.value.code == 0
+
+    output = capture.get()
+    assert "Work with files" in output
+    assert "INPUT-FILE" in output
+
+
+def test_subcommand_version(console):
+    """Test that subcommands display their own version, not the parent's version.
+
+    Regression test for issue #627 where subcommand --version showed parent version.
+    """
+    from cyclopts import App
+
+    # Root app with no version (defaults to 0.0.0)
+    root_app = App(version_flags=[], result_action="return_value")
+
+    # Subcommand with explicit version
+    subcommand = App(
+        name="subcommand",
+        version="1.2.3",
+        version_flags=["--version"],
+    )
+    root_app.command(subcommand)
+
+    @subcommand.default
+    def subcommand_default():
+        """Subcommand default function."""
+        return "executed"
+
+    # Test that subcommand --version shows subcommand's version, not root's
+    with console.capture() as capture:
+        root_app(["subcommand", "--version"], console=console)
+
+    assert "1.2.3\n" == capture.get()
+
+
+def test_subcommand_version_with_meta_app(console):
+    """Test that subcommand version works correctly with meta apps.
+
+    Regression test for issue #627 with meta app wrapper.
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    # Root app with no version
+    root_app = App(version_flags=[], result_action="return_value")
+
+    # Subcommand with explicit version
+    subcommand = App(
+        name="subcommand",
+        version="1.2.3",
+        version_flags=["-v", "--version"],
+    )
+    root_app.command(subcommand)
+
+    @subcommand.default
+    def subcommand_default():
+        """Subcommand default function."""
+        return "executed"
+
+    @root_app.meta.default
+    def meta(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        verbose: Annotated[bool, Parameter(alias="-V")] = False,
+    ):
+        return root_app(tokens)
+
+    # Test that subcommand --version shows subcommand's version even with meta app
+    with console.capture() as capture:
+        root_app.meta(["subcommand", "--version"], console=console)
+
+    assert "1.2.3\n" == capture.get()
+
+    # Also test with meta flag present
+    with console.capture() as capture:
+        root_app.meta(["-V", "subcommand", "-v"], console=console)
+
+    assert "1.2.3\n" == capture.get()
+
+
+def test_subcommand_inherits_parent_version(console):
+    """Test that subcommand inherits parent's version when not explicitly set.
+
+    When a subcommand doesn't have an explicit version, it should inherit
+    the parent's version if the parent has one set.
+    """
+    from cyclopts import App
+
+    # Root app with explicit version
+    root_app = App(version="2.0.0", result_action="return_value")
+
+    # Subcommand without explicit version - should inherit from parent
+    subcommand = App(name="subcommand")
+    root_app.command(subcommand)
+
+    @subcommand.default
+    def subcommand_default():
+        """Subcommand default function."""
+        return "executed"
+
+    # Test that subcommand --version shows parent's version
+    with console.capture() as capture:
+        root_app(["subcommand", "--version"], console=console)
+
+    assert "2.0.0\n" == capture.get()
+
+
+def test_subcommand_explicit_version_overrides_parent(console):
+    """Test that subcommand's explicit version overrides parent's version."""
+    from cyclopts import App
+
+    # Root app with version 2.0.0
+    root_app = App(version="2.0.0", result_action="return_value")
+
+    # Subcommand with explicit different version - should NOT inherit
+    subcommand = App(name="subcommand", version="3.0.0")
+    root_app.command(subcommand)
+
+    @subcommand.default
+    def subcommand_default():
+        """Subcommand default function."""
+        return "executed"
+
+    # Test that subcommand --version shows its own version, not parent's
+    with console.capture() as capture:
+        root_app(["subcommand", "--version"], console=console)
+
+    assert "3.0.0\n" == capture.get()
+
+
+def test_function_command_inherits_parent_version(console):
+    """Test that function commands inherit parent's version."""
+    from cyclopts import App
+
+    root_app = App(version="4.0.0", result_action="return_value")
+
+    @root_app.command
+    def my_command():
+        """A command function."""
+        return "executed"
+
+    # Test that function command --version shows parent's version
+    with console.capture() as capture:
+        root_app(["my-command", "--version"], console=console)
+
+    assert "4.0.0\n" == capture.get()

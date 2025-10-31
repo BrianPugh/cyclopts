@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from sphinx.application import Sphinx
     from sphinx.util.docutils import SphinxDirective
 
+    from cyclopts import App
+
 try:
     from docutils import nodes  # noqa: F401
     from sphinx.application import Sphinx
@@ -25,7 +27,7 @@ except ImportError:
         logger = None
 
 
-def _import_app(module_path: str) -> Any:
+def _import_app(module_path: str) -> "App":
     """Import a Cyclopts App from a module path."""
     from cyclopts import App
 

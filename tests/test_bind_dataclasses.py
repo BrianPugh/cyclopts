@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Annotated
@@ -435,3 +436,144 @@ def test_bind_dataclass_with_varargs_consume_all(app, assert_parse_args):
         "out.txt in1.txt in2.txt in3.txt",
         config=FileProcessor(output="out.txt", inputs=("in1.txt", "in2.txt", "in3.txt")),
     )
+
+
+def test_dataclass_field_metadata_help(app, console):
+    """Test that dataclass Field metadata={"help": "..."} is used for help text."""
+
+    @dataclass
+    class Config:
+        name: str = field(default="default", metadata={"help": "Help from metadata."})
+
+        age: Annotated[int, Parameter(help="Parameter help takes precedence.")] = field(
+            default=25, metadata={"help": "This metadata help is ignored."}
+        )
+
+        count: int = field(default=10)
+        """Docstring for count."""
+
+        size: int = field(default=5, metadata={"help": "Metadata help overrides docstring."})
+        """This docstring is ignored."""
+
+    @app.default
+    def main(config: Config):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    assert "Help from metadata." in actual
+
+    assert "Parameter help takes precedence." in actual
+    assert "This metadata help is ignored." not in actual
+
+    assert "Docstring for count." in actual
+
+    assert "Metadata help overrides docstring." in actual
+    assert "This docstring is ignored." not in actual
+
+
+def test_bind_dataclass_direct_parent_match_issue_647(app, assert_parse_args):
+    """Test that --foo bar baz correctly converts to Foo(name="bar", age=25).
+
+    Previously, parent arguments with children would match directly (e.g., --foo),
+    consume tokens, but then fail to properly construct the object because
+    children had no tokens. The fix allows parent arguments to convert their
+    tokens as positional arguments to the structured type.
+
+    See: https://github.com/BrianPugh/cyclopts/issues/647
+    """
+
+    @dataclass
+    class Foo:
+        name: str
+        age: int
+
+    @app.default
+    def cmd(*, foo: Annotated[Foo, Parameter()] = Foo(name="default", age=0)):  # noqa: B008
+        return foo
+
+    # This should work: directly provide values after parent name (positional-style)
+    assert_parse_args(cmd, "--foo bar 25", foo=Foo(name="bar", age=25))
+
+    # This should also still work: explicit nested keys
+    assert_parse_args(cmd, "--foo.name baz --foo.age 30", foo=Foo(name="baz", age=30))
+
+    # No arguments should use the function default (tested separately)
+    _, bound, _ = app.parse_args("", print_error=False, exit_on_error=False)
+    assert "foo" not in bound.arguments
+    result = cmd(**bound.arguments)
+    assert result == Foo(name="default", age=0)
+
+
+def test_bind_dataclass_kw_only_with_accepts_keys_false_issue_648(app, assert_parse_args):
+    """Test that kw_only dataclass with accepts_keys=False works.
+
+    When a dataclass is kw_only=True, it cannot accept positional arguments.
+    With accepts_keys=False, Cyclopts should still pass values as keyword arguments.
+
+    See: https://github.com/BrianPugh/cyclopts/issues/648
+    """
+
+    @dataclass(kw_only=True)
+    class Foo:
+        name: str
+
+    @app.default
+    def cmd(*, foo: Annotated[Foo, Parameter(accepts_keys=False)]) -> Foo:
+        return foo
+
+    assert_parse_args(cmd, "--foo Alice", foo=Foo(name="Alice"))
+
+
+@pytest.mark.skipif(sys.version_info < (3, 14), reason="Requires Python 3.14+ for field(doc=...)")
+def test_dataclass_field_doc_parameter_help(app, console):
+    """Test that Python 3.14's dataclass field(doc=...) parameter is used for help text."""
+
+    @dataclass
+    class Config:
+        name: str = field(default="default", doc="Help from doc parameter.")  # type: ignore[call-arg]
+
+        age: Annotated[int, Parameter(help="Parameter help takes precedence.")] = field(
+            default=25,
+            doc="This doc is ignored.",  # type: ignore[call-arg]
+        )
+
+        count: int = field(default=10, doc="Doc parameter help.")  # type: ignore[call-arg]
+
+        size: int = field(
+            default=5,
+            metadata={"help": "Metadata help takes precedence over doc."},
+            doc="This doc is ignored.",  # type: ignore[call-arg]
+        )
+
+        height: int = field(default=8)
+        """Docstring for height."""
+
+        width: int = field(default=12, doc="Doc parameter overrides docstring.")  # type: ignore[call-arg]
+        """This docstring is ignored."""
+
+    @app.default
+    def main(config: Config):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    assert "Help from doc parameter." in actual
+
+    assert "Parameter help takes precedence." in actual
+    assert "This doc is ignored." not in actual
+
+    assert "Doc parameter help." in actual
+
+    assert "Metadata help takes precedence" in actual
+
+    assert "Docstring for height." in actual
+
+    assert "Doc parameter overrides docstring." in actual
+    assert "This docstring is ignored." not in actual

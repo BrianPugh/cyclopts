@@ -6,11 +6,11 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, get_origin
+from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
 
 from cyclopts._convert import _bool
 from cyclopts.annotations import resolve_optional
-from cyclopts.argument import ArgumentCollection
+from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
@@ -34,6 +34,22 @@ if TYPE_CHECKING:
     from cyclopts.group import Group
 
 CliToken = partial(Token, source="cli")
+
+
+class _KeywordMatch(NamedTuple):
+    """Represents a matched CLI token with its corresponding argument."""
+
+    matched_token: str
+    """The actual CLI token that was matched (e.g., '-o', '--option')."""
+
+    argument: Argument
+    """The matched Argument object."""
+
+    keys: tuple[str, ...]
+    """Leftover keys for nested arguments."""
+
+    implicit_value: Any
+    """Implicit value if this is a flag, otherwise UNSET."""
 
 
 def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
@@ -101,33 +117,69 @@ def _parse_kw_and_flags(
         # startswith("-") is redundant, but it's cheap safety.
         allow_combined_flags = token.startswith("-") and not token.startswith("--")
 
+        # Try splitting on "=" for long options or short options that match exactly
         if "=" in token:
             cli_option, cli_value = token.split("=", 1)
-            cli_values.append(cli_value)
-            consume_count -= 1
-
-            # Cannot have combined flags when an "=" is parsed.
-            allow_combined_flags = False
+            # Try to match the part before "="
+            try:
+                argument_collection.match(cli_option)
+                # Matched! Use the split
+                cli_values.append(cli_value)
+                consume_count -= 1
+                allow_combined_flags = False
+            except ValueError:
+                # No match - might be GNU-style like "-pfile=value"
+                # Don't split, treat whole token as the option
+                cli_option = token
         else:
             cli_option = token
 
-        matches = []
+        matches: list[_KeywordMatch] = []
+        attached_value: str | None = None  # Track value attached to a GNU-style combined option
         try:
-            matches.append(argument_collection.match(cli_option))
+            matches.append(_KeywordMatch(cli_option, *argument_collection.match(cli_option)))
         except ValueError:
             # Length has to be greater than 2 (hyphen + character) to be exploded.
             if allow_combined_flags and len(token) > 2:
-                # since no direct match was found, try to see if this was a combination of short flags.
-                flags = [f"-{x}" for x in cli_option.lstrip("-")]
-                for flag in flags:
+                # GNU-style combined short options: process left-to-right
+                # Once we hit an option that takes a value, the rest is the value
+                chars = cli_option.lstrip("-")
+                position = 0
+
+                while position < len(chars):
+                    char = chars[position]
+                    test_flag = f"-{char}"
+
                     try:
-                        matches.append(argument_collection.match(flag))
+                        arg, keys, implicit = argument_collection.match(test_flag)
+
+                        if implicit is not UNSET or arg.parameter.count:
+                            # This is a flag (boolean or counting) - consume just this character
+                            matches.append(_KeywordMatch(test_flag, arg, keys, implicit))
+                            position += 1
+                        else:
+                            # This option takes a value - rest of the string is the value
+                            remainder = chars[position + 1 :]
+                            matches.append(_KeywordMatch(test_flag, arg, keys, implicit))
+                            if remainder:
+                                # Value is attached: -uroot or -fvuroot
+                                # Store it separately, will be added to cli_values when processing this match
+                                attached_value = remainder
+                                consume_count -= 1
+                            # Stop processing further characters
+                            break
+
                     except ValueError:
+                        # Unknown flag
                         if stop_at_first_unknown:
-                            # Can't parse this flag combination, stop here
                             unused_tokens.extend(tokens[i:])
                             return unused_tokens
-                        unused_tokens.append(flag)
+                        unused_tokens.append(test_flag)
+                        position += 1
+
+                if not matches:
+                    # No valid matches found at all
+                    continue
             else:
                 if stop_at_first_unknown:
                     # Unknown option, stop parsing and return all remaining tokens
@@ -135,41 +187,63 @@ def _parse_kw_and_flags(
                     return unused_tokens
                 unused_tokens.append(token)
                 continue
-        for argument, leftover_keys, implicit_value in matches:
-            if implicit_value is not UNSET:
+        for match_index, match in enumerate(matches):
+            # For GNU-style combined options, add the attached value only when processing
+            # the last match (the value-taking option), not for preceding flags
+            if attached_value is not None and match_index == len(matches) - 1:
+                cli_values.append(attached_value)
+
+            if match.argument.parameter.count:
+                match.argument.append(CliToken(keyword=match.matched_token, implicit_value=1))
+            elif match.implicit_value is not UNSET:
                 # A flag was parsed
                 if cli_values:
                     try:
                         coerced_value = _bool(cli_values[-1])
                     except CoercionError as e:
                         if e.token is None:
-                            e.token = CliToken(keyword=cli_option)
+                            e.token = CliToken(keyword=match.matched_token)
                         if e.argument is None:
-                            e.argument = argument
+                            e.argument = match.argument
                         raise
                     if coerced_value:  # --positive-flag=true or --negative-flag=true or --empty-flag=true
-                        argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
+                        match.argument.append(
+                            CliToken(keyword=match.matched_token, implicit_value=match.implicit_value)
+                        )
                     else:  # --positive-flag=false or --negative-flag=false or --empty-flag=false
-                        if isinstance(implicit_value, bool):
-                            argument.append(CliToken(keyword=cli_option, implicit_value=not implicit_value))
+                        if isinstance(match.implicit_value, bool):
+                            match.argument.append(
+                                CliToken(keyword=match.matched_token, implicit_value=not match.implicit_value)
+                            )
                         else:
                             # A negative for a non-bool field doesn't really make sense;
                             # e.g. --empty-list=False
                             # So we'll just silently skip it, as it may make bash scripting easier.
                             pass
                 else:
-                    argument.append(CliToken(keyword=cli_option, implicit_value=implicit_value))
-            elif len(matches) != 1:
-                raise CombinedShortOptionError(msg=f"Cannot combine flags and short-options in token {cli_option}")
+                    match.argument.append(CliToken(keyword=match.matched_token, implicit_value=match.implicit_value))
             else:
-                tokens_per_element, consume_all = argument.token_count(leftover_keys)
+                # This is a value-taking option (not a flag or counting parameter)
+                # Error only if we're trying to combine multiple value-taking options without values
+                # (e.g., -fu where both -f and -u take values would be invalid)
+                # But -fu where -f is a flag and -u takes a value is valid (GNU-style)
+                if len(matches) > 1:
+                    # Count how many value-taking options we have
+                    value_taking_count = sum(
+                        1 for m in matches if m.implicit_value is UNSET and not m.argument.parameter.count
+                    )
+                    if value_taking_count > 1:
+                        raise CombinedShortOptionError(
+                            msg=f"Cannot combine multiple value-taking options in token {cli_option}"
+                        )
+                tokens_per_element, consume_all = match.argument.token_count(match.keys)
 
                 # Consume the appropriate number of tokens
                 with suppress(IndexError):
-                    if consume_all and argument.parameter.consume_multiple:
+                    if consume_all and match.argument.parameter.consume_multiple:
                         for j in itertools.count():
                             token = tokens[i + 1 + j]
-                            if not argument.parameter.allow_leading_hyphen and is_option_like(token):
+                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token):
                                 break
                             cli_values.append(token)
                             skip_next_iterations += 1
@@ -177,8 +251,8 @@ def _parse_kw_and_flags(
                         consume_count += tokens_per_element
                         for j in range(consume_count):
                             if len(cli_values) == 1 and (
-                                argument._should_attempt_json_dict(cli_values)
-                                or argument._should_attempt_json_list(cli_values, leftover_keys)
+                                match.argument._should_attempt_json_dict(cli_values)
+                                or match.argument._should_attempt_json_list(cli_values, match.keys)
                             ):
                                 tokens_per_element = 1
                                 # Assume that the contents are json and that we shouldn't
@@ -186,33 +260,40 @@ def _parse_kw_and_flags(
                                 break
 
                             token = tokens[i + 1 + j]
-                            if not argument.parameter.allow_leading_hyphen and is_option_like(token):
+                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token):
                                 raise MissingArgumentError(
-                                    argument=argument,
+                                    argument=match.argument,
                                     tokens_so_far=cli_values,
+                                    keyword=match.matched_token,
                                 )
                             cli_values.append(token)
                             skip_next_iterations += 1
 
                 if not cli_values:
                     # No values were consumed after the keyword
-                    if consume_all and argument.parameter.consume_multiple:
+                    if consume_all and match.argument.parameter.consume_multiple:
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
-                        hint = resolve_optional(argument.hint)
+                        hint = resolve_optional(match.argument.hint)
                         empty_container = (get_origin(hint) or hint)()
-                        argument.append(
-                            CliToken(keyword=cli_option, implicit_value=empty_container, keys=leftover_keys)
+                        match.argument.append(
+                            CliToken(keyword=match.matched_token, implicit_value=empty_container, keys=match.keys)
                         )
                     else:
                         # Non-iterables or consume_multiple=False require at least one value
-                        raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
+                        raise MissingArgumentError(
+                            argument=match.argument, tokens_so_far=cli_values, keyword=match.matched_token
+                        )
                 elif len(cli_values) % tokens_per_element:
                     # For multi-token elements (e.g., tuples), ensure we have complete sets
-                    raise MissingArgumentError(argument=argument, tokens_so_far=cli_values)
+                    raise MissingArgumentError(
+                        argument=match.argument, tokens_so_far=cli_values, keyword=match.matched_token
+                    )
                 else:
                     # Normal case: append the consumed values
                     for index, cli_value in enumerate(cli_values):
-                        argument.append(CliToken(keyword=cli_option, value=cli_value, index=index, keys=leftover_keys))
+                        match.argument.append(
+                            CliToken(keyword=match.matched_token, value=cli_value, index=index, keys=match.keys)
+                        )
 
     unused_tokens.extend(positional_only_tokens)
     return unused_tokens

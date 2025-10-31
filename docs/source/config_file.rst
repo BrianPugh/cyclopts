@@ -199,3 +199,63 @@ For configurations that come from sources other than files, use :class:`cyclopts
 
    if __name__ == "__main__":
        app()
+
+---------------------------------
+Combining Multiple Config Sources
+---------------------------------
+
+You can combine multiple config sources in a single application by passing a sequence to :attr:`App.config <cyclopts.App.config>`. Each configuration is applied sequentially.
+
+In the following example, we combine a TOML file and environment variables, allowing environment variables to override TOML settings:
+
+.. code-block:: python
+
+   # character-counter.py
+   import cyclopts
+   from pathlib import Path
+
+   app = cyclopts.App(
+       name="character-counter",
+       config=[
+           # Since Env comes before Toml, it has priority.
+           cyclopts.config.Env("CHAR_COUNTER_"),
+           cyclopts.config.Toml(
+               "pyproject.toml",
+               root_keys=["tool", "character-counter"],
+               search_parents=True,
+           ),
+       ],
+   )
+
+   @app.command
+   def count(filename: Path, *, character="-"):
+       print(filename.read_text().count(character))
+
+   if __name__ == "__main__":
+       app()
+
+With this setup, the configuration is resolved in the following order:
+
+1. **CLI arguments** (if provided) override everything else
+2. **Environment variables** (prefixed with ``CHAR_COUNTER_``) can override TOML values
+3. **TOML file** (pyproject.toml) provides the base configuration
+4.  **Python default** the default value ``-`` in the python code.
+
+For example, with ``pyproject.toml`` containing:
+
+.. code-block:: toml
+
+   [tool.character-counter.count]
+   character = "t"
+
+You can override it via environment variable:
+
+.. code-block:: console
+
+   $ CHAR_COUNTER_COUNT_CHARACTER=a python character-counter.py count README.md
+
+Or via CLI argument:
+
+.. code-block:: console
+
+   $ python character-counter.py count README.md --character=x

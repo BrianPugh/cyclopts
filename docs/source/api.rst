@@ -145,6 +145,43 @@ API
 
       See :ref:`Help Customization` for detailed examples and advanced usage.
 
+   .. attribute:: help_epilogue
+      :type: Optional[str]
+      :value: None
+
+      Text to display at the end of the help screen, after all help panels.
+      Commonly used for version information, contact details, or additional notes.
+      If :obj:`None`, no epilogue is displayed.
+      If not set, attempts to inherit from parenting :class:`.App`.
+
+      The epilogue supports the same formatting as :attr:`help` based on :attr:`help_format` (markdown, plaintext, restructuredtext, or rich).
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(
+             name="myapp",
+             help="My application help.",
+             help_epilogue="Support: support@example.com"
+         )
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: myapp COMMAND
+
+         My application help.
+
+         ╭─ Commands ────────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                             │
+         │ --version  Display application version.                               │
+         ╰───────────────────────────────────────────────────────────────────────╯
+
+         Support: support@example.com
 
    .. attribute:: help_on_error
       :type: Optional[bool]
@@ -497,12 +534,12 @@ API
          app(backend="trio")  # Override the app's backend for this call
 
    .. attribute:: result_action
-      :type: Literal["return_value", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | None
+      :type: Literal["return_value", "call_if_callable", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | Iterable[Literal[...] | Callable[[Any], Any]] | None
       :value: None
 
       Controls how :meth:`.App.__call__` and :meth:`.App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
 
-      Can be a predefined literal string or a custom callable that takes the result and returns a processed value.
+      Can be a predefined literal string, a custom callable that takes the result and returns a processed value, or a **sequence of actions** to be applied left-to-right in a pipeline.
 
       Each predefined mode's exact behavior is shown below:
 
@@ -529,6 +566,16 @@ API
          .. code-block:: python
 
             return result
+
+      **"call_if_callable"**
+
+         Calls the result if it's callable (with no arguments), otherwise returns it unchanged. Useful for the dataclass command pattern where commands return class instances with ``__call__`` methods. Intended to be used in composition with other result actions (e.g., ``["call_if_callable", "print_non_int_sys_exit"]``).
+
+         .. code-block:: python
+
+            return result() if callable(result) else result
+
+         See :ref:`Dataclass Commands` for usage examples.
 
       **"sys_exit"**
 
@@ -679,6 +726,30 @@ API
                 return result
 
             app = App(result_action=custom_handler)
+
+      **Sequence of Actions**
+
+         Provide a sequence (list or tuple) of actions to create a result-processing pipeline. Actions are applied left-to-right, with each action receiving the result of the previous action.
+
+         .. code-block:: python
+
+            def uppercase(result):
+                return result.upper() if isinstance(result, str) else result
+
+            def add_prefix(result):
+                return f"[OUTPUT] {result}" if isinstance(result, str) else result
+
+            # Pipeline: result → uppercase → add_prefix → return
+            app = App(result_action=[uppercase, add_prefix, "return_value"])
+
+            @app.command
+            def greet(name: str) -> str:
+                return f"hello {name}"
+
+            result = app(["greet", "world"])
+            # result == "[OUTPUT] HELLO WORLD"
+
+         Actions in a sequence can be any combination of predefined literal strings and custom callables. Empty sequences raise a ``ValueError`` at app initialization.
 
       Example:
 
@@ -1247,6 +1318,42 @@ API
       1. The referenced parameter is iterable (not including :obj:`str`).
 
       2. The first character of the token is a ``[``.
+
+   .. attribute:: count
+      :type: bool
+      :value: False
+
+      If :obj:`True`, count the number of times the flag appears instead of parsing a value.
+      Each occurrence increments the count by 1 (e.g., ``-vvv`` results in ``3``).
+
+      Requirements and behavior:
+
+      * The parameter **must** have an :obj:`int` type hint (or ``Optional[int]``).
+      * Short flags can be concatenated: ``-vvv`` is equivalent to ``-v -v -v``.
+      * Long flags can be repeated: ``--verbose --verbose`` results in ``2``.
+      * Negative flag variants (e.g., ``--no-verbose``) are **not** generated.
+
+      Common use case: verbosity levels.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(verbose: Annotated[int, Parameter(name="-v", count=True)] = 0):
+            print(f"Verbosity level: {verbose}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script -vvv
+         Verbosity level: 3
+
+      See :ref:`Coercion Rules` for more details.
 
    .. automethod:: combine
 

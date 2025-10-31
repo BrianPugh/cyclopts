@@ -86,10 +86,45 @@ Int
 ***
 For convenience, Cyclopts provides a richer feature-set of parsing integers than just naively calling ``int``.
 
-* Accepts vanilla decimal values (e.g. `123`, `3.1415`). Floating-point values will be rounded prior to casting to an ``int``.
-* Accepts binary values (strings starting with `0b`)
-* Accepts octal values (strings starting with `0o`)
-* Accepts hexadecimal values (strings starting with `0x`).
+* Accepts vanilla decimal values (e.g. ``123``, ``3.1415``). Floating-point values will be rounded prior to casting to an ``int``.
+* Accepts binary values (strings starting with ``0b``)
+* Accepts octal values (strings starting with ``0o``)
+* Accepts hexadecimal values (strings starting with ``0x``).
+
+^^^^^^^^^^^^^^
+Counting Flags
+^^^^^^^^^^^^^^
+For parameters that need to track the number of times a flag appears (e.g., verbosity levels like ``-vvv``), use :attr:`.Parameter.count` with an :obj:`int` type hint.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App()
+
+   @app.default
+   def main(verbose: Annotated[int, Parameter(alias="-v", count=True)] = 0):
+       print(f"Verbosity level: {verbose}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program
+   Verbosity level: 0
+
+   $ my-program -v
+   Verbosity level: 1
+
+   $ my-program -vvv
+   Verbosity level: 3
+
+   $ my-program --verbose --verbose
+   Verbosity level: 2
+
+   $ my-program -v --verbose -vv
+   Verbosity level: 4
 
 *****
 Float

@@ -2,12 +2,15 @@
 
 import functools
 import inspect
-from collections.abc import Iterable, Iterator, Sequence
+import re
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from attrs import field, frozen
+
+T = TypeVar("T")
 
 # https://threeofwands.com/attra-iv-zero-overhead-frozen-attrs-classes/
 if TYPE_CHECKING:
@@ -40,10 +43,10 @@ class UNSET(Sentinel):
     """Special sentinel value indicating that no data was provided. **Do not instantiate**."""
 
 
-def record_init(target: str):
+def record_init(target: str) -> Callable[[type[T]], type[T]]:
     """Class decorator that records init argument names as a tuple to ``target``."""
 
-    def decorator(cls):
+    def decorator(cls: type[T]) -> type[T]:
         original_init = cls.__init__
         function_signature = inspect.signature(original_init)
         param_names = tuple(name for name in function_signature.parameters if name != "self")
@@ -188,14 +191,26 @@ def help_formatter_converter(
         return input_value
 
 
+def _pascal_to_snake(s: str) -> str:
+    # (Borrowed from pydantic)
+    # Handle the sequence of uppercase letters followed by a lowercase letter
+    snake = re.sub(r"([A-Z]+)([A-Z][a-z])", lambda m: f"{m.group(1)}_{m.group(2)}", s)
+    # Insert an underscore between a lowercase letter and an uppercase letter
+    snake = re.sub(r"([a-z])([A-Z])", lambda m: f"{m.group(1)}_{m.group(2)}", snake)
+    # Insert an underscore between a digit and an uppercase letter
+    snake = re.sub(r"([0-9])([A-Z])", lambda m: f"{m.group(1)}_{m.group(2)}", snake)
+    return snake.lower()
+
+
 def default_name_transform(s: str) -> str:
     """Converts a python identifier into a CLI token.
 
     Performs the following operations (in order):
 
-    1. Convert the string to all lowercase.
-    2. Replace ``_`` with ``-``.
-    3. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 2).
+    1. Convert PascalCase to snake_case.
+    2. Convert the string to all lowercase.
+    3. Replace ``_`` with ``-``.
+    4. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 3).
 
     Intended to be used with :attr:`App.name_transform` and :attr:`Parameter.name_transform`.
 
@@ -209,7 +224,7 @@ def default_name_transform(s: str) -> str:
     str
         Transformed name.
     """
-    return s.lower().replace("_", "-").strip("-")
+    return _pascal_to_snake(s).lower().replace("_", "-").strip("-")
 
 
 def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:

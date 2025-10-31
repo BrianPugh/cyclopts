@@ -52,6 +52,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    :caption: Cookbook
 
    cookbook/app_upgrade.rst
+   cookbook/dataclass_commands.rst
    cookbook/interactive_help.rst
    cookbook/rich_formatted_exceptions.rst
    cookbook/sharing_parameters.rst

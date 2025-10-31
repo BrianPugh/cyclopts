@@ -13,6 +13,7 @@ from attrs import define, field
 from cyclopts._convert import (
     ITERABLE_TYPES,
     convert,
+    instantiate_from_dict,
     token_count,
 )
 from cyclopts.annotations import (
@@ -80,7 +81,7 @@ class Argument:
     Additional information about the parameter from surrounding python syntax.
     """
 
-    parameter: Parameter = field(factory=Parameter)  # pyright: ignore
+    parameter: Parameter = field(factory=Parameter)
     """
     Fully resolved user-provided :class:`.Parameter`.
     """
@@ -170,6 +171,18 @@ class Argument:
         hint = resolve(self.hint)
         hints = get_args(hint) if is_union(hint) else (hint,)
 
+        if self.parameter.count:
+            # Perform type-annotation validation.
+            resolved_hint = resolve_optional(hint)
+            # Technically, bool is a subclass of int, so we need to explicitly check.
+            if resolved_hint is bool or not (
+                resolved_hint is int or (isinstance(resolved_hint, type) and issubclass(resolved_hint, int))
+            ):
+                raise ValueError(
+                    f"Parameter(count=True) requires an int type hint, got {self.hint}. "
+                    f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
+                )
+
         if not self.parameter.parse:
             return
 
@@ -247,7 +260,7 @@ class Argument:
                 if existing_field_info == field_info:
                     pass
                 elif discriminator and discriminator in field_info.names and discriminator in existing_field_info.names:
-                    existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]  # pyright: ignore
+                    existing_field_info.annotation = Literal[existing_field_info.annotation, field_info.annotation]
                     existing_field_info.default = FieldInfo.empty
                 else:
                     raise NotImplementedError
@@ -469,7 +482,7 @@ class Argument:
                             implicit_value = None
                         else:
                             hint = resolve_optional(hint)
-                            implicit_value = (get_origin(hint) or hint)()  # pyright: ignore[reportAbstractUsage]
+                            implicit_value = (get_origin(hint) or hint)()
                         if trailing:
                             if trailing[0] == delimiter:
                                 trailing = trailing[1:]
@@ -504,7 +517,7 @@ class Argument:
 
         if any(x.address == token.address for x in self.tokens):
             _, consume_all = self.token_count(token.keys)
-            if not consume_all:
+            if not consume_all and not self.parameter.count:
                 raise RepeatArgumentError(token=token)
 
         if self.tokens:
@@ -555,7 +568,7 @@ class Argument:
                     raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
             else:
                 try:
-                    return converter(hint, tokens)  # pyright: ignore
+                    return converter(hint, tokens)
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(
@@ -564,6 +577,8 @@ class Argument:
 
         if not self.parameter.parse:
             out = UNSET
+        elif self.parameter.count:
+            out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
         elif not self.children:
             positional: list[Token] = []
             keyword = {}
@@ -637,7 +652,7 @@ class Argument:
 
             if self._enum_flag_type and self.tokens:
                 converted_flags = safe_converter(self._enum_flag_type, self.tokens)
-                out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags  # pyright: ignore
+                out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
             if self._should_attempt_json_dict():
                 while self.tokens:
@@ -657,6 +672,11 @@ class Argument:
             if self._use_pydantic_type_adapter:
                 return self._convert_pydantic()
 
+            if self.tokens and not self._enum_flag_type:
+                positional_tokens = [token for token in self.tokens if not token.keys]
+                if positional_tokens:
+                    return safe_converter(self.hint, tuple(positional_tokens))
+
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
                 if child.has_tokens:
@@ -673,11 +693,11 @@ class Argument:
             self._run_missing_keys_checker(data)
 
             if self._enum_flag_type:
-                out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)  # pyright: ignore[reportPossiblyUnboundVariable]
+                out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)
                 if not out:
                     out = UNSET
             elif data:
-                out = self.hint(**data)
+                out = instantiate_from_dict(self.hint, data)
             elif self.required:
                 raise MissingArgumentError(argument=self)  # pragma: no cover
             else:
@@ -808,6 +828,9 @@ class Argument:
         consume_all: bool
             :obj:`True` if this data type is iterable.
         """
+        if self.parameter.count:
+            return 0, False
+
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:
