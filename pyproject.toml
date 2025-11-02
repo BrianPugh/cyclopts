@@ -33,6 +33,7 @@ toml = ["tomli>=2.0.0; python_version<'3.11'"]
 trio = ["trio>=0.10.0"]
 yaml = ["pyyaml>=6.0.1"]
 docs = [
+    "rich-rst>=1.3.1",
     "sphinx>=7.4.7,<8.2.0",
     "sphinx_rtd_theme>=3.0.0,<4.0.0",
     "gitpython>=3.1.31",
