@@ -23,12 +23,12 @@ dependencies = [
     "attrs>=23.1.0",
     "rich>=13.6.0",
     "docstring-parser>=0.15,<4.0",
-    "rich-rst>=1.3.1,<2.0.0",
     "typing-extensions>=4.8.0; python_version<'3.11'",
     "tomli>=2.0.0; python_version<'3.11'",
 ]
 
 [project.optional-dependencies]
+rst = ["rich-rst>=1.3.1"]
 toml = ["tomli>=2.0.0; python_version<'3.11'"]
 trio = ["trio>=0.10.0"]
 yaml = ["pyyaml>=6.0.1"]
@@ -51,6 +51,7 @@ dev = [
     "toml>=0.10.2,<1.0.0",
     "trio>=0.10.0",
     "pyyaml>=6.0.1",
+    "rich-rst>=1.3.1",
 ]
 debug = ["ipdb>=0.13.9", "line_profiler>=3.5.1"]
 
@@ -218,8 +219,6 @@ sections = ["project.dependencies"]
 exclude-deps = [
     "typing-extensions",
     "docstring-parser",  # Not detected due to deferred import.
-    "rich-rst",          # Not detected due to deferred import.
     "rich",              # Not detected due to deferred import.
     "tomli",             # Not detected due to optional feature.
-    "trio",              # Not detected due to optional feature.
 ]

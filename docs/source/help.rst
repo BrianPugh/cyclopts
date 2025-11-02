@@ -220,6 +220,13 @@ ReStructuredText
 ^^^^^^^^^^^^^^^^
 ReStructuredText can be enabled by setting `help_format` to "restructuredtext" or "rst".
 
+.. note::
+   ReStructuredText support requires the optional ``rst`` extra, which installs rich-rst_:
+
+   .. code-block:: bash
+
+      pip install "cyclopts[rst]"
+
 .. code-block:: python
 
    app = App(help_format="restructuredtext")  # or "rst"
@@ -414,3 +421,4 @@ styled panels, and dynamic column layouts, see :ref:`Help Customization`.
 .. _PEP-0257: https://peps.python.org/pep-0257/
 .. _PEP-0287: https://peps.python.org/pep-0287/
 .. _Rich Markup: https://rich.readthedocs.io/en/stable/markup.html
+.. _rich-rst: https://github.com/wasi-master/rich-rst

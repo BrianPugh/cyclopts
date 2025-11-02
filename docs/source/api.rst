@@ -114,6 +114,11 @@ API
       If :obj:`None`, fallback to parenting :attr:`~.App.help_format`.
       If no :attr:`~.App.help_format` is defined, falls back to ``"markdown"``.
 
+      .. note::
+         The ``"restructuredtext"`` and ``"rst"`` formats require the optional ``rst`` extra,
+         which installs rich-rst_:
+         ``pip install "cyclopts[rst]"``
+
    .. attribute:: help_formatter
       :type: Union[None, Literal["default", "plain"], HelpFormatter]
       :value: None
@@ -155,6 +160,7 @@ API
       If not set, attempts to inherit from parenting :class:`.App`.
 
       The epilogue supports the same formatting as :attr:`help` based on :attr:`help_format` (markdown, plaintext, restructuredtext, or rich).
+      Note that restructuredtext format requires installing ``cyclopts[rst]``, which installs rich-rst_.
 
       Example:
 
@@ -219,6 +225,11 @@ API
       The markup language used in the version string.
       If :obj:`None`, fallback to parenting :attr:`~.App.version_format`.
       If no :attr:`~.App.version_format` is defined, falls back to resolved :attr:`~.App.help_format`.
+
+      .. note::
+         The ``"restructuredtext"`` and ``"rst"`` formats require the optional ``rst`` extra,
+         which installs rich-rst_:
+         ``pip install "cyclopts[rst]"``
 
    .. attribute:: usage
       :type: Optional[str]
@@ -2255,3 +2266,5 @@ Exceptions
 .. autoexception:: cyclopts.EditorDidNotChangeError
    :show-inheritance:
    :members:
+
+.. _rich-rst: https://github.com/wasi-master/rich-rst

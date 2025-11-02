@@ -2106,6 +2106,93 @@ def test_help_plaintext(app, console):
     assert actual == expected
 
 
+def test_rich_rst_not_imported_without_rst_format():
+    """Ensure rich_rst is not imported unless RST format is explicitly used.
+
+    This test verifies that rich_rst remains an optional dependency and is
+    only imported when the user explicitly sets help_format to "rst" or
+    "restructuredtext".
+    """
+    import sys
+
+    # Remove rich_rst from sys.modules if it's already imported
+    for key in list(sys.modules.keys()):
+        if key == "rich_rst" or key.startswith("rich_rst."):
+            del sys.modules[key]
+
+    # Also remove cyclopts.help.inline_text to ensure fresh import
+    sys.modules.pop("cyclopts.help.inline_text", None)
+
+    # Test 1: Create App and use non-RST formats - rich_rst should NOT be imported
+    app = App(name="test", help="Test app", help_format="markdown")
+
+    @app.default
+    def main(value: str = "default"):
+        """A simple function."""
+        return value
+
+    # Trigger help generation with markdown format
+    with pytest.raises(SystemExit):
+        app(["--help"], exit_on_error=True)
+
+    # rich_rst should not be imported yet
+    assert "rich_rst" not in sys.modules, "rich_rst was imported when using markdown format"
+
+    # Test 2: Use plaintext format
+    app2 = App(name="test2", help="Test app", help_format="plaintext")
+
+    @app2.default
+    def main2(value: str = "default"):
+        """A simple function."""
+        return value
+
+    with pytest.raises(SystemExit):
+        app2(["--help"], exit_on_error=True)
+
+    # rich_rst should still not be imported
+    assert "rich_rst" not in sys.modules, "rich_rst was imported when using plaintext format"
+
+    # Test 3: Use rich format
+    app3 = App(name="test3", help="Test app", help_format="rich")
+
+    @app3.default
+    def main3(value: str = "default"):
+        """A simple function."""
+        return value
+
+    with pytest.raises(SystemExit):
+        app3(["--help"], exit_on_error=True)
+
+    # rich_rst should still not be imported
+    assert "rich_rst" not in sys.modules, "rich_rst was imported when using rich format"
+
+
+def test_rich_rst_helpful_error_when_missing(mocker):
+    """Ensure helpful error message when RST format is used without rich_rst installed."""
+    import sys
+
+    # Remove any cached imports
+    for key in list(sys.modules.keys()):
+        if key == "rich_rst" or key.startswith("rich_rst."):
+            del sys.modules[key]
+
+    sys.modules.pop("cyclopts.help.inline_text", None)
+
+    # Mock the rich_rst module to simulate it not being installed
+    mocker.patch.dict("sys.modules", {"rich_rst": None})
+
+    # Now try to use RST format - should get helpful error
+    from cyclopts.help.inline_text import InlineText
+
+    with pytest.raises(ImportError) as exc_info:
+        InlineText.from_format("**test**", "rst")
+
+    # Check that the error message is helpful
+    error_msg = str(exc_info.value)
+    assert "rst" in error_msg.lower()
+    assert "cyclopts[rst]" in error_msg
+
+
 def test_help_consistent_formatting(app, console):
     """Checks to make sure short-descriptions and full-descriptions
     are rendered using the same formatter.
