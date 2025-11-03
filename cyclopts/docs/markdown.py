@@ -389,9 +389,9 @@ def generate_markdown_docs(
         lines.append("**Arguments**:\n")
         for _group, panel in argument_panels:
             formatter.reset()
-            # Don't show panel title for arguments
-            panel.title = ""
-            formatter(None, None, panel)
+            # Create a copy without title to avoid duplicate headings
+            panel_copy = panel.copy(title="")
+            formatter(None, None, panel_copy)
             output = formatter.get_output().strip()
             if output:
                 lines.append(output)
@@ -402,9 +402,9 @@ def generate_markdown_docs(
         lines.append("**Options**:\n")
         for _group, panel in option_panels:
             formatter.reset()
-            # Don't show panel title for options
-            panel.title = ""
-            formatter(None, None, panel)
+            # Create a copy without title to avoid duplicate headings
+            panel_copy = panel.copy(title="")
+            formatter(None, None, panel_copy)
             output = formatter.get_output().strip()
             if output:
                 lines.append(output)
@@ -416,12 +416,8 @@ def generate_markdown_docs(
             if panel.title:
                 lines.append(f"**{panel.title}**:\n")
                 formatter.reset()
-                panel_copy = panel.__class__(
-                    title="",  # Don't show title again in formatter
-                    entries=panel.entries,
-                    format=panel.format,
-                    description=panel.description,
-                )
+                # Don't show title again in formatter
+                panel_copy = panel.copy(title="")
                 formatter(None, None, panel_copy)
                 output = formatter.get_output().strip()
                 if output:
@@ -579,7 +575,9 @@ def generate_markdown_docs(
                         lines.append("**Arguments**:\n")
                         for _group, panel in sub_argument_panels:
                             sub_formatter.reset()
-                            sub_formatter(None, None, panel)
+                            # Create a copy without title to avoid duplicate headings
+                            panel_copy = panel.copy(title="")
+                            sub_formatter(None, None, panel_copy)
                             output = sub_formatter.get_output().strip()
                             if output:
                                 lines.append(output)
@@ -590,7 +588,9 @@ def generate_markdown_docs(
                         lines.append("**Options**:\n")
                         for _group, panel in sub_option_panels:
                             sub_formatter.reset()
-                            sub_formatter(None, None, panel)
+                            # Create a copy without title to avoid duplicate headings
+                            panel_copy = panel.copy(title="")
+                            sub_formatter(None, None, panel_copy)
                             output = sub_formatter.get_output().strip()
                             if output:
                                 lines.append(output)
@@ -602,12 +602,8 @@ def generate_markdown_docs(
                             if panel.title:
                                 lines.append(f"**{panel.title}**:\n")
                                 sub_formatter.reset()
-                                panel_copy = panel.__class__(
-                                    title="",  # Don't show title again in formatter
-                                    entries=panel.entries,
-                                    format=panel.format,
-                                    description=panel.description,
-                                )
+                                # Don't show title again in formatter
+                                panel_copy = panel.copy(title="")
                                 sub_formatter(None, None, panel_copy)
                                 output = sub_formatter.get_output().strip()
                                 if output:
