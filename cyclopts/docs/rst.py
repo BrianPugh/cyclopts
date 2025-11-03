@@ -3,149 +3,16 @@
 from typing import TYPE_CHECKING
 
 from cyclopts._markup import extract_text
-from cyclopts.docs.base import BaseDocGenerator
+from cyclopts.docs.base import (
+    BaseDocGenerator,
+    adjust_filters_for_subcommand,
+    normalize_command_filters,
+    should_include_command,
+)
 from cyclopts.help.formatters._shared import make_rst_section_header
 
 if TYPE_CHECKING:
     from cyclopts.core import App
-
-
-def _normalize_command_filters(
-    commands_filter: list[str] | None = None,
-    exclude_commands: list[str] | None = None,
-) -> tuple[set[str] | None, set[str] | None]:
-    """Normalize command filter lists by converting underscores to dashes.
-
-    Parameters
-    ----------
-    commands_filter : Optional[List[str]]
-        List of commands to include.
-    exclude_commands : Optional[List[str]]
-        List of commands to exclude.
-
-    Returns
-    -------
-    Tuple[Optional[Set[str]], Optional[Set[str]]]
-        Normalized include and exclude sets for O(1) lookup.
-    """
-    normalized_include = None
-    if commands_filter is not None:
-        normalized_include = {cmd.replace("_", "-") for cmd in commands_filter}
-
-    normalized_exclude = None
-    if exclude_commands:
-        normalized_exclude = {cmd.replace("_", "-") for cmd in exclude_commands}
-
-    return normalized_include, normalized_exclude
-
-
-def _should_include_command(
-    name: str,
-    parent_path: list[str],
-    normalized_commands_filter: set[str] | None,
-    normalized_exclude_commands: set[str] | None,
-    subapp: "App",
-) -> bool:
-    """Determine if a command should be included based on filters.
-
-    Parameters
-    ----------
-    name : str
-        The command name.
-    parent_path : List[str]
-        Path to parent commands.
-    normalized_commands_filter : Optional[Set[str]]
-        Set of commands to include (already normalized).
-    normalized_exclude_commands : Optional[Set[str]]
-        Set of commands to exclude (already normalized).
-    subapp : App
-        The subcommand App instance.
-
-    Returns
-    -------
-    bool
-        True if the command should be included, False otherwise.
-    """
-    full_path = ".".join(parent_path + [name]) if parent_path else name
-
-    if normalized_exclude_commands:
-        if name in normalized_exclude_commands or full_path in normalized_exclude_commands:
-            return False
-        for i in range(len(parent_path)):
-            parent_segment = ".".join(parent_path[: i + 1])
-            if parent_segment in normalized_exclude_commands:
-                return False
-
-    if normalized_commands_filter is not None:
-        if name in normalized_commands_filter or full_path in normalized_commands_filter:
-            return True
-
-        for i in range(len(parent_path)):
-            parent_segment = ".".join(parent_path[: i + 1])
-            if parent_segment in normalized_commands_filter:
-                return True
-
-        if not parent_path and name in normalized_commands_filter:
-            return True
-
-        if hasattr(subapp, "_commands") and subapp._commands:
-            for filter_cmd in normalized_commands_filter:
-                if filter_cmd.startswith(full_path + "."):
-                    return True
-
-        return False
-
-    return True
-
-
-def _adjust_filters_for_subcommand(
-    name: str,
-    normalized_commands_filter: set[str] | None,
-    normalized_exclude_commands: set[str] | None,
-) -> tuple[list[str] | None, list[str] | None]:
-    """Adjust filter lists for subcommand context.
-
-    Parameters
-    ----------
-    name : str
-        The current command name.
-    normalized_commands_filter : Optional[Set[str]]
-        Set of commands to include (already normalized).
-    normalized_exclude_commands : Optional[Set[str]]
-        Set of commands to exclude (already normalized).
-
-    Returns
-    -------
-    Tuple[Optional[List[str]], Optional[List[str]]]
-        Adjusted commands_filter and exclude_commands lists (denormalized).
-    """
-    sub_commands_filter = None
-    if normalized_commands_filter is not None:
-        sub_commands_filter = []
-        for filter_cmd in normalized_commands_filter:
-            if filter_cmd.startswith(name + "."):
-                sub_filter = filter_cmd[len(name) + 1 :]
-                sub_commands_filter.append(sub_filter.replace("-", "_"))
-            # If filter matches exactly, include all subcommands (pass None)
-            elif filter_cmd == name:
-                sub_commands_filter = None
-                break
-
-        # If we have an empty list, no subcommands should be shown
-        if sub_commands_filter == []:
-            sub_commands_filter = []
-
-    sub_exclude_commands = None
-    if normalized_exclude_commands:
-        sub_exclude_commands = []
-        for exclude_cmd in normalized_exclude_commands:
-            if exclude_cmd.startswith(name + "."):
-                sub_exclude = exclude_cmd[len(name) + 1 :]
-                sub_exclude_commands.append(sub_exclude.replace("-", "_"))
-            else:
-                sub_exclude_commands.append(exclude_cmd.replace("-", "_"))
-
-    return sub_commands_filter, sub_exclude_commands
 
 
 def _collect_commands_for_toc(
@@ -168,13 +35,12 @@ def _collect_commands_for_toc(
     if parent_path is None:
         parent_path = []
 
-    normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
+    normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
         commands_filter, exclude_commands
     )
 
-    # Use BaseDocGenerator.iterate_commands to automatically resolve CommandSpec
     for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
-        if not _should_include_command(
+        if not should_include_command(
             name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
         ):
             continue
@@ -371,7 +237,7 @@ def generate_rst_docs(
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
     # Separate panels into categories
-    categorized = BaseDocGenerator.categorize_panels(help_panels_with_groups, include_hidden)
+    categorized = BaseDocGenerator.categorize_panels(app, help_panels_with_groups, include_hidden)
     # Command panels are not rendered in RST mode (sections integrate with Sphinx's toctree)
     argument_panels = categorized["arguments"]
     option_panels = categorized["options"]
@@ -420,41 +286,29 @@ def generate_rst_docs(
     # Skip command list entirely (sections integrate with Sphinx's toctree)
     # Command panels are not rendered in sections mode
 
-    # Recursively document subcommands
     if recursive and app._commands:
-        # Normalize filter lists for efficient lookup
-        normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
+        normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
             commands_filter, exclude_commands
         )
-        # Parent path is always empty at the current app level - filters are adjusted for each recursive call
         parent_path = []
 
-        # Use BaseDocGenerator.iterate_commands to automatically resolve CommandSpec
         for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
-            # Apply command filtering
-            if not _should_include_command(
+            if not should_include_command(
                 name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
             ):
                 continue
 
-            # Add some spacing before subcommand
             lines.append("")
 
-            # Recursively generate docs for subcommand
             subcommand_chain = command_chain + [name] if command_chain else [app_name, name]
-            # When flattening, keep the same base heading level; otherwise pass heading_level
             if flatten_commands:
                 next_heading_level = heading_level
             elif no_root_title and not command_chain:
-                # Root title was skipped, so decrement heading_level for children to "take over" root level
-                # This means first-level subcommands will use heading_level instead of heading_level + 1
                 next_heading_level = heading_level - 1
             else:
-                # Normal hierarchical mode - pass heading_level unchanged
                 next_heading_level = heading_level
 
-            # Adjust filters for the subcommand context
-            sub_commands_filter, sub_exclude_commands = _adjust_filters_for_subcommand(
+            sub_commands_filter, sub_exclude_commands = adjust_filters_for_subcommand(
                 name, normalized_commands_filter, normalized_exclude_commands
             )
 

@@ -1,6 +1,7 @@
 """Base utilities for documentation generation."""
 
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -9,6 +10,180 @@ if TYPE_CHECKING:
 
 from cyclopts.command_spec import CommandSpec
 from cyclopts.help import format_doc, format_usage
+
+
+def _is_builtin_flag(app: "App", name: str) -> bool:
+    """Check if a flag name is a built-in help or version flag.
+
+    Parameters
+    ----------
+    app : App
+        The App instance to check against.
+    name : str
+        The flag name to check.
+
+    Returns
+    -------
+    bool
+        True if this is a built-in help or version flag.
+    """
+    help_flags = set(app.app_stack.resolve("help_flags", fallback=()))
+    version_flags = set(app.app_stack.resolve("version_flags", fallback=()))
+    builtin_flags = help_flags | version_flags
+    return name in builtin_flags
+
+
+def is_all_builtin_flags(app: "App", names: Sequence[str]) -> bool:
+    """Check if all names in the sequence are builtin help or version flags.
+
+    Parameters
+    ----------
+    app : App
+        The App instance to check against.
+    names : Sequence[str]
+        Sequence of flag names to check.
+
+    Returns
+    -------
+    bool
+        True if all names are builtin flags.
+    """
+    if not names:
+        return False
+    return all(_is_builtin_flag(app, name) for name in names)
+
+
+def normalize_command_filters(
+    commands_filter: list[str] | None = None,
+    exclude_commands: list[str] | None = None,
+) -> tuple[set[str] | None, set[str] | None]:
+    """Normalize command filter lists by converting underscores to dashes.
+
+    Parameters
+    ----------
+    commands_filter : list[str] | None
+        List of commands to include.
+    exclude_commands : list[str] | None
+        List of commands to exclude.
+
+    Returns
+    -------
+    tuple[set[str] | None, set[str] | None]
+        Normalized include and exclude sets for O(1) lookup.
+    """
+    normalized_include = None
+    if commands_filter is not None:
+        normalized_include = {cmd.replace("_", "-") for cmd in commands_filter}
+
+    normalized_exclude = None
+    if exclude_commands:
+        normalized_exclude = {cmd.replace("_", "-") for cmd in exclude_commands}
+
+    return normalized_include, normalized_exclude
+
+
+def should_include_command(
+    name: str,
+    parent_path: list[str],
+    normalized_commands_filter: set[str] | None,
+    normalized_exclude_commands: set[str] | None,
+    subapp: "App",
+) -> bool:
+    """Determine if a command should be included based on filters.
+
+    Parameters
+    ----------
+    name : str
+        The command name.
+    parent_path : list[str]
+        Path to parent commands.
+    normalized_commands_filter : set[str] | None
+        Set of commands to include (already normalized).
+    normalized_exclude_commands : set[str] | None
+        Set of commands to exclude (already normalized).
+    subapp : App
+        The subcommand App instance.
+
+    Returns
+    -------
+    bool
+        True if the command should be included, False otherwise.
+    """
+    full_path = ".".join(parent_path + [name]) if parent_path else name
+
+    if normalized_exclude_commands:
+        if name in normalized_exclude_commands or full_path in normalized_exclude_commands:
+            return False
+        for i in range(len(parent_path)):
+            parent_segment = ".".join(parent_path[: i + 1])
+            if parent_segment in normalized_exclude_commands:
+                return False
+
+    if normalized_commands_filter is not None:
+        if name in normalized_commands_filter or full_path in normalized_commands_filter:
+            return True
+
+        for i in range(len(parent_path)):
+            parent_segment = ".".join(parent_path[: i + 1])
+            if parent_segment in normalized_commands_filter:
+                return True
+
+        if hasattr(subapp, "_commands") and subapp._commands:
+            for filter_cmd in normalized_commands_filter:
+                if filter_cmd.startswith(full_path + "."):
+                    return True
+
+        return False
+
+    return True
+
+
+def adjust_filters_for_subcommand(
+    name: str,
+    normalized_commands_filter: set[str] | None,
+    normalized_exclude_commands: set[str] | None,
+) -> tuple[list[str] | None, list[str] | None]:
+    """Adjust filter lists for subcommand context.
+
+    Parameters
+    ----------
+    name : str
+        The current command name.
+    normalized_commands_filter : set[str] | None
+        Set of commands to include (already normalized).
+    normalized_exclude_commands : set[str] | None
+        Set of commands to exclude (already normalized).
+
+    Returns
+    -------
+    tuple[list[str] | None, list[str] | None]
+        Adjusted commands_filter and exclude_commands lists (denormalized).
+    """
+    sub_commands_filter = None
+    if normalized_commands_filter is not None:
+        sub_commands_filter = []
+        for filter_cmd in normalized_commands_filter:
+            if filter_cmd.startswith(name + "."):
+                sub_filter = filter_cmd[len(name) + 1 :]
+                sub_commands_filter.append(sub_filter.replace("-", "_"))
+            elif filter_cmd == name:
+                sub_commands_filter = None
+                break
+
+        if sub_commands_filter is not None and not sub_commands_filter:
+            sub_commands_filter = []
+
+    sub_exclude_commands = None
+    if normalized_exclude_commands:
+        sub_exclude_commands = []
+        for exclude_cmd in normalized_exclude_commands:
+            if exclude_cmd.startswith(name + "."):
+                sub_exclude = exclude_cmd[len(name) + 1 :]
+                sub_exclude_commands.append(sub_exclude.replace("-", "_"))
+            else:
+                sub_exclude_commands.append(exclude_cmd.replace("-", "_"))
+
+    return sub_commands_filter, sub_exclude_commands
 
 
 class BaseDocGenerator:
@@ -35,7 +210,7 @@ class BaseDocGenerator:
             full_command = app_name
             title = app_name
         else:
-            app_name = command_chain[0] if command_chain else app.name[0]
+            app_name = command_chain[0]
             full_command = " ".join(command_chain)
             title = full_command
 
@@ -114,7 +289,7 @@ class BaseDocGenerator:
         bool
             True if command should be skipped.
         """
-        if command_name in parent_app._help_flags or command_name in parent_app._version_flags:
+        if _is_builtin_flag(parent_app, command_name):
             return True
 
         if not isinstance(subapp, type(parent_app)):
@@ -126,11 +301,13 @@ class BaseDocGenerator:
         return False
 
     @staticmethod
-    def filter_help_entries(panel: "HelpPanel", include_hidden: bool) -> list[Any]:
+    def filter_help_entries(app: "App", panel: "HelpPanel", include_hidden: bool) -> list[Any]:
         """Filter help panel entries based on visibility settings.
 
         Parameters
         ----------
+        app : App
+            The App instance to check against.
         panel : HelpPanel
             The help panel to filter.
         include_hidden : bool
@@ -144,11 +321,7 @@ class BaseDocGenerator:
         if include_hidden:
             return panel.entries
 
-        return [
-            e
-            for e in panel.entries
-            if not (e.names and all(n.startswith("--help") or n.startswith("--version") or n == "-h" for n in e.names))
-        ]
+        return [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
 
     @staticmethod
     def extract_description(app: "App", help_format: str) -> Any | None:
@@ -227,12 +400,14 @@ class BaseDocGenerator:
 
     @staticmethod
     def categorize_panels(
-        help_panels_with_groups: list[tuple[Any, "HelpPanel"]], include_hidden: bool = False
+        app: "App", help_panels_with_groups: list[tuple[Any, "HelpPanel"]], include_hidden: bool = False
     ) -> dict[str, list[tuple[Any, "HelpPanel"]]]:
         """Categorize help panels by type.
 
         Parameters
         ----------
+        app : App
+            The App instance to check against.
         help_panels_with_groups : List[Tuple[Any, HelpPanel]]
             List of (group, panel) tuples.
         include_hidden : bool
@@ -252,9 +427,7 @@ class BaseDocGenerator:
             if panel.format == "command":
                 if not include_hidden:
                     filtered_entries = [
-                        e
-                        for e in panel.entries
-                        if not (e.names and all(n in ["--help", "--version", "-h"] for n in e.names))
+                        e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))
                     ]
                     if filtered_entries:
                         panel_copy = type(panel)(
@@ -319,7 +492,7 @@ class BaseDocGenerator:
             return
 
         for name, app_or_spec in app._commands.items():
-            if name in app._help_flags or name in app._version_flags:
+            if _is_builtin_flag(app, name):
                 continue
 
             # Resolve CommandSpec to App

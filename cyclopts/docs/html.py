@@ -440,7 +440,7 @@ def generate_html_docs(
             continue
         # Filter out entries based on include_hidden
         if not include_hidden:
-            panel.entries = BaseDocGenerator.filter_help_entries(panel, include_hidden)
+            panel.entries = BaseDocGenerator.filter_help_entries(app, panel, include_hidden)
         if panel.entries:  # Only render non-empty panels
             formatter(None, None, panel)
 
@@ -518,19 +518,8 @@ def generate_html_docs(
                     for sub_group, sub_panel in sub_panels:
                         if not include_hidden and sub_group and not sub_group.show:
                             continue
-                        # Filter out built-in commands if not including hidden
                         if not include_hidden:
-                            sub_panel.entries = [
-                                e
-                                for e in sub_panel.entries
-                                if not (
-                                    e.names
-                                    and all(
-                                        n.startswith("--help") or n.startswith("--version") or n == "-h"
-                                        for n in e.names
-                                    )
-                                )
-                            ]
+                            sub_panel.entries = BaseDocGenerator.filter_help_entries(subapp, sub_panel, include_hidden)
                         if sub_panel.entries:
                             sub_formatter(None, None, sub_panel)
 
