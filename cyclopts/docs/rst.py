@@ -442,11 +442,15 @@ def generate_rst_docs(
 
             # Recursively generate docs for subcommand
             subcommand_chain = command_chain + [name] if command_chain else [app_name, name]
-            # When flattening, keep the same base heading level; otherwise increment
+            # When flattening, keep the same base heading level; otherwise pass heading_level
             if flatten_commands:
                 next_heading_level = heading_level
+            elif no_root_title and not command_chain:
+                # Root title was skipped, so decrement heading_level for children to "take over" root level
+                # This means first-level subcommands will use heading_level instead of heading_level + 1
+                next_heading_level = heading_level - 1
             else:
-                # Normal hierarchical mode - don't increment heading_level, let the chain length determine it
+                # Normal hierarchical mode - pass heading_level unchanged
                 next_heading_level = heading_level
 
             # Adjust filters for the subcommand context

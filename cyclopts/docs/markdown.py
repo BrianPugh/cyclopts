@@ -506,6 +506,9 @@ def generate_markdown_docs(
             # Determine heading level for subcommand
             if flatten_commands:
                 sub_heading_level = heading_level
+            elif no_root_title and not command_chain:
+                # When root title is skipped, subcommands "take over" the root heading level
+                sub_heading_level = heading_level
             else:
                 sub_heading_level = heading_level + 1
 
@@ -746,6 +749,7 @@ def generate_markdown_docs(
                         flatten_commands=flatten_commands,
                         commands_filter=sub_commands_filter,
                         exclude_commands=sub_exclude_commands,
+                        no_root_title=False,  # Always show title for nested commands
                     )
                     # Just append the generated docs - no title replacement
                     lines.append(nested_docs)

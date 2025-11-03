@@ -76,8 +76,8 @@ class DirectiveOptions:
             if not line or not line.startswith(":"):
                 continue
 
-            # Parse :key: value format
-            match = re.match(r":([a-z-]+):\s*(.*)", line)
+            # Parse :key: value format (support both dashes and underscores)
+            match = re.match(r":([a-z_-]+):\s*(.*)", line)
             if not match:
                 continue
 
