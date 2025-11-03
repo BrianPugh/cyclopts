@@ -274,19 +274,29 @@ def generate_rst_docs(
         command_chain = []
 
     app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
-    # Use clean section headers - remove root command from title for nested commands
-    if command_chain:
-        title = " ".join(command_chain[1:]) if len(command_chain) > 1 else command_chain[-1]
+    # Title logic: match markdown behavior for consistency
+    # - Hierarchical mode: show just command name (last part of chain)
+    # - Flattened mode: show full command path
+    # - Root: use base title
+    if command_chain and not flatten_commands:
+        # Hierarchical: show just the command name (last part of chain)
+        title = command_chain[-1]
+    elif command_chain:
+        # Flattened: show full command path
+        title = full_command
     else:
+        # Root app: use base title
         title = base_title
 
     # Always generate RST anchor/label with improved namespacing
+    # RST uses a "cyclopts-" prefix for namespacing
     anchor_parts = ["cyclopts"]
     if command_chain:
         anchor_parts.extend(command_chain)
     else:
         anchor_parts.append(app_name)
-    anchor_name = "-".join(anchor_parts).replace(" ", "-").replace("/", "-").lower()
+    # Use shared anchor generation logic, then add RST-specific slash replacement
+    anchor_name = BaseDocGenerator.generate_anchor(" ".join(anchor_parts)).replace("/", "-")
     lines.append(f".. _{anchor_name}:")
     lines.append("")
 
@@ -416,7 +426,7 @@ def generate_rst_docs(
         normalized_commands_filter, normalized_exclude_commands = _normalize_command_filters(
             commands_filter, exclude_commands
         )
-        # parent_path should be empty at each app's root level, not the command chain
+        # Parent path is always empty at the current app level - filters are adjusted for each recursive call
         parent_path = []
 
         # Use BaseDocGenerator.iterate_commands to automatically resolve CommandSpec

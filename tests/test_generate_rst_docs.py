@@ -259,34 +259,32 @@ def test_generate_rst_docs_flatten_commands():
     # Main app should be level 1 (=====)
     assert "=====\nmyapp\n=====" in docs_hierarchical
     # Subcommands should be level 2 (-----)
-    # Note: RST implementation uses short titles (not full command path)
     assert "sub1\n----" in docs_hierarchical
     assert "sub2\n----" in docs_hierarchical
-    # Nested commands should be level 3 (^^^^^)
-    assert "sub1 nested1\n^^^^^^^^^^^^" in docs_hierarchical
-    assert "sub1 nested2\n^^^^^^^^^^^^" in docs_hierarchical
-    assert "sub2 nested3\n^^^^^^^^^^^^" in docs_hierarchical
+    # Nested commands should be level 3 (^^^^^) and show just command name in hierarchical mode
+    assert "nested1\n^^^^^^^" in docs_hierarchical
+    assert "nested2\n^^^^^^^" in docs_hierarchical
+    assert "nested3\n^^^^^^^" in docs_hierarchical
 
     # With flatten_commands - all at same level
     docs_flat = app.generate_docs(output_format="rst", flatten_commands=True)
 
     # Main app should be level 1 (=====)
     assert "=====\nmyapp\n=====" in docs_flat
-    # All subcommands should also be level 1 (=====)
-    # Note: RST implementation uses short titles (not full command path)
-    assert "====\nsub1\n====" in docs_flat
-    assert "====\nsub2\n====" in docs_flat
-    # All nested commands should also be level 1 (=====)
-    assert "============\nsub1 nested1\n============" in docs_flat
-    assert "============\nsub1 nested2\n============" in docs_flat
-    assert "============\nsub2 nested3\n============" in docs_flat
+    # All subcommands should also be level 1 (=====) with full path in flattened mode
+    assert "==========\nmyapp sub1\n==========" in docs_flat
+    assert "==========\nmyapp sub2\n==========" in docs_flat
+    # All nested commands should also be level 1 (=====) with full path
+    assert "==================\nmyapp sub1 nested1\n==================" in docs_flat
+    assert "==================\nmyapp sub1 nested2\n==================" in docs_flat
+    assert "==================\nmyapp sub2 nested3\n==================" in docs_flat
     # Should NOT have level 2 or level 3 markers for commands
     # (Level 2 uses single underline, level 3 uses ^^^^)
     # Check that subcommands don't use level 2 markers (----)
     assert "sub1\n----" not in docs_flat
     assert "sub2\n----" not in docs_flat
     # Check that nested commands don't use level 3 markers (^^^^)
-    assert "sub1 nested1\n^^^^^^^^^^^^" not in docs_flat
+    assert "nested1\n^^^^^^^" not in docs_flat
 
 
 def test_generate_rst_docs_usage_strings_match_help():

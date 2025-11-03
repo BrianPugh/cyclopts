@@ -387,9 +387,8 @@ def generate_html_docs(
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        # Create anchor-friendly ID
-        anchor_id = f"{app_name}-{'-'.join(command_chain[1:])}"
-        anchor_id = anchor_id.lower().replace(" ", "-")
+        # Create anchor-friendly ID using shared logic
+        anchor_id = BaseDocGenerator.generate_anchor(full_command)
         lines.append('<section class="command-section">')
         lines.append(
             f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{heading_level}>'

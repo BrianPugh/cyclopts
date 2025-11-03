@@ -1,5 +1,6 @@
 """Base utilities for documentation generation."""
 
+import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -62,6 +63,36 @@ class BaseDocGenerator:
             return command_chain + [command_name]
         else:
             return [app_name, command_name]
+
+    @staticmethod
+    def generate_anchor(command_path: str) -> str:
+        """Generate a URL-friendly anchor from a command path.
+
+        Converts spaces to hyphens and lowercases the string to match
+        how markdown/HTML processors generate anchors from headings.
+        Strips leading dashes to match markdown processor behavior.
+
+        Parameters
+        ----------
+        command_path : str
+            Full command path (e.g., "myapp files cp").
+
+        Returns
+        -------
+        str
+            Anchor string (e.g., "myapp-files-cp").
+
+        Examples
+        --------
+        >>> BaseDocGenerator.generate_anchor("myapp files cp")
+        'myapp-files-cp'
+        >>> BaseDocGenerator.generate_anchor("myapp --install-completion")
+        'myapp-install-completion'
+        """
+        anchor = command_path.lower().replace(" ", "-")
+        # Collapse consecutive dashes to single dash (markdown processors do this)
+        anchor = re.sub(r"-+", "-", anchor)
+        return anchor
 
     @staticmethod
     def should_skip_command(command_name: str, subapp: "App", parent_app: "App", include_hidden: bool) -> bool:
