@@ -111,7 +111,7 @@ class TestDirectiveOptions:
 
     def test_parse_basic_directive(self):
         """Test parsing a basic directive with minimal options."""
-        from cyclopts.mkdocs_ext import DirectiveOptions
+        from cyclopts.ext.mkdocs import DirectiveOptions
 
         directive_text = textwrap.dedent(
             """\
@@ -128,7 +128,7 @@ class TestDirectiveOptions:
 
     def test_parse_full_directive(self):
         """Test parsing a directive with all options."""
-        from cyclopts.mkdocs_ext import DirectiveOptions
+        from cyclopts.ext.mkdocs import DirectiveOptions
 
         directive_text = textwrap.dedent(
             """\
@@ -156,7 +156,7 @@ class TestDirectiveOptions:
 
     def test_parse_comma_separated_commands(self):
         """Test parsing comma-separated command lists."""
-        from cyclopts.mkdocs_ext import DirectiveOptions
+        from cyclopts.ext.mkdocs import DirectiveOptions
 
         directive_text = textwrap.dedent(
             """\
@@ -171,7 +171,7 @@ class TestDirectiveOptions:
 
     def test_parse_missing_module_raises_error(self):
         """Test that missing :module: option raises an error."""
-        from cyclopts.mkdocs_ext import DirectiveOptions
+        from cyclopts.ext.mkdocs import DirectiveOptions
 
         directive_text = textwrap.dedent(
             """\
@@ -185,7 +185,7 @@ class TestDirectiveOptions:
 
     def test_parse_boolean_variations(self):
         """Test parsing various boolean value formats."""
-        from cyclopts.mkdocs_ext import DirectiveOptions
+        from cyclopts.ext.mkdocs import DirectiveOptions
 
         # Test "true"
         directive_text = textwrap.dedent(
@@ -255,7 +255,7 @@ class TestProcessDirectives:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -303,7 +303,7 @@ class TestProcessDirectives:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -338,7 +338,7 @@ class TestProcessDirectives:
     def test_process_directive_with_error(self):
         """Test that errors in directive processing raise PluginError."""
         pytest.importorskip("mkdocs")
-        from cyclopts.mkdocs_ext import PluginError, process_cyclopts_directives
+        from cyclopts.ext.mkdocs import PluginError, process_cyclopts_directives
 
         markdown = textwrap.dedent(
             """\
@@ -357,7 +357,7 @@ class TestProcessDirectives:
 
     def test_no_directives_unchanged(self):
         """Test that markdown without directives is unchanged."""
-        from cyclopts.mkdocs_ext import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
         markdown = textwrap.dedent(
             """\
@@ -392,7 +392,7 @@ class TestProcessDirectives:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import DirectiveOptions
+            from cyclopts.ext.mkdocs import DirectiveOptions
 
             # Test with default_heading_level=3
             directive_text = textwrap.dedent(
@@ -442,7 +442,7 @@ class TestProcessDirectives:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -476,7 +476,7 @@ class TestDirectivePattern:
 
     def test_pattern_matches_simple_directive(self):
         """Test that the pattern matches a simple directive."""
-        from cyclopts.mkdocs_ext import DIRECTIVE_PATTERN
+        from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
         text = textwrap.dedent(
             """\
@@ -491,7 +491,7 @@ class TestDirectivePattern:
 
     def test_pattern_matches_multiline_directive(self):
         """Test that the pattern matches directives with multiple options."""
-        from cyclopts.mkdocs_ext import DIRECTIVE_PATTERN
+        from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
         text = textwrap.dedent(
             """\
@@ -517,7 +517,7 @@ class TestDirectivePattern:
 
     def test_pattern_finds_all_directives(self):
         """Test that the pattern finds all directives in text."""
-        from cyclopts.mkdocs_ext import DIRECTIVE_PATTERN
+        from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
         text = textwrap.dedent(
             """\
@@ -544,7 +544,7 @@ class TestPluginIntegration:
     def plugin(self):
         """Create a plugin instance."""
         pytest.importorskip("mkdocs")
-        from cyclopts.mkdocs_ext import CycloptsPlugin
+        from cyclopts.ext.mkdocs import CycloptsPlugin
 
         return CycloptsPlugin()
 
@@ -607,13 +607,13 @@ class TestMkDocsAvailable:
 
     def test_plugin_class_exists(self):
         """Test that the plugin class can be imported."""
-        from cyclopts.mkdocs_ext import CycloptsPlugin
+        from cyclopts.ext.mkdocs import CycloptsPlugin
 
         assert CycloptsPlugin is not None
 
     def test_plugin_config_class_exists(self):
         """Test that the config class can be imported."""
-        from cyclopts.mkdocs_ext import CycloptsPluginConfig
+        from cyclopts.ext.mkdocs import CycloptsPluginConfig
 
         assert CycloptsPluginConfig is not None
 
@@ -651,7 +651,7 @@ class TestCommandFiltering:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -706,7 +706,7 @@ class TestCommandFiltering:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -754,7 +754,7 @@ class TestCodeBlockDetection:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -801,7 +801,7 @@ class TestCodeBlockDetection:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import process_cyclopts_directives
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
 
             markdown = textwrap.dedent(
                 """\
@@ -850,7 +850,7 @@ class TestDirectiveEOFEdgeCases:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import DIRECTIVE_PATTERN
+            from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
             # Directive at EOF without trailing newline
             markdown = "::: cyclopts\n    :module: eof_test_app:app"
@@ -883,7 +883,7 @@ class TestDirectiveEOFEdgeCases:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import DIRECTIVE_PATTERN
+            from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
             # Directive at EOF with trailing spaces but no newline
             markdown = "::: cyclopts\n    :module: eof_ws_test_app:app    "

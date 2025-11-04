@@ -63,7 +63,7 @@ debug = ["ipdb>=0.13.9", "line_profiler>=3.5.1"]
 cyclopts = "cyclopts.cli:app"
 
 [project.entry-points."mkdocs.plugins"]
-cyclopts = "cyclopts.mkdocs_ext:CycloptsPlugin"
+cyclopts = "cyclopts.ext.mkdocs:CycloptsPlugin"
 
 [project.urls]
 Homepage = "https://github.com/BrianPugh/cyclopts"

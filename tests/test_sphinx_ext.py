@@ -100,7 +100,7 @@ class TestCycloptsDirective:
     @pytest.fixture
     def mock_directive(self):
         """Create a mock directive with necessary attributes."""
-        from cyclopts.sphinx_ext import CycloptsDirective
+        from cyclopts.ext.sphinx import CycloptsDirective
 
         # Create a mock directive instance
         directive = MagicMock(spec=CycloptsDirective)
@@ -130,7 +130,7 @@ def cmd():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             # Create actual directive instance
             directive = CycloptsDirective(
@@ -176,7 +176,7 @@ def hidden():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             # Create directive with options
             directive = CycloptsDirective(
@@ -215,7 +215,7 @@ def hidden():
 
     def test_directive_import_error(self, mock_directive):
         """Test directive handles import errors gracefully."""
-        from cyclopts.sphinx_ext import CycloptsDirective
+        from cyclopts.ext.sphinx import CycloptsDirective
 
         directive = CycloptsDirective(
             name="cyclopts",
@@ -241,7 +241,7 @@ class TestSphinxSetup:
 
     def test_setup_function(self):
         """Test the setup function registers the directive."""
-        from cyclopts.sphinx_ext import setup
+        from cyclopts.ext.sphinx import setup
 
         # Create a mock Sphinx app
         mock_app = MagicMock()
@@ -287,7 +287,7 @@ app.command(sub2)
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             # Create mock state
             mock_state = MagicMock()
@@ -348,7 +348,7 @@ def action():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -413,7 +413,7 @@ def also_include():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -478,7 +478,7 @@ def also_keep():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -557,7 +557,7 @@ app.command(api_app)
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -628,7 +628,7 @@ def third_command():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -732,7 +732,7 @@ def status():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -811,7 +811,7 @@ def cmd3():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -870,7 +870,7 @@ def cmd2():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
             mock_state.nested_parse = MagicMock()
@@ -935,7 +935,7 @@ def cmd():
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import CycloptsDirective
+            from cyclopts.ext.sphinx import CycloptsDirective
 
             mock_state = MagicMock()
 
@@ -977,3 +977,32 @@ def cmd():
 
         finally:
             sys.path.remove(str(tmp_path))
+
+
+class TestBackwardCompatibility:
+    """Test backward compatibility of cyclopts.sphinx_ext."""
+
+    def test_deprecation_warning(self):
+        """Test that importing cyclopts.sphinx_ext shows a deprecation warning."""
+        import sys
+
+        # Remove module if already imported to ensure fresh import
+        if "cyclopts.sphinx_ext" in sys.modules:
+            del sys.modules["cyclopts.sphinx_ext"]
+
+        with pytest.warns(DeprecationWarning, match="Importing from 'cyclopts.sphinx_ext' is deprecated"):
+            import cyclopts.sphinx_ext  # noqa: F401
+
+    def test_backward_compatible_imports(self):
+        """Test that old import path still works."""
+        import warnings
+
+        # Suppress the deprecation warning for this test
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from cyclopts.sphinx_ext import SPHINX_AVAILABLE, CycloptsDirective, DirectiveOptions, setup
+
+            assert CycloptsDirective is not None
+            assert DirectiveOptions is not None
+            assert SPHINX_AVAILABLE is not None
+            assert setup is not None
