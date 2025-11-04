@@ -7,24 +7,14 @@ import attrs
 from cyclopts.utils import import_app
 
 if TYPE_CHECKING:
-    from docutils import nodes
     from sphinx.application import Sphinx
-    from sphinx.util.docutils import SphinxDirective
 
+from docutils import nodes
+from sphinx.application import Sphinx
+from sphinx.util import logging
+from sphinx.util.docutils import SphinxDirective
 
-try:
-    from docutils import nodes  # noqa: F401
-    from sphinx.application import Sphinx
-    from sphinx.util import logging
-    from sphinx.util.docutils import SphinxDirective
-
-    logger = logging.getLogger(__name__)
-    SPHINX_AVAILABLE = True
-except ImportError:
-    SPHINX_AVAILABLE = False
-    if not TYPE_CHECKING:
-        SphinxDirective = object  # Fallback base class
-        logger = None
+logger = logging.getLogger(__name__)
 
 
 @attrs.define(kw_only=True)
@@ -73,9 +63,6 @@ class DirectiveOptions:
     @staticmethod
     def spec() -> dict[str, Any]:
         """Generate Sphinx option_spec from DirectiveOptions fields."""
-        if not SPHINX_AVAILABLE:
-            return {}
-
         from docutils.parsers.rst import directives
 
         type_mapping = {
@@ -223,10 +210,6 @@ def _process_rst_content(content: str, skip_title: bool = False) -> list[str]:
 
 def _create_section_nodes(lines: list[str], state: Any) -> list["nodes.Node"]:
     """Create section nodes from RST lines."""
-    if not SPHINX_AVAILABLE:
-        return []
-
-    from docutils import nodes
     from docutils.statemachine import StringList
 
     result = []
@@ -343,9 +326,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
 
     def run(self) -> list["nodes.Node"]:
         """Generate documentation nodes for the Cyclopts app."""
-        if not SPHINX_AVAILABLE:
-            return []
-
         module_path = self.arguments[0]
         opts = DirectiveOptions.from_dict(self.options)
 
@@ -377,9 +357,6 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
 
     def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> list["nodes.Node"]:
         """Create docutils nodes from RST content."""
-        if not SPHINX_AVAILABLE:
-            return []
-
         lines = _process_rst_content(rst_content, skip_title=False)  # Title already skipped in generate_docs
 
         # Always use section nodes for better Sphinx integration
@@ -387,20 +364,13 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
 
     def _error_node(self, message: str) -> list["nodes.Node"]:
         """Create an error node with the given message."""
-        if not SPHINX_AVAILABLE:
-            return []
-
-        from docutils import nodes
-
-        if logger:
-            logger.error(message)
+        logger.error(message)
         return [nodes.error("", nodes.paragraph(text=message))]
 
 
 def setup(app: "Sphinx") -> dict[str, Any]:
     """Setup function for the Sphinx extension."""
-    if SPHINX_AVAILABLE:
-        app.add_directive("cyclopts", CycloptsDirective)
+    app.add_directive("cyclopts", CycloptsDirective)
     return {
         "version": "1.0.0",
         "parallel_read_safe": True,

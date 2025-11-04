@@ -1000,9 +1000,8 @@ class TestBackwardCompatibility:
         # Suppress the deprecation warning for this test
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            from cyclopts.sphinx_ext import SPHINX_AVAILABLE, CycloptsDirective, DirectiveOptions, setup
+            from cyclopts.sphinx_ext import CycloptsDirective, DirectiveOptions, setup
 
             assert CycloptsDirective is not None
             assert DirectiveOptions is not None
-            assert SPHINX_AVAILABLE is not None
             assert setup is not None

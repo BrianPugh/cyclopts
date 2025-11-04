@@ -21,7 +21,6 @@ warnings.warn(
 )
 
 from cyclopts.ext.sphinx import (
-    SPHINX_AVAILABLE,
     CycloptsDirective,
     DirectiveOptions,
     setup,
@@ -30,6 +29,5 @@ from cyclopts.ext.sphinx import (
 __all__ = [
     "CycloptsDirective",
     "DirectiveOptions",
-    "SPHINX_AVAILABLE",
     "setup",
 ]
