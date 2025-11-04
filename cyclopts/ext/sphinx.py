@@ -332,10 +332,8 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         try:
             rst_content = self._generate_documentation(module_path, opts)
             return self._create_nodes(rst_content, opts)
-        except (ImportError, AttributeError, TypeError) as e:
-            return self._error_node(f"Error generating Cyclopts documentation: {e}")
         except Exception as e:
-            return self._error_node(f"Unexpected error: {e}")
+            return self._error_node(f"Error generating Cyclopts documentation: {e}")
 
     def _generate_documentation(self, module_path: str, opts: DirectiveOptions) -> str:
         """Generate RST documentation for the app."""
