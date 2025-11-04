@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import attrs
 
+from cyclopts import __version__
 from cyclopts.utils import import_app
 
 if TYPE_CHECKING:
@@ -370,7 +371,7 @@ def setup(app: "Sphinx") -> dict[str, Any]:
     """Setup function for the Sphinx extension."""
     app.add_directive("cyclopts", CycloptsDirective)
     return {
-        "version": "1.0.0",
+        "version": __version__,
         "parallel_read_safe": True,
         "parallel_write_safe": True,
     }

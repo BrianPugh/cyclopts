@@ -241,6 +241,7 @@ class TestSphinxSetup:
 
     def test_setup_function(self):
         """Test the setup function registers the directive."""
+        from cyclopts import __version__
         from cyclopts.ext.sphinx import setup
 
         # Create a mock Sphinx app
@@ -253,7 +254,7 @@ class TestSphinxSetup:
         mock_app.add_directive.assert_called_once_with("cyclopts", ANY)
 
         # Verify metadata
-        assert result["version"] == "1.0.0"
+        assert result["version"] == __version__
         assert result["parallel_read_safe"] is True
         assert result["parallel_write_safe"] is True
 
