@@ -5,29 +5,19 @@ from typing import TYPE_CHECKING, Any
 
 import attrs
 
-from cyclopts.sphinx_ext import _import_app
+from cyclopts.utils import import_app
 
 if TYPE_CHECKING:
     from mkdocs.config.defaults import MkDocsConfig
     from mkdocs.structure.files import Files
     from mkdocs.structure.pages import Page
 
-try:
-    from mkdocs.config import base
-    from mkdocs.config import config_options as c
-    from mkdocs.exceptions import PluginError
-    from mkdocs.plugins import BasePlugin, get_plugin_logger
+from mkdocs.config import base
+from mkdocs.config import config_options as c
+from mkdocs.exceptions import PluginError
+from mkdocs.plugins import BasePlugin, get_plugin_logger
 
-    logger = get_plugin_logger(__name__)
-    MKDOCS_AVAILABLE = True
-except ImportError:
-    base = None  # type: ignore[assignment]
-    c = None  # type: ignore[assignment]
-    PluginError = Exception  # type: ignore[assignment,misc]
-    MKDOCS_AVAILABLE = False
-    if not TYPE_CHECKING:
-        BasePlugin = object  # type: ignore[assignment,misc]
-        logger = None
+logger = get_plugin_logger(__name__)
 
 
 @attrs.define(kw_only=True)
@@ -201,7 +191,7 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
             options = DirectiveOptions.from_directive_block(directive_text, default_heading_level=default_heading)
 
             # Import the app
-            app = _import_app(options.module)
+            app = import_app(options.module)
 
             # Generate markdown documentation
             markdown_docs = generate_markdown_docs(
@@ -226,49 +216,36 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
     return processed
 
 
-if MKDOCS_AVAILABLE:
-    assert base is not None
-    assert c is not None
+class CycloptsPluginConfig(base.Config):  # type: ignore[misc]
+    """Configuration schema for the Cyclopts MkDocs plugin."""
 
-    class CycloptsPluginConfig(base.Config):  # type: ignore[misc]
-        """Configuration schema for the Cyclopts MkDocs plugin."""
+    default_heading_level = c.Type(int, default=2)  # type: ignore[attr-defined]
 
-        default_heading_level = c.Type(int, default=2)  # type: ignore[attr-defined]
 
-    class CycloptsPlugin(BasePlugin[CycloptsPluginConfig]):  # type: ignore[misc]
-        """MkDocs plugin to generate Cyclopts CLI documentation.
+class CycloptsPlugin(BasePlugin[CycloptsPluginConfig]):  # type: ignore[misc]
+    """MkDocs plugin to generate Cyclopts CLI documentation.
 
-        Usage in mkdocs.yml:
-            plugins:
-              - cyclopts:
-                  default_heading_level: 2
+    Usage in mkdocs.yml:
+        plugins:
+          - cyclopts:
+              default_heading_level: 2
 
-        Usage in Markdown files:
-            ::: cyclopts
-                :module: myapp.cli:app
-                :heading-level: 2
-                :recursive: true
-                :commands: init, build
-                :exclude-commands: debug
+    Usage in Markdown files:
+        ::: cyclopts
+            :module: myapp.cli:app
+            :heading-level: 2
+            :recursive: true
+            :commands: init, build
+            :exclude-commands: debug
+    """
+
+    def on_page_markdown(self, markdown: str, *, page: "Page", config: "MkDocsConfig", files: "Files", **kwargs) -> str:
+        """Process ::: cyclopts directives in markdown content.
+
+        This event is called after the page's markdown is loaded from file
+        but before it's converted to HTML.
         """
+        if "::: cyclopts" not in markdown:
+            return markdown
 
-        def on_page_markdown(
-            self, markdown: str, *, page: "Page", config: "MkDocsConfig", files: "Files", **kwargs
-        ) -> str:
-            """Process ::: cyclopts directives in markdown content.
-
-            This event is called after the page's markdown is loaded from file
-            but before it's converted to HTML.
-            """
-            if "::: cyclopts" not in markdown:
-                return markdown
-
-            return process_cyclopts_directives(markdown, self.config)
-
-else:
-
-    class CycloptsPluginConfig:  # type: ignore[no-redef]
-        """Fallback config class when MkDocs is not installed."""
-
-    class CycloptsPlugin:  # type: ignore[no-redef]
-        """Fallback plugin class when MkDocs is not installed."""
+        return process_cyclopts_directives(markdown, self.config)

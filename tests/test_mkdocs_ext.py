@@ -6,10 +6,11 @@ import textwrap
 import pytest
 
 from cyclopts import App
+from cyclopts.utils import import_app
 
 
 class TestImportApp:
-    """Test the _import_app function."""
+    """Test the import_app function."""
 
     def test_import_with_colon_notation(self, tmp_path):
         """Test importing an app using module:app notation."""
@@ -31,9 +32,7 @@ class TestImportApp:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import _import_app
-
-            app = _import_app("test_module:my_app")
+            app = import_app("test_module:my_app")
             assert isinstance(app, App)
             assert app.name == ("test-app",)
         finally:
@@ -56,9 +55,7 @@ class TestImportApp:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import _import_app
-
-            found_app = _import_app("test_cli")
+            found_app = import_app("test_cli")
             assert isinstance(found_app, App)
             assert found_app.name == ("auto-found",)
         finally:
@@ -68,10 +65,8 @@ class TestImportApp:
 
     def test_import_module_not_found(self):
         """Test error when module doesn't exist."""
-        from cyclopts.mkdocs_ext import _import_app
-
         with pytest.raises(ImportError, match="Cannot import module"):
-            _import_app("nonexistent_module:app")
+            import_app("nonexistent_module:app")
 
     def test_import_app_not_found(self, tmp_path):
         """Test error when specified app doesn't exist in module."""
@@ -88,10 +83,8 @@ class TestImportApp:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import _import_app
-
             with pytest.raises(AttributeError, match="has no attribute 'missing_app'"):
-                _import_app("test_no_app:missing_app")
+                import_app("test_no_app:missing_app")
         finally:
             sys.path.remove(str(tmp_path))
             if "test_no_app" in sys.modules:
@@ -105,10 +98,8 @@ class TestImportApp:
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.mkdocs_ext import _import_app
-
             with pytest.raises(TypeError, match="is not a Cyclopts App instance"):
-                _import_app(f"{module_name}:not_an_app")
+                import_app(f"{module_name}:not_an_app")
         finally:
             sys.path.remove(str(tmp_path))
             if module_name in sys.modules:
@@ -625,12 +616,6 @@ class TestMkDocsAvailable:
         from cyclopts.mkdocs_ext import CycloptsPluginConfig
 
         assert CycloptsPluginConfig is not None
-
-    def test_mkdocs_available_flag(self):
-        """Test that MKDOCS_AVAILABLE is True when mkdocs is installed."""
-        from cyclopts.mkdocs_ext import MKDOCS_AVAILABLE
-
-        assert MKDOCS_AVAILABLE is True
 
 
 class TestCommandFiltering:

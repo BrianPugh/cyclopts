@@ -1,16 +1,16 @@
 """Sphinx extension for automatic Cyclopts CLI documentation."""
 
-import importlib
 from typing import TYPE_CHECKING, Any
 
 import attrs
+
+from cyclopts.utils import import_app
 
 if TYPE_CHECKING:
     from docutils import nodes
     from sphinx.application import Sphinx
     from sphinx.util.docutils import SphinxDirective
 
-    from cyclopts import App
 
 try:
     from docutils import nodes  # noqa: F401
@@ -25,44 +25,6 @@ except ImportError:
     if not TYPE_CHECKING:
         SphinxDirective = object  # Fallback base class
         logger = None
-
-
-def _import_app(module_path: str) -> "App":
-    """Import a Cyclopts App from a module path."""
-    from cyclopts import App
-
-    if ":" in module_path:
-        module_name, app_name = module_path.rsplit(":", 1)
-    else:
-        module_name, app_name = module_path, None
-
-    try:
-        module = importlib.import_module(module_name)
-    except ImportError as e:
-        raise ImportError(f"Cannot import module '{module_name}': {e}") from e
-
-    if app_name:
-        if not hasattr(module, app_name):
-            raise AttributeError(f"Module '{module_name}' has no attribute '{app_name}'")
-        app = getattr(module, app_name)
-        if not isinstance(app, App):
-            raise TypeError(f"'{app_name}' is not a Cyclopts App instance")
-        return app
-
-    # Auto-discovery: search for App instance
-    for name in ["app", "cli", "main"]:
-        obj = getattr(module, name, None)
-        if isinstance(obj, App):
-            return obj
-
-    # Search all public attributes
-    for name in dir(module):
-        if not name.startswith("_"):
-            obj = getattr(module, name)
-            if isinstance(obj, App):
-                return obj
-
-    raise AttributeError(f"No Cyclopts App found in '{module_name}'. Specify explicitly: '{module_name}:app_name'")
 
 
 @attrs.define(kw_only=True)
@@ -399,7 +361,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
         """Generate RST documentation for the app."""
         from cyclopts.docs.rst import generate_rst_docs
 
-        app = _import_app(module_path)
+        app = import_app(module_path)
 
         # Call generate_rst_docs directly to access internal no_root_title parameter
         return generate_rst_docs(

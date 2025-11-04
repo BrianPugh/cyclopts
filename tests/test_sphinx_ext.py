@@ -7,10 +7,11 @@ import pytest
 from docutils.statemachine import StringList
 
 from cyclopts import App
+from cyclopts.utils import import_app
 
 
 class TestImportApp:
-    """Test the _import_app function."""
+    """Test the import_app function."""
 
     def test_import_with_colon_notation(self, tmp_path):
         """Test importing an app using module:app notation."""
@@ -30,9 +31,7 @@ def hello():
         # Add the temp directory to sys.path
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import _import_app
-
-            app = _import_app("test_module:my_app")
+            app = import_app("test_module:my_app")
             assert isinstance(app, App)
             assert app.name == ("test-app",)
         finally:
@@ -49,9 +48,7 @@ app = App(name="auto-found", help="Automatically found app")
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import _import_app
-
-            found_app = _import_app("test_cli")
+            found_app = import_app("test_cli")
             assert isinstance(found_app, App)
             assert found_app.name == ("auto-found",)
         finally:
@@ -59,10 +56,8 @@ app = App(name="auto-found", help="Automatically found app")
 
     def test_import_module_not_found(self):
         """Test error when module doesn't exist."""
-        from cyclopts.sphinx_ext import _import_app
-
         with pytest.raises(ImportError, match="Cannot import module"):
-            _import_app("nonexistent_module:app")
+            import_app("nonexistent_module:app")
 
     def test_import_app_not_found(self, tmp_path):
         """Test error when specified app doesn't exist in module."""
@@ -75,10 +70,8 @@ some_app = App(name="test", help="Test")
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import _import_app
-
             with pytest.raises(AttributeError, match="has no attribute 'missing_app'"):
-                _import_app("test_module:missing_app")
+                import_app("test_module:missing_app")
         finally:
             sys.path.remove(str(tmp_path))
 
@@ -91,10 +84,8 @@ some_app = App(name="test", help="Test")
 
         sys.path.insert(0, str(tmp_path))
         try:
-            from cyclopts.sphinx_ext import _import_app
-
             with pytest.raises(TypeError, match="is not a Cyclopts App instance"):
-                _import_app(f"{module_name}:not_an_app")
+                import_app(f"{module_name}:not_an_app")
         finally:
             # Clean up
             sys.path.remove(str(tmp_path))
