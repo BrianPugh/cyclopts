@@ -66,7 +66,7 @@ The :meth:`app.command <cyclopts.App.command>` method can also register another 
    sub_app = App(name="foo")  # "foo" would be a better variable name than "sub_app".
    # "sub_app" in this example emphasizes the name comes from name="foo".
    app.command(sub_app)  # Registers sub_app to command "foo"
-   # Or, as a one-liner:  app.command(sub_app := App(name="foo"))
+   # Or, as a one-liner:  sub_app = app.command(App(name="foo"))
 
 
    @sub_app.command
