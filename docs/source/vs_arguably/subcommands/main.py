@@ -29,7 +29,7 @@ if __name__ == "__main__":
 from cyclopts import App
 
 app = App()
-app.command(ec2 := App(name="ec2"))
+ec2 = app.command(App(name="ec2"))
 
 
 @ec2.command
