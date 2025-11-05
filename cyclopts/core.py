@@ -79,7 +79,7 @@ from cyclopts._run import _run_maybe_async_command
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
-_DEFAULT_FORMAT = "markdown"
+DEFAULT_FORMAT = "markdown"
 
 
 def _result_action_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...] | None:
@@ -728,7 +728,7 @@ class App:
 
         version_format = self.app_stack.resolve("version_format")
         if version_format is None:
-            version_format = self.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
+            version_format = self.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
         version_formatted = InlineText.from_format(version_raw, format=version_format)
         (console or self.console).print(version_formatted)
 
@@ -2032,7 +2032,7 @@ class App:
                 usage = None
 
             # Prepare description
-            help_format = executing_app.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
+            help_format = executing_app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
             description = format_doc(executing_app, help_format)
 
             # Prepare panels with their associated groups
@@ -2085,7 +2085,7 @@ class App:
         command_chain, execution_path, _ = self.parse_commands(tokens)
         command_app = execution_path[-1]
 
-        help_format = command_app.app_stack.resolve("help_format", help_format, _DEFAULT_FORMAT)
+        help_format = command_app.app_stack.resolve("help_format", help_format, DEFAULT_FORMAT)
 
         panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"

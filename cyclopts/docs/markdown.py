@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 from cyclopts._markup import extract_text
+from cyclopts.core import DEFAULT_FORMAT
 from cyclopts.docs.base import (
     BaseDocGenerator,
     adjust_filters_for_subcommand,
@@ -97,6 +98,7 @@ def generate_markdown_docs(
     commands_filter: list[str] | None = None,
     exclude_commands: list[str] | None = None,
     no_root_title: bool = False,
+    code_block_title: bool = False,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -144,10 +146,11 @@ def generate_markdown_docs(
     # Build the main documentation
     lines = []
 
-    # Initialize command chain if not provided
-    is_root = command_chain is None
     if command_chain is None:
         command_chain = []
+        is_root = True
+    else:
+        is_root = False
 
     # Determine the app name and full command path
     app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
@@ -155,7 +158,7 @@ def generate_markdown_docs(
     # (e.g., "files cp" and "other cp" would both generate #cp without this)
     if command_chain:
         # Show full command path (same for both hierarchical and flattened modes)
-        title = f"`{full_command}`"
+        title = f"`{full_command}`" if code_block_title else full_command
     else:
         # Root app: use base title
         title = base_title
@@ -166,7 +169,7 @@ def generate_markdown_docs(
         lines.append("")
 
     # Add application description
-    help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
+    help_format = app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
     description = BaseDocGenerator.extract_description(app, help_format)
     if description:
         # Extract plain text from description
@@ -351,7 +354,8 @@ def generate_markdown_docs(
             # Generate subcommand documentation
             # Always use full command path to avoid anchor collisions
             display_name = " ".join(sub_command_chain)
-            lines.append(f"{'#' * sub_heading_level} `{display_name}`")
+            display_fmt = f"`{display_name}`" if code_block_title else display_name
+            lines.append(f"{'#' * sub_heading_level} {display_fmt}")
             lines.append("")
 
             # Get subapp help
@@ -579,6 +583,7 @@ def generate_markdown_docs(
                         commands_filter=sub_commands_filter,
                         exclude_commands=sub_exclude_commands,
                         no_root_title=False,  # Always show title for nested commands
+                        code_block_title=code_block_title,
                     )
                     # Just append the generated docs - no title replacement
                     lines.append(nested_docs)

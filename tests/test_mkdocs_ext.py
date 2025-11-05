@@ -116,7 +116,7 @@ class TestDirectiveOptions:
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli:app
+                module: myapp.cli:app
             """
         )
 
@@ -133,14 +133,19 @@ class TestDirectiveOptions:
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli:app
-                :heading-level: 3
-                :recursive: false
-                :include-hidden: true
-                :flatten-commands: true
-                :generate-toc: false
-                :commands: init, build, deploy
-                :exclude-commands: debug, internal
+                module: myapp.cli:app
+                heading_level: 3
+                recursive: false
+                include_hidden: true
+                flatten_commands: true
+                generate_toc: false
+                commands:
+                  - init
+                  - build
+                  - deploy
+                exclude_commands:
+                  - debug
+                  - internal
             """
         )
 
@@ -155,14 +160,14 @@ class TestDirectiveOptions:
         assert options.exclude_commands == ["debug", "internal"]
 
     def test_parse_comma_separated_commands(self):
-        """Test parsing comma-separated command lists."""
+        """Test parsing YAML list format for commands."""
         from cyclopts.ext.mkdocs import DirectiveOptions
 
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli
-                :commands: cmd1,   cmd2  ,  cmd3
+                module: myapp.cli
+                commands: [cmd1, cmd2, cmd3]
             """
         )
 
@@ -170,13 +175,13 @@ class TestDirectiveOptions:
         assert options.commands == ["cmd1", "cmd2", "cmd3"]
 
     def test_parse_missing_module_raises_error(self):
-        """Test that missing :module: option raises an error."""
+        """Test that missing module option raises an error."""
         from cyclopts.ext.mkdocs import DirectiveOptions
 
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :heading-level: 2
+                heading_level: 2
             """
         )
 
@@ -191,8 +196,8 @@ class TestDirectiveOptions:
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli
-                :recursive: true
+                module: myapp.cli
+                recursive: true
             """
         )
         options = DirectiveOptions.from_directive_block(directive_text)
@@ -202,19 +207,8 @@ class TestDirectiveOptions:
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli
-                :recursive: yes
-            """
-        )
-        options = DirectiveOptions.from_directive_block(directive_text)
-        assert options.recursive is True
-
-        # Test "1"
-        directive_text = textwrap.dedent(
-            """\
-            ::: cyclopts
-                :module: myapp.cli
-                :recursive: 1
+                module: myapp.cli
+                recursive: yes
             """
         )
         options = DirectiveOptions.from_directive_block(directive_text)
@@ -224,8 +218,8 @@ class TestDirectiveOptions:
         directive_text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli
-                :recursive: false
+                module: myapp.cli
+                recursive: false
             """
         )
         options = DirectiveOptions.from_directive_block(directive_text)
@@ -264,8 +258,8 @@ class TestProcessDirectives:
                 Here's the documentation:
 
                 ::: cyclopts
-                    :module: simple_app:app
-                    :heading-level: 2
+                    module: simple_app:app
+                    heading_level: 2
 
                 More content here.
                 """
@@ -310,16 +304,16 @@ class TestProcessDirectives:
                 # First Section
 
                 ::: cyclopts
-                    :module: multi_app:app
-                    :heading-level: 2
-                    :generate-toc: false
+                    module: multi_app:app
+                    heading_level: 2
+                    generate_toc: false
 
                 # Second Section
 
                 ::: cyclopts
-                    :module: multi_app:app
-                    :heading-level: 3
-                    :generate-toc: false
+                    module: multi_app:app
+                    heading_level: 3
+                    generate_toc: false
                 """
             )
 
@@ -345,7 +339,7 @@ class TestProcessDirectives:
             # My Documentation
 
             ::: cyclopts
-                :module: nonexistent_module:app
+                module: nonexistent_module:app
 
             More content.
             """
@@ -398,7 +392,7 @@ class TestProcessDirectives:
             directive_text = textwrap.dedent(
                 """\
                 ::: cyclopts
-                    :module: config_test_app:app
+                    module: config_test_app:app
                 """
             )
 
@@ -409,8 +403,8 @@ class TestProcessDirectives:
             directive_text_with_level = textwrap.dedent(
                 """\
                 ::: cyclopts
-                    :module: config_test_app:app
-                    :heading-level: 4
+                    module: config_test_app:app
+                    heading_level: 4
                 """
             )
 
@@ -449,8 +443,8 @@ class TestProcessDirectives:
                 # Documentation
 
                 ::: cyclopts
-                    :module: no_title_app:app
-                    :generate-toc: false
+                    module: no_title_app:app
+                    generate_toc: false
 
                 More content.
                 """
@@ -481,7 +475,7 @@ class TestDirectivePattern:
         text = textwrap.dedent(
             """\
             ::: cyclopts
-                :module: myapp.cli
+                module: myapp.cli
             """
         )
 
@@ -498,10 +492,10 @@ class TestDirectivePattern:
             Some text before.
 
             ::: cyclopts
-                :module: myapp.cli:app
-                :heading-level: 2
-                :recursive: true
-                :commands: cmd1, cmd2
+                module: myapp.cli:app
+                heading_level: 2
+                recursive: true
+                commands: cmd1, cmd2
 
             Some text after.
             """
@@ -510,10 +504,10 @@ class TestDirectivePattern:
         match = DIRECTIVE_PATTERN.search(text)
         assert match is not None
         matched_text = match.group(0)
-        assert ":module:" in matched_text
-        assert ":heading-level:" in matched_text
-        assert ":recursive:" in matched_text
-        assert ":commands:" in matched_text
+        assert "module:" in matched_text
+        assert "heading_level:" in matched_text
+        assert "recursive:" in matched_text
+        assert "commands:" in matched_text
 
     def test_pattern_finds_all_directives(self):
         """Test that the pattern finds all directives in text."""
@@ -524,12 +518,12 @@ class TestDirectivePattern:
             # First
 
             ::: cyclopts
-                :module: app1
+                module: app1
 
             # Second
 
             ::: cyclopts
-                :module: app2
+                module: app2
             """
         )
 
@@ -577,9 +571,9 @@ class TestPluginIntegration:
                 # Documentation
 
                 ::: cyclopts
-                    :module: plugin_test_app:app
-                    :heading-level: 2
-                    :generate-toc: false
+                    module: plugin_test_app:app
+                    heading_level: 2
+                    generate_toc: false
                 """
             )
 
@@ -658,8 +652,8 @@ class TestCommandFiltering:
                 # CLI Reference
 
                 ::: cyclopts
-                    :module: multi_cmd_app:app
-                    :commands: init, build
+                    module: multi_cmd_app:app
+                    commands: [init, build]
                 """
             )
 
@@ -713,8 +707,8 @@ class TestCommandFiltering:
                 # CLI Reference
 
                 ::: cyclopts
-                    :module: exclude_cmd_app:app
-                    :exclude-commands: debug, internal
+                    module: exclude_cmd_app:app
+                    exclude_commands: [debug, internal]
                 """
             )
 
@@ -764,7 +758,7 @@ class TestCodeBlockDetection:
 
                 ```markdown
                 ::: cyclopts
-                    :module: fence_test_app:app
+                    module: fence_test_app:app
                 ```
 
                 The above should not be processed.
@@ -810,7 +804,7 @@ class TestCodeBlockDetection:
                 Here's an example directive:
 
                     ::: cyclopts
-                        :module: indent_test_app:app
+                        module: indent_test_app:app
 
                 The above should not be processed.
                 """
@@ -853,7 +847,7 @@ class TestDirectiveEOFEdgeCases:
             from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
             # Directive at EOF without trailing newline
-            markdown = "::: cyclopts\n    :module: eof_test_app:app"
+            markdown = "::: cyclopts\n    module: eof_test_app:app"
 
             matches = list(DIRECTIVE_PATTERN.finditer(markdown))
             assert len(matches) == 1
@@ -886,7 +880,7 @@ class TestDirectiveEOFEdgeCases:
             from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
             # Directive at EOF with trailing spaces but no newline
-            markdown = "::: cyclopts\n    :module: eof_ws_test_app:app    "
+            markdown = "::: cyclopts\n    module: eof_ws_test_app:app    "
 
             matches = list(DIRECTIVE_PATTERN.finditer(markdown))
             assert len(matches) == 1

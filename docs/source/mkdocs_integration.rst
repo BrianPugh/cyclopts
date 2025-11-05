@@ -28,7 +28,7 @@ Quick Start
    .. code-block:: markdown
 
       ::: cyclopts
-          :module: mypackage.cli:app
+          module: mypackage.cli:app
 
 Directive Usage
 ---------------
@@ -36,12 +36,12 @@ Directive Usage
 Basic Syntax
 ~~~~~~~~~~~~
 
-The ``::: cyclopts`` directive accepts a module path to your Cyclopts ``App`` object:
+The ``::: cyclopts`` directive uses YAML format and accepts a module path to your Cyclopts ``App`` object:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
+       module: mypackage.cli:app
 
 Module Path Formats
 ~~~~~~~~~~~~~~~~~~~
@@ -53,13 +53,13 @@ The directive accepts two module path formats:
    .. code-block:: markdown
 
       ::: cyclopts
-          :module: mypackage.cli:app
+          module: mypackage.cli:app
 
       ::: cyclopts
-          :module: myapp.commands:main_app
+          module: myapp.commands:main_app
 
       ::: cyclopts
-          :module: src.cli:cli
+          module: src.cli:cli
 
    This explicitly specifies which ``App`` object to document.
 
@@ -68,113 +68,140 @@ The directive accepts two module path formats:
    .. code-block:: markdown
 
       ::: cyclopts
-          :module: mypackage.cli
+          module: mypackage.cli
 
       ::: cyclopts
-          :module: myapp.main
+          module: myapp.main
 
    The plugin will search the module for an ``App`` instance, looking for common names like ``app``, ``cli``, or ``main``.
 
 Directive Options
 -----------------
 
-The directive supports several options to customize the generated documentation:
+The directive supports several options to customize the generated documentation. All options use standard YAML syntax:
 
-``:module:`` - Module Path (Required)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``module`` - Module Path (Required)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The module path to your Cyclopts App instance:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
+       module: mypackage.cli:app
 
 This is the only required option.
 
-``:heading-level:`` - Heading Level
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``heading_level`` - Heading Level
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Set the starting heading level for the generated documentation (1-6, default: 2):
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :heading-level: 3
+       module: mypackage.cli:app
+       heading_level: 3
 
 This is useful when you need to adjust the heading hierarchy. The default of 2 works well for most cases where the directive is placed under a page title.
 
-``:recursive:`` - Include Subcommands
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``recursive`` - Include Subcommands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Control whether to document subcommands recursively (default: true):
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :recursive: false
+       module: mypackage.cli:app
+       recursive: false
 
 Set to ``false`` to only document the top-level commands.
 
-``:include-hidden:`` - Show Hidden Commands
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``include_hidden`` - Show Hidden Commands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Include commands marked with ``show=False`` in the documentation:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :include-hidden: true
+       module: mypackage.cli:app
+       include_hidden: true
 
 By default, hidden commands are not included in the generated documentation.
 
-``:flatten-commands:`` - Generate Flat Command Hierarchy
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``flatten_commands`` - Generate Flat Command Hierarchy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Generate all commands at the same heading level instead of nested hierarchy:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :flatten-commands: true
+       module: mypackage.cli:app
+       flatten_commands: true
 
 This creates distinct, equally-weighted headings for each command and subcommand, making them easier to reference and navigate in the documentation. Without this option, subcommands are nested with incrementing heading levels.
 
-``:generate-toc:`` - Generate Table of Contents
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``generate_toc`` - Generate Table of Contents
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Control whether to generate a table of contents for multi-command apps (default: true):
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :generate-toc: false
+       module: mypackage.cli:app
+       generate_toc: false
 
 This is useful when you want to suppress the automatic table of contents, especially when using multiple directives on the same page or when you have your own navigation structure.
 
-``:commands:`` - Filter Specific Commands
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``code_block_title`` - Render Titles as Inline Code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Render command titles with inline code formatting (backticks) instead of plain text:
+
+.. code-block:: markdown
+
+   ::: cyclopts
+       module: mypackage.cli:app
+       code_block_title: true
+
+When enabled, command titles are rendered as ``#### `command-name``` instead of ``#### command-name``. This makes command names appear with monospace formatting, which can be useful for certain documentation themes or to make command names stand out visually.
+
+``commands`` - Filter Specific Commands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Document only specific commands from your CLI application:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :commands: init, build, deploy
+       module: mypackage.cli:app
+       commands:
+         - init
+         - build
+         - deploy
 
 This will only document the specified commands. You can also use nested command paths with dot notation:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :commands: db.migrate, db.backup, api
+       module: mypackage.cli:app
+       commands:
+         - db.migrate
+         - db.backup
+         - api
+
+Or use inline YAML list syntax:
+
+.. code-block:: markdown
+
+   ::: cyclopts
+       module: mypackage.cli:app
+       commands: [db.migrate, db.backup, api]
 
 - ``db.migrate`` - Documents only the ``migrate`` subcommand under ``db``
 - ``db.backup`` - Documents only the ``backup`` subcommand under ``db``
@@ -182,18 +209,20 @@ This will only document the specified commands. You can also use nested command 
 
 You can use either underscore or dash notation in command names - they will be normalized automatically.
 
-``:exclude-commands:`` - Exclude Specific Commands
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``exclude_commands`` - Exclude Specific Commands
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Exclude specific commands from the documentation:
 
 .. code-block:: markdown
 
    ::: cyclopts
-       :module: mypackage.cli:app
-       :exclude-commands: debug, internal-test
+       module: mypackage.cli:app
+       exclude_commands:
+         - debug
+         - internal-test
 
-This is useful for hiding internal or debug commands from user-facing documentation. Like ``:commands:``, this also supports nested command paths with dot notation.
+This is useful for hiding internal or debug commands from user-facing documentation. Like ``commands``, this also supports nested command paths with dot notation and inline YAML list syntax.
 
 Complete Example
 ----------------
@@ -283,9 +312,9 @@ Documentation File (``docs/cli-reference.md``):
    This section documents all available CLI commands.
 
    ::: cyclopts
-       :module: myapp.cli:app
-       :heading-level: 2
-       :recursive: true
+       module: myapp.cli:app
+       heading_level: 2
+       recursive: true
 
    The above directive will automatically generate documentation for all
    commands, including their parameters, types, defaults, and help text.
@@ -303,8 +332,8 @@ When you want each command to have its own distinct heading for better navigatio
    # CLI Command Reference
 
    ::: cyclopts
-       :module: myapp.cli:app
-       :flatten-commands: true
+       module: myapp.cli:app
+       flatten_commands: true
 
    This generates all commands at the same heading level (not nested),
    making it easier to navigate and reference specific commands.
@@ -321,28 +350,28 @@ Split your CLI documentation across multiple sections or pages:
    The following commands manage database operations:
 
    ::: cyclopts
-       :module: myapp.cli:app
-       :commands: db
-       :recursive: true
+       module: myapp.cli:app
+       commands: [db]
+       recursive: true
 
    ## API Management
 
    Commands for controlling the API server:
 
    ::: cyclopts
-       :module: myapp.cli:app
-       :commands: api
-       :recursive: true
+       module: myapp.cli:app
+       commands: [api]
+       recursive: true
 
    ## Development Tools
 
    Utilities for development (excluding internal debug commands):
 
    ::: cyclopts
-       :module: myapp.cli:app
-       :commands: dev
-       :exclude-commands: dev.debug, dev.internal
-       :recursive: true
+       module: myapp.cli:app
+       commands: [dev]
+       exclude_commands: [dev.debug, dev.internal]
+       recursive: true
 
 This approach allows you to:
 

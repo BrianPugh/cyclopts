@@ -32,6 +32,7 @@ class DirectiveOptions:
     include_hidden: bool = False
     flatten_commands: bool = False
     generate_toc: bool = True
+    code_block_title: bool = False
 
     @classmethod
     def from_directive_block(
@@ -41,10 +42,12 @@ class DirectiveOptions:
 
         Expected format:
             ::: cyclopts
-                :module: myapp.cli:app
-                :heading-level: 2
-                :recursive: true
-                :commands: cmd1, cmd2
+                module: myapp.cli:app
+                heading_level: 2
+                recursive: true
+                commands:
+                  - cmd1
+                  - cmd2
 
         Parameters
         ----------
@@ -53,59 +56,47 @@ class DirectiveOptions:
         default_heading_level : int | None
             Default heading level from plugin config. Used if :heading-level: not specified.
         """
+        import yaml
+
         lines = directive_text.strip().split("\n")
 
         # Remove the ::: cyclopts line
         if lines and lines[0].strip().startswith("::: cyclopts"):
             lines = lines[1:]
 
-        options = {}
+        # Join remaining lines and parse as YAML
+        yaml_content = "\n".join(lines)
 
-        for line in lines:
-            line = line.strip()
-            if not line or not line.startswith(":"):
-                continue
+        try:
+            options = yaml.safe_load(yaml_content) or {}
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in ::: cyclopts directive: {e}") from e
 
-            # Parse :key: value format (support both dashes and underscores)
-            match = re.match(r":([a-z_-]+):\s*(.*)", line)
-            if not match:
-                continue
-
-            key, value = match.groups()
-            value = value.strip()
-
-            # Convert dash-separated to underscore for Python
-            key = key.replace("-", "_")
-
-            # Parse value based on key
-            if key in ("commands", "exclude_commands"):
-                # Comma-separated list
-                if value:
-                    options[key] = [cmd.strip() for cmd in value.split(",") if cmd.strip()]
-            elif key == "heading_level":
-                options[key] = int(value)
-            elif key in ("recursive", "include_hidden", "flatten_commands", "generate_toc"):
-                # Boolean values
-                options[key] = value.lower() in ("true", "yes", "1")
-            else:
-                options[key] = value
+        if not isinstance(options, dict):
+            raise TypeError("Invalid YAML in ::: cyclopts directive: expected a dictionary")
 
         if "module" not in options:
-            raise ValueError("The :module: option is required for ::: cyclopts directive")
+            raise ValueError("The module option is required for ::: cyclopts directive")
 
         # Apply default heading level if not specified in directive
-        if "heading_level" not in options and default_heading_level is not None:
-            options["heading_level"] = default_heading_level
+        if default_heading_level is not None:
+            options.setdefault("heading_level", default_heading_level)
 
-        return cls(**options)
+        # Convert keys with dashes to underscores
+        normalized_options = {key.replace("-", "_"): value for key, value in options.items()}
+
+        try:
+            return cls(**normalized_options)
+        except TypeError as e:
+            raise ValueError(f"Error creating DirectiveOptions: {e}") from e
 
 
 # Regex to match ::: cyclopts directive blocks
 # The pattern matches:
 # - "^::: cyclopts\n" - the directive start on its own line
-# - "(?:[ \t]+:[a-z-]+:.*\n?)*" - zero or more option lines (with optional trailing newline for EOF)
+# - "(?:[ \t]+.*\n?)*" - zero or more indented YAML lines (with optional trailing newline for EOF)
 DIRECTIVE_PATTERN = re.compile(
-    r"^::: cyclopts\n(?:[ \t]+:[a-z-]+:.*\n?)*",
+    r"^::: cyclopts\n(?:[ \t]+.*\n?)*",
     re.MULTILINE,
 )
 
@@ -204,6 +195,7 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
                 commands_filter=options.commands,
                 exclude_commands=options.exclude_commands,
                 no_root_title=True,  # Skip root title in plugin context
+                code_block_title=options.code_block_title,
             )
 
             return markdown_docs

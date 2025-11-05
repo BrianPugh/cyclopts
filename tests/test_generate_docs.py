@@ -94,14 +94,14 @@ def test_generate_docs_with_commands():
     assert "* `serve`: Start the server." in actual
 
     # Serve command details (now shows full path)
-    assert "## `myapp serve`" in actual
+    assert "## myapp serve" in actual
     assert "Start the server." in actual
     assert "**Usage**:" in actual
     assert "**Options**:" in actual
     assert "* `PORT, --port`: Port number.  *[default: 8000]*" in actual
 
     # Build command details (now shows full path)
-    assert "## `myapp build`" in actual
+    assert "## myapp build" in actual
     assert "Build the project." in actual
     assert "* `OUTPUT, --output`: Output directory.  *[default: ./dist]*" in actual
 
@@ -135,7 +135,7 @@ def test_generate_docs_recursive():
     # Verify structure of recursive documentation
     assert "# myapp" in actual
     assert "Main app" in actual
-    assert "## `myapp db`" in actual
+    assert "## myapp db" in actual
     assert "Database commands" in actual
     assert "migrate" in actual
     assert "backup" in actual
@@ -182,7 +182,7 @@ def test_generate_docs_non_recursive():
 
         * `db`: Database commands
 
-        ## `myapp db`
+        ## myapp db
 
         Database commands
 
@@ -237,7 +237,7 @@ def test_generate_docs_with_hidden_commands(mocker):
 
         * `visible`: Visible command.
 
-        ## `myapp visible`
+        ## myapp visible
 
         Visible command.
 
@@ -255,7 +255,7 @@ def test_generate_docs_with_hidden_commands(mocker):
     actual_with_hidden = app.generate_docs(include_hidden=True)
 
     # Verify the hidden command is present when include_hidden=True
-    assert "## `myapp hidden`" in actual_with_hidden
+    assert "## myapp hidden" in actual_with_hidden
     assert "Hidden command." in actual_with_hidden
     # Also verify it has help and version commands shown
     assert "* `--help`: Display this message and exit." in actual_with_hidden
@@ -495,7 +495,7 @@ def test_generate_docs_with_heading_levels():
     assert "Main app" in actual
     assert "**Usage**:" in actual
     assert "**Commands**:" in actual
-    assert "### `myapp cmd`" in actual
+    assert "### myapp cmd" in actual
 
 
 def test_generate_docs_complex_nested_app():
@@ -547,7 +547,7 @@ def test_generate_docs_complex_nested_app():
     assert "Complex CLI tool" in docs
     assert "version" in docs
     assert "Show version information" in docs
-    assert "## `cli git`" in docs
+    assert "## cli git" in docs
     assert "Git operations" in docs
     assert "clone" in docs
     assert "push" in docs
@@ -730,7 +730,7 @@ def test_generate_docs_nested_meta_apps():
     assert "Verbose output" in docs
 
     # Check db subcommand appears
-    assert "## `myapp db`" in docs
+    assert "## myapp db" in docs
     # When registering db_app.meta, it uses the meta's docstring
     assert "Database meta options" in docs
 
@@ -775,12 +775,12 @@ def test_generate_docs_flatten_commands():
     # Main app should be h1
     assert "# myapp" in docs_hierarchical
     # Subcommands should be h2 with full paths
-    assert "## `myapp sub1`" in docs_hierarchical
-    assert "## `myapp sub2`" in docs_hierarchical
+    assert "## myapp sub1" in docs_hierarchical
+    assert "## myapp sub2" in docs_hierarchical
     # Nested commands should be h3 (properly nested under their parent) with full paths
-    assert "### `myapp sub1 nested1`" in docs_hierarchical
-    assert "### `myapp sub1 nested2`" in docs_hierarchical
-    assert "### `myapp sub2 nested3`" in docs_hierarchical
+    assert "### myapp sub1 nested1" in docs_hierarchical
+    assert "### myapp sub1 nested2" in docs_hierarchical
+    assert "### myapp sub2 nested3" in docs_hierarchical
 
     # With flatten_commands - all at same level
     docs_flat = app.generate_docs(flatten_commands=True)
@@ -788,14 +788,14 @@ def test_generate_docs_flatten_commands():
     # Main app should be h1
     assert "# myapp" in docs_flat
     # All subcommands should also be h1 (flattened) with full paths
-    assert "# `myapp sub1`" in docs_flat
-    assert "# `myapp sub2`" in docs_flat
+    assert "# myapp sub1" in docs_flat
+    assert "# myapp sub2" in docs_flat
     # All nested commands should also be h1 (flattened) with full paths
-    assert "# `myapp sub1 nested1`" in docs_flat
-    assert "# `myapp sub1 nested2`" in docs_flat
-    assert "# `myapp sub2 nested3`" in docs_flat
+    assert "# myapp sub1 nested1" in docs_flat
+    assert "# myapp sub1 nested2" in docs_flat
+    assert "# myapp sub2 nested3" in docs_flat
     # Should NOT have h2 command headings when flattened
-    assert "## `myapp sub" not in docs_flat
+    assert "## myapp sub" not in docs_flat
 
 
 def test_generate_docs_toc_anchors_flattened():
@@ -834,11 +834,11 @@ def test_generate_docs_toc_anchors_flattened():
     assert "- [`nested3`](#myapp-sub2-nested3)" in docs
 
     # Verify headings exist that will generate these anchors (all show full paths)
-    assert "# `myapp sub1`" in docs
-    assert "# `myapp sub1 nested1`" in docs
-    assert "# `myapp sub1 nested2`" in docs
-    assert "# `myapp sub2`" in docs
-    assert "# `myapp sub2 nested3`" in docs
+    assert "# myapp sub1" in docs
+    assert "# myapp sub1 nested1" in docs
+    assert "# myapp sub1 nested2" in docs
+    assert "# myapp sub2" in docs
+    assert "# myapp sub2 nested3" in docs
 
 
 def test_generate_docs_toc_anchors_hierarchical():
@@ -877,11 +877,11 @@ def test_generate_docs_toc_anchors_hierarchical():
     assert "- [`nested3`](#myapp-sub2-nested3)" in docs
 
     # Verify headings exist that will generate these anchors (now showing full paths)
-    assert "## `myapp sub1`" in docs
-    assert "### `myapp sub1 nested1`" in docs
-    assert "### `myapp sub1 nested2`" in docs
-    assert "## `myapp sub2`" in docs
-    assert "### `myapp sub2 nested3`" in docs
+    assert "## myapp sub1" in docs
+    assert "### myapp sub1 nested1" in docs
+    assert "### myapp sub1 nested2" in docs
+    assert "## myapp sub2" in docs
+    assert "### myapp sub2 nested3" in docs
 
 
 def test_generate_docs_toc_anchor_collisions():
@@ -927,7 +927,7 @@ def test_generate_docs_toc_anchor_collisions():
     assert "    - [`delete`](#myapp-sub2-delete)" in docs
 
     # Verify the actual headings use full paths
-    assert "### `myapp sub1 create`" in docs
-    assert "### `myapp sub1 delete`" in docs
-    assert "### `myapp sub2 create`" in docs
-    assert "### `myapp sub2 delete`" in docs
+    assert "### myapp sub1 create" in docs
+    assert "### myapp sub1 delete" in docs
+    assert "### myapp sub2 create" in docs
+    assert "### myapp sub2 delete" in docs

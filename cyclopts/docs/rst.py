@@ -9,7 +9,7 @@ from cyclopts.docs.base import (
     normalize_command_filters,
     should_include_command,
 )
-from cyclopts.help.formatters._shared import make_rst_section_header
+from cyclopts.help.formatters._shared import make_rst_code_block_title, make_rst_section_header
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -89,6 +89,7 @@ def generate_rst_docs(
     commands_filter: list[str] | None = None,
     exclude_commands: list[str] | None = None,
     no_root_title: bool = False,
+    code_block_title: bool = False,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -178,7 +179,10 @@ def generate_rst_docs(
         effective_heading_level = heading_level + len(command_chain) - 1 if command_chain else heading_level
 
     if not (no_root_title and not command_chain):
-        header_lines = make_rst_section_header(title, effective_heading_level)
+        if code_block_title:
+            header_lines = make_rst_code_block_title(title)
+        else:
+            header_lines = make_rst_section_header(title, effective_heading_level)
         lines.extend(header_lines)
         lines.append("")
 
@@ -323,6 +327,7 @@ def generate_rst_docs(
                 commands_filter=sub_commands_filter,
                 exclude_commands=sub_exclude_commands,
                 no_root_title=False,  # Subcommands should have titles
+                code_block_title=code_block_title,
             )
             lines.append(subdocs)
 
