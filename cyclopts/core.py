@@ -73,7 +73,7 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
-from cyclopts._result_action import ResultAction
+from cyclopts._result_action import ResultAction, ResultActionSingle
 from cyclopts._run import _run_maybe_async_command
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -380,7 +380,9 @@ class App:
         default=None, converter=help_formatter_converter, kw_only=True
     )
 
-    result_action: ResultAction | None = field(
+    # This can ONLY ever be None or Tuple[ResultActionSingle, ...] due to converter.
+    # The other types is to make type checkers happy for Cyclopts users.
+    result_action: ResultAction | ResultActionSingle | None = field(
         default=None,
         converter=_result_action_converter,
         kw_only=True,
