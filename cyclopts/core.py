@@ -226,7 +226,7 @@ def _combined_meta_command_mapping(
                 command_mapping[cmd_name] = subapp[cmd_name]
 
     if recurse_meta and app._meta:
-        command_mapping.update(_combined_meta_command_mapping(app._meta))
+        command_mapping.update(_combined_meta_command_mapping(app._meta, recurse_parent_meta=False))
     if recurse_parent_meta and app._meta_parent:
         meta_parent_commands = _combined_meta_command_mapping(app._meta_parent, recurse_meta=False)
         command_mapping.update(meta_parent_commands)
