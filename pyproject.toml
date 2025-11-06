@@ -44,6 +44,7 @@ docs = [
 mkdocs = [
     "mkdocs>=1.4.0",
     "markdown>=3.3",
+    "pymdown-extensions>=10.0",
 ]
 dev = [
     "coverage[toml]>=5.1",
