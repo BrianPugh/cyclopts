@@ -296,3 +296,46 @@ def test_meta_app_help_inconsistency_with_argument_order(app, console):
     help_user_after_foo = capture.get()
 
     assert help_user_after_foo == expected
+
+
+def test_issue_680_nested_meta_command_resolution(app, queue):
+    """Test for issue #680: Commands parsed at wrong level with multiple meta apps."""
+
+    @app.meta.meta.default
+    def meta_meta_default(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    ):
+        queue.append("meta_meta_default")
+        command, bound, _ignored = app.meta.parse_args(tokens)
+        command(*bound.args, **bound.kwargs)
+
+    @app.meta.default
+    def meta_default(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        meta_param: str = "default",
+    ):
+        queue.append(f"meta_default({meta_param})")
+        app(tokens)
+
+    @app.default
+    def default():
+        queue.append("default")
+
+    @app.command
+    def command():
+        queue.append("command")
+
+    # Test 1: No command, no parameters
+    queue.clear()
+    app.meta.meta([])
+    assert queue == ["meta_meta_default", "meta_default(default)", "default"]
+
+    # Test 2: Command without meta parameter (this was the bug case)
+    queue.clear()
+    app.meta.meta(["command"])
+    assert queue == ["meta_meta_default", "meta_default(default)", "command"]
+
+    # Test 3: Command with meta parameter
+    queue.clear()
+    app.meta.meta(["--meta-param", "value", "command"])
+    assert queue == ["meta_meta_default", "meta_default(value)", "command"]
