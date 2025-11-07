@@ -339,3 +339,53 @@ def test_issue_680_nested_meta_command_resolution(app, queue):
     queue.clear()
     app.meta.meta(["--meta-param", "value", "command"])
     assert queue == ["meta_meta_default", "meta_default(value)", "command"]
+
+
+def test_nested_meta_app_command_help(console):
+    """Test that --help works for commands in nested meta-apps (issue-680)."""
+    app = App(console=console, result_action="return_value")
+
+    @app.meta.meta.default
+    def meta_meta_default(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    ):
+        command, bound, _ignored = app.meta.parse_args(tokens)
+        command(*bound.args, **bound.kwargs)
+
+    @app.meta.meta.command
+    def foo(value: str):
+        """Test command in nested meta-app.
+
+        Parameters
+        ----------
+        value : str
+            A test value.
+        """
+        pass
+
+    @app.meta.default
+    def meta_default(
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        meta_param: str = "default",
+    ):
+        app(tokens)
+
+    @app.default
+    def default():
+        """Default command."""
+        pass
+
+    @app.command
+    def command():
+        """Regular command."""
+        pass
+
+    # This should not raise a KeyError
+    with console.capture() as capture:
+        app.meta.meta(["foo", "--help"])
+
+    actual = capture.get()
+
+    # Should show help for foo command
+    assert "foo" in actual.lower()
+    assert "value" in actual.lower()

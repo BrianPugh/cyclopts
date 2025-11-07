@@ -868,7 +868,7 @@ class App:
         """Internal getter that returns App or unresolved CommandSpec."""
         if recurse_meta and self._meta:
             with suppress(KeyError):
-                return self.meta._get_item(key, recurse_meta=False)
+                return self.meta._get_item(key, recurse_meta=True)
         if self._meta_parent:
             with suppress(KeyError):
                 return self._meta_parent._get_item(key, recurse_meta=False)
