@@ -3,7 +3,7 @@
 import re
 from typing import TYPE_CHECKING, Any
 
-import attrs
+from attrs import define, field, validators
 
 from cyclopts.utils import import_app
 
@@ -20,19 +20,21 @@ from mkdocs.plugins import BasePlugin, get_plugin_logger
 logger = get_plugin_logger(__name__)
 
 
-@attrs.define(kw_only=True)
+@define(kw_only=True)
 class DirectiveOptions:
     """Configuration for the ::: cyclopts directive."""
 
-    module: str
-    heading_level: int = 2
-    commands: list[str] | None = None
-    exclude_commands: list[str] | None = None
-    recursive: bool = True
-    include_hidden: bool = False
-    flatten_commands: bool = False
-    generate_toc: bool = True
-    code_block_title: bool = False
+    module: str = field(validator=validators.instance_of(str))
+    heading_level: int = field(default=2, validator=validators.instance_of(int))
+    commands: list[str] | None = field(default=None, validator=validators.optional(validators.instance_of(list)))
+    exclude_commands: list[str] | None = field(
+        default=None, validator=validators.optional(validators.instance_of(list))
+    )
+    recursive: bool = field(default=True, validator=validators.instance_of(bool))
+    include_hidden: bool = field(default=False, validator=validators.instance_of(bool))
+    flatten_commands: bool = field(default=False, validator=validators.instance_of(bool))
+    generate_toc: bool = field(default=True, validator=validators.instance_of(bool))
+    code_block_title: bool = field(default=False, validator=validators.instance_of(bool))
 
     @classmethod
     def from_directive_block(
@@ -64,21 +66,15 @@ class DirectiveOptions:
         if lines and lines[0].strip().startswith("::: cyclopts"):
             lines = lines[1:]
 
-        # Join remaining lines and parse as YAML
         yaml_content = "\n".join(lines)
-
-        try:
-            options = yaml.safe_load(yaml_content) or {}
-        except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in ::: cyclopts directive: {e}") from e
+        options = yaml.safe_load(yaml_content) or {}
 
         if not isinstance(options, dict):
             raise TypeError("Invalid YAML in ::: cyclopts directive: expected a dictionary")
 
         if "module" not in options:
-            raise ValueError("The module option is required for ::: cyclopts directive")
+            raise ValueError('The "module" option is required for ::: cyclopts directive')
 
-        # Apply default heading level if not specified in directive
         if default_heading_level is not None:
             options.setdefault("heading_level", default_heading_level)
 
