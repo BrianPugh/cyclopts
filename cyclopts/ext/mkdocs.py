@@ -3,8 +3,10 @@
 import re
 from typing import TYPE_CHECKING, Any
 
+import yaml
 from attrs import define, field, validators
 
+from cyclopts.docs.markdown import generate_markdown_docs
 from cyclopts.utils import import_app
 
 if TYPE_CHECKING:
@@ -58,8 +60,6 @@ class DirectiveOptions:
         default_heading_level : int | None
             Default heading level from plugin config. Used if :heading-level: not specified.
         """
-        import yaml
-
         lines = directive_text.strip().split("\n")
 
         # Remove the ::: cyclopts line
@@ -112,8 +112,6 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
     str
         The markdown content with directives replaced by generated documentation.
     """
-    from cyclopts.docs.markdown import generate_markdown_docs
-
     # Find all code blocks to exclude from processing
     code_blocks = []
 
@@ -173,14 +171,11 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
         directive_text = match.group(0)
 
         try:
-            # Parse directive options, using plugin config defaults
             default_heading = plugin_config.default_heading_level if plugin_config else None
             options = DirectiveOptions.from_directive_block(directive_text, default_heading_level=default_heading)
 
-            # Import the app
             app = import_app(options.module)
 
-            # Generate markdown documentation
             markdown_docs = generate_markdown_docs(
                 app,
                 recursive=options.recursive,
