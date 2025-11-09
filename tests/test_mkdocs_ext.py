@@ -174,6 +174,40 @@ class TestDirectiveOptions:
         options = DirectiveOptions.from_directive_block(directive_text)
         assert options.commands == ["cmd1", "cmd2", "cmd3"]
 
+    def test_parse_single_command_string_raises_error(self):
+        """Test that a single command string (not a list) raises ValueError.
+
+        YAML parses 'commands: files.cp' as a string, not a list.
+        We enforce that commands must be a list for clarity.
+        """
+        from cyclopts.ext.mkdocs import DirectiveOptions
+
+        directive_text = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: myapp.cli
+                commands: files.cp
+            """
+        )
+
+        with pytest.raises(ValueError, match="'commands'.*must be.*list"):
+            DirectiveOptions.from_directive_block(directive_text)
+
+    def test_parse_single_exclude_command_string_raises_error(self):
+        """Test that a single exclude command string raises ValueError."""
+        from cyclopts.ext.mkdocs import DirectiveOptions
+
+        directive_text = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: myapp.cli
+                exclude_commands: debug
+            """
+        )
+
+        with pytest.raises(ValueError, match="'exclude_commands'.*must be.*list"):
+            DirectiveOptions.from_directive_block(directive_text)
+
     def test_parse_missing_module_raises_error(self):
         """Test that missing module option raises an error."""
         from cyclopts.ext.mkdocs import DirectiveOptions
@@ -186,6 +220,36 @@ class TestDirectiveOptions:
         )
 
         with pytest.raises(ValueError, match="module.*required"):
+            DirectiveOptions.from_directive_block(directive_text)
+
+    def test_parse_invalid_heading_level_type_raises_error(self):
+        """Test that non-integer heading_level raises TypeError."""
+        from cyclopts.ext.mkdocs import DirectiveOptions
+
+        directive_text = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: myapp.cli
+                heading_level: "3"
+            """
+        )
+
+        with pytest.raises(ValueError, match="'heading_level'.*must be.*int"):
+            DirectiveOptions.from_directive_block(directive_text)
+
+    def test_parse_invalid_recursive_type_raises_error(self):
+        """Test that non-boolean recursive raises TypeError."""
+        from cyclopts.ext.mkdocs import DirectiveOptions
+
+        directive_text = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: myapp.cli
+                recursive: "yes"
+            """
+        )
+
+        with pytest.raises(ValueError, match="'recursive'.*must be.*bool"):
             DirectiveOptions.from_directive_block(directive_text)
 
     def test_parse_boolean_variations(self):
