@@ -126,7 +126,7 @@ def test_html_formatter_with_panel_description():
 def test_html_formatter_render_usage():
     """Test usage rendering."""
     formatter = HtmlFormatter()
-    usage = "Usage: myapp [OPTIONS] COMMAND"
+    usage = "myapp [OPTIONS] COMMAND"
 
     formatter.render_usage(None, None, usage)
     output = formatter.get_output()

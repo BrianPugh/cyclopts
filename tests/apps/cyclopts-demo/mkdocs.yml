@@ -1,7 +1,7 @@
 site_name: Cyclopts Demo
 site_description: Cyclopts Demo Description.
 theme:
-  name: readthedocs
+  name: mkdocs
   palette:
     primary: indigo
     accent: indigo

@@ -340,7 +340,11 @@ class HtmlFormatter:
             usage_text = escape_html(extract_text(usage, console))
             if usage_text:
                 self._output.write('<div class="usage-block">\n')
-                self._output.write(f'<pre class="usage">{usage_text}</pre>\n')
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._output.write(f'<pre class="usage">Usage: {usage_text}</pre>\n')
+                else:
+                    self._output.write(f'<pre class="usage">{usage_text}</pre>\n')
                 self._output.write("</div>\n")
 
     def render_description(

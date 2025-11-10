@@ -5,10 +5,19 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import extract_text
 from cyclopts.core import DEFAULT_FORMAT
 from cyclopts.docs.base import (
-    BaseDocGenerator,
     adjust_filters_for_subcommand,
+    build_command_chain,
+    categorize_panels,
+    extract_description,
+    extract_usage,
+    format_usage_line,
+    generate_anchor,
+    get_app_info,
+    iterate_commands,
     normalize_command_filters,
     should_include_command,
+    should_show_commands_list,
+    should_show_usage,
 )
 
 if TYPE_CHECKING:
@@ -36,7 +45,7 @@ def _collect_commands_for_toc(
         commands_filter, exclude_commands
     )
 
-    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+    for name, subapp in iterate_commands(app, include_hidden):
         if not should_include_command(
             name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
         ):
@@ -76,7 +85,7 @@ def _generate_toc_entries(lines: list[str], commands: list[tuple[str, "App"]]) -
         indent = "    " * depth
 
         cmd_name = display_name.split()[-1]
-        anchor = BaseDocGenerator.generate_anchor(display_name)
+        anchor = generate_anchor(display_name)
 
         if anchor in anchor_counts:
             anchor_counts[anchor] += 1
@@ -153,7 +162,7 @@ def generate_markdown_docs(
         is_root = False
 
     # Determine the app name and full command path
-    app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
+    app_name, full_command, base_title = get_app_info(app, command_chain)
     # Always use full command path for nested commands to avoid anchor collisions
     # (e.g., "files cp" and "other cp" would both generate #cp without this)
     if command_chain:
@@ -170,7 +179,7 @@ def generate_markdown_docs(
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
-    description = BaseDocGenerator.extract_description(app, help_format)
+    description = extract_description(app, help_format)
     if description:
         # Extract plain text from description
         # Preserve markup when help_format matches output format (markdown)
@@ -197,26 +206,25 @@ def generate_markdown_docs(
             _generate_toc_entries(lines, toc_commands)
             lines.append("")
 
-    # Add usage section if not suppressed
-    usage = BaseDocGenerator.extract_usage(app)
-    if usage:
-        lines.append("**Usage**:")
-        lines.append("")
-        lines.append("```console")
-        if isinstance(usage, str):
-            usage_text = usage
-        else:
-            usage_text = extract_text(usage, None, preserve_markup=False)
-        usage_line = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
-        lines.append(usage_line)
-        lines.append("```")
-        lines.append("")
+    # Add usage section if appropriate
+    if should_show_usage(app):
+        usage = extract_usage(app)
+        if usage:
+            lines.append("```console")
+            if isinstance(usage, str):
+                usage_text = usage
+            else:
+                usage_text = extract_text(usage, None, preserve_markup=False)
+            usage_line = format_usage_line(usage_text, command_chain)
+            lines.append(usage_line)
+            lines.append("```")
+            lines.append("")
 
     # Get help panels for the current app
     help_panels_with_groups = app._assemble_help_panels([], help_format)
 
     # Separate panels into categories for organized output
-    categorized = BaseDocGenerator.categorize_panels(app, help_panels_with_groups, include_hidden)
+    categorized = categorize_panels(app, help_panels_with_groups, include_hidden)
     command_panels = categorized["commands"]
     argument_panels = categorized["arguments"]
     option_panels = categorized["options"]
@@ -281,7 +289,7 @@ def generate_markdown_docs(
     # Build a mapping of command names to App objects for filtering
     command_map = {}
     if app._commands:
-        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden=True):
+        for name, subapp in iterate_commands(app, include_hidden=True):
             command_map[name] = subapp
 
     # Render commands
@@ -333,14 +341,14 @@ def generate_markdown_docs(
     if app._commands:
         # Iterate through registered commands using iterate_commands helper
         # This automatically resolves CommandSpec instances
-        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+        for name, subapp in iterate_commands(app, include_hidden):
             if not should_include_command(
                 name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
             ):
                 continue
 
             # Build the command chain for this subcommand
-            sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
+            sub_command_chain = build_command_chain(command_chain, name, app_name)
 
             # Determine heading level for subcommand
             if flatten_commands:
@@ -363,34 +371,33 @@ def generate_markdown_docs(
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 # Preserve markup when sub_help_format matches output format (markdown)
                 preserve_sub = sub_help_format in ("markdown", "md")
-                sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
+                sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
                     sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
                     if sub_desc_text:
                         lines.append(sub_desc_text.strip())
                         lines.append("")
 
-                # Generate usage for subcommand
-                sub_usage = BaseDocGenerator.extract_usage(subapp)
-                if sub_usage:
-                    lines.append("**Usage**:")
-                    lines.append("")
-                    lines.append("```console")
-                    if isinstance(sub_usage, str):
-                        sub_usage_text = sub_usage
-                    else:
-                        sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
-                    # For root-level commands, use just the command name in usage
-                    if command_chain:
-                        # Nested command: show full command chain
-                        usage_command_chain = sub_command_chain
-                    else:
-                        # Root-level command: show just the command name
-                        usage_command_chain = [name]
-                    usage_line = BaseDocGenerator.format_usage_line(sub_usage_text, usage_command_chain, prefix="$")
-                    lines.append(usage_line)
-                    lines.append("```")
-                    lines.append("")
+                # Generate usage for subcommand if appropriate
+                if should_show_usage(subapp):
+                    sub_usage = extract_usage(subapp)
+                    if sub_usage:
+                        lines.append("```console")
+                        if isinstance(sub_usage, str):
+                            sub_usage_text = sub_usage
+                        else:
+                            sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
+                        # For root-level commands, use just the command name in usage
+                        if command_chain:
+                            # Nested command: show full command chain
+                            usage_command_chain = sub_command_chain
+                        else:
+                            # Root-level command: show just the command name
+                            usage_command_chain = [name]
+                        usage_line = format_usage_line(sub_usage_text, usage_command_chain)
+                        lines.append(usage_line)
+                        lines.append("```")
+                        lines.append("")
 
                 # Only show subcommand panels if we're in recursive mode
                 # (Otherwise we just show the basic info about this command)
@@ -399,7 +406,7 @@ def generate_markdown_docs(
                     sub_panels = subapp._assemble_help_panels([], sub_help_format)
 
                     # Separate panels for organized output
-                    sub_categorized = BaseDocGenerator.categorize_panels(subapp, sub_panels, include_hidden)
+                    sub_categorized = categorize_panels(subapp, sub_panels, include_hidden)
                     sub_argument_panels = sub_categorized["arguments"]
                     sub_option_panels = sub_categorized["options"]
                     sub_grouped_panels = sub_categorized["grouped"]
@@ -454,8 +461,8 @@ def generate_markdown_docs(
                                     lines.append(output)
                                 lines.append("")
 
-                    # Commands - only show list if not recursively documenting them
-                    if sub_command_panels:
+                    # Commands - only show list if appropriate
+                    if sub_command_panels and should_show_commands_list(subapp):
                         sub_commands_filter_for_panel, sub_exclude_commands_for_panel = adjust_filters_for_subcommand(
                             name, normalized_commands_filter, normalized_exclude_commands
                         )
@@ -466,9 +473,7 @@ def generate_markdown_docs(
                         # Build a map of command names to App objects for filtering
                         sub_command_map = {}
                         if subapp._commands:
-                            for sub_cmd_name, sub_cmd_app in BaseDocGenerator.iterate_commands(
-                                subapp, include_hidden=True
-                            ):
+                            for sub_cmd_name, sub_cmd_app in iterate_commands(subapp, include_hidden=True):
                                 sub_command_map[sub_cmd_name] = sub_cmd_app
 
                         # Build parent path for nested commands
@@ -556,16 +561,14 @@ def generate_markdown_docs(
                 # Build parent path for nested commands
                 nested_parent_path = parent_path + [name] if parent_path else [name]
 
-                for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
+                for nested_name, nested_app in iterate_commands(subapp, include_hidden):
                     if not should_include_command(
                         nested_name, nested_parent_path, normalized_sub_filter, normalized_sub_exclude, nested_app
                     ):
                         continue
 
                     # Build nested command chain
-                    nested_command_chain = BaseDocGenerator.build_command_chain(
-                        sub_command_chain, nested_name, app_name
-                    )
+                    nested_command_chain = build_command_chain(sub_command_chain, nested_name, app_name)
                     # Determine heading level for nested commands
                     if flatten_commands:
                         nested_heading_level = heading_level

@@ -33,10 +33,8 @@ def test_generate_docs_simple_app():
 
         A simple CLI application
 
-        **Usage**:
-
         ```console
-        $ myapp NAME [ARGS]
+        myapp NAME [ARGS]
         ```
 
         **Arguments**:
@@ -85,8 +83,7 @@ def test_generate_docs_with_commands():
     assert "CLI with commands" in actual
 
     # Main usage section
-    assert "**Usage**:" in actual
-    assert "$ myapp COMMAND" in actual
+    assert "myapp COMMAND" in actual
 
     # Commands list
     assert "**Commands**:" in actual
@@ -96,7 +93,6 @@ def test_generate_docs_with_commands():
     # Serve command details (now shows full path)
     assert "## myapp serve" in actual
     assert "Start the server." in actual
-    assert "**Usage**:" in actual
     assert "**Options**:" in actual
     assert "* `PORT, --port`: Port number.  *[default: 8000]*" in actual
 
@@ -161,6 +157,7 @@ def test_generate_docs_non_recursive():
     # Note: In non-recursive mode, subcommands like 'migrate' don't get headings,
     # so they appear in the ToC but the link is broken. This is a known limitation.
     # The current implementation always collects ToC entries recursively.
+    # Note: The 'db' subcommand doesn't show usage because it has no default_command.
     expected = dedent(
         """\
         # myapp
@@ -172,10 +169,8 @@ def test_generate_docs_non_recursive():
         - [`db`](#myapp-db)
             - [`migrate`](#myapp-db-migrate)
 
-        **Usage**:
-
         ```console
-        $ myapp COMMAND
+        myapp COMMAND
         ```
 
         **Commands**:
@@ -185,12 +180,6 @@ def test_generate_docs_non_recursive():
         ## myapp db
 
         Database commands
-
-        **Usage**:
-
-        ```console
-        $ db COMMAND
-        ```
         """
     )
 
@@ -227,10 +216,8 @@ def test_generate_docs_with_hidden_commands(mocker):
 
         - [`visible`](#myapp-visible)
 
-        **Usage**:
-
         ```console
-        $ myapp COMMAND
+        myapp COMMAND
         ```
 
         **Commands**:
@@ -241,10 +228,8 @@ def test_generate_docs_with_hidden_commands(mocker):
 
         Visible command.
 
-        **Usage**:
-
         ```console
-        $ visible
+        visible
         ```
         """
     )
@@ -282,10 +267,8 @@ def test_generate_docs_with_required_parameters():
 
         Main command.
 
-        **Usage**:
-
         ```console
-        $ myapp REQUIRED [ARGS]
+        myapp REQUIRED [ARGS]
         ```
 
         **Arguments**:
@@ -343,10 +326,8 @@ def test_generate_docs_with_custom_usage():
 
         Main command.
 
-        **Usage**:
-
         ```console
-        $ myapp [OPTIONS] <input> <output>
+        myapp [OPTIONS] <input> <output>
         ```
         """
     )
@@ -397,10 +378,8 @@ def test_generate_docs_write_to_file():
 
             Test app
 
-            **Usage**:
-
             ```console
-            $ myapp
+            myapp
             ```
             """
         )
@@ -436,10 +415,8 @@ def test_generate_docs_output_format_explicit():
 
         Test app
 
-        **Usage**:
-
         ```console
-        $ myapp
+        myapp
         ```
         """
     )
@@ -493,7 +470,6 @@ def test_generate_docs_with_heading_levels():
     # Check the heading levels
     assert "## myapp" in actual
     assert "Main app" in actual
-    assert "**Usage**:" in actual
     assert "**Commands**:" in actual
     assert "### myapp cmd" in actual
 
@@ -615,10 +591,8 @@ def test_generate_docs_with_meta_app():
 
         Main application
 
-        **Usage**:
-
         ```console
-        $ myapp INPUT-FILE
+        myapp INPUT-FILE
         ```
 
         **Arguments**:

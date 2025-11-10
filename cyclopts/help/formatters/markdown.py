@@ -318,7 +318,11 @@ class MarkdownFormatter:
         if usage:
             usage_text = extract_text(usage, console)
             if usage_text:
-                self._output.write(f"```\n{usage_text}\n```\n\n")
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._output.write(f"```\nUsage: {usage_text}\n```\n\n")
+                else:
+                    self._output.write(f"```\n{usage_text}\n```\n\n")
 
     def render_description(
         self,

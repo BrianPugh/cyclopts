@@ -245,9 +245,11 @@ class RstFormatter:
             if usage_text:
                 # Use literal block for usage
                 self._output.write("::\n\n")
-                # Indent the usage text
-                for line in usage_text.split("\n"):
-                    self._output.write(f"    {line}\n")
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._output.write(f"    Usage: {usage_text}\n")
+                else:
+                    self._output.write(f"    {usage_text}\n")
                 self._output.write("\n")
 
     def render_description(

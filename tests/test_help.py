@@ -80,7 +80,7 @@ def test_help_custom_usage(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        My custom usage.
+        Usage: My custom usage.
 
         App Help String Line 1.
 
@@ -103,7 +103,7 @@ def test_help_custom_usage_subapp(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        My custom usage.
+        Usage: My custom usage.
 
         """
     )
@@ -144,7 +144,7 @@ def test_help_format_usage_empty(console):
     with console.capture() as capture:
         console.print(format_usage(app, []))
     actual = capture.get()
-    assert actual == "Usage: app\n\n"
+    assert actual == "app\n\n"
 
 
 def test_help_format_usage_command(app, console):
@@ -155,7 +155,7 @@ def test_help_format_usage_command(app, console):
     with console.capture() as capture:
         console.print(format_usage(app, []))
     actual = capture.get()
-    assert actual == "Usage: app COMMAND\n\n"
+    assert actual == "app COMMAND\n\n"
 
 
 def test_format_commands_docstring(app, console):

@@ -450,5 +450,30 @@ def status(
     print(f"Server Status: detailed={detailed}, format={format}")
 
 
+@app.command
+def dump_markdown():
+    """Generate markdown documentation and save to intermediate.md.
+
+    This is a debug command to inspect the intermediate markdown output
+    that gets generated for the cyclopts-demo app.
+    """
+    from cyclopts.docs.markdown import generate_markdown_docs
+
+    # Generate markdown for this app
+    markdown = generate_markdown_docs(
+        app,
+        recursive=True,
+        heading_level=1,
+        generate_toc=True,
+    )
+
+    # Write to intermediate.md in current directory
+    with Path("intermediate.md").open("w") as f:
+        f.write(markdown)
+
+    print("✓ Markdown documentation written to intermediate.md")
+    print(f"  ({len(markdown)} characters, {len(markdown.splitlines())} lines)")
+
+
 if __name__ == "__main__":
     app()

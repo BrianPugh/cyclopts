@@ -12,6 +12,58 @@ from cyclopts.command_spec import CommandSpec
 from cyclopts.help import format_doc, format_usage
 
 
+def should_show_usage(app: "App") -> bool:
+    """Determine if usage should be shown for an app.
+
+    Root apps always show usage (even without default_command, showing "app COMMAND").
+    Subcommands only show usage if they have a default_command.
+    This skips usage for command groups that can't be invoked directly.
+
+    The determination is made by checking the app_stack depth:
+    - Stack length of 1 means root app (just the initial frame)
+    - Stack length > 1 means we're in a subcommand context (frames were pushed)
+
+    Parameters
+    ----------
+    app : App
+        The App instance to check.
+
+    Returns
+    -------
+    bool
+        True if usage should be shown.
+    """
+    # Check if we're in a subcommand context by examining the stack depth
+    is_root = len(app.app_stack.stack) == 1
+
+    if is_root:
+        # Root app: always show usage
+        return True
+    else:
+        # Subcommand: only show if it has a default_command
+        return app.default_command is not None
+
+
+def should_show_commands_list(app: "App") -> bool:
+    """Determine if commands list should be shown for an app.
+
+    Only show commands list for apps with a default_command.
+    Command groups (apps without default_command) skip the list
+    since their commands will be documented recursively anyway.
+
+    Parameters
+    ----------
+    app : App
+        The App instance to check.
+
+    Returns
+    -------
+    bool
+        True if commands list should be shown.
+    """
+    return app.default_command is not None
+
+
 def _is_builtin_flag(app: "App", name: str) -> bool:
     """Check if a flag name is a built-in help or version flag.
 
@@ -186,322 +238,316 @@ def adjust_filters_for_subcommand(
     return sub_commands_filter, sub_exclude_commands
 
 
-class BaseDocGenerator:
-    """Base class for documentation generators with shared utilities."""
+def get_app_info(app: "App", command_chain: list[str] | None = None) -> tuple[str, str, str]:
+    """Get app name, full command path, and title.
 
-    @staticmethod
-    def get_app_info(app: "App", command_chain: list[str] | None = None) -> tuple[str, str, str]:
-        """Get app name, full command path, and title.
+    Parameters
+    ----------
+    app : App
+        The cyclopts App instance.
+    command_chain : Optional[List[str]]
+        Chain of parent commands leading to this app.
 
-        Parameters
-        ----------
-        app : App
-            The cyclopts App instance.
-        command_chain : Optional[List[str]]
-            Chain of parent commands leading to this app.
+    Returns
+    -------
+    Tuple[str, str, str]
+        (app_name, full_command, title)
+    """
+    if not command_chain:
+        app_name = app.name[0]
+        full_command = app_name
+        title = app_name
+    else:
+        app_name = command_chain[0]
+        full_command = " ".join(command_chain)
+        title = full_command
 
-        Returns
-        -------
-        Tuple[str, str, str]
-            (app_name, full_command, title)
-        """
-        if not command_chain:
-            app_name = app.name[0]
-            full_command = app_name
-            title = app_name
-        else:
-            app_name = command_chain[0]
-            full_command = " ".join(command_chain)
-            title = full_command
+    return app_name, full_command, title
 
-        return app_name, full_command, title
 
-    @staticmethod
-    def build_command_chain(command_chain: list[str] | None, command_name: str, app_name: str) -> list[str]:
-        """Build command chain for a subcommand.
+def build_command_chain(command_chain: list[str] | None, command_name: str, app_name: str) -> list[str]:
+    """Build command chain for a subcommand.
 
-        Parameters
-        ----------
-        command_chain : Optional[List[str]]
-            Current command chain.
-        command_name : str
-            Name of the subcommand.
-        app_name : str
-            Name of the root app.
+    Parameters
+    ----------
+    command_chain : Optional[List[str]]
+        Current command chain.
+    command_name : str
+        Name of the subcommand.
+    app_name : str
+        Name of the root app.
 
-        Returns
-        -------
-        List[str]
-            Updated command chain.
-        """
-        if command_chain:
-            return command_chain + [command_name]
-        else:
-            return [app_name, command_name]
+    Returns
+    -------
+    List[str]
+        Updated command chain.
+    """
+    if command_chain:
+        return command_chain + [command_name]
+    else:
+        return [app_name, command_name]
 
-    @staticmethod
-    def generate_anchor(command_path: str) -> str:
-        """Generate a URL-friendly anchor from a command path.
 
-        Converts spaces to hyphens and lowercases the string to match
-        how markdown/HTML processors generate anchors from headings.
-        Strips leading dashes to match markdown processor behavior.
+def generate_anchor(command_path: str) -> str:
+    """Generate a URL-friendly anchor from a command path.
 
-        Parameters
-        ----------
-        command_path : str
-            Full command path (e.g., "myapp files cp").
+    Converts spaces to hyphens and lowercases the string to match
+    how markdown/HTML processors generate anchors from headings.
+    Strips leading dashes to match markdown processor behavior.
 
-        Returns
-        -------
-        str
-            Anchor string (e.g., "myapp-files-cp").
+    Parameters
+    ----------
+    command_path : str
+        Full command path (e.g., "myapp files cp").
 
-        Examples
-        --------
-        >>> BaseDocGenerator.generate_anchor("myapp files cp")
-        'myapp-files-cp'
-        >>> BaseDocGenerator.generate_anchor("myapp --install-completion")
-        'myapp-install-completion'
-        """
-        anchor = command_path.lower().replace(" ", "-")
-        # Collapse consecutive dashes to single dash (markdown processors do this)
-        anchor = re.sub(r"-+", "-", anchor)
-        return anchor
+    Returns
+    -------
+    str
+        Anchor string (e.g., "myapp-files-cp").
 
-    @staticmethod
-    def should_skip_command(command_name: str, subapp: "App", parent_app: "App", include_hidden: bool) -> bool:
-        """Check if a command should be skipped.
+    Examples
+    --------
+    >>> generate_anchor("myapp files cp")
+    'myapp-files-cp'
+    >>> generate_anchor("myapp --install-completion")
+    'myapp-install-completion'
+    """
+    anchor = command_path.lower().replace(" ", "-")
+    # Collapse consecutive dashes to single dash (markdown processors do this)
+    anchor = re.sub(r"-+", "-", anchor)
+    return anchor
 
-        Parameters
-        ----------
-        command_name : str
-            Name of the command.
-        subapp : App
-            The subcommand App instance.
-        parent_app : App
-            The parent App instance.
-        include_hidden : bool
-            Whether to include hidden commands.
 
-        Returns
-        -------
-        bool
-            True if command should be skipped.
-        """
-        if _is_builtin_flag(parent_app, command_name):
-            return True
+def should_skip_command(command_name: str, subapp: "App", parent_app: "App", include_hidden: bool) -> bool:
+    """Check if a command should be skipped.
 
-        if not isinstance(subapp, type(parent_app)):
-            return True
+    Parameters
+    ----------
+    command_name : str
+        Name of the command.
+    subapp : App
+        The subcommand App instance.
+    parent_app : App
+        The parent App instance.
+    include_hidden : bool
+        Whether to include hidden commands.
+
+    Returns
+    -------
+    bool
+        True if command should be skipped.
+    """
+    if _is_builtin_flag(parent_app, command_name):
+        return True
+
+    if not isinstance(subapp, type(parent_app)):
+        return True
+
+    if not include_hidden and not subapp.show:
+        return True
+
+    return False
+
+
+def filter_help_entries(app: "App", panel: "HelpPanel", include_hidden: bool) -> list[Any]:
+    """Filter help panel entries based on visibility settings.
+
+    Parameters
+    ----------
+    app : App
+        The App instance to check against.
+    panel : HelpPanel
+        The help panel to filter.
+    include_hidden : bool
+        Whether to include hidden entries.
+
+    Returns
+    -------
+    List[Any]
+        Filtered panel entries.
+    """
+    if include_hidden:
+        return panel.entries
+
+    return [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
+
+
+def extract_description(app: "App", help_format: str) -> Any | None:
+    """Extract app description.
+
+    Parameters
+    ----------
+    app : App
+        The App instance.
+    help_format : str
+        Help format type.
+
+    Returns
+    -------
+    Optional[Any]
+        The extracted description object, or None.
+    """
+    description = format_doc(app, help_format)
+    return description
+
+
+def extract_usage(app: "App") -> Any | None:
+    """Extract usage string.
+
+    Parameters
+    ----------
+    app : App
+        The App instance.
+
+    Returns
+    -------
+    Optional[Any]
+        The extracted usage object, or None.
+    """
+    if app.usage is not None:
+        return app.usage if app.usage else None
+
+    usage = format_usage(app, [])
+    return usage
+
+
+def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "") -> str:
+    """Format usage line with proper command path.
+
+    Parameters
+    ----------
+    usage_text : str
+        Raw usage text.
+    command_chain : List[str]
+        Command chain for the app.
+    prefix : str
+        Optional prefix for the usage line (e.g., "$").
+
+    Returns
+    -------
+    str
+        Formatted usage line.
+    """
+    if not usage_text:
+        return ""
+
+    if "Usage:" in usage_text:
+        usage_text = usage_text.replace("Usage:", "").strip()
+
+    full_command = " ".join(command_chain) if command_chain else ""
+
+    parts = usage_text.split(None, 1)
+    if len(parts) > 1 and command_chain:
+        usage_line = f"{prefix} {full_command} {parts[1]}" if prefix else f"{full_command} {parts[1]}"
+    elif command_chain:
+        usage_line = f"{prefix} {full_command}" if prefix else full_command
+    else:
+        usage_line = f"{prefix} {usage_text}" if prefix else usage_text
+
+    return usage_line.strip()
+
+
+def categorize_panels(
+    app: "App", help_panels_with_groups: list[tuple[Any, "HelpPanel"]], include_hidden: bool = False
+) -> dict[str, list[tuple[Any, "HelpPanel"]]]:
+    """Categorize help panels by type.
+
+    Parameters
+    ----------
+    app : App
+        The App instance to check against.
+    help_panels_with_groups : List[Tuple[Any, HelpPanel]]
+        List of (group, panel) tuples.
+    include_hidden : bool
+        Whether to include hidden panels.
+
+    Returns
+    -------
+    Dict[str, List[Tuple[Any, HelpPanel]]]
+        Categorized panels with keys: 'commands', 'arguments', 'options', 'grouped'.
+    """
+    result = {"commands": [], "arguments": [], "options": [], "grouped": []}
+
+    for group, panel in help_panels_with_groups:
+        if not include_hidden and group and not group.show:
+            continue
+
+        if panel.format == "command":
+            if not include_hidden:
+                filtered_entries = [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
+                if filtered_entries:
+                    panel_copy = type(panel)(
+                        entries=filtered_entries,
+                        title=panel.title,
+                        description=panel.description,
+                        format=panel.format,
+                    )
+                    result["commands"].append((group, panel_copy))
+            else:
+                result["commands"].append((group, panel))
+        elif panel.format == "parameter":
+            title = panel.title
+            if title == "Arguments":
+                result["arguments"].append((group, panel))
+            elif title and title not in ["Parameters", "Options"]:
+                result["grouped"].append((group, panel))
+            else:
+                args = []
+                opts = []
+                for entry in panel.entries:
+                    # Simple heuristic: positional args are required with no default
+                    is_positional = entry.required and entry.default is None
+                    if is_positional:
+                        args.append(entry)
+                    else:
+                        opts.append(entry)
+
+                if args:
+                    panel_copy = type(panel)(
+                        entries=args, title="Arguments", description=panel.description, format=panel.format
+                    )
+                    result["arguments"].append((group, panel_copy))
+
+                if opts:
+                    panel_copy = type(panel)(
+                        entries=opts, title="Options", description=panel.description, format=panel.format
+                    )
+                    result["options"].append((group, panel_copy))
+
+    return result
+
+
+def iterate_commands(app: "App", include_hidden: bool = False):
+    """Iterate through app commands, yielding valid resolved subapps.
+
+    Automatically resolves CommandSpec instances to App instances.
+
+    Parameters
+    ----------
+    app : App
+        The App instance.
+    include_hidden : bool
+        Whether to include hidden commands.
+
+    Yields
+    ------
+    Tuple[str, App]
+        (command_name, resolved_subapp) for each valid command.
+    """
+    if not app._commands:
+        return
+
+    for name, app_or_spec in app._commands.items():
+        if _is_builtin_flag(app, name):
+            continue
+
+        # Resolve CommandSpec to App
+        subapp = app_or_spec.resolve(app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
+
+        if not isinstance(subapp, type(app)):
+            continue
 
         if not include_hidden and not subapp.show:
-            return True
+            continue
 
-        return False
-
-    @staticmethod
-    def filter_help_entries(app: "App", panel: "HelpPanel", include_hidden: bool) -> list[Any]:
-        """Filter help panel entries based on visibility settings.
-
-        Parameters
-        ----------
-        app : App
-            The App instance to check against.
-        panel : HelpPanel
-            The help panel to filter.
-        include_hidden : bool
-            Whether to include hidden entries.
-
-        Returns
-        -------
-        List[Any]
-            Filtered panel entries.
-        """
-        if include_hidden:
-            return panel.entries
-
-        return [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
-
-    @staticmethod
-    def extract_description(app: "App", help_format: str) -> Any | None:
-        """Extract app description.
-
-        Parameters
-        ----------
-        app : App
-            The App instance.
-        help_format : str
-            Help format type.
-
-        Returns
-        -------
-        Optional[Any]
-            The extracted description object, or None.
-        """
-        description = format_doc(app, help_format)
-        return description
-
-    @staticmethod
-    def extract_usage(app: "App") -> Any | None:
-        """Extract usage string.
-
-        Parameters
-        ----------
-        app : App
-            The App instance.
-
-        Returns
-        -------
-        Optional[Any]
-            The extracted usage object, or None.
-        """
-        if app.usage is not None:
-            return app.usage if app.usage else None
-
-        usage = format_usage(app, [])
-        return usage
-
-    @staticmethod
-    def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "$") -> str:
-        """Format usage line with proper command path.
-
-        Parameters
-        ----------
-        usage_text : str
-            Raw usage text.
-        command_chain : List[str]
-            Command chain for the app.
-        prefix : str
-            Prefix for the usage line (e.g., "$").
-
-        Returns
-        -------
-        str
-            Formatted usage line.
-        """
-        if not usage_text:
-            return ""
-
-        if "Usage:" in usage_text:
-            usage_text = usage_text.replace("Usage:", "").strip()
-
-        full_command = " ".join(command_chain) if command_chain else ""
-
-        parts = usage_text.split(None, 1)
-        if len(parts) > 1 and command_chain:
-            usage_line = f"{prefix} {full_command} {parts[1]}"
-        elif command_chain:
-            usage_line = f"{prefix} {full_command}"
-        else:
-            usage_line = f"{prefix} {usage_text}"
-
-        return usage_line.strip()
-
-    @staticmethod
-    def categorize_panels(
-        app: "App", help_panels_with_groups: list[tuple[Any, "HelpPanel"]], include_hidden: bool = False
-    ) -> dict[str, list[tuple[Any, "HelpPanel"]]]:
-        """Categorize help panels by type.
-
-        Parameters
-        ----------
-        app : App
-            The App instance to check against.
-        help_panels_with_groups : List[Tuple[Any, HelpPanel]]
-            List of (group, panel) tuples.
-        include_hidden : bool
-            Whether to include hidden panels.
-
-        Returns
-        -------
-        Dict[str, List[Tuple[Any, HelpPanel]]]
-            Categorized panels with keys: 'commands', 'arguments', 'options', 'grouped'.
-        """
-        result = {"commands": [], "arguments": [], "options": [], "grouped": []}
-
-        for group, panel in help_panels_with_groups:
-            if not include_hidden and group and not group.show:
-                continue
-
-            if panel.format == "command":
-                if not include_hidden:
-                    filtered_entries = [
-                        e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))
-                    ]
-                    if filtered_entries:
-                        panel_copy = type(panel)(
-                            entries=filtered_entries,
-                            title=panel.title,
-                            description=panel.description,
-                            format=panel.format,
-                        )
-                        result["commands"].append((group, panel_copy))
-                else:
-                    result["commands"].append((group, panel))
-            elif panel.format == "parameter":
-                title = panel.title
-                if title == "Arguments":
-                    result["arguments"].append((group, panel))
-                elif title and title not in ["Parameters", "Options"]:
-                    result["grouped"].append((group, panel))
-                else:
-                    args = []
-                    opts = []
-                    for entry in panel.entries:
-                        # Simple heuristic: positional args are required with no default
-                        is_positional = entry.required and entry.default is None
-                        if is_positional:
-                            args.append(entry)
-                        else:
-                            opts.append(entry)
-
-                    if args:
-                        panel_copy = type(panel)(
-                            entries=args, title="Arguments", description=panel.description, format=panel.format
-                        )
-                        result["arguments"].append((group, panel_copy))
-
-                    if opts:
-                        panel_copy = type(panel)(
-                            entries=opts, title="Options", description=panel.description, format=panel.format
-                        )
-                        result["options"].append((group, panel_copy))
-
-        return result
-
-    @staticmethod
-    def iterate_commands(app: "App", include_hidden: bool = False):
-        """Iterate through app commands, yielding valid resolved subapps.
-
-        Automatically resolves CommandSpec instances to App instances.
-
-        Parameters
-        ----------
-        app : App
-            The App instance.
-        include_hidden : bool
-            Whether to include hidden commands.
-
-        Yields
-        ------
-        Tuple[str, App]
-            (command_name, resolved_subapp) for each valid command.
-        """
-        if not app._commands:
-            return
-
-        for name, app_or_spec in app._commands.items():
-            if _is_builtin_flag(app, name):
-                continue
-
-            # Resolve CommandSpec to App
-            subapp = app_or_spec.resolve(app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
-
-            if not isinstance(subapp, type(app)):
-                continue
-
-            if not include_hidden and not subapp.show:
-                continue
-
-            yield name, subapp
+        yield name, subapp

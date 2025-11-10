@@ -4,10 +4,16 @@ from typing import TYPE_CHECKING
 
 from cyclopts._markup import extract_text
 from cyclopts.docs.base import (
-    BaseDocGenerator,
     adjust_filters_for_subcommand,
+    categorize_panels,
+    extract_description,
+    extract_usage,
+    generate_anchor,
+    get_app_info,
+    iterate_commands,
     normalize_command_filters,
     should_include_command,
+    should_show_usage,
 )
 from cyclopts.help.formatters._shared import make_rst_code_block_title, make_rst_section_header
 
@@ -39,7 +45,7 @@ def _collect_commands_for_toc(
         commands_filter, exclude_commands
     )
 
-    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+    for name, subapp in iterate_commands(app, include_hidden):
         if not should_include_command(
             name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
         ):
@@ -140,7 +146,7 @@ def generate_rst_docs(
     if command_chain is None:
         command_chain = []
 
-    app_name, full_command, base_title = BaseDocGenerator.get_app_info(app, command_chain)
+    app_name, full_command, base_title = get_app_info(app, command_chain)
     # Title logic: match markdown behavior for consistency
     # - Hierarchical mode: show just command name (last part of chain)
     # - Flattened mode: show full command path
@@ -163,7 +169,7 @@ def generate_rst_docs(
     else:
         anchor_parts.append(app_name)
     # Use shared anchor generation logic, then add RST-specific slash replacement
-    anchor_name = BaseDocGenerator.generate_anchor(" ".join(anchor_parts)).replace("/", "-")
+    anchor_name = generate_anchor(" ".join(anchor_parts)).replace("/", "-")
     lines.append(f".. _{anchor_name}:")
     lines.append("")
 
@@ -187,7 +193,7 @@ def generate_rst_docs(
         lines.append("")
 
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = BaseDocGenerator.extract_description(app, help_format)
+    description = extract_description(app, help_format)
     if description:
         # Extract plain text from description
         # Preserve markup when help_format matches output format (RST)
@@ -197,42 +203,36 @@ def generate_rst_docs(
             lines.append(desc_text.strip())
             lines.append("")
 
-    # Add usage section - only if we have a parent title
-    if not (no_root_title and not command_chain) and command_chain:
-        # Render usage as bold text for subcommands
-        lines.append("**Usage:**")
-        lines.append("")
+    # Add usage section if appropriate
+    if should_show_usage(app):
+        # Generate usage line - only if we're documenting a specific command
+        if not (no_root_title and not command_chain):
+            # Extract usage from app
+            usage = extract_usage(app)
+            usage_text = None
+            if usage:
+                if isinstance(usage, str):
+                    usage_text = usage
+                else:
+                    usage_text = extract_text(usage, None, preserve_markup=False)
 
-    # Generate usage line - only if we're documenting a specific command
-    if not (no_root_title and not command_chain):
-        # Extract usage from app
-        usage = BaseDocGenerator.extract_usage(app)
-        usage_text = None
-        if usage:
-            if isinstance(usage, str):
-                usage_text = usage
-            else:
-                usage_text = extract_text(usage, None, preserve_markup=False)
+                # Format usage with command chain if this is a subcommand
+                if command_chain:
+                    # Add command chain to usage
+                    parts = usage_text.split(None, 1)
+                    if len(parts) > 1:
+                        usage_text = f"{' '.join(command_chain)} {parts[1]}"
+                    else:
+                        usage_text = " ".join(command_chain)
 
-            # Format usage with command chain if this is a subcommand
-            if command_chain:
-                usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="")
-
-            # Remove "Usage:" prefix if present as we'll add it back in the RST format
-            if "Usage:" in usage_text:
-                usage_text = usage_text.replace("Usage:", "").strip()
-
-            # Add "Usage:" label
-            usage_text = f"Usage: {usage_text}"
-
-        if usage_text:
-            # Use literal block with double colon
-            lines.append("::")
-            lines.append("")
-            # Indent usage text with 4 spaces for literal block
-            for line in usage_text.split("\n"):
-                lines.append(f"    {line}")
-            lines.append("")
+            if usage_text:
+                # Use literal block with double colon
+                lines.append("::")
+                lines.append("")
+                # Indent usage text with 4 spaces for literal block
+                for line in usage_text.split("\n"):
+                    lines.append(f"    {line}")
+                lines.append("")
 
     # Get help panels for the current app
     help_panels_with_groups = app._assemble_help_panels([], help_format)
@@ -241,7 +241,7 @@ def generate_rst_docs(
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
     # Separate panels into categories
-    categorized = BaseDocGenerator.categorize_panels(app, help_panels_with_groups, include_hidden)
+    categorized = categorize_panels(app, help_panels_with_groups, include_hidden)
     # Command panels are not rendered in RST mode (sections integrate with Sphinx's toctree)
     argument_panels = categorized["arguments"]
     option_panels = categorized["options"]
@@ -296,7 +296,7 @@ def generate_rst_docs(
         )
         parent_path = []
 
-        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+        for name, subapp in iterate_commands(app, include_hidden):
             if not should_include_command(
                 name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
             ):
@@ -316,19 +316,21 @@ def generate_rst_docs(
                 name, normalized_commands_filter, normalized_exclude_commands
             )
 
-            subdocs = generate_rst_docs(
-                subapp,
-                recursive=recursive,
-                include_hidden=include_hidden,
-                heading_level=next_heading_level,
-                command_chain=subcommand_chain,
-                generate_toc=False,  # Only generate TOC at root level
-                flatten_commands=flatten_commands,
-                commands_filter=sub_commands_filter,
-                exclude_commands=sub_exclude_commands,
-                no_root_title=False,  # Subcommands should have titles
-                code_block_title=code_block_title,
-            )
+            # Push subapp onto app_stack so should_show_usage() can detect subcommand context
+            with subapp.app_stack([subapp]):
+                subdocs = generate_rst_docs(
+                    subapp,
+                    recursive=recursive,
+                    include_hidden=include_hidden,
+                    heading_level=next_heading_level,
+                    command_chain=subcommand_chain,
+                    generate_toc=False,  # Only generate TOC at root level
+                    flatten_commands=flatten_commands,
+                    commands_filter=sub_commands_filter,
+                    exclude_commands=sub_exclude_commands,
+                    no_root_title=False,  # Subcommands should have titles
+                    code_block_title=code_block_title,
+                )
             lines.append(subdocs)
 
     return "\n".join(lines)
