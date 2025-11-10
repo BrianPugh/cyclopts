@@ -229,7 +229,7 @@ def test_generate_docs_with_hidden_commands(mocker):
         Visible command.
 
         ```console
-        visible
+        myapp visible
         ```
         """
     )

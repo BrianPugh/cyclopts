@@ -387,14 +387,7 @@ def generate_markdown_docs(
                             sub_usage_text = sub_usage
                         else:
                             sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
-                        # For root-level commands, use just the command name in usage
-                        if command_chain:
-                            # Nested command: show full command chain
-                            usage_command_chain = sub_command_chain
-                        else:
-                            # Root-level command: show just the command name
-                            usage_command_chain = [name]
-                        usage_line = format_usage_line(sub_usage_text, usage_command_chain)
+                        usage_line = format_usage_line(sub_usage_text, sub_command_chain)
                         lines.append(usage_line)
                         lines.append("```")
                         lines.append("")
