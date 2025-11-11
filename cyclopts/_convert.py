@@ -122,10 +122,8 @@ def _datetime(s: str) -> datetime:
     except ValueError:
         # Fallback for space-separated format (not ISO 8601 compliant)
         # Python 3.11+ fromisoformat() accepts spaces, but 3.10 doesn't
-        try:
-            return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-        except ValueError:
-            raise ValueError from None
+        # Convert space to 'T' to make it ISO-compliant
+        return datetime.fromisoformat(s.strip().replace(" ", "T", 1))
 
 
 def _timedelta(s: str) -> timedelta:
