@@ -117,23 +117,15 @@ def _datetime(s: str) -> datetime:
     -------
     datetime.datetime
     """
-    formats = [
-        # ISO 8601 formats (unambiguous internationally)
-        "%Y-%m-%d",  # 1956-01-31
-        "%Y-%m-%dT%H:%M:%S",  # 1956-01-31T10:00:00
-        "%Y-%m-%d %H:%M:%S",  # 1956-01-31 10:00:00
-        "%Y-%m-%dT%H:%M:%S%z",  # 1956-01-31T10:00:00+0000
-        "%Y-%m-%dT%H:%M:%S.%f",  # 1956-01-31T10:00:00.123456
-        "%Y-%m-%dT%H:%M:%S.%f%z",  # 1956-01-31T10:00:00.123456+0000
-    ]
-
-    for fmt in formats:
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        # Fallback for space-separated format (not ISO 8601 compliant)
+        # Python 3.11+ fromisoformat() accepts spaces, but 3.10 doesn't
         try:
-            return datetime.strptime(s, fmt)
+            return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
         except ValueError:
-            continue
-
-    raise ValueError
+            raise ValueError from None
 
 
 def _timedelta(s: str) -> timedelta:
