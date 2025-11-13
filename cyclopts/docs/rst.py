@@ -9,7 +9,6 @@ from cyclopts.docs.base import (
     extract_usage,
     generate_anchor,
     get_app_info,
-    is_all_builtin_flags,
     iterate_commands,
     normalize_command_filters,
     should_include_command,
@@ -240,12 +239,7 @@ def generate_rst_docs(
     # Create formatter for help panels
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
-    # Command panels are not rendered in RST mode (sections integrate with Sphinx's toctree)
-    # We iterate through panels directly and categorize on the fly
-    argument_panels = []
-    option_panels = []
-    grouped_panels = []
-
+    # Render panels as-is without categorization
     for group, panel in help_panels_with_groups:
         # Skip hidden panels unless include_hidden is True
         if not include_hidden and group and not group.show:
@@ -255,80 +249,20 @@ def generate_rst_docs(
         if panel.format == "command":
             continue
 
-        # Process parameter panels
+        # Skip if no_root_title and we're at root
+        if no_root_title and not command_chain:
+            continue
+
+        # Render parameter panels as-is
         if panel.format == "parameter":
-            title = panel.title
-            if title == "Arguments":
-                argument_panels.append((group, panel))
-            elif title and title not in ["Parameters", "Options"]:
-                # Custom group
-                grouped_panels.append((group, panel))
-            else:
-                # Split into arguments and options based on is_positional
-                args = []
-                opts = []
-                for entry in panel.entries:
-                    # Filter built-in flags if not including hidden
-                    if not include_hidden and entry.names and is_all_builtin_flags(app, entry.names):
-                        continue
-
-                    is_positional = entry.required and entry.default is None
-                    if is_positional:
-                        args.append(entry)
-                    else:
-                        opts.append(entry)
-
-                if args:
-                    from cyclopts.help import HelpPanel
-
-                    panel_copy = HelpPanel(
-                        entries=args, title="Arguments", description=panel.description, format=panel.format
-                    )
-                    argument_panels.append((group, panel_copy))
-
-                if opts:
-                    from cyclopts.help import HelpPanel
-
-                    panel_copy = HelpPanel(
-                        entries=opts, title="Options", description=panel.description, format=panel.format
-                    )
-                    option_panels.append((group, panel_copy))
-
-    # Render panels in order: Arguments, Options, Grouped Options
-    # Render arguments
-    if argument_panels and not (no_root_title and not command_chain):
-        # Use bold text instead of subsections
-        lines.append("**Arguments:**")
-        lines.append("")
-        for _, panel in argument_panels:
-            formatter.reset()
-            panel.title = ""
-            formatter(None, None, panel)
-            output = formatter.get_output().strip()
-            if output:
-                lines.append(output)
+            # Render panel title if present
+            if panel.title:
+                lines.append(f"**{panel.title}:**")
                 lines.append("")
 
-    # Render options
-    if (option_panels or grouped_panels) and not (no_root_title and not command_chain):
-        # Use bold text instead of subsections
-        lines.append("**Options:**")
-        lines.append("")
-
-        # First render ungrouped options
-        for _, panel in option_panels:
             formatter.reset()
-            panel.title = ""
-            formatter(None, None, panel)
-            output = formatter.get_output().strip()
-            if output:
-                lines.append(output)
-                lines.append("")
-
-        # Then render grouped options
-        for _, panel in grouped_panels:
-            formatter.reset()
-            formatter(None, None, panel)
+            panel_copy = panel.copy(title="")
+            formatter(None, None, panel_copy)
             output = formatter.get_output().strip()
             if output:
                 lines.append(output)
