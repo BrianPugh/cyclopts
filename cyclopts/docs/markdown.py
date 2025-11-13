@@ -258,7 +258,10 @@ def generate_markdown_docs(
 
         # Render arguments
         if argument_panels:
-            lines.append("**Arguments**:\n")
+            # Use panel title instead of hardcoded string
+            title = argument_panels[0][1].title
+            if title:
+                lines.append(f"**{title}**:\n")
             for _group, panel in argument_panels:
                 formatter.reset()
                 # Create a copy without title to avoid duplicate headings
@@ -271,7 +274,10 @@ def generate_markdown_docs(
 
         # Render options
         if option_panels:
-            lines.append("**Options**:\n")
+            # Use panel title instead of hardcoded string
+            title = option_panels[0][1].title
+            if title:
+                lines.append(f"**{title}**:\n")
             for _group, panel in option_panels:
                 formatter.reset()
                 # Create a copy without title to avoid duplicate headings
@@ -313,6 +319,9 @@ def generate_markdown_docs(
 
         # Render commands
         if command_panels:
+            # Get panel title instead of hardcoding
+            panel_title = command_panels[0][1].title
+
             # First, collect all filtered panels
             filtered_panels_output = []
             for _group, panel in command_panels:
@@ -351,7 +360,8 @@ def generate_markdown_docs(
 
             # Only add header if there are panels to render
             if filtered_panels_output:
-                lines.append("**Commands**:\n")
+                if panel_title:
+                    lines.append(f"**{panel_title}**:\n")
                 for output in filtered_panels_output:
                     lines.append(output)
                 lines.append("")
@@ -447,7 +457,10 @@ def generate_markdown_docs(
 
                         # Arguments
                         if sub_argument_panels:
-                            lines.append("**Arguments**:\n")
+                            # Use panel title instead of hardcoded string
+                            title = sub_argument_panels[0][1].title
+                            if title:
+                                lines.append(f"**{title}**:\n")
                             for _group, panel in sub_argument_panels:
                                 sub_formatter.reset()
                                 # Create a copy without title to avoid duplicate headings
@@ -460,7 +473,10 @@ def generate_markdown_docs(
 
                         # Ungrouped Options
                         if sub_option_panels:
-                            lines.append("**Options**:\n")
+                            # Use panel title instead of hardcoded string
+                            title = sub_option_panels[0][1].title
+                            if title:
+                                lines.append(f"**{title}**:\n")
                             for _group, panel in sub_option_panels:
                                 sub_formatter.reset()
                                 # Create a copy without title to avoid duplicate headings
@@ -487,6 +503,9 @@ def generate_markdown_docs(
 
                         # Commands - only show list if appropriate
                         if sub_command_panels and should_show_commands_list(subapp):
+                            # Get panel title instead of hardcoding
+                            sub_panel_title = sub_command_panels[0][1].title
+
                             sub_commands_filter_for_panel, sub_exclude_commands_for_panel = (
                                 adjust_filters_for_subcommand(
                                     name, normalized_commands_filter, normalized_exclude_commands
@@ -533,7 +552,8 @@ def generate_markdown_docs(
                                             command_entries.append(f"* `{cmd_name}`: {desc_text}")
                                 # Only add header if there are entries
                                 if command_entries:
-                                    lines.append("**Commands**:\n")
+                                    if sub_panel_title:
+                                        lines.append(f"**{sub_panel_title}**:\n")
                                     lines.extend(command_entries)
                                     lines.append("")
                             else:
@@ -571,7 +591,8 @@ def generate_markdown_docs(
 
                                 # Only add header if there's output
                                 if filtered_panels_output:
-                                    lines.append("**Commands**:\n")
+                                    if sub_panel_title:
+                                        lines.append(f"**{sub_panel_title}**:\n")
                                     lines.extend(filtered_panels_output)
                                     lines.append("")
 
