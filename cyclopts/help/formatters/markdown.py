@@ -189,7 +189,7 @@ class MarkdownFormatter:
             if names:
                 # Use first name as primary
                 primary_name = names[0]
-                desc = extract_text(entry.description, console)
+                desc = extract_text(entry.description, console, preserve_markup=True)
 
                 if desc:
                     self._output.write(f"* `{primary_name}`: {desc}")
@@ -242,10 +242,43 @@ class MarkdownFormatter:
                 # Start the entry (no type display)
                 self._output.write(f"* `{name_str}`: ")
 
-                # Add description
-                desc = extract_text(entry.description, console)
+                # Add description with proper indentation for nested content
+                desc = extract_text(entry.description, console, preserve_markup=True)
                 if desc:
-                    self._output.write(desc)
+                    import re
+
+                    # Split into lines and indent continuation lines to nest under the bullet
+                    lines = desc.split("\n")
+                    self._output.write(lines[0])  # First line on same line as bullet
+
+                    # Track what type of list context we're in for proper nesting
+                    in_numbered_list = False
+
+                    for line in lines[1:]:
+                        if not line.strip():  # Blank line
+                            self._output.write("\n")
+                        else:
+                            stripped = line.lstrip()
+                            existing_indent = len(line) - len(stripped)
+
+                            # Check if this line starts a numbered list
+                            if re.match(r"^\d+\.", stripped):
+                                in_numbered_list = True
+                                # Numbered lists need 4 spaces base indentation minimum
+                                indent = max(existing_indent + 4, 4)
+                            # Check if this is a bullet under a numbered list
+                            elif re.match(r"^\-", stripped) and in_numbered_list:
+                                # Bullets nested under numbered items need extra indentation
+                                # At least 10 spaces (4 base + 3 for "N. " + 3 more for nesting)
+                                indent = max(existing_indent + 4, 10)
+                            elif re.match(r"^\-", stripped):
+                                # Top-level bullets just need base indentation
+                                indent = max(existing_indent + 4, 4)
+                            else:
+                                # Regular content preserves relative indentation
+                                indent = existing_indent + 4
+
+                            self._output.write("\n" + " " * indent + stripped)
 
                 # Add metadata in brackets
                 # Handle required separately for bold formatting
