@@ -31,6 +31,7 @@ def _collect_commands_for_toc(
     commands_filter: list[str] | None = None,
     exclude_commands: list[str] | None = None,
     parent_path: list[str] | None = None,
+    skip_filtered_command: bool = False,
 ) -> list[tuple[str, "App"]]:
     """Recursively collect all commands for table of contents.
 
@@ -51,17 +52,26 @@ def _collect_commands_for_toc(
         ):
             continue
 
-        display_name = f"{prefix}{name}" if prefix else name
-        commands.append((display_name, subapp))
+        # Skip the command itself if it's the single filtered command with subcommands
+        # (we'll include its children directly instead)
+        skip_this_command = skip_filtered_command and subapp._commands
 
+        if not skip_this_command:
+            display_name = f"{prefix}{name}" if prefix else name
+            commands.append((display_name, subapp))
+
+        # Collect nested commands
         nested_path = parent_path + [name]
+        # Always include parent in prefix for nested commands (for correct paths)
+        nested_prefix = f"{prefix}{name} "
         nested = _collect_commands_for_toc(
             subapp,
             include_hidden=include_hidden,
-            prefix=f"{display_name} ",
+            prefix=nested_prefix,
             commands_filter=commands_filter,
             exclude_commands=exclude_commands,
             parent_path=nested_path,
+            skip_filtered_command=False,  # Only skip at the top level
         )
         commands.extend(nested)
 
@@ -161,6 +171,10 @@ def generate_markdown_docs(
     else:
         is_root = False
 
+    # Determine if we should skip the current level's content
+    # When filtering to a single command, skip the root app content
+    skip_current_level = is_root and commands_filter is not None and len(commands_filter) == 1
+
     # Determine the app name and full command path
     app_name, full_command, base_title = get_app_info(app, command_chain)
     # Always use full command path for nested commands to avoid anchor collisions
@@ -172,22 +186,25 @@ def generate_markdown_docs(
         # Root app: use base title
         title = base_title
 
-    # Add title for all levels (unless skipping root title)
-    if not (no_root_title and is_root):
+    # Add title for all levels (unless skipping root title or skipping current level entirely)
+    if not skip_current_level and not (no_root_title and is_root):
         lines.append(f"{'#' * heading_level} {title}")
         lines.append("")
 
-    # Add application description
+    # Get help format (needed for both current level and recursive docs)
     help_format = app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
-    description = extract_description(app, help_format)
-    if description:
-        # Extract plain text from description
-        # Preserve markup when help_format matches output format (markdown)
-        preserve = help_format in ("markdown", "md")
-        desc_text = extract_text(description, None, preserve_markup=preserve)
-        if desc_text:
-            lines.append(desc_text.strip())
-            lines.append("")
+
+    # Add application description (skip if skipping current level)
+    if not skip_current_level:
+        description = extract_description(app, help_format)
+        if description:
+            # Extract plain text from description
+            # Preserve markup when help_format matches output format (markdown)
+            preserve = help_format in ("markdown", "md")
+            desc_text = extract_text(description, None, preserve_markup=preserve)
+            if desc_text:
+                lines.append(desc_text.strip())
+                lines.append("")
 
     # Generate table of contents if this is the root level and has commands
     if generate_toc and not command_chain and app._commands:
@@ -199,6 +216,7 @@ def generate_markdown_docs(
             prefix=f"{app_name} " if app_name else "",
             commands_filter=commands_filter,
             exclude_commands=exclude_commands,
+            skip_filtered_command=skip_current_level,  # Skip single filtered command in TOC
         )
         if toc_commands:
             lines.append("## Table of Contents")
@@ -206,8 +224,8 @@ def generate_markdown_docs(
             _generate_toc_entries(lines, toc_commands)
             lines.append("")
 
-    # Add usage section if appropriate
-    if should_show_usage(app):
+    # Add usage section if appropriate (skip if skipping current level)
+    if not skip_current_level and should_show_usage(app):
         usage = extract_usage(app)
         if usage:
             lines.append("```console")
@@ -220,122 +238,129 @@ def generate_markdown_docs(
             lines.append("```")
             lines.append("")
 
-    # Get help panels for the current app
-    help_panels_with_groups = app._assemble_help_panels([], help_format)
+    # Get help panels for the current app (skip if skipping current level)
+    if not skip_current_level:
+        help_panels_with_groups = app._assemble_help_panels([], help_format)
 
-    # Separate panels into categories for organized output
-    categorized = categorize_panels(app, help_panels_with_groups, include_hidden)
-    command_panels = categorized["commands"]
-    argument_panels = categorized["arguments"]
-    option_panels = categorized["options"]
-    grouped_panels = categorized["grouped"]
+        # Separate panels into categories for organized output
+        categorized = categorize_panels(app, help_panels_with_groups, include_hidden)
+        command_panels = categorized["commands"]
+        argument_panels = categorized["arguments"]
+        option_panels = categorized["options"]
+        grouped_panels = categorized["grouped"]
 
-    # Render panels in Typer order: Arguments, Options, Commands
-    formatter = MarkdownFormatter(
-        heading_level=heading_level + 1,
-        include_hidden=include_hidden,
-        table_style="list",  # Always use list style for Typer-like output
-    )
+        # Render panels in Typer order: Arguments, Options, Commands
+        formatter = MarkdownFormatter(
+            heading_level=heading_level + 1,
+            include_hidden=include_hidden,
+            table_style="list",  # Always use list style for Typer-like output
+        )
 
-    # Render arguments
-    if argument_panels:
-        lines.append("**Arguments**:\n")
-        for _group, panel in argument_panels:
-            formatter.reset()
-            # Create a copy without title to avoid duplicate headings
-            panel_copy = panel.copy(title="")
-            formatter(None, None, panel_copy)
-            output = formatter.get_output().strip()
-            if output:
-                lines.append(output)
-        lines.append("")
-
-    # Render options
-    if option_panels:
-        lines.append("**Options**:\n")
-        for _group, panel in option_panels:
-            formatter.reset()
-            # Create a copy without title to avoid duplicate headings
-            panel_copy = panel.copy(title="")
-            formatter(None, None, panel_copy)
-            output = formatter.get_output().strip()
-            if output:
-                lines.append(output)
-        lines.append("")
-
-    # Render grouped options (e.g., Condiments, Toppings)
-    if grouped_panels:
-        for _group, panel in grouped_panels:
-            if panel.title:
-                lines.append(f"**{panel.title}**:\n")
+        # Render arguments
+        if argument_panels:
+            lines.append("**Arguments**:\n")
+            for _group, panel in argument_panels:
                 formatter.reset()
-                # Don't show title again in formatter
+                # Create a copy without title to avoid duplicate headings
                 panel_copy = panel.copy(title="")
                 formatter(None, None, panel_copy)
                 output = formatter.get_output().strip()
                 if output:
                     lines.append(output)
-                lines.append("")
+            lines.append("")
 
-    # Normalize filter lists for efficient lookup (used for both panels and recursive docs)
-    normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
-        commands_filter, exclude_commands
-    )
-    # Parent path is always empty at the current app level. Filters are adjusted for each
-    # recursive call via _adjust_filters_for_subcommand(), so filtering logic remains correct
-    # without threading parent_path through recursive generate_markdown_docs() calls.
-    parent_path = []
-
-    # Build a mapping of command names to App objects for filtering
-    command_map = {}
-    if app._commands:
-        for name, subapp in iterate_commands(app, include_hidden=True):
-            command_map[name] = subapp
-
-    # Render commands
-    if command_panels:
-        # First, collect all filtered panels
-        filtered_panels_output = []
-        for _group, panel in command_panels:
-            # Filter command entries based on commands_filter and exclude_commands
-            filtered_entries = []
-            for entry in panel.entries:
-                if entry.names:
-                    cmd_name = entry.names[0]
-                    # Get the App object for this command
-                    subapp = command_map.get(cmd_name)
-                    # If there's no subapp (e.g., --help, --version), include it if no filters are specified
-                    if subapp is None:
-                        # Non-command entries (like --help, --version) are included if no filters are specified
-                        if normalized_commands_filter is None and normalized_exclude_commands is None:
-                            filtered_entries.append(entry)
-                    else:
-                        if should_include_command(
-                            cmd_name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
-                        ):
-                            filtered_entries.append(entry)
-
-            # Only render if there are filtered entries
-            if filtered_entries:
+        # Render options
+        if option_panels:
+            lines.append("**Options**:\n")
+            for _group, panel in option_panels:
                 formatter.reset()
-                # Create a new panel with filtered entries
-                filtered_panel = panel.__class__(
-                    title="",  # Don't show panel title for commands
-                    entries=filtered_entries,
-                    format=panel.format,
-                    description=panel.description,
-                )
-                formatter(None, None, filtered_panel)
+                # Create a copy without title to avoid duplicate headings
+                panel_copy = panel.copy(title="")
+                formatter(None, None, panel_copy)
                 output = formatter.get_output().strip()
                 if output:
-                    filtered_panels_output.append(output)
-
-        # Only add header if there are panels to render
-        if filtered_panels_output:
-            lines.append("**Commands**:\n")
-            for output in filtered_panels_output:
-                lines.append(output)
+                    lines.append(output)
             lines.append("")
+
+        # Render grouped options (e.g., Condiments, Toppings)
+        if grouped_panels:
+            for _group, panel in grouped_panels:
+                if panel.title:
+                    lines.append(f"**{panel.title}**:\n")
+                    formatter.reset()
+                    # Don't show title again in formatter
+                    panel_copy = panel.copy(title="")
+                    formatter(None, None, panel_copy)
+                    output = formatter.get_output().strip()
+                    if output:
+                        lines.append(output)
+                    lines.append("")
+
+        # Normalize filter lists for efficient lookup (used for both panels and recursive docs)
+        normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
+            commands_filter, exclude_commands
+        )
+        # Parent path is always empty at the current app level. Filters are adjusted for each
+        # recursive call via _adjust_filters_for_subcommand(), so filtering logic remains correct
+        # without threading parent_path through recursive generate_markdown_docs() calls.
+        parent_path = []
+
+        # Build a mapping of command names to App objects for filtering
+        command_map = {}
+        if app._commands:
+            for name, subapp in iterate_commands(app, include_hidden=True):
+                command_map[name] = subapp
+
+        # Render commands
+        if command_panels:
+            # First, collect all filtered panels
+            filtered_panels_output = []
+            for _group, panel in command_panels:
+                # Filter command entries based on commands_filter and exclude_commands
+                filtered_entries = []
+                for entry in panel.entries:
+                    if entry.names:
+                        cmd_name = entry.names[0]
+                        # Get the App object for this command
+                        subapp = command_map.get(cmd_name)
+                        # If there's no subapp (e.g., --help, --version), include it if no filters are specified
+                        if subapp is None:
+                            # Non-command entries (like --help, --version) are included if no filters are specified
+                            if normalized_commands_filter is None and normalized_exclude_commands is None:
+                                filtered_entries.append(entry)
+                        else:
+                            if should_include_command(
+                                cmd_name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
+                            ):
+                                filtered_entries.append(entry)
+
+                # Only render if there are filtered entries
+                if filtered_entries:
+                    formatter.reset()
+                    # Create a new panel with filtered entries
+                    filtered_panel = panel.__class__(
+                        title="",  # Don't show panel title for commands
+                        entries=filtered_entries,
+                        format=panel.format,
+                        description=panel.description,
+                    )
+                    formatter(None, None, filtered_panel)
+                    output = formatter.get_output().strip()
+                    if output:
+                        filtered_panels_output.append(output)
+
+            # Only add header if there are panels to render
+            if filtered_panels_output:
+                lines.append("**Commands**:\n")
+                for output in filtered_panels_output:
+                    lines.append(output)
+                lines.append("")
+    else:
+        # When skipping current level, still need to set up filter variables for recursive docs
+        normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
+            commands_filter, exclude_commands
+        )
+        parent_path = []
 
     # Handle recursive documentation for subcommands
     if app._commands:
@@ -359,188 +384,196 @@ def generate_markdown_docs(
             else:
                 sub_heading_level = heading_level + 1
 
-            # Generate subcommand documentation
-            # Always use full command path to avoid anchor collisions
-            display_name = " ".join(sub_command_chain)
-            display_fmt = f"`{display_name}`" if code_block_title else display_name
-            lines.append(f"{'#' * sub_heading_level} {display_fmt}")
-            lines.append("")
+            # Check if we should skip this command's inline documentation
+            # Skip when: root was skipped (single command filter) AND this command has subcommands
+            skip_this_command_inline = skip_current_level and subapp._commands
+
+            # Generate subcommand documentation (skip if this is the single filtered command with subcommands)
+            if not skip_this_command_inline:
+                # Always use full command path to avoid anchor collisions
+                display_name = " ".join(sub_command_chain)
+                display_fmt = f"`{display_name}`" if code_block_title else display_name
+                lines.append(f"{'#' * sub_heading_level} {display_fmt}")
+                lines.append("")
 
             # Get subapp help
-            with subapp.app_stack([subapp]):
-                sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
-                # Preserve markup when sub_help_format matches output format (markdown)
-                preserve_sub = sub_help_format in ("markdown", "md")
-                sub_description = extract_description(subapp, sub_help_format)
-                if sub_description:
-                    sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
-                    if sub_desc_text:
-                        lines.append(sub_desc_text.strip())
-                        lines.append("")
+            if not skip_this_command_inline:
+                with subapp.app_stack([subapp]):
+                    sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
+                    # Preserve markup when sub_help_format matches output format (markdown)
+                    preserve_sub = sub_help_format in ("markdown", "md")
+                    sub_description = extract_description(subapp, sub_help_format)
+                    if sub_description:
+                        sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
+                        if sub_desc_text:
+                            lines.append(sub_desc_text.strip())
+                            lines.append("")
 
-                # Generate usage for subcommand if appropriate
-                if should_show_usage(subapp):
-                    sub_usage = extract_usage(subapp)
-                    if sub_usage:
-                        lines.append("```console")
-                        if isinstance(sub_usage, str):
-                            sub_usage_text = sub_usage
+                    # Generate usage for subcommand if appropriate
+                    if should_show_usage(subapp):
+                        sub_usage = extract_usage(subapp)
+                        if sub_usage:
+                            lines.append("```console")
+                            if isinstance(sub_usage, str):
+                                sub_usage_text = sub_usage
+                            else:
+                                sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
+                            usage_line = format_usage_line(sub_usage_text, sub_command_chain)
+                            lines.append(usage_line)
+                            lines.append("```")
+                            lines.append("")
+
+                    # Only show subcommand panels if we're in recursive mode
+                    # (Otherwise we just show the basic info about this command)
+                    if recursive:
+                        # Get help panels for subcommand
+                        sub_panels = subapp._assemble_help_panels([], sub_help_format)
+
+                        # Separate panels for organized output
+                        sub_categorized = categorize_panels(subapp, sub_panels, include_hidden)
+                        sub_argument_panels = sub_categorized["arguments"]
+                        sub_option_panels = sub_categorized["options"]
+                        sub_grouped_panels = sub_categorized["grouped"]
+                        sub_command_panels = sub_categorized["commands"]
+
+                        # Render panels in Typer order
+                        if flatten_commands:
+                            panel_heading_level = heading_level + 1
                         else:
-                            sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
-                        usage_line = format_usage_line(sub_usage_text, sub_command_chain)
-                        lines.append(usage_line)
-                        lines.append("```")
-                        lines.append("")
+                            panel_heading_level = heading_level + 2
+                        sub_formatter = MarkdownFormatter(
+                            heading_level=panel_heading_level, include_hidden=include_hidden, table_style="list"
+                        )
 
-                # Only show subcommand panels if we're in recursive mode
-                # (Otherwise we just show the basic info about this command)
-                if recursive:
-                    # Get help panels for subcommand
-                    sub_panels = subapp._assemble_help_panels([], sub_help_format)
-
-                    # Separate panels for organized output
-                    sub_categorized = categorize_panels(subapp, sub_panels, include_hidden)
-                    sub_argument_panels = sub_categorized["arguments"]
-                    sub_option_panels = sub_categorized["options"]
-                    sub_grouped_panels = sub_categorized["grouped"]
-                    sub_command_panels = sub_categorized["commands"]
-
-                    # Render panels in Typer order
-                    if flatten_commands:
-                        panel_heading_level = heading_level + 1
-                    else:
-                        panel_heading_level = heading_level + 2
-                    sub_formatter = MarkdownFormatter(
-                        heading_level=panel_heading_level, include_hidden=include_hidden, table_style="list"
-                    )
-
-                    # Arguments
-                    if sub_argument_panels:
-                        lines.append("**Arguments**:\n")
-                        for _group, panel in sub_argument_panels:
-                            sub_formatter.reset()
-                            # Create a copy without title to avoid duplicate headings
-                            panel_copy = panel.copy(title="")
-                            sub_formatter(None, None, panel_copy)
-                            output = sub_formatter.get_output().strip()
-                            if output:
-                                lines.append(output)
-                        lines.append("")
-
-                    # Ungrouped Options
-                    if sub_option_panels:
-                        lines.append("**Options**:\n")
-                        for _group, panel in sub_option_panels:
-                            sub_formatter.reset()
-                            # Create a copy without title to avoid duplicate headings
-                            panel_copy = panel.copy(title="")
-                            sub_formatter(None, None, panel_copy)
-                            output = sub_formatter.get_output().strip()
-                            if output:
-                                lines.append(output)
-                        lines.append("")
-
-                    # Grouped Options (e.g., Condiments, Toppings)
-                    if sub_grouped_panels:
-                        for _group, panel in sub_grouped_panels:
-                            if panel.title:
-                                lines.append(f"**{panel.title}**:\n")
+                        # Arguments
+                        if sub_argument_panels:
+                            lines.append("**Arguments**:\n")
+                            for _group, panel in sub_argument_panels:
                                 sub_formatter.reset()
-                                # Don't show title again in formatter
+                                # Create a copy without title to avoid duplicate headings
                                 panel_copy = panel.copy(title="")
                                 sub_formatter(None, None, panel_copy)
                                 output = sub_formatter.get_output().strip()
                                 if output:
                                     lines.append(output)
-                                lines.append("")
+                            lines.append("")
 
-                    # Commands - only show list if appropriate
-                    if sub_command_panels and should_show_commands_list(subapp):
-                        sub_commands_filter_for_panel, sub_exclude_commands_for_panel = adjust_filters_for_subcommand(
-                            name, normalized_commands_filter, normalized_exclude_commands
-                        )
-                        normalized_sub_filter_panel, normalized_sub_exclude_panel = normalize_command_filters(
-                            sub_commands_filter_for_panel, sub_exclude_commands_for_panel
-                        )
+                        # Ungrouped Options
+                        if sub_option_panels:
+                            lines.append("**Options**:\n")
+                            for _group, panel in sub_option_panels:
+                                sub_formatter.reset()
+                                # Create a copy without title to avoid duplicate headings
+                                panel_copy = panel.copy(title="")
+                                sub_formatter(None, None, panel_copy)
+                                output = sub_formatter.get_output().strip()
+                                if output:
+                                    lines.append(output)
+                            lines.append("")
 
-                        # Build a map of command names to App objects for filtering
-                        sub_command_map = {}
-                        if subapp._commands:
-                            for sub_cmd_name, sub_cmd_app in iterate_commands(subapp, include_hidden=True):
-                                sub_command_map[sub_cmd_name] = sub_cmd_app
-
-                        # Build parent path for nested commands
-                        nested_parent_path_for_panel = parent_path + [name] if parent_path else [name]
-
-                        # Check if we'll be recursively documenting these commands
-                        will_recurse = recursive and subapp._commands
-                        if will_recurse:
-                            # Just show a simple command list without the duplicate heading
-                            # Collect entries first to check if there are any
-                            command_entries = []
-                            for _group, panel in sub_command_panels:
-                                for entry in panel.entries:
-                                    if entry.names:
-                                        cmd_name = entry.names[0]
-                                        sub_cmd_app = sub_command_map.get(cmd_name)
-                                        if sub_cmd_app and not should_include_command(
-                                            cmd_name,
-                                            nested_parent_path_for_panel,
-                                            normalized_sub_filter_panel,
-                                            normalized_sub_exclude_panel,
-                                            sub_cmd_app,
-                                        ):
-                                            continue
-
-                                        desc_text = (
-                                            extract_text(entry.description, None, preserve_markup=preserve_sub)
-                                            if entry.description
-                                            else ""
-                                        )
-                                        command_entries.append(f"* `{cmd_name}`: {desc_text}")
-                            # Only add header if there are entries
-                            if command_entries:
-                                lines.append("**Commands**:\n")
-                                lines.extend(command_entries)
-                                lines.append("")
-                        else:
-                            # Show full command panel if not recursing
-                            # Filter panel entries based on adjusted filters
-                            filtered_panels_output = []
-                            for _group, panel in sub_command_panels:
-                                filtered_entries = []
-                                for entry in panel.entries:
-                                    if entry.names:
-                                        cmd_name = entry.names[0]
-                                        sub_cmd_app = sub_command_map.get(cmd_name)
-                                        if sub_cmd_app and not should_include_command(
-                                            cmd_name,
-                                            nested_parent_path_for_panel,
-                                            normalized_sub_filter_panel,
-                                            normalized_sub_exclude_panel,
-                                            sub_cmd_app,
-                                        ):
-                                            continue
-                                        filtered_entries.append(entry)
-
-                                if filtered_entries:
+                        # Grouped Options (e.g., Condiments, Toppings)
+                        if sub_grouped_panels:
+                            for _group, panel in sub_grouped_panels:
+                                if panel.title:
+                                    lines.append(f"**{panel.title}**:\n")
                                     sub_formatter.reset()
-                                    filtered_panel = panel.__class__(
-                                        title="",
-                                        entries=filtered_entries,
-                                        format=panel.format,
-                                        description=panel.description,
-                                    )
-                                    sub_formatter(None, None, filtered_panel)
+                                    # Don't show title again in formatter
+                                    panel_copy = panel.copy(title="")
+                                    sub_formatter(None, None, panel_copy)
                                     output = sub_formatter.get_output().strip()
                                     if output:
-                                        filtered_panels_output.append(output)
+                                        lines.append(output)
+                                    lines.append("")
 
-                            # Only add header if there's output
-                            if filtered_panels_output:
-                                lines.append("**Commands**:\n")
-                                lines.extend(filtered_panels_output)
-                                lines.append("")
+                        # Commands - only show list if appropriate
+                        if sub_command_panels and should_show_commands_list(subapp):
+                            sub_commands_filter_for_panel, sub_exclude_commands_for_panel = (
+                                adjust_filters_for_subcommand(
+                                    name, normalized_commands_filter, normalized_exclude_commands
+                                )
+                            )
+                            normalized_sub_filter_panel, normalized_sub_exclude_panel = normalize_command_filters(
+                                sub_commands_filter_for_panel, sub_exclude_commands_for_panel
+                            )
+
+                            # Build a map of command names to App objects for filtering
+                            sub_command_map = {}
+                            if subapp._commands:
+                                for sub_cmd_name, sub_cmd_app in iterate_commands(subapp, include_hidden=True):
+                                    sub_command_map[sub_cmd_name] = sub_cmd_app
+
+                            # Build parent path for nested commands
+                            nested_parent_path_for_panel = parent_path + [name] if parent_path else [name]
+
+                            # Check if we'll be recursively documenting these commands
+                            will_recurse = recursive and subapp._commands
+                            if will_recurse:
+                                # Just show a simple command list without the duplicate heading
+                                # Collect entries first to check if there are any
+                                command_entries = []
+                                for _group, panel in sub_command_panels:
+                                    for entry in panel.entries:
+                                        if entry.names:
+                                            cmd_name = entry.names[0]
+                                            sub_cmd_app = sub_command_map.get(cmd_name)
+                                            if sub_cmd_app and not should_include_command(
+                                                cmd_name,
+                                                nested_parent_path_for_panel,
+                                                normalized_sub_filter_panel,
+                                                normalized_sub_exclude_panel,
+                                                sub_cmd_app,
+                                            ):
+                                                continue
+
+                                            desc_text = (
+                                                extract_text(entry.description, None, preserve_markup=preserve_sub)
+                                                if entry.description
+                                                else ""
+                                            )
+                                            command_entries.append(f"* `{cmd_name}`: {desc_text}")
+                                # Only add header if there are entries
+                                if command_entries:
+                                    lines.append("**Commands**:\n")
+                                    lines.extend(command_entries)
+                                    lines.append("")
+                            else:
+                                # Show full command panel if not recursing
+                                # Filter panel entries based on adjusted filters
+                                filtered_panels_output = []
+                                for _group, panel in sub_command_panels:
+                                    filtered_entries = []
+                                    for entry in panel.entries:
+                                        if entry.names:
+                                            cmd_name = entry.names[0]
+                                            sub_cmd_app = sub_command_map.get(cmd_name)
+                                            if sub_cmd_app and not should_include_command(
+                                                cmd_name,
+                                                nested_parent_path_for_panel,
+                                                normalized_sub_filter_panel,
+                                                normalized_sub_exclude_panel,
+                                                sub_cmd_app,
+                                            ):
+                                                continue
+                                            filtered_entries.append(entry)
+
+                                    if filtered_entries:
+                                        sub_formatter.reset()
+                                        filtered_panel = panel.__class__(
+                                            title="",
+                                            entries=filtered_entries,
+                                            format=panel.format,
+                                            description=panel.description,
+                                        )
+                                        sub_formatter(None, None, filtered_panel)
+                                        output = sub_formatter.get_output().strip()
+                                        if output:
+                                            filtered_panels_output.append(output)
+
+                                # Only add header if there's output
+                                if filtered_panels_output:
+                                    lines.append("**Commands**:\n")
+                                    lines.extend(filtered_panels_output)
+                                    lines.append("")
 
             if recursive and subapp._commands:
                 sub_commands_filter, sub_exclude_commands = adjust_filters_for_subcommand(
@@ -560,11 +593,14 @@ def generate_markdown_docs(
                     ):
                         continue
 
-                    # Build nested command chain
+                    # Build nested command chain (always use full path for correct usage)
                     nested_command_chain = build_command_chain(sub_command_chain, nested_name, app_name)
                     # Determine heading level for nested commands
                     if flatten_commands:
                         nested_heading_level = heading_level
+                    elif skip_this_command_inline:
+                        # When parent command's section was skipped, promote nested commands to parent's level
+                        nested_heading_level = sub_heading_level
                     else:
                         nested_heading_level = sub_heading_level + 1
                     # Recursively generate docs for nested commands
