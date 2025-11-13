@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import extract_text
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
-    categorize_panels,
     extract_description,
     extract_usage,
     generate_anchor,
     get_app_info,
+    is_all_builtin_flags,
     iterate_commands,
     normalize_command_filters,
     should_include_command,
@@ -240,14 +240,61 @@ def generate_rst_docs(
     # Create formatter for help panels
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
-    # Separate panels into categories
-    categorized = categorize_panels(app, help_panels_with_groups, include_hidden)
     # Command panels are not rendered in RST mode (sections integrate with Sphinx's toctree)
-    argument_panels = categorized["arguments"]
-    option_panels = categorized["options"]
-    grouped_panels = categorized["grouped"]
+    # We iterate through panels directly and categorize on the fly
+    argument_panels = []
+    option_panels = []
+    grouped_panels = []
 
-    # Render panels in order: Arguments, Options, Commands
+    for group, panel in help_panels_with_groups:
+        # Skip hidden panels unless include_hidden is True
+        if not include_hidden and group and not group.show:
+            continue
+
+        # Skip command panels entirely (not rendered in RST mode)
+        if panel.format == "command":
+            continue
+
+        # Process parameter panels
+        if panel.format == "parameter":
+            title = panel.title
+            if title == "Arguments":
+                argument_panels.append((group, panel))
+            elif title and title not in ["Parameters", "Options"]:
+                # Custom group
+                grouped_panels.append((group, panel))
+            else:
+                # Split into arguments and options based on is_positional
+                args = []
+                opts = []
+                for entry in panel.entries:
+                    # Filter built-in flags if not including hidden
+                    if not include_hidden and entry.names and is_all_builtin_flags(app, entry.names):
+                        continue
+
+                    is_positional = entry.required and entry.default is None
+                    if is_positional:
+                        args.append(entry)
+                    else:
+                        opts.append(entry)
+
+                if args:
+                    from cyclopts.help import HelpPanel
+
+                    panel_copy = HelpPanel(
+                        entries=args, title="Arguments", description=panel.description, format=panel.format
+                    )
+                    argument_panels.append((group, panel_copy))
+
+                if opts:
+                    from cyclopts.help import HelpPanel
+
+                    panel_copy = HelpPanel(
+                        entries=opts, title="Options", description=panel.description, format=panel.format
+                    )
+                    option_panels.append((group, panel_copy))
+
+    # Render panels in order: Arguments, Options, Grouped Options
     # Render arguments
     if argument_panels and not (no_root_title and not command_chain):
         # Use bold text instead of subsections
@@ -286,9 +333,6 @@ def generate_rst_docs(
             if output:
                 lines.append(output)
                 lines.append("")
-
-    # Skip command list entirely (sections integrate with Sphinx's toctree)
-    # Command panels are not rendered in sections mode
 
     if recursive and app._commands:
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
