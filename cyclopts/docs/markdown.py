@@ -106,6 +106,207 @@ def _generate_toc_entries(lines: list[str], commands: list[tuple[str, "App"]]) -
         lines.append(f"{indent}- [`{cmd_name}`](#{anchor})")
 
 
+def _build_command_map(app: "App", include_hidden: bool = True) -> dict[str, "App"]:
+    """Build mapping of command names to App objects.
+
+    Parameters
+    ----------
+    app : App
+        The app to extract commands from.
+    include_hidden : bool
+        Whether to include hidden commands.
+
+    Returns
+    -------
+    dict[str, App]
+        Mapping of command names to App instances.
+    """
+    command_map = {}
+    if app._commands:
+        for name, subapp in iterate_commands(app, include_hidden):
+            command_map[name] = subapp
+    return command_map
+
+
+def _append_if_present(lines: list[str], content: str, add_blank: bool = True) -> None:
+    """Append content to lines if present, optionally adding blank line.
+
+    Parameters
+    ----------
+    lines : list[str]
+        List to append to.
+    content : str
+        Content to append (only if non-empty).
+    add_blank : bool
+        Whether to add a blank line after content.
+    """
+    if content:
+        lines.append(content)
+    if add_blank:
+        lines.append("")
+
+
+def _render_description_section(app: "App", help_format: str, lines: list[str]) -> None:
+    """Extract and render app description.
+
+    Parameters
+    ----------
+    app : App
+        The app to extract description from.
+    help_format : str
+        Help format (e.g., "markdown", "rich").
+    lines : list[str]
+        List to append description to.
+    """
+    description = extract_description(app, help_format)
+    if description:
+        # Preserve markup when help_format matches output format (markdown)
+        preserve = help_format in ("markdown", "md")
+        desc_text = extract_text(description, None, preserve_markup=preserve)
+        if desc_text:
+            lines.append(desc_text.strip())
+            lines.append("")
+
+
+def _render_usage_section(app: "App", command_chain: list[str], lines: list[str]) -> None:
+    """Render usage console block.
+
+    Parameters
+    ----------
+    app : App
+        The app to extract usage from.
+    command_chain : list[str]
+        Command chain for usage line.
+    lines : list[str]
+        List to append usage to.
+    """
+    if should_show_usage(app):
+        usage = extract_usage(app)
+        if usage:
+            lines.append("```console")
+            if isinstance(usage, str):
+                usage_text = usage
+            else:
+                usage_text = extract_text(usage, None, preserve_markup=False)
+            usage_line = format_usage_line(usage_text, command_chain)
+            lines.append(usage_line)
+            lines.append("```")
+            lines.append("")
+
+
+def _render_toc(
+    app: "App",
+    app_name: str,
+    include_hidden: bool,
+    commands_filter: list[str] | None,
+    exclude_commands: list[str] | None,
+    skip_filtered_command: bool,
+    lines: list[str],
+) -> None:
+    """Generate and render table of contents.
+
+    Parameters
+    ----------
+    app : App
+        The app to generate TOC for.
+    app_name : str
+        Application name for TOC prefixes.
+    include_hidden : bool
+        Whether to include hidden commands.
+    commands_filter : list[str] | None
+        Commands to include.
+    exclude_commands : list[str] | None
+        Commands to exclude.
+    skip_filtered_command : bool
+        Whether to skip the single filtered command in TOC.
+    lines : list[str]
+        List to append TOC to.
+    """
+    # Collect all commands recursively for TOC
+    toc_commands = _collect_commands_for_toc(
+        app,
+        include_hidden=include_hidden,
+        prefix=f"{app_name} " if app_name else "",
+        commands_filter=commands_filter,
+        exclude_commands=exclude_commands,
+        skip_filtered_command=skip_filtered_command,
+    )
+    if toc_commands:
+        lines.append("## Table of Contents")
+        lines.append("")
+        _generate_toc_entries(lines, toc_commands)
+        lines.append("")
+
+
+def _render_parameter_panel(panel, formatter, lines: list[str]) -> None:
+    """Render a parameter panel as-is.
+
+    Parameters
+    ----------
+    panel : HelpPanel
+        The parameter panel to render.
+    formatter : MarkdownFormatter
+        Formatter to use for rendering.
+    lines : list[str]
+        List to append rendered content to.
+    """
+    # Render panel title if present
+    if panel.title:
+        lines.append(f"**{panel.title}**:\n")
+
+    # Render panel content
+    formatter.reset()
+    panel_copy = panel.copy(title="")
+    formatter(None, None, panel_copy)
+    output = formatter.get_output().strip()
+    if output:
+        lines.append(output)
+    lines.append("")
+
+
+def _filter_command_entries(
+    entries: list,
+    command_map: dict[str, "App"],
+    parent_path: list[str],
+    normalized_filter: set[str] | None,
+    normalized_exclude: set[str] | None,
+) -> list:
+    """Filter command entries based on inclusion/exclusion rules.
+
+    Parameters
+    ----------
+    entries : list
+        Command entries to filter.
+    command_map : dict[str, App]
+        Mapping of command names to App objects.
+    parent_path : list[str]
+        Parent command path.
+    normalized_filter : set[str] | None
+        Normalized filter set.
+    normalized_exclude : set[str] | None
+        Normalized exclude set.
+
+    Returns
+    -------
+    list
+        Filtered command entries.
+    """
+    filtered_entries = []
+    for entry in entries:
+        if entry.names:
+            cmd_name = entry.names[0]
+            subapp = command_map.get(cmd_name)
+            if subapp is None:
+                # If command not in map and no filters, include it
+                if normalized_filter is None and normalized_exclude is None:
+                    filtered_entries.append(entry)
+            else:
+                # Check if command should be included
+                if should_include_command(cmd_name, parent_path, normalized_filter, normalized_exclude, subapp):
+                    filtered_entries.append(entry)
+    return filtered_entries
+
+
 def generate_markdown_docs(
     app: "App",
     recursive: bool = True,
@@ -196,47 +397,15 @@ def generate_markdown_docs(
 
     # Add application description (skip if skipping current level)
     if not skip_current_level:
-        description = extract_description(app, help_format)
-        if description:
-            # Extract plain text from description
-            # Preserve markup when help_format matches output format (markdown)
-            preserve = help_format in ("markdown", "md")
-            desc_text = extract_text(description, None, preserve_markup=preserve)
-            if desc_text:
-                lines.append(desc_text.strip())
-                lines.append("")
+        _render_description_section(app, help_format, lines)
 
     # Generate table of contents if this is the root level and has commands
     if generate_toc and not command_chain and app._commands:
-        # Collect all commands recursively for TOC
-        # Use app_name as prefix so TOC paths match heading paths (e.g., "myapp files cp")
-        toc_commands = _collect_commands_for_toc(
-            app,
-            include_hidden=include_hidden,
-            prefix=f"{app_name} " if app_name else "",
-            commands_filter=commands_filter,
-            exclude_commands=exclude_commands,
-            skip_filtered_command=skip_current_level,  # Skip single filtered command in TOC
-        )
-        if toc_commands:
-            lines.append("## Table of Contents")
-            lines.append("")
-            _generate_toc_entries(lines, toc_commands)
-            lines.append("")
+        _render_toc(app, app_name, include_hidden, commands_filter, exclude_commands, skip_current_level, lines)
 
     # Add usage section if appropriate (skip if skipping current level)
-    if not skip_current_level and should_show_usage(app):
-        usage = extract_usage(app)
-        if usage:
-            lines.append("```console")
-            if isinstance(usage, str):
-                usage_text = usage
-            else:
-                usage_text = extract_text(usage, None, preserve_markup=False)
-            usage_line = format_usage_line(usage_text, command_chain)
-            lines.append(usage_line)
-            lines.append("```")
-            lines.append("")
+    if not skip_current_level:
+        _render_usage_section(app, command_chain, lines)
 
     # Get help panels for the current app (skip if skipping current level)
     if not skip_current_level:
@@ -249,10 +418,7 @@ def generate_markdown_docs(
         parent_path = []
 
         # Build a mapping of command names to App objects for filtering
-        command_map = {}
-        if app._commands:
-            for name, subapp in iterate_commands(app, include_hidden=True):
-                command_map[name] = subapp
+        command_map = _build_command_map(app, include_hidden=True)
 
         # Create formatter
         formatter = MarkdownFormatter(
@@ -279,19 +445,9 @@ def generate_markdown_docs(
                     continue  # Skip empty panel
 
                 # Apply command filtering
-                filtered_entries = []
-                for entry in command_entries:
-                    if entry.names:
-                        cmd_name = entry.names[0]
-                        subapp = command_map.get(cmd_name)
-                        if subapp is None:
-                            if normalized_commands_filter is None and normalized_exclude_commands is None:
-                                filtered_entries.append(entry)
-                        else:
-                            if should_include_command(
-                                cmd_name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
-                            ):
-                                filtered_entries.append(entry)
+                filtered_entries = _filter_command_entries(
+                    command_entries, command_map, parent_path, normalized_commands_filter, normalized_exclude_commands
+                )
 
                 # Only render if there are filtered entries
                 if filtered_entries:
@@ -312,55 +468,7 @@ def generate_markdown_docs(
                     lines.append("")
             elif panel.format == "parameter":
                 # Handle parameter panels - split into arguments and options if needed
-                title = panel.title
-                if title == "Arguments" or (title and title not in ["Parameters", "Options"]):
-                    # Keep as-is (already categorized or grouped)
-                    if panel.title:
-                        lines.append(f"**{panel.title}**:\n")
-
-                    formatter.reset()
-                    panel_copy = panel.copy(title="")
-                    formatter(None, None, panel_copy)
-                    output = formatter.get_output().strip()
-                    if output:
-                        lines.append(output)
-                    lines.append("")
-                else:
-                    # Split into arguments and options
-                    args = []
-                    opts = []
-                    for entry in panel.entries:
-                        is_positional = entry.required and entry.default is None
-                        if is_positional:
-                            args.append(entry)
-                        else:
-                            opts.append(entry)
-
-                    # Render arguments
-                    if args:
-                        lines.append("**Arguments**:\n")
-                        formatter.reset()
-                        args_panel = panel.__class__(
-                            title="", entries=args, description=panel.description, format=panel.format
-                        )
-                        formatter(None, None, args_panel)
-                        output = formatter.get_output().strip()
-                        if output:
-                            lines.append(output)
-                        lines.append("")
-
-                    # Render options
-                    if opts:
-                        lines.append("**Options**:\n")
-                        formatter.reset()
-                        opts_panel = panel.__class__(
-                            title="", entries=opts, description=panel.description, format=panel.format
-                        )
-                        formatter(None, None, opts_panel)
-                        output = formatter.get_output().strip()
-                        if output:
-                            lines.append(output)
-                        lines.append("")
+                _render_parameter_panel(panel, formatter, lines)
     else:
         # When skipping current level, still need to set up filter variables for recursive docs
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -408,26 +516,10 @@ def generate_markdown_docs(
                     sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                     # Preserve markup when sub_help_format matches output format (markdown)
                     preserve_sub = sub_help_format in ("markdown", "md")
-                    sub_description = extract_description(subapp, sub_help_format)
-                    if sub_description:
-                        sub_desc_text = extract_text(sub_description, None, preserve_markup=preserve_sub)
-                        if sub_desc_text:
-                            lines.append(sub_desc_text.strip())
-                            lines.append("")
+                    _render_description_section(subapp, sub_help_format, lines)
 
                     # Generate usage for subcommand if appropriate
-                    if should_show_usage(subapp):
-                        sub_usage = extract_usage(subapp)
-                        if sub_usage:
-                            lines.append("```console")
-                            if isinstance(sub_usage, str):
-                                sub_usage_text = sub_usage
-                            else:
-                                sub_usage_text = extract_text(sub_usage, None, preserve_markup=False)
-                            usage_line = format_usage_line(sub_usage_text, sub_command_chain)
-                            lines.append(usage_line)
-                            lines.append("```")
-                            lines.append("")
+                    _render_usage_section(subapp, sub_command_chain, lines)
 
                     # Only show subcommand panels if we're in recursive mode
                     # (Otherwise we just show the basic info about this command)
@@ -444,10 +536,7 @@ def generate_markdown_docs(
                         )
 
                         # Build a map of command names to App objects for filtering
-                        sub_command_map = {}
-                        if subapp._commands:
-                            for sub_cmd_name, sub_cmd_app in iterate_commands(subapp, include_hidden=True):
-                                sub_command_map[sub_cmd_name] = sub_cmd_app
+                        sub_command_map = _build_command_map(subapp, include_hidden=True)
 
                         # Build parent path for nested commands
                         nested_parent_path_for_panel = parent_path + [name] if parent_path else [name]
@@ -547,55 +636,7 @@ def generate_markdown_docs(
                                         lines.append("")
                             elif panel.format == "parameter":
                                 # Handle parameter panels - split into arguments and options if needed
-                                title = panel.title
-                                if title == "Arguments" or (title and title not in ["Parameters", "Options"]):
-                                    # Keep as-is (already categorized or grouped)
-                                    if panel.title:
-                                        lines.append(f"**{panel.title}**:\n")
-
-                                    sub_formatter.reset()
-                                    panel_copy = panel.copy(title="")
-                                    sub_formatter(None, None, panel_copy)
-                                    output = sub_formatter.get_output().strip()
-                                    if output:
-                                        lines.append(output)
-                                    lines.append("")
-                                else:
-                                    # Split into arguments and options
-                                    args = []
-                                    opts = []
-                                    for entry in panel.entries:
-                                        is_positional = entry.required and entry.default is None
-                                        if is_positional:
-                                            args.append(entry)
-                                        else:
-                                            opts.append(entry)
-
-                                    # Render arguments
-                                    if args:
-                                        lines.append("**Arguments**:\n")
-                                        sub_formatter.reset()
-                                        args_panel = panel.__class__(
-                                            title="", entries=args, description=panel.description, format=panel.format
-                                        )
-                                        sub_formatter(None, None, args_panel)
-                                        output = sub_formatter.get_output().strip()
-                                        if output:
-                                            lines.append(output)
-                                        lines.append("")
-
-                                    # Render options
-                                    if opts:
-                                        lines.append("**Options**:\n")
-                                        sub_formatter.reset()
-                                        opts_panel = panel.__class__(
-                                            title="", entries=opts, description=panel.description, format=panel.format
-                                        )
-                                        sub_formatter(None, None, opts_panel)
-                                        output = sub_formatter.get_output().strip()
-                                        if output:
-                                            lines.append(output)
-                                        lines.append("")
+                                _render_parameter_panel(panel, sub_formatter, lines)
 
             if recursive and subapp._commands:
                 sub_commands_filter, sub_exclude_commands = adjust_filters_for_subcommand(

@@ -37,12 +37,9 @@ def test_generate_docs_simple_app():
         myapp NAME [ARGS]
         ```
 
-        **Arguments**:
+        **Parameters**:
 
         * `NAME`: Your name.  **[required]**
-
-        **Options**:
-
         * `VERBOSE, --verbose, --no-verbose`: Enable verbose output.  *[default: --no-verbose]*
         """
     )
@@ -93,7 +90,7 @@ def test_generate_docs_with_commands():
     # Serve command details (now shows full path)
     assert "## myapp serve" in actual
     assert "Start the server." in actual
-    assert "**Options**:" in actual
+    assert "**Parameters**:" in actual
     assert "* `PORT, --port`: Port number.  *[default: 8000]*" in actual
 
     # Build command details (now shows full path)
@@ -271,12 +268,9 @@ def test_generate_docs_with_required_parameters():
         myapp REQUIRED [ARGS]
         ```
 
-        **Arguments**:
+        **Parameters**:
 
         * `REQUIRED`: Required parameter  **[required]**
-
-        **Options**:
-
         * `OPTIONAL, --optional`:   *[default: default]*
         """
     )
@@ -595,12 +589,9 @@ def test_generate_docs_with_meta_app():
         myapp INPUT-FILE
         ```
 
-        **Arguments**:
+        **Parameters**:
 
         * `INPUT-FILE`: Input file path.  **[required]**
-
-        **Options**:
-
         * `VERBOSE, --verbose, --no-verbose`: Enable verbose output.  *[default: --no-verbose]*
         * `CONFIG, --config`: Config file
         """
