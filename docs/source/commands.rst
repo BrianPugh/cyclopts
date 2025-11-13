@@ -66,7 +66,7 @@ The :meth:`app.command <cyclopts.App.command>` method can also register another 
    sub_app = App(name="foo")  # "foo" would be a better variable name than "sub_app".
    # "sub_app" in this example emphasizes the name comes from name="foo".
    app.command(sub_app)  # Registers sub_app to command "foo"
-   # Or, as a one-liner:  app.command(sub_app := App(name="foo"))
+   # Or, as a one-liner:  sub_app = app.command(App(name="foo"))
 
 
    @sub_app.command
@@ -158,14 +158,14 @@ Subcommands inherit configuration from their parent apps.
    )
 
    # Child app inherits parent's settings
-   root_app.command(child_app := App(name="child"))
+   child_app = root_app.command(App(name="child"))
 
    @child_app.default
    def child_action():
        return "Child executed successfully"
 
    # Child can override parent settings if needed
-   child_app.command(grandchild_app := App(name="grandchild", exit_on_error=True))
+   grandchild_app = child_app.command(App(name="grandchild", exit_on_error=True))
 
 When ``parent_app("child ...")`` is called, the child command will use the parent's
 error handling settings unless explicitly overridden.

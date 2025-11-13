@@ -73,7 +73,7 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
-from cyclopts._result_action import ResultAction
+from cyclopts._result_action import ResultAction, ResultActionSingle
 from cyclopts._run import _run_maybe_async_command
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -226,7 +226,7 @@ def _combined_meta_command_mapping(
                 command_mapping[cmd_name] = subapp[cmd_name]
 
     if recurse_meta and app._meta:
-        command_mapping.update(_combined_meta_command_mapping(app._meta))
+        command_mapping.update(_combined_meta_command_mapping(app._meta, recurse_parent_meta=False))
     if recurse_parent_meta and app._meta_parent:
         meta_parent_commands = _combined_meta_command_mapping(app._meta_parent, recurse_meta=False)
         command_mapping.update(meta_parent_commands)
@@ -380,7 +380,9 @@ class App:
         default=None, converter=help_formatter_converter, kw_only=True
     )
 
-    result_action: ResultAction | None = field(
+    # This can ONLY ever be None or Tuple[ResultActionSingle, ...] due to converter.
+    # The other types is to make type checkers happy for Cyclopts users.
+    result_action: ResultAction | ResultActionSingle | None = field(
         default=None,
         converter=_result_action_converter,
         kw_only=True,
@@ -868,7 +870,7 @@ class App:
         """Internal getter that returns App or unresolved CommandSpec."""
         if recurse_meta and self._meta:
             with suppress(KeyError):
-                return self.meta._get_item(key, recurse_meta=False)
+                return self.meta._get_item(key, recurse_meta=True)
         if self._meta_parent:
             with suppress(KeyError):
                 return self._meta_parent._get_item(key, recurse_meta=False)
