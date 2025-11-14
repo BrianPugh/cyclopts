@@ -172,3 +172,30 @@ def test_boolean_flag_disable_negative(app, negative, assert_parse_args):
     assert_parse_args(foo, "--my-flag", True)
     with pytest.raises(UnknownOptionError):
         assert_parse_args(foo, "--no-my-flag", True)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        # Positive flags with kebab-case and snake_case
+        ("--my-flag", True),
+        ("--my_flag", True),
+        # Negative flags with kebab-case and snake_case (issue #692)
+        ("--no-my-flag", False),
+        ("--no_my_flag", False),
+        ("--no-my_flag", False),  # Mixed case
+    ],
+)
+def test_boolean_flag_snake_case_negative(app, cmd_str, expected, assert_parse_args):
+    """Test that negative boolean flags accept both kebab-case and snake_case.
+
+    Issue #692: Cyclopts accepts both `--some-flag` and `--some_flag` for
+    positive flags, but only accepts `--no-some-flag` for negative flags.
+    This test ensures that `--no_some_flag` and `--no-some_flag` also work.
+    """
+
+    @app.default
+    def foo(my_flag: bool = True):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
