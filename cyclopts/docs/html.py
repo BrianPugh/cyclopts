@@ -3,7 +3,15 @@
 from typing import TYPE_CHECKING
 
 from cyclopts._markup import escape_html, extract_text
-from cyclopts.docs.base import BaseDocGenerator
+from cyclopts.docs.base import (
+    build_command_chain,
+    extract_description,
+    extract_usage,
+    filter_help_entries,
+    format_usage_line,
+    generate_anchor,
+    iterate_commands,
+)
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -21,7 +29,7 @@ def _generate_html_toc(
     if not app._commands:
         return
 
-    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+    for name, subapp in iterate_commands(app, include_hidden):
         display_name = f"{prefix}{name}" if prefix else name
         full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
 
@@ -387,9 +395,8 @@ def generate_html_docs(
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        # Create anchor-friendly ID
-        anchor_id = f"{app_name}-{'-'.join(command_chain[1:])}"
-        anchor_id = anchor_id.lower().replace(" ", "-")
+        # Create anchor-friendly ID using shared logic
+        anchor_id = generate_anchor(full_command)
         lines.append('<section class="command-section">')
         lines.append(
             f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{heading_level}>'
@@ -397,7 +404,7 @@ def generate_html_docs(
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = BaseDocGenerator.extract_description(app, help_format)
+    description = extract_description(app, help_format)
     if description:
         desc_text = extract_text(description, None)
         if desc_text:
@@ -413,7 +420,7 @@ def generate_html_docs(
         lines.append("</div>")
 
     # Add usage section if not suppressed
-    usage = BaseDocGenerator.extract_usage(app)
+    usage = extract_usage(app)
     if usage:
         lines.append(f"<h{heading_level + 1}>Usage</h{heading_level + 1}>")
         lines.append('<div class="usage-block">')
@@ -421,7 +428,7 @@ def generate_html_docs(
             usage_text = usage
         else:
             usage_text = extract_text(usage, None)
-        usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
+        usage_text = format_usage_line(usage_text, command_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
@@ -441,7 +448,7 @@ def generate_html_docs(
             continue
         # Filter out entries based on include_hidden
         if not include_hidden:
-            panel.entries = BaseDocGenerator.filter_help_entries(panel, include_hidden)
+            panel.entries = filter_help_entries(app, panel, include_hidden)
         if panel.entries:  # Only render non-empty panels
             formatter(None, None, panel)
 
@@ -452,9 +459,9 @@ def generate_html_docs(
     # Handle recursive documentation for subcommands
     if app._commands:
         # Iterate through registered commands
-        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+        for name, subapp in iterate_commands(app, include_hidden):
             # Build the command chain for this subcommand
-            sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
+            sub_command_chain = build_command_chain(command_chain, name, app_name)
 
             # Determine heading level for subcommand
             if flatten_commands:
@@ -477,14 +484,14 @@ def generate_html_docs(
             # Get subapp help
             with subapp.app_stack([subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
-                sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
+                sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
                     sub_desc_text = extract_text(sub_description, None)
                     if sub_desc_text:
                         lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
                 # Generate usage for subcommand
-                sub_usage = BaseDocGenerator.extract_usage(subapp)
+                sub_usage = extract_usage(subapp)
                 if sub_usage:
                     if flatten_commands:
                         usage_heading_level = heading_level + 1
@@ -496,7 +503,7 @@ def generate_html_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_usage_text = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
+                    sub_usage_text = format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
 
@@ -519,19 +526,8 @@ def generate_html_docs(
                     for sub_group, sub_panel in sub_panels:
                         if not include_hidden and sub_group and not sub_group.show:
                             continue
-                        # Filter out built-in commands if not including hidden
                         if not include_hidden:
-                            sub_panel.entries = [
-                                e
-                                for e in sub_panel.entries
-                                if not (
-                                    e.names
-                                    and all(
-                                        n.startswith("--help") or n.startswith("--version") or n == "-h"
-                                        for n in e.names
-                                    )
-                                )
-                            ]
+                            sub_panel.entries = filter_help_entries(subapp, sub_panel, include_hidden)
                         if sub_panel.entries:
                             sub_formatter(None, None, sub_panel)
 
@@ -541,9 +537,9 @@ def generate_html_docs(
 
                 # Recursively handle nested subcommands
                 if recursive and subapp._commands:
-                    for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
+                    for nested_name, nested_app in iterate_commands(subapp, include_hidden):
                         # Build nested command chain
-                        nested_chain = BaseDocGenerator.build_command_chain(sub_command_chain, nested_name, app_name)
+                        nested_chain = build_command_chain(sub_command_chain, nested_name, app_name)
                         # Determine heading level for nested commands
                         if flatten_commands:
                             nested_heading_level = heading_level
