@@ -917,7 +917,7 @@ API
            }
 
       If not provided, defaults to Cyclopts's internal coercion engine.
-      If a pydantic type-hint is provided, Cyclopts will disable it's internal coercion
+      If a pydantic type-hint is provided, Cyclopts will disable its internal coercion
       engine (including this `converter` argument) and leave the coercion to pydantic.
 
       The number of tokens passed to the converter is inferred from the type hint by default,
