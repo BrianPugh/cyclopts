@@ -920,6 +920,11 @@ API
       If a pydantic type-hint is provided, Cyclopts will disable it's internal coercion
       engine (including this `converter` argument) and leave the coercion to pydantic.
 
+      The number of tokens passed to the converter is inferred from the type hint by default,
+      but can be explicitly controlled with :attr:`~.Parameter.n_tokens`. This is useful when
+      the type signature doesn't match the desired CLI token consumption. When loading complex
+      objects with multiple fields, it may also be useful to combine with :attr:`~.Parameter.accepts_keys`.
+
    .. attribute:: validator
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
@@ -1224,6 +1229,9 @@ API
 
          $ my-program --image foo.jpg nature
          image=Image(path='foo.jpg', label='nature')
+
+      The ``accepts_keys=False`` option is commonly used with :attr:`~.Parameter.converter` and
+      :attr:`~.Parameter.n_tokens`.
 
    .. attribute:: consume_multiple
       :type: Optional[bool]
