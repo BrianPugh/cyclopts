@@ -255,6 +255,11 @@ class Parameter:
         kw_only=True,
     )
 
+    n_tokens: int | None = field(
+        default=None,
+        kw_only=True,
+    )
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str, ...] = field(factory=tuple, init=False, eq=False)
 

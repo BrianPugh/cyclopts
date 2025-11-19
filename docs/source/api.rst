@@ -1355,6 +1355,63 @@ API
 
       See :ref:`Coercion Rules` for more details.
 
+   .. attribute:: n_tokens
+      :type: Optional[int]
+      :value: None
+
+      Explicitly override the number of CLI tokens this parameter consumes.
+
+      By default, Cyclopts infers the token count from the parameter's type hint
+      (e.g., :obj:`int` consumes 1 token, ``tuple[int, int]`` consumes 2, :obj:`list` consumes all remaining).
+      This attribute allows you to override that inference, which is particularly useful when:
+
+      * Using custom converters that need a different token count than the type suggests.
+      * Loading complex types from a single token (e.g., loading from a file path).
+      * Implementing selection/lookup patterns where one token identifies an object.
+
+      Values:
+
+      * ``None`` (default): Infer token count from the type hint.
+      * non-negative integer: Consume exactly that many tokens.
+      * ``-1``: Consume all remaining tokens (similar to iterables).
+
+      For ``*args`` parameters, ``n_tokens`` specifies tokens **per element**.
+      For example, ``n_tokens=2`` with 6 tokens creates 3 elements.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         class Config:
+             def __init__(self, host: str, port: int):
+                 self.host = host
+                 self.port = port
+
+         def load_config(type_, tokens):
+             # Load config from a file path (single token)
+             filepath = tokens[0].value
+             # ... load from file ...
+             return Config("example.com", 8080)
+
+         app = App()
+
+         @app.default
+         def main(
+             config: Annotated[
+                 Config,
+                 Parameter(n_tokens=1, converter=load_config, accepts_keys=False)
+             ]
+         ):
+             print(f"Connecting to {config.host}:{config.port}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --config prod.conf
+         Connecting to example.com:8080
+
    .. automethod:: combine
 
    .. automethod:: default

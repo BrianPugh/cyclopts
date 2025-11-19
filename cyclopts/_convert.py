@@ -799,7 +799,20 @@ def token_count(type_: Any) -> tuple[int, bool]:
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    type_ = resolve(type_)
+    # Check for explicit n_tokens in Parameter annotation before resolving
+    # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
+    from cyclopts.parameter import get_parameters
+
+    resolved_type, parameters = get_parameters(type_)
+    for param in parameters:
+        if param.n_tokens is not None:
+            if param.n_tokens == -1:
+                return 1, True
+            else:
+                _, consume_all_from_type = token_count(resolved_type)
+                return param.n_tokens, consume_all_from_type
+
+    type_ = resolved_type
     origin_type = get_origin(type_)
 
     if (origin_type or type_) is tuple:
