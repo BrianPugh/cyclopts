@@ -322,7 +322,54 @@ When using custom converters, you may need to override this inference with :attr
 The :attr:`.Parameter.accepts_keys` parameter prevents Cyclopts from generating nested options like
 ``--config.host`` and ``--config.port``, which wouldn't make sense when loading from a file.
 
-See the :attr:`.Parameter.n_tokens` API documentation for more details.
+Alternative to the above syntax, you can directly decorate the converter function itself with :class:`.Parameter` to define
+its behavior. This keeps all the information organized in a single location.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   class Config:
+       def __init__(self, host: str, port: int):
+           self.host = host
+           self.port = port
+
+   @Parameter(n_tokens=1, accepts_keys=False)
+   def load_from_id(type_, tokens):
+       """Load configuration from an ID."""
+       config_id = tokens[0].value
+       # Simulate database lookup
+       return Config(f"server-{config_id}.example.com", 443)
+
+   app = App()
+
+   @app.default
+   def main(config: Annotated[Config, Parameter(converter=load_from_id)]):
+       """The converter's n_tokens and accepts_keys are automatically inherited."""
+       print(f"Connecting to {config.host}:{config.port}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --config prod
+   Connecting to server-prod.example.com:443
+
+You can also decorate classes directly with the converter:
+
+.. code-block:: python
+
+   @Parameter(converter=load_from_id)
+   class Config:
+       def __init__(self, host: str, port: int):
+           self.host = host
+           self.port = port
+
+   @app.default
+   def main(config: Config):
+       """No Annotated wrapper needed - converter is part of the class definition."""
+       print(f"Connecting to {config.host}:{config.port}")
 
 ----------------
 Validating Input

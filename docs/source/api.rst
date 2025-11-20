@@ -925,6 +925,23 @@ API
       the type signature doesn't match the desired CLI token consumption. When loading complex
       objects with multiple fields, it may also be useful to combine with :attr:`~.Parameter.accepts_keys`.
 
+      **Decorating Converters:** Converter functions can be decorated with :class:`.Parameter` to define
+      reusable conversion behavior:
+
+      .. code-block:: python
+
+         @Parameter(n_tokens=1, accepts_keys=False)
+         def load_from_id(type_, tokens):
+             """Load object from database by ID."""
+             return fetch_from_db(tokens[0].value)
+
+         @app.default
+         def main(obj: Annotated[MyType, Parameter(converter=load_from_id)]):
+             # Automatically inherits n_tokens=1 and accepts_keys=False
+             pass
+
+      See :ref:`Decorating Converter Functions<Decorating Converter Functions>` for detailed examples.
+
    .. attribute:: validator
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
