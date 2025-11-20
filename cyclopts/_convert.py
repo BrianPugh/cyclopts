@@ -783,13 +783,16 @@ def convert(
             raise NotImplementedError("Unreachable?")
 
 
-def token_count(type_: Any) -> tuple[int, bool]:
+def token_count(type_: Any, _skip_converter_params: bool = False) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
     ----------
     type_: Type
         A type hint/annotation to infer token_count from if not explicitly specified.
+    _skip_converter_params: bool
+        Internal parameter. If True, don't extract converter parameters from __cyclopts__.
+        Used to prevent infinite recursion when determining consume_all behavior.
 
     Returns
     -------
@@ -803,13 +806,16 @@ def token_count(type_: Any) -> tuple[int, bool]:
     # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
     from cyclopts.parameter import get_parameters
 
-    resolved_type, parameters = get_parameters(type_)
+    resolved_type, parameters = get_parameters(type_, _extract_converter_params=not _skip_converter_params)
     for param in parameters:
         if param.n_tokens is not None:
             if param.n_tokens == -1:
                 return 1, True
             else:
-                _, consume_all_from_type = token_count(resolved_type)
+                # Recursively determine consume_all from the type's natural structure.
+                # Skip converter params to avoid infinite recursion when converter is decorated
+                # with @Parameter(n_tokens=...) and attached to a class via @Parameter(converter=...).
+                _, consume_all_from_type = token_count(resolved_type, _skip_converter_params=True)
                 return param.n_tokens, consume_all_from_type
 
     type_ = resolved_type

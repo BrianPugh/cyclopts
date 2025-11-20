@@ -237,3 +237,172 @@ def test_n_tokens_list_consume_all(app, assert_parse_args):
         pass
 
     assert_parse_args(foo, "--items a b c d e f", items=["a-b", "c-d", "e-f"])
+
+
+def test_n_tokens_decorated_converter(app, assert_parse_args):
+    """Test that converter functions decorated with @Parameter(n_tokens=...) use that value."""
+
+    class ComplexType:
+        """A type that normally requires multiple tokens but can be loaded from a single token."""
+
+        def __init__(self, name: str, value: int):
+            self.name = name
+            self.value = value
+
+        def __eq__(self, other):
+            return self.name == other.name and self.value == other.value
+
+    @Parameter(n_tokens=1, accepts_keys=False)
+    def load_from_id(type_, tokens):
+        """Custom converter decorated with n_tokens=1."""
+        id_value = tokens[0].value
+        return ComplexType(name=f"loaded_{id_value}", value=int(id_value) * 100)
+
+    @app.default
+    def foo(obj: Annotated[ComplexType, Parameter(converter=load_from_id)]):
+        pass
+
+    assert_parse_args(foo, "5", obj=ComplexType(name="loaded_5", value=500))
+
+
+def test_n_tokens_decorated_converter_with_option(app, assert_parse_args):
+    """Test decorated converter with keyword option."""
+
+    @Parameter(n_tokens=2)
+    def combine_two(type_, tokens):
+        """Converter that combines two tokens."""
+        return f"{tokens[0].value}+{tokens[1].value}"
+
+    @app.default
+    def foo(*, value: Annotated[str, Parameter(converter=combine_two)]):
+        pass
+
+    assert_parse_args(foo, "--value hello world", value="hello+world")
+
+
+def test_n_tokens_signature_overrides_decorated_converter(app, assert_parse_args):
+    """Test that n_tokens in signature annotation takes priority over decorated converter."""
+
+    @Parameter(n_tokens=2)
+    def combine_two(type_, tokens):
+        """Converter decorated with n_tokens=2."""
+        return f"{tokens[0].value}+{tokens[1].value}"
+
+    @Parameter(n_tokens=3)
+    def combine_three(type_, tokens):
+        """Converter decorated with n_tokens=3, but signature will override."""
+        # Even though decorated with n_tokens=3, signature says n_tokens=2
+        return f"{tokens[0].value}+{tokens[1].value}"
+
+    @app.default
+    def foo(
+        *,
+        # Signature explicitly sets n_tokens=2, which should override the decorator's n_tokens=3
+        value: Annotated[str, Parameter(n_tokens=2, converter=combine_three)],
+    ):
+        pass
+
+    # Should consume 2 tokens (from signature), not 3 (from decorator)
+    assert_parse_args(foo, "--value hello world", value="hello+world")
+
+
+def test_n_tokens_decorated_converter_var_positional(app, assert_parse_args):
+    """Test decorated converter with *args."""
+
+    @Parameter(n_tokens=2)
+    def pair_converter(type_, tokens):
+        """Convert two tokens into a tuple."""
+        return (tokens[0].value, int(tokens[1].value))
+
+    @app.default
+    def foo(*pairs: Annotated[tuple[str, int], Parameter(converter=pair_converter)]):
+        pass
+
+    assert_parse_args(foo, "alice 10 bob 20", ("alice", 10), ("bob", 20))
+
+
+def test_n_tokens_decorated_converter_kwargs(app, assert_parse_args):
+    """Test decorated converter with **kwargs."""
+
+    @Parameter(n_tokens=2)
+    def pair_converter(type_, tokens):
+        """Combine two tokens with a colon."""
+        return f"{tokens[0].value}:{tokens[1].value}"
+
+    @app.default
+    def foo(**config: Annotated[str, Parameter(converter=pair_converter)]):
+        pass
+
+    assert_parse_args(foo, "--host localhost 8080 --db postgres 5432", host="localhost:8080", db="postgres:5432")
+
+
+def test_accepts_keys_signature_overrides_decorated_converter(app):
+    """Test that accepts_keys in signature takes priority over decorated converter.
+
+    When signature sets accepts_keys=True, it should override the converter's accepts_keys=False
+    and allow the argument collection to be built with sub-keys.
+    """
+
+    class Config:
+        def __init__(self, host: str = "localhost", port: int = 8080):
+            self.host = host
+            self.port = port
+
+    @Parameter(accepts_keys=False, n_tokens=1)
+    def load_from_file(type_, tokens):
+        """Converter that loads from a file (decorated with accepts_keys=False)."""
+        # Simulate loading from file based on tokens[0].value
+        return Config("file.example.com", 443)
+
+    @app.default
+    def foo(
+        *,
+        # Signature explicitly sets accepts_keys=True to allow sub-keys
+        # This should override the converter's accepts_keys=False
+        config: Annotated[Config, Parameter(converter=load_from_file, accepts_keys=True)],
+    ):
+        pass
+
+    # With accepts_keys=True in signature, sub-keys like --config.host should be recognized
+    # (even though converter says accepts_keys=False)
+    # This verifies that the signature setting takes priority
+    argument_collection = app.assemble_argument_collection()
+
+    # Should have child arguments for host and port since accepts_keys=True
+    config_arg = argument_collection[0]
+    assert config_arg.name == "--config"
+    assert len(list(config_arg.children)) > 0  # Should have children
+
+
+def test_n_tokens_class_decorated_with_converter(app, assert_parse_args):
+    """Test that a class decorated with @Parameter(converter=...) inherits the converter's n_tokens.
+
+    When a class is decorated with @Parameter(converter=load_from_id), and the converter itself
+    is decorated with @Parameter(n_tokens=1, accepts_keys=False), the class should automatically
+    use those settings without needing an Annotated wrapper in the function signature.
+    """
+
+    @Parameter(n_tokens=1, accepts_keys=False)
+    def load_from_id(type_, tokens):
+        """Custom converter decorated with n_tokens=1."""
+        id_value = tokens[0].value
+        # Simulate loading from database/file based on ID
+        return type_(name=f"loaded_{id_value}", value=int(id_value) * 100)
+
+    @Parameter(converter=load_from_id)
+    class ComplexType:
+        """A type with a converter attached via class decorator."""
+
+        def __init__(self, name: str, value: int):
+            self.name = name
+            self.value = value
+
+        def __eq__(self, other):
+            return self.name == other.name and self.value == other.value
+
+    @app.default
+    def foo(obj: ComplexType):
+        pass
+
+    # The converter's n_tokens=1 should be inherited from the class decoration
+    assert_parse_args(foo, "5", obj=ComplexType(name="loaded_5", value=500))

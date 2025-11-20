@@ -467,26 +467,52 @@ def validate_command(f: Callable):
                 )
 
 
-def get_parameters(hint: T) -> tuple[T, list[Parameter]]:
+def get_parameters(hint: T, _extract_converter_params: bool = True) -> tuple[T, list[Parameter]]:
     """At root level, checks for cyclopts.Parameter annotations.
 
-    Includes checking the ``__cyclopts__`` attribute.
+    Includes checking the ``__cyclopts__`` attribute on both the type and any converter functions.
+
+    Parameters
+    ----------
+    hint
+        Type hint to extract parameters from.
+    _extract_converter_params
+        Internal parameter. If False, skip extracting parameters from converter's __cyclopts__.
+        Used to prevent infinite recursion in token_count.
 
     Returns
     -------
     hint
         Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
     list[Parameter]
-        List of parameters discovered.
+        List of parameters discovered, ordered by priority (lowest to highest):
+        converter-decoration < type-decoration < annotation.
     """
-    parameters = []
     hint = resolve_optional(hint)
+
+    # Extract parameters from type's __cyclopts__ attribute
+    type_cyclopts_config_params = []
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
-        parameters.extend(cyclopts_config.parameters)
+        type_cyclopts_config_params.extend(cyclopts_config.parameters)
+
+    # Extract parameters from Annotated metadata
+    annotated_params = []
     if is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
-        parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
+        annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+
+    # Check if any parameter has a converter with __cyclopts__ and extract its parameters
+    converter_params = []
+    if _extract_converter_params:
+        for param in annotated_params + type_cyclopts_config_params:
+            if param.converter and hasattr(param.converter, "__cyclopts__"):
+                converter_params.extend(param.converter.__cyclopts__.parameters)
+                break  # Only use the highest priority converter found
+
+    # Return parameters in priority order (lowest to highest)
+    # This allows Parameter.combine() to correctly prioritize later parameters
+    parameters = converter_params + type_cyclopts_config_params + annotated_params
 
     return hint, parameters
 
