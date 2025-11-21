@@ -746,3 +746,61 @@ def test_dataclass_inheritance_no_docstrings_in_derived(app, console):
 
     # Base docstring should be present
     assert "Base field documentation." in actual
+
+
+def test_bind_dataclass_with_parameter_alias_issue_696(app, assert_parse_args, console):
+    """Test that user class with parameter alias generates correct arguments.
+
+    https://github.com/BrianPugh/cyclopts/issues/696
+
+    When using a user class as a parameter with an alias, the generated
+    arguments should use the class attribute names, not the parameter alias.
+
+    For example, parameter `source` with alias `from`, and class attribute `server`:
+    - Should generate: --source.server, --from.server
+    - Should NOT generate: --source.from, --from.from
+    """
+
+    @dataclass
+    class Source:
+        server: str
+        port: int = 8080
+
+    @app.default
+    def main(source: Annotated[Source, Parameter(name="source", alias="from")]):
+        return source
+
+    # Check the help output to see what arguments are generated
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Should have the correct arguments
+    assert "--source.server" in actual, "Missing --source.server"
+    assert "--from.server" in actual, "Missing --from.server"
+
+    # Should NOT have the incorrect arguments (using parameter alias as attribute name)
+    assert "--source.from" not in actual, "Incorrectly generated --source.from"
+    assert "--from.from" not in actual, "Incorrectly generated --from.from"
+
+    # Test with --source.server (should work)
+    assert_parse_args(
+        main,
+        "--source.server=localhost --source.port=9000",
+        source=Source(server="localhost", port=9000),
+    )
+
+    # Test with --from.server (should work)
+    assert_parse_args(
+        main,
+        "--from.server=localhost --from.port=9000",
+        source=Source(server="localhost", port=9000),
+    )
+
+    # Test mixed usage (should work)
+    assert_parse_args(
+        main,
+        "--source.server=localhost --from.port=9000",
+        source=Source(server="localhost", port=9000),
+    )
