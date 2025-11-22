@@ -831,6 +831,27 @@ class Argument:
         if self.parameter.count:
             return 0, False
 
+        # Check for explicit n_tokens override
+        # This applies to values at any level: root values (keys=()) or nested values (keys=(...))
+        # For example, **kwargs: Annotated[str, Parameter(n_tokens=2)] means each kwarg value needs 2 tokens
+        if self.parameter.n_tokens is not None:
+            if self.parameter.n_tokens == -1:
+                return 1, True
+            else:
+                # Determine consume_all based on the hint at the requested level
+                # by recursively calling token_count on the hint
+                if len(keys) > 1:
+                    hint = self._default
+                elif len(keys) == 1:
+                    hint = self._type_hint_for_key(keys[0])
+                else:
+                    hint = self.hint
+
+                # Recursively call token_count to get the consume_all behavior
+                # We ignore the token count from the recursive call and use our explicit n_tokens
+                _, consume_all_from_type = token_count(hint)
+                return self.parameter.n_tokens, consume_all_from_type
+
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:

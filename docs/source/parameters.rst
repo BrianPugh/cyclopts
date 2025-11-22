@@ -282,6 +282,48 @@ Tokens are Cyclopt's way of bookkeeping user inputs; in the last command the ``t
       ),
    )
 
+^^^^^^^^^^^^^^^^^^^^^^^^
+Controlling Token Count
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, Cyclopts infers how many tokens a parameter should consume from its type hint.
+For example, :obj:`int` consumes 1 token, ``tuple[int, int]`` consumes 2, and ``list[int]`` consumes all remaining tokens.
+When using custom converters, you may need to override this inference with :attr:`.Parameter.n_tokens`:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   class Config:
+       def __init__(self, host: str, port: int):
+           self.host = host
+           self.port = port
+
+   def load_config(type_, tokens):
+       """Load configuration from a file path."""
+       filepath = tokens[0].value
+       return Config("localhost", 8080)
+
+   app = App()
+
+   @app.default
+   def main(config: Annotated[Config, Parameter(n_tokens=1, converter=load_config, accepts_keys=False)]):
+       """Without n_tokens=1, Cyclopts would expect 2 tokens based on Config's __init__ signature."""
+       print(f"Connecting to {config.host}:{config.port}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --config prod.conf
+   Connecting to localhost:8080
+
+The :attr:`.Parameter.accepts_keys` parameter prevents Cyclopts from generating nested options like
+``--config.host`` and ``--config.port``, which wouldn't make sense when loading from a file.
+
+See the :attr:`.Parameter.n_tokens` API documentation for more details.
+
 ----------------
 Validating Input
 ----------------
