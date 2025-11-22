@@ -1,51 +1,38 @@
-# Cyclopts Demo - Shell Completion Test Application
+# Cyclopts Demo
 
-This application is designed for testing shell completion features in Cyclopts.
+Demo CLI application for testing and demonstrating Cyclopts features.
 
 ## Purpose
 
-Provides a comprehensive CLI application that exercises all major completion scenarios:
+This app is designed for:
 
-- **Boolean flags**: `--verbose`, `--dry-run`, `--reload`, `--ssl`
-- **Literal choices**: `--environment {dev,staging,production}`, `--format {json,yaml,toml,xml}`
-- **Path completion**: `--input-file`, `--output-file`, `--directory`, `--config`
-- **Lists**: `--items`, `--tags`, `--exclude`, `--tables`
-- **Numbers**: `--count`, `--port`, `--threshold`
-- **Nested subcommands**: `database` and `server` groups with their own commands
+- Manual testing of shell completion
+- Testing edge cases that are hard to unit test
+- Demonstrating Cyclopts features in documentation
+- Serving as a reference implementation
 
-## Usage
+## Quick Start
 
-Install and run via uv:
+### Run the CLI
 
 ```bash
-# Install dependencies
-uv sync
+cd tests/apps/cyclopts-demo
 
-# Run the demo app
-uv run cyclopts-demo --help
+# Show help
+python cyclopts_demo.py --help
 
-# Test specific commands
-uv run cyclopts-demo files --help
-uv run cyclopts-demo database migrate --help
-uv run cyclopts-demo server start --help
+# Try commands
+python cyclopts_demo.py files ls --help
+python cyclopts_demo.py database migrate --help
 ```
 
-## Commands
+### Build and View MkDocs Documentation
 
-- **main** - Root command with verbose and config options
-- **files** - File operations with path and format parameters
-- **deploy** - Deployment with environment, region, and flags
-- **process** - Item processing with lists and validation
-- **install-completion** - Install shell completion (demonstrates `app.register_install_completion()`)
-- **database** - Database management group
-  - `connect` - Database connection
-  - `migrate` - Run migrations
-  - `backup` - Create backups
-- **server** - Server management group
-  - `start` - Start the server
-  - `stop` - Stop the server
-  - `status` - Show server status
+```bash
+# Build the documentation
+uv run mkdocs build
 
-## Direct Invocation
-
-The `cyclopts_demo.py` file can be invoked directly with Python 3.10+, but requires Cyclopts to be installed in the environment.
+# Serve the documentation locally
+uv run mkdocs serve
+# Opens http://127.0.0.1:8000
+```
