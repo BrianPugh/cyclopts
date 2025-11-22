@@ -590,3 +590,43 @@ def test_lazy_app_name_match_allows_resolution():
         assert resolved is test_module.subapp
     finally:
         del sys.modules["test_lazy_module"]
+
+
+def test_lazy_subapp_help_excludes_help_version_flags(console):
+    """Test that lazy-loaded subapps don't show --help/--version in their help.
+
+    Regression test for issue #697.
+    When a subapp is registered via lazy loading, its help output should NOT
+    include --help and --version flags (matching behavior of direct registration).
+    """
+    test_module = ModuleType("test_lazy_module")
+
+    # Create a subapp with a default command
+    subapp = App(name="greet")
+
+    @subapp.default
+    def greet(name: str):
+        """Greet a person by name."""
+        print(f"Hello, {name}!")
+
+    test_module.subapp = subapp  # type: ignore[attr-defined]
+    sys.modules["test_lazy_module"] = test_module
+
+    try:
+        # Test lazy registration (should not show --help/--version)
+        app_lazy = App(name="App", result_action="return_value")
+        app_lazy.command("test_lazy_module:subapp", name="greet")
+
+        with console.capture() as capture:
+            app_lazy(["greet", "--help"], console=console)
+
+        output_lazy = capture.get()
+
+        # Lazy registration should not include --help/--version in the subapp help
+        assert "--help" not in output_lazy
+        assert "--version" not in output_lazy
+        assert "Commands" not in output_lazy  # Should not have a Commands section at all
+        assert "NAME" in output_lazy
+        assert "Greet a person by name" in output_lazy
+    finally:
+        del sys.modules["test_lazy_module"]
