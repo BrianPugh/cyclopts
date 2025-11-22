@@ -58,6 +58,43 @@ class ArgumentCollection(list[Argument]):
 
         return self.get(term)
 
+    def __contains__(self, item: object, /) -> bool:
+        """Check if an argument or argument name exists in the collection.
+
+        Parameters
+        ----------
+        item : Argument | str
+            Either an Argument object or a string name/alias to search for.
+
+        Returns
+        -------
+        bool
+            True if the item is in the collection.
+
+        Examples
+        --------
+        >>> argument_collection = ArgumentCollection(
+        ...     [
+        ...         Argument(parameter=Parameter(name="--foo")),
+        ...         Argument(parameter=Parameter(name=("--bar", "-b"))),
+        ...     ]
+        ... )
+        >>> "--foo" in argument_collection
+        True
+        >>> "-b" in argument_collection  # Alias matching
+        True
+        >>> "--baz" in argument_collection
+        False
+        """
+        if isinstance(item, str):
+            try:
+                self[item]
+                return True
+            except KeyError:
+                return False
+        else:
+            return super().__contains__(item)
+
     @overload
     def get(
         self,

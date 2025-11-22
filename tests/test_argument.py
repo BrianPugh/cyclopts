@@ -647,3 +647,119 @@ def test_argument_collection_getitem_not_found():
 
     with pytest.raises(IndexError):
         _ = collection[10]
+
+
+def test_argument_collection_contains_with_string():
+    """Test that 'in' operator works with string argument names."""
+
+    def foo(alpha: int, beta: str):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    # Test with full option names
+    assert "--alpha" in collection
+    assert "--beta" in collection
+
+    # Test with non-existent option
+    assert "--nonexistent" not in collection
+    assert "--gamma" not in collection
+
+
+def test_argument_collection_contains_with_alias():
+    """Test that 'in' operator works with argument aliases."""
+
+    def foo(
+        alpha: Annotated[int, Parameter(name="--foo", alias="-f")],
+        beta: Annotated[str, Parameter(name="--bar", alias=("-b", "--baz"))],
+    ):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    # Test with primary names
+    assert "--foo" in collection
+    assert "--bar" in collection
+
+    # Test with aliases
+    assert "-f" in collection
+    assert "-b" in collection
+    assert "--baz" in collection
+
+    # Test that original parameter names don't match
+    assert "--alpha" not in collection
+    assert "--beta" not in collection
+
+
+def test_argument_collection_contains_with_object():
+    """Test that 'in' operator works with Argument objects (backward compatibility)."""
+
+    def foo(alpha: int, beta: str):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    # Test with actual Argument objects from the collection
+    assert collection[0] in collection
+    assert collection[1] in collection
+
+    # Test with a new Argument object not in the collection
+    new_arg = Argument(parameter=Parameter(name="--gamma"), hint=float)
+    assert new_arg not in collection
+
+
+def test_argument_collection_contains_with_filtered():
+    """Test that 'in' operator works with filtered collections (common validator pattern)."""
+    collection = ArgumentCollection(
+        [
+            Argument(
+                tokens=[Token(keyword="--foo", value="100", source="test")],
+                parameter=Parameter(name="--foo"),
+                value=100,
+            ),
+            Argument(
+                parameter=Parameter(name="--bar"),
+            ),
+            Argument(
+                tokens=[Token(keyword="--baz", value="text", source="test")],
+                parameter=Parameter(name="--baz"),
+                value="text",
+            ),
+        ]
+    )
+
+    # All arguments exist in the full collection
+    assert "--foo" in collection
+    assert "--bar" in collection
+    assert "--baz" in collection
+
+    # Only arguments with values exist in the filtered collection
+    populated = collection.filter_by(value_set=True)
+    assert "--foo" in populated
+    assert "--bar" not in populated  # Has no value
+    assert "--baz" in populated
+
+
+def test_argument_collection_contains_with_keys():
+    """Test that 'in' operator works with nested argument keys (dataclass fields)."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Config:
+        host: str
+        port: int
+
+    def foo(config: Config):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    # Check for nested fields
+    assert "--config.host" in collection
+    assert "--config.port" in collection
+
+    # Check that parent also exists (for accepting dict/JSON)
+    assert "--config" in collection
+
+    # Check non-existent nested fields
+    assert "--config.username" not in collection

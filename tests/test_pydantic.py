@@ -698,3 +698,30 @@ def test_pydantic_secret_explicit_value(app, assert_parse_args, secret_type, val
         f"test-cmd --some-secret {value}",
         ScriptSettings(some_secret=expected_value),
     )
+
+
+def test_pydantic_inheritance_simple(app, console):
+    """Test that Field descriptions from base pydantic model are inherited by derived model."""
+
+    class BaseModelCustom(BaseModel):
+        """Base pydantic model."""
+
+        base_field: int = Field(default=42, description="Field from base pydantic model")
+
+    class DerivedModel(BaseModelCustom):
+        """Derived pydantic model."""
+
+        derived_field: str = Field(default="test", description="Field from derived pydantic model")
+
+    @app.default
+    def main(params: DerivedModel):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Check that both base and derived field descriptions are present
+    assert "Field from base pydantic model" in actual
+    assert "Field from derived pydantic model" in actual

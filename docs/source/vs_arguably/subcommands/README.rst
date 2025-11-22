@@ -48,7 +48,7 @@ Cyclopts handles the command tree by creating and registering recursive :class:`
    from cyclopts import App
 
    app = App()
-   app.command(ec2 := App(name="ec2"))
+   ec2 = app.command(App(name="ec2"))
 
 
    @ec2.command

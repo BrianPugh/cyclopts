@@ -217,3 +217,34 @@ def test_attrs_field_metadata_help(app, console):
 
     assert "Metadata help overrides docstring." in actual
     assert "This docstring is ignored." not in actual
+
+
+def test_attrs_inheritance_simple(app, console):
+    """Test that docstrings from base attrs class are inherited by derived class."""
+
+    @define
+    class BaseClass:
+        """Base class."""
+
+        some_arg: int = 42
+        """BaseClass.some_arg docstring."""
+
+    @define
+    class DerivedClass(BaseClass):
+        """Derived class."""
+
+        some_other_arg: str = "some_other_arg default value"
+        """DerivedClass.some_other_arg docstring."""
+
+    @app.default
+    def main(params: DerivedClass):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Check that both base and derived docstrings are present
+    assert "BaseClass.some_arg docstring." in actual
+    assert "DerivedClass.some_other_arg docstring." in actual

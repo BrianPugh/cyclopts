@@ -5,6 +5,7 @@ from typing import Annotated
 import pytest
 
 from cyclopts import (
+    App,
     Argument,
     ArgumentOrderError,
     CoercionError,
@@ -400,3 +401,30 @@ def test_exceptions_combined_short_option_error(app, console):
     # -bo is now valid GNU-style: -b with value "o"
     _, bound, _ = app.parse_args("foo -bo", exit_on_error=False)
     assert bound.arguments["bar"] == "o"
+
+
+def test_unknown_option_starting_with_h():
+    """Test that --h (not --help) is treated as an unknown option, not a NameError.
+
+    Previously, passing --h would trigger a NameError about Console not being defined,
+    because it would try to inspect the help_print method's signature which had a
+    forward reference to Console that wasn't available at runtime.
+
+    From issue #697.
+    """
+    app = App(exit_on_error=False)
+
+    @app.default
+    def foo(loops: int):
+        for i in range(loops):
+            print(f"Looping! {i}")
+
+    # Should raise an error about unknown option, not NameError about Console
+    with pytest.raises(Exception) as exc_info:
+        app.parse_args(["--h"])
+
+    # Make sure it's not a NameError about Console
+    assert not (isinstance(exc_info.value, NameError) and "Console" in str(exc_info.value))
+
+    # It should be an unknown option error
+    assert "Unknown option" in str(exc_info.value) or "unknown" in str(exc_info.value).lower()

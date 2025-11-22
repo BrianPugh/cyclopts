@@ -577,3 +577,230 @@ def test_dataclass_field_doc_parameter_help(app, console):
 
     assert "Doc parameter overrides docstring." in actual
     assert "This docstring is ignored." not in actual
+
+
+def test_dataclass_inheritance_simple(app, console):
+    """Test that docstrings from base dataclass are inherited by derived class.
+
+    Regression test for: https://github.com/BrianPugh/cyclopts/issues/691
+    """
+
+    @dataclass
+    class BaseClass:
+        """Base class."""
+
+        some_arg: int = 42
+        """BaseClass.some_arg docstring."""
+
+    @dataclass
+    class DerivedClass(BaseClass):
+        """Derived class."""
+
+        some_other_arg: str = "some_other_arg default value"
+        """DerivedClass.some_other_arg docstring."""
+
+    @app.default
+    def main(params: DerivedClass):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Check that both base and derived docstrings are present
+    assert "BaseClass.some_arg docstring." in actual
+    assert "DerivedClass.some_other_arg docstring." in actual
+
+
+def test_dataclass_inheritance_multi_level(app, console):
+    """Test that docstrings propagate through multiple inheritance levels."""
+
+    @dataclass
+    class GrandparentClass:
+        """Grandparent class."""
+
+        grandparent_field: int = 1
+        """Grandparent field doc."""
+
+    @dataclass
+    class ParentClass(GrandparentClass):
+        """Parent class."""
+
+        parent_field: int = 2
+        """Parent field doc."""
+
+    @dataclass
+    class ChildClass(ParentClass):
+        """Child class."""
+
+        child_field: int = 3
+        """Child field doc."""
+
+    @app.default
+    def main(params: ChildClass):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Check that all three levels of docstrings are present
+    assert "Grandparent field doc." in actual
+    assert "Parent field doc." in actual
+    assert "Child field doc." in actual
+
+
+def test_dataclass_inheritance_override_docstring(app, console):
+    """Test that derived class can override base class docstrings."""
+
+    @dataclass
+    class BaseClass:
+        """Base class."""
+
+        shared_field: int = 1
+        """Base docstring."""
+
+    @dataclass
+    class DerivedClass(BaseClass):
+        """Derived class."""
+
+        shared_field: int = 2
+        """Derived docstring overrides base."""
+
+        new_field: str = "new"
+        """New field in derived."""
+
+    @app.default
+    def main(params: DerivedClass):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Derived class docstring should take precedence
+    assert "Derived docstring overrides base." in actual
+    assert "Base docstring." not in actual
+    assert "New field in derived." in actual
+
+
+def test_dataclass_inheritance_with_parameter_name_star(app, console, normalize_trailing_whitespace):
+    """Test inheritance with Parameter(name='*') works correctly."""
+
+    @dataclass
+    class BaseConfig:
+        """Base configuration."""
+
+        verbose: bool = False
+        """Enable verbose output."""
+
+    @dataclass
+    class ExtendedConfig(BaseConfig):
+        """Extended configuration."""
+
+        debug: bool = False
+        """Enable debug mode."""
+
+    @app.default
+    def main(config: Annotated[ExtendedConfig | None, Parameter(name="*")] = None):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Both base and derived docstrings should be present
+    assert "Enable verbose output." in actual
+    assert "Enable debug mode." in actual
+
+
+def test_dataclass_inheritance_no_docstrings_in_derived(app, console):
+    """Test that base docstrings work even if derived class has no docstrings."""
+
+    @dataclass
+    class BaseClass:
+        """Base class."""
+
+        base_field: int = 1
+        """Base field documentation."""
+
+    @dataclass
+    class DerivedClass(BaseClass):
+        """Derived class."""
+
+        # No docstring for this field
+        derived_field: int = 2
+
+    @app.default
+    def main(params: DerivedClass):
+        pass
+
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Base docstring should be present
+    assert "Base field documentation." in actual
+
+
+def test_bind_dataclass_with_parameter_alias_issue_696(app, assert_parse_args, console):
+    """Test that user class with parameter alias generates correct arguments.
+
+    https://github.com/BrianPugh/cyclopts/issues/696
+
+    When using a user class as a parameter with an alias, the generated
+    arguments should use the class attribute names, not the parameter alias.
+
+    For example, parameter `source` with alias `from`, and class attribute `server`:
+    - Should generate: --source.server, --from.server
+    - Should NOT generate: --source.from, --from.from
+    """
+
+    @dataclass
+    class Source:
+        server: str
+        port: int = 8080
+
+    @app.default
+    def main(source: Annotated[Source, Parameter(name="source", alias="from")]):
+        return source
+
+    # Check the help output to see what arguments are generated
+    with console.capture() as capture:
+        app("--help", console=console)
+
+    actual = capture.get()
+
+    # Should have the correct arguments
+    assert "--source.server" in actual, "Missing --source.server"
+    assert "--from.server" in actual, "Missing --from.server"
+
+    # Should NOT have the incorrect arguments (using parameter alias as attribute name)
+    assert "--source.from" not in actual, "Incorrectly generated --source.from"
+    assert "--from.from" not in actual, "Incorrectly generated --from.from"
+
+    # Test with --source.server (should work)
+    assert_parse_args(
+        main,
+        "--source.server=localhost --source.port=9000",
+        source=Source(server="localhost", port=9000),
+    )
+
+    # Test with --from.server (should work)
+    assert_parse_args(
+        main,
+        "--from.server=localhost --from.port=9000",
+        source=Source(server="localhost", port=9000),
+    )
+
+    # Test mixed usage (should work)
+    assert_parse_args(
+        main,
+        "--source.server=localhost --from.port=9000",
+        source=Source(server="localhost", port=9000),
+    )

@@ -474,7 +474,7 @@ class Argument:
                 for name in self.parameter.get_negatives(hint):
                     if transform:
                         name = transform(name)
-                    if term.startswith(name):
+                    if startswith(term, name):
                         trailing = term[len(name) :]
                         if hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
                             implicit_value = False
