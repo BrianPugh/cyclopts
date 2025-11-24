@@ -1,5 +1,6 @@
 import collections.abc
 from collections.abc import Sequence
+from collections.abc import Set as AbcSet
 from pathlib import Path
 
 import pytest
@@ -183,3 +184,45 @@ def test_list_positional_all_but_last(app, cmd_str, assert_parse_args):
         pass
 
     assert_parse_args(foo, cmd_str, [Path("fizz"), Path("buzz")], Path("bar"))
+
+
+def test_abc_set_basic(app, assert_parse_args):
+    """Test that collections.abc.Set works as a type hint (issue #702)."""
+
+    @app.default
+    def main(test: AbcSet[str]):
+        return test
+
+    # Should successfully parse and return a set
+    assert_parse_args(main, "1 2 3", {"1", "2", "3"})
+
+
+def test_abc_set_with_multiple_values(app, assert_parse_args):
+    """Test collections.abc.Set with multiple values and deduplication (issue #702)."""
+
+    @app.default
+    def main(values: AbcSet[str]):
+        return values
+
+    # Sets should deduplicate values
+    assert_parse_args(main, "apple banana apple cherry", {"apple", "banana", "cherry"})
+
+
+def test_abc_set_with_int(app, assert_parse_args):
+    """Test collections.abc.Set with int type (issue #702)."""
+
+    @app.default
+    def main(numbers: AbcSet[int]):
+        return numbers
+
+    assert_parse_args(main, "1 2 3 2 1", {1, 2, 3})
+
+
+def test_abc_set_keyword_argument(app, assert_parse_args):
+    """Test collections.abc.Set with keyword argument syntax (issue #702)."""
+
+    @app.default
+    def main(values: AbcSet[str]):
+        return values
+
+    assert_parse_args(main, "--values a --values b --values c", {"a", "b", "c"})

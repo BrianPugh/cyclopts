@@ -1,6 +1,7 @@
 import inspect
 import sys
 from collections.abc import Iterable, Sequence
+from collections.abc import Set as AbcSet
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
@@ -254,6 +255,12 @@ def test_coerce_set():
 def test_coerce_frozenset():
     assert frozenset({"123", "456"}) == convert(frozenset[str], ["123", "456"])
     assert frozenset({123, 456}) == convert(frozenset[int | str], ["123", "456"])
+
+
+def test_coerce_abc_set():
+    """Test that collections.abc.Set is supported (issue #702)."""
+    result = convert(AbcSet[str], ["123", "456"])
+    assert {"123", "456"} == result
 
 
 def test_coerce_literal():
