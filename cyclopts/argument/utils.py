@@ -35,6 +35,7 @@ else:  # pragma: no cover
 
 PARAMETER_SUBKEY_BLOCKER = Parameter(
     name=None,
+    alias=None,
     converter=None,  # pyright: ignore
     validator=None,
     accepts_keys=None,
