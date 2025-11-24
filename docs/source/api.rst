@@ -940,7 +940,21 @@ API
              # Automatically inherits n_tokens=1 and accepts_keys=False
              pass
 
-      See :ref:`Decorating Converter Functions<Decorating Converter Functions>` for detailed examples.
+      **Classmethod Support:** Converters can be classmethods. Use string references for class decoration
+      or direct references in annotations. Classmethod signature should be ``(cls, tokens)`` instead of
+      ``(type_, tokens)``:
+
+      .. code-block:: python
+
+         @Parameter(converter="from_env")
+         class Config:
+             @Parameter(n_tokens=1, accepts_keys=False)
+             @classmethod
+             def from_env(cls, tokens):
+                 env = tokens[0].value
+                 configs = {"dev": ("localhost", 8080), "prod": ("api.example.com", 443)}
+                 return cls(*configs[env])
+
 
    .. attribute:: validator
       :type: Union[None, Callable, Iterable[Callable]]

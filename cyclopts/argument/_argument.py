@@ -1,5 +1,6 @@
 """Argument class and related functionality."""
 
+import inspect
 import json
 import operator
 import sys
@@ -556,9 +557,15 @@ class Argument:
         from cyclopts.argument._collection import update_argument_collection
 
         if self.parameter.converter:
-            converter = self.parameter.converter
+            # Resolve string converters to methods on the type
+            if isinstance(self.parameter.converter, str):
+                converter = getattr(self.hint, self.parameter.converter)
+            else:
+                converter = self.parameter.converter
         elif converter is None:
             converter = partial(convert, name_transform=self.parameter.name_transform)
+
+        assert converter is not None  # Ensure converter is set at this point
 
         def safe_converter(hint, tokens):
             if isinstance(tokens, dict):
@@ -568,7 +575,13 @@ class Argument:
                     raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
             else:
                 try:
-                    return converter(hint, tokens)
+                    # Detect bound methods (classmethods/instance methods)
+                    if inspect.ismethod(converter):
+                        # Call with just tokens - cls/self already bound
+                        return converter(tokens)  # pyright: ignore[reportCallIssue]
+                    else:
+                        # Regular function - pass type and tokens
+                        return converter(hint, tokens)  # pyright: ignore[reportCallIssue]
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(

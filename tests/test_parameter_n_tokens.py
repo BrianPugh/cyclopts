@@ -406,3 +406,141 @@ def test_n_tokens_class_decorated_with_converter(app, assert_parse_args):
 
     # The converter's n_tokens=1 should be inherited from the class decoration
     assert_parse_args(foo, "5", obj=ComplexType(name="loaded_5", value=500))
+
+
+def test_classmethod_converter_string_reference(app, assert_parse_args):
+    """Test that string references to classmethods work as converters."""
+
+    @Parameter(converter="from_id", n_tokens=1, accepts_keys=False)
+    class Config:
+        def __init__(self, host: str, port: int):
+            self.host = host
+            self.port = port
+
+        @classmethod
+        def from_id(cls, tokens):
+            config_id = tokens[0].value
+            return cls(host=f"server-{config_id}.example.com", port=443)
+
+        def __eq__(self, other):
+            return self.host == other.host and self.port == other.port
+
+    @app.default
+    def foo(config: Config):
+        pass
+
+    assert_parse_args(foo, "prod", config=Config(host="server-prod.example.com", port=443))
+
+
+def test_classmethod_converter_direct_reference(app, assert_parse_args):
+    """Test that direct classmethod references work as converters."""
+
+    class Config:
+        def __init__(self, host: str, port: int):
+            self.host = host
+            self.port = port
+
+        @classmethod
+        def from_id(cls, tokens):
+            config_id = tokens[0].value
+            return cls(host=f"server-{config_id}.example.com", port=443)
+
+        def __eq__(self, other):
+            return self.host == other.host and self.port == other.port
+
+    @app.default
+    def foo(config: Annotated[Config, Parameter(converter=Config.from_id, n_tokens=1, accepts_keys=False)]):
+        pass
+
+    assert_parse_args(foo, "prod", config=Config(host="server-prod.example.com", port=443))
+
+
+def test_classmethod_converter_with_parameter_decoration(app, assert_parse_args):
+    """Test that @Parameter on classmethods (above @classmethod) works correctly."""
+
+    class Config:
+        def __init__(self, host: str, port: int):
+            self.host = host
+            self.port = port
+
+        @Parameter(n_tokens=1, accepts_keys=False)
+        @classmethod
+        def from_id(cls, tokens):
+            config_id = tokens[0].value
+            return cls(host=f"server-{config_id}.example.com", port=443)
+
+        def __eq__(self, other):
+            return self.host == other.host and self.port == other.port
+
+    @app.default
+    def foo(config: Annotated[Config, Parameter(converter=Config.from_id)]):
+        pass
+
+    # n_tokens=1 should be inherited from the classmethod's @Parameter decoration
+    assert_parse_args(foo, "prod", config=Config(host="server-prod.example.com", port=443))
+
+
+def test_classmethod_string_reference_with_n_tokens(app, assert_parse_args):
+    """Test string reference with explicit n_tokens on class decoration."""
+
+    @Parameter(converter="from_id", n_tokens=1, accepts_keys=False)
+    class Config:
+        def __init__(self, host: str, port: int):
+            self.host = host
+            self.port = port
+
+        @classmethod
+        def from_id(cls, tokens):
+            config_id = tokens[0].value
+            return cls(host=f"server-{config_id}.example.com", port=443)
+
+        def __eq__(self, other):
+            return self.host == other.host and self.port == other.port
+
+    @app.default
+    def foo(config: Config):
+        pass
+
+    assert_parse_args(foo, "prod", config=Config(host="server-prod.example.com", port=443))
+
+
+def test_classmethod_inherits_parameter_from_method(app, assert_parse_args):
+    """Test that class decoration with classmethod inherits @Parameter from the method."""
+
+    @Parameter(converter="from_id")
+    class Config:
+        def __init__(self, host: str, port: int):
+            self.host = host
+            self.port = port
+
+        @Parameter(n_tokens=1, accepts_keys=False)
+        @classmethod
+        def from_id(cls, tokens):
+            config_id = tokens[0].value
+            return cls(host=f"server-{config_id}.example.com", port=443)
+
+        def __eq__(self, other):
+            return self.host == other.host and self.port == other.port
+
+    @app.default
+    def foo(config: Config):
+        pass
+
+    # n_tokens=1 should be inherited from the classmethod's decoration
+    assert_parse_args(foo, "prod", config=Config(host="server-prod.example.com", port=443))
+
+
+def test_staticmethod_converter(app, assert_parse_args):
+    """Test that staticmethods can be used as converters."""
+
+    class Processor:
+        @staticmethod
+        def parse(type_, tokens):
+            value = int(tokens[0].value)
+            return type_(value * 2)
+
+    @app.default
+    def foo(value: Annotated[int, Parameter(converter=Processor.parse)]):
+        pass
+
+    assert_parse_args(foo, "5", value=10)
