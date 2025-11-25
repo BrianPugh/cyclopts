@@ -1,6 +1,9 @@
 import inspect
 import sys
 from collections.abc import Iterable, Sequence
+from collections.abc import MutableSequence as AbcMutableSequence
+from collections.abc import MutableSet as AbcMutableSet
+from collections.abc import Set as AbcSet
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
@@ -254,6 +257,27 @@ def test_coerce_set():
 def test_coerce_frozenset():
     assert frozenset({"123", "456"}) == convert(frozenset[str], ["123", "456"])
     assert frozenset({123, 456}) == convert(frozenset[int | str], ["123", "456"])
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (AbcSet[str], {"123", "456"}),
+        (AbcMutableSet[str], {"123", "456"}),
+        (AbcMutableSequence[str], ["123", "456"]),
+        (AbcSet, {"123", "456"}),
+        (AbcMutableSet, {"123", "456"}),
+        (AbcMutableSequence, ["123", "456"]),
+    ],
+)
+def test_coerce_abstract_collection_types(hint, expected):
+    """Test that collections.abc abstract types are supported (issue #702).
+
+    Tests both parameterized types (e.g., Set[str]) and bare types (e.g., Set).
+    Bare abstract types should default to [str] like bare concrete types do.
+    """
+    result = convert(hint, ["123", "456"])
+    assert expected == result
 
 
 def test_coerce_literal():

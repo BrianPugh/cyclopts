@@ -41,14 +41,27 @@ T = TypeVar("T")
 E = TypeVar("E", bound=Enum)
 F = TypeVar("F", bound=Flag)
 
+# Mapping from bare concrete types to their default parameterized versions.
+# Used when type parameters are not specified (e.g., bare `list` becomes `list[str]`).
 _implicit_iterable_type_mapping: dict[type, type] = {
-    Iterable: list[str],
-    typing.Sequence: list[str],
-    Sequence: list[str],
     frozenset: frozenset[str],
     list: list[str],
     set: set[str],
     tuple: tuple[str, ...],
+    dict: dict[str, str],
+}
+
+# Mapping from abstract collection types to their concrete implementations.
+# Used to convert abstract types like collections.abc.Set to concrete types like set.
+_abstract_to_concrete_type_mapping: dict[type, type] = {
+    Iterable: list,
+    typing.Sequence: list,
+    Sequence: list,
+    collections.abc.Set: set,
+    collections.abc.MutableSet: set,
+    collections.abc.MutableSequence: list,
+    collections.abc.Mapping: dict,
+    collections.abc.MutableMapping: dict,
 }
 
 ITERABLE_TYPES = {
@@ -525,6 +538,10 @@ def _convert(
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
 
     origin_type = get_origin(type_)
+    # Normalize abstract origin types to concrete types early
+    # (e.g., collections.abc.Set -> set) so we only check ITERABLE_TYPES later
+    if origin_type in _abstract_to_concrete_type_mapping:
+        origin_type = _abstract_to_concrete_type_mapping[origin_type]
     # Inner types **may** be ``Annotated``
     inner_types = get_args(type_)
 
@@ -532,9 +549,12 @@ def _convert(
         out = convert(dict[str, str], token)
     elif type_ in _implicit_iterable_type_mapping:
         out = convert(_implicit_iterable_type_mapping[type_], token)
-    elif origin_type in (collections.abc.Iterable, collections.abc.Sequence):
-        assert len(inner_types) == 1
-        out = convert(list[inner_types[0]], token)
+    elif type_ in _abstract_to_concrete_type_mapping:
+        # Bare abstract type (e.g., collections.abc.Set with no [T])
+        # Convert to default parameterized concrete type
+        concrete_type = _abstract_to_concrete_type_mapping[type_]
+        default_param = _implicit_iterable_type_mapping.get(concrete_type, concrete_type)
+        out = convert(default_param, token)
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
@@ -576,6 +596,7 @@ def _convert(
             out = convert_tuple(type_, *token, converter=converter)
     elif origin_type in ITERABLE_TYPES:
         # NOT including tuple; handled in ``origin_type is tuple`` body above.
+        # Note: origin_type has already been normalized from abstract to concrete
         count, _ = token_count(inner_types[0])
         if not isinstance(token, Sequence):
             raise ValueError
@@ -747,12 +768,21 @@ def convert(
 
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
+    # Handle bare abstract types (e.g., collections.abc.Set without [T])
+    # Convert to their default parameterized concrete versions
+    if type_ in _abstract_to_concrete_type_mapping:
+        concrete_type = _abstract_to_concrete_type_mapping[type_]
+        type_ = _implicit_iterable_type_mapping.get(concrete_type, concrete_type)
+
     origin_type = get_origin(type_)
+    # Normalize abstract origin types to concrete types early
+    if origin_type in _abstract_to_concrete_type_mapping:
+        origin_type = _abstract_to_concrete_type_mapping[origin_type]
     maybe_origin_type = origin_type or type_
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
-    elif maybe_origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable:
+    elif maybe_origin_type in ITERABLE_TYPES:
         return convert_priv(type_, tokens)  # pyright: ignore
     elif maybe_origin_type is dict:
         if not isinstance(tokens, dict):
@@ -801,6 +831,15 @@ def token_count(type_: Any) -> tuple[int, bool]:
     """
     type_ = resolve(type_)
     origin_type = get_origin(type_)
+    # Normalize abstract origin types to concrete types early
+    if origin_type in _abstract_to_concrete_type_mapping:
+        origin_type = _abstract_to_concrete_type_mapping[origin_type]
+
+    # Handle bare abstract types like bare concrete types
+    if type_ in _abstract_to_concrete_type_mapping:
+        concrete_type = _abstract_to_concrete_type_mapping[type_]
+        type_ = _implicit_iterable_type_mapping.get(concrete_type, concrete_type)
+        origin_type = get_origin(type_)
 
     if (origin_type or type_) is tuple:
         args = get_args(type_)
@@ -814,7 +853,7 @@ def token_count(type_: Any) -> tuple[int, bool]:
         return 1, True
     elif is_enum_flag(type_):
         return 1, True
-    elif (origin_type in ITERABLE_TYPES or origin_type is collections.abc.Iterable) and len(get_args(type_)):
+    elif origin_type in ITERABLE_TYPES and len(get_args(type_)):
         return token_count(get_args(type_)[0])[0], True
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return token_count(type_.__value__)
