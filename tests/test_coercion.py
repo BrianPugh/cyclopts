@@ -259,22 +259,25 @@ def test_coerce_frozenset():
     assert frozenset({123, 456}) == convert(frozenset[int | str], ["123", "456"])
 
 
-def test_coerce_abc_set():
-    """Test that collections.abc.Set is supported (issue #702)."""
-    result = convert(AbcSet[str], ["123", "456"])
-    assert {"123", "456"} == result
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (AbcSet[str], {"123", "456"}),
+        (AbcMutableSet[str], {"123", "456"}),
+        (AbcMutableSequence[str], ["123", "456"]),
+        (AbcSet, {"123", "456"}),
+        (AbcMutableSet, {"123", "456"}),
+        (AbcMutableSequence, ["123", "456"]),
+    ],
+)
+def test_coerce_abstract_collection_types(hint, expected):
+    """Test that collections.abc abstract types are supported (issue #702).
 
-
-def test_coerce_abc_mutable_set():
-    """Test that collections.abc.MutableSet is supported."""
-    result = convert(AbcMutableSet[str], ["123", "456"])
-    assert {"123", "456"} == result
-
-
-def test_coerce_abc_mutable_sequence():
-    """Test that collections.abc.MutableSequence is supported."""
-    result = convert(AbcMutableSequence[str], ["123", "456"])
-    assert ["123", "456"] == result
+    Tests both parameterized types (e.g., Set[str]) and bare types (e.g., Set).
+    Bare abstract types should default to [str] like bare concrete types do.
+    """
+    result = convert(hint, ["123", "456"])
+    assert expected == result
 
 
 def test_coerce_literal():

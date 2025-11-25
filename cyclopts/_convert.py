@@ -768,6 +768,12 @@ def convert(
 
     type_ = _implicit_iterable_type_mapping.get(type_, type_)
 
+    # Handle bare abstract types (e.g., collections.abc.Set without [T])
+    # Convert to their default parameterized concrete versions
+    if type_ in _abstract_to_concrete_type_mapping:
+        concrete_type = _abstract_to_concrete_type_mapping[type_]
+        type_ = _implicit_iterable_type_mapping.get(concrete_type, concrete_type)
+
     origin_type = get_origin(type_)
     # Normalize abstract origin types to concrete types early
     if origin_type in _abstract_to_concrete_type_mapping:
@@ -828,6 +834,12 @@ def token_count(type_: Any) -> tuple[int, bool]:
     # Normalize abstract origin types to concrete types early
     if origin_type in _abstract_to_concrete_type_mapping:
         origin_type = _abstract_to_concrete_type_mapping[origin_type]
+
+    # Handle bare abstract types like bare concrete types
+    if type_ in _abstract_to_concrete_type_mapping:
+        concrete_type = _abstract_to_concrete_type_mapping[type_]
+        type_ = _implicit_iterable_type_mapping.get(concrete_type, concrete_type)
+        origin_type = get_origin(type_)
 
     if (origin_type or type_) is tuple:
         args = get_args(type_)
