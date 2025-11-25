@@ -149,7 +149,19 @@ class DefaultFormatter:
             The usage line (Text or str).
         """
         if usage:
-            console.print(usage)
+            from rich.text import Text
+
+            # Add "Usage:" prefix if not already present (for custom usage strings)
+            usage_str = str(usage)
+            if not usage_str.strip().startswith("Usage:"):
+                if isinstance(usage, Text):
+                    usage_with_label = Text("Usage: ", style="bold") + usage
+                else:
+                    usage_with_label = Text(f"Usage: {usage}", style="bold")
+            else:
+                # Custom usage already has "Usage:", use as-is
+                usage_with_label = usage if isinstance(usage, Text) else Text(str(usage), style="bold")
+            console.print(usage_with_label)
 
     def render_description(self, console: "Console", options: "ConsoleOptions", description: Any) -> None:
         """Render the description.
