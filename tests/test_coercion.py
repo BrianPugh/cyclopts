@@ -1,6 +1,8 @@
 import inspect
 import sys
 from collections.abc import Iterable, Sequence
+from collections.abc import MutableSequence as AbcMutableSequence
+from collections.abc import MutableSet as AbcMutableSet
 from collections.abc import Set as AbcSet
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
@@ -261,6 +263,18 @@ def test_coerce_abc_set():
     """Test that collections.abc.Set is supported (issue #702)."""
     result = convert(AbcSet[str], ["123", "456"])
     assert {"123", "456"} == result
+
+
+def test_coerce_abc_mutable_set():
+    """Test that collections.abc.MutableSet is supported."""
+    result = convert(AbcMutableSet[str], ["123", "456"])
+    assert {"123", "456"} == result
+
+
+def test_coerce_abc_mutable_sequence():
+    """Test that collections.abc.MutableSequence is supported."""
+    result = convert(AbcMutableSequence[str], ["123", "456"])
+    assert ["123", "456"] == result
 
 
 def test_coerce_literal():

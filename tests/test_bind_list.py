@@ -1,4 +1,6 @@
 import collections.abc
+from collections.abc import MutableSequence as AbcMutableSequence
+from collections.abc import MutableSet as AbcMutableSet
 from collections.abc import Sequence
 from collections.abc import Set as AbcSet
 from pathlib import Path
@@ -226,3 +228,23 @@ def test_abc_set_keyword_argument(app, assert_parse_args):
         return values
 
     assert_parse_args(main, "--values a --values b --values c", {"a", "b", "c"})
+
+
+def test_abc_mutable_set_basic(app, assert_parse_args):
+    """Test that collections.abc.MutableSet works as a type hint."""
+
+    @app.default
+    def main(test: AbcMutableSet[str]):
+        return test
+
+    assert_parse_args(main, "1 2 3", {"1", "2", "3"})
+
+
+def test_abc_mutable_sequence_basic(app, assert_parse_args):
+    """Test that collections.abc.MutableSequence works as a type hint."""
+
+    @app.default
+    def main(test: AbcMutableSequence[str]):
+        return test
+
+    assert_parse_args(main, "1 2 3", ["1", "2", "3"])
