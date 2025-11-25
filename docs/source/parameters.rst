@@ -220,7 +220,7 @@ Converters
 ----------
 
 Cyclopts has a powerful coercion engine that automatically converts CLI string tokens to the types hinted in a function signature.
-However, sometimes a custom :attr:`~.Parameter.converter` is required.
+However, sometimes a custom :attr:`~.Parameter.converter` is required to transform the input string tokens into the desired type.
 
 Lets consider a case where we want the user to specify a file size, and we want to allows suffixes like `"MB"`.
 
@@ -281,6 +281,157 @@ Tokens are Cyclopt's way of bookkeeping user inputs; in the last command the ``t
          index=0,       # For the variable "size", this is the first (0th) token.
       ),
    )
+
+^^^^^^^^^^^^^^^^^^^^^^^^
+Controlling Token Count
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, Cyclopts infers how many tokens a parameter should consume from its type hint.
+For example, :obj:`int` consumes 1 token, ``tuple[int, int]`` consumes 2, and ``list[int]`` consumes all remaining tokens.
+When using custom converters, you may need to override this inference with :attr:`.Parameter.n_tokens`:
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   class Point:
+       def __init__(self, x: int, y: int):
+           self.x = x
+           self.y = y
+
+   def parse_point(type_, tokens):
+       """Parse a coordinate string like '10,20' into a Point."""
+       x, y = tokens[0].value.split(",")
+       return Point(int(x), int(y))
+
+   app = App()
+
+   @app.default
+   def main(pos: Annotated[Point, Parameter(n_tokens=1, converter=parse_point, accepts_keys=False)]):
+       """Without n_tokens=1, Cyclopts would expect 2 tokens based on Point's __init__ signature."""
+       print(f"Position: ({pos.x}, {pos.y})")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --pos 10,20
+   Position: (10, 20)
+
+The :attr:`.Parameter.accepts_keys` parameter prevents Cyclopts from generating nested options like
+``--pos.x`` and ``--pos.y``.
+
+Alternative to the above syntax, you can directly **decorate the converter function** itself with :class:`.Parameter` to define
+its behavior. This keeps all the information organized in a single location.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   class Point:
+       def __init__(self, x: int, y: int):
+           self.x = x
+           self.y = y
+
+   @Parameter(n_tokens=1, accepts_keys=False)
+   def parse_point(type_, tokens):
+       """Parse a coordinate string like '10,20' into a Point."""
+       x, y = tokens[0].value.split(",")
+       return Point(int(x), int(y))
+
+   app = App()
+
+   @app.default
+   def main(pos: Annotated[Point, Parameter(converter=parse_point)]):
+       """The converter's n_tokens and accepts_keys are automatically inherited."""
+       print(f"Position: ({pos.x}, {pos.y})")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --pos 10,20
+   Position: (10, 20)
+
+You can also decorate classes directly with the converter:
+
+.. code-block:: python
+
+   @Parameter(converter=parse_point)
+   class Point:
+       def __init__(self, x: int, y: int):
+           self.x = x
+           self.y = y
+
+   @app.default
+   def main(pos: Point):
+       """No Annotated wrapper needed - converter is part of the class definition."""
+       print(f"Position: ({pos.x}, {pos.y})")
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Using Classmethods as Converters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Converter functions are often closely associated with the class they create, making classmethods a natural choice. Cyclopts supports using classmethods as converters through forward string references (for class decoration) or direct references (for function annotations):
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   # Decorate the classmethod to configure n_tokens and accepts_keys
+   # (decorator must go above @classmethod)
+   @Parameter(converter="parse")
+   class Point:
+       def __init__(self, x: int, y: int):
+           self.x = x
+           self.y = y
+
+       @Parameter(n_tokens=1, accepts_keys=False)
+       @classmethod
+       def parse(cls, tokens):
+           """Parse a coordinate string like '10,20' into a Point.
+
+           Note: classmethod signature is (cls, tokens), not (type_, tokens)
+           """
+           x, y = tokens[0].value.split(",")
+           return cls(int(x), int(y))
+
+   app = App()
+
+   @app.default
+   def main(pos: Point):
+       """The classmethod's n_tokens and accepts_keys are automatically inherited."""
+       print(f"Position: ({pos.x}, {pos.y})")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script --pos 10,20
+   Position: (10, 20)
+
+Alternatively, you can reference the classmethod directly in function annotations:
+
+.. code-block:: python
+
+   class Point:
+       def __init__(self, x: int, y: int):
+           self.x = x
+           self.y = y
+
+       @classmethod
+       def parse(cls, tokens):
+           x, y = tokens[0].value.split(",")
+           return cls(int(x), int(y))
+
+   @app.default
+   def main(pos: Annotated[Point, Parameter(converter=Point.parse, n_tokens=1, accepts_keys=False)]):
+       print(f"Position: ({pos.x}, {pos.y})")
+
+**Note on classmethod signatures**: Classmethods used as converters should have the signature ``(cls, tokens)`` rather than ``(type_, tokens)``. Cyclopts automatically detects bound methods and calls them with just the ``tokens`` parameter, since ``cls`` is already bound.
 
 ----------------
 Validating Input

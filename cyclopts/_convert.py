@@ -1,4 +1,5 @@
 import collections.abc
+import inspect
 import json
 import operator
 import re
@@ -525,7 +526,20 @@ def _convert(
 
             def converter_with_token(t_, value):
                 assert cparam.converter
-                return cparam.converter(t_, (value,))
+
+                # Resolve string converters to methods on the type
+                resolved_converter = cparam.converter
+                if isinstance(resolved_converter, str):
+                    resolved_converter = getattr(t_, resolved_converter)
+
+                # Detect bound methods (classmethods/instance methods)
+                # Bound methods already have their first parameter bound
+                if inspect.ismethod(resolved_converter):
+                    # Call with just tokens - cls/self already bound
+                    return resolved_converter((value,))
+                else:
+                    # Regular function - pass type and tokens
+                    return resolved_converter(t_, (value,))
 
             converter = converter_with_token
 
@@ -813,13 +827,16 @@ def convert(
             raise NotImplementedError("Unreachable?")
 
 
-def token_count(type_: Any) -> tuple[int, bool]:
+def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
     ----------
     type_: Type
         A type hint/annotation to infer token_count from if not explicitly specified.
+    skip_converter_params: bool
+        If True, don't extract converter parameters from __cyclopts__.
+        Used to prevent infinite recursion when determining consume_all behavior.
 
     Returns
     -------
@@ -829,7 +846,30 @@ def token_count(type_: Any) -> tuple[int, bool]:
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    type_ = resolve(type_)
+    # Check for explicit n_tokens in Parameter annotation before resolving
+    # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
+    from cyclopts.parameter import get_parameters
+
+    resolved_type, parameters = get_parameters(type_, skip_converter_params=skip_converter_params)
+    for param in parameters:
+        if param.n_tokens is not None:
+            if param.n_tokens == -1:
+                return 1, True
+            else:
+                # Recursively determine consume_all from the type's natural structure.
+                # Only recurse if the type has changed (e.g., Annotated wrapper was removed).
+                # If resolved_type is the same as type_, recursing would cause infinite loop.
+                if resolved_type is not type_:
+                    # Skip converter params to avoid infinite recursion when converter is decorated
+                    # with @Parameter(n_tokens=...) and attached to a class via @Parameter(converter=...).
+                    _, consume_all_from_type = token_count(resolved_type, skip_converter_params=True)
+                else:
+                    # Type didn't change (e.g., class decorated with @Parameter(n_tokens=...))
+                    # Can't determine natural consume_all by recursing on same type
+                    consume_all_from_type = False
+                return param.n_tokens, consume_all_from_type
+
+    type_ = resolved_type
     origin_type = get_origin(type_)
     # Normalize abstract origin types to concrete types early
     if origin_type in _abstract_to_concrete_type_mapping:

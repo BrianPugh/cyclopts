@@ -34,7 +34,6 @@ from cyclopts.annotations import (
 )
 from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
-from cyclopts.token import Token
 from cyclopts.utils import (
     default_name_transform,
     frozen,
@@ -117,7 +116,8 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Callable[[type, Sequence[Token]], Any] | None = field(
+    # Accepts regular converters (type, tokens) -> Any, bound methods (tokens) -> Any, or string references
+    converter: Callable[..., Any] | str | None = field(
         default=None,
         kw_only=True,
     )
@@ -252,6 +252,11 @@ class Parameter:
     count: bool = field(
         default=None,
         converter=attrs.converters.default_if_none(False),
+        kw_only=True,
+    )
+
+    n_tokens: int | None = field(
+        default=None,
         kw_only=True,
     )
 
@@ -462,26 +467,71 @@ def validate_command(f: Callable):
                 )
 
 
-def get_parameters(hint: T) -> tuple[T, list[Parameter]]:
+def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, list[Parameter]]:
     """At root level, checks for cyclopts.Parameter annotations.
 
-    Includes checking the ``__cyclopts__`` attribute.
+    Includes checking the ``__cyclopts__`` attribute on both the type and any converter functions.
+
+    Parameters
+    ----------
+    hint
+        Type hint to extract parameters from.
+    skip_converter_params
+        If True, skip extracting parameters from converter's __cyclopts__.
+        Used to prevent infinite recursion in token_count.
 
     Returns
     -------
     hint
         Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
     list[Parameter]
-        List of parameters discovered.
+        List of parameters discovered, ordered by priority (lowest to highest):
+        converter-decoration < type-decoration < annotation.
     """
-    parameters = []
     hint = resolve_optional(hint)
+
+    # Extract parameters from type's __cyclopts__ attribute
+    type_cyclopts_config_params = []
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
-        parameters.extend(cyclopts_config.parameters)
+        type_cyclopts_config_params.extend(cyclopts_config.parameters)
+
+    # Extract parameters from Annotated metadata
+    annotated_params = []
     if is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
-        parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
+        annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+
+    # Check if any parameter has a converter with __cyclopts__ and extract its parameters
+    converter_params = []
+    if not skip_converter_params:
+        for param in annotated_params + type_cyclopts_config_params:
+            if param.converter:
+                converter = param.converter
+
+                # Resolve string converters to methods on the type
+                if isinstance(converter, str):
+                    converter = getattr(hint, converter)
+
+                # Check for __cyclopts__ on the converter
+                if hasattr(converter, "__cyclopts__"):
+                    converter_params.extend(converter.__cyclopts__.parameters)
+                    break
+                # For bound methods from classmethods/staticmethods, access the descriptor via __self__
+                elif (
+                    hasattr(converter, "__self__")
+                    and hasattr(converter, "__name__")
+                    and hasattr(converter.__self__, "__dict__")
+                ):
+                    # Get the descriptor from the class's __dict__
+                    descriptor = converter.__self__.__dict__.get(converter.__name__)
+                    if descriptor and hasattr(descriptor, "__cyclopts__"):
+                        converter_params.extend(descriptor.__cyclopts__.parameters)
+                        break
+
+    # Return parameters in priority order (lowest to highest)
+    # This allows Parameter.combine() to correctly prioritize later parameters
+    parameters = converter_params + type_cyclopts_config_params + annotated_params
 
     return hint, parameters
 
