@@ -1,5 +1,6 @@
 """Argument class and related functionality."""
 
+import inspect
 import json
 import operator
 import sys
@@ -474,7 +475,7 @@ class Argument:
                 for name in self.parameter.get_negatives(hint):
                     if transform:
                         name = transform(name)
-                    if term.startswith(name):
+                    if startswith(term, name):
                         trailing = term[len(name) :]
                         if hint in ITERATIVE_BOOL_IMPLICIT_VALUE:
                             implicit_value = False
@@ -556,9 +557,15 @@ class Argument:
         from cyclopts.argument._collection import update_argument_collection
 
         if self.parameter.converter:
-            converter = self.parameter.converter
+            # Resolve string converters to methods on the type
+            if isinstance(self.parameter.converter, str):
+                converter = getattr(self.hint, self.parameter.converter)
+            else:
+                converter = self.parameter.converter
         elif converter is None:
             converter = partial(convert, name_transform=self.parameter.name_transform)
+
+        assert converter is not None  # Ensure converter is set at this point
 
         def safe_converter(hint, tokens):
             if isinstance(tokens, dict):
@@ -568,7 +575,13 @@ class Argument:
                     raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
             else:
                 try:
-                    return converter(hint, tokens)
+                    # Detect bound methods (classmethods/instance methods)
+                    if inspect.ismethod(converter):
+                        # Call with just tokens - cls/self already bound
+                        return converter(tokens)  # pyright: ignore[reportCallIssue]
+                    else:
+                        # Regular function - pass type and tokens
+                        return converter(hint, tokens)  # pyright: ignore[reportCallIssue]
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(
@@ -830,6 +843,27 @@ class Argument:
         """
         if self.parameter.count:
             return 0, False
+
+        # Check for explicit n_tokens override
+        # This applies to values at any level: root values (keys=()) or nested values (keys=(...))
+        # For example, **kwargs: Annotated[str, Parameter(n_tokens=2)] means each kwarg value needs 2 tokens
+        if self.parameter.n_tokens is not None:
+            if self.parameter.n_tokens == -1:
+                return 1, True
+            else:
+                # Determine consume_all based on the hint at the requested level
+                # by recursively calling token_count on the hint
+                if len(keys) > 1:
+                    hint = self._default
+                elif len(keys) == 1:
+                    hint = self._type_hint_for_key(keys[0])
+                else:
+                    hint = self.hint
+
+                # Recursively call token_count to get the consume_all behavior
+                # We ignore the token count from the recursive call and use our explicit n_tokens
+                _, consume_all_from_type = token_count(hint)
+                return self.parameter.n_tokens, consume_all_from_type
 
         if len(keys) > 1:
             hint = self._default

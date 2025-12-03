@@ -35,6 +35,7 @@ else:  # pragma: no cover
 
 PARAMETER_SUBKEY_BLOCKER = Parameter(
     name=None,
+    alias=None,
     converter=None,  # pyright: ignore
     validator=None,
     accepts_keys=None,
@@ -166,13 +167,38 @@ def extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
     with suppress(AttributeError):
         f = f.func  # pyright: ignore[reportFunctionMemberAccess]
 
-    try:
-        return {
-            tuple(dparam.arg_name.split(".")): Parameter(help=dparam.description)
-            for dparam in parse_from_object(f).params
-        }
-    except TypeError:
-        return {}
+    result = {}
+
+    # For classes, walk through MRO  to include base class fields.
+    # parse_from_object only extracts docstrings from the **immediate** class's source code,
+    # not from inherited fields.
+    # From docstring_parser docs:
+    #
+    #    When given a class, only the attribute docstrings of that class are parsed, not its
+    #    inherited classes. This is a design decision. Separate calls to this function
+    #    should be performed to get attribute docstrings of parent classes.
+    if mro := getattr(f, "__mro__", None):
+        # Process base classes first (reversed MRO order), so derived classes can override
+        # their parent's docstrings if they redefine the same field with a new docstring.
+        for base_class in reversed(mro[:-1]):  # Exclude 'object'
+            try:
+                parsed = parse_from_object(base_class)
+                for dparam in parsed.params:
+                    result[tuple(dparam.arg_name.split("."))] = Parameter(help=dparam.description)
+            except (TypeError, AttributeError):
+                # Some base classes may not have parseable docstrings (e.g., built-in classes)
+                continue
+    else:
+        # For functions/callables (original behavior)
+        try:
+            parsed = parse_from_object(f)
+            for dparam in parsed.params:
+                result[tuple(dparam.arg_name.split("."))] = Parameter(help=dparam.description)
+        except (TypeError, AttributeError):
+            # parse_from_object may fail for some callables
+            pass
+
+    return result
 
 
 def resolve_parameter_name_helper(elem):

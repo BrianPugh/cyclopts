@@ -1026,7 +1026,10 @@ class App:
             # Try exact match first; O(1)
             if token in command_mapping:
                 app_or_spec = command_mapping[token]
-            else:
+            # Don't apply fuzzy matching to option-like tokens (starting with -)
+            # Fuzzy matching is for camelCase command names, not for flags like --h matching -h
+            # Issue #698
+            elif not token.startswith("-"):
                 # Try fuzzy match (backward compatibility for camelCase commands) O(n).
                 # NOTE: This fuzzy matching is for v4 backward compatibility with
                 # _pascal_to_snake introduction. Consider removing in v5.

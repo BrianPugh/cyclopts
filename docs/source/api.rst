@@ -917,8 +917,44 @@ API
            }
 
       If not provided, defaults to Cyclopts's internal coercion engine.
-      If a pydantic type-hint is provided, Cyclopts will disable it's internal coercion
+      If a pydantic type-hint is provided, Cyclopts will disable its internal coercion
       engine (including this `converter` argument) and leave the coercion to pydantic.
+
+      The number of tokens passed to the converter is inferred from the type hint by default,
+      but can be explicitly controlled with :attr:`~.Parameter.n_tokens`. This is useful when
+      the type signature doesn't match the desired CLI token consumption. When loading complex
+      objects with multiple fields, it may also be useful to combine with :attr:`~.Parameter.accepts_keys`.
+
+      **Decorating Converters:** Converter functions can be decorated with :class:`.Parameter` to define
+      reusable conversion behavior:
+
+      .. code-block:: python
+
+         @Parameter(n_tokens=1, accepts_keys=False)
+         def load_from_id(type_, tokens):
+             """Load object from database by ID."""
+             return fetch_from_db(tokens[0].value)
+
+         @app.default
+         def main(obj: Annotated[MyType, Parameter(converter=load_from_id)]):
+             # Automatically inherits n_tokens=1 and accepts_keys=False
+             pass
+
+      **Classmethod Support:** Converters can be classmethods. Use string references for class decoration
+      or direct references in annotations. Classmethod signature should be ``(cls, tokens)`` instead of
+      ``(type_, tokens)``:
+
+      .. code-block:: python
+
+         @Parameter(converter="from_env")
+         class Config:
+             @Parameter(n_tokens=1, accepts_keys=False)
+             @classmethod
+             def from_env(cls, tokens):
+                 env = tokens[0].value
+                 configs = {"dev": ("localhost", 8080), "prod": ("api.example.com", 443)}
+                 return cls(*configs[env])
+
 
    .. attribute:: validator
       :type: Union[None, Callable, Iterable[Callable]]
@@ -1225,6 +1261,9 @@ API
          $ my-program --image foo.jpg nature
          image=Image(path='foo.jpg', label='nature')
 
+      The ``accepts_keys=False`` option is commonly used with :attr:`~.Parameter.converter` and
+      :attr:`~.Parameter.n_tokens`.
+
    .. attribute:: consume_multiple
       :type: Optional[bool]
       :value: None
@@ -1354,6 +1393,63 @@ API
          Verbosity level: 3
 
       See :ref:`Coercion Rules` for more details.
+
+   .. attribute:: n_tokens
+      :type: Optional[int]
+      :value: None
+
+      Explicitly override the number of CLI tokens this parameter consumes.
+
+      By default, Cyclopts infers the token count from the parameter's type hint
+      (e.g., :obj:`int` consumes 1 token, ``tuple[int, int]`` consumes 2, :obj:`list` consumes all remaining).
+      This attribute allows you to override that inference, which is particularly useful when:
+
+      * Using custom converters that need a different token count than the type suggests.
+      * Loading complex types from a single token (e.g., loading from a file path).
+      * Implementing selection/lookup patterns where one token identifies an object.
+
+      Values:
+
+      * ``None`` (default): Infer token count from the type hint.
+      * non-negative integer: Consume exactly that many tokens.
+      * ``-1``: Consume all remaining tokens (similar to iterables).
+
+      For ``*args`` parameters, ``n_tokens`` specifies tokens **per element**.
+      For example, ``n_tokens=2`` with 6 tokens creates 3 elements.
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         class Config:
+             def __init__(self, host: str, port: int):
+                 self.host = host
+                 self.port = port
+
+         def load_config(type_, tokens):
+             # Load config from a file path (single token)
+             filepath = tokens[0].value
+             # ... load from file ...
+             return Config("example.com", 8080)
+
+         app = App()
+
+         @app.default
+         def main(
+             config: Annotated[
+                 Config,
+                 Parameter(n_tokens=1, converter=load_config, accepts_keys=False)
+             ]
+         ):
+             print(f"Connecting to {config.host}:{config.port}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --config prod.conf
+         Connecting to example.com:8080
 
    .. automethod:: combine
 

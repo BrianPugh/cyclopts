@@ -1,6 +1,7 @@
 """Lazy-loadable command specification for deferred imports."""
 
 import importlib
+from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 from attrs import Factory, define, field
@@ -136,6 +137,11 @@ class CommandSpec:
 
             self._resolved = App(name=self.name, **app_kwargs)
             self._resolved.default(target)
+
+        # Hide help and version flags from subapp help output
+        # This matches the behavior of direct App/function registration in core.py
+        for flag in chain(self._resolved.help_flags, self._resolved.version_flags):
+            self._resolved[flag].show = False
 
         return self._resolved
 

@@ -1,5 +1,8 @@
 import collections.abc
+from collections.abc import MutableSequence as AbcMutableSequence
+from collections.abc import MutableSet as AbcMutableSet
 from collections.abc import Sequence
+from collections.abc import Set as AbcSet
 from pathlib import Path
 
 import pytest
@@ -183,3 +186,28 @@ def test_list_positional_all_but_last(app, cmd_str, assert_parse_args):
         pass
 
     assert_parse_args(foo, cmd_str, [Path("fizz"), Path("buzz")], Path("bar"))
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (AbcSet[str], {"1", "2", "3"}),
+        (AbcMutableSet[str], {"1", "2", "3"}),
+        (AbcMutableSequence[str], ["1", "2", "3"]),
+        (collections.abc.Set, {"1", "2", "3"}),
+        (collections.abc.MutableSet, {"1", "2", "3"}),
+        (collections.abc.MutableSequence, ["1", "2", "3"]),
+    ],
+)
+def test_abstract_collection_types(app, assert_parse_args, hint, expected):
+    """Test that collections.abc abstract types work (issue #702).
+
+    Tests both parameterized types (e.g., Set[str]) and bare types (e.g., Set).
+    Bare abstract types should default to [str] like bare concrete types.
+    """
+
+    @app.default
+    def main(test: hint):  # pyright: ignore[reportInvalidTypeForm]
+        return test
+
+    assert_parse_args(main, "1 2 3", expected)

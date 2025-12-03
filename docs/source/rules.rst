@@ -8,6 +8,8 @@ This page intends to serve as a terse set of type coercion rules that Cyclopts f
 Automatic coercion can always be overridden by the :attr:`.Parameter.converter` field.
 Typically, the :attr:`~.Parameter.converter` function will receive a single token, but it may receive multiple tokens
 if the annotated type is iterable (e.g. :class:`list`, :class:`set`).
+The number of tokens can be explicitly controlled with :attr:`~.Parameter.n_tokens`, which is useful when the
+type signature doesn't match the desired CLI token consumption.
 
 *******
 No Hint
