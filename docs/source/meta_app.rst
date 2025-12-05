@@ -160,3 +160,9 @@ This might be useful to share an expensive-to-create object amongst commands in 
 The ``parse=False`` configuration tells Cyclopts to not try and bind arguments to this parameter.
 Cyclopts will pass it along to ``ignored`` to make custom meta-app logic easier.
 The annotated parameter **must** be a keyword-only parameter.
+
+.. tip::
+
+   For app-wide control over which parameters are parsed, :attr:`~.Parameter.parse` can also accept a **regex pattern**.
+   This can be useful for automatically skipping all "private" parameters (e.g., those prefixed with ``_``) with the regex pattern ``"^(?!_)"``.
+   See :ref:`Skipping Private Parameters` for details.
