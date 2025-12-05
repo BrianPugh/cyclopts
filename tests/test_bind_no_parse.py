@@ -125,3 +125,17 @@ def test_parse_compiled_regex_via_default_parameter():
     assert bound.args == ("buzz_value",)
     assert bound.kwargs == {"visible": "cli_visible"}
     assert ignored == {"_hidden": str}
+
+
+def test_parse_regex_invalid_positional_no_default():
+    """App.default_parameter regex that skips a required positional param should raise."""
+    app = App(default_parameter=Parameter(parse="^(?!_)"))
+
+    @app.default
+    def foo(_value: str):  # Positional, no default, would be skipped by regex
+        pass
+
+    # The error should be raised when trying to parse (Argument creation),
+    # not at registration time (since validate_command only sees direct annotations)
+    with pytest.raises(ValueError, match="KEYWORD_ONLY"):
+        app.parse_args([])

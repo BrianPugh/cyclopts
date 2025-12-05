@@ -186,6 +186,14 @@ class Argument:
                 )
 
         if not self.parse:
+            # Validate that non-parsed parameters are keyword-only or have defaults
+            is_keyword_only = self.field_info.kind is self.field_info.KEYWORD_ONLY
+            has_default = self.field_info.default is not self.field_info.empty
+            if not (is_keyword_only or has_default):
+                raise ValueError(
+                    f"Non-parsed parameter '{self.field_info.name}' must be a KEYWORD_ONLY function parameter "
+                    "or have a default value."
+                )
             return
 
         if self.parameter.accepts_keys is False:
