@@ -1,0 +1,27 @@
+site_name: Cyclopts Demo
+site_description: Cyclopts Demo Description.
+theme:
+  name: mkdocs
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+plugins:
+  - search
+  - cyclopts
+
+nav:
+  - Home: index.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html

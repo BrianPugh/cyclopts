@@ -233,7 +233,6 @@ def format_usage(
     from cyclopts.annotations import get_hint_name
 
     usage = []
-    usage.append("Usage:")
 
     # If we're at the root level (no command chain), the app has a default_command,
     # and no explicit name was set, derive a better name from sys.argv[0]
