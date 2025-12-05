@@ -1,5 +1,6 @@
 import collections.abc
 import inspect
+import re
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
@@ -74,6 +75,17 @@ def _negative_converter(default: tuple[str, ...]):
             return to_tuple_converter(value)
 
     return converter
+
+
+def _parse_converter(value):
+    """Convert string patterns to compiled regex, pass through other types.
+
+    Note: re.compile() internally caches compiled patterns, so no additional
+    caching is needed here.
+    """
+    if isinstance(value, str):
+        return re.compile(value)
+    return value
 
 
 @record_init("_provided_args")
@@ -151,8 +163,9 @@ class Parameter:
         hash=False,
     )
 
-    parse: bool | str | None = field(
+    parse: bool | re.Pattern | None = field(
         default=None,
+        converter=_parse_converter,
         kw_only=True,
     )
 
@@ -266,9 +279,9 @@ class Parameter:
     def show(self) -> bool | None:
         if self._show is not None:
             return self._show
-        if isinstance(self.parse, bool):
-            return self.parse
-        return None  # For regex or None, let Argument.show handle it
+        if self.parse is None or isinstance(self.parse, re.Pattern):
+            return None  # For regex or None, let Argument.show handle it
+        return bool(self.parse)
 
     @property
     def name_transform(self):
@@ -442,7 +455,7 @@ def validate_command(f: Callable):
         # Check both annotated parameters and classes with __cyclopts__ attribute
         _, cparam = Parameter.from_annotation(field_info.annotation)
 
-        if cparam.parse is False:
+        if cparam.parse is not None and not isinstance(cparam.parse, re.Pattern) and not cparam.parse:
             is_keyword_only = field_info.kind is field_info.KEYWORD_ONLY
             has_default = field_info.default is not field_info.empty
             if not (is_keyword_only or has_default):

@@ -109,3 +109,19 @@ def test_parse_regex_explicit_show_true_override(capsys):
     app(["--help"], exit_on_error=False)
     output = capsys.readouterr().out
     assert "private" in output.lower()
+
+
+def test_parse_compiled_regex_via_default_parameter():
+    """App.default_parameter with pre-compiled regex skips underscore-prefixed params."""
+    import re
+
+    app = App(default_parameter=Parameter(parse=re.compile("^(?!_)")))
+
+    @app.default
+    def foo(buzz: str, *, visible: str = "visible_default", _hidden: str = "hidden_default"):
+        return (buzz, visible, _hidden)
+
+    _, bound, ignored = app.parse_args(["buzz_value", "--visible", "cli_visible"])
+    assert bound.args == ("buzz_value",)
+    assert bound.kwargs == {"visible": "cli_visible"}
+    assert ignored == {"_hidden": str}

@@ -918,14 +918,14 @@ class Argument:
     def parse(self) -> bool:
         """Whether this argument should be parsed from CLI tokens.
 
-        If ``Parameter.parse`` is a regex string, parse if the pattern matches
+        If ``Parameter.parse`` is a regex pattern, parse if the pattern matches
         the field name; otherwise don't parse.
         """
         if self.parameter.parse is None:
             return True
-        if isinstance(self.parameter.parse, str):
-            return bool(re.search(self.parameter.parse, self.field_info.name))
-        return self.parameter.parse
+        if isinstance(self.parameter.parse, re.Pattern):
+            return bool(self.parameter.parse.search(self.field_info.name))
+        return bool(self.parameter.parse)
 
     @property
     def required(self) -> bool:
