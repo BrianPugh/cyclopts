@@ -1,5 +1,6 @@
 import collections.abc
 import inspect
+import re
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
@@ -74,6 +75,17 @@ def _negative_converter(default: tuple[str, ...]):
             return to_tuple_converter(value)
 
     return converter
+
+
+def _parse_converter(value):
+    """Convert string patterns to compiled regex, pass through other types.
+
+    Note: re.compile() internally caches compiled patterns, so no additional
+    caching is needed here.
+    """
+    if isinstance(value, str):
+        return re.compile(value)
+    return value
 
 
 @record_init("_provided_args")
@@ -151,9 +163,9 @@ class Parameter:
         hash=False,
     )
 
-    parse: bool = field(
+    parse: bool | re.Pattern | None = field(
         default=None,
-        converter=attrs.converters.default_if_none(True),
+        converter=_parse_converter,
         kw_only=True,
     )
 
@@ -264,8 +276,12 @@ class Parameter:
     _provided_args: tuple[str, ...] = field(factory=tuple, init=False, eq=False)
 
     @property
-    def show(self) -> bool:
-        return self._show if self._show is not None else self.parse
+    def show(self) -> bool | None:
+        if self._show is not None:
+            return self._show
+        if self.parse is None or isinstance(self.parse, re.Pattern):
+            return None  # For regex or None, let Argument.show handle it
+        return bool(self.parse)
 
     @property
     def name_transform(self):
@@ -439,8 +455,14 @@ def validate_command(f: Callable):
         # Check both annotated parameters and classes with __cyclopts__ attribute
         _, cparam = Parameter.from_annotation(field_info.annotation)
 
-        if not cparam.parse and field_info.kind is not field_info.KEYWORD_ONLY:
-            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if cparam.parse is not None and not isinstance(cparam.parse, re.Pattern) and not cparam.parse:
+            is_keyword_only = field_info.kind is field_info.KEYWORD_ONLY
+            has_default = field_info.default is not field_info.empty
+            if not (is_keyword_only or has_default):
+                raise ValueError(
+                    "Parameter.parse=False must be used with either a KEYWORD_ONLY function parameter "
+                    "or a parameter with a default value."
+                )
 
         # Check for Parameter(name="*") without a default value when ALL class fields are optional
         # This is confusing for CLI users who expect the dataclass to be instantiated automatically

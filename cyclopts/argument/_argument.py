@@ -3,6 +3,7 @@
 import inspect
 import json
 import operator
+import re
 import sys
 from collections.abc import Callable, Sequence
 from contextlib import suppress
@@ -184,7 +185,15 @@ class Argument:
                     f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
                 )
 
-        if not self.parameter.parse:
+        if not self.parse:
+            # Validate that non-parsed parameters are keyword-only or have defaults
+            is_keyword_only = self.field_info.kind is self.field_info.KEYWORD_ONLY
+            has_default = self.field_info.default is not self.field_info.empty
+            if not (is_keyword_only or has_default):
+                raise ValueError(
+                    f"Non-parsed parameter '{self.field_info.name}' must be a KEYWORD_ONLY function parameter "
+                    "or have a default value."
+                )
             return
 
         if self.parameter.accepts_keys is False:
@@ -406,7 +415,7 @@ class Argument:
             Implicit value.
             :obj:`~.UNSET` if no implicit value is applicable.
         """
-        if not self.parameter.parse:
+        if not self.parse:
             raise ValueError
         return (
             self._match_index(term)
@@ -513,7 +522,7 @@ class Argument:
 
     def append(self, token: Token):
         """Safely add a :class:`Token`."""
-        if not self.parameter.parse:
+        if not self.parse:
             raise ValueError
 
         if any(x.address == token.address for x in self.tokens):
@@ -588,7 +597,7 @@ class Argument:
                         msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
                     ) from e
 
-        if not self.parameter.parse:
+        if not self.parse:
             out = UNSET
         elif self.parameter.count:
             out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
@@ -903,8 +912,28 @@ class Argument:
         """Show this argument on the help page.
 
         If an argument has child arguments, don't show it on the help-page.
+        Returns False for arguments that won't be parsed (including underscore-prefixed params).
         """
-        return not self.children and self.parameter.show
+        if self.children:
+            return False
+        if self.parameter.show is not None:
+            # User explicitly set show
+            return self.parameter.show
+        # Default to whether this argument is parsed
+        return self.parse
+
+    @property
+    def parse(self) -> bool:
+        """Whether this argument should be parsed from CLI tokens.
+
+        If ``Parameter.parse`` is a regex pattern, parse if the pattern matches
+        the field name; otherwise don't parse.
+        """
+        if self.parameter.parse is None:
+            return True
+        if isinstance(self.parameter.parse, re.Pattern):
+            return bool(self.parameter.parse.search(self.field_info.name))
+        return bool(self.parameter.parse)
 
     @property
     def required(self) -> bool:
