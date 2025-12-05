@@ -184,7 +184,7 @@ class Argument:
                     f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
                 )
 
-        if not self.parameter.parse:
+        if not self.parse:
             return
 
         if self.parameter.accepts_keys is False:
@@ -406,7 +406,7 @@ class Argument:
             Implicit value.
             :obj:`~.UNSET` if no implicit value is applicable.
         """
-        if not self.parameter.parse:
+        if not self.parse:
             raise ValueError
         return (
             self._match_index(term)
@@ -513,7 +513,7 @@ class Argument:
 
     def append(self, token: Token):
         """Safely add a :class:`Token`."""
-        if not self.parameter.parse:
+        if not self.parse:
             raise ValueError
 
         if any(x.address == token.address for x in self.tokens):
@@ -588,7 +588,7 @@ class Argument:
                         msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
                     ) from e
 
-        if not self.parameter.parse:
+        if not self.parse:
             out = UNSET
         elif self.parameter.count:
             out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
@@ -903,8 +903,36 @@ class Argument:
         """Show this argument on the help page.
 
         If an argument has child arguments, don't show it on the help-page.
+        Returns False for arguments that won't be parsed (including underscore-prefixed params).
         """
-        return not self.children and self.parameter.show
+        if self.children:
+            return False
+        if self.parameter.show is not None:
+            # User explicitly set show
+            return self.parameter.show
+        # Default to whether this argument is parsed
+        return self.parse
+
+    @property
+    def parse(self) -> bool:
+        """Whether this argument should be parsed from CLI tokens.
+
+        Returns False for underscore-prefixed KEYWORD_ONLY parameters,
+        unless explicitly overridden with Parameter(parse=True).
+        """
+        if self.parameter.parse is not None:
+            return self.parameter.parse
+
+        # Auto-disable parsing for private KEYWORD_ONLY params (dependency injection pattern)
+        if (
+            not self.keys
+            and self.field_info.names
+            and self.field_info.name.startswith("_")
+            and self.field_info.kind is self.field_info.KEYWORD_ONLY
+        ):
+            return False
+
+        return True
 
     @property
     def required(self) -> bool:

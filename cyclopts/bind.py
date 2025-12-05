@@ -497,9 +497,7 @@ def create_bound_arguments(
         for argument in argument_collection:
             # if a dict-like argument is missing, raise a MissingArgumentError on the first
             # required child (as opposed generically to the root dict-like object).
-            if not argument.parameter.parse or not argument.field_info.required or argument.keys:
-                continue
-            if not argument.has_tokens:
+            if argument.parse and argument.field_info.required and not argument.keys and not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)
 
         bound = _bind(argument_collection, func)

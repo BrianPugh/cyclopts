@@ -151,9 +151,8 @@ class Parameter:
         hash=False,
     )
 
-    parse: bool = field(
+    parse: bool | None = field(
         default=None,
-        converter=attrs.converters.default_if_none(True),
         kw_only=True,
     )
 
@@ -264,8 +263,10 @@ class Parameter:
     _provided_args: tuple[str, ...] = field(factory=tuple, init=False, eq=False)
 
     @property
-    def show(self) -> bool:
-        return self._show if self._show is not None else self.parse
+    def show(self) -> bool | None:
+        if self._show is not None:
+            return self._show
+        return self.parse  # None means "auto", handled by Argument.show
 
     @property
     def name_transform(self):
@@ -439,8 +440,14 @@ def validate_command(f: Callable):
         # Check both annotated parameters and classes with __cyclopts__ attribute
         _, cparam = Parameter.from_annotation(field_info.annotation)
 
-        if not cparam.parse and field_info.kind is not field_info.KEYWORD_ONLY:
-            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if cparam.parse is False:
+            is_keyword_only = field_info.kind is field_info.KEYWORD_ONLY
+            has_default = field_info.default is not field_info.empty
+            if not (is_keyword_only or has_default):
+                raise ValueError(
+                    "Parameter.parse=False must be used with either a KEYWORD_ONLY function parameter "
+                    "or a parameter with a default value."
+                )
 
         # Check for Parameter(name="*") without a default value when ALL class fields are optional
         # This is confusing for CLI users who expect the dataclass to be instantiated automatically
