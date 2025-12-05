@@ -1081,12 +1081,31 @@ API
       This is disabled (:obj:`False`) by default, allowing for more helpful error messages for unknown CLI options.
 
    .. attribute:: parse
-      :type: Optional[bool]
-      :value: True
+      :type: Union[None, bool, str]
+      :value: None
 
       Attempt to use this parameter while parsing.
-      Annotated parameter **must** be keyword-only.
+      Annotated parameter **must** be keyword-only or have a default value.
       This is intended to be used with :ref:`meta apps <Meta App>` for injecting values.
+
+      * :obj:`True` - Parse this parameter from CLI tokens.
+      * :obj:`False` - Do not parse; parameter will appear in the ``ignored`` dict from :meth:`.App.parse_args`.
+      * :obj:`None` - Default behavior (parse).
+      * :obj:`str` - A regex pattern; parse **if the pattern matches the parameter name**, otherwise skip.
+
+      Regex patterns are primarily intended for use with :attr:`.App.default_parameter` to define app-wide skip patterns:
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+
+         # Skip parsing underscore-prefixed KEYWORD_ONLY parameters (i.e. private parameters)
+         app = App(default_parameter=Parameter(parse="^(?!_)"))
+
+         @app.default
+         def main(visible: str, *, _injected: str = "default"):
+             # _injected is NOT parsed from CLI; uses default value
+             pass
 
    .. attribute:: required
       :type: Optional[bool]
@@ -1100,7 +1119,7 @@ API
       :value: None
 
       Show this parameter on the help screen.
-      Defaults to :attr:`parse` value (default: :obj:`True`).
+      Defaults to whether the parameter is :attr:`parsed <.Parameter.parse>` (usually :obj:`True`).
 
    .. attribute:: show_default
       :type: Union[None, bool, Callable[[Any], Any]]

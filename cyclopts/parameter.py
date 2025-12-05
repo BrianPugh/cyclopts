@@ -151,7 +151,7 @@ class Parameter:
         hash=False,
     )
 
-    parse: bool | None = field(
+    parse: bool | str | None = field(
         default=None,
         kw_only=True,
     )
@@ -266,7 +266,9 @@ class Parameter:
     def show(self) -> bool | None:
         if self._show is not None:
             return self._show
-        return self.parse  # None means "auto", handled by Argument.show
+        if isinstance(self.parse, bool):
+            return self.parse
+        return None  # For regex or None, let Argument.show handle it
 
     @property
     def name_transform(self):

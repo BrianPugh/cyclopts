@@ -3,6 +3,7 @@
 import inspect
 import json
 import operator
+import re
 import sys
 from collections.abc import Callable, Sequence
 from contextlib import suppress
@@ -917,22 +918,14 @@ class Argument:
     def parse(self) -> bool:
         """Whether this argument should be parsed from CLI tokens.
 
-        Returns False for underscore-prefixed KEYWORD_ONLY parameters,
-        unless explicitly overridden with Parameter(parse=True).
+        If ``Parameter.parse`` is a regex string, parse if the pattern matches
+        the field name; otherwise don't parse.
         """
-        if self.parameter.parse is not None:
-            return self.parameter.parse
-
-        # Auto-disable parsing for private KEYWORD_ONLY params (dependency injection pattern)
-        if (
-            not self.keys
-            and self.field_info.names
-            and self.field_info.name.startswith("_")
-            and self.field_info.kind is self.field_info.KEYWORD_ONLY
-        ):
-            return False
-
-        return True
+        if self.parameter.parse is None:
+            return True
+        if isinstance(self.parameter.parse, str):
+            return bool(re.search(self.parameter.parse, self.field_info.name))
+        return self.parameter.parse
 
     @property
     def required(self) -> bool:
