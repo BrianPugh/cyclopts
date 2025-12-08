@@ -68,8 +68,8 @@ def test_config_env_help(app, assert_parse_args, console):
         Usage: test_end2end FOO
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  [env var: BAR, FOO] [required]                       │
