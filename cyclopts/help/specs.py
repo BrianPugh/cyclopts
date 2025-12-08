@@ -74,6 +74,62 @@ class NameRenderer:
         return "\n".join(wrapped)
 
 
+class CommandNameRenderer:
+    """Renderer for command names with aliases in parentheses.
+
+    Displays commands in argparse-style format: ``primary (alias1, alias2)``.
+
+    Parameters
+    ----------
+    max_width : int | None
+        Maximum width for wrapping. If None, no wrapping is applied.
+    """
+
+    def __init__(self, max_width: int | None = None):
+        """Initialize the renderer with formatting options.
+
+        Parameters
+        ----------
+        max_width : int | None
+            Maximum width for wrapping. If None, no wrapping is applied.
+        """
+        self.max_width = max_width
+
+    def __call__(self, entry: "HelpEntry") -> "RenderableType":
+        """Render command name with aliases in parentheses.
+
+        Parameters
+        ----------
+        entry : HelpEntry
+            The table entry to render.
+
+        Returns
+        -------
+        ~rich.console.RenderableType
+            Primary command name with aliases in parentheses.
+        """
+        primary = entry.names[0]
+        aliases = list(entry.names[1:]) + list(entry.shorts)
+
+        if aliases:
+            text = f"{primary} ({', '.join(aliases)})"
+        else:
+            text = primary
+
+        if self.max_width is None:
+            return text
+
+        wrapped = textwrap.wrap(
+            text,
+            self.max_width,
+            subsequent_indent="  ",
+            break_on_hyphens=False,
+            tabsize=4,
+        )
+
+        return "\n".join(wrapped)
+
+
 class DescriptionRenderer:
     """Renderer for descriptions with configurable metadata formatting.
 
@@ -387,7 +443,7 @@ def get_default_command_columns(
     """
     max_width = math.ceil(console.width * 0.35)
     command_column = ColumnSpec(
-        renderer=NameRenderer(max_width=max_width),
+        renderer=CommandNameRenderer(max_width=max_width),
         header="Command",
         justify="left",
         style="cyan",

@@ -64,8 +64,8 @@ def test_help_default_action(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -85,8 +85,8 @@ def test_help_custom_usage(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -124,8 +124,8 @@ def test_help_default_help_flags(console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -243,9 +243,9 @@ def test_format_commands_no_show(app, console, assert_parse_args):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        Docstring for foo.                                      │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo          Docstring for foo.                                    │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -314,9 +314,9 @@ def test_help_functools_partial_1(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        Docstring for foo.                                      │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo          Docstring for foo.                                    │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -395,8 +395,8 @@ def test_format_choices_rich_format(app, console, assert_parse_args):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  REGION --region  [choices: us, ca] [required]                   │
@@ -785,8 +785,8 @@ def test_help_format_dataclass_default_parameter_negative_propagation(app, conso
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FORCE --force  [required]                                       │
@@ -817,8 +817,8 @@ def test_help_format_dataclass_decorated_parameter_negative_propagation(app, con
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FORCE --force  [required]                                       │
@@ -1385,8 +1385,8 @@ def test_help_print_command_group_description(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Custom Title ─────────────────────────────────────────────────────╮
         │ Command description.                                               │
@@ -1422,8 +1422,8 @@ def test_help_print_command_group_no_show(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ cmd2                                                               │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1483,10 +1483,47 @@ def test_help_print_commands(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1       Cmd1 help string.                                       │
-        │ cmd2       Cmd2 help string.                                       │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ cmd1         Cmd1 help string.                                     │
+        │ cmd2         Cmd2 help string.                                     │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_print_commands_with_aliases(app, console):
+    """Test that command aliases are displayed in parentheses."""
+
+    @app.command(alias=["g", "greet-alias"], help="Say hello.")
+    def greet():
+        pass
+
+    @app.command(alias="b", help="Say goodbye.")
+    def bye():
+        pass
+
+    @app.command(help="No aliases.")
+    def solo():
+        pass
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app COMMAND
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ bye (b)                 Say goodbye.                               │
+        │ greet (g, greet-alias)  Say hello.                                 │
+        │ solo                    No aliases.                                │
+        │ --help (-h)             Display this message and exit.             │
+        │ --version               Display application version.               │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1521,8 +1558,8 @@ def test_help_print_commands_group_sort_key(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ 4 ────────────────────────────────────────────────────────────────╮
         │ cmd1                                                               │
@@ -1569,10 +1606,10 @@ def test_help_print_commands_and_function(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1       Cmd1 help string.                                       │
-        │ cmd2       Cmd2 help string.                                       │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ cmd1         Cmd1 help string.                                     │
+        │ cmd2         Cmd2 help string.                                     │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Docstring for foo. [required]                        │
@@ -1599,7 +1636,7 @@ def test_help_print_commands_special_flag_reassign(app, console):
         │ --version  Display application version.                            │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Admin ────────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
+        │ --help (-h)  Display this message and exit.                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1718,8 +1755,8 @@ def test_help_print_commands_sort_key(app, console):
         │ charlie                                                            │
         │ bob                                                                │
         │ alice                                                              │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1814,11 +1851,11 @@ def test_help_print_commands_plus_meta_short(app, console):
         App Help String Line 1 from meta.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1       Cmd1 help string.                                       │
-        │ cmd2       Cmd2 help string.                                       │
-        │ meta-cmd   Meta cmd help string.                                   │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ cmd1         Cmd1 help string.                                     │
+        │ cmd2         Cmd2 help string.                                     │
+        │ meta-cmd     Meta cmd help string.                                 │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Arguments ────────────────────────────────────────────────╮
         │ TOKENS                                                             │
@@ -1853,11 +1890,11 @@ def test_help_print_commands_plus_meta_short(app, console):
         Root Default Command Short Description.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ cmd1       Cmd1 help string.                                       │
-        │ cmd2       Cmd2 help string.                                       │
-        │ meta-cmd   Meta cmd help string.                                   │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ cmd1         Cmd1 help string.                                     │
+        │ cmd2         Cmd2 help string.                                     │
+        │ meta-cmd     Meta cmd help string.                                 │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  RDP --rdp  RDP description. [required]                          │
@@ -1934,9 +1971,9 @@ def test_help_restructuredtext(app, console, normalize_trailing_whitespace):
          • bulletpoint 2
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        This is bold.                                           │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo          This is bold.                                         │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1988,9 +2025,9 @@ def test_help_markdown(app, console, normalize_trailing_whitespace):
          • bulletpoint 2
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        This is bold.                                           │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo          This is bold.                                         │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -2035,9 +2072,9 @@ def test_help_rich(app, console, normalize_trailing_whitespace):
         This text is red.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        This is italic.                                         │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo          This is italic.                                       │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -2096,9 +2133,9 @@ def test_help_plaintext(app, console):
         * point 2
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ foo        This is [italic]italic[/italic].                        │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ foo          This is [italic]italic[/italic].                      │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -2191,8 +2228,8 @@ def test_issue_373_help_space_with_meta_app(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  VALUE --value  [required]                                       │
@@ -2369,8 +2406,8 @@ def test_help_epilogue_basic(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
 
         This is an epilogue.
@@ -2406,8 +2443,8 @@ def test_help_epilogue_none(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -2428,8 +2465,8 @@ def test_help_epilogue_empty_string(app, console):
         App Help String Line 1.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

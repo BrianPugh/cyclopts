@@ -82,9 +82,9 @@ def test_meta_app_nested_root_help(nested_meta_app, console, queue):
         Usage: test_app COMMAND
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ subapp     This is subapp's help.                                  │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ subapp       This is subapp's help.                                │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -184,8 +184,8 @@ def test_meta_app_inheriting_root_default_parameter(app, console):
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo                                                                │
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Global options ───────────────────────────────────────────────────╮
         │ --flag1  [default: False]                                          │

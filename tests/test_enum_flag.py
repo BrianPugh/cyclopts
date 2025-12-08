@@ -120,8 +120,8 @@ def test_flag_as_boolean_flags_star_name(app, assert_parse_args, console):
         Manage file permissions.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --read     Enable read permissions. [default: False]               │
@@ -203,8 +203,8 @@ def test_flag_help_shows_member_docstrings(app, console):
         Manage file permissions.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --perms.read          Enable read permissions. [default: False]    │
@@ -238,8 +238,8 @@ def test_flag_help_star_name_shows_member_docstrings(app, console):
         Manage file permissions.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --read --no-read        Enable read permissions. [default: False]  │
@@ -298,8 +298,8 @@ def test_flag_in_dataclass_help(app, console):
         Create a user with permissions.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.NAME --user.name      [required]                           │
@@ -335,8 +335,8 @@ def test_flag_in_dataclass_help_no_negative(app, console):
         Create a user with permissions.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.NAME --user.name  [required]                               │
@@ -377,8 +377,8 @@ def test_flag_in_dataclass_help_no_keywords(app, assert_parse_args, console):
         Create a user with permissions.
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.NAME --user.name    [required]                             │
