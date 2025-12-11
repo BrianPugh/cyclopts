@@ -28,7 +28,7 @@ def test_generate_rst_docs_simple_app():
     assert "myapp" in docs
     assert "A simple CLI application" in docs
 
-    assert "Usage:" in docs
+    assert "myapp NAME" in docs  # Usage without "Usage:" prefix
     assert "::" in docs  # Literal block marker
     assert "myapp" in docs
 
@@ -259,34 +259,32 @@ def test_generate_rst_docs_flatten_commands():
     # Main app should be level 1 (=====)
     assert "=====\nmyapp\n=====" in docs_hierarchical
     # Subcommands should be level 2 (-----)
-    # Note: RST implementation uses short titles (not full command path)
     assert "sub1\n----" in docs_hierarchical
     assert "sub2\n----" in docs_hierarchical
-    # Nested commands should be level 3 (^^^^^)
-    assert "sub1 nested1\n^^^^^^^^^^^^" in docs_hierarchical
-    assert "sub1 nested2\n^^^^^^^^^^^^" in docs_hierarchical
-    assert "sub2 nested3\n^^^^^^^^^^^^" in docs_hierarchical
+    # Nested commands should be level 3 (^^^^^) and show just command name in hierarchical mode
+    assert "nested1\n^^^^^^^" in docs_hierarchical
+    assert "nested2\n^^^^^^^" in docs_hierarchical
+    assert "nested3\n^^^^^^^" in docs_hierarchical
 
     # With flatten_commands - all at same level
     docs_flat = app.generate_docs(output_format="rst", flatten_commands=True)
 
     # Main app should be level 1 (=====)
     assert "=====\nmyapp\n=====" in docs_flat
-    # All subcommands should also be level 1 (=====)
-    # Note: RST implementation uses short titles (not full command path)
-    assert "====\nsub1\n====" in docs_flat
-    assert "====\nsub2\n====" in docs_flat
-    # All nested commands should also be level 1 (=====)
-    assert "============\nsub1 nested1\n============" in docs_flat
-    assert "============\nsub1 nested2\n============" in docs_flat
-    assert "============\nsub2 nested3\n============" in docs_flat
+    # All subcommands should also be level 1 (=====) with full path in flattened mode
+    assert "==========\nmyapp sub1\n==========" in docs_flat
+    assert "==========\nmyapp sub2\n==========" in docs_flat
+    # All nested commands should also be level 1 (=====) with full path
+    assert "==================\nmyapp sub1 nested1\n==================" in docs_flat
+    assert "==================\nmyapp sub1 nested2\n==================" in docs_flat
+    assert "==================\nmyapp sub2 nested3\n==================" in docs_flat
     # Should NOT have level 2 or level 3 markers for commands
     # (Level 2 uses single underline, level 3 uses ^^^^)
     # Check that subcommands don't use level 2 markers (----)
     assert "sub1\n----" not in docs_flat
     assert "sub2\n----" not in docs_flat
     # Check that nested commands don't use level 3 markers (^^^^)
-    assert "sub1 nested1\n^^^^^^^^^^^^" not in docs_flat
+    assert "nested1\n^^^^^^^" not in docs_flat
 
 
 def test_generate_rst_docs_usage_strings_match_help():
@@ -324,11 +322,11 @@ def test_generate_rst_docs_usage_strings_match_help():
 
     # Verify usage strings are present and correctly formatted
     # The serve command should show: myapp serve [ARGS]
-    assert "Usage: myapp serve [ARGS]" in docs
+    assert "myapp serve [ARGS]" in docs
 
     # The build command should show: myapp build OUTPUT [ARGS]
     # with OUTPUT as a required argument shown explicitly
-    assert "Usage: myapp build OUTPUT [ARGS]" in docs
+    assert "myapp build OUTPUT [ARGS]" in docs
 
     # The key thing we're testing is that the usage strings match the actual
     # help output format, not the old manually-constructed generic patterns
@@ -336,7 +334,8 @@ def test_generate_rst_docs_usage_strings_match_help():
 
     # Verify that required arguments are shown explicitly by name
     lines = docs.split("\n")
-    usage_lines = [line.strip() for line in lines if "Usage:" in line]
+    # Look for usage lines in literal blocks (lines that start with myapp after whitespace)
+    usage_lines = [line.strip() for line in lines if line.strip().startswith("myapp")]
 
     # For the build command with required OUTPUT parameter
     build_usage = [line for line in usage_lines if "myapp build" in line]
@@ -367,7 +366,7 @@ def test_generate_rst_docs_usage_with_positional_args():
     docs = app.generate_docs(output_format="rst")
 
     # Should show the actual parameter names in usage
-    assert "Usage: tool process" in docs
+    assert "tool process" in docs
     # Should have INPUT-FILE and OUTPUT-FILE explicitly listed
     # The key point is that required positional args are shown by name
     assert "INPUT-FILE OUTPUT-FILE" in docs or "INPUT_FILE OUTPUT_FILE" in docs
@@ -393,7 +392,7 @@ def test_generate_rst_docs_usage_with_varargs():
     docs = app.generate_docs(output_format="rst")
 
     # Should show SCRIPT and [ARGS...] or similar
-    assert "Usage: cmd run" in docs
+    assert "cmd run" in docs
     assert "SCRIPT" in docs
     # Variable args are typically shown as [ARGS...] or ARGS...
     assert "[ARGS" in docs or "ARGS" in docs

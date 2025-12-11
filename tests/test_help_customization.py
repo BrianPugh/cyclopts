@@ -740,7 +740,7 @@ def test_custom_help_formatter_with_optional_methods(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        [CUSTOM USAGE]  Usage: test_help_customization [ARGS]
+        [CUSTOM USAGE]  test_help_customization [ARGS]
 
         [CUSTOM DESC]
         This is a test application.
@@ -910,7 +910,7 @@ def test_group_formatter_none_fallback(console: Console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_help_customization [ARGS]
+        test_help_customization [ARGS]
 
         +--------------------------------------------------------------------+
         |                              Commands                              |

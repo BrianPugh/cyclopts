@@ -1,6 +1,7 @@
 """To prevent circular dependencies, this module should never import anything else from Cyclopts."""
 
 import functools
+import importlib
 import inspect
 import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -448,3 +449,63 @@ def create_error_console_from_console(console: "Console") -> "Console":
         get_datetime=getattr(console, "get_datetime", None),
         get_time=getattr(console, "get_time", None),
     )
+
+
+def import_app(module_path: str):
+    """Import a Cyclopts App from a module path.
+
+    Parameters
+    ----------
+    module_path : str
+        Module path in format "module.name" or "module.name:app_name".
+        If ":app_name" is omitted, auto-discovers by searching for common
+        names (app, cli, main) or any public App instance.
+
+    Returns
+    -------
+    App
+        The imported Cyclopts App instance.
+
+    Raises
+    ------
+    ImportError
+        If the module cannot be imported.
+    AttributeError
+        If the specified app name doesn't exist or no App is found.
+    TypeError
+        If the specified attribute is not a Cyclopts App instance.
+    """
+    from cyclopts import App
+
+    if ":" in module_path:
+        module_name, app_name = module_path.rsplit(":", 1)
+    else:
+        module_name, app_name = module_path, None
+
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as e:
+        raise ImportError(f"Cannot import module '{module_name}': {e}") from e
+
+    if app_name:
+        if not hasattr(module, app_name):
+            raise AttributeError(f"Module '{module_name}' has no attribute '{app_name}'")
+        app = getattr(module, app_name)
+        if not isinstance(app, App):
+            raise TypeError(f"'{app_name}' is not a Cyclopts App instance")
+        return app
+
+    # Auto-discovery: search for App instance
+    for name in ["app", "cli", "main"]:
+        obj = getattr(module, name, None)
+        if isinstance(obj, App):
+            return obj
+
+    # Search all public attributes
+    for name in dir(module):
+        if not name.startswith("_"):
+            obj = getattr(module, name)
+            if isinstance(obj, App):
+                return obj
+
+    raise AttributeError(f"No Cyclopts App found in '{module_name}'. Specify explicitly: '{module_name}:app_name'")
