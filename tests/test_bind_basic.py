@@ -257,6 +257,32 @@ def test_short_integer_flag(app, assert_parse_args):
 
 
 @pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("-9", -9),
+        ("-10", -10),  # Multi-digit negatives should NOT be treated as combined short flags
+        ("-100", -100),
+        ("-3.14", -3.14),
+        ("-1e5", -1e5),
+        ("-1.5e-3", -1.5e-3),
+    ],
+)
+def test_negative_number_not_combined_short_flags(app, cmd_str, expected, assert_parse_args):
+    """Negative numbers should be parsed as values, not as combined short flags.
+
+    Regression test for issue where -10 was incorrectly interpreted as combined
+    short flags -1 and -0, while -9 worked because len("-9") == 2 doesn't trigger
+    combined flag parsing (which requires len > 2).
+    """
+
+    @app.default
+    def main(value: float):
+        pass
+
+    assert_parse_args(main, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
     "cmd_str",
     [
         "foo --age 10",
