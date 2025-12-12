@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from cyclopts.command_spec import CommandSpec
 from cyclopts.group import Group
 
 if TYPE_CHECKING:
@@ -60,9 +61,17 @@ def groups_from_app(app: "App") -> list[tuple[Group, list[RegisteredCommand]]]:
 
     # First pass: collect all registered names and unique apps
     # Use __iter__ and __getitem__ to properly handle meta parents
+    #
+    # Skip unresolved lazy commands to avoid importing modules unnecessarily.
+    # Limitation: Group objects defined in unresolved lazy modules won't be
+    # available until those modules are imported. To avoid this, define Group
+    # objects in non-lazy modules. See docs/source/lazy_loading.rst for details.
     app_names: dict[int, list[str]] = {}
     unique_apps: dict[int, App] = {}
     for name in app:
+        cmd = app._get_item(name, recurse_meta=True)
+        if isinstance(cmd, CommandSpec) and not cmd.is_resolved:
+            continue
         subapp = app[name]
         app_id = id(subapp)
         app_names.setdefault(app_id, []).append(name)
