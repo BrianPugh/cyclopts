@@ -151,3 +151,51 @@ To catch import errors early, you can access the command during testing:
        # This will trigger the import and fail if path is wrong
        resolved = app["create"]
        assert resolved is not None
+
+-----------------------
+Groups and Lazy Loading
+-----------------------
+
+.. tip:: **TL;DR:** Define :class:`~cyclopts.Group` objects used by commands in your main CLI module, NOT in lazy-loaded modules.
+
+:class:`~cyclopts.Group` objects defined in **unresolved lazy modules** won't be available
+until those modules are **explicitly imported**. To avoid this, define :class:`~cyclopts.Group` objects in non-lazy modules.
+
+.. code-block:: python
+
+   # myapp/cli.py (always imported)
+   from cyclopts import App, Group
+
+   # Define Group objects here
+   admin_group = Group("Admin Commands", validator=require_admin_role)
+   db_group = Group("Database", default_parameter=Parameter(envvar_prefix="DB_"))
+
+   app = App()
+
+   # Lazy commands can reference the Group objects
+   app.command("myapp.admin:create_user", group=admin_group)
+   app.command("myapp.admin:delete_user", group=admin_group)
+   app.command("myapp.db:migrate", group=db_group)
+
+**What to avoid:** Defining ``Group`` objects inside lazy-loaded modules:
+
+.. code-block:: python
+
+   # myapp/admin.py (lazy-loaded)
+   from cyclopts import App, Group
+
+   # BAD: This Group won't be available to other commands until this module is imported
+   admin_group = Group("Admin Commands", validator=require_admin_role)
+
+   def create_user():
+       ...
+
+If you reference a group by string (e.g., ``group="Admin Commands"``) and the :class:`~cyclopts.Group` object
+with that name is only defined in an unresolved lazy module, the group won't be available
+until that lazy module is imported. This means that:
+
+- Validators defined on the lazy-loaded :class:`~cyclopts.Group` won't be applied to commands in other modules.
+- :attr:`.Group.default_parameter` and other settings won't be inherited by commands **referencing the group by string**.
+
+Once the lazy module is imported (e.g., by executing one of its commands), the :class:`~cyclopts.Group` object
+becomes available and subsequent operations will use it correctly.

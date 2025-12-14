@@ -140,7 +140,8 @@ def _parse_kw_and_flags(
             matches.append(_KeywordMatch(cli_option, *argument_collection.match(cli_option)))
         except ValueError:
             # Length has to be greater than 2 (hyphen + character) to be exploded.
-            if allow_combined_flags and len(token) > 2:
+            # Also exclude numeric values (e.g., -10, -3.14) from combined flag parsing.
+            if allow_combined_flags and len(token) > 2 and is_option_like(token, allow_numbers=False):
                 # GNU-style combined short options: process left-to-right
                 # Once we hit an option that takes a value, the rest is the value
                 chars = cli_option.lstrip("-")
