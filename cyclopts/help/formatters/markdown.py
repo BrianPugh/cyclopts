@@ -1,7 +1,7 @@
 """Markdown documentation formatter."""
 
 import io
-from typing import TYPE_CHECKING, Any, Optional, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Optional
 
 from cyclopts._markup import extract_text
 
@@ -9,83 +9,6 @@ if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpEntry, HelpPanel
-
-
-def _format_type_name(type_obj: Any) -> str:
-    """Format a type object into a readable string.
-
-    Parameters
-    ----------
-    type_obj : Any
-        Type object to format.
-
-    Returns
-    -------
-    str
-        Formatted type name.
-
-    Examples
-    --------
-    >>> _format_type_name(str)
-    'str'
-    >>> _format_type_name(Optional[int])
-    'int'
-    >>> _format_type_name(list[str])
-    'list[str]'
-    """
-    if type_obj is None:
-        return ""
-
-    # Handle string representation of types
-    if isinstance(type_obj, str):
-        # Clean up common patterns
-        type_str = type_obj
-        type_str = type_str.replace("<class '", "").replace("'>", "")
-        type_str = type_str.replace("typing.", "")
-
-        # Handle Optional types
-        if "Optional[" in type_str:
-            # Extract the inner type
-            inner = type_str[type_str.index("[") + 1 : type_str.rindex("]")]
-            return inner
-
-        return type_str
-
-    # Get string representation of the type
-    type_str = str(type_obj)
-
-    # Clean up class representations
-    if type_str.startswith("<class '"):
-        type_str = type_str[8:-2]  # Remove "<class '...'>" wrapper
-
-    # Handle typing module types
-    origin = get_origin(type_obj)
-    if origin is Union:
-        args = get_args(type_obj)
-        # Check if it's Optional (Union with None)
-        if len(args) == 2 and type(None) in args:
-            non_none = args[0] if args[1] is type(None) else args[1]
-            return _format_type_name(non_none)
-        # Format as Union
-        formatted_args = [_format_type_name(arg) for arg in args]
-        return f"Union[{', '.join(formatted_args)}]"
-    elif origin:
-        # Handle generic types like List, Dict, etc.
-        args = get_args(type_obj)
-        origin_name = getattr(origin, "__name__", str(origin))
-        if args:
-            formatted_args = [_format_type_name(arg) for arg in args]
-            return f"{origin_name}[{', '.join(formatted_args)}]"
-        return origin_name
-
-    # Handle built-in types
-    if hasattr(type_obj, "__name__"):
-        return type_obj.__name__
-
-    # Clean up typing module prefixes
-    type_str = type_str.replace("typing.", "")
-
-    return type_str
 
 
 class MarkdownFormatter:

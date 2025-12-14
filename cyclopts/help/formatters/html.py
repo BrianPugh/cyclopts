@@ -11,54 +11,6 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpEntry, HelpPanel
 
 
-def _format_type_name(type_obj: Any) -> str:
-    """Format a type object into a readable string.
-
-    Parameters
-    ----------
-    type_obj : Any
-        Type object to format.
-
-    Returns
-    -------
-    str
-        Formatted type name.
-    """
-    if type_obj is None:
-        return ""
-
-    # Extract plain text if it's a Rich object
-    if hasattr(type_obj, "plain"):
-        type_str = type_obj.plain.rstrip()
-    elif hasattr(type_obj, "__rich_console__"):
-        type_str = extract_text(type_obj, None)
-    else:
-        type_str = str(type_obj)
-
-    # Clean up the type string
-    type_str = type_str.replace("<class '", "").replace("'>", "")
-
-    # Handle Optional types
-    if type_str.startswith("typing.Optional["):
-        inner_type = type_str[16:-1]  # Remove "typing.Optional[" and "]"
-        return f"Optional[{inner_type}]"
-    elif type_str.startswith("Optional["):
-        return type_str
-
-    # Handle Union types
-    if type_str.startswith("typing.Union["):
-        inner_types = type_str[13:-1]  # Remove "typing.Union[" and "]"
-        return f"Union[{inner_types}]"
-    elif type_str.startswith("Union["):
-        return type_str
-
-    # Handle List/Dict/etc
-    if type_str.startswith("typing."):
-        return type_str[7:]  # Remove "typing." prefix
-
-    return type_str
-
-
 class HtmlFormatter:
     """HTML documentation formatter.
 
