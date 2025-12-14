@@ -3,6 +3,11 @@ MkDocs Integration
 
 Cyclopts provides builtin `MkDocs <https://www.mkdocs.org/>`_ support.
 
+.. warning::
+
+   The MkDocs plugin is **experimental** and may have breaking changes in future releases.
+   If you encounter any issues or have feedback, please `report them on GitHub <https://github.com/BrianPugh/cyclopts/issues>`_.
+
 .. contents:: Table of Contents
    :local:
    :depth: 2
