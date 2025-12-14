@@ -38,6 +38,7 @@ class DirectiveOptions:
     flatten_commands: bool = field(default=False, validator=validators.instance_of(bool))
     generate_toc: bool = field(default=True, validator=validators.instance_of(bool))
     code_block_title: bool = field(default=False, validator=validators.instance_of(bool))
+    skip_preamble: bool = field(default=False, validator=validators.instance_of(bool))
 
     @classmethod
     def from_directive_block(
@@ -204,6 +205,7 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
                 exclude_commands=options.exclude_commands,
                 no_root_title=True,  # Skip root title in plugin context
                 code_block_title=options.code_block_title,
+                skip_preamble=options.skip_preamble,
             )
 
             return markdown_docs

@@ -110,6 +110,19 @@ Set the starting heading level for the generated documentation (1-6, default: 2)
 
 This is useful when you need to adjust the heading hierarchy. The default of 2 works well for most cases where the directive is placed under a page title.
 
+``max_heading_level`` - Maximum Heading Level
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Set the maximum heading level to use (1-6, default: 6):
+
+.. code-block:: markdown
+
+   ::: cyclopts
+       module: mypackage.cli:app
+       max_heading_level: 4
+
+Headings deeper than this level will be capped at this value. This is useful for deeply nested command hierarchies where you want to prevent headings from becoming too small.
+
 ``recursive`` - Include Subcommands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -228,6 +241,35 @@ Exclude specific commands from the documentation:
          - internal-test
 
 This is useful for hiding internal or debug commands from user-facing documentation. Like ``commands``, this also supports nested command paths with dot notation and inline YAML list syntax.
+
+``skip_preamble`` - Skip Description and Usage
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Skip the description and usage sections for the target command when filtering to a single command:
+
+.. code-block:: markdown
+
+   ::: cyclopts
+       module: mypackage.cli:app
+       commands: [deploy]
+       skip_preamble: true
+
+When you filter to a single command using ``commands`` and provide your own section heading in the Markdown, you may not want the plugin to generate the command's description and usage block. Setting ``skip_preamble: true`` suppresses these sections while still generating the command's parameters and subcommands.
+
+This is useful when you want to write your own introduction for a command section:
+
+.. code-block:: markdown
+
+   ## Deployment
+
+   Deploy your application to production with these commands.
+
+   ::: cyclopts
+       module: mypackage.cli:app
+       commands: [deploy]
+       skip_preamble: true
+
+Without ``skip_preamble``, the output would include both your introduction and the command's docstring description, which can be redundant.
 
 Complete Example
 ----------------

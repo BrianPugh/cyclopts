@@ -320,6 +320,7 @@ def generate_markdown_docs(
     exclude_commands: list[str] | None = None,
     no_root_title: bool = False,
     code_block_title: bool = False,
+    skip_preamble: bool = False,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -359,6 +360,11 @@ def generate_markdown_docs(
         Default is None (no exclusions).
     no_root_title : bool
         If True, skip the root application title. Used for plugin contexts.
+        Default is False.
+    skip_preamble : bool
+        If True, skip the description and usage sections for the target command
+        when filtering to a single command via ``commands_filter``.
+        Useful when the user provides their own section introduction.
         Default is False.
 
     Returns
@@ -519,16 +525,20 @@ def generate_markdown_docs(
                 lines.append(f"{'#' * effective_sub_level} {display_fmt}")
                 lines.append("")
 
-            # Get subapp help - always show description, usage, and panels for included commands
+            # Get subapp help - show description, usage, and panels for included commands
+            # Skip preamble (description + usage) if skip_preamble is True and this command's title was skipped
+            skip_this_preamble = skip_preamble and skip_this_command_title
+
             # Include parent app in the stack so default_parameter is properly inherited
             with subapp.app_stack([app, subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 # Preserve markup when sub_help_format matches output format (markdown)
                 preserve_sub = sub_help_format in ("markdown", "md")
-                _render_description_section(subapp, sub_help_format, lines)
 
-                # Generate usage for subcommand if appropriate
-                _render_usage_section(subapp, sub_command_chain, lines)
+                if not skip_this_preamble:
+                    _render_description_section(subapp, sub_help_format, lines)
+                    # Generate usage for subcommand if appropriate
+                    _render_usage_section(subapp, sub_command_chain, lines)
 
                 # Only show subcommand panels if we're in recursive mode
                 # (Otherwise we just show the basic info about this command)
@@ -699,6 +709,7 @@ def generate_markdown_docs(
                                 exclude_commands=sub_exclude_commands,
                                 no_root_title=False,  # Always show title for nested commands
                                 code_block_title=code_block_title,
+                                skip_preamble=False,  # Nested commands show preamble normally
                             )
                         # Just append the generated docs - no title replacement
                         lines.append(nested_docs)

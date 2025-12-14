@@ -168,6 +168,7 @@ def generate_rst_docs(
     exclude_commands: list[str] | None = None,
     no_root_title: bool = False,
     code_block_title: bool = False,
+    skip_preamble: bool = False,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -208,6 +209,11 @@ def generate_rst_docs(
     no_root_title : bool
         If True, skip generating the root application title.
         Useful when embedding in existing documentation with its own title.
+        Default is False.
+    skip_preamble : bool
+        If True, skip the description and usage sections for the target command
+        when filtering to a single command via ``commands_filter``.
+        Useful when the user provides their own section introduction.
         Default is False.
 
     Returns
@@ -272,22 +278,25 @@ def generate_rst_docs(
         lines.append("")
 
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = extract_description(app, help_format)
-    if description:
-        # Extract plain text from description
-        # Preserve markup when help_format matches output format (RST)
-        preserve = help_format in ("restructuredtext", "rst")
-        desc_text = extract_text(description, None, preserve_markup=preserve)
-        if desc_text:
-            lines.append(desc_text.strip())
-            lines.append("")
+
+    # Skip preamble (description + usage) if skip_preamble is True
+    if not skip_preamble:
+        description = extract_description(app, help_format)
+        if description:
+            # Extract plain text from description
+            # Preserve markup when help_format matches output format (RST)
+            preserve = help_format in ("restructuredtext", "rst")
+            desc_text = extract_text(description, None, preserve_markup=preserve)
+            if desc_text:
+                lines.append(desc_text.strip())
+                lines.append("")
 
     # Generate table of contents at root level only
     if generate_toc and not command_chain and app._commands:
         _generate_toc(lines)
 
-    # Add usage section if appropriate
-    if should_show_usage(app):
+    # Add usage section if appropriate (skip if skip_preamble is True)
+    if not skip_preamble and should_show_usage(app):
         # Generate usage line - only if we're documenting a specific command
         if not (no_root_title and not command_chain):
             # Extract usage from app
@@ -416,6 +425,16 @@ def generate_rst_docs(
                 name, normalized_commands_filter, normalized_exclude_commands
             )
 
+            # Determine if this subcommand should skip its preamble
+            # Skip preamble when: we're at root, skip_preamble is True, and this is the single target command
+            is_single_target = (
+                not command_chain
+                and skip_preamble
+                and commands_filter is not None
+                and len(commands_filter) == 1
+                and name == commands_filter[0]
+            )
+
             # Push subapp onto app_stack - context will stack with recursive call's app_stack([app])
             with subapp.app_stack([app, subapp]):
                 subdocs = generate_rst_docs(
@@ -431,6 +450,7 @@ def generate_rst_docs(
                     exclude_commands=sub_exclude_commands,
                     no_root_title=False,  # Subcommands should have titles
                     code_block_title=code_block_title,
+                    skip_preamble=is_single_target,  # Skip preamble for single target command
                 )
             lines.append(subdocs)
 

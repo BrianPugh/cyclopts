@@ -528,6 +528,73 @@ class TestProcessDirectives:
             if "no_title_app" in sys.modules:
                 del sys.modules["no_title_app"]
 
+    def test_skip_preamble_skips_description_and_usage(self, tmp_path):
+        """Test that skip_preamble skips description and usage for filtered command."""
+        module_file = tmp_path / "skip_preamble_app.py"
+        module_file.write_text(
+            textwrap.dedent(
+                """\
+                from cyclopts import App
+
+                app = App(name="main-app", help="Main app description")
+
+                sub = App(name="sub", help="This description should be skipped")
+
+                @sub.default
+                def sub_cmd(arg: str):
+                    '''Sub command.'''
+                    pass
+
+                app.command(sub)
+                """
+            )
+        )
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            from cyclopts.ext.mkdocs import process_cyclopts_directives
+
+            # Test without skip_preamble (default) - description should be present
+            markdown_without_skip = textwrap.dedent(
+                """\
+                # Sub Commands
+
+                ::: cyclopts
+                    module: skip_preamble_app:app
+                    commands: [sub]
+                    generate_toc: false
+                """
+            )
+
+            result_without_skip = process_cyclopts_directives(markdown_without_skip, None)
+            assert "This description should be skipped" in result_without_skip
+
+            # Clear module cache for fresh import
+            del sys.modules["skip_preamble_app"]
+
+            # Test with skip_preamble=true - description should be absent
+            markdown_with_skip = textwrap.dedent(
+                """\
+                # Sub Commands
+
+                ::: cyclopts
+                    module: skip_preamble_app:app
+                    commands: [sub]
+                    generate_toc: false
+                    skip_preamble: true
+                """
+            )
+
+            result_with_skip = process_cyclopts_directives(markdown_with_skip, None)
+            assert "This description should be skipped" not in result_with_skip
+            # The command's parameters should still be present
+            assert "arg" in result_with_skip.lower()
+
+        finally:
+            sys.path.remove(str(tmp_path))
+            if "skip_preamble_app" in sys.modules:
+                del sys.modules["skip_preamble_app"]
+
 
 class TestDirectivePattern:
     """Test the directive pattern regex."""

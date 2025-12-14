@@ -913,6 +913,92 @@ def cmd2():
         finally:
             sys.path.remove(str(tmp_path))
 
+    def test_skip_preamble_option(self, tmp_path):
+        """Test :skip-preamble: option to skip description and usage."""
+        module_file = tmp_path / "test_skip_preamble.py"
+        module_file.write_text("""from cyclopts import App
+
+app = App(name="test-cli", help="Main app description")
+
+sub_cmd = App(name="sub", help="This description should be skipped")
+
+@sub_cmd.default
+def sub_handler(arg: str):
+    '''Sub command handler.'''
+    pass
+
+app.command(sub_cmd)
+""")
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            from cyclopts.ext.sphinx import CycloptsDirective
+
+            # First test without skip-preamble - description should be present
+            mock_state1 = MagicMock()
+            mock_state1.nested_parse = MagicMock()
+
+            directive1 = CycloptsDirective(
+                name="cyclopts",
+                arguments=["test_skip_preamble:app"],
+                options={"commands": "sub"},  # No skip-preamble
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state1,
+                state_machine=MagicMock(),
+            )
+
+            directive1.run()
+
+            # Collect content from nested_parse calls
+            all_calls1 = mock_state1.nested_parse.call_args_list
+            all_content1 = []
+            for call_args in all_calls1:
+                if call_args:
+                    rst_lines = call_args[0][0]
+                    all_content1.extend(rst_lines)
+            rst_content1 = "\n".join(all_content1)
+
+            # Without skip_preamble, description should be present
+            assert "This description should be skipped" in rst_content1
+
+            # Now test with skip-preamble - description should be absent
+            mock_state2 = MagicMock()
+            mock_state2.nested_parse = MagicMock()
+
+            directive2 = CycloptsDirective(
+                name="cyclopts",
+                arguments=["test_skip_preamble:app"],
+                options={"commands": "sub", "skip-preamble": True},
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state2,
+                state_machine=MagicMock(),
+            )
+
+            directive2.run()
+
+            # Collect content from nested_parse calls
+            all_calls2 = mock_state2.nested_parse.call_args_list
+            all_content2 = []
+            for call_args in all_calls2:
+                if call_args:
+                    rst_lines = call_args[0][0]
+                    all_content2.extend(rst_lines)
+            rst_content2 = "\n".join(all_content2)
+
+            # With skip_preamble, description should NOT be present
+            assert "This description should be skipped" not in rst_content2
+            # But parameters should still be present
+            assert "arg" in rst_content2.lower()
+
+        finally:
+            sys.path.remove(str(tmp_path))
+
 
 class TestRstContentParsing:
     """Test RST content parsing and formatting."""

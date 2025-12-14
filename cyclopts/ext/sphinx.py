@@ -32,6 +32,7 @@ class DirectiveOptions:
     include_hidden: bool = False
     flatten_commands: bool = False
     code_block_title: bool = False
+    skip_preamble: bool = False
 
     @classmethod
     def from_dict(cls, options: dict) -> "DirectiveOptions":
@@ -356,6 +357,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             exclude_commands=opts.exclude_commands,
             no_root_title=True,  # Always skip root title in Sphinx context
             code_block_title=opts.code_block_title,
+            skip_preamble=opts.skip_preamble,
         )
 
     def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> list["nodes.Node"]:
