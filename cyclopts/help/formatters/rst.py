@@ -4,7 +4,7 @@ import io
 from typing import TYPE_CHECKING, Any, Optional
 
 from cyclopts._markup import extract_text
-from cyclopts.help.formatters._shared import make_rst_section_header
+from cyclopts.docs.rst import make_rst_section_header
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
