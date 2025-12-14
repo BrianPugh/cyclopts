@@ -187,14 +187,19 @@ class MarkdownFormatter:
                 names.extend(entry.shorts)
 
             if names:
-                # Use first name as primary
+                # Use first name as primary, show aliases in parentheses
                 primary_name = names[0]
+                aliases = names[1:]
+                if aliases:
+                    name_display = f"{primary_name} ({', '.join(aliases)})"
+                else:
+                    name_display = primary_name
                 desc = extract_text(entry.description, console, preserve_markup=True)
 
                 if desc:
-                    self._output.write(f"* `{primary_name}`: {desc}")
+                    self._output.write(f"* `{name_display}`: {desc}")
                 else:
-                    self._output.write(f"* `{primary_name}`:")
+                    self._output.write(f"* `{name_display}`:")
 
                 self._output.write("\n")
 
@@ -218,26 +223,30 @@ class MarkdownFormatter:
                 names.extend(entry.shorts)
 
             if names:
-                # In cyclopts, parameters have both positional and option names
-                # Determine if we should display as positional based on requirement and default
+                # Separate positional names from option names
+                positional_names = [n for n in names if not n.startswith("-")]
+                short_opts = [n for n in names if n.startswith("-") and not n.startswith("--")]
+                long_opts = [n for n in names if n.startswith("--")]
+
+                # Determine if this is a positional argument (required, no default)
                 is_positional = entry.required and entry.default is None
 
-                if is_positional:
-                    # For positional arguments, only show the positional name (uppercase)
-                    positional_names = [n for n in names if not n.startswith("-")]
-                    name_str = positional_names[0].upper() if positional_names else names[0].upper()
+                if is_positional and positional_names:
+                    # Show uppercase positional name first, then any option names
+                    parts = [positional_names[0].upper()]
+                    parts.extend(long_opts)
+                    name_str = ", ".join(parts)
                 else:
-                    # For options, format with both short and long forms
-                    if len(names) > 1:
-                        # Show short option first if available
-                        if any(n.startswith("-") and not n.startswith("--") for n in names):
-                            short_opts = [n for n in names if n.startswith("-") and not n.startswith("--")]
-                            long_opts = [n for n in names if n.startswith("--")]
-                            name_str = ", ".join(short_opts + long_opts)
-                        else:
-                            name_str = ", ".join(names)
+                    # For options, show long opts first, then short opts
+                    if short_opts:
+                        name_str = ", ".join(long_opts + short_opts)
+                    elif positional_names:
+                        # Has positional name but not required - show all
+                        parts = [positional_names[0].upper()]
+                        parts.extend(long_opts)
+                        name_str = ", ".join(parts)
                     else:
-                        name_str = names[0]
+                        name_str = ", ".join(long_opts)
 
                 # Start the entry (no type display)
                 self._output.write(f"* `{name_str}`: ")
@@ -301,25 +310,7 @@ class MarkdownFormatter:
 
                 if entry.default is not None:
                     default_str = extract_text(entry.default, console)
-                    # For boolean flags, format as flag style
-                    if entry.type and _format_type_name(entry.type) == "bool":
-                        # Find the positive and negative flag names
-                        positive_flag = None
-                        negative_flag = None
-                        for name in names:
-                            if name.startswith("--no-"):
-                                negative_flag = name
-                            elif name.startswith("--"):
-                                if not positive_flag:  # Take first positive flag
-                                    positive_flag = name
-
-                        if default_str.lower() == "true" and positive_flag:
-                            metadata.append(f"default: {positive_flag}")
-                        elif default_str.lower() == "false" and negative_flag:
-                            metadata.append(f"default: {negative_flag}")
-                        # Don't show default if we can't determine the flag
-                    else:
-                        metadata.append(f"default: {default_str}")
+                    metadata.append(f"default: {default_str}")
 
                 # Write required in bold and separate brackets first
                 if is_required:

@@ -451,6 +451,7 @@ def iterate_commands(app: "App", include_hidden: bool = False):
     """Iterate through app commands, yielding valid resolved subapps.
 
     Automatically resolves CommandSpec instances to App instances.
+    Each unique subapp is yielded only once (first occurrence wins).
 
     Parameters
     ----------
@@ -467,11 +468,12 @@ def iterate_commands(app: "App", include_hidden: bool = False):
     if not app._commands:
         return
 
+    seen: set[int] = set()
+
     for name, app_or_spec in app._commands.items():
         if _is_builtin_flag(app, name):
             continue
 
-        # Resolve CommandSpec to App
         subapp = app_or_spec.resolve(app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
 
         if not isinstance(subapp, type(app)):
@@ -479,5 +481,11 @@ def iterate_commands(app: "App", include_hidden: bool = False):
 
         if not include_hidden and not subapp.show:
             continue
+
+        # Skip if we've already yielded this app (alias)
+        app_id = id(subapp)
+        if app_id in seen:
+            continue
+        seen.add(app_id)
 
         yield name, subapp

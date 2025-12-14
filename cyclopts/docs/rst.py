@@ -9,6 +9,7 @@ from cyclopts.docs.base import (
     extract_usage,
     generate_anchor,
     get_app_info,
+    is_all_builtin_flags,
     iterate_commands,
     normalize_command_filters,
     should_include_command,
@@ -20,66 +21,80 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
-def _collect_commands_for_toc(
-    app: "App",
-    include_hidden: bool = False,
-    prefix: str = "",
-    commands_filter: list[str] | None = None,
-    exclude_commands: list[str] | None = None,
-    parent_path: list[str] | None = None,
-) -> list[tuple[str, str, "App"]]:
-    """Recursively collect all commands for table of contents.
+def _build_command_map(app: "App", include_hidden: bool = True) -> dict[str, "App"]:
+    """Build mapping of command names to App objects.
 
-    Returns a list of (display_name, anchor, app) tuples.
+    Parameters
+    ----------
+    app : App
+        The app to extract commands from.
+    include_hidden : bool
+        Whether to include hidden commands.
+
+    Returns
+    -------
+    dict[str, App]
+        Mapping of command names to App instances.
     """
-    commands = []
-
-    if not app._commands:
-        return commands
-
-    if parent_path is None:
-        parent_path = []
-
-    normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
-        commands_filter, exclude_commands
-    )
-
-    for name, subapp in iterate_commands(app, include_hidden):
-        if not should_include_command(
-            name, parent_path, normalized_commands_filter, normalized_exclude_commands, subapp
-        ):
-            continue
-
-        display_name = f"{prefix}{name}" if prefix else name
-        # For RST, anchors work differently - they're explicit labels
-        anchor = display_name.replace(" ", "-").lower()
-
-        commands.append((display_name, anchor, subapp))
-
-        nested_path = parent_path + [name]
-        nested = _collect_commands_for_toc(
-            subapp,
-            include_hidden=include_hidden,
-            prefix=f"{display_name} ",
-            commands_filter=commands_filter,
-            exclude_commands=exclude_commands,
-            parent_path=nested_path,
-        )
-        commands.extend(nested)
-
-    return commands
+    command_map = {}
+    if app._commands:
+        for name, subapp in iterate_commands(app, include_hidden):
+            command_map[name] = subapp
+    return command_map
 
 
-def _generate_toc_entries(
-    lines: list[str], commands: list[tuple[str, str, "App"]], app_name: str | None = None
-) -> None:
-    """Generate TOC entries with proper indentation for RST."""
-    if not commands:
-        return
+def _filter_command_entries(
+    entries: list,
+    command_map: dict[str, "App"],
+    parent_path: list[str],
+    normalized_filter: set[str] | None,
+    normalized_exclude: set[str] | None,
+) -> list:
+    """Filter command entries based on inclusion/exclusion rules.
 
-    lines.append(".. contents:: Commands")
+    Parameters
+    ----------
+    entries : list
+        Command entries to filter.
+    command_map : dict[str, App]
+        Mapping of command names to App objects.
+    parent_path : list[str]
+        Parent command path.
+    normalized_filter : set[str] | None
+        Normalized filter set.
+    normalized_exclude : set[str] | None
+        Normalized exclude set.
+
+    Returns
+    -------
+    list
+        Filtered command entries.
+    """
+    filtered_entries = []
+    for entry in entries:
+        if entry.names:
+            cmd_name = entry.names[0]
+            subapp = command_map.get(cmd_name)
+            if subapp is None:
+                # If command not in map and no filters, include it
+                if normalized_filter is None and normalized_exclude is None:
+                    filtered_entries.append(entry)
+            else:
+                # Check if command should be included
+                if should_include_command(cmd_name, parent_path, normalized_filter, normalized_exclude, subapp):
+                    filtered_entries.append(entry)
+    return filtered_entries
+
+
+def _generate_toc(lines: list[str]) -> None:
+    """Generate table of contents using RST contents directive.
+
+    The `.. contents::` directive automatically generates a TOC from
+    section headings, which is the idiomatic approach for RST/Sphinx.
+    """
+    lines.append(".. contents:: Table of Contents")
     lines.append("   :local:")
-    lines.append("   :depth: 2")
+    lines.append("   :depth: 6")
     lines.append("")
 
 
@@ -88,6 +103,7 @@ def generate_rst_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
+    max_heading_level: int = 6,
     command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
@@ -111,6 +127,10 @@ def generate_rst_docs(
     heading_level : int
         Starting heading level for the main application title.
         Default is 1 (uses '=' markers).
+    max_heading_level : int
+        Maximum heading level to use. Headings deeper than this will be capped
+        at this level. RST uses different underline characters for each level.
+        Default is 6.
     command_chain : list[str]
         Internal parameter to track command hierarchy.
         Default is None.
@@ -183,6 +203,9 @@ def generate_rst_docs(
         # Normal hierarchical: increment level for nested commands
         effective_heading_level = heading_level + len(command_chain) - 1 if command_chain else heading_level
 
+    # Cap at max_heading_level
+    effective_heading_level = min(effective_heading_level, max_heading_level)
+
     if not (no_root_title and not command_chain):
         if code_block_title:
             header_lines = make_rst_code_block_title(title)
@@ -201,6 +224,10 @@ def generate_rst_docs(
         if desc_text:
             lines.append(desc_text.strip())
             lines.append("")
+
+    # Generate table of contents at root level only
+    if generate_toc and not command_chain and app._commands:
+        _generate_toc(lines)
 
     # Add usage section if appropriate
     if should_show_usage(app):
@@ -234,7 +261,18 @@ def generate_rst_docs(
                 lines.append("")
 
     # Get help panels for the current app
-    help_panels_with_groups = app._assemble_help_panels([], help_format)
+    # Use app_stack context - if caller set up parent context, it will be stacked
+    with app.app_stack([app]):
+        help_panels_with_groups = app._assemble_help_panels([], help_format)
+
+    # Set up command filtering
+    normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
+        commands_filter, exclude_commands
+    )
+    parent_path: list[str] = []
+
+    # Build a mapping of command names to App objects for filtering
+    command_map = _build_command_map(app, include_hidden=True)
 
     # Create formatter for help panels
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
@@ -245,26 +283,53 @@ def generate_rst_docs(
         if not include_hidden and group and not group.show:
             continue
 
-        # Skip command panels entirely (not rendered in RST mode)
-        if panel.format == "command":
-            continue
-
         # Skip if no_root_title and we're at root
         if no_root_title and not command_chain:
             continue
 
-        # Render parameter panels as-is
-        if panel.format == "parameter":
-            # Render panel title if present
+        # Render command panels as grouped command lists
+        if panel.format == "command":
+            # Filter out built-in flags (--help, --version) from command panels
+            command_entries = [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
+
+            if not command_entries:
+                continue  # Skip empty panel
+
+            # Apply command filtering
+            filtered_entries = _filter_command_entries(
+                command_entries, command_map, parent_path, normalized_commands_filter, normalized_exclude_commands
+            )
+
+            if not filtered_entries:
+                continue  # Skip if nothing after filtering
+
+            # Render group title
             if panel.title:
                 lines.append(f"**{panel.title}:**")
                 lines.append("")
 
+            # Render commands as RST definition list
+            for entry in filtered_entries:
+                primary_name = entry.names[0] if entry.names else ""
+                desc = extract_text(entry.description, None)
+                lines.append(f"``{primary_name}``")
+                if desc:
+                    lines.append(f"    {desc}")
+                lines.append("")
+
+        # Render parameter panels as-is
+        elif panel.format == "parameter":
+            # Render content first to check if there's anything
             formatter.reset()
             panel_copy = panel.copy(title="")
             formatter(None, None, panel_copy)
             output = formatter.get_output().strip()
+
+            # Only render if there's actual content
             if output:
+                if panel.title:
+                    lines.append(f"**{panel.title}:**")
+                    lines.append("")
                 lines.append(output)
                 lines.append("")
 
@@ -294,13 +359,14 @@ def generate_rst_docs(
                 name, normalized_commands_filter, normalized_exclude_commands
             )
 
-            # Push subapp onto app_stack so should_show_usage() can detect subcommand context
-            with subapp.app_stack([subapp]):
+            # Push subapp onto app_stack - context will stack with recursive call's app_stack([app])
+            with subapp.app_stack([app, subapp]):
                 subdocs = generate_rst_docs(
                     subapp,
                     recursive=recursive,
                     include_hidden=include_hidden,
                     heading_level=next_heading_level,
+                    max_heading_level=max_heading_level,
                     command_chain=subcommand_chain,
                     generate_toc=False,  # Only generate TOC at root level
                     flatten_commands=flatten_commands,
@@ -311,4 +377,10 @@ def generate_rst_docs(
                 )
             lines.append(subdocs)
 
-    return "\n".join(lines)
+    # Join and normalize multiple consecutive blank lines to a single blank line
+    import re
+
+    doc = "\n".join(lines)
+    doc = re.sub(r"\n{3,}", "\n\n", doc)
+
+    return doc

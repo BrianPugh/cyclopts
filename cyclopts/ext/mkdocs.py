@@ -28,6 +28,7 @@ class DirectiveOptions:
 
     module: str = field(validator=validators.instance_of(str))
     heading_level: int = field(default=2, validator=validators.instance_of(int))
+    max_heading_level: int = field(default=6, validator=validators.instance_of(int))
     commands: list[str] | None = field(default=None, validator=validators.optional(validators.instance_of(list)))
     exclude_commands: list[str] | None = field(
         default=None, validator=validators.optional(validators.instance_of(list))
@@ -40,7 +41,11 @@ class DirectiveOptions:
 
     @classmethod
     def from_directive_block(
-        cls, directive_text: str, *, default_heading_level: int | None = None
+        cls,
+        directive_text: str,
+        *,
+        default_heading_level: int | None = None,
+        default_max_heading_level: int | None = None,
     ) -> "DirectiveOptions":
         """Parse options from a ::: cyclopts directive block.
 
@@ -48,6 +53,7 @@ class DirectiveOptions:
             ::: cyclopts
                 module: myapp.cli:app
                 heading_level: 2
+                max_heading_level: 6
                 recursive: true
                 commands:
                   - cmd1
@@ -59,6 +65,8 @@ class DirectiveOptions:
             The directive text to parse.
         default_heading_level : int | None
             Default heading level from plugin config. Used if :heading-level: not specified.
+        default_max_heading_level : int | None
+            Default max heading level from plugin config. Used if :max-heading-level: not specified.
         """
         lines = directive_text.strip().split("\n")
 
@@ -77,6 +85,9 @@ class DirectiveOptions:
 
         if default_heading_level is not None:
             options.setdefault("heading_level", default_heading_level)
+
+        if default_max_heading_level is not None:
+            options.setdefault("max_heading_level", default_max_heading_level)
 
         # Convert keys with dashes to underscores
         normalized_options = {key.replace("-", "_"): value for key, value in options.items()}
@@ -172,7 +183,12 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
 
         try:
             default_heading = plugin_config.default_heading_level if plugin_config else None
-            options = DirectiveOptions.from_directive_block(directive_text, default_heading_level=default_heading)
+            default_max_heading = plugin_config.default_max_heading_level if plugin_config else None
+            options = DirectiveOptions.from_directive_block(
+                directive_text,
+                default_heading_level=default_heading,
+                default_max_heading_level=default_max_heading,
+            )
 
             app = import_app(options.module)
 
@@ -181,6 +197,7 @@ def process_cyclopts_directives(markdown: str, plugin_config: Any) -> str:
                 recursive=options.recursive,
                 include_hidden=options.include_hidden,
                 heading_level=options.heading_level,
+                max_heading_level=options.max_heading_level,
                 generate_toc=options.generate_toc,
                 flatten_commands=options.flatten_commands,
                 commands_filter=options.commands,
@@ -203,6 +220,7 @@ class CycloptsPluginConfig(base.Config):  # type: ignore[misc]
     """Configuration schema for the Cyclopts MkDocs plugin."""
 
     default_heading_level = c.Type(int, default=2)  # type: ignore[attr-defined]
+    default_max_heading_level = c.Type(int, default=6)  # type: ignore[attr-defined]
 
 
 class CycloptsPlugin(BasePlugin[CycloptsPluginConfig]):  # type: ignore[misc]

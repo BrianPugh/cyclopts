@@ -2184,6 +2184,7 @@ class App:
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
+        max_heading_level: int = 6,
         flatten_commands: bool = False,
     ) -> str:
         """Generate documentation for this CLI application.
@@ -2202,6 +2203,10 @@ class App:
         heading_level : int
             Starting heading level for the main application title.
             Default is 1 (single # for markdown, = for RST).
+        max_heading_level : int
+            Maximum heading level to use. Headings deeper than this will be capped
+            at this level. Standard Markdown and HTML support levels 1-6.
+            Default is 6.
         flatten_commands : bool
             If True, generate all commands at the same heading level instead of nested.
             Default is False.
@@ -2240,6 +2245,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
             )
         elif output_format == "html":
@@ -2248,6 +2254,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
             )
         elif output_format == "rst":
@@ -2256,6 +2263,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
                 no_root_title=False,  # Default to False for direct API usage
             )

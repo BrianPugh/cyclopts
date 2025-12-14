@@ -329,6 +329,7 @@ def generate_html_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
+    max_heading_level: int = 6,
     standalone: bool = True,
     custom_css: str | None = None,
     command_chain: list[str] | None = None,
@@ -350,6 +351,10 @@ def generate_html_docs(
     heading_level : int
         Starting heading level for the main application title.
         Default is 1.
+    max_heading_level : int
+        Maximum heading level to use. Headings deeper than this will be capped
+        at this level. HTML supports levels 1-6.
+        Default is 6.
     standalone : bool
         If True, generate a complete HTML document with <html>, <head>, etc.
         If False, generate only the body content. Default is True.
@@ -390,16 +395,18 @@ def generate_html_docs(
         full_command = app_name
         title = app_name
         # Add title for all levels
-        lines.append(f'<h{heading_level} class="app-title">{title}</h{heading_level}>')
+        effective_level = min(heading_level, max_heading_level)
+        lines.append(f'<h{effective_level} class="app-title">{title}</h{effective_level}>')
     else:
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
         # Create anchor-friendly ID using shared logic
         anchor_id = generate_anchor(full_command)
+        effective_level = min(heading_level, max_heading_level)
         lines.append('<section class="command-section">')
         lines.append(
-            f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{heading_level}>'
+            f'<h{effective_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{effective_level}>'
         )
 
     # Add application description
@@ -422,7 +429,8 @@ def generate_html_docs(
     # Add usage section if not suppressed
     usage = extract_usage(app)
     if usage:
-        lines.append(f"<h{heading_level + 1}>Usage</h{heading_level + 1}>")
+        usage_level = min(heading_level + 1, max_heading_level)
+        lines.append(f"<h{usage_level}>Usage</h{usage_level}>")
         lines.append('<div class="usage-block">')
         if isinstance(usage, str):
             usage_text = usage
@@ -433,7 +441,9 @@ def generate_html_docs(
         lines.append("</div>")
 
     # Get help panels for the current app
-    help_panels_with_groups = app._assemble_help_panels([], help_format)
+    # Use app_stack context - if caller set up parent context, it will be stacked
+    with app.app_stack([app]):
+        help_panels_with_groups = app._assemble_help_panels([], help_format)
 
     # Render panels
     formatter = HtmlFormatter(
@@ -477,12 +487,14 @@ def generate_html_docs(
                 if len(sub_command_chain) > 1
                 else f"{app_name}-{name}".lower()
             )
+            effective_sub_level = min(sub_heading_level, max_heading_level)
             lines.append(
-                f'<h{sub_heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{sub_heading_level}>'
+                f'<h{effective_sub_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
             )
 
             # Get subapp help
-            with subapp.app_stack([subapp]):
+            # Include parent app in the stack so default_parameter is properly inherited
+            with subapp.app_stack([app, subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
@@ -497,6 +509,7 @@ def generate_html_docs(
                         usage_heading_level = heading_level + 1
                     else:
                         usage_heading_level = heading_level + 2
+                    usage_heading_level = min(usage_heading_level, max_heading_level)
                     lines.append(f"<h{usage_heading_level}>Usage</h{usage_heading_level}>")
                     lines.append('<div class="usage-block">')
                     if isinstance(sub_usage, str):
@@ -517,6 +530,7 @@ def generate_html_docs(
                         panel_heading_level = heading_level + 1
                     else:
                         panel_heading_level = heading_level + 2
+                    panel_heading_level = min(panel_heading_level, max_heading_level)
                     sub_formatter = HtmlFormatter(
                         heading_level=panel_heading_level,
                         include_hidden=include_hidden,
@@ -545,18 +559,21 @@ def generate_html_docs(
                             nested_heading_level = heading_level
                         else:
                             nested_heading_level = heading_level + 2
-                        # Recursively generate docs for nested commands
-                        nested_docs = generate_html_docs(
-                            nested_app,
-                            recursive=recursive,
-                            include_hidden=include_hidden,
-                            heading_level=nested_heading_level,
-                            standalone=False,  # Not standalone for nested
-                            custom_css=None,
-                            command_chain=nested_chain,  # Pass the command chain
-                            generate_toc=False,  # No TOC for nested commands
-                            flatten_commands=flatten_commands,
-                        )
+                        # Set up context for nested_app, then recurse
+                        # The recursive call's app_stack([app]) will stack on top of this
+                        with nested_app.app_stack([subapp, nested_app]):
+                            nested_docs = generate_html_docs(
+                                nested_app,
+                                recursive=recursive,
+                                include_hidden=include_hidden,
+                                heading_level=nested_heading_level,
+                                max_heading_level=max_heading_level,
+                                standalone=False,  # Not standalone for nested
+                                custom_css=None,
+                                command_chain=nested_chain,  # Pass the command chain
+                                generate_toc=False,  # No TOC for nested commands
+                                flatten_commands=flatten_commands,
+                            )
                         lines.append(nested_docs)
 
             # Add back to top link if we're in a nested section

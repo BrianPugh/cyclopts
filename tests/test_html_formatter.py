@@ -40,7 +40,7 @@ def test_html_formatter_command_panel():
     assert "<ul" in output
     assert "<code>serve</code>" in output
     assert "<code>build</code>" in output
-    assert "<code>-b</code>" in output
+    assert "(-b)" in output  # Aliases are shown in parentheses without code tags
     assert "Start the server" in output
     assert "Build the project" in output
 

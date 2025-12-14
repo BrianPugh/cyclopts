@@ -250,18 +250,18 @@ def _render_parameter_panel(panel, formatter, lines: list[str]) -> None:
     lines : list[str]
         List to append rendered content to.
     """
-    # Render panel title if present
-    if panel.title:
-        lines.append(f"**{panel.title}**:\n")
-
-    # Render panel content
+    # Render panel content first to check if there's anything
     formatter.reset()
     panel_copy = panel.copy(title="")
     formatter(None, None, panel_copy)
     output = formatter.get_output().strip()
+
+    # Only render if there's actual content
     if output:
+        if panel.title:
+            lines.append(f"**{panel.title}**:\n")
         lines.append(output)
-    lines.append("")
+        lines.append("")
 
 
 def _filter_command_entries(
@@ -312,6 +312,7 @@ def generate_markdown_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
+    max_heading_level: int = 6,
     command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
@@ -335,6 +336,10 @@ def generate_markdown_docs(
     heading_level : int
         Starting heading level for the main application title.
         Default is 1 (single #).
+    max_heading_level : int
+        Maximum heading level to use. Headings deeper than this will be capped
+        at this level. Standard Markdown supports levels 1-6.
+        Default is 6.
     command_chain : list[str]
         Internal parameter to track command hierarchy.
         Default is None.
@@ -389,7 +394,8 @@ def generate_markdown_docs(
 
     # Add title for all levels (unless skipping root title or skipping current level entirely)
     if not skip_current_level and not (no_root_title and is_root):
-        lines.append(f"{'#' * heading_level} {title}")
+        effective_level = min(heading_level, max_heading_level)
+        lines.append(f"{'#' * effective_level} {title}")
         lines.append("")
 
     # Get help format (needed for both current level and recursive docs)
@@ -408,8 +414,10 @@ def generate_markdown_docs(
         _render_usage_section(app, command_chain, lines)
 
     # Get help panels for the current app (skip if skipping current level)
+    # Use app_stack context - if caller set up parent context, it will be stacked
     if not skip_current_level:
-        help_panels_with_groups = app._assemble_help_panels([], help_format)
+        with app.app_stack([app]):
+            help_panels_with_groups = app._assemble_help_panels([], help_format)
 
         # Set up command filtering (used for command panels only)
         normalized_commands_filter, normalized_exclude_commands = normalize_command_filters(
@@ -434,12 +442,9 @@ def generate_markdown_docs(
                 continue
 
             if panel.format == "command":
-                # Filter out built-in flags (--help, --version) when not showing hidden
-                command_entries = panel.entries
-                if not include_hidden:
-                    command_entries = [
-                        e for e in command_entries if not (e.names and is_all_builtin_flags(app, e.names))
-                    ]
+                # Always filter out built-in flags (--help, --version) from command panels
+                # These are standard CLI flags, not commands, and shouldn't appear here
+                command_entries = [e for e in panel.entries if not (e.names and is_all_builtin_flags(app, e.names))]
 
                 if not command_entries:
                     continue  # Skip empty panel
@@ -510,11 +515,13 @@ def generate_markdown_docs(
                 # Always use full command path to avoid anchor collisions
                 display_name = " ".join(sub_command_chain)
                 display_fmt = f"`{display_name}`" if code_block_title else display_name
-                lines.append(f"{'#' * sub_heading_level} {display_fmt}")
+                effective_sub_level = min(sub_heading_level, max_heading_level)
+                lines.append(f"{'#' * effective_sub_level} {display_fmt}")
                 lines.append("")
 
             # Get subapp help - always show description, usage, and panels for included commands
-            with subapp.app_stack([subapp]):
+            # Include parent app in the stack so default_parameter is properly inherited
+            with subapp.app_stack([app, subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
                 # Preserve markup when sub_help_format matches output format (markdown)
                 preserve_sub = sub_help_format in ("markdown", "md")
@@ -541,7 +548,8 @@ def generate_markdown_docs(
                     sub_command_map = _build_command_map(subapp, include_hidden=True)
 
                     # Build parent path for nested commands
-                    nested_parent_path_for_panel = parent_path + [name] if parent_path else [name]
+                    # Use empty path since filter was already adjusted to strip current level's prefix
+                    nested_parent_path_for_panel = []
 
                     # Create formatter
                     if flatten_commands:
@@ -562,14 +570,10 @@ def generate_markdown_docs(
                             continue
 
                         if panel.format == "command" and should_show_commands_list(subapp):
-                            # Filter out built-in flags when not showing hidden
-                            command_entries_list = panel.entries
-                            if not include_hidden:
-                                command_entries_list = [
-                                    e
-                                    for e in command_entries_list
-                                    if not (e.names and is_all_builtin_flags(subapp, e.names))
-                                ]
+                            # Always filter out built-in flags (--help, --version) from command panels
+                            command_entries_list = [
+                                e for e in panel.entries if not (e.names and is_all_builtin_flags(subapp, e.names))
+                            ]
 
                             if not command_entries_list:
                                 continue  # Skip empty panel
@@ -640,64 +644,73 @@ def generate_markdown_docs(
                             # Handle parameter panels - split into arguments and options if needed
                             _render_parameter_panel(panel, sub_formatter, lines)
 
-            if recursive and subapp._commands:
-                sub_commands_filter, sub_exclude_commands = adjust_filters_for_subcommand(
-                    name, normalized_commands_filter, normalized_exclude_commands
-                )
-
-                normalized_sub_filter, normalized_sub_exclude = normalize_command_filters(
-                    sub_commands_filter, sub_exclude_commands
-                )
-
-                # Build parent path for nested commands
-                nested_parent_path = parent_path + [name] if parent_path else [name]
-
-                for nested_name, nested_app in iterate_commands(subapp, include_hidden):
-                    if not should_include_command(
-                        nested_name, nested_parent_path, normalized_sub_filter, normalized_sub_exclude, nested_app
-                    ):
-                        continue
-
-                    # Build nested command chain (always use full path for correct usage)
-                    nested_command_chain = build_command_chain(sub_command_chain, nested_name, app_name)
-                    # Determine heading level for nested commands
-                    if flatten_commands:
-                        nested_heading_level = heading_level
-                    elif skip_this_command_title:
-                        # When parent command's title was skipped, promote nested commands to parent's level
-                        nested_heading_level = sub_heading_level
-                    else:
-                        nested_heading_level = sub_heading_level + 1
-                    # Determine commands_filter for the recursive call
-                    # If this nested command is the exact target of the filter,
-                    # pass None to include all its children
-                    if (
-                        normalized_sub_filter
-                        and nested_name in normalized_sub_filter
-                        and len(normalized_sub_filter) == 1
-                    ):
-                        nested_commands_filter = None
-                    else:
-                        nested_commands_filter = sub_commands_filter
-
-                    # Recursively generate docs for nested commands
-                    nested_docs = generate_markdown_docs(
-                        nested_app,
-                        recursive=recursive,
-                        include_hidden=include_hidden,
-                        heading_level=nested_heading_level,
-                        command_chain=nested_command_chain,
-                        generate_toc=False,  # Don't generate TOC for nested commands
-                        flatten_commands=flatten_commands,
-                        commands_filter=nested_commands_filter,
-                        exclude_commands=sub_exclude_commands,
-                        no_root_title=False,  # Always show title for nested commands
-                        code_block_title=code_block_title,
+                # Process nested commands INSIDE the with block so context is preserved
+                if recursive and subapp._commands:
+                    sub_commands_filter, sub_exclude_commands = adjust_filters_for_subcommand(
+                        name, normalized_commands_filter, normalized_exclude_commands
                     )
-                    # Just append the generated docs - no title replacement
-                    lines.append(nested_docs)
-                    lines.append("")
+
+                    normalized_sub_filter, normalized_sub_exclude = normalize_command_filters(
+                        sub_commands_filter, sub_exclude_commands
+                    )
+
+                    # Build parent path for nested commands
+                    # Use empty path since filter was already adjusted to strip current level's prefix
+                    nested_parent_path = []
+
+                    for nested_name, nested_app in iterate_commands(subapp, include_hidden):
+                        if not should_include_command(
+                            nested_name, nested_parent_path, normalized_sub_filter, normalized_sub_exclude, nested_app
+                        ):
+                            continue
+
+                        # Build nested command chain (always use full path for correct usage)
+                        nested_command_chain = build_command_chain(sub_command_chain, nested_name, app_name)
+                        # Determine heading level for nested commands
+                        if flatten_commands:
+                            nested_heading_level = heading_level
+                        elif skip_this_command_title:
+                            # When parent command's title was skipped, promote nested commands to parent's level
+                            nested_heading_level = sub_heading_level
+                        else:
+                            nested_heading_level = sub_heading_level + 1
+                        # Determine commands_filter for the recursive call
+                        # Adjust filter to strip current command's prefix for the nested level
+                        if normalized_sub_filter:
+                            nested_commands_filter, _ = adjust_filters_for_subcommand(
+                                nested_name, normalized_sub_filter, normalized_sub_exclude
+                            )
+                        else:
+                            nested_commands_filter = None
+
+                        # Set up context for nested_app, then recurse
+                        # The recursive call's app_stack([app]) will stack on top of this
+                        with nested_app.app_stack([subapp, nested_app]):
+                            nested_docs = generate_markdown_docs(
+                                nested_app,
+                                recursive=recursive,
+                                include_hidden=include_hidden,
+                                heading_level=nested_heading_level,
+                                max_heading_level=max_heading_level,
+                                command_chain=nested_command_chain,
+                                generate_toc=False,  # Don't generate TOC for nested commands
+                                flatten_commands=flatten_commands,
+                                commands_filter=nested_commands_filter,
+                                exclude_commands=sub_exclude_commands,
+                                no_root_title=False,  # Always show title for nested commands
+                                code_block_title=code_block_title,
+                            )
+                        # Just append the generated docs - no title replacement
+                        lines.append(nested_docs)
+                        lines.append("")
 
     # Join all lines into final document
     doc = "\n".join(lines).rstrip() + "\n"
+
+    # Normalize multiple consecutive blank lines to a single blank line
+    # This ensures consistent spacing regardless of how content was assembled
+    import re
+
+    doc = re.sub(r"\n{3,}", "\n\n", doc)
+
     return doc

@@ -23,6 +23,7 @@ class DirectiveOptions:
     """Configuration for the Cyclopts directive."""
 
     heading_level: int = 2
+    max_heading_level: int = 6
     commands: list[str] | None = None
     exclude_commands: list[str] | None = None
 
@@ -349,6 +350,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             recursive=not opts.no_recursive,
             include_hidden=opts.include_hidden,
             heading_level=opts.heading_level,
+            max_heading_level=opts.max_heading_level,
             flatten_commands=opts.flatten_commands,
             commands_filter=opts.commands,
             exclude_commands=opts.exclude_commands,

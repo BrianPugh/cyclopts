@@ -122,6 +122,7 @@ omit = ["cyclopts/protocols.py"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+extraPaths = ["tests/apps/complex-demo"]
 ignore = ["docs/", "tests/py312/"]
 reportUnsupportedDunderAll = "none"
 
