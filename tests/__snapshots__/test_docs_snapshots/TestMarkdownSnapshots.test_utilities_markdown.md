@@ -15,10 +15,10 @@ Complex CLI application for comprehensive documentation testing.
 
 **Utilities**:
 
-* `cache`: Cache management commands.
-* `complex-types`: Demonstrate complex type annotations.
-* `info (i)`: Show application information.
-* `version (ver, v)`: Show version information.
+* [`cache`](#complex-cli-cache): Cache management commands.
+* [`complex-types`](#complex-cli-complex-types): Demonstrate complex type annotations.
+* [`info`](#complex-cli-info): Show application information.
+* [`version`](#complex-cli-version): Show version information.
 
 ### complex-cli version
 

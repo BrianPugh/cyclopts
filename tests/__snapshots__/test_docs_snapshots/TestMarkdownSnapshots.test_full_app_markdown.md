@@ -51,19 +51,19 @@ Complex CLI application for comprehensive documentation testing.
 
 **Subcommands**:
 
-* `admin`: Administrative commands for system management.
-* `data`: Data processing commands.
-* `server`: Server management commands.
+* [`admin`](#complex-cli-admin): Administrative commands for system management.
+* [`data`](#complex-cli-data): Data processing commands.
+* [`server`](#complex-cli-server): Server management commands.
 
 **Utilities**:
 
-* `cache`: Cache management commands.
-* `complex-types`: Demonstrate complex type annotations.
-* `google-style`: Command with Google-style docstring.
-* `info (i)`: Show application information.
-* `numpy-style`: Command with NumPy-style docstring.
-* `sphinx-style`: Command with Sphinx-style docstring.
-* `version (ver, v)`: Show version information.
+* [`cache`](#complex-cli-cache): Cache management commands.
+* [`complex-types`](#complex-cli-complex-types): Demonstrate complex type annotations.
+* [`google-style`](#complex-cli-google-style): Command with Google-style docstring.
+* [`info`](#complex-cli-info): Show application information.
+* [`numpy-style`](#complex-cli-numpy-style): Command with NumPy-style docstring.
+* [`sphinx-style`](#complex-cli-sphinx-style): Command with Sphinx-style docstring.
+* [`version`](#complex-cli-version): Show version information.
 
 ## complex-cli version
 
@@ -150,10 +150,10 @@ User management commands.
 
 **Commands**:
 
-* `create`: Create a new user.
-* `delete`: Delete a user.
-* `list-users`: List all users.
-* `permissions`: Permission management for users.
+* [`create`](#complex-cli-admin-users-create): Create a new user.
+* [`delete`](#complex-cli-admin-users-delete): Delete a user.
+* [`list-users`](#complex-cli-admin-users-list-users): List all users.
+* [`permissions`](#complex-cli-admin-users-permissions): Permission management for users.
 
 #### complex-cli admin users list-users
 
@@ -265,8 +265,8 @@ Role template management.
 
 **Commands**:
 
-* `create-role`: Create a new role template.
-* `list-roles`: List all role templates.
+* [`create-role`](#complex-cli-admin-users-permissions-roles-create-role): Create a new role template.
+* [`list-roles`](#complex-cli-admin-users-permissions-roles-list-roles): List all role templates.
 
 ###### complex-cli admin users permissions roles list-roles
 

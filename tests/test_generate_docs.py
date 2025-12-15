@@ -82,10 +82,10 @@ def test_generate_docs_with_commands():
     # Main usage section
     assert "myapp COMMAND" in actual
 
-    # Commands list
+    # Commands list with hyperlinks
     assert "**Commands**:" in actual
-    assert "* `build`: Build the project." in actual
-    assert "* `serve`: Start the server." in actual
+    assert "* [`build`](#myapp-build): Build the project." in actual
+    assert "* [`serve`](#myapp-serve): Start the server." in actual
 
     # Serve command details (now shows full path)
     assert "## myapp serve" in actual
@@ -172,7 +172,7 @@ def test_generate_docs_non_recursive():
 
         **Commands**:
 
-        * `db`: Database commands
+        * [`db`](#myapp-db): Database commands
 
         ## myapp db
 
@@ -219,7 +219,7 @@ def test_generate_docs_with_hidden_commands(mocker):
 
         **Commands**:
 
-        * `visible`: Visible command.
+        * [`visible`](#myapp-visible): Visible command.
 
         ## myapp visible
 
@@ -895,3 +895,46 @@ def test_generate_docs_toc_anchor_collisions():
     assert "### myapp sub1 delete" in docs
     assert "### myapp sub2 create" in docs
     assert "### myapp sub2 delete" in docs
+
+
+def test_generate_docs_nested_command_list_hyperlinks():
+    """Test that command list hyperlinks in nested apps use full command path.
+
+    This tests that when a deeply nested command (e.g., app -> parent -> child -> grandchild)
+    lists its subcommands in the **Commands**: section, the hyperlinks use the full path
+    (e.g., #app-parent-child-grandchild) not just the app name and command
+    (e.g., #child-grandchild).
+    """
+    app = App(name="darts", help="Main app")
+
+    training = App(name="training", help="Training commands")
+
+    create_dataset = App(name="create-dataset", help="Dataset creation")
+
+    @create_dataset.command
+    def planet():
+        """Preprocess Planet data for training."""
+        pass
+
+    @create_dataset.command
+    def sentinel2():
+        """Preprocess Sentinel-2 data for training."""
+        pass
+
+    training.command(create_dataset)
+    app.command(training)
+
+    docs = app.generate_docs()
+
+    # The command list in create-dataset should have hyperlinks with the FULL path
+    # NOT just #create-dataset-planet (wrong) but #darts-training-create-dataset-planet (correct)
+    assert "* [`planet`](#darts-training-create-dataset-planet):" in docs
+    assert "* [`sentinel2`](#darts-training-create-dataset-sentinel2):" in docs
+
+    # Verify the headings exist with matching anchors
+    assert "### darts training create-dataset" in docs
+    assert "#### darts training create-dataset planet" in docs
+    assert "#### darts training create-dataset sentinel2" in docs
+
+    # Also verify the root-level command list (darts listing training)
+    assert "* [`training`](#darts-training):" in docs

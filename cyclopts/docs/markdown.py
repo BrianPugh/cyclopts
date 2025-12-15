@@ -465,17 +465,21 @@ def generate_markdown_docs(
                     if panel.title:
                         lines.append(f"**{panel.title}**:\n")
 
-                    formatter.reset()
-                    filtered_panel = panel.__class__(
-                        title="",
-                        entries=filtered_entries,
-                        format=panel.format,
-                        description=panel.description,
-                    )
-                    formatter(None, None, filtered_panel)
-                    output = formatter.get_output().strip()
-                    if output:
-                        lines.append(output)
+                    # Render command entries with hyperlinks to their sections
+                    for entry in filtered_entries:
+                        if entry.names:
+                            cmd_name = entry.names[0]
+                            # Generate anchor for the full command path
+                            # Use full_command (not app_name) to include the complete path for nested apps
+                            full_cmd_path = f"{full_command} {cmd_name}"
+                            anchor = generate_anchor(full_cmd_path)
+                            desc_text = (
+                                extract_text(entry.description, None, preserve_markup=True) if entry.description else ""
+                            )
+                            if desc_text:
+                                lines.append(f"* [`{cmd_name}`](#{anchor}): {desc_text}")
+                            else:
+                                lines.append(f"* [`{cmd_name}`](#{anchor})")
                     lines.append("")
             elif panel.format == "parameter":
                 # Handle parameter panels - split into arguments and options if needed
@@ -622,7 +626,13 @@ def generate_markdown_docs(
                                             if entry.description
                                             else ""
                                         )
-                                        command_entries.append(f"* `{cmd_name}`: {desc_text}")
+                                        # Generate anchor for the full command path
+                                        full_cmd_path = " ".join(sub_command_chain + [cmd_name])
+                                        anchor = generate_anchor(full_cmd_path)
+                                        if desc_text:
+                                            command_entries.append(f"* [`{cmd_name}`](#{anchor}): {desc_text}")
+                                        else:
+                                            command_entries.append(f"* [`{cmd_name}`](#{anchor})")
 
                                 if command_entries:
                                     if panel.title:

@@ -15,10 +15,10 @@ User management commands.
 
 **Commands**:
 
-* `create`: Create a new user.
-* `delete`: Delete a user.
-* `list-users`: List all users.
-* `permissions`: Permission management for users.
+* [`create`](#complex-cli-admin-users-create): Create a new user.
+* [`delete`](#complex-cli-admin-users-delete): Delete a user.
+* [`list-users`](#complex-cli-admin-users-list-users): List all users.
+* [`permissions`](#complex-cli-admin-users-permissions): Permission management for users.
 
 ## complex-cli admin users list-users
 
@@ -130,8 +130,8 @@ Role template management.
 
 **Commands**:
 
-* `create-role`: Create a new role template.
-* `list-roles`: List all role templates.
+* [`create-role`](#complex-cli-admin-users-permissions-roles-create-role): Create a new role template.
+* [`list-roles`](#complex-cli-admin-users-permissions-roles-list-roles): List all role templates.
 
 ## complex-cli admin users permissions roles list-roles
 

@@ -15,7 +15,7 @@ User management commands.
 
 **Commands**:
 
-* `permissions`: Permission management for users.
+* [`permissions`](#complex-cli-admin-users-permissions): Permission management for users.
 
 ##### complex-cli admin users permissions
 
@@ -72,8 +72,8 @@ Role template management.
 
 **Commands**:
 
-* `create-role`: Create a new role template.
-* `list-roles`: List all role templates.
+* [`create-role`](#complex-cli-admin-users-permissions-roles-create-role): Create a new role template.
+* [`list-roles`](#complex-cli-admin-users-permissions-roles-list-roles): List all role templates.
 
 ###### complex-cli admin users permissions roles list-roles
 

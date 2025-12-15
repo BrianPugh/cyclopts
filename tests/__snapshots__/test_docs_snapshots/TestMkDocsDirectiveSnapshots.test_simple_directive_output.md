@@ -15,19 +15,19 @@ Complex CLI application for comprehensive documentation testing.
 
 **Subcommands**:
 
-* `admin`: Administrative commands for system management.
-* `data`: Data processing commands.
-* `server`: Server management commands.
+* [`admin`](#complex-cli-admin): Administrative commands for system management.
+* [`data`](#complex-cli-data): Data processing commands.
+* [`server`](#complex-cli-server): Server management commands.
 
 **Utilities**:
 
-* `cache`: Cache management commands.
-* `complex-types`: Demonstrate complex type annotations.
-* `google-style`: Command with Google-style docstring.
-* `info (i)`: Show application information.
-* `numpy-style`: Command with NumPy-style docstring.
-* `sphinx-style`: Command with Sphinx-style docstring.
-* `version (ver, v)`: Show version information.
+* [`cache`](#complex-cli-cache): Cache management commands.
+* [`complex-types`](#complex-cli-complex-types): Demonstrate complex type annotations.
+* [`google-style`](#complex-cli-google-style): Command with Google-style docstring.
+* [`info`](#complex-cli-info): Show application information.
+* [`numpy-style`](#complex-cli-numpy-style): Command with NumPy-style docstring.
+* [`sphinx-style`](#complex-cli-sphinx-style): Command with Sphinx-style docstring.
+* [`version`](#complex-cli-version): Show version information.
 
 ## complex-cli version
 
