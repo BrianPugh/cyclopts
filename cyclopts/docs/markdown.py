@@ -407,17 +407,17 @@ def generate_markdown_docs(
     # Get help format (needed for both current level and recursive docs)
     help_format = app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
 
-    # Add application description (skip if skipping current level)
-    if not skip_current_level:
+    # Add usage section first (skip if skipping current level or skip_preamble is True)
+    if not skip_current_level and not skip_preamble:
+        _render_usage_section(app, command_chain, lines)
+
+    # Add application description (skip if skipping current level or skip_preamble is True)
+    if not skip_current_level and not skip_preamble:
         _render_description_section(app, help_format, lines)
 
     # Generate table of contents if this is the root level and has commands
     if generate_toc and not command_chain and app._commands:
         _render_toc(app, app_name, include_hidden, commands_filter, exclude_commands, skip_current_level, lines)
-
-    # Add usage section if appropriate (skip if skipping current level)
-    if not skip_current_level:
-        _render_usage_section(app, command_chain, lines)
 
     # Get help panels for the current app (skip if skipping current level)
     # Use app_stack context - if caller set up parent context, it will be stacked
@@ -511,13 +511,23 @@ def generate_markdown_docs(
 
             # Check if we should skip this command's title heading
             # Skip title when: root was skipped (single command filter) AND this is the direct target
+            # OR this is an intermediate command on the path to a nested target
             # This allows the markdown author's section title to serve as the heading
-            skip_this_command_title = (
-                skip_current_level and len(commands_filter or []) == 1 and name == (commands_filter or [None])[0]
+            is_single_filter = commands_filter is not None and len(commands_filter) == 1
+            is_exact_target = is_single_filter and commands_filter is not None and name == commands_filter[0]
+            is_intermediate_path = (
+                is_single_filter and commands_filter is not None and commands_filter[0].startswith(name + ".")
             )
 
-            # Generate subcommand title (skip if this is the single filtered command at root level)
-            if not skip_this_command_title:
+            skip_this_command_title = skip_current_level and is_exact_target
+            # Also skip intermediate commands entirely when skip_preamble is set
+            skip_intermediate = skip_preamble and skip_current_level and is_intermediate_path
+            # Skip preamble for the exact target when skip_preamble is set (even in recursive calls)
+            skip_target_preamble = skip_preamble and is_exact_target
+
+            # Generate subcommand title (skip if this is the single filtered command at root level,
+            # or if this is an intermediate command and skip_preamble is set)
+            if not skip_this_command_title and not skip_intermediate:
                 # Always use full command path to avoid anchor collisions
                 display_name = " ".join(sub_command_chain)
                 display_fmt = f"`{display_name}`" if code_block_title else display_name
@@ -526,8 +536,10 @@ def generate_markdown_docs(
                 lines.append("")
 
             # Get subapp help - show description, usage, and panels for included commands
-            # Skip preamble (description + usage) if skip_preamble is True and this command's title was skipped
-            skip_this_preamble = skip_preamble and skip_this_command_title
+            # Skip preamble (description + usage) if:
+            # - skip_preamble is True and this is the exact target (even in recursive calls)
+            # - or this is an intermediate command on the path to a nested target
+            skip_this_preamble = skip_target_preamble or skip_intermediate
 
             # Include parent app in the stack so default_parameter is properly inherited
             with subapp.app_stack([app, subapp]):
@@ -536,9 +548,9 @@ def generate_markdown_docs(
                 preserve_sub = sub_help_format in ("markdown", "md")
 
                 if not skip_this_preamble:
-                    _render_description_section(subapp, sub_help_format, lines)
-                    # Generate usage for subcommand if appropriate
+                    # Generate usage first for subcommand
                     _render_usage_section(subapp, sub_command_chain, lines)
+                    _render_description_section(subapp, sub_help_format, lines)
 
                 # Only show subcommand panels if we're in recursive mode
                 # (Otherwise we just show the basic info about this command)
@@ -693,6 +705,22 @@ def generate_markdown_docs(
                         else:
                             nested_commands_filter = None
 
+                        # Check if this nested command is the target for skip_preamble purposes
+                        # This handles nested paths like "parent.child" where "child" is the target
+                        nested_is_target = (
+                            skip_preamble
+                            and sub_commands_filter is not None
+                            and len(sub_commands_filter) == 1
+                            and nested_name == sub_commands_filter[0]
+                        )
+                        # Also check if this is an intermediate on a deeper path
+                        nested_is_intermediate = (
+                            skip_preamble
+                            and sub_commands_filter is not None
+                            and len(sub_commands_filter) == 1
+                            and sub_commands_filter[0].startswith(nested_name + ".")
+                        )
+
                         # Set up context for nested_app, then recurse
                         # The recursive call's app_stack([app]) will stack on top of this
                         with nested_app.app_stack([subapp, nested_app]):
@@ -707,9 +735,9 @@ def generate_markdown_docs(
                                 flatten_commands=flatten_commands,
                                 commands_filter=nested_commands_filter,
                                 exclude_commands=sub_exclude_commands,
-                                no_root_title=False,  # Always show title for nested commands
+                                no_root_title=nested_is_intermediate,  # Skip title for intermediate paths
                                 code_block_title=code_block_title,
-                                skip_preamble=False,  # Nested commands show preamble normally
+                                skip_preamble=nested_is_target or nested_is_intermediate,
                             )
                         # Just append the generated docs - no title replacement
                         lines.append(nested_docs)

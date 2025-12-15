@@ -3,15 +3,15 @@
 complex-cli
 -----------
 
+::
+
+    complex-cli COMMAND
+
 Complex CLI application for comprehensive documentation testing.
 
 .. contents:: Table of Contents
    :local:
    :depth: 6
-
-::
-
-    complex-cli COMMAND
 
 **Global Options:**
 

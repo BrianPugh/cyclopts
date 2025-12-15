@@ -9,14 +9,14 @@ Data processing commands.
 
 ### complex-cli data process
 
+```console
+complex-cli data process [OPTIONS] INPUT_FILES
+```
+
 Process data files with configurable options.
 
 This command demonstrates dataclass parameter flattening where
 all fields from ProcessingConfig and PathConfig become CLI options.
-
-```console
-complex-cli data process [OPTIONS] INPUT_FILES
-```
 
 **Arguments**:
 
@@ -36,14 +36,14 @@ complex-cli data process [OPTIONS] INPUT_FILES
 
 ### complex-cli data pipeline
 
+```console
+complex-cli data pipeline [OPTIONS]
+```
+
 Run a complete data pipeline.
 
 Demonstrates nested dataclass flattening (PipelineConfig contains
 PathConfig and ProcessingConfig).
-
-```console
-complex-cli data pipeline [OPTIONS]
-```
 
 **Parameters**:
 
@@ -61,11 +61,11 @@ complex-cli data pipeline [OPTIONS]
 
 ### complex-cli data validate
 
-Validate data files against schema.
-
 ```console
 complex-cli data validate [OPTIONS] INPUT_PATH
 ```
+
+Validate data files against schema.
 
 **Arguments**:
 

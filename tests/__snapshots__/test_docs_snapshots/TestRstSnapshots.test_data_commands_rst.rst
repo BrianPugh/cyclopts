@@ -3,15 +3,15 @@
 complex-cli
 -----------
 
+::
+
+    complex-cli COMMAND
+
 Complex CLI application for comprehensive documentation testing.
 
 .. contents:: Table of Contents
    :local:
    :depth: 6
-
-::
-
-    complex-cli COMMAND
 
 **Global Options:**
 
@@ -55,14 +55,14 @@ Data processing commands.
 process
 """""""
 
+::
+
+    complex-cli data process [OPTIONS] INPUT_FILES
+
 Process data files with configurable options.
 
 This command demonstrates dataclass parameter flattening where
 all fields from ProcessingConfig and PathConfig become CLI options.
-
-::
-
-    complex-cli data process [OPTIONS] INPUT_FILES
 
 **Arguments:**
 
@@ -103,14 +103,14 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 pipeline
 """"""""
 
+::
+
+    complex-cli data pipeline [OPTIONS]
+
 Run a complete data pipeline.
 
 Demonstrates nested dataclass flattening (PipelineConfig contains
 PathConfig and ProcessingConfig).
-
-::
-
-    complex-cli data pipeline [OPTIONS]
 
 **Parameters:**
 
@@ -152,11 +152,11 @@ PathConfig and ProcessingConfig).
 validate
 """"""""
 
-Validate data files against schema.
-
 ::
 
     complex-cli data validate [OPTIONS] INPUT_PATH
+
+Validate data files against schema.
 
 **Arguments:**
 

@@ -3,15 +3,15 @@
 complex-cli
 -----------
 
+::
+
+    complex-cli COMMAND
+
 Complex CLI application for comprehensive documentation testing.
 
 .. contents:: Table of Contents
    :local:
    :depth: 6
-
-::
-
-    complex-cli COMMAND
 
 **Global Options:**
 
@@ -55,13 +55,13 @@ Server management commands.
 start
 """""
 
-Start the server with configuration.
-
-Demonstrates Pydantic model support for CLI parameters.
-
 ::
 
     complex-cli server start [OPTIONS]
+
+Start the server with configuration.
+
+Demonstrates Pydantic model support for CLI parameters.
 
 **Parameters:**
 
@@ -97,11 +97,11 @@ Demonstrates Pydantic model support for CLI parameters.
 stop
 """"
 
-Stop the server.
-
 ::
 
     complex-cli server stop [OPTIONS]
+
+Stop the server.
 
 **Parameters:**
 
@@ -119,11 +119,11 @@ Stop the server.
 restart
 """""""
 
-Restart the server.
-
 ::
 
     complex-cli server restart [ARGS]
+
+Restart the server.
 
 **Parameters:**
 

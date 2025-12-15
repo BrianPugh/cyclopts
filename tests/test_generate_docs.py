@@ -31,11 +31,11 @@ def test_generate_docs_simple_app():
         """\
         # myapp
 
-        A simple CLI application
-
         ```console
         myapp NAME [ARGS]
         ```
+
+        A simple CLI application
 
         **Parameters**:
 
@@ -159,16 +159,16 @@ def test_generate_docs_non_recursive():
         """\
         # myapp
 
+        ```console
+        myapp COMMAND
+        ```
+
         Main app
 
         ## Table of Contents
 
         - [`db`](#myapp-db)
             - [`migrate`](#myapp-db-migrate)
-
-        ```console
-        myapp COMMAND
-        ```
 
         **Commands**:
 
@@ -207,15 +207,15 @@ def test_generate_docs_with_hidden_commands(mocker):
         """\
         # myapp
 
+        ```console
+        myapp COMMAND
+        ```
+
         App with hidden commands
 
         ## Table of Contents
 
         - [`visible`](#myapp-visible)
-
-        ```console
-        myapp COMMAND
-        ```
 
         **Commands**:
 
@@ -223,11 +223,11 @@ def test_generate_docs_with_hidden_commands(mocker):
 
         ## myapp visible
 
-        Visible command.
-
         ```console
         myapp visible
         ```
+
+        Visible command.
         """
     )
 
@@ -261,11 +261,11 @@ def test_generate_docs_with_required_parameters():
         """\
         # myapp
 
-        Main command.
-
         ```console
         myapp REQUIRED [ARGS]
         ```
+
+        Main command.
 
         **Parameters**:
 
@@ -317,11 +317,11 @@ def test_generate_docs_with_custom_usage():
         """\
         # myapp
 
-        Main command.
-
         ```console
         myapp [OPTIONS] <input> <output>
         ```
+
+        Main command.
         """
     )
 
@@ -369,11 +369,11 @@ def test_generate_docs_write_to_file():
             """\
             # myapp
 
-            Test app
-
             ```console
             myapp
             ```
+
+            Test app
             """
         )
 
@@ -406,11 +406,11 @@ def test_generate_docs_output_format_explicit():
         """\
         # myapp
 
-        Test app
-
         ```console
         myapp
         ```
+
+        Test app
         """
     )
 
@@ -582,11 +582,11 @@ def test_generate_docs_with_meta_app():
         """\
         # myapp
 
-        Main application
-
         ```console
         myapp INPUT-FILE
         ```
+
+        Main application
 
         **Parameters**:
 

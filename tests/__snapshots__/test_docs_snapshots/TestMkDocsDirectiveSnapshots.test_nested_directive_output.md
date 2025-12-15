@@ -34,11 +34,11 @@ Role template management.
 
 ###### complex-cli admin users permissions roles list-roles
 
-List all role templates.
-
 ```console
 complex-cli admin users permissions roles list-roles [ARGS]
 ```
+
+List all role templates.
 
 **Parameters**:
 
@@ -46,11 +46,11 @@ complex-cli admin users permissions roles list-roles [ARGS]
 
 ###### complex-cli admin users permissions roles create-role
 
-Create a new role template.
-
 ```console
 complex-cli admin users permissions roles create-role [OPTIONS] NAME
 ```
+
+Create a new role template.
 
 **Arguments**:
 

@@ -279,23 +279,7 @@ def generate_rst_docs(
 
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
 
-    # Skip preamble (description + usage) if skip_preamble is True
-    if not skip_preamble:
-        description = extract_description(app, help_format)
-        if description:
-            # Extract plain text from description
-            # Preserve markup when help_format matches output format (RST)
-            preserve = help_format in ("restructuredtext", "rst")
-            desc_text = extract_text(description, None, preserve_markup=preserve)
-            if desc_text:
-                lines.append(desc_text.strip())
-                lines.append("")
-
-    # Generate table of contents at root level only
-    if generate_toc and not command_chain and app._commands:
-        _generate_toc(lines)
-
-    # Add usage section if appropriate (skip if skip_preamble is True)
+    # Add usage section first if appropriate (skip if skip_preamble is True)
     if not skip_preamble and should_show_usage(app):
         # Generate usage line - only if we're documenting a specific command
         if not (no_root_title and not command_chain):
@@ -325,6 +309,22 @@ def generate_rst_docs(
                 for line in usage_text.split("\n"):
                     lines.append(f"    {line}")
                 lines.append("")
+
+    # Add description (skip if skip_preamble is True)
+    if not skip_preamble:
+        description = extract_description(app, help_format)
+        if description:
+            # Extract plain text from description
+            # Preserve markup when help_format matches output format (RST)
+            preserve = help_format in ("restructuredtext", "rst")
+            desc_text = extract_text(description, None, preserve_markup=preserve)
+            if desc_text:
+                lines.append(desc_text.strip())
+                lines.append("")
+
+    # Generate table of contents at root level only
+    if generate_toc and not command_chain and app._commands:
+        _generate_toc(lines)
 
     # Get help panels for the current app
     # Use app_stack context - if caller set up parent context, it will be stacked
@@ -427,12 +427,20 @@ def generate_rst_docs(
 
             # Determine if this subcommand should skip its preamble
             # Skip preamble when: we're at root, skip_preamble is True, and this is the single target command
+            # OR this is an intermediate command on the path to a nested target
             is_single_target = (
                 not command_chain
                 and skip_preamble
                 and commands_filter is not None
                 and len(commands_filter) == 1
                 and name == commands_filter[0]
+            )
+            is_intermediate_path = (
+                not command_chain
+                and skip_preamble
+                and commands_filter is not None
+                and len(commands_filter) == 1
+                and commands_filter[0].startswith(name + ".")
             )
 
             # Push subapp onto app_stack - context will stack with recursive call's app_stack([app])
@@ -448,9 +456,9 @@ def generate_rst_docs(
                     flatten_commands=flatten_commands,
                     commands_filter=sub_commands_filter,
                     exclude_commands=sub_exclude_commands,
-                    no_root_title=False,  # Subcommands should have titles
+                    no_root_title=is_intermediate_path,  # Skip title for intermediate path commands
                     code_block_title=code_block_title,
-                    skip_preamble=is_single_target,  # Skip preamble for single target command
+                    skip_preamble=is_single_target or is_intermediate_path,  # Skip preamble for target or intermediate
                 )
             lines.append(subdocs)
 

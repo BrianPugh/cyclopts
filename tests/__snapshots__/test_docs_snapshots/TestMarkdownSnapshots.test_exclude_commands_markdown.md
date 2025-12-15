@@ -9,11 +9,11 @@ Administrative commands for system management.
 
 ### complex-cli admin status
 
-Show system status.
-
 ```console
 complex-cli admin status [OPTIONS] [ARGS]
 ```
+
+Show system status.
 
 **Parameters**:
 
@@ -23,11 +23,11 @@ complex-cli admin status [OPTIONS] [ARGS]
 
 ### complex-cli admin config-cmd
 
-Configure database settings.
-
 ```console
 complex-cli admin config-cmd [OPTIONS]
 ```
+
+Configure database settings.
 
 **Parameters**:
 
@@ -51,11 +51,11 @@ User management commands.
 
 #### complex-cli admin users list-users
 
-List all users.
-
 ```console
 complex-cli admin users list-users [ARGS]
 ```
+
+List all users.
 
 **Parameters**:
 
@@ -66,11 +66,11 @@ complex-cli admin users list-users [ARGS]
 
 #### complex-cli admin users create
 
-Create a new user.
-
 ```console
 complex-cli admin users create [OPTIONS] USERNAME EMAIL
 ```
+
+Create a new user.
 
 **Arguments**:
 
@@ -89,11 +89,11 @@ complex-cli admin users create [OPTIONS] USERNAME EMAIL
 
 #### complex-cli admin users delete
 
-Delete a user.
-
 ```console
 complex-cli admin users delete [OPTIONS] USERNAME
 ```
+
+Delete a user.
 
 **Arguments**:
 
@@ -110,11 +110,11 @@ Permission management for users.
 
 ##### complex-cli admin users permissions grant
 
-Grant permissions to a user.
-
 ```console
 complex-cli admin users permissions grant [OPTIONS] USERNAME PERMISSION
 ```
+
+Grant permissions to a user.
 
 **Arguments**:
 
@@ -128,11 +128,11 @@ complex-cli admin users permissions grant [OPTIONS] USERNAME PERMISSION
 
 ##### complex-cli admin users permissions revoke
 
-Revoke permissions from a user.
-
 ```console
 complex-cli admin users permissions revoke USERNAME PERMISSION
 ```
+
+Revoke permissions from a user.
 
 **Arguments**:
 
@@ -141,11 +141,11 @@ complex-cli admin users permissions revoke USERNAME PERMISSION
 
 ##### complex-cli admin users permissions audit
 
-Audit permission changes.
-
 ```console
 complex-cli admin users permissions audit [ARGS]
 ```
+
+Audit permission changes.
 
 **Parameters**:
 
@@ -164,11 +164,11 @@ Role template management.
 
 ###### complex-cli admin users permissions roles list-roles
 
-List all role templates.
-
 ```console
 complex-cli admin users permissions roles list-roles [ARGS]
 ```
+
+List all role templates.
 
 **Parameters**:
 
@@ -176,11 +176,11 @@ complex-cli admin users permissions roles list-roles [ARGS]
 
 ###### complex-cli admin users permissions roles create-role
 
-Create a new role template.
-
 ```console
 complex-cli admin users permissions roles create-role [OPTIONS] NAME
 ```
+
+Create a new role template.
 
 **Arguments**:
 

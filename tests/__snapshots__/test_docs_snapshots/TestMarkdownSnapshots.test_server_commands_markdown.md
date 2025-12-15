@@ -9,13 +9,13 @@ Server management commands.
 
 ### complex-cli server start
 
-Start the server with configuration.
-
-Demonstrates Pydantic model support for CLI parameters.
-
 ```console
 complex-cli server start [OPTIONS]
 ```
+
+Start the server with configuration.
+
+Demonstrates Pydantic model support for CLI parameters.
 
 **Parameters**:
 
@@ -31,11 +31,11 @@ complex-cli server start [OPTIONS]
 
 ### complex-cli server stop
 
-Stop the server.
-
 ```console
 complex-cli server stop [OPTIONS]
 ```
+
+Stop the server.
 
 **Parameters**:
 
@@ -45,11 +45,11 @@ complex-cli server stop [OPTIONS]
 
 ### complex-cli server restart
 
-Restart the server.
-
 ```console
 complex-cli server restart [ARGS]
 ```
+
+Restart the server.
 
 **Parameters**:
 

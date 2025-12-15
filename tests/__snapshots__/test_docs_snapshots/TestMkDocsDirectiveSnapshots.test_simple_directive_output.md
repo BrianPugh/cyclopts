@@ -1,10 +1,10 @@
 # CLI Reference
 
-Complex CLI application for comprehensive documentation testing.
-
 ```console
 complex-cli COMMAND
 ```
+
+Complex CLI application for comprehensive documentation testing.
 
 **Global Options**:
 
@@ -31,21 +31,21 @@ complex-cli COMMAND
 
 ## complex-cli version
 
-Show version information.
-
-Displays the application version and system information.
-
 ```console
 complex-cli version
 ```
 
-## complex-cli info
+Show version information.
 
-Show application information.
+Displays the application version and system information.
+
+## complex-cli info
 
 ```console
 complex-cli info [ARGS]
 ```
+
+Show application information.
 
 ## complex-cli admin
 
@@ -65,52 +65,52 @@ Cache management commands.
 
 ## complex-cli complex-types
 
+```console
+complex-cli complex-types [ARGS]
+```
+
 Demonstrate complex type annotations.
 
 This command showcases various complex type patterns that the
 documentation system needs to handle correctly.
 
-```console
-complex-cli complex-types [ARGS]
-```
-
 ## complex-cli numpy-style
+
+```console
+complex-cli numpy-style NAME [ARGS]
+```
 
 Command with NumPy-style docstring.
 
 This command demonstrates NumPy docstring format which is the
 default for cyclopts.
 
-```console
-complex-cli numpy-style NAME [ARGS]
-```
-
 ## complex-cli google-style
-
-Command with Google-style docstring.
-
-This command demonstrates Google docstring format.
 
 ```console
 complex-cli google-style NAME [ARGS]
 ```
 
+Command with Google-style docstring.
+
+This command demonstrates Google docstring format.
+
 ## complex-cli sphinx-style
-
-Command with Sphinx-style docstring.
-
-This command demonstrates Sphinx/reST docstring format.
 
 ```console
 complex-cli sphinx-style NAME [ARGS]
 ```
 
+Command with Sphinx-style docstring.
+
+This command demonstrates Sphinx/reST docstring format.
+
 ## complex-cli secret-feature
-
-Secret feature command.
-
-This command has a hidden parameter.
 
 ```console
 complex-cli secret-feature [ARGS]
 ```
+
+Secret feature command.
+
+This command has a hidden parameter.

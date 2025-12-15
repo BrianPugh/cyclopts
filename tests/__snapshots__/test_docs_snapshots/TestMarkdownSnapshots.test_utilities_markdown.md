@@ -1,10 +1,10 @@
 ## complex-cli
 
-Complex CLI application for comprehensive documentation testing.
-
 ```console
 complex-cli COMMAND
 ```
+
+Complex CLI application for comprehensive documentation testing.
 
 **Global Options**:
 
@@ -22,13 +22,13 @@ complex-cli COMMAND
 
 ### complex-cli version
 
-Show version information.
-
-Displays the application version and system information.
-
 ```console
 complex-cli version
 ```
+
+Show version information.
+
+Displays the application version and system information.
 
 **Global Options**:
 
@@ -39,11 +39,11 @@ complex-cli version
 
 ### complex-cli info
 
-Show application information.
-
 ```console
 complex-cli info [ARGS]
 ```
+
+Show application information.
 
 **Parameters**:
 
@@ -70,13 +70,13 @@ Cache management commands.
 
 #### complex-cli cache configure
 
-Configure cache settings.
-
-Demonstrates attrs class support for CLI parameters.
-
 ```console
 complex-cli cache configure [OPTIONS]
 ```
+
+Configure cache settings.
+
+Demonstrates attrs class support for CLI parameters.
 
 **Parameters**:
 
@@ -87,11 +87,11 @@ complex-cli cache configure [OPTIONS]
 
 #### complex-cli cache clear
 
-Clear cache entries.
-
 ```console
 complex-cli cache clear [ARGS]
 ```
+
+Clear cache entries.
 
 **Parameters**:
 
@@ -100,11 +100,11 @@ complex-cli cache clear [ARGS]
 
 #### complex-cli cache stats
 
-Show cache statistics.
-
 ```console
 complex-cli cache stats [ARGS]
 ```
+
+Show cache statistics.
 
 **Parameters**:
 
@@ -113,14 +113,14 @@ complex-cli cache stats [ARGS]
 
 ### complex-cli complex-types
 
+```console
+complex-cli complex-types [ARGS]
+```
+
 Demonstrate complex type annotations.
 
 This command showcases various complex type patterns that the
 documentation system needs to handle correctly.
-
-```console
-complex-cli complex-types [ARGS]
-```
 
 **Parameters**:
 

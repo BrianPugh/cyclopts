@@ -9,12 +9,32 @@ from cyclopts import App
 from cyclopts.utils import import_app
 
 
+@pytest.fixture
+def importable_tmp_path(tmp_path, monkeypatch):
+    """Fixture that makes tmp_path importable and cleans up sys.modules after test.
+
+    Usage:
+        def test_foo(importable_tmp_path):
+            module_file = importable_tmp_path / "my_module.py"
+            module_file.write_text("...")
+            import my_module  # Works!
+            # Cleanup is automatic
+    """
+    monkeypatch.syspath_prepend(str(tmp_path))
+    modules_before = set(sys.modules.keys())
+    yield tmp_path
+    # Clean up any modules that were imported during the test
+    for mod_name in list(sys.modules.keys()):
+        if mod_name not in modules_before:
+            del sys.modules[mod_name]
+
+
 class TestImportApp:
     """Test the import_app function."""
 
-    def test_import_with_colon_notation(self, tmp_path):
+    def test_import_with_colon_notation(self, importable_tmp_path):
         """Test importing an app using module:app notation."""
-        module_file = tmp_path / "test_module.py"
+        module_file = importable_tmp_path / "test_module.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -30,19 +50,13 @@ class TestImportApp:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            app = import_app("test_module:my_app")
-            assert isinstance(app, App)
-            assert app.name == ("test-app",)
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "test_module" in sys.modules:
-                del sys.modules["test_module"]
+        app = import_app("test_module:my_app")
+        assert isinstance(app, App)
+        assert app.name == ("test-app",)
 
-    def test_import_without_colon_finds_app(self, tmp_path):
+    def test_import_without_colon_finds_app(self, importable_tmp_path):
         """Test importing when app name is not specified (auto-discovery)."""
-        module_file = tmp_path / "test_cli.py"
+        module_file = importable_tmp_path / "test_cli.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -53,24 +67,18 @@ class TestImportApp:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            found_app = import_app("test_cli")
-            assert isinstance(found_app, App)
-            assert found_app.name == ("auto-found",)
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "test_cli" in sys.modules:
-                del sys.modules["test_cli"]
+        found_app = import_app("test_cli")
+        assert isinstance(found_app, App)
+        assert found_app.name == ("auto-found",)
 
     def test_import_module_not_found(self):
         """Test error when module doesn't exist."""
         with pytest.raises(ImportError, match="Cannot import module"):
             import_app("nonexistent_module:app")
 
-    def test_import_app_not_found(self, tmp_path):
+    def test_import_app_not_found(self, importable_tmp_path):
         """Test error when specified app doesn't exist in module."""
-        module_file = tmp_path / "test_no_app.py"
+        module_file = importable_tmp_path / "test_no_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -81,29 +89,17 @@ class TestImportApp:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            with pytest.raises(AttributeError, match="has no attribute 'missing_app'"):
-                import_app("test_no_app:missing_app")
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "test_no_app" in sys.modules:
-                del sys.modules["test_no_app"]
+        with pytest.raises(AttributeError, match="has no attribute 'missing_app'"):
+            import_app("test_no_app:missing_app")
 
-    def test_import_not_an_app(self, tmp_path):
+    def test_import_not_an_app(self, importable_tmp_path):
         """Test error when object is not a Cyclopts App."""
         module_name = "test_not_app_module"
-        module_file = tmp_path / f"{module_name}.py"
+        module_file = importable_tmp_path / f"{module_name}.py"
         module_file.write_text("not_an_app = 'This is just a string'")
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            with pytest.raises(TypeError, match="is not a Cyclopts App instance"):
-                import_app(f"{module_name}:not_an_app")
-        finally:
-            sys.path.remove(str(tmp_path))
-            if module_name in sys.modules:
-                del sys.modules[module_name]
+        with pytest.raises(TypeError, match="is not a Cyclopts App instance"):
+            import_app(f"{module_name}:not_an_app")
 
 
 class TestDirectiveOptions:
@@ -293,9 +289,9 @@ class TestDirectiveOptions:
 class TestProcessDirectives:
     """Test the process_cyclopts_directives function."""
 
-    def test_process_simple_directive(self, tmp_path):
+    def test_process_simple_directive(self, importable_tmp_path):
         """Test processing a simple directive in markdown."""
-        module_file = tmp_path / "simple_app.py"
+        module_file = importable_tmp_path / "simple_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -311,40 +307,33 @@ class TestProcessDirectives:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # My CLI Tool
+        markdown = textwrap.dedent(
+            """\
+            # My CLI Tool
 
-                Here's the documentation:
+            Here's the documentation:
 
-                ::: cyclopts
-                    module: simple_app:app
-                    heading_level: 2
+            ::: cyclopts
+                module: simple_app:app
+                heading_level: 2
 
-                More content here.
-                """
-            )
+            More content here.
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # Verify the directive was replaced
-            assert "::: cyclopts" not in result
-            assert "simple-cli" in result or "simple_cli" in result
-            assert "More content here." in result
-            assert "# My CLI Tool" in result
+        # Verify the directive was replaced
+        assert "::: cyclopts" not in result
+        assert "simple-cli" in result or "simple_cli" in result
+        assert "More content here." in result
+        assert "# My CLI Tool" in result
 
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "simple_app" in sys.modules:
-                del sys.modules["simple_app"]
-
-    def test_process_multiple_directives(self, tmp_path):
+    def test_process_multiple_directives(self, importable_tmp_path):
         """Test processing multiple directives in one page."""
-        module_file = tmp_path / "multi_app.py"
+        module_file = importable_tmp_path / "multi_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -359,39 +348,32 @@ class TestProcessDirectives:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # First Section
+        markdown = textwrap.dedent(
+            """\
+            # First Section
 
-                ::: cyclopts
-                    module: multi_app:app
-                    heading_level: 2
-                    generate_toc: false
+            ::: cyclopts
+                module: multi_app:app
+                heading_level: 2
+                generate_toc: false
 
-                # Second Section
+            # Second Section
 
-                ::: cyclopts
-                    module: multi_app:app
-                    heading_level: 3
-                    generate_toc: false
-                """
-            )
+            ::: cyclopts
+                module: multi_app:app
+                heading_level: 3
+                generate_toc: false
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # Both directives should be processed
-            assert result.count("::: cyclopts") == 0
-            assert "# First Section" in result
-            assert "# Second Section" in result
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "multi_app" in sys.modules:
-                del sys.modules["multi_app"]
+        # Both directives should be processed
+        assert result.count("::: cyclopts") == 0
+        assert "# First Section" in result
+        assert "# Second Section" in result
 
     def test_process_directive_with_error(self):
         """Test that errors in directive processing raise PluginError."""
@@ -430,59 +412,36 @@ class TestProcessDirectives:
         result = process_cyclopts_directives(markdown, None)
         assert result == markdown
 
-    def test_default_heading_level_from_config(self, tmp_path):
+    def test_default_heading_level_from_config(self):
         """Test that default_heading_level from config is used when not specified in directive."""
-        module_file = tmp_path / "config_test_app.py"
-        module_file.write_text(
-            textwrap.dedent(
-                """\
-                from cyclopts import App
+        from cyclopts.ext.mkdocs import DirectiveOptions
 
-                app = App(name="config-test", help="Test app")
-
-                @app.default
-                def main():
-                    '''Main function.'''
-                    pass
-                """
-            )
+        # Test with default_heading_level=3
+        directive_text = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: config_test_app:app
+            """
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import DirectiveOptions
+        options = DirectiveOptions.from_directive_block(directive_text, default_heading_level=3)
+        assert options.heading_level == 3
 
-            # Test with default_heading_level=3
-            directive_text = textwrap.dedent(
-                """\
-                ::: cyclopts
-                    module: config_test_app:app
-                """
-            )
+        # Test that explicit heading-level overrides default
+        directive_text_with_level = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: config_test_app:app
+                heading_level: 4
+            """
+        )
 
-            options = DirectiveOptions.from_directive_block(directive_text, default_heading_level=3)
-            assert options.heading_level == 3
+        options_override = DirectiveOptions.from_directive_block(directive_text_with_level, default_heading_level=3)
+        assert options_override.heading_level == 4
 
-            # Test that explicit heading-level overrides default
-            directive_text_with_level = textwrap.dedent(
-                """\
-                ::: cyclopts
-                    module: config_test_app:app
-                    heading_level: 4
-                """
-            )
-
-            options_override = DirectiveOptions.from_directive_block(directive_text_with_level, default_heading_level=3)
-            assert options_override.heading_level == 4
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "config_test_app" in sys.modules:
-                del sys.modules["config_test_app"]
-
-    def test_no_root_title_in_output(self, tmp_path):
+    def test_no_root_title_in_output(self, importable_tmp_path):
         """Test that the root app title is not included in generated docs."""
-        module_file = tmp_path / "no_title_app.py"
+        module_file = importable_tmp_path / "no_title_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -498,39 +457,32 @@ class TestProcessDirectives:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # Documentation
+        markdown = textwrap.dedent(
+            """\
+            # Documentation
 
-                ::: cyclopts
-                    module: no_title_app:app
-                    generate_toc: false
+            ::: cyclopts
+                module: no_title_app:app
+                generate_toc: false
 
-                More content.
-                """
-            )
+            More content.
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # Should not contain the app name as a header
-            assert "# no-title-test" not in result
-            assert "## no-title-test" not in result
-            # Should still contain the description
-            assert "This app should not show its title" in result
-            assert "More content." in result
+        # Should not contain the app name as a header
+        assert "# no-title-test" not in result
+        assert "## no-title-test" not in result
+        # Should still contain the description
+        assert "This app should not show its title" in result
+        assert "More content." in result
 
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "no_title_app" in sys.modules:
-                del sys.modules["no_title_app"]
-
-    def test_skip_preamble_skips_description_and_usage(self, tmp_path):
+    def test_skip_preamble_skips_description_and_usage(self, importable_tmp_path):
         """Test that skip_preamble skips description and usage for filtered command."""
-        module_file = tmp_path / "skip_preamble_app.py"
+        module_file = importable_tmp_path / "skip_preamble_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -550,50 +502,92 @@ class TestProcessDirectives:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            # Test without skip_preamble (default) - description should be present
-            markdown_without_skip = textwrap.dedent(
+        # Test without skip_preamble (default) - description should be present
+        markdown_without_skip = textwrap.dedent(
+            """\
+            # Sub Commands
+
+            ::: cyclopts
+                module: skip_preamble_app:app
+                commands: [sub]
+                generate_toc: false
+            """
+        )
+
+        result_without_skip = process_cyclopts_directives(markdown_without_skip, None)
+        assert "This description should be skipped" in result_without_skip
+
+        # Clear module cache for fresh import
+        del sys.modules["skip_preamble_app"]
+
+        # Test with skip_preamble=true - description should be absent
+        markdown_with_skip = textwrap.dedent(
+            """\
+            # Sub Commands
+
+            ::: cyclopts
+                module: skip_preamble_app:app
+                commands: [sub]
+                generate_toc: false
+                skip_preamble: true
+            """
+        )
+
+        result_with_skip = process_cyclopts_directives(markdown_with_skip, None)
+        assert "This description should be skipped" not in result_with_skip
+        # The command's parameters should still be present
+        assert "arg" in result_with_skip.lower()
+
+    def test_skip_preamble_with_nested_path(self, importable_tmp_path):
+        """Test that skip_preamble also skips intermediate commands for nested paths."""
+        module_file = importable_tmp_path / "nested_skip_app.py"
+        module_file.write_text(
+            textwrap.dedent(
                 """\
-                # Sub Commands
+                from cyclopts import App
 
-                ::: cyclopts
-                    module: skip_preamble_app:app
-                    commands: [sub]
-                    generate_toc: false
+                app = App(name="main-app", help="Main app description")
+
+                parent = App(name="parent", help="Parent description - should be skipped")
+
+                child = App(name="child", help="Child description - should be skipped")
+
+                @child.default
+                def child_cmd(arg: str):
+                    '''Child command.'''
+                    pass
+
+                parent.command(child)
+                app.command(parent)
                 """
             )
+        )
 
-            result_without_skip = process_cyclopts_directives(markdown_without_skip, None)
-            assert "This description should be skipped" in result_without_skip
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            # Clear module cache for fresh import
-            del sys.modules["skip_preamble_app"]
+        # Test with skip_preamble=true and nested path - intermediate command should be skipped
+        markdown = textwrap.dedent(
+            """\
+            # Child Commands
 
-            # Test with skip_preamble=true - description should be absent
-            markdown_with_skip = textwrap.dedent(
-                """\
-                # Sub Commands
+            ::: cyclopts
+                module: nested_skip_app:app
+                commands: [parent.child]
+                generate_toc: false
+                skip_preamble: true
+            """
+        )
 
-                ::: cyclopts
-                    module: skip_preamble_app:app
-                    commands: [sub]
-                    generate_toc: false
-                    skip_preamble: true
-                """
-            )
+        result = process_cyclopts_directives(markdown, None)
 
-            result_with_skip = process_cyclopts_directives(markdown_with_skip, None)
-            assert "This description should be skipped" not in result_with_skip
-            # The command's parameters should still be present
-            assert "arg" in result_with_skip.lower()
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "skip_preamble_app" in sys.modules:
-                del sys.modules["skip_preamble_app"]
+        # Intermediate "parent" description should NOT be present
+        assert "Parent description - should be skipped" not in result
+        # Target "child" description should NOT be present (skip_preamble)
+        assert "Child description - should be skipped" not in result
+        # The command's parameters should still be present
+        assert "arg" in result.lower()
 
 
 class TestDirectivePattern:
@@ -677,9 +671,9 @@ class TestPluginIntegration:
         """Test that the plugin has configuration."""
         assert hasattr(plugin, "config")
 
-    def test_plugin_on_page_markdown_with_directive(self, plugin, tmp_path):
+    def test_plugin_on_page_markdown_with_directive(self, plugin, importable_tmp_path):
         """Test the on_page_markdown event with a cyclopts directive."""
-        module_file = tmp_path / "plugin_test_app.py"
+        module_file = importable_tmp_path / "plugin_test_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -695,29 +689,22 @@ class TestPluginIntegration:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            markdown = textwrap.dedent(
-                """\
-                # Documentation
+        markdown = textwrap.dedent(
+            """\
+            # Documentation
 
-                ::: cyclopts
-                    module: plugin_test_app:app
-                    heading_level: 2
-                    generate_toc: false
-                """
-            )
+            ::: cyclopts
+                module: plugin_test_app:app
+                heading_level: 2
+                generate_toc: false
+            """
+        )
 
-            # Mock the required arguments
-            result = plugin.on_page_markdown(markdown, page=None, config=None, files=None)
+        # Mock the required arguments
+        result = plugin.on_page_markdown(markdown, page=None, config=None, files=None)
 
-            assert "::: cyclopts" not in result
-            assert "test" in result.lower()
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "plugin_test_app" in sys.modules:
-                del sys.modules["plugin_test_app"]
+        assert "::: cyclopts" not in result
+        assert "test" in result.lower()
 
     def test_plugin_on_page_markdown_without_directive(self, plugin):
         """Test that pages without directives are unchanged."""
@@ -746,9 +733,9 @@ class TestMkDocsAvailable:
 class TestCommandFiltering:
     """Test command filtering functionality."""
 
-    def test_filter_specific_commands(self, tmp_path):
+    def test_filter_specific_commands(self, importable_tmp_path):
         """Test filtering to include only specific commands."""
-        module_file = tmp_path / "multi_cmd_app.py"
+        module_file = importable_tmp_path / "multi_cmd_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -774,36 +761,29 @@ class TestCommandFiltering:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # CLI Reference
+        markdown = textwrap.dedent(
+            """\
+            # CLI Reference
 
-                ::: cyclopts
-                    module: multi_cmd_app:app
-                    commands: [init, build]
-                """
-            )
+            ::: cyclopts
+                module: multi_cmd_app:app
+                commands: [init, build]
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # Should include init and build
-            assert "init" in result.lower()
-            assert "build" in result.lower()
-            # Should NOT include deploy
-            assert "deploy" not in result.lower()
+        # Should include init and build
+        assert "init" in result.lower()
+        assert "build" in result.lower()
+        # Should NOT include deploy
+        assert "deploy" not in result.lower()
 
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "multi_cmd_app" in sys.modules:
-                del sys.modules["multi_cmd_app"]
-
-    def test_exclude_specific_commands(self, tmp_path):
+    def test_exclude_specific_commands(self, importable_tmp_path):
         """Test excluding specific commands."""
-        module_file = tmp_path / "exclude_cmd_app.py"
+        module_file = importable_tmp_path / "exclude_cmd_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -829,40 +809,33 @@ class TestCommandFiltering:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # CLI Reference
+        markdown = textwrap.dedent(
+            """\
+            # CLI Reference
 
-                ::: cyclopts
-                    module: exclude_cmd_app:app
-                    exclude_commands: [debug, internal]
-                """
-            )
+            ::: cyclopts
+                module: exclude_cmd_app:app
+                exclude_commands: [debug, internal]
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # Should include public_cmd
-            assert "public" in result.lower()
-            # Should NOT include debug or internal
-            assert "debug" not in result.lower()
-            assert "internal" not in result.lower()
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "exclude_cmd_app" in sys.modules:
-                del sys.modules["exclude_cmd_app"]
+        # Should include public_cmd
+        assert "public" in result.lower()
+        # Should NOT include debug or internal
+        assert "debug" not in result.lower()
+        assert "internal" not in result.lower()
 
 
 class TestCodeBlockDetection:
     """Test code block detection to avoid processing directives in code."""
 
-    def test_directive_in_fenced_code_block_ignored(self, tmp_path):
+    def test_directive_in_fenced_code_block_ignored(self, importable_tmp_path):
         """Test that directives in fenced code blocks are not processed."""
-        module_file = tmp_path / "fence_test_app.py"
+        module_file = importable_tmp_path / "fence_test_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -877,39 +850,32 @@ class TestCodeBlockDetection:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # Documentation
+        markdown = textwrap.dedent(
+            """\
+            # Documentation
 
-                Here's an example directive:
+            Here's an example directive:
 
-                ```markdown
-                ::: cyclopts
-                    module: fence_test_app:app
-                ```
+            ```markdown
+            ::: cyclopts
+                module: fence_test_app:app
+            ```
 
-                The above should not be processed.
-                """
-            )
+            The above should not be processed.
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # The directive should remain unchanged since it's in a code block
-            assert "::: cyclopts" in result
-            assert "fence-test" not in result.lower()
+        # The directive should remain unchanged since it's in a code block
+        assert "::: cyclopts" in result
+        assert "fence-test" not in result.lower()
 
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "fence_test_app" in sys.modules:
-                del sys.modules["fence_test_app"]
-
-    def test_directive_in_indented_code_block_ignored(self, tmp_path):
+    def test_directive_in_indented_code_block_ignored(self, importable_tmp_path):
         """Test that directives in indented code blocks are not processed."""
-        module_file = tmp_path / "indent_test_app.py"
+        module_file = importable_tmp_path / "indent_test_app.py"
         module_file.write_text(
             textwrap.dedent(
                 """\
@@ -924,99 +890,48 @@ class TestCodeBlockDetection:
             )
         )
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import process_cyclopts_directives
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
 
-            markdown = textwrap.dedent(
-                """\
-                # Documentation
+        markdown = textwrap.dedent(
+            """\
+            # Documentation
 
-                Here's an example directive:
+            Here's an example directive:
 
-                    ::: cyclopts
-                        module: indent_test_app:app
+                ::: cyclopts
+                    module: indent_test_app:app
 
-                The above should not be processed.
-                """
-            )
+            The above should not be processed.
+            """
+        )
 
-            result = process_cyclopts_directives(markdown, None)
+        result = process_cyclopts_directives(markdown, None)
 
-            # The directive should remain unchanged since it's in an indented code block
-            assert "::: cyclopts" in result
-            assert "indent-test" not in result.lower()
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "indent_test_app" in sys.modules:
-                del sys.modules["indent_test_app"]
+        # The directive should remain unchanged since it's in an indented code block
+        assert "::: cyclopts" in result
+        assert "indent-test" not in result.lower()
 
 
 class TestDirectiveEOFEdgeCases:
     """Test directive pattern edge cases at end of file."""
 
-    def test_directive_at_eof_without_trailing_newline(self, tmp_path):
+    def test_directive_at_eof_without_trailing_newline(self):
         """Test directive at EOF without trailing newline."""
-        module_file = tmp_path / "eof_test_app.py"
-        module_file.write_text(
-            textwrap.dedent(
-                """\
-                from cyclopts import App
+        from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
-                app = App(name="eof-test", help="EOF test app")
+        # Directive at EOF without trailing newline
+        markdown = "::: cyclopts\n    module: eof_test_app:app"
 
-                @app.default
-                def main():
-                    pass
-                """
-            )
-        )
+        matches = list(DIRECTIVE_PATTERN.finditer(markdown))
+        assert len(matches) == 1
+        assert matches[0].group(0) == markdown
 
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
-
-            # Directive at EOF without trailing newline
-            markdown = "::: cyclopts\n    module: eof_test_app:app"
-
-            matches = list(DIRECTIVE_PATTERN.finditer(markdown))
-            assert len(matches) == 1
-            assert matches[0].group(0) == markdown
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "eof_test_app" in sys.modules:
-                del sys.modules["eof_test_app"]
-
-    def test_directive_with_trailing_whitespace_at_eof(self, tmp_path):
+    def test_directive_with_trailing_whitespace_at_eof(self):
         """Test directive with trailing whitespace at EOF."""
-        module_file = tmp_path / "eof_ws_test_app.py"
-        module_file.write_text(
-            textwrap.dedent(
-                """\
-                from cyclopts import App
+        from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
 
-                app = App(name="eof-ws-test", help="EOF whitespace test app")
+        # Directive at EOF with trailing spaces but no newline
+        markdown = "::: cyclopts\n    module: eof_ws_test_app:app    "
 
-                @app.default
-                def main():
-                    pass
-                """
-            )
-        )
-
-        sys.path.insert(0, str(tmp_path))
-        try:
-            from cyclopts.ext.mkdocs import DIRECTIVE_PATTERN
-
-            # Directive at EOF with trailing spaces but no newline
-            markdown = "::: cyclopts\n    module: eof_ws_test_app:app    "
-
-            matches = list(DIRECTIVE_PATTERN.finditer(markdown))
-            assert len(matches) == 1
-
-        finally:
-            sys.path.remove(str(tmp_path))
-            if "eof_ws_test_app" in sys.modules:
-                del sys.modules["eof_ws_test_app"]
+        matches = list(DIRECTIVE_PATTERN.finditer(markdown))
+        assert len(matches) == 1

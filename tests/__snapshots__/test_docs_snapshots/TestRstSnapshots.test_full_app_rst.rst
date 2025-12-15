@@ -4,15 +4,15 @@
 complex-cli
 ===========
 
+::
+
+    complex-cli COMMAND
+
 Complex CLI application for comprehensive documentation testing.
 
 .. contents:: Table of Contents
    :local:
    :depth: 6
-
-::
-
-    complex-cli COMMAND
 
 **Global Options:**
 
@@ -67,24 +67,24 @@ Complex CLI application for comprehensive documentation testing.
 version
 -------
 
-Show version information.
-
-Displays the application version and system information.
-
 ::
 
     complex-cli version
+
+Show version information.
+
+Displays the application version and system information.
 
 .. _cyclopts-complex-cli-info:
 
 info
 ----
 
-Show application information.
-
 ::
 
     complex-cli info [ARGS]
+
+Show application information.
 
 **Parameters:**
 
@@ -117,11 +117,11 @@ Administrative commands for system management.
 status
 ^^^^^^
 
-Show system status.
-
 ::
 
     complex-cli admin status [OPTIONS] [ARGS]
+
+Show system status.
 
 **Parameters:**
 
@@ -139,11 +139,11 @@ Show system status.
 config-cmd
 ^^^^^^^^^^
 
-Configure database settings.
-
 ::
 
     complex-cli admin config-cmd [OPTIONS]
+
+Configure database settings.
 
 **Parameters:**
 
@@ -191,11 +191,11 @@ User management commands.
 list-users
 """"""""""
 
-List all users.
-
 ::
 
     complex-cli admin users list-users [ARGS]
+
+List all users.
 
 **Parameters:**
 
@@ -216,11 +216,11 @@ List all users.
 create
 """"""
 
-Create a new user.
-
 ::
 
     complex-cli admin users create [OPTIONS] USERNAME EMAIL
+
+Create a new user.
 
 **Arguments:**
 
@@ -258,11 +258,11 @@ Create a new user.
 delete
 """"""
 
-Delete a user.
-
 ::
 
     complex-cli admin users delete [OPTIONS] USERNAME
+
+Delete a user.
 
 **Arguments:**
 
@@ -303,11 +303,11 @@ Permission management for users.
 grant
 '''''
 
-Grant permissions to a user.
-
 ::
 
     complex-cli admin users permissions grant [OPTIONS] USERNAME PERMISSION
+
+Grant permissions to a user.
 
 **Arguments:**
 
@@ -330,11 +330,11 @@ Grant permissions to a user.
 revoke
 ''''''
 
-Revoke permissions from a user.
-
 ::
 
     complex-cli admin users permissions revoke USERNAME PERMISSION
+
+Revoke permissions from a user.
 
 **Arguments:**
 
@@ -349,11 +349,11 @@ Revoke permissions from a user.
 audit
 '''''
 
-Audit permission changes.
-
 ::
 
     complex-cli admin users permissions audit [ARGS]
+
+Audit permission changes.
 
 **Parameters:**
 
@@ -386,11 +386,11 @@ Role template management.
 list-roles
 ~~~~~~~~~~
 
-List all role templates.
-
 ::
 
     complex-cli admin users permissions roles list-roles [ARGS]
+
+List all role templates.
 
 **Parameters:**
 
@@ -402,11 +402,11 @@ List all role templates.
 create-role
 ~~~~~~~~~~~
 
-Create a new role template.
-
 ::
 
     complex-cli admin users permissions roles create-role [OPTIONS] NAME
+
+Create a new role template.
 
 **Arguments:**
 
@@ -456,14 +456,14 @@ Data processing commands.
 process
 ^^^^^^^
 
+::
+
+    complex-cli data process [OPTIONS] INPUT_FILES
+
 Process data files with configurable options.
 
 This command demonstrates dataclass parameter flattening where
 all fields from ProcessingConfig and PathConfig become CLI options.
-
-::
-
-    complex-cli data process [OPTIONS] INPUT_FILES
 
 **Arguments:**
 
@@ -504,14 +504,14 @@ all fields from ProcessingConfig and PathConfig become CLI options.
 pipeline
 ^^^^^^^^
 
+::
+
+    complex-cli data pipeline [OPTIONS]
+
 Run a complete data pipeline.
 
 Demonstrates nested dataclass flattening (PipelineConfig contains
 PathConfig and ProcessingConfig).
-
-::
-
-    complex-cli data pipeline [OPTIONS]
 
 **Parameters:**
 
@@ -553,11 +553,11 @@ PathConfig and ProcessingConfig).
 validate
 ^^^^^^^^
 
-Validate data files against schema.
-
 ::
 
     complex-cli data validate [OPTIONS] INPUT_PATH
+
+Validate data files against schema.
 
 **Arguments:**
 
@@ -598,13 +598,13 @@ Server management commands.
 start
 ^^^^^
 
-Start the server with configuration.
-
-Demonstrates Pydantic model support for CLI parameters.
-
 ::
 
     complex-cli server start [OPTIONS]
+
+Start the server with configuration.
+
+Demonstrates Pydantic model support for CLI parameters.
 
 **Parameters:**
 
@@ -640,11 +640,11 @@ Demonstrates Pydantic model support for CLI parameters.
 stop
 ^^^^
 
-Stop the server.
-
 ::
 
     complex-cli server stop [OPTIONS]
+
+Stop the server.
 
 **Parameters:**
 
@@ -662,11 +662,11 @@ Stop the server.
 restart
 ^^^^^^^
 
-Restart the server.
-
 ::
 
     complex-cli server restart [ARGS]
+
+Restart the server.
 
 **Parameters:**
 
@@ -699,13 +699,13 @@ Cache management commands.
 configure
 ^^^^^^^^^
 
-Configure cache settings.
-
-Demonstrates attrs class support for CLI parameters.
-
 ::
 
     complex-cli cache configure [OPTIONS]
+
+Configure cache settings.
+
+Demonstrates attrs class support for CLI parameters.
 
 **Parameters:**
 
@@ -726,11 +726,11 @@ Demonstrates attrs class support for CLI parameters.
 clear
 ^^^^^
 
-Clear cache entries.
-
 ::
 
     complex-cli cache clear [ARGS]
+
+Clear cache entries.
 
 **Parameters:**
 
@@ -745,11 +745,11 @@ Clear cache entries.
 stats
 ^^^^^
 
-Show cache statistics.
-
 ::
 
     complex-cli cache stats [ARGS]
+
+Show cache statistics.
 
 **Parameters:**
 
@@ -764,14 +764,14 @@ Show cache statistics.
 complex-types
 -------------
 
+::
+
+    complex-cli complex-types [ARGS]
+
 Demonstrate complex type annotations.
 
 This command showcases various complex type patterns that the
 documentation system needs to handle correctly.
-
-::
-
-    complex-cli complex-types [ARGS]
 
 **Parameters:**
 
@@ -798,14 +798,14 @@ documentation system needs to handle correctly.
 numpy-style
 -----------
 
+::
+
+    complex-cli numpy-style NAME [ARGS]
+
 Command with NumPy-style docstring.
 
 This command demonstrates NumPy docstring format which is the
 default for cyclopts.
-
-::
-
-    complex-cli numpy-style NAME [ARGS]
 
 **Parameters:**
 
@@ -820,13 +820,13 @@ default for cyclopts.
 google-style
 ------------
 
-Command with Google-style docstring.
-
-This command demonstrates Google docstring format.
-
 ::
 
     complex-cli google-style NAME [ARGS]
+
+Command with Google-style docstring.
+
+This command demonstrates Google docstring format.
 
 **Parameters:**
 
@@ -841,13 +841,13 @@ This command demonstrates Google docstring format.
 sphinx-style
 ------------
 
-Command with Sphinx-style docstring.
-
-This command demonstrates Sphinx/reST docstring format.
-
 ::
 
     complex-cli sphinx-style NAME [ARGS]
+
+Command with Sphinx-style docstring.
+
+This command demonstrates Sphinx/reST docstring format.
 
 **Parameters:**
 
@@ -862,13 +862,13 @@ This command demonstrates Sphinx/reST docstring format.
 secret-feature
 --------------
 
-Secret feature command.
-
-This command has a hidden parameter.
-
 ::
 
     complex-cli secret-feature [ARGS]
+
+Secret feature command.
+
+This command has a hidden parameter.
 
 **Parameters:**
 

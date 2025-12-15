@@ -1,5 +1,9 @@
 # complex-cli
 
+```console
+complex-cli COMMAND
+```
+
 Complex CLI application for comprehensive documentation testing.
 
 ## Table of Contents
@@ -38,10 +42,6 @@ Complex CLI application for comprehensive documentation testing.
 - [`sphinx-style`](#complex-cli-sphinx-style)
 - [`secret-feature`](#complex-cli-secret-feature)
 
-```console
-complex-cli COMMAND
-```
-
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv).  *[default: 0]*
@@ -67,13 +67,13 @@ complex-cli COMMAND
 
 ## complex-cli version
 
-Show version information.
-
-Displays the application version and system information.
-
 ```console
 complex-cli version
 ```
+
+Show version information.
+
+Displays the application version and system information.
 
 **Global Options**:
 
@@ -84,11 +84,11 @@ complex-cli version
 
 ## complex-cli info
 
-Show application information.
-
 ```console
 complex-cli info [ARGS]
 ```
+
+Show application information.
 
 **Parameters**:
 
@@ -115,11 +115,11 @@ Administrative commands for system management.
 
 ### complex-cli admin status
 
-Show system status.
-
 ```console
 complex-cli admin status [OPTIONS] [ARGS]
 ```
+
+Show system status.
 
 **Parameters**:
 
@@ -129,11 +129,11 @@ complex-cli admin status [OPTIONS] [ARGS]
 
 ### complex-cli admin config-cmd
 
-Configure database settings.
-
 ```console
 complex-cli admin config-cmd [OPTIONS]
 ```
+
+Configure database settings.
 
 **Parameters**:
 
@@ -157,11 +157,11 @@ User management commands.
 
 #### complex-cli admin users list-users
 
-List all users.
-
 ```console
 complex-cli admin users list-users [ARGS]
 ```
+
+List all users.
 
 **Parameters**:
 
@@ -172,11 +172,11 @@ complex-cli admin users list-users [ARGS]
 
 #### complex-cli admin users create
 
-Create a new user.
-
 ```console
 complex-cli admin users create [OPTIONS] USERNAME EMAIL
 ```
+
+Create a new user.
 
 **Arguments**:
 
@@ -195,11 +195,11 @@ complex-cli admin users create [OPTIONS] USERNAME EMAIL
 
 #### complex-cli admin users delete
 
-Delete a user.
-
 ```console
 complex-cli admin users delete [OPTIONS] USERNAME
 ```
+
+Delete a user.
 
 **Arguments**:
 
@@ -216,11 +216,11 @@ Permission management for users.
 
 ##### complex-cli admin users permissions grant
 
-Grant permissions to a user.
-
 ```console
 complex-cli admin users permissions grant [OPTIONS] USERNAME PERMISSION
 ```
+
+Grant permissions to a user.
 
 **Arguments**:
 
@@ -234,11 +234,11 @@ complex-cli admin users permissions grant [OPTIONS] USERNAME PERMISSION
 
 ##### complex-cli admin users permissions revoke
 
-Revoke permissions from a user.
-
 ```console
 complex-cli admin users permissions revoke USERNAME PERMISSION
 ```
+
+Revoke permissions from a user.
 
 **Arguments**:
 
@@ -247,11 +247,11 @@ complex-cli admin users permissions revoke USERNAME PERMISSION
 
 ##### complex-cli admin users permissions audit
 
-Audit permission changes.
-
 ```console
 complex-cli admin users permissions audit [ARGS]
 ```
+
+Audit permission changes.
 
 **Parameters**:
 
@@ -270,11 +270,11 @@ Role template management.
 
 ###### complex-cli admin users permissions roles list-roles
 
-List all role templates.
-
 ```console
 complex-cli admin users permissions roles list-roles [ARGS]
 ```
+
+List all role templates.
 
 **Parameters**:
 
@@ -282,11 +282,11 @@ complex-cli admin users permissions roles list-roles [ARGS]
 
 ###### complex-cli admin users permissions roles create-role
 
-Create a new role template.
-
 ```console
 complex-cli admin users permissions roles create-role [OPTIONS] NAME
 ```
+
+Create a new role template.
 
 **Arguments**:
 
@@ -314,14 +314,14 @@ Data processing commands.
 
 ### complex-cli data process
 
+```console
+complex-cli data process [OPTIONS] INPUT_FILES
+```
+
 Process data files with configurable options.
 
 This command demonstrates dataclass parameter flattening where
 all fields from ProcessingConfig and PathConfig become CLI options.
-
-```console
-complex-cli data process [OPTIONS] INPUT_FILES
-```
 
 **Arguments**:
 
@@ -341,14 +341,14 @@ complex-cli data process [OPTIONS] INPUT_FILES
 
 ### complex-cli data pipeline
 
+```console
+complex-cli data pipeline [OPTIONS]
+```
+
 Run a complete data pipeline.
 
 Demonstrates nested dataclass flattening (PipelineConfig contains
 PathConfig and ProcessingConfig).
-
-```console
-complex-cli data pipeline [OPTIONS]
-```
 
 **Parameters**:
 
@@ -366,11 +366,11 @@ complex-cli data pipeline [OPTIONS]
 
 ### complex-cli data validate
 
-Validate data files against schema.
-
 ```console
 complex-cli data validate [OPTIONS] INPUT_PATH
 ```
+
+Validate data files against schema.
 
 **Arguments**:
 
@@ -395,13 +395,13 @@ Server management commands.
 
 ### complex-cli server start
 
-Start the server with configuration.
-
-Demonstrates Pydantic model support for CLI parameters.
-
 ```console
 complex-cli server start [OPTIONS]
 ```
+
+Start the server with configuration.
+
+Demonstrates Pydantic model support for CLI parameters.
 
 **Parameters**:
 
@@ -417,11 +417,11 @@ complex-cli server start [OPTIONS]
 
 ### complex-cli server stop
 
-Stop the server.
-
 ```console
 complex-cli server stop [OPTIONS]
 ```
+
+Stop the server.
 
 **Parameters**:
 
@@ -431,11 +431,11 @@ complex-cli server stop [OPTIONS]
 
 ### complex-cli server restart
 
-Restart the server.
-
 ```console
 complex-cli server restart [ARGS]
 ```
+
+Restart the server.
 
 **Parameters**:
 
@@ -455,13 +455,13 @@ Cache management commands.
 
 ### complex-cli cache configure
 
-Configure cache settings.
-
-Demonstrates attrs class support for CLI parameters.
-
 ```console
 complex-cli cache configure [OPTIONS]
 ```
+
+Configure cache settings.
+
+Demonstrates attrs class support for CLI parameters.
 
 **Parameters**:
 
@@ -472,11 +472,11 @@ complex-cli cache configure [OPTIONS]
 
 ### complex-cli cache clear
 
-Clear cache entries.
-
 ```console
 complex-cli cache clear [ARGS]
 ```
+
+Clear cache entries.
 
 **Parameters**:
 
@@ -485,11 +485,11 @@ complex-cli cache clear [ARGS]
 
 ### complex-cli cache stats
 
-Show cache statistics.
-
 ```console
 complex-cli cache stats [ARGS]
 ```
+
+Show cache statistics.
 
 **Parameters**:
 
@@ -498,14 +498,14 @@ complex-cli cache stats [ARGS]
 
 ## complex-cli complex-types
 
+```console
+complex-cli complex-types [ARGS]
+```
+
 Demonstrate complex type annotations.
 
 This command showcases various complex type patterns that the
 documentation system needs to handle correctly.
-
-```console
-complex-cli complex-types [ARGS]
-```
 
 **Parameters**:
 
@@ -525,14 +525,14 @@ complex-cli complex-types [ARGS]
 
 ## complex-cli numpy-style
 
+```console
+complex-cli numpy-style NAME [ARGS]
+```
+
 Command with NumPy-style docstring.
 
 This command demonstrates NumPy docstring format which is the
 default for cyclopts.
-
-```console
-complex-cli numpy-style NAME [ARGS]
-```
 
 **Parameters**:
 
@@ -548,13 +548,13 @@ complex-cli numpy-style NAME [ARGS]
 
 ## complex-cli google-style
 
-Command with Google-style docstring.
-
-This command demonstrates Google docstring format.
-
 ```console
 complex-cli google-style NAME [ARGS]
 ```
+
+Command with Google-style docstring.
+
+This command demonstrates Google docstring format.
 
 **Parameters**:
 
@@ -570,13 +570,13 @@ complex-cli google-style NAME [ARGS]
 
 ## complex-cli sphinx-style
 
-Command with Sphinx-style docstring.
-
-This command demonstrates Sphinx/reST docstring format.
-
 ```console
 complex-cli sphinx-style NAME [ARGS]
 ```
+
+Command with Sphinx-style docstring.
+
+This command demonstrates Sphinx/reST docstring format.
 
 **Parameters**:
 
@@ -592,13 +592,13 @@ complex-cli sphinx-style NAME [ARGS]
 
 ## complex-cli secret-feature
 
-Secret feature command.
-
-This command has a hidden parameter.
-
 ```console
 complex-cli secret-feature [ARGS]
 ```
+
+Secret feature command.
+
+This command has a hidden parameter.
 
 **Parameters**:
 

@@ -38,11 +38,11 @@ User management commands.
 list-users
 """"""""""
 
-List all users.
-
 ::
 
     complex-cli admin users list-users [ARGS]
+
+List all users.
 
 **Parameters:**
 
@@ -63,11 +63,11 @@ List all users.
 create
 """"""
 
-Create a new user.
-
 ::
 
     complex-cli admin users create [OPTIONS] USERNAME EMAIL
+
+Create a new user.
 
 **Arguments:**
 
@@ -105,11 +105,11 @@ Create a new user.
 delete
 """"""
 
-Delete a user.
-
 ::
 
     complex-cli admin users delete [OPTIONS] USERNAME
+
+Delete a user.
 
 **Arguments:**
 
@@ -150,11 +150,11 @@ Permission management for users.
 grant
 '''''
 
-Grant permissions to a user.
-
 ::
 
     complex-cli admin users permissions grant [OPTIONS] USERNAME PERMISSION
+
+Grant permissions to a user.
 
 **Arguments:**
 
@@ -177,11 +177,11 @@ Grant permissions to a user.
 revoke
 ''''''
 
-Revoke permissions from a user.
-
 ::
 
     complex-cli admin users permissions revoke USERNAME PERMISSION
+
+Revoke permissions from a user.
 
 **Arguments:**
 
@@ -196,11 +196,11 @@ Revoke permissions from a user.
 audit
 '''''
 
-Audit permission changes.
-
 ::
 
     complex-cli admin users permissions audit [ARGS]
+
+Audit permission changes.
 
 **Parameters:**
 
@@ -233,11 +233,11 @@ Role template management.
 list-roles
 ~~~~~~~~~~
 
-List all role templates.
-
 ::
 
     complex-cli admin users permissions roles list-roles [ARGS]
+
+List all role templates.
 
 **Parameters:**
 
@@ -249,11 +249,11 @@ List all role templates.
 create-role
 ~~~~~~~~~~~
 
-Create a new role template.
-
 ::
 
     complex-cli admin users permissions roles create-role [OPTIONS] NAME
+
+Create a new role template.
 
 **Arguments:**
 
