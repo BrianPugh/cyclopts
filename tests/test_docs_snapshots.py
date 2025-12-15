@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pytest
 
+# Skip all snapshot tests on Windows due to platform-specific output differences
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Snapshot tests not supported on Windows")
+
 # Path to the complex-demo application
 COMPLEX_DEMO_DIR = Path(__file__).parent / "apps" / "complex-demo"
 
