@@ -1,0 +1,18 @@
+# MkDocs build
+site/
+
+# Sphinx build
+docs/build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.venv/
+uv.lock

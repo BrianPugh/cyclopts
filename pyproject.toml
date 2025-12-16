@@ -41,6 +41,11 @@ docs = [
     "sphinx-autodoc-typehints>=1.25.2,<4.0.0",
     "sphinx-rtd-dark-mode>=1.3.0,<2.0.0",
 ]
+mkdocs = [
+    "mkdocs>=1.4.0",
+    "markdown>=3.3",
+    "pymdown-extensions>=10.0",
+]
 dev = [
     "coverage[toml]>=5.1",
     "pre_commit>=2.16.0",
@@ -48,14 +53,19 @@ dev = [
     "pytest-cov>=3.0.0",
     "pytest-mock>=3.7.0",
     "pydantic>=2.11.2,<3.0.0",
+    "syrupy>=4.0.0",
     "toml>=0.10.2,<1.0.0",
     "trio>=0.10.0",
     "pyyaml>=6.0.1",
+    "mkdocs>=1.4.0",
 ]
 debug = ["ipdb>=0.13.9", "line_profiler>=3.5.1"]
 
 [project.scripts]
 cyclopts = "cyclopts.cli:app"
+
+[project.entry-points."mkdocs.plugins"]
+cyclopts = "cyclopts.ext.mkdocs:CycloptsPlugin"
 
 [project.urls]
 Homepage = "https://github.com/BrianPugh/cyclopts"
@@ -113,6 +123,7 @@ omit = ["cyclopts/protocols.py"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+extraPaths = ["tests/apps/complex-demo"]
 ignore = ["docs/", "tests/py312/"]
 reportUnsupportedDunderAll = "none"
 

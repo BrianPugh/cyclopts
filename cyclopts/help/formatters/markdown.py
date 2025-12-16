@@ -1,7 +1,7 @@
 """Markdown documentation formatter."""
 
 import io
-from typing import TYPE_CHECKING, Any, Optional, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Optional
 
 from cyclopts._markup import extract_text
 
@@ -9,83 +9,6 @@ if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
 
     from cyclopts.help import HelpEntry, HelpPanel
-
-
-def _format_type_name(type_obj: Any) -> str:
-    """Format a type object into a readable string.
-
-    Parameters
-    ----------
-    type_obj : Any
-        Type object to format.
-
-    Returns
-    -------
-    str
-        Formatted type name.
-
-    Examples
-    --------
-    >>> _format_type_name(str)
-    'str'
-    >>> _format_type_name(Optional[int])
-    'int'
-    >>> _format_type_name(list[str])
-    'list[str]'
-    """
-    if type_obj is None:
-        return ""
-
-    # Handle string representation of types
-    if isinstance(type_obj, str):
-        # Clean up common patterns
-        type_str = type_obj
-        type_str = type_str.replace("<class '", "").replace("'>", "")
-        type_str = type_str.replace("typing.", "")
-
-        # Handle Optional types
-        if "Optional[" in type_str:
-            # Extract the inner type
-            inner = type_str[type_str.index("[") + 1 : type_str.rindex("]")]
-            return inner
-
-        return type_str
-
-    # Get string representation of the type
-    type_str = str(type_obj)
-
-    # Clean up class representations
-    if type_str.startswith("<class '"):
-        type_str = type_str[8:-2]  # Remove "<class '...'>" wrapper
-
-    # Handle typing module types
-    origin = get_origin(type_obj)
-    if origin is Union:
-        args = get_args(type_obj)
-        # Check if it's Optional (Union with None)
-        if len(args) == 2 and type(None) in args:
-            non_none = args[0] if args[1] is type(None) else args[1]
-            return _format_type_name(non_none)
-        # Format as Union
-        formatted_args = [_format_type_name(arg) for arg in args]
-        return f"Union[{', '.join(formatted_args)}]"
-    elif origin:
-        # Handle generic types like List, Dict, etc.
-        args = get_args(type_obj)
-        origin_name = getattr(origin, "__name__", str(origin))
-        if args:
-            formatted_args = [_format_type_name(arg) for arg in args]
-            return f"{origin_name}[{', '.join(formatted_args)}]"
-        return origin_name
-
-    # Handle built-in types
-    if hasattr(type_obj, "__name__"):
-        return type_obj.__name__
-
-    # Clean up typing module prefixes
-    type_str = type_str.replace("typing.", "")
-
-    return type_str
 
 
 class MarkdownFormatter:
@@ -187,14 +110,19 @@ class MarkdownFormatter:
                 names.extend(entry.shorts)
 
             if names:
-                # Use first name as primary
+                # Use first name as primary, show aliases in parentheses
                 primary_name = names[0]
-                desc = extract_text(entry.description, console)
+                aliases = names[1:]
+                if aliases:
+                    name_display = f"{primary_name} ({', '.join(aliases)})"
+                else:
+                    name_display = primary_name
+                desc = extract_text(entry.description, console, preserve_markup=True)
 
                 if desc:
-                    self._output.write(f"* `{primary_name}`: {desc}")
+                    self._output.write(f"* `{name_display}`: {desc}")
                 else:
-                    self._output.write(f"* `{primary_name}`:")
+                    self._output.write(f"* `{name_display}`:")
 
                 self._output.write("\n")
 
@@ -218,34 +146,71 @@ class MarkdownFormatter:
                 names.extend(entry.shorts)
 
             if names:
-                # In cyclopts, parameters have both positional and option names
-                # Determine if we should display as positional based on requirement and default
+                # Separate positional names from option names
+                positional_names = [n for n in names if not n.startswith("-")]
+                short_opts = [n for n in names if n.startswith("-") and not n.startswith("--")]
+                long_opts = [n for n in names if n.startswith("--")]
+
+                # Determine if this is a positional argument (required, no default)
                 is_positional = entry.required and entry.default is None
 
-                if is_positional:
-                    # For positional arguments, only show the positional name (uppercase)
-                    positional_names = [n for n in names if not n.startswith("-")]
-                    name_str = positional_names[0].upper() if positional_names else names[0].upper()
+                if is_positional and positional_names:
+                    # Show uppercase positional name first, then any option names
+                    parts = [positional_names[0].upper()]
+                    parts.extend(long_opts)
+                    name_str = ", ".join(parts)
                 else:
-                    # For options, format with both short and long forms
-                    if len(names) > 1:
-                        # Show short option first if available
-                        if any(n.startswith("-") and not n.startswith("--") for n in names):
-                            short_opts = [n for n in names if n.startswith("-") and not n.startswith("--")]
-                            long_opts = [n for n in names if n.startswith("--")]
-                            name_str = ", ".join(short_opts + long_opts)
-                        else:
-                            name_str = ", ".join(names)
+                    # For options, show long opts first, then short opts
+                    if short_opts:
+                        name_str = ", ".join(long_opts + short_opts)
+                    elif positional_names:
+                        # Has positional name but not required - show all
+                        parts = [positional_names[0].upper()]
+                        parts.extend(long_opts)
+                        name_str = ", ".join(parts)
                     else:
-                        name_str = names[0]
+                        name_str = ", ".join(long_opts)
 
                 # Start the entry (no type display)
                 self._output.write(f"* `{name_str}`: ")
 
-                # Add description
-                desc = extract_text(entry.description, console)
+                # Add description with proper indentation for nested content
+                desc = extract_text(entry.description, console, preserve_markup=True)
                 if desc:
-                    self._output.write(desc)
+                    import re
+
+                    # Split into lines and indent continuation lines to nest under the bullet
+                    lines = desc.split("\n")
+                    self._output.write(lines[0])  # First line on same line as bullet
+
+                    # Track what type of list context we're in for proper nesting
+                    in_numbered_list = False
+
+                    for line in lines[1:]:
+                        if not line.strip():  # Blank line
+                            self._output.write("\n")
+                        else:
+                            stripped = line.lstrip()
+                            existing_indent = len(line) - len(stripped)
+
+                            # Check if this line starts a numbered list
+                            if re.match(r"^\d+\.", stripped):
+                                in_numbered_list = True
+                                # Numbered lists need 4 spaces base indentation minimum
+                                indent = max(existing_indent + 4, 4)
+                            # Check if this is a bullet under a numbered list
+                            elif re.match(r"^\-", stripped) and in_numbered_list:
+                                # Bullets nested under numbered items need extra indentation
+                                # At least 10 spaces (4 base + 3 for "N. " + 3 more for nesting)
+                                indent = max(existing_indent + 4, 10)
+                            elif re.match(r"^\-", stripped):
+                                # Top-level bullets just need base indentation
+                                indent = max(existing_indent + 4, 4)
+                            else:
+                                # Regular content preserves relative indentation
+                                indent = existing_indent + 4
+
+                            self._output.write("\n" + " " * indent + stripped)
 
                 # Add metadata in brackets
                 # Handle required separately for bold formatting
@@ -268,25 +233,7 @@ class MarkdownFormatter:
 
                 if entry.default is not None:
                     default_str = extract_text(entry.default, console)
-                    # For boolean flags, format as flag style
-                    if entry.type and _format_type_name(entry.type) == "bool":
-                        # Find the positive and negative flag names
-                        positive_flag = None
-                        negative_flag = None
-                        for name in names:
-                            if name.startswith("--no-"):
-                                negative_flag = name
-                            elif name.startswith("--"):
-                                if not positive_flag:  # Take first positive flag
-                                    positive_flag = name
-
-                        if default_str.lower() == "true" and positive_flag:
-                            metadata.append(f"default: {positive_flag}")
-                        elif default_str.lower() == "false" and negative_flag:
-                            metadata.append(f"default: {negative_flag}")
-                        # Don't show default if we can't determine the flag
-                    else:
-                        metadata.append(f"default: {default_str}")
+                    metadata.append(f"default: {default_str}")
 
                 # Write required in bold and separate brackets first
                 if is_required:
@@ -318,7 +265,11 @@ class MarkdownFormatter:
         if usage:
             usage_text = extract_text(usage, console)
             if usage_text:
-                self._output.write(f"```\n{usage_text}\n```\n\n")
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._output.write(f"```\nUsage: {usage_text}\n```\n\n")
+                else:
+                    self._output.write(f"```\n{usage_text}\n```\n\n")
 
     def render_description(
         self,

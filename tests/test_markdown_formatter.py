@@ -35,7 +35,7 @@ def test_markdown_formatter_command_panel_table():
         ## Commands
 
         * `serve`: Start the server
-        * `build`: Build the project
+        * `build (-b)`: Build the project
 
         """)
 
@@ -61,7 +61,7 @@ def test_markdown_formatter_command_panel_list():
         ## Commands
 
         * `serve`: Start the server
-        * `build`: Build the project
+        * `build (-b)`: Build the project
 
         """)
 
@@ -99,8 +99,8 @@ def test_markdown_formatter_parameter_panel_table():
     expected = dedent("""\
         ## Parameters
 
-        * `-p, --port`: Port number  **[required]**  *[default: 8080]*
-        * `-v, --verbose`: Enable verbose mode  *[choices: true, false]*
+        * `--port, -p`: Port number  **[required]**  *[default: 8080]*
+        * `--verbose, -v`: Enable verbose mode  *[choices: true, false]*
 
         """)
 
@@ -136,7 +136,7 @@ def test_markdown_formatter_parameter_panel_list():
     expected = dedent("""\
         ## Parameters
 
-        * `-p, --port`: Port number  **[required]**  *[default: 8080]*
+        * `--port, -p`: Port number  **[required]**  *[default: 8080]*
         * `--verbose`: Enable verbose mode  *[env: VERBOSE]*
 
         """)
@@ -192,7 +192,7 @@ def test_markdown_formatter_with_panel_description():
 def test_markdown_formatter_render_usage():
     """Test usage rendering."""
     formatter = MarkdownFormatter()
-    usage = "Usage: myapp [OPTIONS] COMMAND"
+    usage = "myapp [OPTIONS] COMMAND"
 
     formatter.render_usage(None, None, usage)
     output = formatter.get_output()
@@ -297,7 +297,7 @@ def test_parameter_table_with_all_metadata():
     expected = dedent("""\
         ## Parameters
 
-        * `-c, --config`: Configuration file path  **[required]**  *[choices: /etc/app.conf, ~/.app.conf, ./app.conf]*  *[env: APP_CONFIG, CONFIG_PATH]*  *[default: /etc/app.conf]*
+        * `--config, -c`: Configuration file path  **[required]**  *[choices: /etc/app.conf, ~/.app.conf, ./app.conf]*  *[env: APP_CONFIG, CONFIG_PATH]*  *[default: /etc/app.conf]*
 
         """)
 
@@ -331,8 +331,8 @@ def test_parameter_table_no_required_column():
     expected = dedent("""\
         ## Options
 
-        * `--debug`: Enable debug mode
-        * `-q, --quiet`: Suppress output
+        * `--debug`: Enable debug mode  *[default: False]*
+        * `--quiet, -q`: Suppress output
 
         """)
 
@@ -360,7 +360,7 @@ def test_parameter_with_no_description():
     expected = dedent("""\
         ## Parameters
 
-        * `--flag`:   *[default: --flag]*
+        * `--flag`:   *[default: True]*
 
         """)
 
@@ -394,7 +394,7 @@ def test_command_table_empty_description():
 
 
 def test_command_list_with_shorts_and_aliases():
-    """Test command list with short options."""
+    """Test command list with short options and aliases in parentheses."""
     formatter = MarkdownFormatter(table_style="list")
     panel = HelpPanel(
         format="command",
@@ -419,8 +419,8 @@ def test_command_list_with_shorts_and_aliases():
     expected = dedent("""\
         ## Available Commands
 
-        * `serve`: Start the development server
-        * `test`: Run tests
+        * `serve (server, s)`: Start the development server
+        * `test (t, T)`: Run tests
 
         """)
 

@@ -79,7 +79,7 @@ from cyclopts._run import _run_maybe_async_command
 T = TypeVar("T", bound=Callable[..., Any])
 V = TypeVar("V")
 
-_DEFAULT_FORMAT = "markdown"
+DEFAULT_FORMAT = "markdown"
 
 
 def _result_action_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...] | None:
@@ -730,7 +730,7 @@ class App:
 
         version_format = self.app_stack.resolve("version_format")
         if version_format is None:
-            version_format = self.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
+            version_format = self.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
         version_formatted = InlineText.from_format(version_raw, format=version_format)
         (console or self.console).print(version_formatted)
 
@@ -2037,7 +2037,7 @@ class App:
                 usage = None
 
             # Prepare description
-            help_format = executing_app.app_stack.resolve("help_format", fallback=_DEFAULT_FORMAT)
+            help_format = executing_app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
             description = format_doc(executing_app, help_format)
 
             # Prepare panels with their associated groups
@@ -2090,7 +2090,7 @@ class App:
         command_chain, execution_path, _ = self.parse_commands(tokens)
         command_app = execution_path[-1]
 
-        help_format = command_app.app_stack.resolve("help_format", help_format, _DEFAULT_FORMAT)
+        help_format = command_app.app_stack.resolve("help_format", help_format, DEFAULT_FORMAT)
 
         panels: dict[str, tuple[Group, HelpPanel]] = {}
         # Handle commands first; there's an off chance they may be "upgraded"
@@ -2184,6 +2184,7 @@ class App:
         recursive: bool = True,
         include_hidden: bool = False,
         heading_level: int = 1,
+        max_heading_level: int = 6,
         flatten_commands: bool = False,
     ) -> str:
         """Generate documentation for this CLI application.
@@ -2202,6 +2203,10 @@ class App:
         heading_level : int
             Starting heading level for the main application title.
             Default is 1 (single # for markdown, = for RST).
+        max_heading_level : int
+            Maximum heading level to use. Headings deeper than this will be capped
+            at this level. Standard Markdown and HTML support levels 1-6.
+            Default is 6.
         flatten_commands : bool
             If True, generate all commands at the same heading level instead of nested.
             Default is False.
@@ -2240,6 +2245,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
             )
         elif output_format == "html":
@@ -2248,6 +2254,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
             )
         elif output_format == "rst":
@@ -2256,6 +2263,7 @@ class App:
                 recursive=recursive,
                 include_hidden=include_hidden,
                 heading_level=heading_level,
+                max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
                 no_root_title=False,  # Default to False for direct API usage
             )

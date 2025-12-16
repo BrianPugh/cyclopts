@@ -1,0 +1,33 @@
+site_name: Complex CLI Documentation
+site_description: Comprehensive test documentation for cyclopts MkDocs plugin.
+
+theme:
+  name: mkdocs
+  palette:
+    primary: blue
+    accent: blue
+
+plugins:
+  - search
+  - cyclopts:
+      default_heading_level: 2
+
+nav:
+  - Home: index.md
+  - CLI Reference:
+    - Overview: cli/index.md
+    - Admin Commands: cli/admin.md
+    - Data Commands: cli/data.md
+    - Server Commands: cli/server.md
+    - Utilities: cli/utilities.md
+    - Full Reference: cli/full.md
+
+docs_dir: mkdocs_docs
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
+  - tables
