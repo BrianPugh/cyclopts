@@ -988,11 +988,14 @@ API
       :type: Union[None, str, Iterable[str]]
       :value: None
 
-      Name(s) for empty iterables or false boolean flags.
+      Name(s) for empty iterables, false boolean flags, or setting optional types to :obj:`None`.
 
       * For booleans, defaults to ``no-{name}`` (see :attr:`negative_bool`).
 
       * For iterables, defaults to ``empty-{name}`` (see :attr:`negative_iterable`).
+
+      * For optional types (e.g., ``int | None``), no default prefix is set (see :attr:`negative_none`).
+        However, an explicit :attr:`negative` flag can be used to set the value to :obj:`None`.
 
       Set to an empty list or string to disable the creation of negative flags.
 
@@ -1023,6 +1026,32 @@ API
          ╭─ Parameters ───────────────────────────────────────────────────╮
          │ --verbose --quiet  [default: False]                            │
          ╰────────────────────────────────────────────────────────────────╯
+
+      For optional types like ``int | None``, an explicit negative flag can set the value to :obj:`None`:
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(*, count: Annotated[int | None, Parameter(negative="--no-count")] = 10):
+            print(f"{count=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script
+         count=10
+
+         $ my-script --count 5
+         count=5
+
+         $ my-script --no-count
+         count=None
 
    .. attribute:: negative_bool
       :type: Optional[str]
