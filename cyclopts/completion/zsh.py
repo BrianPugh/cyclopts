@@ -13,6 +13,7 @@ from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
     clean_choice_text,
+    escape_for_shell_pattern,
     extract_completion_data,
     get_completion_action,
     strip_markup,
@@ -369,7 +370,8 @@ def _generate_completion_for_path(
             for cmd_name in registered_command.names:
                 if not cmd_name.startswith("-"):
                     desc = _safe_get_description_from_app(registered_command.app, data.help_format)
-                    cmd_list.append(f"'{cmd_name}:{desc}'")
+                    escaped_cmd_name = _escape_completion_choice(cmd_name)
+                    cmd_list.append(f"'{escaped_cmd_name}:{desc}'")
 
         lines.append(f"{indent_str}    local -a commands")
         lines.append(f"{indent_str}    commands=(")
@@ -389,7 +391,8 @@ def _generate_completion_for_path(
 
                 sub_path = command_path + (cmd_name,)
                 if sub_path in completion_data:
-                    lines.append(f"{indent_str}      {cmd_name})")
+                    escaped_case_name = _escape_command_name_for_case(cmd_name)
+                    lines.append(f"{indent_str}      {escaped_case_name})")
                     sub_lines = _generate_completion_for_path(
                         completion_data, sub_path, indent + 8, prog_name, help_flags, version_flags
                     )
@@ -434,6 +437,25 @@ def _escape_completion_choice(choice: str) -> str:
     choice = choice.replace("&", "\\&")
     choice = choice.replace(":", "\\:")
     return choice
+
+
+def _escape_command_name_for_case(name: str) -> str:
+    """Escape special characters in command name for zsh case patterns.
+
+    In zsh case patterns, glob characters need to be escaped to match literally.
+
+    Parameters
+    ----------
+    name : str
+        Command name.
+
+    Returns
+    -------
+    str
+        Escaped command name safe for zsh case patterns.
+    """
+    # zsh case patterns have more special chars than bash: includes ()|
+    return escape_for_shell_pattern(name, chars="*?[]()|")
 
 
 def _escape_zsh_description(text: str) -> str:

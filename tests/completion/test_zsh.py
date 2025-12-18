@@ -905,3 +905,65 @@ def test_list_path_completion(zsh_tester):
 
     assert "_files" in script, "list[Path] should generate file completion"
     assert tester.validate_script_syntax()
+
+
+def test_colon_in_command_name(zsh_tester):
+    """Test that colons in command names are properly escaped.
+
+    Regression test for issue #715: Command names containing colons like
+    'utility:ping' should have the colon escaped in zsh completion scripts
+    so that the full name is displayed, not just the part before the colon.
+    """
+    app = App(name="myapp")
+
+    sub = App()
+
+    @sub.default
+    def action(value: str = ""):
+        """Perform an action."""
+        pass
+
+    # Register command with colon in name
+    app.command(sub, name="utility:ping")
+
+    tester = zsh_tester(app, "myapp")
+    script = tester.completion_script
+
+    # The colon should be escaped in the _describe format
+    # 'utility\:ping:description' instead of 'utility:ping:description'
+    assert r"utility\:ping" in script, "Colon in command name should be escaped"
+
+    # The case pattern should have the command name (colons don't need escaping in case patterns)
+    assert "utility:ping)" in script, "Command name should appear in case pattern (colon not escaped)"
+
+    assert tester.validate_script_syntax()
+
+
+def test_special_chars_in_command_name(zsh_tester):
+    """Test that special characters in command names are properly escaped.
+
+    Tests escaping for various special characters that could appear in command names
+    and cause issues in zsh completion scripts.
+    """
+    app = App(name="myapp")
+
+    sub1 = App()
+
+    @sub1.default
+    def action1():
+        """Action with brackets."""
+        pass
+
+    # Register command with brackets in name (unusual but possible)
+    app.command(sub1, name="test[1]")
+
+    tester = zsh_tester(app, "myapp")
+    script = tester.completion_script
+
+    # Brackets should be escaped in the _describe format
+    assert r"test\[1\]" in script, "Brackets in command name should be escaped"
+
+    # In case patterns, brackets should also be escaped
+    assert r"test\[1\])" in script, "Brackets in case pattern should be escaped"
+
+    assert tester.validate_script_syntax()
