@@ -999,6 +999,17 @@ API
 
       Set to an empty list or string to disable the creation of negative flags.
 
+      .. note::
+
+         Setting :attr:`negative` to **any** value (including an empty list/string) overrides
+         **all** automatic prefix generation from :attr:`negative_bool`, :attr:`negative_iterable`,
+         and :attr:`negative_none`. For example, ``negative=()`` disables negative flags for
+         the entire parameter, even if ``negative_none="none-"`` is also set.
+
+         To selectively disable only one type of negative prefix while keeping others functional,
+         set the specific attribute to an empty string instead. For example, use ``negative_bool=""``
+         to disable boolean negatives while allowing :attr:`negative_none` to still generate flags.
+
       Example usage:
 
       .. code-block:: python
