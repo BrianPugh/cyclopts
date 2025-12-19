@@ -443,6 +443,8 @@ def _escape_command_name_for_case(name: str) -> str:
     """Escape special characters in command name for zsh case patterns.
 
     In zsh case patterns, glob characters need to be escaped to match literally.
+    Colons also need escaping because zsh's completion system may treat them
+    specially when populating the $words array after _describe completion.
 
     Parameters
     ----------
@@ -455,7 +457,8 @@ def _escape_command_name_for_case(name: str) -> str:
         Escaped command name safe for zsh case patterns.
     """
     # zsh case patterns have more special chars than bash: includes ()|
-    return escape_for_shell_pattern(name, chars="*?[]()|")
+    # Colons (:) also need escaping for completion $words matching (issue #715)
+    return escape_for_shell_pattern(name, chars="*?[]()|:")
 
 
 def _escape_zsh_description(text: str) -> str:
