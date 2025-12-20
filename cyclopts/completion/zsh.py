@@ -638,8 +638,14 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
     -------
     str
         Escaped plain text description (truncated to 80 chars).
+        Falls back to argument name if help text is empty, since zsh _arguments
+        requires a non-empty description for positional specs to work correctly.
     """
     text = strip_markup(argument.parameter.help or "", format=help_format)
+    if not text:
+        # Use primary argument name as fallback - zsh _arguments requires non-empty
+        # description for positional specs to provide completions
+        text = argument.names[0] if argument.names else "argument"
     return _escape_zsh_description(text)
 
 
