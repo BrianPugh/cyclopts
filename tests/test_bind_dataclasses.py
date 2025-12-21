@@ -269,8 +269,8 @@ def test_bind_dataclass_positionally(app, assert_parse_args, cmd_str, console):
         Usage: test_bind_dataclasses A [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  A --a      Docstring for a. [required]                          │
@@ -301,8 +301,8 @@ def test_bind_dataclass_default_factory_help(app, console):
         Usage: test_bind_dataclasses [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ A --a  Docstring for a. [default: 5]                               │

@@ -1,7 +1,9 @@
 """Argument class and related functionality."""
 
+import inspect
 import json
 import operator
+import re
 import sys
 from collections.abc import Callable, Sequence
 from contextlib import suppress
@@ -183,7 +185,15 @@ class Argument:
                     f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
                 )
 
-        if not self.parameter.parse:
+        if not self.parse:
+            # Validate that non-parsed parameters are keyword-only or have defaults
+            is_keyword_only = self.field_info.kind is self.field_info.KEYWORD_ONLY
+            has_default = self.field_info.default is not self.field_info.empty
+            if not (is_keyword_only or has_default):
+                raise ValueError(
+                    f"Non-parsed parameter '{self.field_info.name}' must be a KEYWORD_ONLY function parameter "
+                    "or have a default value."
+                )
             return
 
         if self.parameter.accepts_keys is False:
@@ -405,7 +415,7 @@ class Argument:
             Implicit value.
             :obj:`~.UNSET` if no implicit value is applicable.
         """
-        if not self.parameter.parse:
+        if not self.parse:
             raise ValueError
         return (
             self._match_index(term)
@@ -512,7 +522,7 @@ class Argument:
 
     def append(self, token: Token):
         """Safely add a :class:`Token`."""
-        if not self.parameter.parse:
+        if not self.parse:
             raise ValueError
 
         if any(x.address == token.address for x in self.tokens):
@@ -556,9 +566,15 @@ class Argument:
         from cyclopts.argument._collection import update_argument_collection
 
         if self.parameter.converter:
-            converter = self.parameter.converter
+            # Resolve string converters to methods on the type
+            if isinstance(self.parameter.converter, str):
+                converter = getattr(self.hint, self.parameter.converter)
+            else:
+                converter = self.parameter.converter
         elif converter is None:
             converter = partial(convert, name_transform=self.parameter.name_transform)
+
+        assert converter is not None  # Ensure converter is set at this point
 
         def safe_converter(hint, tokens):
             if isinstance(tokens, dict):
@@ -568,14 +584,20 @@ class Argument:
                     raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
             else:
                 try:
-                    return converter(hint, tokens)
+                    # Detect bound methods (classmethods/instance methods)
+                    if inspect.ismethod(converter):
+                        # Call with just tokens - cls/self already bound
+                        return converter(tokens)  # pyright: ignore[reportCallIssue]
+                    else:
+                        # Regular function - pass type and tokens
+                        return converter(hint, tokens)  # pyright: ignore[reportCallIssue]
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(
                         msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
                     ) from e
 
-        if not self.parameter.parse:
+        if not self.parse:
             out = UNSET
         elif self.parameter.count:
             out = sum(token.implicit_value for token in self.tokens if token.implicit_value is not UNSET)
@@ -831,6 +853,27 @@ class Argument:
         if self.parameter.count:
             return 0, False
 
+        # Check for explicit n_tokens override
+        # This applies to values at any level: root values (keys=()) or nested values (keys=(...))
+        # For example, **kwargs: Annotated[str, Parameter(n_tokens=2)] means each kwarg value needs 2 tokens
+        if self.parameter.n_tokens is not None:
+            if self.parameter.n_tokens == -1:
+                return 1, True
+            else:
+                # Determine consume_all based on the hint at the requested level
+                # by recursively calling token_count on the hint
+                if len(keys) > 1:
+                    hint = self._default
+                elif len(keys) == 1:
+                    hint = self._type_hint_for_key(keys[0])
+                else:
+                    hint = self.hint
+
+                # Recursively call token_count to get the consume_all behavior
+                # We ignore the token count from the recursive call and use our explicit n_tokens
+                _, consume_all_from_type = token_count(hint)
+                return self.parameter.n_tokens, consume_all_from_type
+
         if len(keys) > 1:
             hint = self._default
         elif len(keys) == 1:
@@ -869,8 +912,28 @@ class Argument:
         """Show this argument on the help page.
 
         If an argument has child arguments, don't show it on the help-page.
+        Returns False for arguments that won't be parsed (including underscore-prefixed params).
         """
-        return not self.children and self.parameter.show
+        if self.children:
+            return False
+        if self.parameter.show is not None:
+            # User explicitly set show
+            return self.parameter.show
+        # Default to whether this argument is parsed
+        return self.parse
+
+    @property
+    def parse(self) -> bool:
+        """Whether this argument should be parsed from CLI tokens.
+
+        If ``Parameter.parse`` is a regex pattern, parse if the pattern matches
+        the field name; otherwise don't parse.
+        """
+        if self.parameter.parse is None:
+            return True
+        if isinstance(self.parameter.parse, re.Pattern):
+            return bool(self.parameter.parse.search(self.field_info.name))
+        return bool(self.parameter.parse)
 
     @property
     def required(self) -> bool:

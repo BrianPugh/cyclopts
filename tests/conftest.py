@@ -4,9 +4,30 @@ from pathlib import Path
 
 import pytest
 from rich.console import Console
+from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 
 import cyclopts
 from cyclopts import Group, Parameter
+
+
+class MarkdownSnapshotExtension(SingleFileSnapshotExtension):
+    _write_mode = WriteMode.TEXT
+    file_extension = "md"
+
+
+class RstSnapshotExtension(SingleFileSnapshotExtension):
+    _write_mode = WriteMode.TEXT
+    file_extension = "rst"
+
+
+@pytest.fixture
+def md_snapshot(snapshot):
+    return snapshot.use_extension(MarkdownSnapshotExtension)
+
+
+@pytest.fixture
+def rst_snapshot(snapshot):
+    return snapshot.use_extension(RstSnapshotExtension)
 
 
 def pytest_ignore_collect(collection_path):

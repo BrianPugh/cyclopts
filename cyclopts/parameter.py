@@ -1,5 +1,6 @@
 import collections.abc
 import inspect
+import re
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
@@ -34,7 +35,6 @@ from cyclopts.annotations import (
 )
 from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
-from cyclopts.token import Token
 from cyclopts.utils import (
     default_name_transform,
     frozen,
@@ -77,6 +77,17 @@ def _negative_converter(default: tuple[str, ...]):
     return converter
 
 
+def _parse_converter(value):
+    """Convert string patterns to compiled regex, pass through other types.
+
+    Note: re.compile() internally caches compiled patterns, so no additional
+    caching is needed here.
+    """
+    if isinstance(value, str):
+        return re.compile(value)
+    return value
+
+
 @record_init("_provided_args")
 @frozen
 class Parameter:
@@ -117,7 +128,8 @@ class Parameter:
         converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
     )
 
-    converter: Callable[[type, Sequence[Token]], Any] | None = field(
+    # Accepts regular converters (type, tokens) -> Any, bound methods (tokens) -> Any, or string references
+    converter: Callable[..., Any] | str | None = field(
         default=None,
         kw_only=True,
     )
@@ -151,9 +163,9 @@ class Parameter:
         hash=False,
     )
 
-    parse: bool = field(
+    parse: bool | re.Pattern | None = field(
         default=None,
-        converter=attrs.converters.default_if_none(True),
+        converter=_parse_converter,
         kw_only=True,
     )
 
@@ -255,12 +267,21 @@ class Parameter:
         kw_only=True,
     )
 
+    n_tokens: int | None = field(
+        default=None,
+        kw_only=True,
+    )
+
     # Populated by the record_attrs_init_args decorator.
     _provided_args: tuple[str, ...] = field(factory=tuple, init=False, eq=False)
 
     @property
-    def show(self) -> bool:
-        return self._show if self._show is not None else self.parse
+    def show(self) -> bool | None:
+        if self._show is not None:
+            return self._show
+        if self.parse is None or isinstance(self.parse, re.Pattern):
+            return None  # For regex or None, let Argument.show handle it
+        return bool(self.parse)
 
     @property
     def name_transform(self):
@@ -434,8 +455,14 @@ def validate_command(f: Callable):
         # Check both annotated parameters and classes with __cyclopts__ attribute
         _, cparam = Parameter.from_annotation(field_info.annotation)
 
-        if not cparam.parse and field_info.kind is not field_info.KEYWORD_ONLY:
-            raise ValueError("Parameter.parse=False must be used with a KEYWORD_ONLY function parameter.")
+        if cparam.parse is not None and not isinstance(cparam.parse, re.Pattern) and not cparam.parse:
+            is_keyword_only = field_info.kind is field_info.KEYWORD_ONLY
+            has_default = field_info.default is not field_info.empty
+            if not (is_keyword_only or has_default):
+                raise ValueError(
+                    "Parameter.parse=False must be used with either a KEYWORD_ONLY function parameter "
+                    "or a parameter with a default value."
+                )
 
         # Check for Parameter(name="*") without a default value when ALL class fields are optional
         # This is confusing for CLI users who expect the dataclass to be instantiated automatically
@@ -462,26 +489,71 @@ def validate_command(f: Callable):
                 )
 
 
-def get_parameters(hint: T) -> tuple[T, list[Parameter]]:
+def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, list[Parameter]]:
     """At root level, checks for cyclopts.Parameter annotations.
 
-    Includes checking the ``__cyclopts__`` attribute.
+    Includes checking the ``__cyclopts__`` attribute on both the type and any converter functions.
+
+    Parameters
+    ----------
+    hint
+        Type hint to extract parameters from.
+    skip_converter_params
+        If True, skip extracting parameters from converter's __cyclopts__.
+        Used to prevent infinite recursion in token_count.
 
     Returns
     -------
     hint
         Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
     list[Parameter]
-        List of parameters discovered.
+        List of parameters discovered, ordered by priority (lowest to highest):
+        converter-decoration < type-decoration < annotation.
     """
-    parameters = []
     hint = resolve_optional(hint)
+
+    # Extract parameters from type's __cyclopts__ attribute
+    type_cyclopts_config_params = []
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
-        parameters.extend(cyclopts_config.parameters)
+        type_cyclopts_config_params.extend(cyclopts_config.parameters)
+
+    # Extract parameters from Annotated metadata
+    annotated_params = []
     if is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
-        parameters.extend(x for x in inner[1:] if isinstance(x, Parameter))
+        annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+
+    # Check if any parameter has a converter with __cyclopts__ and extract its parameters
+    converter_params = []
+    if not skip_converter_params:
+        for param in annotated_params + type_cyclopts_config_params:
+            if param.converter:
+                converter = param.converter
+
+                # Resolve string converters to methods on the type
+                if isinstance(converter, str):
+                    converter = getattr(hint, converter)
+
+                # Check for __cyclopts__ on the converter
+                if hasattr(converter, "__cyclopts__"):
+                    converter_params.extend(converter.__cyclopts__.parameters)
+                    break
+                # For bound methods from classmethods/staticmethods, access the descriptor via __self__
+                elif (
+                    hasattr(converter, "__self__")
+                    and hasattr(converter, "__name__")
+                    and hasattr(converter.__self__, "__dict__")
+                ):
+                    # Get the descriptor from the class's __dict__
+                    descriptor = converter.__self__.__dict__.get(converter.__name__)
+                    if descriptor and hasattr(descriptor, "__cyclopts__"):
+                        converter_params.extend(descriptor.__cyclopts__.parameters)
+                        break
+
+    # Return parameters in priority order (lowest to highest)
+    # This allows Parameter.combine() to correctly prioritize later parameters
+    parameters = converter_params + type_cyclopts_config_params + annotated_params
 
     return hint, parameters
 

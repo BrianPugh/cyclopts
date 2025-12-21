@@ -533,7 +533,7 @@ class ArgumentCollection(list[Argument]):
         if value_set is not None:
             ac = cls(x for x in ac if ((x.value is UNSET) ^ bool(value_set)))
         if parse is not None:
-            ac = cls(x for x in ac if not (x.parameter.parse ^ parse))
+            ac = cls(x for x in ac if not (x.parse ^ parse))
 
         return ac
 

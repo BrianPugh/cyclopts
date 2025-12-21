@@ -1,4 +1,4 @@
-exclude: ^(uv.lock|.idea/)
+exclude: ^(uv.lock|.idea/|tests/__snapshots__/)
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.14.2"

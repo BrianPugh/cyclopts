@@ -147,7 +147,11 @@ class PlainFormatter:
         if usage:
             usage_text = _to_plain_text(usage, console)
             if usage_text:
-                self._print_plain(console, usage_text)
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._print_plain(console, f"Usage: {usage_text}")
+                else:
+                    self._print_plain(console, usage_text)
                 console.print()
 
     def render_description(

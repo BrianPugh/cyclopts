@@ -3,7 +3,15 @@
 from typing import TYPE_CHECKING
 
 from cyclopts._markup import escape_html, extract_text
-from cyclopts.docs.base import BaseDocGenerator
+from cyclopts.docs.base import (
+    build_command_chain,
+    extract_description,
+    extract_usage,
+    filter_help_entries,
+    format_usage_line,
+    generate_anchor,
+    iterate_commands,
+)
 
 if TYPE_CHECKING:
     from cyclopts.core import App
@@ -21,7 +29,7 @@ def _generate_html_toc(
     if not app._commands:
         return
 
-    for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+    for name, subapp in iterate_commands(app, include_hidden):
         display_name = f"{prefix}{name}" if prefix else name
         full_path = f"{app_name}-{display_name.replace(' ', '-')}".lower()
 
@@ -321,6 +329,7 @@ def generate_html_docs(
     recursive: bool = True,
     include_hidden: bool = False,
     heading_level: int = 1,
+    max_heading_level: int = 6,
     standalone: bool = True,
     custom_css: str | None = None,
     command_chain: list[str] | None = None,
@@ -342,6 +351,10 @@ def generate_html_docs(
     heading_level : int
         Starting heading level for the main application title.
         Default is 1.
+    max_heading_level : int
+        Maximum heading level to use. Headings deeper than this will be capped
+        at this level. HTML supports levels 1-6.
+        Default is 6.
     standalone : bool
         If True, generate a complete HTML document with <html>, <head>, etc.
         If False, generate only the body content. Default is True.
@@ -382,22 +395,23 @@ def generate_html_docs(
         full_command = app_name
         title = app_name
         # Add title for all levels
-        lines.append(f'<h{heading_level} class="app-title">{title}</h{heading_level}>')
+        effective_level = min(heading_level, max_heading_level)
+        lines.append(f'<h{effective_level} class="app-title">{title}</h{effective_level}>')
     else:
         # Nested command - build full path
         app_name = command_chain[0] if command_chain else app.name[0]
         full_command = " ".join(command_chain)
-        # Create anchor-friendly ID
-        anchor_id = f"{app_name}-{'-'.join(command_chain[1:])}"
-        anchor_id = anchor_id.lower().replace(" ", "-")
+        # Create anchor-friendly ID using shared logic
+        anchor_id = generate_anchor(full_command)
+        effective_level = min(heading_level, max_heading_level)
         lines.append('<section class="command-section">')
         lines.append(
-            f'<h{heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{heading_level}>'
+            f'<h{effective_level} id="{anchor_id}" class="command-title"><code>{escape_html(full_command)}</code></h{effective_level}>'
         )
 
     # Add application description
     help_format = app.app_stack.resolve("help_format", fallback="restructuredtext")
-    description = BaseDocGenerator.extract_description(app, help_format)
+    description = extract_description(app, help_format)
     if description:
         desc_text = extract_text(description, None)
         if desc_text:
@@ -413,20 +427,23 @@ def generate_html_docs(
         lines.append("</div>")
 
     # Add usage section if not suppressed
-    usage = BaseDocGenerator.extract_usage(app)
+    usage = extract_usage(app)
     if usage:
-        lines.append(f"<h{heading_level + 1}>Usage</h{heading_level + 1}>")
+        usage_level = min(heading_level + 1, max_heading_level)
+        lines.append(f"<h{usage_level}>Usage</h{usage_level}>")
         lines.append('<div class="usage-block">')
         if isinstance(usage, str):
             usage_text = usage
         else:
             usage_text = extract_text(usage, None)
-        usage_text = BaseDocGenerator.format_usage_line(usage_text, command_chain, prefix="$")
+        usage_text = format_usage_line(usage_text, command_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
     # Get help panels for the current app
-    help_panels_with_groups = app._assemble_help_panels([], help_format)
+    # Use app_stack context - if caller set up parent context, it will be stacked
+    with app.app_stack([app]):
+        help_panels_with_groups = app._assemble_help_panels([], help_format)
 
     # Render panels
     formatter = HtmlFormatter(
@@ -441,7 +458,7 @@ def generate_html_docs(
             continue
         # Filter out entries based on include_hidden
         if not include_hidden:
-            panel.entries = BaseDocGenerator.filter_help_entries(panel, include_hidden)
+            panel.entries = filter_help_entries(app, panel, include_hidden)
         if panel.entries:  # Only render non-empty panels
             formatter(None, None, panel)
 
@@ -452,9 +469,9 @@ def generate_html_docs(
     # Handle recursive documentation for subcommands
     if app._commands:
         # Iterate through registered commands
-        for name, subapp in BaseDocGenerator.iterate_commands(app, include_hidden):
+        for name, subapp in iterate_commands(app, include_hidden):
             # Build the command chain for this subcommand
-            sub_command_chain = BaseDocGenerator.build_command_chain(command_chain, name, app_name)
+            sub_command_chain = build_command_chain(command_chain, name, app_name)
 
             # Determine heading level for subcommand
             if flatten_commands:
@@ -470,33 +487,36 @@ def generate_html_docs(
                 if len(sub_command_chain) > 1
                 else f"{app_name}-{name}".lower()
             )
+            effective_sub_level = min(sub_heading_level, max_heading_level)
             lines.append(
-                f'<h{sub_heading_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{sub_heading_level}>'
+                f'<h{effective_sub_level} id="{anchor_id}" class="command-title"><code>{escape_html(" ".join(sub_command_chain))}</code></h{effective_sub_level}>'
             )
 
             # Get subapp help
-            with subapp.app_stack([subapp]):
+            # Include parent app in the stack so default_parameter is properly inherited
+            with subapp.app_stack([app, subapp]):
                 sub_help_format = subapp.app_stack.resolve("help_format", fallback=help_format)
-                sub_description = BaseDocGenerator.extract_description(subapp, sub_help_format)
+                sub_description = extract_description(subapp, sub_help_format)
                 if sub_description:
                     sub_desc_text = extract_text(sub_description, None)
                     if sub_desc_text:
                         lines.append(f'<div class="command-description">{escape_html(sub_desc_text)}</div>')
 
                 # Generate usage for subcommand
-                sub_usage = BaseDocGenerator.extract_usage(subapp)
+                sub_usage = extract_usage(subapp)
                 if sub_usage:
                     if flatten_commands:
                         usage_heading_level = heading_level + 1
                     else:
                         usage_heading_level = heading_level + 2
+                    usage_heading_level = min(usage_heading_level, max_heading_level)
                     lines.append(f"<h{usage_heading_level}>Usage</h{usage_heading_level}>")
                     lines.append('<div class="usage-block">')
                     if isinstance(sub_usage, str):
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_usage_text = BaseDocGenerator.format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
+                    sub_usage_text = format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
 
@@ -510,6 +530,7 @@ def generate_html_docs(
                         panel_heading_level = heading_level + 1
                     else:
                         panel_heading_level = heading_level + 2
+                    panel_heading_level = min(panel_heading_level, max_heading_level)
                     sub_formatter = HtmlFormatter(
                         heading_level=panel_heading_level,
                         include_hidden=include_hidden,
@@ -519,19 +540,8 @@ def generate_html_docs(
                     for sub_group, sub_panel in sub_panels:
                         if not include_hidden and sub_group and not sub_group.show:
                             continue
-                        # Filter out built-in commands if not including hidden
                         if not include_hidden:
-                            sub_panel.entries = [
-                                e
-                                for e in sub_panel.entries
-                                if not (
-                                    e.names
-                                    and all(
-                                        n.startswith("--help") or n.startswith("--version") or n == "-h"
-                                        for n in e.names
-                                    )
-                                )
-                            ]
+                            sub_panel.entries = filter_help_entries(subapp, sub_panel, include_hidden)
                         if sub_panel.entries:
                             sub_formatter(None, None, sub_panel)
 
@@ -541,26 +551,29 @@ def generate_html_docs(
 
                 # Recursively handle nested subcommands
                 if recursive and subapp._commands:
-                    for nested_name, nested_app in BaseDocGenerator.iterate_commands(subapp, include_hidden):
+                    for nested_name, nested_app in iterate_commands(subapp, include_hidden):
                         # Build nested command chain
-                        nested_chain = BaseDocGenerator.build_command_chain(sub_command_chain, nested_name, app_name)
+                        nested_chain = build_command_chain(sub_command_chain, nested_name, app_name)
                         # Determine heading level for nested commands
                         if flatten_commands:
                             nested_heading_level = heading_level
                         else:
                             nested_heading_level = heading_level + 2
-                        # Recursively generate docs for nested commands
-                        nested_docs = generate_html_docs(
-                            nested_app,
-                            recursive=recursive,
-                            include_hidden=include_hidden,
-                            heading_level=nested_heading_level,
-                            standalone=False,  # Not standalone for nested
-                            custom_css=None,
-                            command_chain=nested_chain,  # Pass the command chain
-                            generate_toc=False,  # No TOC for nested commands
-                            flatten_commands=flatten_commands,
-                        )
+                        # Set up context for nested_app, then recurse
+                        # The recursive call's app_stack([app]) will stack on top of this
+                        with nested_app.app_stack([subapp, nested_app]):
+                            nested_docs = generate_html_docs(
+                                nested_app,
+                                recursive=recursive,
+                                include_hidden=include_hidden,
+                                heading_level=nested_heading_level,
+                                max_heading_level=max_heading_level,
+                                standalone=False,  # Not standalone for nested
+                                custom_css=None,
+                                command_chain=nested_chain,  # Pass the command chain
+                                generate_toc=False,  # No TOC for nested commands
+                                flatten_commands=flatten_commands,
+                            )
                         lines.append(nested_docs)
 
             # Add back to top link if we're in a nested section

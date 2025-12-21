@@ -704,3 +704,58 @@ def test_list_path_completion(bash_tester):
 
     assert "compgen -f" in script, "list[Path] should generate file completion"
     assert tester.validate_script_syntax()
+
+
+def test_colon_in_command_name(bash_tester):
+    """Test that colons in command names work correctly in bash completion.
+
+    Unlike zsh where colons are special in _describe format, bash handles
+    colons without special escaping in compgen -W word lists.
+    """
+    app = App(name="myapp")
+
+    sub = App()
+
+    @sub.default
+    def action(value: str = ""):
+        """Perform an action."""
+        pass
+
+    # Register command with colon in name
+    app.command(sub, name="utility:ping")
+
+    tester = bash_tester(app, "myapp")
+    script = tester.completion_script
+
+    # Command name should appear in the script
+    assert "utility:ping" in script, "Command name with colon should appear in script"
+
+    assert tester.validate_script_syntax()
+
+
+def test_glob_chars_in_command_name(bash_tester):
+    """Test that glob characters in command names are properly escaped.
+
+    Regression test: Command names containing glob characters like * ? [ ]
+    should be escaped in case patterns to prevent glob matching.
+    """
+    app = App(name="myapp")
+
+    sub1 = App()
+
+    @sub1.default
+    def action1():
+        """Action with brackets."""
+        pass
+
+    # Register command with brackets in name (unusual but possible)
+    app.command(sub1, name="test[1]")
+
+    tester = bash_tester(app, "myapp")
+    script = tester.completion_script
+
+    # Brackets should be escaped in case patterns
+    # The pattern should be "test\[1\]" not "test[1]"
+    assert r"test\[1\]" in script, "Brackets in command name should be escaped in case patterns"
+
+    assert tester.validate_script_syntax()

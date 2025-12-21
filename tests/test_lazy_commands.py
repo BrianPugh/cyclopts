@@ -592,6 +592,66 @@ def test_lazy_app_name_match_allows_resolution():
         del sys.modules["test_lazy_module"]
 
 
+def test_lazy_command_not_resolved_when_executing_different_command():
+    """Test that lazy commands are not resolved when executing a different command.
+
+    Regression test for issue #709.
+    When executing a specific command (e.g., "b run"), other lazy-loaded commands
+    (e.g., "c") should NOT be imported/resolved.
+    """
+    # Create two fake modules for lazy loading
+    module_b = ModuleType("test_lazy_module_b")
+    module_c = ModuleType("test_lazy_module_c")
+
+    def run_b():
+        return "running b"
+
+    def run_c():
+        return "running c"
+
+    # Create sub-apps for each module
+    b_app = App(name="b", result_action="return_value")
+    b_app.command(run_b, name="run")
+
+    c_app = App(name="c", result_action="return_value")
+    c_app.command(run_c, name="run")
+
+    module_b.b_app = b_app  # type: ignore[attr-defined]
+    module_c.c_app = c_app  # type: ignore[attr-defined]
+
+    sys.modules["test_lazy_module_b"] = module_b
+    sys.modules["test_lazy_module_c"] = module_c
+
+    try:
+        # Create parent app with lazy-loaded sub-apps
+        app = App(name="a", result_action="return_value")
+        app.command("test_lazy_module_b:b_app", name="b")
+        app.command("test_lazy_module_c:c_app", name="c")
+
+        # Verify both are registered as lazy (not resolved yet)
+        assert isinstance(app._commands["b"], CommandSpec)
+        assert isinstance(app._commands["c"], CommandSpec)
+        assert not app._commands["b"].is_resolved
+        assert not app._commands["c"].is_resolved
+
+        # Execute only command "b run"
+        result = app(["b", "run"])
+        assert result == "running b"
+
+        # Command "b" should now be resolved
+        assert app._commands["b"].is_resolved
+
+        # Command "c" should NOT be resolved - this is the bug!
+        # Currently fails because groups_from_app() resolves all lazy commands
+        assert not app._commands["c"].is_resolved, (
+            "Lazy command 'c' was resolved even though it was not executed. "
+            "This indicates that lazy loading is not working correctly."
+        )
+    finally:
+        del sys.modules["test_lazy_module_b"]
+        del sys.modules["test_lazy_module_c"]
+
+
 def test_lazy_subapp_help_excludes_help_version_flags(console):
     """Test that lazy-loaded subapps don't show --help/--version in their help.
 

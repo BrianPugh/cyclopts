@@ -152,8 +152,8 @@ def test_parameter_name_transform_help(app, console):
         Usage: test_name_transform --b_a_r INT
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --b_a_r  [required]                                             │

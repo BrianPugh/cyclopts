@@ -140,7 +140,8 @@ def _parse_kw_and_flags(
             matches.append(_KeywordMatch(cli_option, *argument_collection.match(cli_option)))
         except ValueError:
             # Length has to be greater than 2 (hyphen + character) to be exploded.
-            if allow_combined_flags and len(token) > 2:
+            # Also exclude numeric values (e.g., -10, -3.14) from combined flag parsing.
+            if allow_combined_flags and len(token) > 2 and is_option_like(token, allow_numbers=False):
                 # GNU-style combined short options: process left-to-right
                 # Once we hit an option that takes a value, the rest is the value
                 chars = cli_option.lstrip("-")
@@ -497,9 +498,7 @@ def create_bound_arguments(
         for argument in argument_collection:
             # if a dict-like argument is missing, raise a MissingArgumentError on the first
             # required child (as opposed generically to the root dict-like object).
-            if not argument.parameter.parse or not argument.field_info.required or argument.keys:
-                continue
-            if not argument.has_tokens:
+            if argument.parse and argument.field_info.required and not argument.keys and not argument.has_tokens:
                 raise MissingArgumentError(argument=argument)
 
         bound = _bind(argument_collection, func)

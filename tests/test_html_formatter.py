@@ -40,7 +40,7 @@ def test_html_formatter_command_panel():
     assert "<ul" in output
     assert "<code>serve</code>" in output
     assert "<code>build</code>" in output
-    assert "<code>-b</code>" in output
+    assert "(-b)" in output  # Aliases are shown in parentheses without code tags
     assert "Start the server" in output
     assert "Build the project" in output
 
@@ -126,7 +126,7 @@ def test_html_formatter_with_panel_description():
 def test_html_formatter_render_usage():
     """Test usage rendering."""
     formatter = HtmlFormatter()
-    usage = "Usage: myapp [OPTIONS] COMMAND"
+    usage = "myapp [OPTIONS] COMMAND"
 
     formatter.render_usage(None, None, usage)
     output = formatter.get_output()

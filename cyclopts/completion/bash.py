@@ -11,6 +11,7 @@ from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
     clean_choice_text,
+    escape_for_shell_pattern,
     extract_completion_data,
     get_completion_action,
 )
@@ -281,7 +282,9 @@ def _generate_completion_logic(
         else:
             lines.append('      case "${cmd_path[@]}" in')
             for path in sorted(relevant_paths):
-                path_str = " ".join(path)
+                # Escape glob characters in command names for case pattern matching
+                escaped_path = [escape_for_shell_pattern(cmd) for cmd in path]
+                path_str = " ".join(escaped_path)
                 lines.append(f'        "{path_str}")')
                 lines.extend(
                     _generate_completions_for_path(completion_data, path, "          ", help_flags, version_flags)

@@ -4,7 +4,7 @@ import io
 from typing import TYPE_CHECKING, Any, Optional
 
 from cyclopts._markup import extract_text
-from cyclopts.help.formatters._shared import make_rst_section_header
+from cyclopts.docs.rst import make_rst_section_header
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions
@@ -105,11 +105,16 @@ class RstFormatter:
                 names.extend(entry.shorts)
 
             if names:
-                # Use first name as primary
+                # Use first name as primary, show aliases in parentheses
                 primary_name = names[0]
+                aliases = names[1:]
+                if aliases:
+                    name_display = f"{primary_name} ({', '.join(aliases)})"
+                else:
+                    name_display = primary_name
 
                 # Use definition list format
-                self._output.write(f"``{primary_name}``\n")
+                self._output.write(f"``{name_display}``\n")
 
                 # Check if the description has RST markup to preserve
                 preserve_rst_markup = (
@@ -185,26 +190,7 @@ class RstFormatter:
 
                 if entry.default is not None:
                     default_str = extract_text(entry.default, console, preserve_markup=False)
-                    # For boolean flags, format as flag style
-                    if entry.type and "bool" in str(entry.type):
-                        # Find the appropriate flag name
-                        positive_flag = None
-                        negative_flag = None
-                        for name in names:
-                            if name.startswith("--no-"):
-                                negative_flag = name
-                            elif name.startswith("--"):
-                                if not positive_flag:
-                                    positive_flag = name
-
-                        if default_str.lower() == "true" and positive_flag:
-                            metadata.append(f"Default: ``{positive_flag}``")
-                        elif default_str.lower() == "false" and negative_flag:
-                            metadata.append(f"Default: ``{negative_flag}``")
-                        else:
-                            metadata.append(f"Default: ``{default_str}``")
-                    else:
-                        metadata.append(f"Default: ``{default_str}``")
+                    metadata.append(f"Default: ``{default_str}``")
 
                 if entry.env_var:
                     env_str = ", ".join(f"``{e}``" for e in entry.env_var)
@@ -245,9 +231,11 @@ class RstFormatter:
             if usage_text:
                 # Use literal block for usage
                 self._output.write("::\n\n")
-                # Indent the usage text
-                for line in usage_text.split("\n"):
-                    self._output.write(f"    {line}\n")
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._output.write(f"    Usage: {usage_text}\n")
+                else:
+                    self._output.write(f"    {usage_text}\n")
                 self._output.write("\n")
 
     def render_description(

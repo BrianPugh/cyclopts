@@ -11,54 +11,6 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpEntry, HelpPanel
 
 
-def _format_type_name(type_obj: Any) -> str:
-    """Format a type object into a readable string.
-
-    Parameters
-    ----------
-    type_obj : Any
-        Type object to format.
-
-    Returns
-    -------
-    str
-        Formatted type name.
-    """
-    if type_obj is None:
-        return ""
-
-    # Extract plain text if it's a Rich object
-    if hasattr(type_obj, "plain"):
-        type_str = type_obj.plain.rstrip()
-    elif hasattr(type_obj, "__rich_console__"):
-        type_str = extract_text(type_obj, None)
-    else:
-        type_str = str(type_obj)
-
-    # Clean up the type string
-    type_str = type_str.replace("<class '", "").replace("'>", "")
-
-    # Handle Optional types
-    if type_str.startswith("typing.Optional["):
-        inner_type = type_str[16:-1]  # Remove "typing.Optional[" and "]"
-        return f"Optional[{inner_type}]"
-    elif type_str.startswith("Optional["):
-        return type_str
-
-    # Handle Union types
-    if type_str.startswith("typing.Union["):
-        inner_types = type_str[13:-1]  # Remove "typing.Union[" and "]"
-        return f"Union[{inner_types}]"
-    elif type_str.startswith("Union["):
-        return type_str
-
-    # Handle List/Dict/etc
-    if type_str.startswith("typing."):
-        return type_str[7:]  # Remove "typing." prefix
-
-    return type_str
-
-
 class HtmlFormatter:
     """HTML documentation formatter.
 
@@ -172,6 +124,7 @@ class HtmlFormatter:
             if self.app_name and names:
                 # Build the anchor ID for this command
                 primary_name = names[0]
+                aliases = names[1:]
                 if self.command_chain:
                     # We're in a subcommand, build full chain
                     full_chain = self.command_chain + [primary_name]
@@ -180,15 +133,23 @@ class HtmlFormatter:
                     # Top-level command
                     anchor_id = f"{self.app_name}-{primary_name}".lower()
 
-                # Create linked command name
+                # Create linked command name with aliases in parentheses
                 name_html = f'<a href="#{anchor_id}"><code>{escape_html(primary_name)}</code></a>'
-                if len(names) > 1:
-                    # Add aliases
-                    aliases = ", ".join(f"<code>{escape_html(n)}</code>" for n in names[1:])
-                    name_html = f"{name_html}, {aliases}"
+                if aliases:
+                    # Add aliases in parentheses
+                    aliases_str = ", ".join(escape_html(n) for n in aliases)
+                    name_html = f"{name_html} ({aliases_str})"
             else:
-                # Fallback to non-linked format
-                name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names) if names else ""
+                # Fallback to non-linked format with aliases in parentheses
+                if names:
+                    primary_name = names[0]
+                    aliases = names[1:]
+                    name_html = f"<code>{escape_html(primary_name)}</code>"
+                    if aliases:
+                        aliases_str = ", ".join(escape_html(n) for n in aliases)
+                        name_html = f"{name_html} ({aliases_str})"
+                else:
+                    name_html = ""
 
             desc_html = escape_html(extract_text(entry.description, console))
 
@@ -216,41 +177,16 @@ class HtmlFormatter:
         self._output.write('<ul class="parameters-list">\n')
 
         for entry in entries:
-            # Build parameter names - prefer negatives for boolean defaults
+            # Build parameter names
             names = []
             if entry.names:
                 names.extend(entry.names)
             if entry.shorts:
                 names.extend(entry.shorts)
 
-            # Check if this is a boolean flag with a default
-            default_str = extract_text(entry.default, console) if entry.default is not None else None
-            is_bool_flag = False
-
-            # Look for --no- prefixed names to determine if this is a boolean flag
-            if names:
-                has_positive = any(not n.startswith("--no-") and n.startswith("--") for n in names)
-                has_negative = any(n.startswith("--no-") for n in names)
-                is_bool_flag = has_positive and has_negative
-
-                if is_bool_flag and default_str in ["True", "enabled"]:
-                    # Prefer showing the negative flag when default is True
-                    names = [n for n in names if n.startswith("--no-")] + [
-                        n for n in names if not n.startswith("--no-")
-                    ]
-                elif is_bool_flag and default_str in ["False", "disabled"]:
-                    # Prefer showing the positive flag when default is False
-                    names = [n for n in names if not n.startswith("--no-")] + [
-                        n for n in names if n.startswith("--no-")
-                    ]
-
             # Format name with code tags
             if names:
-                # For boolean flags, show both but emphasize the preferred one
-                if is_bool_flag and len(names) >= 2:
-                    name_html = f"<code>{escape_html(names[0])}</code>, <code>{escape_html(names[1])}</code>"
-                else:
-                    name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names)
+                name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names)
             else:
                 name_html = ""
 
@@ -276,33 +212,12 @@ class HtmlFormatter:
                     f'<span class="metadata-item metadata-choices"><span class="metadata-label">choices:</span> {choices_str}</span>'
                 )
 
-            # Add default - format boolean defaults specially
-            if default_str is not None:
-                if is_bool_flag:
-                    # For boolean flags, show which flag is the default
-                    if default_str in ["True", "enabled"]:
-                        # Find the positive flag name
-                        positive_flag = next(
-                            (n for n in names if not n.startswith("--no-") and n.startswith("--")),
-                            names[0] if names else "--flag",
-                        )
-                        metadata_items.append(
-                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(positive_flag)}</code></span>'
-                        )
-                    elif default_str in ["False", "disabled"]:
-                        # Find the negative flag name
-                        negative_flag = next((n for n in names if n.startswith("--no-")), "--no-flag")
-                        metadata_items.append(
-                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(negative_flag)}</code></span>'
-                        )
-                    else:
-                        metadata_items.append(
-                            f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(default_str)}</code></span>'
-                        )
-                else:
-                    metadata_items.append(
-                        f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(default_str)}</code></span>'
-                    )
+            # Add default
+            if entry.default is not None:
+                default_str = extract_text(entry.default, console)
+                metadata_items.append(
+                    f'<span class="metadata-item metadata-default"><span class="metadata-label">default:</span> <code>{escape_html(default_str)}</code></span>'
+                )
 
             # Add environment variable
             if entry.env_var:
@@ -340,7 +255,11 @@ class HtmlFormatter:
             usage_text = escape_html(extract_text(usage, console))
             if usage_text:
                 self._output.write('<div class="usage-block">\n')
-                self._output.write(f'<pre class="usage">{usage_text}</pre>\n')
+                # Add "Usage:" prefix if not already present (for custom usage strings)
+                if not usage_text.strip().startswith("Usage:"):
+                    self._output.write(f'<pre class="usage">Usage: {usage_text}</pre>\n')
+                else:
+                    self._output.write(f'<pre class="usage">{usage_text}</pre>\n')
                 self._output.write("</div>\n")
 
     def render_description(

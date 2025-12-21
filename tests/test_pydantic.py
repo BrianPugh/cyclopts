@@ -156,8 +156,8 @@ def test_bind_pydantic_basemodel_help(app, console):
         Usage: test_pydantic USER.ID USER.SIGNUP-TS USER.TASTES [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.ID --user.id          [required]                           │
@@ -428,8 +428,8 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         Usage: test_pydantic [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
-        │ --help -h  Display this message and exit.                          │
-        │ --version  Display application version.                            │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ DATASET.TYPE               [choices: image, video]                 │

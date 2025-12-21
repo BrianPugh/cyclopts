@@ -75,7 +75,7 @@ def test_install_completion_bash_add_to_startup_preserves_existing(temp_home):
 
 
 def test_install_completion_zsh_add_to_startup_true(temp_home):
-    """Test that add_to_startup=True adds source line to zshrc."""
+    """Test that add_to_startup=True adds fpath line to zshrc."""
     app = App(name="testapp")
     zshrc = temp_home / ".zshrc"
 
@@ -85,8 +85,9 @@ def test_install_completion_zsh_add_to_startup_true(temp_home):
     assert zshrc.exists()
 
     zshrc_content = zshrc.read_text()
-    assert "# Load testapp completion" in zshrc_content
-    assert f'[ -f "{install_path}" ] && . "{install_path}"' in zshrc_content
+    completion_dir = install_path.parent
+    assert "# testapp completions" in zshrc_content
+    assert f"fpath=({completion_dir} $fpath)" in zshrc_content
 
 
 def test_install_completion_zsh_add_to_startup_false(temp_home):
@@ -112,7 +113,7 @@ def test_install_completion_zsh_add_to_startup_idempotent(temp_home):
     second_content = zshrc.read_text()
 
     assert first_content == second_content
-    assert first_content.count("# Load testapp completion") == 1
+    assert first_content.count("# testapp completions") == 1
 
 
 def test_install_completion_custom_output_path(temp_home):
@@ -239,9 +240,9 @@ def test_install_completion_command_zsh_with_add_to_startup(temp_home, monkeypat
 
     captured = capsys.readouterr()
     assert "Completion script installed" in captured.out
-    assert "Added completion loader to" in captured.out
+    assert "fpath" in captured.out
     assert ".zshrc" in captured.out
-    assert "source ~/.zshrc" in captured.out
+    assert "exec zsh" in captured.out
 
 
 def test_install_completion_command_zsh_without_add_to_startup(temp_home, monkeypatch, capsys):

@@ -50,7 +50,10 @@ def get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_name
 
 
 def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zsh"]) -> bool:
-    """Add source line to shell RC file to ensure completion is loaded.
+    """Add completion configuration to shell RC file.
+
+    For bash, adds a source line to load the completion script.
+    For zsh, adds the completion directory to fpath so compinit can find it.
 
     Parameters
     ----------
@@ -64,14 +67,17 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
     Returns
     -------
     bool
-        True if the source line was added, False if it already existed or on error.
+        True if configuration was added, False if it already existed or on error.
     """
     if shell == "bash":
         rc_file = Path.home() / ".bashrc"
-        source_line = f'[ -f "{script_path}" ] && . "{script_path}"'
+        config_line = f'[ -f "{script_path}" ] && . "{script_path}"'
+        comment = f"# Load {prog_name} completion"
     elif shell == "zsh":
         rc_file = Path.home() / ".zshrc"
-        source_line = f'[ -f "{script_path}" ] && . "{script_path}"'
+        completion_dir = script_path.parent
+        config_line = f"fpath=({completion_dir} $fpath)"
+        comment = f"# {prog_name} completions"
     else:
         raise NotImplementedError
 
@@ -79,7 +85,11 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
 
     if rc_file.exists():
         content = rc_file.read_text()
-        if source_line in content:
+        # For zsh, check if this directory is already in fpath configuration
+        # For bash, check if the exact source line exists
+        if shell == "zsh" and str(script_path.parent) in content and "fpath=" in content:
+            return False
+        elif config_line in content:
             return False
         needs_newline = content and not content.endswith("\n")
     else:
@@ -88,7 +98,7 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
     with rc_file.open("a") as f:
         if needs_newline:
             f.write("\n")
-        f.write(f"# Load {prog_name} completion\n{source_line}\n")
+        f.write(f"{comment}\n{config_line}\n")
 
     return True
 
@@ -150,8 +160,10 @@ def create_install_completion_command(
         if shell == "zsh":
             if add_to_startup:
                 zshrc = Path.home() / ".zshrc"
-                print(f"✓ Added completion loader to {zshrc}")
-                print("\nRestart your shell or run: source ~/.zshrc")
+                completion_dir = install_path.parent
+                print(f"✓ Added {completion_dir} to fpath in {zshrc}")
+                print("\nNote: Ensure compinit is configured in your .zshrc (most zsh setups already have this).")
+                print("Restart your shell or run: exec zsh")
             else:
                 completion_dir = install_path.parent
                 print(f"\nTo enable completions, ensure {completion_dir} is in your $fpath.")

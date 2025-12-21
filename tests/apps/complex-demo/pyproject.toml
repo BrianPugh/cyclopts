@@ -1,0 +1,26 @@
+[project]
+name = "complex-demo"
+version = "1.0.0"
+description = "Complex demo application for cyclopts documentation testing"
+requires-python = ">=3.10"
+dependencies = [
+    "cyclopts",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs",
+    "sphinx",
+]
+pydantic = [
+    "pydantic>=2.0",
+]
+attrs = [
+    "attrs",
+]
+all = [
+    "complex-demo[docs,pydantic,attrs]",
+]
+
+[project.scripts]
+complex-cli = "complex_app:app"

@@ -233,7 +233,6 @@ def format_usage(
     from cyclopts.annotations import get_hint_name
 
     usage = []
-    usage.append("Usage:")
 
     # If we're at the root level (no command chain), the app has a default_command,
     # and no explicit name was set, derive a better name from sys.argv[0]
@@ -394,12 +393,38 @@ def create_parameter_help_panel(
         # Prepare default if needed
         default = None
         if argument.show_default:
+            default_val = argument.field_info.default
             if is_class_and_subclass(argument.hint, Enum):
-                default = argument.parameter.name_transform(argument.field_info.default.name)
+                default = argument.parameter.name_transform(default_val.name)
+            elif isinstance(default_val, (list, tuple, set, frozenset)):
+                # Handle collections - format each element, especially enums
+                formatted_items = []
+                for item in default_val:
+                    if isinstance(item, Enum):
+                        # For enums, use the transformed name without quotes
+                        formatted_items.append(argument.parameter.name_transform(item.name))
+                    elif isinstance(item, str):
+                        # Keep strings quoted
+                        formatted_items.append(f"'{item}'")
+                    else:
+                        formatted_items.append(str(item))
+                # Use appropriate collection notation
+                if isinstance(default_val, tuple):
+                    if len(formatted_items) == 1:
+                        default = "(" + formatted_items[0] + ",)"
+                    else:
+                        default = "(" + ", ".join(formatted_items) + ")"
+                elif isinstance(default_val, list):
+                    default = "[" + ", ".join(formatted_items) + "]"
+                else:  # set or frozenset
+                    default = "{" + ", ".join(formatted_items) + "}"
+            elif default_val == "":
+                # Empty string - show explicitly as empty
+                default = '""'
             else:
-                default = str(argument.field_info.default)
+                default = str(default_val)
             if callable(argument.show_default):
-                default = argument.show_default(argument.field_info.default)
+                default = argument.show_default(default_val)
 
         # populate row
         entry = HelpEntry(

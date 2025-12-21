@@ -253,6 +253,63 @@ def concat(
     print(f"Concat: files={files}, output={output}, add_separators={add_separators}")
 
 
+@app.command
+def image_convert(
+    input_file: Annotated[Path, Parameter(help="Input image file")],
+    output_file: Annotated[Path, Parameter(help="Output image file")],
+    # Image Settings Group
+    width: Annotated[int | None, Parameter(group="Image Settings", help="Output width in pixels")] = None,
+    height: Annotated[int | None, Parameter(group="Image Settings", help="Output height in pixels")] = None,
+    quality: Annotated[int, Parameter(group="Image Settings", help="Output quality (1-100)")] = 90,
+    # Processing Options Group
+    grayscale: Annotated[bool, Parameter(group="Processing Options", help="Convert to grayscale")] = False,
+    rotate: Annotated[int, Parameter(group="Processing Options", help="Rotation angle (degrees)")] = 0,
+    flip: Annotated[
+        Literal["none", "horizontal", "vertical", "both"],
+        Parameter(group="Processing Options", help="Flip direction"),
+    ] = "none",
+    # Format Options Group
+    format: Annotated[
+        Literal["auto", "jpeg", "png", "webp"],
+        Parameter(group="Format Options", help="Output format"),
+    ] = "auto",
+    progressive: Annotated[bool, Parameter(group="Format Options", help="Use progressive encoding")] = False,
+):
+    """Convert and transform images.
+
+    This command demonstrates parameter grouping for better organization of related options.
+
+    Parameters
+    ----------
+    input_file : Path
+        Path to the input image file.
+    output_file : Path
+        Path where the converted image will be saved.
+    width : int, optional
+        Desired output width in pixels. Maintains aspect ratio if height not specified.
+    height : int, optional
+        Desired output height in pixels. Maintains aspect ratio if width not specified.
+    quality : int
+        JPEG/WebP quality level from 1 (lowest) to 100 (highest).
+    grayscale : bool
+        Convert the image to grayscale.
+    rotate : int
+        Rotation angle in degrees (clockwise).
+    flip : Literal["none", "horizontal", "vertical", "both"]
+        Flip the image horizontally, vertically, both, or none.
+    format : Literal["auto", "jpeg", "png", "webp"]
+        Output format. Auto-detects from file extension if set to 'auto'.
+    progressive : bool
+        Use progressive/interlaced encoding for web optimization.
+    """
+    print(
+        f"Image Convert: {input_file} -> {output_file}, "
+        f"size={width}x{height}, quality={quality}, "
+        f"grayscale={grayscale}, rotate={rotate}, flip={flip}, "
+        f"format={format}, progressive={progressive}"
+    )
+
+
 database_app = App(name="database", help="Database commands.")
 app.command(database_app)
 
@@ -391,6 +448,77 @@ def status(
         Output format.
     """
     print(f"Server Status: detailed={detailed}, format={format}")
+
+
+# Register with colon in name - this is the key test case for issue #715
+@app.command(name="utility:ping")
+def utility_ping_action(
+    host: Annotated[str, Parameter(help="Host to ping")] = "localhost",
+    port: Annotated[int, Parameter(help="Port number")] = 8080,
+    timeout: Annotated[int, Parameter(help="Timeout in seconds")] = 5,
+    count: Annotated[int, Parameter(help="Number of pings")] = 3,
+):
+    """Ping a utility service to check connectivity.
+
+    Parameters
+    ----------
+    host : str
+        Hostname or IP address of the service.
+    port : int
+        Port number to connect to.
+    timeout : int
+        Connection timeout in seconds.
+    count : int
+        Number of ping attempts.
+    """
+    print(f"Pinging utility at {host}:{port} (timeout={timeout}s, count={count})")
+
+
+@app.command(name="utility:status")
+def utility_status_action(
+    foo: Literal["beep", "boop"],  # for testing if positional completion still works.
+    /,
+    service: Annotated[str, Parameter(help="Service name")] = "all",
+    verbose: Annotated[bool, Parameter(help="Show detailed status")] = False,
+    format: Annotated[Literal["text", "json", "yaml"], Parameter(help="Output format")] = "text",
+):
+    """Check the status of utility services.
+
+    Parameters
+    ----------
+    service : str
+        Name of the service to check, or 'all' for all services.
+    verbose : bool
+        Show detailed status information.
+    format : Literal["text", "json", "yaml"]
+        Output format for the status report.
+    """
+    print(f"Utility status: service={service}, verbose={verbose}, format={format}")
+
+
+@app.command
+def dump_markdown():
+    """Generate markdown documentation and save to intermediate.md.
+
+    This is a debug command to inspect the intermediate markdown output
+    that gets generated for the cyclopts-demo app.
+    """
+    from cyclopts.docs.markdown import generate_markdown_docs
+
+    # Generate markdown for this app
+    markdown = generate_markdown_docs(
+        app,
+        recursive=True,
+        heading_level=1,
+        generate_toc=True,
+    )
+
+    # Write to intermediate.md in current directory
+    with Path("intermediate.md").open("w") as f:
+        f.write(markdown)
+
+    print("✓ Markdown documentation written to intermediate.md")
+    print(f"  ({len(markdown)} characters, {len(markdown.splitlines())} lines)")
 
 
 if __name__ == "__main__":
