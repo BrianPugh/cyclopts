@@ -112,19 +112,47 @@ def is_typeddict(hint) -> bool:
 
 def resolve(
     type_: Any,
+    *,
+    type_alias: bool = True,
+    annotated: bool = True,
+    optional: bool = True,
+    required: bool = True,
+    new_type: bool = True,
 ) -> type:
-    """Perform all simplifying resolutions."""
+    """Perform all simplifying resolutions.
+
+    Parameters
+    ----------
+    type_
+        The type to resolve.
+    type_alias
+        If True (default), resolves Python 3.12+ TypeAliasType to underlying type.
+    annotated
+        If True (default), strips Annotated wrapper to get the base type.
+    optional
+        If True (default), strips NoneType from Optional/Union types.
+        Set to False when you need to preserve NoneType for conversion.
+    required
+        If True (default), strips Required/NotRequired wrappers.
+    new_type
+        If True (default), resolves NewType to its underlying type.
+    """
     if type_ is inspect.Parameter.empty:
         return str
 
     type_prev = None
     while type_ != type_prev:
         type_prev = type_
-        type_ = resolve_type_alias(type_)
-        type_ = resolve_annotated(type_)
-        type_ = resolve_optional(type_)
-        type_ = resolve_required(type_)
-        type_ = resolve_new_type(type_)
+        if type_alias:
+            type_ = resolve_type_alias(type_)
+        if annotated:
+            type_ = resolve_annotated(type_)
+        if optional:
+            type_ = resolve_optional(type_)
+        if required:
+            type_ = resolve_required(type_)
+        if new_type:
+            type_ = resolve_new_type(type_)
     return type_
 
 
