@@ -152,6 +152,32 @@ def clean_choice_text(text: str) -> str:
     return text
 
 
+def escape_for_shell_pattern(name: str, chars: str = "*?[]") -> str:
+    """Escape glob/pattern characters for shell case patterns.
+
+    Both bash and zsh case patterns treat glob characters as special even inside
+    quotes. This function escapes them with backslashes for literal matching.
+
+    Parameters
+    ----------
+    name : str
+        String to escape.
+    chars : str
+        Characters to escape. Default covers basic glob chars.
+        For zsh, also pass "()|" for extended patterns.
+
+    Returns
+    -------
+    str
+        Escaped string safe for shell case patterns.
+    """
+    # Escape backslashes first to avoid double-escaping
+    result = name.replace("\\", "\\\\")
+    for char in chars:
+        result = result.replace(char, f"\\{char}")
+    return result
+
+
 def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> str:
     """Strip markup and render to plain text for shell completions.
 

@@ -798,11 +798,11 @@ def test_no_direct_function_call(zsh_tester):
     # Should not have a direct call to the completion function
     assert '_basic "$@"' not in script, "Should not directly call the completion function"
 
-    # Script should end with the closing brace and empty line
+    # Script should end with the closing brace (no compdef needed - #compdef directive suffices)
     lines = script.rstrip().split("\n")
     assert lines[-1] == "}", "Script should end with closing brace"
 
-    # Should still have the #compdef directive
+    # Should have the #compdef directive for autoload compatibility
     assert script.startswith("#compdef basic"), "Should have #compdef directive"
 
     assert tester.validate_script_syntax()
@@ -904,4 +904,108 @@ def test_list_path_completion(zsh_tester):
     script = tester.completion_script
 
     assert "_files" in script, "list[Path] should generate file completion"
+    assert tester.validate_script_syntax()
+
+
+def test_colon_in_command_name(zsh_tester):
+    """Test that colons in command names are properly escaped.
+
+    Regression test for issue #715: Command names containing colons like
+    'utility:ping' should have the colon escaped in zsh completion scripts
+    so that the full name is displayed, not just the part before the colon.
+
+    Colons need escaping both in _describe format and in case patterns because
+    zsh's completion system treats them specially when populating the $words array.
+    """
+    app = App(name="myapp")
+
+    sub = App()
+
+    @sub.default
+    def action(value: str = ""):
+        """Perform an action."""
+        pass
+
+    # Register command with colon in name
+    app.command(sub, name="utility:ping")
+
+    tester = zsh_tester(app, "myapp")
+    script = tester.completion_script
+
+    # The colon should be escaped in the _describe format
+    # 'utility\:ping:description' instead of 'utility:ping:description'
+    assert r"utility\:ping" in script, "Colon in command name should be escaped"
+
+    # The case pattern should also have the colon escaped for proper $words matching
+    assert r"utility\:ping)" in script, "Colon should be escaped in case pattern for $words matching"
+
+    assert tester.validate_script_syntax()
+
+
+def test_special_chars_in_command_name(zsh_tester):
+    """Test that special characters in command names are properly escaped.
+
+    Tests escaping for various special characters that could appear in command names
+    and cause issues in zsh completion scripts.
+    """
+    app = App(name="myapp")
+
+    sub1 = App()
+
+    @sub1.default
+    def action1():
+        """Action with brackets."""
+        pass
+
+    # Register command with brackets in name (unusual but possible)
+    app.command(sub1, name="test[1]")
+
+    tester = zsh_tester(app, "myapp")
+    script = tester.completion_script
+
+    # Brackets should be escaped in the _describe format
+    assert r"test\[1\]" in script, "Brackets in command name should be escaped"
+
+    # In case patterns, brackets should also be escaped
+    assert r"test\[1\])" in script, "Brackets in case pattern should be escaped"
+
+    assert tester.validate_script_syntax()
+
+
+def test_positional_without_help_uses_name_fallback(zsh_tester):
+    """Test that positional arguments without help text use parameter name as description.
+
+    Regression test: zsh _arguments requires non-empty descriptions for positional
+    specs to provide completions. When a parameter has no help text, the completion
+    script should fall back to using the parameter name as the description.
+
+    Without this fallback, '1::(choices)' is generated which silently breaks
+    completion, while '1:param_name:(choices)' works correctly.
+    """
+    app = App(name="testapp")
+
+    @app.command
+    def action(
+        choice: Literal["foo", "bar"],  # No Parameter() annotation, no help text
+        /,
+    ):
+        """Do something."""
+        pass
+
+    tester = zsh_tester(app, "testapp")
+    script = tester.completion_script
+
+    # Should NOT have empty description '1::(foo bar)'
+    assert "'1::(foo bar)'" not in script, "Should not have empty description in positional spec"
+
+    # Should have parameter name as fallback '1:CHOICE:(foo bar)' or similar
+    # The format is '1:description:(choices)' - description should be non-empty
+    import re
+
+    positional_spec = re.search(r"'1:([^:]+):\(foo bar\)'", script)
+    assert positional_spec is not None, "Should have positional spec with choices"
+    description = positional_spec.group(1)
+    assert description, "Description should not be empty"
+    assert len(description) > 0, "Description should have content"
+
     assert tester.validate_script_syntax()

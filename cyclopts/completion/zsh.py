@@ -13,6 +13,7 @@ from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
     clean_choice_text,
+    escape_for_shell_pattern,
     extract_completion_data,
     get_completion_action,
     strip_markup,
@@ -369,7 +370,8 @@ def _generate_completion_for_path(
             for cmd_name in registered_command.names:
                 if not cmd_name.startswith("-"):
                     desc = _safe_get_description_from_app(registered_command.app, data.help_format)
-                    cmd_list.append(f"'{cmd_name}:{desc}'")
+                    escaped_cmd_name = _escape_completion_choice(cmd_name)
+                    cmd_list.append(f"'{escaped_cmd_name}:{desc}'")
 
         lines.append(f"{indent_str}    local -a commands")
         lines.append(f"{indent_str}    commands=(")
@@ -389,7 +391,8 @@ def _generate_completion_for_path(
 
                 sub_path = command_path + (cmd_name,)
                 if sub_path in completion_data:
-                    lines.append(f"{indent_str}      {cmd_name})")
+                    escaped_case_name = _escape_command_name_for_case(cmd_name)
+                    lines.append(f"{indent_str}      {escaped_case_name})")
                     sub_lines = _generate_completion_for_path(
                         completion_data, sub_path, indent + 8, prog_name, help_flags, version_flags
                     )
@@ -434,6 +437,28 @@ def _escape_completion_choice(choice: str) -> str:
     choice = choice.replace("&", "\\&")
     choice = choice.replace(":", "\\:")
     return choice
+
+
+def _escape_command_name_for_case(name: str) -> str:
+    """Escape special characters in command name for zsh case patterns.
+
+    In zsh case patterns, glob characters need to be escaped to match literally.
+    Colons also need escaping because zsh's completion system may treat them
+    specially when populating the $words array after _describe completion.
+
+    Parameters
+    ----------
+    name : str
+        Command name.
+
+    Returns
+    -------
+    str
+        Escaped command name safe for zsh case patterns.
+    """
+    # zsh case patterns have more special chars than bash: includes ()|
+    # Colons (:) also need escaping for completion $words matching (issue #715)
+    return escape_for_shell_pattern(name, chars="*?[]()|:")
 
 
 def _escape_zsh_description(text: str) -> str:
@@ -613,8 +638,14 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
     -------
     str
         Escaped plain text description (truncated to 80 chars).
+        Falls back to argument name if help text is empty, since zsh _arguments
+        requires a non-empty description for positional specs to work correctly.
     """
     text = strip_markup(argument.parameter.help or "", format=help_format)
+    if not text:
+        # Use primary argument name as fallback - zsh _arguments requires non-empty
+        # description for positional specs to provide completions
+        text = argument.names[0] if argument.names else "argument"
     return _escape_zsh_description(text)
 
 

@@ -450,6 +450,52 @@ def status(
     print(f"Server Status: detailed={detailed}, format={format}")
 
 
+# Register with colon in name - this is the key test case for issue #715
+@app.command(name="utility:ping")
+def utility_ping_action(
+    host: Annotated[str, Parameter(help="Host to ping")] = "localhost",
+    port: Annotated[int, Parameter(help="Port number")] = 8080,
+    timeout: Annotated[int, Parameter(help="Timeout in seconds")] = 5,
+    count: Annotated[int, Parameter(help="Number of pings")] = 3,
+):
+    """Ping a utility service to check connectivity.
+
+    Parameters
+    ----------
+    host : str
+        Hostname or IP address of the service.
+    port : int
+        Port number to connect to.
+    timeout : int
+        Connection timeout in seconds.
+    count : int
+        Number of ping attempts.
+    """
+    print(f"Pinging utility at {host}:{port} (timeout={timeout}s, count={count})")
+
+
+@app.command(name="utility:status")
+def utility_status_action(
+    foo: Literal["beep", "boop"],  # for testing if positional completion still works.
+    /,
+    service: Annotated[str, Parameter(help="Service name")] = "all",
+    verbose: Annotated[bool, Parameter(help="Show detailed status")] = False,
+    format: Annotated[Literal["text", "json", "yaml"], Parameter(help="Output format")] = "text",
+):
+    """Check the status of utility services.
+
+    Parameters
+    ----------
+    service : str
+        Name of the service to check, or 'all' for all services.
+    verbose : bool
+        Show detailed status information.
+    format : Literal["text", "json", "yaml"]
+        Output format for the status report.
+    """
+    print(f"Utility status: service={service}, verbose={verbose}, format={format}")
+
+
 @app.command
 def dump_markdown():
     """Generate markdown documentation and save to intermediate.md.
