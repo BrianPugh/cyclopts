@@ -139,6 +139,42 @@ Complex
 Token gets cast as ``complex(token)``. For example, ``complex("3+5j")``
 
 ****
+None
+****
+For optional parameters (e.g., ``int | None``), the strings ``"none"`` and ``"null"`` (case-insensitive) can be used to explicitly pass :obj:`None`.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(value: int | None = 5):
+       print(f"{value=} {type(value)=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program 10
+   value=10 type(value)=<class 'int'>
+
+   $ my-program none
+   value=None type(value)=<class 'NoneType'>
+
+   $ my-program NULL
+   value=None type(value)=<class 'NoneType'>
+
+This is particularly useful for resetting a parameter to its unset state, or for explicitly indicating "no value" in configuration scenarios.
+
+.. note::
+   **Union ordering matters.** For union types, Cyclopts iterates left-to-right and uses the first
+   successful coercion. If ``str`` appears before ``None`` in a union (e.g., ``str | None``),
+   the string ``"none"`` will be parsed as the literal string ``"none"`` because ``str`` coercion
+   succeeds first. See Union_ for more details.
+
+****
 Bool
 ****
 1. If specified as a **keyword**, booleans are interpreted flags that take no parameter.
@@ -525,7 +561,6 @@ Union
 *****
 
 The unioned types will be iterated **left-to-right** until a successful coercion is performed.
-:obj:`None` type hints are ignored.
 
 .. code-block:: python
 
