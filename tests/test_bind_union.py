@@ -52,7 +52,8 @@ def test_union_coercion_cannot_coerce_error(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for "A": unable to convert "foo" into int|float.     │
+        │ Invalid value for "A": unable to convert "foo" into                │
+        │ None|int|float.                                                    │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
