@@ -42,7 +42,7 @@ def test_bind_none_string_none_or_path(app, assert_parse_args, none_str):
     assert_parse_args(default, f"--path={none_str}", None)
 
 
-@pytest.mark.parametrize("none_str", ["none", "null"])
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
 def test_bind_none_string_path_or_none(app, assert_parse_args, none_str):
     """Test that 'none' and 'null' strings become Path for Path | None.
 

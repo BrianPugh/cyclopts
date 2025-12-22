@@ -600,6 +600,10 @@ def _convert(
             try:
                 out = convert(t, token)
                 break
+            except ValidationError:
+                # ValidationError means coercion succeeded but the value failed validation.
+                # Propagate immediately since the input matched this type's structure.
+                raise
             except Exception:
                 pass
         else:
