@@ -31,7 +31,6 @@ from cyclopts.annotations import (
     is_typeddict,
     resolve,
     resolve_annotated,
-    resolve_optional,
 )
 from cyclopts.utils import UNSET, is_builtin
 
@@ -95,13 +94,12 @@ class FieldInfo:
 
     @property
     def hint(self):
-        """Annotation with Optional-removed and cyclopts type-inferring."""
+        """Annotation with cyclopts type-inferring."""
         hint = self.annotation
         if hint is inspect.Parameter.empty or resolve(hint) is Any:
             hint = _replace_annotated_type(
                 hint, str if self.default is inspect.Parameter.empty or self.default is None else type(self.default)
             )
-        hint = resolve_optional(hint)
         return hint
 
     @property
