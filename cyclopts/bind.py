@@ -9,7 +9,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
 
 from cyclopts._convert import _bool
-from cyclopts.annotations import resolve_optional
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -274,8 +273,7 @@ def _parse_kw_and_flags(
                     # No values were consumed after the keyword
                     if consume_all and match.argument.parameter.consume_multiple:
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
-                        hint = resolve_optional(match.argument.hint)
-                        empty_container = (get_origin(hint) or hint)()
+                        empty_container = (get_origin(match.argument.resolved_hint) or match.argument.resolved_hint)()
                         match.argument.append(
                             CliToken(keyword=match.matched_token, implicit_value=empty_container, keys=match.keys)
                         )

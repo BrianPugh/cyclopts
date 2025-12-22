@@ -24,7 +24,16 @@ if sys.version_info >= (3, 12):
 else:
     TypeAliasType = None
 
-from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
+from cyclopts.annotations import (
+    NoneType,
+    is_annotated,
+    is_enum_flag,
+    is_nonetype,
+    is_union,
+    resolve,
+    resolve_annotated,
+    resolve_optional,
+)
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import FieldInfo, get_field_infos
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
@@ -75,6 +84,13 @@ ITERABLE_TYPES = {
     tuple,
 }
 
+
+def _has_iterable_origin(t: Any) -> bool:
+    """Check if a type has an iterable origin (list, set, frozenset, etc.)."""
+    inner = resolve_annotated(t)
+    return (get_origin(inner) or inner) in ITERABLE_TYPES
+
+
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
 
@@ -87,6 +103,13 @@ def _bool(s: str) -> bool:
     else:
         # Cyclopts is a little bit conservative when coercing strings into boolean.
         raise CoercionError(target_type=bool)
+
+
+def _none(s: str) -> None:
+    """Convert 'none' or 'null' strings (case-insensitive) to None."""
+    if s.lower() in {"none", "null"}:
+        return None
+    raise CoercionError(target_type=NoneType)
 
 
 def _int(s: str) -> int:
@@ -242,6 +265,7 @@ _converters: dict[Any, Callable] = {
     date: _date,
     datetime: _datetime,
     timedelta: _timedelta,
+    NoneType: _none,
 }
 
 
@@ -573,8 +597,6 @@ def _convert(
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
         for t in inner_types:
-            if is_nonetype(t):
-                continue
             try:
                 out = convert(t, token)
                 break
@@ -775,7 +797,7 @@ def convert(
 
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
-    type_ = resolve(type_)
+    type_ = resolve(type_, optional=False)
 
     if type_ is Any:
         type_ = str
@@ -792,29 +814,44 @@ def convert(
     # Normalize abstract origin types to concrete types early
     if origin_type in _abstract_to_concrete_type_mapping:
         origin_type = _abstract_to_concrete_type_mapping[origin_type]
-    maybe_origin_type = origin_type or type_
+
+    # For dispatch purposes, resolve Optional-like Unions (T | None) to T.
+    # This allows the if/elif chain below to handle dict|None, Flag|None, etc. uniformly.
+    dispatch_type = type_
+    dispatch_origin = origin_type or type_
+
+    if is_union(origin_type):
+        # For Unions containing iterables, use convert_priv (handles Union iteration with all tokens)
+        if any(_has_iterable_origin(t) for t in get_args(type_) if not is_nonetype(t)):
+            return convert_priv(type_, tokens)  # pyright: ignore
+
+        # For Optional (T | None), resolve to T for dispatch
+        resolved = resolve_optional(type_)
+        if resolved is not type_:
+            dispatch_type = resolve_annotated(resolved)
+            dispatch_origin = get_origin(dispatch_type) or dispatch_type
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
-    elif maybe_origin_type in ITERABLE_TYPES:
+    elif dispatch_origin in ITERABLE_TYPES:
         return convert_priv(type_, tokens)  # pyright: ignore
-    elif maybe_origin_type is dict:
+    elif dispatch_origin is dict:
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
         try:
-            value_type = get_args(type_)[1]
+            value_type = get_args(dispatch_type)[1]
         except IndexError:
             value_type = str
         dict_converted = {
             k: convert(value_type, v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
         }
-        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
+        return dict(**dict_converted)
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
-    elif is_enum_flag(maybe_origin_type):
+    elif is_enum_flag(dispatch_origin):
         # Unlike other types that can accept multiple tokens, the result is not a sequence, it's a single
         # enum.Flag object.
-        return convert_enum_flag(maybe_origin_type, tokens, name_transform)
+        return convert_enum_flag(dispatch_origin, tokens, name_transform)
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
@@ -898,7 +935,11 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return token_count(type_.__value__)
     elif is_union(type_):
-        sub_args = get_args(type_)
+        # Filter out NoneType to avoid token count conflicts (e.g., bool consumes 0, None consumes 1)
+        sub_args = [t for t in get_args(type_) if not is_nonetype(t)]
+        if not sub_args:
+            # Edge case: Union containing only NoneType
+            return 1, False
         token_count_target = token_count(sub_args[0])
         for sub_type_ in sub_args[1:]:
             this = token_count(sub_type_)

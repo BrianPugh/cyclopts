@@ -164,7 +164,7 @@ def resolve_optional(type_: Any) -> Any:
     if not is_union(type_):
         return type_
 
-    non_none_types = [t for t in get_args(type_) if t is not NoneType]
+    non_none_types = [t for t in get_args(type_) if not is_nonetype(t)]
     if not non_none_types:  # pragma: no cover
         # This should never happen; python simplifies:
         #    ``Union[None, None] -> NoneType``
@@ -183,6 +183,12 @@ def resolve_annotated(type_: Any) -> type:
     type_ = resolve_type_alias(type_)
     if type(type_) is AnnotatedType:
         type_ = get_args(type_)[0]
+    elif is_union(type_):
+        # Resolve Annotated inside union members
+        args = get_args(type_)
+        resolved_args = tuple(resolve_annotated(arg) for arg in args)
+        if resolved_args != args:
+            type_ = Union[resolved_args]  # noqa: UP007
     return type_
 
 
