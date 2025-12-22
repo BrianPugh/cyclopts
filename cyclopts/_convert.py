@@ -31,7 +31,6 @@ from cyclopts.annotations import (
     is_nonetype,
     is_union,
     resolve,
-    resolve_annotated,
     resolve_optional,
 )
 from cyclopts.exceptions import CoercionError, ValidationError
@@ -83,12 +82,6 @@ ITERABLE_TYPES = {
     set,
     tuple,
 }
-
-
-def _has_iterable_origin(t: Any) -> bool:
-    """Check if a type has an iterable origin (list, set, frozenset, etc.)."""
-    inner = resolve_annotated(t)
-    return (get_origin(inner) or inner) in ITERABLE_TYPES
 
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
@@ -820,20 +813,17 @@ def convert(
         origin_type = _abstract_to_concrete_type_mapping[origin_type]
 
     # For dispatch purposes, resolve Optional-like Unions (T | None) to T.
-    # This allows the if/elif chain below to handle dict|None, Flag|None, etc. uniformly.
+    # This allows the if/elif chain below to handle the token sequence correctly
+    # (e.g., unpacking single tokens), while _convert handles the union iteration.
     dispatch_type = type_
     dispatch_origin = origin_type or type_
 
     if is_union(origin_type):
-        # For Unions containing iterables, use convert_priv (handles Union iteration with all tokens)
-        if any(_has_iterable_origin(t) for t in get_args(type_) if not is_nonetype(t)):
-            return convert_priv(type_, tokens)  # pyright: ignore
-
-        # For Optional (T | None), resolve to T for dispatch
         resolved = resolve_optional(type_)
         if resolved is not type_:
-            dispatch_type = resolve_annotated(resolved)
-            dispatch_origin = get_origin(dispatch_type) or dispatch_type
+            # Optional pattern (T | None): dispatch based on T's requirements
+            dispatch_type = resolved
+            dispatch_origin = get_origin(resolved) or resolved
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
