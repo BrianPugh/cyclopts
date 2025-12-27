@@ -1034,8 +1034,12 @@ class App:
                 # NOTE: This fuzzy matching is for v4 backward compatibility with
                 # _pascal_to_snake introduction. Consider removing in v5.
                 normalized_token = _normalize_for_matching(token)
+                # Also exclude option-like commands (--help, --version, etc.) from fuzzy matching.
+                # Prevents "version" from matching to "--version"
                 matches = [
-                    cmd_name for cmd_name in command_mapping if _normalize_for_matching(cmd_name) == normalized_token
+                    cmd_name
+                    for cmd_name in command_mapping
+                    if not cmd_name.startswith("-") and _normalize_for_matching(cmd_name) == normalized_token
                 ]
 
                 if len(matches) == 1:
