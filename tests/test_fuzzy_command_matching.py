@@ -186,3 +186,47 @@ def test_fuzzy_command_matching_nested_commands(app, subcommand, input_variants,
 
     for input_cmd in input_variants:
         assert app(["database", input_cmd]) == expected
+
+
+def test_fuzzy_matching_excludes_flags_issue_718(app):
+    """Fuzzy matching should NOT match bare words to flags like --version or --help.
+
+    Regression test for issue #718: Running 'app version' (without --) should NOT
+    match the '--version' flag via fuzzy matching.
+    """
+
+    @app.command
+    def hello():
+        return "hello"
+
+    # "version" should NOT match "--version" via fuzzy matching
+    with pytest.raises(UnknownCommandError, match="version"):
+        app.parse_args(["version"], exit_on_error=False)
+
+    # "help" should NOT match "--help" via fuzzy matching
+    with pytest.raises(UnknownCommandError, match="help"):
+        app.parse_args(["help"], exit_on_error=False)
+
+    # But actual flags should still work
+    # Note: --help and --version cause the app to exit, so we check parse_commands instead
+    command_chain, apps, unused = app.parse_commands(["--version"])
+    assert "--version" in command_chain
+
+    command_chain, apps, unused = app.parse_commands(["--help"])
+    assert "--help" in command_chain
+
+
+def test_fuzzy_matching_excludes_short_flags(app):
+    """Fuzzy matching should also exclude short flags like -v and -h."""
+
+    @app.command
+    def hello():
+        return "hello"
+
+    # "v" should NOT match "-v" via fuzzy matching
+    with pytest.raises(UnknownCommandError, match="v"):
+        app.parse_args(["v"], exit_on_error=False)
+
+    # "h" should NOT match "-h" via fuzzy matching
+    with pytest.raises(UnknownCommandError, match="h"):
+        app.parse_args(["h"], exit_on_error=False)
