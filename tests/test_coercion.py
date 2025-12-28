@@ -15,6 +15,9 @@ import pytest
 from cyclopts import CoercionError, Token
 from cyclopts._convert import convert, token_count
 
+# Case variations of "none" and "null" strings that should be parsed as None
+NONE_STRINGS = ["none", "null", "NONE", "NULL", "None", "Null"]
+
 
 def _assert_tuple(expected, actual):
     assert type(actual) is tuple
@@ -104,6 +107,39 @@ def test_coerce_no_tokens():
 def test_coerce_bool():
     assert True is convert(bool, ["true"])
     assert False is convert(bool, ["false"])
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+def test_coerce_none(none_str):
+    """Test that 'none' and 'null' strings are converted to None."""
+    assert None is convert(type(None), [none_str])
+
+
+def test_coerce_none_error():
+    """Test that invalid strings raise CoercionError for NoneType."""
+    with pytest.raises(CoercionError):
+        convert(type(None), ["foo"])
+    with pytest.raises(CoercionError):
+        convert(type(None), [""])
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+def test_coerce_none_union_none_first(none_str):
+    """Test that 'none'/'null' becomes None when None is before str in union."""
+    assert None is convert(None | str, [none_str])
+    assert None is convert(None | int | str, [none_str])
+
+
+def test_coerce_none_union_str_first():
+    """Test that 'none' stays as string when str is before None in union."""
+    assert "none" == convert(str | None, ["none"])
+    assert "none" == convert(int | str | None, ["none"])
+
+
+@pytest.mark.parametrize("none_str", NONE_STRINGS)
+def test_coerce_none_union_int_none(none_str):
+    """Test int | None: 'none'/'null' becomes None (int fails, None succeeds)."""
+    assert None is convert(int | None, [none_str])
 
 
 def test_coerce_error():

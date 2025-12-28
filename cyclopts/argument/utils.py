@@ -124,7 +124,8 @@ def missing_keys_factory(
 ) -> Callable[["Argument", dict[str, Any]], list[str]]:
     def inner(argument: "Argument", data: dict[str, Any]) -> list[str]:
         provided_keys = set(data)
-        field_info = get_field_info(argument.hint)
+        # Use resolved_hint to get the actual class type (Optional stripped)
+        field_info = get_field_info(argument.resolved_hint)
         return [k for k, v in field_info.items() if (v.required and k not in provided_keys)]
 
     return inner
