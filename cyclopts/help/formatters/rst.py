@@ -97,17 +97,9 @@ class RstFormatter:
             Console for text extraction.
         """
         for entry in entries:
-            # Get command name(s)
-            names = []
-            if entry.names:
-                names.extend(entry.names)
-            if entry.shorts:
-                names.extend(entry.shorts)
-
-            if names:
+            if names := entry.all_options:
                 # Use first name as primary, show aliases in parentheses
-                primary_name = names[0]
-                aliases = names[1:]
+                primary_name, aliases = names[0], names[1:]
                 if aliases:
                     name_display = f"{primary_name} ({', '.join(aliases)})"
                 else:
@@ -140,14 +132,7 @@ class RstFormatter:
             Console for text extraction.
         """
         for entry in entries:
-            # Build parameter names
-            names = []
-            if entry.names:
-                names.extend(entry.names)
-            if entry.shorts:
-                names.extend(entry.shorts)
-
-            if names:
+            if names := entry.all_options:
                 # Determine if we should display as positional based on requirement and default
                 is_positional = entry.required and entry.default is None and not any(n.startswith("-") for n in names)
 

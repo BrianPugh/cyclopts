@@ -18,7 +18,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--verbose, -v``
     Verbosity level (-v, -vv, -vvv). [Default: ``0``]
 
-``--quiet, --no-quiet, -q``
+``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
 ``--log-level``
