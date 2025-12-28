@@ -51,14 +51,9 @@ class NameRenderer:
         -------
         ~rich.console.RenderableType
             Combined names and shorts, optionally wrapped.
+            Order: positive_names, positive_shorts, negative_names, negative_shorts
         """
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-
-        if names_str and shorts_str:
-            text = names_str + " " + shorts_str
-        else:
-            text = names_str or shorts_str
+        text = " ".join(entry.all_options)
 
         if self.max_width is None:
             return text
@@ -108,8 +103,8 @@ class CommandNameRenderer:
         ~rich.console.RenderableType
             Primary command name with aliases in parentheses.
         """
-        primary = entry.names[0]
-        aliases = list(entry.names[1:]) + list(entry.shorts)
+        primary = entry.all_options[0] if entry.all_options else ""
+        aliases = list(entry.all_options[1:])
 
         if aliases:
             text = f"{primary} ({', '.join(aliases)})"

@@ -23,8 +23,8 @@ def test_markdown_formatter_command_panel_table():
         format="command",
         title="Commands",
         entries=[
-            HelpEntry(names=("serve",), description="Start the server"),
-            HelpEntry(names=("build",), shorts=("-b",), description="Build the project"),
+            HelpEntry(positive_names=("serve",), description="Start the server"),
+            HelpEntry(positive_names=("build",), positive_shorts=("-b",), description="Build the project"),
         ],
     )
 
@@ -49,8 +49,8 @@ def test_markdown_formatter_command_panel_list():
         format="command",
         title="Commands",
         entries=[
-            HelpEntry(names=("serve",), description="Start the server"),
-            HelpEntry(names=("build",), shorts=("-b",), description="Build the project"),
+            HelpEntry(positive_names=("serve",), description="Start the server"),
+            HelpEntry(positive_names=("build",), positive_shorts=("-b",), description="Build the project"),
         ],
     )
 
@@ -76,16 +76,16 @@ def test_markdown_formatter_parameter_panel_table():
         title="Parameters",
         entries=[
             HelpEntry(
-                names=("--port",),
-                shorts=("-p",),
+                positive_names=("--port",),
+                positive_shorts=("-p",),
                 description="Port number",
                 required=True,
                 type="int",
                 default="8080",
             ),
             HelpEntry(
-                names=("--verbose",),
-                shorts=("-v",),
+                positive_names=("--verbose",),
+                positive_shorts=("-v",),
                 description="Enable verbose mode",
                 required=False,
                 choices=("true", "false"),
@@ -115,15 +115,15 @@ def test_markdown_formatter_parameter_panel_list():
         title="Parameters",
         entries=[
             HelpEntry(
-                names=("--port",),
-                shorts=("-p",),
+                positive_names=("--port",),
+                positive_shorts=("-p",),
                 description="Port number",
                 required=True,
                 type="int",
                 default="8080",
             ),
             HelpEntry(
-                names=("--verbose",),
+                positive_names=("--verbose",),
                 description="Enable verbose mode",
                 env_var=("VERBOSE",),
             ),
@@ -148,7 +148,7 @@ def test_markdown_formatter_heading_level():
     """Test custom heading levels."""
     formatter = MarkdownFormatter(heading_level=3)
     panel = HelpPanel(
-        format="command", title="Commands", entries=[HelpEntry(names=("test",), description="Test command")]
+        format="command", title="Commands", entries=[HelpEntry(positive_names=("test",), description="Test command")]
     )
 
     formatter(None, None, panel)
@@ -171,7 +171,7 @@ def test_markdown_formatter_with_panel_description():
         format="command",
         title="Commands",
         description="Available commands for the application",
-        entries=[HelpEntry(names=("test",), description="Test command")],
+        entries=[HelpEntry(positive_names=("test",), description="Test command")],
     )
 
     formatter(None, None, panel)
@@ -279,8 +279,8 @@ def test_parameter_table_with_all_metadata():
         title="Parameters",
         entries=[
             HelpEntry(
-                names=("--config",),
-                shorts=("-c",),
+                positive_names=("--config",),
+                positive_shorts=("-c",),
                 description="Configuration file path",
                 required=True,
                 type="Path",
@@ -312,14 +312,14 @@ def test_parameter_table_no_required_column():
         title="Options",
         entries=[
             HelpEntry(
-                names=("--debug",),
+                positive_names=("--debug",),
                 description="Enable debug mode",
                 type="bool",
                 default="False",
             ),
             HelpEntry(
-                names=("--quiet",),
-                shorts=("-q",),
+                positive_names=("--quiet",),
+                positive_shorts=("-q",),
                 description="Suppress output",
             ),
         ],
@@ -347,7 +347,7 @@ def test_parameter_with_no_description():
         title="Parameters",
         entries=[
             HelpEntry(
-                names=("--flag",),
+                positive_names=("--flag",),
                 type="bool",
                 default="True",
             ),
@@ -374,8 +374,8 @@ def test_command_table_empty_description():
         format="command",
         title="Commands",
         entries=[
-            HelpEntry(names=("test",)),  # No description
-            HelpEntry(names=("run",), description="Run the application"),
+            HelpEntry(positive_names=("test",)),  # No description
+            HelpEntry(positive_names=("run",), description="Run the application"),
         ],
     )
 
@@ -401,13 +401,13 @@ def test_command_list_with_shorts_and_aliases():
         title="Available Commands",
         entries=[
             HelpEntry(
-                names=("serve", "server"),
-                shorts=("s",),
+                positive_names=("serve", "server"),
+                positive_shorts=("s",),
                 description="Start the development server",
             ),
             HelpEntry(
-                names=("test",),
-                shorts=("t", "T"),
+                positive_names=("test",),
+                positive_shorts=("t", "T"),
                 description="Run tests",
             ),
         ],
@@ -433,7 +433,7 @@ def test_multiple_panels_accumulate():
 
     # First panel
     panel1 = HelpPanel(
-        format="command", title="Commands", entries=[HelpEntry(names=("help",), description="Show help")]
+        format="command", title="Commands", entries=[HelpEntry(positive_names=("help",), description="Show help")]
     )
 
     # Second panel
@@ -441,7 +441,7 @@ def test_multiple_panels_accumulate():
         format="parameter",
         title="Global Options",
         entries=[
-            HelpEntry(names=("--verbose",), description="Verbose output", type="bool"),
+            HelpEntry(positive_names=("--verbose",), description="Verbose output", type="bool"),
         ],
     )
 
@@ -470,7 +470,7 @@ def test_escape_markdown_in_descriptions():
         format="command",
         title="Commands",
         entries=[
-            HelpEntry(names=("pipe",), description="Use | to separate values"),
+            HelpEntry(positive_names=("pipe",), description="Use | to separate values"),
         ],
     )
 

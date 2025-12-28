@@ -18,7 +18,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--verbose, -v``
     Verbosity level (-v, -vv, -vvv). [Default: ``0``]
 
-``--quiet, --no-quiet, -q``
+``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
 ``--log-level``
@@ -150,7 +150,7 @@ Delete a user.
 
 **Parameters:**
 
-``--force, --no-force, -f``
+``--force, -f, --no-force``
     Skip confirmation prompt. [Default: ``False``]
 
 ``--backup, --no-backup``
