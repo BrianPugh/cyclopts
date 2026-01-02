@@ -51,6 +51,7 @@ from cyclopts.utils import (
     default_name_transform,
     help_formatter_converter,
     optional_to_tuple_converter,
+    resolve_callables,
     sort_key_converter,
     to_list_converter,
     to_tuple_converter,
@@ -599,24 +600,54 @@ class App:
 
     @property
     def sort_key(self):
-        return None if self._sort_key is UNSET else self._sort_key
+        """Sort key for ordering in help output.
+
+        If the configured sort_key is a callable, invokes it with this App as the argument.
+        Otherwise returns the sort_key value unchanged.
+        """
+        if self._sort_key is UNSET:
+            return None
+        return resolve_callables(self._sort_key, self)
 
     @sort_key.setter
     def sort_key(self, value):
         self._sort_key = sort_key_converter(value)
 
     @property
-    def _registered_commands(self) -> dict[str, "App"]:
+    def _is_resolved(self) -> bool:
+        """Whether this command is resolved. Always True for App instances.
+
+        For duck-typing with CommandSpec.
+        """
+        return True
+
+    @property
+    def _resolved_command(self) -> "App":
+        """The resolved command. Always self for App instances.
+
+        For duck-typing with CommandSpec.
+        """
+        return self
+
+    @property
+    def _registered_commands(self) -> dict[str, "App | CommandSpec"]:
         """Commands that are not help or version commands.
 
         This includes commands from flattened subapps.
+        Returns App instances for resolved commands, CommandSpec for unresolved lazy commands.
         """
-        out = {}
+        out: dict[str, App | CommandSpec] = {}
         for x in self:
             if x in self.help_flags or x in self.version_flags:
                 continue
-            out[x] = self[x]
+            out[x] = self._get_item(x)
         return out
+
+    @property
+    def _has_visible_commands(self) -> bool:
+        """Check if this app has any visible commands without resolving lazy commands."""
+        # Both App and CommandSpec have a .show property
+        return any(cmd.show for cmd in self._registered_commands.values())
 
     @property
     def console(self) -> "Console":
@@ -794,7 +825,13 @@ class App:
         for k in self:
             yield self[k]
 
-    def resolved_commands(self) -> dict[str, "App"]:
+    @overload
+    def resolve_commands(self, recursive: Literal[False] = False) -> dict[str, "App"]: ...
+
+    @overload
+    def resolve_commands(self, recursive: Literal[True]) -> dict[tuple[str, ...], "App"]: ...
+
+    def resolve_commands(self, recursive: bool = False) -> dict[str, "App"] | dict[tuple[str, ...], "App"]:
         """Get all commands as resolved App instances.
 
         This function resolves any lazy-loaded commands (CommandSpec) into App instances.
@@ -802,27 +839,20 @@ class App:
         and memory usage. Consider accessing commands individually via ``app["command_name"]`` if
         you don't need all commands at once.
 
+        Parameters
+        ----------
+        recursive : bool
+            If ``True``, recursively resolve commands from all subapps.
+            Returns a dict mapping path tuples (e.g., ``("sub", "cmd")``) to Apps.
+            Defaults to ``False``.
+
         Returns
         -------
-        dict[str, App]
-            Mapping of command names to resolved :class:`App` instances.
-
-        Examples
-        --------
-        .. code-block:: python
-
-            from cyclopts import App
-
-            app = App()
-            app.command("myapp.commands:create")
-            app.command("myapp.commands:delete")
-
-            # Resolve all lazy commands
-            commands = app.resolved_commands()
-            assert "create" in commands
-            assert isinstance(commands["create"], App)
+        dict[str, App] | dict[tuple[str, ...], App]
+            When ``recursive=False``: Mapping of command names to resolved :class:`App` instances.
+            When ``recursive=True``: Mapping of command path tuples to resolved :class:`App` instances.
         """
-        resolved = {
+        resolved: dict[str, App] = {
             name: cmd.resolve(self) if isinstance(cmd, CommandSpec) else cmd for name, cmd in self._commands.items()
         }
 
@@ -832,7 +862,19 @@ class App:
                 if cmd_name not in resolved:
                     resolved[cmd_name] = subapp[cmd_name]
 
-        return resolved
+        if not recursive:
+            return resolved
+
+        result: dict[tuple[str, ...], App] = {}
+
+        def _resolve(current_resolved: dict[str, App], path: tuple[str, ...] = ()):
+            for name, subapp in current_resolved.items():
+                cmd_path = path + (name,)
+                result[cmd_path] = subapp
+                _resolve(subapp.resolve_commands(recursive=False), cmd_path)
+
+        _resolve(resolved)
+        return result
 
     def __getitem__(self, key: str) -> "App":
         """Get the subapp from a command string.

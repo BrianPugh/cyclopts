@@ -11,10 +11,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from cyclopts._convert import ITERABLE_TYPES
+from cyclopts._markup import extract_text
 from cyclopts.annotations import is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
 from cyclopts.group_extractors import RegisteredCommand, groups_from_app
+from cyclopts.help.help import extract_short_description
+from cyclopts.help.inline_text import InlineText
 from cyclopts.utils import frozen, is_class_and_subclass
 
 if TYPE_CHECKING:
@@ -80,7 +83,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
         for group, registered_commands in groups_from_app(command_app):
             if group.show:
                 for registered_command in registered_commands:
-                    if registered_command.app.show and registered_command not in commands:
+                    if registered_command.command.show and registered_command not in commands:
                         commands.append(registered_command)
 
         help_format = command_app.app_stack.resolve("help_format", fallback="markdown")
@@ -178,6 +181,18 @@ def escape_for_shell_pattern(name: str, chars: str = "*?[]") -> str:
     return result
 
 
+def get_short_description(help_text: str, format: str, max_length: int = 80) -> str:
+    """Extract short description from help text for shell completion.
+
+    Returns
+    -------
+    str
+        Plain text short description, stripped of markup.
+    """
+    text = extract_short_description(help_text)
+    return strip_markup(text, format=format, max_length=max_length)
+
+
 def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> str:
     """Strip markup and render to plain text for shell completions.
 
@@ -199,9 +214,6 @@ def strip_markup(text: str, format: str = "markdown", max_length: int = 80) -> s
     str
         Plain text (not shell-escaped).
     """
-    from cyclopts._markup import extract_text
-    from cyclopts.help.inline_text import InlineText
-
     inline = InlineText.from_format(text, format=format)
     text = extract_text(inline)
 

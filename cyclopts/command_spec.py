@@ -6,8 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 from attrs import Factory, define, field
 
+from cyclopts.ast_utils import extract_docstring_from_import_path
+
 if TYPE_CHECKING:
     from cyclopts.core import App
+    from cyclopts.group import Group
 
 
 @define
@@ -43,7 +46,99 @@ class CommandSpec:
     name: str | tuple[str, ...] | None = None
     app_kwargs: dict[str, Any] = Factory(dict)
 
-    _resolved: "App | None" = field(init=False, default=None, repr=False)
+    _resolved_app: "App | None" = field(init=False, default=None, repr=False)
+    _ast_docstring: str | None = field(init=False, default=None, repr=False)
+
+    # Duck-typing properties shared with App.
+    # Public: show, help, sort_key, group (user-facing command attributes)
+    # Private: _is_resolved, _resolved_command (internal implementation details)
+
+    @property
+    def _is_resolved(self) -> bool:
+        """Whether this lazy command has been resolved (imported)."""
+        return self._resolved_app is not None
+
+    @property
+    def _resolved_command(self) -> "App | CommandSpec":
+        """The resolved App if available, otherwise this CommandSpec."""
+        return self._resolved_app if self._resolved_app is not None else self
+
+    @property
+    def group(self) -> "Group | str | tuple[Group | str, ...]":
+        """Command groups for categorization in help output.
+
+        For resolved commands, returns the App's group.
+        For unresolved commands, returns empty tuple (placed in default group).
+        """
+        if self._resolved_app is not None:
+            return self._resolved_app.group
+        return ()
+
+    @property
+    def show(self) -> bool:
+        """Whether this command should be shown in help.
+
+        For resolved commands, returns the App's show value.
+        For unresolved commands, returns app_kwargs.get("show", True).
+        """
+        if self._resolved_app is not None:
+            return self._resolved_app.show
+        return self.app_kwargs.get("show", True)
+
+    @property
+    def help(self) -> str:
+        """Help text for this command.
+
+        For resolved commands, returns the App's help property.
+        For unresolved commands, uses AST-based extraction from the source file.
+
+        Successful AST results are cached. Failures raise immediately and will
+        retry on next call.
+
+        Returns
+        -------
+        str
+            The help text. Returns empty string if no help/docstring.
+
+        Raises
+        ------
+        ValueError
+            If unresolved and AST extraction fails (no source file, syntax error, etc.).
+            The error message includes guidance on how to fix the issue.
+        """
+        # Explicit help is authoritative
+        if (help_value := self.app_kwargs.get("help")) is not None:
+            return str(help_value)
+
+        # If resolved, use the App's help property
+        if self._resolved_app is not None:
+            return self._resolved_app.help or ""
+
+        # Return cached AST result
+        if self._ast_docstring is not None:
+            return self._ast_docstring
+
+        # Try AST extraction
+        try:
+            self._ast_docstring = extract_docstring_from_import_path(self.import_path)
+            return self._ast_docstring
+        except ValueError as e:
+            raise ValueError(
+                f"Cannot extract help text for lazy command {self.import_path!r}: {e}. "
+                f"Provide explicit help via: app.command({self.import_path!r}, help='...')"
+            ) from e
+
+    @property
+    def sort_key(self):
+        """Sort key for ordering in help output.
+
+        For resolved commands, returns the App's sort_key (with callables resolved).
+        For unresolved commands, returns the raw value from app_kwargs since there's
+        no app context to invoke callables.
+        """
+        if self._resolved_app is not None:
+            return self._resolved_app.sort_key
+        return self.app_kwargs.get("sort_key", None)
 
     def resolve(self, parent_app: "App") -> "App":
         """Import and resolve the command on first access.
@@ -68,8 +163,8 @@ class CommandSpec:
         AttributeError
             If the attribute doesn't exist in the module.
         """
-        if self._resolved is not None:
-            return self._resolved
+        if self._resolved_app is not None:
+            return self._resolved_app
 
         # Parse import path
         module_path, _, attr_name = self.import_path.rpartition(":")
@@ -120,7 +215,7 @@ class CommandSpec:
 
             _apply_parent_defaults_to_app(target, parent_app)
 
-            self._resolved = target
+            self._resolved_app = target
         else:
             # It's a function - wrap it in an App with parent defaults
             # Match the behavior of direct function registration
@@ -135,17 +230,12 @@ class CommandSpec:
 
             _apply_parent_groups_to_kwargs(app_kwargs, parent_app)
 
-            self._resolved = App(name=self.name, **app_kwargs)
-            self._resolved.default(target)
+            self._resolved_app = App(name=self.name, **app_kwargs)
+            self._resolved_app.default(target)
 
         # Hide help and version flags from subapp help output
         # This matches the behavior of direct App/function registration in core.py
-        for flag in chain(self._resolved.help_flags, self._resolved.version_flags):
-            self._resolved[flag].show = False
+        for flag in chain(self._resolved_app.help_flags, self._resolved_app.version_flags):
+            self._resolved_app[flag].show = False
 
-        return self._resolved
-
-    @property
-    def is_resolved(self) -> bool:
-        """Check if this command has been imported and resolved yet."""
-        return self._resolved is not None
+        return self._resolved_app

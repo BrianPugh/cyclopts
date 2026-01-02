@@ -103,7 +103,7 @@ def test_flatten_multiple_subapps(app):
         ("iter_has_foo", True),
         ("iter_no_duplicates", True),
         ("getitem_works", True),
-        ("resolved_commands", True),
+        ("resolve_commands", True),
         ("registered_commands", True),
     ],
 )
@@ -129,8 +129,8 @@ def test_flatten_dict_interface(app, method, expected):
     elif method == "getitem_works":
         foo_app = app["foo"]
         assert foo_app.default_command() == "foo"
-    elif method == "resolved_commands":
-        assert ("foo" in app.resolved_commands()) == expected
+    elif method == "resolve_commands":
+        assert ("foo" in app.resolve_commands()) == expected
     elif method == "registered_commands":
         registered = app._registered_commands
         assert ("foo" in registered) == expected

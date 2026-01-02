@@ -5,7 +5,7 @@ API
 ===
 
 .. autoclass:: cyclopts.App
-   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args, run_async, assemble_argument_collection, update, generate_docs, generate_completion, install_completion, register_install_completion_command
+   :members: default, command, version_print, help_print, interactive_shell, parse_commands, parse_known_args, parse_args, run_async, assemble_argument_collection, update, generate_docs, generate_completion, install_completion, register_install_completion_command, resolve_commands
    :special-members: __call__, __getitem__, __iter__
 
    Cyclopts Application.

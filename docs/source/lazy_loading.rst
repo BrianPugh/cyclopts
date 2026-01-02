@@ -45,13 +45,15 @@ Use an import path string:
 
 The import path format is ``"module.path:function_name"``, similar to setuptools entry points.
 
-Lazy commands are resolved/imported in these situations:
+Lazy commands are resolved/imported when:
 
-- **Command Execution** - When the user runs that specific command
-- **Help Generation** - When displaying help that includes the command
-- **Direct Access** - When accessing via ``app["command_name"]``
+- the user runs that specific command.
+- python code directly accesses the command; e.g. ``app["command_name"]``.
 
-In order to benefit from lazy loading, you have to make sure that the files are not imported by other means when your CLI starts up.
+Notably, **help generation does not trigger imports**. Cyclopts uses AST-based docstring extraction
+to display help for lazy commands without importing their modules (see :ref:`Help Text and Docstrings`).
+
+In order to benefit from lazy loading, you have to make sure that the files are **not imported by other means** when your CLI starts up.
 
 ------------------
 Import Path Format
@@ -63,7 +65,7 @@ The import path string has two parts separated by a colon (``:``):
   The Python **module** to import, using dot notation (e.g., ``myapp.commands.users``).
 
 **Attribute Name** (after the ``:``)
-  The function or App to get from the module using :func:`getattr`.
+  The function or :class:`.App` to get from the module using :func:`getattr`.
 
 Examples:
 
@@ -72,15 +74,12 @@ Examples:
    # Simple function in a module
    app.command("myapp.commands:create_user")
 
-   # Nested module path
-   app.command("myapp.admin.database.operations:migrate")
-
    # Import an App instance, exposed to the CLI as "admin"
    app.command("myapp.admin:admin_app", name="admin")
 
 .. note::
    The attribute name (after ``:``) is the **actual Python name**, not the CLI command name.
-   Use the ``name`` parameter to specify the CLI command name.
+   Use the ``name`` parameter to specify a different CLI command name.
 
 ----------------------
 Name vs Function Name
@@ -96,8 +95,8 @@ specifies **what code to execute**. They can be completely different:
    user_app = App(name="user")
 
    # Function name: "list_users"
-   # CLI command name: "list"
-   user_app.command("myapp.commands.users:list_users", name="list")
+   # CLI command name: "list-users"
+   user_app.command("myapp.commands.users:list_users")
 
    # Function name: "delete"
    # CLI command name: "remove"
@@ -105,7 +104,7 @@ specifies **what code to execute**. They can be completely different:
 
 .. code-block:: console
 
-   $ myapp user list --limit 10
+   $ myapp user list-users --limit 10
    # Imports and runs myapp.commands.users:list_users
 
    $ myapp user remove --username alice
@@ -137,20 +136,15 @@ If an import path/configuration is invalid, the error occurs **when the command 
    # Now the error occurs:
    ImportError: Cannot import module 'nonexistent.module'
 
-To catch import errors early, you can access the command during testing:
+To catch import errors early, you can use :meth:`~cyclopts.App.resolve_commands` during testing:
 
 .. code-block:: python
 
-   import pytest
-   from cyclopts import App
+   from myapp import app  # Your app with lazy commands
 
-   def test_lazy_commands_are_importable():
-       app = App()
-       app.command("myapp.commands:create")
-
-       # This will trigger the import and fail if path is wrong
-       resolved = app["create"]
-       assert resolved is not None
+   def test_lazy_commands_are_valid():
+       # This resolves all direct lazy subcommands and will fail if any path is wrong
+       app.resolve_commands()
 
 -----------------------
 Groups and Lazy Loading
@@ -158,8 +152,8 @@ Groups and Lazy Loading
 
 .. tip:: **TL;DR:** Define :class:`~cyclopts.Group` objects used by commands in your main CLI module, NOT in lazy-loaded modules.
 
-:class:`~cyclopts.Group` objects defined in **unresolved lazy modules** won't be available
-until those modules are **explicitly imported**. To avoid this, define :class:`~cyclopts.Group` objects in non-lazy modules.
+:class:`.Group` objects defined in **unresolved lazy modules** won't be available
+until those modules are **explicitly imported**. To avoid this, define :class:`~cyclopts.Group` objects in non-lazy modules (particularly important for **command groups**).
 
 .. code-block:: python
 
@@ -176,8 +170,6 @@ until those modules are **explicitly imported**. To avoid this, define :class:`~
    app.command("myapp.admin:create_user", group=admin_group)
    app.command("myapp.admin:delete_user", group=admin_group)
    app.command("myapp.db:migrate", group=db_group)
-
-**What to avoid:** Defining ``Group`` objects inside lazy-loaded modules:
 
 .. code-block:: python
 
@@ -198,4 +190,59 @@ until that lazy module is imported. This means that:
 - :attr:`.Group.default_parameter` and other settings won't be inherited by commands **referencing the group by string**.
 
 Once the lazy module is imported (e.g., by executing one of its commands), the :class:`~cyclopts.Group` object
-becomes available and subsequent operations will use it correctly.
+becomes available and subsequent operations will use it correctly. However, in conjunction with lazy-loading, this is just unnecessary complexity and should be avoided.
+
+.. _Help Text and Docstrings:
+
+------------------------
+Help Text and Docstrings
+------------------------
+
+For lazy commands, Cyclopts extracts docstrings directly from the source file using Python's
+:mod:`ast` module, **without importing the module**. This preserves the startup time benefits
+of lazy loading even when displaying help.
+
+.. code-block:: python
+
+   # myapp/commands/heavy.py
+   import tensorflow  # Expensive import!
+
+   def train_model(epochs: int = 10):
+       """Train the machine learning model.
+
+       This trains using the configured dataset and hyperparameters.
+       """
+       ...
+
+.. code-block:: python
+
+   # myapp/cli.py
+   from cyclopts import App
+
+   app = App()
+   app.command("myapp.commands.heavy:train_model", name="train")
+
+.. code-block:: console
+
+   $ myapp --help
+   Usage: myapp COMMAND
+
+   Commands:
+     train  Train the machine learning model.
+
+   # tensorflow was NOT imported!
+
+The docstring's short description (first paragraph) is extracted and displayed in help output.
+
+Explicit Help Override
+======================
+
+If AST-based extraction isn't possible (e.g., dynamically created modules, compiled extensions,
+or modules without source files), you can provide help text explicitly:
+
+.. code-block:: python
+
+   # For commands where AST extraction would fail
+   app.command("compiled_module:func", name="process", help="Process data using compiled code.")
+
+The ``help`` parameter takes precedence over docstring extraction when provided.

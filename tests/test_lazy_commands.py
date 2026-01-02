@@ -1,6 +1,9 @@
 """Tests for lazy command loading via import path strings."""
 
 import sys
+from contextlib import contextmanager
+from pathlib import Path
+from textwrap import dedent
 from types import ModuleType
 
 import pytest
@@ -8,6 +11,63 @@ import pytest
 from cyclopts import App, Group
 from cyclopts.command_spec import CommandSpec
 from cyclopts.exceptions import CommandCollisionError
+
+
+@contextmanager
+def temp_module(tmp_path: Path, module_name: str, source: str):
+    """Context manager that creates a temporary file-based module.
+
+    Use this when you need AST extraction (requires actual .py file).
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path (from pytest fixture).
+    module_name : str
+        Name for the module.
+    source : str
+        Python source code for the module.
+
+    Yields
+    ------
+    Path
+        Path to the created module file.
+    """
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        yield module_path
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
+@contextmanager
+def fake_module(module_name: str = "test_lazy_module"):
+    """Context manager that creates a fake in-memory module.
+
+    Use this for simple tests that don't need AST extraction.
+
+    Parameters
+    ----------
+    module_name : str
+        Name for the module in sys.modules.
+
+    Yields
+    ------
+    ModuleType
+        The fake module object. Add attributes to it before using.
+    """
+    module = ModuleType(module_name)
+    sys.modules[module_name] = module
+    try:
+        yield module
+    finally:
+        if module_name in sys.modules:
+            del sys.modules[module_name]
 
 
 def test_command_spec_basic_function(app):
@@ -70,12 +130,8 @@ def test_lazy_command_registration():
 
 def test_lazy_command_execution(app):
     """Test executing a lazy command."""
-    # Create a fake module with a command function
-    test_module = ModuleType("test_lazy_module")
-    test_module.test_command = lambda x: f"executed with {x}"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
+    with fake_module() as m:
+        m.test_command = lambda x: f"executed with {x}"  # type: ignore[attr-defined]
         app.command("test_lazy_module:test_command", name="lazy")
 
         # Access the command - should resolve it
@@ -86,34 +142,25 @@ def test_lazy_command_execution(app):
         # Execute the command
         result = app(["lazy", "--x", "value"])
         assert result == "executed with value"
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_name_transform(app):
     """Test that name transform is applied to lazy command names."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.create_user = lambda: "created"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.create_user = lambda: "created"  # type: ignore[attr-defined]
 
-    try:
         # Don't specify name - should auto-derive from function name
         app.command("test_lazy_module:create_user")
 
         # Should be registered with transformed name (underscores -> hyphens)
         assert "create-user" in app
         assert "create_user" not in app
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_with_alias(app):
     """Test lazy command with alias."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
+    with fake_module() as m:
+        m.cmd = lambda: "result"  # type: ignore[attr-defined]
         app.command("test_lazy_module:cmd", name="command", alias=["c", "cmd-alias"])
 
         assert "command" in app
@@ -122,8 +169,6 @@ def test_lazy_command_with_alias(app):
 
         # All should resolve to the same App
         assert app["command"] is app["c"] is app["cmd-alias"]
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_collision(app):
@@ -137,40 +182,34 @@ def test_lazy_command_collision(app):
         app.command("os.path:join", name="existing")
 
 
-def test_lazy_command_help(app, console):
+def test_lazy_command_help(console, tmp_path):
     """Test that help generation works with lazy commands."""
-    test_module = ModuleType("test_lazy_module")
+    source = dedent('''\
+        def cmd(x):
+            """Test command documentation."""
+            return x
+        ''')
+    with temp_module(tmp_path, "test_lazy_help_module", source):
+        app = App(name="test")
+        app.command("test_lazy_help_module:cmd", name="lazy-cmd")
 
-    def cmd(x):
-        """Test command documentation."""
-        return x
-
-    test_module.cmd = cmd  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
-        app.command("test_lazy_module:cmd", name="lazy-cmd")
-
-        # Generate help - should resolve the lazy command
+        # Generate help - should use AST extraction
         with console.capture() as capture:
-            app(["--help"], console=console)
+            with pytest.raises(SystemExit):
+                app(["--help"], console=console)
 
         output = capture.get()
         # The command name used for registration should appear
-        assert "lazy-cmd" in output or "cmd" in output
+        assert "lazy-cmd" in output
         # The help should show the command documentation
         assert "Test command documentation" in output
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_and_immediate_commands_mixed(app):
     """Test mixing lazy and immediate command registration."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.lazy_func = lambda: "lazy"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.lazy_func = lambda: "lazy"  # type: ignore[attr-defined]
 
-    try:
         # Immediate command
         @app.command
         def immediate():
@@ -182,8 +221,6 @@ def test_lazy_and_immediate_commands_mixed(app):
         # Both should work
         assert app(["immediate"]) == "immediate"
         assert app(["lazy"]) == "lazy"
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_not_resolved_until_accessed(app):
@@ -194,27 +231,25 @@ def test_lazy_command_not_resolved_until_accessed(app):
 
     # Should be CommandSpec, not resolved App
     assert isinstance(app._commands["lazy"], CommandSpec)
-    assert not app._commands["lazy"].is_resolved
+    assert app._commands["lazy"]._resolved_app is None
 
     # Now access it
     _ = app["lazy"]
 
     # Should now be resolved
-    assert app._commands["lazy"].is_resolved
+    assert app._commands["lazy"]._resolved_app is not None
 
 
 def test_lazy_command_app_kwargs(app):
     """Test that app_kwargs are passed when wrapping a function."""
-    test_module = ModuleType("test_lazy_module")
 
     def test_func(x: int):
         """Test function."""
         return x * 2
 
-    test_module.test_func = test_func  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.test_func = test_func  # type: ignore[attr-defined]
 
-    try:
         # Register with custom app configuration
         app.command(
             "test_lazy_module:test_func",
@@ -225,17 +260,12 @@ def test_lazy_command_app_kwargs(app):
 
         resolved = app["custom"]
         assert resolved.help == "Custom help text"
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_parse_commands(app):
     """Test that parse_commands works with lazy commands."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
+    with fake_module() as m:
+        m.cmd = lambda: "result"  # type: ignore[attr-defined]
         app.command("test_lazy_module:cmd", name="lazy")
 
         # Parse commands should resolve the lazy command
@@ -245,17 +275,12 @@ def test_lazy_command_parse_commands(app):
         assert len(apps) == 2  # root app and lazy command app
         assert isinstance(apps[-1], App)
         assert unused == ["arg1", "arg2"]
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_iteration(app):
     """Test that iterating over commands includes lazy commands."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: None  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
+    with fake_module() as m:
+        m.cmd = lambda: None  # type: ignore[attr-defined]
         app.command("test_lazy_module:cmd", name="lazy")
 
         @app.command
@@ -266,33 +291,24 @@ def test_lazy_command_iteration(app):
         commands = list(app)
         assert "lazy" in commands
         assert "immediate" in commands
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_contains(app):
     """Test that 'in' operator works with lazy commands."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: None  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
+    with fake_module() as m:
+        m.cmd = lambda: None  # type: ignore[attr-defined]
         app.command("test_lazy_module:cmd", name="lazy")
 
         # Should work without resolving
         assert "lazy" in app
         assert "nonexistent" not in app
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_command_resolves_to_app_instance():
     """Test that if the import path points to an App, it's used directly."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.my_app = App(name="subapp", help="Subapp help")  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.my_app = App(name="subapp", help="Subapp help")  # type: ignore[attr-defined]
 
-    try:
         app = App()
         # Use explicit name since we're registering via import path
         app.command("test_lazy_module:my_app", name="subapp")
@@ -301,19 +317,15 @@ def test_lazy_command_resolves_to_app_instance():
         resolved = app["subapp"]
 
         # Should be the same App instance, not wrapped
-        assert resolved is test_module.my_app
+        assert resolved is m.my_app
         assert resolved.help == "Subapp help"
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_subcommands(app):
     """Test lazy loading in nested command structures."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.subcmd = lambda: "sub result"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.subcmd = lambda: "sub result"  # type: ignore[attr-defined]
 
-    try:
         # Create a subapp with a lazy command
         user_app = App(name="user")
         user_app.command("test_lazy_module:subcmd", name="create")
@@ -322,32 +334,28 @@ def test_lazy_subcommands(app):
         # Execute nested lazy command
         result = app(["user", "create"])
         assert result == "sub result"
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
-def test_lazy_command_custom_name_in_help(app, console):
+def test_lazy_command_custom_name_in_help(console, tmp_path):
     """Test that custom name (not function name) appears in help.
 
     Regression test for bug where lazy commands with custom names
     showed the function name instead of the custom name in help output.
     """
-    test_module = ModuleType("test_lazy_module")
-
-    def list_users(limit: int = 10):
-        """List all user accounts."""
-        return f"listing {limit} users"
-
-    test_module.list_users = list_users  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
-
-    try:
+    source = dedent('''\
+        def list_users(limit: int = 10):
+            """List all user accounts."""
+            return f"listing {limit} users"
+        ''')
+    with temp_module(tmp_path, "test_custom_name_module", source):
+        app = App(name="test")
         # Register with custom name "list" instead of function name "list_users"
-        app.command("test_lazy_module:list_users", name="list")
+        app.command("test_custom_name_module:list_users", name="list")
 
         # Generate help
         with console.capture() as capture:
-            app(["--help"], console=console)
+            with pytest.raises(SystemExit):
+                app(["--help"], console=console)
 
         output = capture.get()
 
@@ -357,8 +365,6 @@ def test_lazy_command_custom_name_in_help(app, console):
         assert "list-users" not in output
         # Help text should still appear
         assert "List all user accounts" in output
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_function_inherits_parent_help_flags():
@@ -366,11 +372,9 @@ def test_lazy_function_inherits_parent_help_flags():
 
     This proves behavioral equivalence with direct function registration.
     """
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.cmd = lambda: "result"  # type: ignore[attr-defined]
 
-    try:
         # Create parent with custom help flags
         parent = App(name="parent", help_flags=["--custom-help", "-ch"])
 
@@ -389,8 +393,6 @@ def test_lazy_function_inherits_parent_help_flags():
 
         # Both should be identical
         assert direct_app.help_flags == lazy_app.help_flags
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_function_inherits_parent_version_flags():
@@ -398,11 +400,9 @@ def test_lazy_function_inherits_parent_version_flags():
 
     This proves behavioral equivalence with direct function registration.
     """
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.cmd = lambda: "result"  # type: ignore[attr-defined]
 
-    try:
         # Create parent with custom version flags
         parent = App(name="parent", version_flags=["--custom-version", "-cv"])
 
@@ -421,8 +421,6 @@ def test_lazy_function_inherits_parent_version_flags():
 
         # Both should be identical
         assert direct_app.version_flags == lazy_app.version_flags
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_function_inherits_parent_groups():
@@ -430,11 +428,9 @@ def test_lazy_function_inherits_parent_groups():
 
     This proves behavioral equivalence with direct function registration.
     """
-    test_module = ModuleType("test_lazy_module")
-    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.cmd = lambda: "result"  # type: ignore[attr-defined]
 
-    try:
         # Create parent with custom groups
         custom_cmd_group = Group("Custom Commands", sort_key=1)
         custom_param_group = Group("Custom Parameters", sort_key=2)
@@ -465,8 +461,6 @@ def test_lazy_function_inherits_parent_groups():
         assert direct_app._group_commands == lazy_app._group_commands
         assert direct_app._group_parameters == lazy_app._group_parameters
         assert direct_app._group_arguments == lazy_app._group_arguments
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_app_inherits_parent_groups_when_unset():
@@ -474,12 +468,10 @@ def test_lazy_app_inherits_parent_groups_when_unset():
 
     This proves behavioral equivalence with direct App registration.
     """
-    test_module = ModuleType("test_lazy_module")
-    # Create an App without groups set (None)
-    test_module.subapp = App(name="subapp", help="Subapp help")  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        # Create an App without groups set (None)
+        m.subapp = App(name="subapp", help="Subapp help")  # type: ignore[attr-defined]
 
-    try:
         # Create parent with custom groups
         custom_cmd_group = Group("Parent Commands", sort_key=1)
         custom_param_group = Group("Parent Parameters", sort_key=2)
@@ -505,8 +497,6 @@ def test_lazy_app_inherits_parent_groups_when_unset():
         # Both should be identical
         assert direct_subapp._group_commands == lazy_subapp._group_commands
         assert direct_subapp._group_parameters == lazy_subapp._group_parameters
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_app_doesnt_override_existing_groups():
@@ -514,13 +504,12 @@ def test_lazy_app_doesnt_override_existing_groups():
 
     An imported App with its own groups should keep them, not inherit parent's.
     """
-    test_module = ModuleType("test_lazy_module")
     # Create an App WITH groups set
     subapp_group = Group("Subapp Commands", sort_key=99)
-    test_module.subapp = App(name="subapp", group_commands=subapp_group)  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
 
-    try:
+    with fake_module() as m:
+        m.subapp = App(name="subapp", group_commands=subapp_group)  # type: ignore[attr-defined]
+
         # Create parent with different groups
         parent_group = Group("Parent Commands", sort_key=1)
         parent = App(name="parent", group_commands=parent_group)
@@ -532,17 +521,13 @@ def test_lazy_app_doesnt_override_existing_groups():
         # Should keep its own group, not inherit parent's
         assert lazy_subapp._group_commands == subapp_group
         assert lazy_subapp._group_commands != parent_group
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_app_rejects_kwargs():
     """Test that CommandSpec rejects app_kwargs for App imports."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.subapp = App(name="subapp")  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.subapp = App(name="subapp")  # type: ignore[attr-defined]
 
-    try:
         parent = App(name="parent")
 
         # Registration succeeds (creates CommandSpec)
@@ -551,17 +536,13 @@ def test_lazy_app_rejects_kwargs():
         # Error occurs during resolution (access)
         with pytest.raises(ValueError, match="Cannot apply configuration to imported App"):
             _ = parent["subapp"]
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_app_name_must_match():
     """Test that CommandSpec validates App name matches CLI command name."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.subapp = App(name="actual-name")  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.subapp = App(name="actual-name")  # type: ignore[attr-defined]
 
-    try:
         parent = App(name="parent")
 
         # Register with different name - should fail on resolution
@@ -569,17 +550,13 @@ def test_lazy_app_name_must_match():
 
         with pytest.raises(ValueError, match="Imported App name mismatch"):
             _ = parent["wrong-name"]
-    finally:
-        del sys.modules["test_lazy_module"]
 
 
 def test_lazy_app_name_match_allows_resolution():
     """Test that CommandSpec allows resolution when name matches."""
-    test_module = ModuleType("test_lazy_module")
-    test_module.subapp = App(name="matching-name")  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.subapp = App(name="matching-name")  # type: ignore[attr-defined]
 
-    try:
         parent = App(name="parent")
 
         # Register with matching name - should succeed
@@ -587,9 +564,7 @@ def test_lazy_app_name_match_allows_resolution():
         resolved = parent["matching-name"]
 
         assert resolved.name[0] == "matching-name"
-        assert resolved is test_module.subapp
-    finally:
-        del sys.modules["test_lazy_module"]
+        assert resolved is m.subapp
 
 
 def test_lazy_command_not_resolved_when_executing_different_command():
@@ -599,9 +574,6 @@ def test_lazy_command_not_resolved_when_executing_different_command():
     When executing a specific command (e.g., "b run"), other lazy-loaded commands
     (e.g., "c") should NOT be imported/resolved.
     """
-    # Create two fake modules for lazy loading
-    module_b = ModuleType("test_lazy_module_b")
-    module_c = ModuleType("test_lazy_module_c")
 
     def run_b():
         return "running b"
@@ -616,13 +588,10 @@ def test_lazy_command_not_resolved_when_executing_different_command():
     c_app = App(name="c", result_action="return_value")
     c_app.command(run_c, name="run")
 
-    module_b.b_app = b_app  # type: ignore[attr-defined]
-    module_c.c_app = c_app  # type: ignore[attr-defined]
+    with fake_module("test_lazy_module_b") as mb, fake_module("test_lazy_module_c") as mc:
+        mb.b_app = b_app  # type: ignore[attr-defined]
+        mc.c_app = c_app  # type: ignore[attr-defined]
 
-    sys.modules["test_lazy_module_b"] = module_b
-    sys.modules["test_lazy_module_c"] = module_c
-
-    try:
         # Create parent app with lazy-loaded sub-apps
         app = App(name="a", result_action="return_value")
         app.command("test_lazy_module_b:b_app", name="b")
@@ -631,25 +600,22 @@ def test_lazy_command_not_resolved_when_executing_different_command():
         # Verify both are registered as lazy (not resolved yet)
         assert isinstance(app._commands["b"], CommandSpec)
         assert isinstance(app._commands["c"], CommandSpec)
-        assert not app._commands["b"].is_resolved
-        assert not app._commands["c"].is_resolved
+        assert app._commands["b"]._resolved_app is None
+        assert app._commands["c"]._resolved_app is None
 
         # Execute only command "b run"
         result = app(["b", "run"])
         assert result == "running b"
 
         # Command "b" should now be resolved
-        assert app._commands["b"].is_resolved
+        assert app._commands["b"]._resolved_app is not None
 
         # Command "c" should NOT be resolved - this is the bug!
         # Currently fails because groups_from_app() resolves all lazy commands
-        assert not app._commands["c"].is_resolved, (
+        assert app._commands["c"]._resolved_app is None, (
             "Lazy command 'c' was resolved even though it was not executed. "
             "This indicates that lazy loading is not working correctly."
         )
-    finally:
-        del sys.modules["test_lazy_module_b"]
-        del sys.modules["test_lazy_module_c"]
 
 
 def test_lazy_subapp_help_excludes_help_version_flags(console):
@@ -659,8 +625,6 @@ def test_lazy_subapp_help_excludes_help_version_flags(console):
     When a subapp is registered via lazy loading, its help output should NOT
     include --help and --version flags (matching behavior of direct registration).
     """
-    test_module = ModuleType("test_lazy_module")
-
     # Create a subapp with a default command
     subapp = App(name="greet")
 
@@ -669,10 +633,9 @@ def test_lazy_subapp_help_excludes_help_version_flags(console):
         """Greet a person by name."""
         print(f"Hello, {name}!")
 
-    test_module.subapp = subapp  # type: ignore[attr-defined]
-    sys.modules["test_lazy_module"] = test_module
+    with fake_module() as m:
+        m.subapp = subapp  # type: ignore[attr-defined]
 
-    try:
         # Test lazy registration (should not show --help/--version)
         app_lazy = App(name="App", result_action="return_value")
         app_lazy.command("test_lazy_module:subapp", name="greet")
@@ -688,5 +651,320 @@ def test_lazy_subapp_help_excludes_help_version_flags(console):
         assert "Commands" not in output_lazy  # Should not have a Commands section at all
         assert "NAME" in output_lazy
         assert "Greet a person by name" in output_lazy
+
+
+# ============================================================================
+# AST-based Lazy Help Tests
+# ============================================================================
+
+
+def test_lazy_help_uses_ast_extraction(console, tmp_path):
+    """Test that --help for parent app extracts lazy command help via AST without importing."""
+    module_name = "ast_test_heavy_module"
+    source = dedent(f'''\
+        # This module sets a global when imported to track if it was imported
+        _IMPORT_TRACKER = "{module_name}_imported"
+
+        import sys
+        if not hasattr(sys, _IMPORT_TRACKER):
+            setattr(sys, _IMPORT_TRACKER, True)
+
+        def train_model():
+            """Train the machine learning model with heavy dependencies."""
+            pass
+        ''')
+    # Ensure the import tracker is not set
+    if hasattr(sys, f"{module_name}_imported"):
+        delattr(sys, f"{module_name}_imported")
+
+    try:
+        with temp_module(tmp_path, module_name, source):
+            app = App(name="ml", result_action="return_value")
+            app.command(f"{module_name}:train_model", name="train")
+
+            # Generate help - should use AST and NOT import the module
+            with console.capture() as capture:
+                app(["--help"], console=console)
+
+            output = capture.get()
+
+            # The command should appear in help
+            assert "train" in output
+            # The docstring should be extracted via AST
+            assert "Train the machine learning model" in output
+
+            # CRITICAL: The module should NOT have been imported
+            assert not hasattr(sys, f"{module_name}_imported"), (
+                "Module was imported during --help! AST extraction should have been used instead."
+            )
+
+            # The CommandSpec should still be unresolved
+            assert isinstance(app._commands["train"], CommandSpec)
+            assert app._commands["train"]._resolved_app is None
     finally:
-        del sys.modules["test_lazy_module"]
+        if hasattr(sys, f"{module_name}_imported"):
+            delattr(sys, f"{module_name}_imported")
+
+
+def test_lazy_help_raises_on_ast_failure(console):
+    """Test that lazy help raises an error when AST extraction fails."""
+
+    def dynamic_func():
+        """Dynamic function documentation."""
+        return "dynamic"
+
+    # Use a module that exists but where AST extraction will fail
+    # (dynamically created module with no .py source file)
+    with fake_module("dynamic_module") as m:
+        m.dynamic_func = dynamic_func  # type: ignore[attr-defined]
+
+        app = App(name="test", result_action="return_value")
+        app.command("dynamic_module:dynamic_func", name="dynamic")
+
+        # Generate help - AST will fail (no .py file), should raise ValueError
+        with pytest.raises(ValueError, match="Cannot extract help text"):
+            app(["--help"], console=console)
+
+        # The CommandSpec should still be unresolved
+        cmd = app._commands["dynamic"]
+        assert isinstance(cmd, CommandSpec)
+        assert cmd._resolved_app is None
+
+
+def test_lazy_help_with_explicit_help_avoids_ast_failure(console):
+    """Test that providing explicit help avoids AST extraction failure."""
+
+    def dynamic_func():
+        """Dynamic function documentation."""
+        return "dynamic"
+
+    # Use a module that would fail AST extraction
+    with fake_module("dynamic_module2") as m:
+        m.dynamic_func = dynamic_func  # type: ignore[attr-defined]
+
+        app = App(name="test", result_action="return_value")
+        # Provide explicit help to avoid AST extraction
+        app.command("dynamic_module2:dynamic_func", name="dynamic", help="Explicit help works")
+
+        with console.capture() as capture:
+            app(["--help"], console=console)
+
+        output = capture.get()
+
+        # The explicit help should be shown
+        assert "Explicit help works" in output
+        assert "dynamic" in output
+
+
+def test_lazy_help_explicit_help_kwarg(console, tmp_path):
+    """Test that explicit help kwarg is used without AST or import."""
+    # Create a module with a DIFFERENT docstring than the help kwarg
+    source = dedent('''\
+        import sys
+        sys.modules["explicit_help_module"]._was_imported = True
+
+        def my_func():
+            """This is the actual docstring."""
+            pass
+        ''')
+    module_path = tmp_path / "explicit_help_module.py"
+    module_path.write_text(source)
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        sentinel = ModuleType("explicit_help_module")
+        sentinel._was_imported = False  # type: ignore[attr-defined]
+        sys.modules["explicit_help_module"] = sentinel
+
+        app = App(name="test", result_action="return_value")
+        # Provide explicit help that differs from docstring
+        app.command("explicit_help_module:my_func", name="cmd", help="Explicit help text here")
+
+        with console.capture() as capture:
+            app(["--help"], console=console)
+
+        output = capture.get()
+
+        # The explicit help should be shown
+        assert "Explicit help text here" in output
+        # The actual docstring should NOT be shown
+        assert "actual docstring" not in output
+
+        # Module should NOT have been imported
+        assert not sentinel._was_imported  # type: ignore[attr-defined]
+    finally:
+        sys.path.remove(str(tmp_path))
+        if "explicit_help_module" in sys.modules:
+            del sys.modules["explicit_help_module"]
+
+
+def test_lazy_help_no_docstring(console, tmp_path):
+    """Test that lazy commands without docstrings still appear in help."""
+    source = dedent("""\
+        def no_doc_func():
+            pass
+        """)
+    with temp_module(tmp_path, "no_doc_module", source):
+        app = App(name="test", result_action="return_value")
+        app.command("no_doc_module:no_doc_func", name="nodoc")
+
+        with console.capture() as capture:
+            app(["--help"], console=console)
+
+        output = capture.get()
+
+        # The command should still appear even without a docstring
+        assert "nodoc" in output
+
+
+def test_lazy_help_multiline_short_description(console, tmp_path):
+    """Test that multiline first paragraphs are collapsed correctly."""
+    source = dedent('''\
+        def multiline_func():
+            """This is a multiline
+            short description that spans
+            several lines.
+
+            This is the long description.
+            """
+            pass
+        ''')
+    with temp_module(tmp_path, "multiline_module", source):
+        app = App(name="test", result_action="return_value")
+        app.command("multiline_module:multiline_func", name="multi")
+
+        with console.capture() as capture:
+            app(["--help"], console=console)
+
+        output = capture.get()
+
+        # The multiline first paragraph should be collapsed
+        assert "multiline" in output.lower()
+        # Long description should not appear in command listing
+        assert "long description" not in output.lower()
+
+
+def test_command_spec_help_property(tmp_path):
+    """Test CommandSpec.help property directly."""
+    source = dedent('''\
+        def test_func():
+            """Short description for testing.
+
+            This is the longer description.
+            """
+            pass
+        ''')
+    with temp_module(tmp_path, "spec_test_module", source):
+        spec = CommandSpec(import_path="spec_test_module:test_func")
+
+        # Should not be resolved yet
+        assert spec._resolved_app is None
+
+        # Get full docstring via AST
+        doc = spec.help
+        assert "Short description for testing." in doc
+        assert "longer description" in doc
+
+        # Should still not be resolved
+        assert spec._resolved_app is None
+
+        # Calling again should return cached result
+        doc2 = spec.help
+        assert doc2 == doc
+
+
+def test_command_spec_help_with_explicit_help():
+    """Test that explicit help kwarg is preferred over AST extraction."""
+    spec = CommandSpec(
+        import_path="os.path:join",  # Has its own docstring
+        app_kwargs={"help": "Custom help text"},
+    )
+
+    doc = spec.help
+    assert doc == "Custom help text"
+
+
+def test_command_spec_help_raises_on_failure():
+    """Test that help property raises ValueError on failure."""
+    # Use an import path that can't be resolved via AST
+    spec = CommandSpec(import_path="nonexistent_module_12345:func")
+
+    with pytest.raises(ValueError, match="Cannot extract help text"):
+        _ = spec.help
+
+    # Calling again should also raise (not cached, will retry)
+    with pytest.raises(ValueError, match="Cannot extract help text"):
+        _ = spec.help
+
+
+def test_lazy_help_with_show_false(console, tmp_path):
+    """Test that lazy commands with show=False are hidden from help."""
+    source = dedent('''\
+        def hidden_func():
+            """This should be hidden."""
+            pass
+        ''')
+    with temp_module(tmp_path, "hidden_module", source):
+        app = App(name="test", result_action="return_value")
+        app.command("hidden_module:hidden_func", name="hidden", show=False)
+
+        with console.capture() as capture:
+            app(["--help"], console=console)
+
+        output = capture.get()
+
+        # The hidden command should not appear
+        assert "hidden" not in output.lower()
+
+
+def test_resolve_commands(tmp_path):
+    """Test that resolve_commands resolves all lazy commands."""
+    source = dedent('''\
+        def func1():
+            """First function."""
+            pass
+
+        def func2():
+            """Second function."""
+            pass
+        ''')
+    with temp_module(tmp_path, "resolve_commands_module", source):
+        app = App(name="test")
+        app.command("resolve_commands_module:func1", name="cmd1")
+        app.command("resolve_commands_module:func2", name="cmd2")
+
+        # Both should be unresolved
+        assert isinstance(app._commands["cmd1"], CommandSpec)
+        assert isinstance(app._commands["cmd2"], CommandSpec)
+        assert app._commands["cmd1"]._resolved_app is None
+        assert app._commands["cmd2"]._resolved_app is None
+
+        # resolve_commands should resolve both and return dict
+        commands = app.resolve_commands()
+
+        # Should return resolved App instances
+        assert "cmd1" in commands
+        assert "cmd2" in commands
+        assert isinstance(commands["cmd1"], App)
+        assert isinstance(commands["cmd2"], App)
+
+        # Both should now be resolved in the original app too
+        assert app._commands["cmd1"]._resolved_app is not None
+        assert app._commands["cmd2"]._resolved_app is not None
+
+
+def test_resolve_commands_catches_errors(tmp_path):
+    """Test that resolve_commands raises on invalid lazy commands."""
+    source = dedent('''\
+        def valid_func():
+            """Valid function."""
+            pass
+        ''')
+    with temp_module(tmp_path, "resolve_errors_module", source):
+        app = App(name="test")
+        app.command("resolve_errors_module:valid_func", name="valid")
+        app.command("resolve_errors_module:nonexistent", name="invalid")
+
+        # Should raise AttributeError for the nonexistent function
+        with pytest.raises(AttributeError):
+            app.resolve_commands()

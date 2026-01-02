@@ -17,7 +17,7 @@ from cyclopts.core import _get_root_module_name
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
+from cyclopts.utils import SortHelper, frozen, is_class_and_subclass
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 @lru_cache(maxsize=16)
-def docstring_parse(doc: str, format: str):
+def docstring_parse(doc: str):
     """Addon to :func:`docstring_parser.parse` that supports multi-line `short_description`."""
     import docstring_parser
 
@@ -49,6 +49,26 @@ def docstring_parse(doc: str, format: str):
     assert not res.long_description or res.short_description
 
     return res
+
+
+def extract_short_description(help_text: str) -> str:
+    """Extract short description from help text.
+
+    Parameters
+    ----------
+    help_text : str
+        Full help text (docstring).
+
+    Returns
+    -------
+    str
+        Short description, or empty string if none found.
+    """
+    if not help_text:
+        return ""
+
+    parsed = docstring_parse(help_text)
+    return parsed.short_description or ""
 
 
 def _text_factory():
@@ -272,7 +292,7 @@ def format_usage(
     for command in command_chain:
         app = app[command]
 
-    if any(app[x].show for x in app._registered_commands):
+    if app._has_visible_commands:
         usage.append("COMMAND")
 
     if app.default_command:
@@ -330,7 +350,7 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     if not raw_doc_string:
         return SILENT
 
-    parsed = docstring_parse(raw_doc_string, format)
+    parsed = docstring_parse(raw_doc_string)
 
     components: list[str] = []
     if parsed.short_description:
@@ -489,20 +509,22 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
     """
     entries = []
     for registered_command in apps_with_names:
-        names = registered_command.names
-        app = registered_command.app
-        if not app.show:
+        if not registered_command.command.show:
             continue
+
+        # Parse docstring for short description
+        short_description = extract_short_description(registered_command.command.help or "")
+
         # Commands don't have negative variants, so all names are "positive"
         short_names, long_names = [], []
-        for name in names:
+        for name in registered_command.names:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
         entry = HelpEntry(
             positive_names=tuple(long_names),
             positive_shorts=tuple(short_names),
-            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
-            sort_key=resolve_callables(app.sort_key, app),
+            description=InlineText.from_format(short_description, format=format),
+            sort_key=registered_command.command.sort_key,
         )
         if entry not in entries:
             entries.append(entry)
