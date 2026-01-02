@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 from cyclopts.cli import app
+from cyclopts.completion._base import get_short_description
+from cyclopts.group_extractors import groups_from_app
 from cyclopts.loader import load_app_from_script
 from cyclopts.parameter import Parameter
 
@@ -11,28 +13,6 @@ if TYPE_CHECKING:
     from cyclopts import App
 
 MAX_DESCRIPTION_LENGTH = 60
-
-
-def _extract_short_description(help_text: str) -> str:
-    """Extract first line of help text as a short description.
-
-    Parameters
-    ----------
-    help_text : str
-        Full help text to extract from.
-
-    Returns
-    -------
-    str
-        First line of help text, or empty string if parsing fails.
-    """
-    from cyclopts.help.help import docstring_parse
-
-    try:
-        parsed = docstring_parse(help_text, "plaintext")
-        return parsed.short_description or ""
-    except Exception:
-        return str(help_text).split("\n")[0]
 
 
 def _print_subcommand_completions(app_obj: "App") -> None:
@@ -43,16 +23,14 @@ def _print_subcommand_completions(app_obj: "App") -> None:
     app_obj : App
         Application object to extract subcommands from.
     """
-    from cyclopts.group_extractors import groups_from_app
-
     for _, registered_commands in groups_from_app(app_obj):
         for registered_command in registered_commands:
-            if registered_command.app.show:
+            if registered_command.command.show:
                 for name in registered_command.names:
                     if not name.startswith("-"):
-                        short_desc = ""
-                        if registered_command.app.help:
-                            short_desc = _extract_short_description(registered_command.app.help)
+                        short_desc = get_short_description(
+                            registered_command.command.help or "", "plaintext", MAX_DESCRIPTION_LENGTH
+                        )
 
                         if short_desc:
                             print(f"{name}:{short_desc}")
