@@ -14,6 +14,7 @@ from attrs import define, field
 
 from cyclopts._convert import (
     ITERABLE_TYPES,
+    _validate_json_extra_keys,
     convert,
     instantiate_from_dict,
     token_count,
@@ -683,6 +684,7 @@ class Argument:
                         parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
                         raise CoercionError(token=token, target_type=self.hint) from e
+                    _validate_json_extra_keys(parsed_json, self.hint, token)
                     update_argument_collection(
                         {self.name.lstrip("-"): parsed_json},
                         token.source,
