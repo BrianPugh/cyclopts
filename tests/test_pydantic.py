@@ -447,6 +447,42 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     assert actual == expected
 
 
+def test_pydantic_annotated_field_discriminator_basemodel_container(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/726
+
+    Discriminated unions should work when the container is also a pydantic.BaseModel.
+    """
+
+    class DatasetImage(pydantic.BaseModel):
+        type: Literal["image"] = "image"
+        path: str
+
+    class DatasetVideo(pydantic.BaseModel):
+        type: Literal["video"] = "video"
+        path: str
+        fps: int
+
+    class Config(pydantic.BaseModel):
+        dataset: Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
+
+    @app.default
+    def main(
+        config: Annotated[Config | None, Parameter(name="*")] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        "--dataset.type=image --dataset.path foo.png",
+        Config(dataset=DatasetImage(path="foo.png")),
+    )
+    assert_parse_args(
+        main,
+        "--dataset.type=video --dataset.path foo.mp4 --dataset.fps 30",
+        Config(dataset=DatasetVideo(path="foo.mp4", fps=30)),
+    )
+
+
 def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatch):
     """
     Test that Pydantic's own JSON serialization (which uses aliases by default)
