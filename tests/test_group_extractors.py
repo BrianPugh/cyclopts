@@ -67,8 +67,9 @@ def test_app_registered_with_multiple_names():
     assert len(groups[0][1]) == 1
 
     registered_command = groups[0][1][0]
+    assert isinstance(registered_command, RegisteredCommand)
     assert set(registered_command.names) == {"foo", "bar", "baz"}
-    assert registered_command.app is sub
+    assert registered_command.command is sub
 
 
 def test_same_app_registered_multiple_times():
@@ -87,5 +88,6 @@ def test_same_app_registered_multiple_times():
     assert len(groups[0][1]) == 1
 
     registered_command = groups[0][1][0]
+    assert isinstance(registered_command, RegisteredCommand)
     assert set(registered_command.names) == {"first", "second"}
-    assert registered_command.app is sub
+    assert registered_command.command is sub
