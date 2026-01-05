@@ -556,6 +556,37 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
     )
 
 
+def test_pydantic_annotated_field_discriminator_missing_argument(app):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/725
+
+    Missing required field in a discriminated union should raise MissingArgumentError,
+    not an IndexError.
+    """
+
+    @dataclass
+    class Cat:
+        rainbow: bool
+        type: Literal["cat"]
+
+    @dataclass
+    class Dog:
+        type: Literal["dog"]
+
+    @dataclass
+    class AnimalParameter:
+        animal: Annotated[Cat | Dog, pydantic.Field(discriminator="type")]
+
+    @app.default
+    def main(animal_parameter: Annotated[AnimalParameter, Parameter(name="*")]):
+        pass
+
+    with pytest.raises(MissingArgumentError) as exc_info:
+        app(["--animal.type", "cat"], exit_on_error=False)
+
+    assert exc_info.value.argument is not None
+    assert exc_info.value.argument.parameter.name == ("--animal.rainbow",)
+
+
 def test_pydantic_list_empty_flag(app, assert_parse_args):
     """Regression test for https://github.com/BrianPugh/cyclopts/issues/572"""
 
