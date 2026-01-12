@@ -1,3 +1,5 @@
+import pytest
+
 from cyclopts import App
 from cyclopts.config import Dict
 
@@ -317,6 +319,69 @@ def test_config_dict_allow_unknown():
 
     result = app([])
     assert result == "Alice is 30 years old."
+
+
+def test_config_dict_allow_unknown_nested_user_class():
+    """Test that unknown nested keys are ignored with user classes when allow_unknown=True.
+
+    Regression test for https://github.com/BrianPugh/cyclopts/issues/731
+    """
+    from dataclasses import dataclass
+
+    @dataclass
+    class ConnectionParameter:
+        timeout: float
+
+    config_data = {
+        "p": {"timeout": 3},
+        "np": {"timeout": 4},  # Unknown, should be ignored
+    }
+    app = App(
+        config=Dict(config_data, allow_unknown=True, use_commands_as_keys=False),
+        result_action="return_value",
+    )
+
+    @app.default
+    def connect(*, p: ConnectionParameter):
+        return p.timeout
+
+    result = app([])
+    assert result == 3.0
+
+
+@pytest.mark.parametrize(
+    "config_data",
+    [
+        {"p": {"timeout": 5}},
+        {"timeout": 5},
+    ],
+)
+def test_config_dict_remapped_nested_parameter(config_data):
+    """Test that nested config paths don't match remapped parameters.
+
+    When a nested parameter has Parameter(name="--timeout") (remapped to root level),
+    config should use {"timeout": 5}, not {"p": {"timeout": 5}}. The nested path
+    should raise UnknownOptionError because it doesn't match the remapped CLI name.
+    """
+    from dataclasses import dataclass
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    @dataclass
+    class ConnectionParameter:
+        timeout: Annotated[float, Parameter(name="--timeout")]
+
+    app = App(
+        config=Dict(config_data, use_commands_as_keys=False),
+        result_action="return_value",
+    )
+
+    @app.default
+    def connect(*, p: ConnectionParameter):
+        return p.timeout
+
+    app([], exit_on_error=False)
 
 
 def test_config_dict_partial_override():
