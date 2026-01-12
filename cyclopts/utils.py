@@ -4,6 +4,7 @@ import functools
 import importlib
 import inspect
 import re
+from collections import OrderedDict
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
@@ -42,6 +43,41 @@ class Sentinel(metaclass=SentinelMeta):
 
 class UNSET(Sentinel):
     """Special sentinel value indicating that no data was provided. **Do not instantiate**."""
+
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+
+class LRUCache(OrderedDict[K, V]):
+    """Simple bounded LRU cache using OrderedDict.
+
+    Provides dict-like access with automatic LRU eviction when maxsize is exceeded.
+    Most recently accessed items are moved to the end, and oldest items are
+    evicted from the front when capacity is reached.
+
+    Parameters
+    ----------
+    maxsize
+        Maximum number of entries to keep in the cache.
+    """
+
+    def __init__(self, maxsize: int):
+        super().__init__()
+        self.maxsize = maxsize
+
+    def __getitem__(self, key: K) -> V:
+        # Move to end on access (LRU behavior)
+        self.move_to_end(key)
+        return super().__getitem__(key)
+
+    def __setitem__(self, key: K, value: V) -> None:
+        if key in self:
+            self.move_to_end(key)
+        super().__setitem__(key, value)
+        # Evict oldest entries if over capacity
+        while len(self) > self.maxsize:
+            self.popitem(last=False)
 
 
 def record_init(target: str) -> Callable[[type[T]], type[T]]:

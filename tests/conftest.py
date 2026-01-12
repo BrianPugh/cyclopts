@@ -61,6 +61,28 @@ def chdir_to_tmp_path(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def clear_ast_caches_fixture():
+    """Clear AST caches before each test to prevent cross-test pollution.
+
+    The AST extraction module caches parsed module ASTs and resolved type aliases.
+    Without clearing, tests that create temporary modules could affect each other.
+    """
+    from cyclopts.ast_utils import (
+        _alias_cache,
+        _get_cached_module_ast,
+        classify_type_for_negatives,
+    )
+
+    _get_cached_module_ast.cache_clear()
+    _alias_cache.clear()
+    classify_type_for_negatives.cache_clear()
+    yield
+    _get_cached_module_ast.cache_clear()
+    _alias_cache.clear()
+    classify_type_for_negatives.cache_clear()
+
+
 @pytest.fixture
 def app():
     return cyclopts.App(result_action="return_value")

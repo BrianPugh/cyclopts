@@ -1002,7 +1002,8 @@ class App:
         tokens: None | str | Iterable[str] = None,
         *,
         include_parent_meta=True,
-    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
+        skip_lazy_resolution=False,
+    ) -> tuple[tuple[str, ...], tuple["App | CommandSpec", ...], list[str]]:
         """Extract out the command tokens from a command.
 
         You are probably actually looking for :meth:`parse_args`.
@@ -1026,12 +1027,17 @@ class App:
 
             This parameter is primarily for internal use.
 
+        skip_lazy_resolution: bool
+            When True, lazy commands (CommandSpec) are NOT resolved/imported.
+            The returned apps tuple may contain CommandSpec instances.
+            Used for help generation to enable AST-based help without importing.
+
         Returns
         -------
         tuple[str, ...]
             Strings that are interpreted as a valid command chain.
-        tuple[App, ...]
-            The execution path - apps that will be invoked in order.
+        tuple[App | CommandSpec, ...]
+            The execution path - apps (or unresolved CommandSpec if skip_lazy_resolution=True).
         list[str]
             The remaining non-command tokens.
         """
@@ -1108,17 +1114,30 @@ class App:
             # Note: CommandSpec.resolve() has built-in caching via its _resolved field
             # Pass the current app as parent to inherit its defaults
             if isinstance(app_or_spec, CommandSpec):
-                parent_app = app  # Save parent before overwriting
-                app = app_or_spec.resolve(parent_app)
+                if skip_lazy_resolution and not app_or_spec._is_resolved:
+                    # For help generation: don't resolve, keep as CommandSpec
+                    # This enables AST-based help without importing
+                    app = app_or_spec  # type: ignore[assignment]
+                else:
+                    parent_app = app  # Save parent before overwriting
+                    app = app_or_spec.resolve(parent_app)
             else:
                 app = app_or_spec
 
             # Found a command - add it to the chain
-            add_parent_metas(app)
-            apps.append(app)
-            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-            command_chain.append(token)
-            unused_tokens = unused_tokens[1:]
+            if isinstance(app, CommandSpec):
+                # Unresolved lazy command - this is a leaf, can't traverse further
+                apps.append(app)
+                command_chain.append(token)
+                unused_tokens = unused_tokens[1:]
+                # Stop traversal - we can't get sub-commands from an unresolved CommandSpec
+                break
+            else:
+                add_parent_metas(app)
+                apps.append(app)
+                command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+                command_chain.append(token)
+                unused_tokens = unused_tokens[1:]
 
         return tuple(command_chain), tuple(apps), unused_tokens
 
@@ -1899,6 +1918,28 @@ class App:
         if self._is_nested_call():
             overrides.setdefault("result_action", "return_value")
 
+        # Early help detection for lazy commands
+        # Check if help is requested AND the final command is a lazy (unresolved) CommandSpec
+        # If so, we can use AST-based help without importing the lazy module
+        # Note: This only works for lazy FUNCTIONS, not lazy Apps (which need to be imported)
+        if any(t in self.help_flags for t in tokens):
+            _, apps, _ = self.parse_commands(tokens, skip_lazy_resolution=True)
+            if apps:
+                final_app = apps[-1]
+                if isinstance(final_app, CommandSpec) and not final_app._is_resolved:
+                    # Try AST extraction - if it fails (e.g., target is an App), fall through to normal flow
+                    try:
+                        from cyclopts.ast_utils import extract_signature_from_import_path
+
+                        sig = extract_signature_from_import_path(final_app.import_path)
+                        if sig.fields:  # Only use AST help if we found function parameters
+                            self.help_print(tokens, console=console)
+                            return None
+                    except Exception:
+                        # AST extraction failed - target might be an App, not a function
+                        # Fall through to normal flow which will import and resolve
+                        pass
+
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
                 tokens,
@@ -2063,13 +2104,25 @@ class App:
             Console to print help and runtime Cyclopts errors.
             If not provided, follows the resolution order defined in :attr:`App.console`.
         """
-        from cyclopts.help import format_doc, format_usage
+        from cyclopts.help import format_docstring, format_usage
         from cyclopts.help.formatters import DefaultFormatter
 
         tokens = normalize_tokens(tokens)
 
-        command_chain, apps, _ = self.parse_commands(tokens)
-        executing_app = apps[-1]
+        # Use skip_lazy_resolution to avoid importing lazy commands for help
+        command_chain, apps, _ = self.parse_commands(tokens, skip_lazy_resolution=True)
+        executing_app_or_spec = apps[-1]
+
+        # Check if we have an unresolved lazy command
+        if isinstance(executing_app_or_spec, CommandSpec) and not executing_app_or_spec._is_resolved:
+            # Use parent apps for app_stack context (exclude the CommandSpec)
+            parent_apps = apps[:-1]
+            overrides = {"_console": console}
+            with self.app_stack(parent_apps, overrides=overrides):
+                self._print_ast_help(executing_app_or_spec, command_chain)
+            return
+
+        executing_app = executing_app_or_spec
         overrides = {"_console": console}
         with self.app_stack(apps, overrides=overrides):
             console = executing_app.console
@@ -2084,7 +2137,7 @@ class App:
 
             # Prepare description
             help_format = executing_app.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
-            description = format_doc(executing_app, help_format)
+            description = format_docstring(executing_app.help, help_format)
 
             # Prepare panels with their associated groups
             help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
@@ -2117,6 +2170,74 @@ class App:
                 console.print()  # Add blank line before epilogue
                 epilogue = InlineText.from_format(help_epilogue, format=help_format)
                 console.print(epilogue)
+
+    def _print_ast_help(
+        self,
+        command_spec: "CommandSpec",
+        command_chain: tuple[str, ...],
+    ) -> None:
+        """Print help for an unresolved lazy command using AST-based extraction.
+
+        Must be called within an app_stack context (set up by help_print).
+        """
+        from cyclopts.argument._ast_argument import ASTArgumentCollection
+        from cyclopts.help import create_parameter_help_panel, format_docstring
+        from cyclopts.help.formatters import DefaultFormatter
+
+        # Resolve via app_stack (already in context from help_print)
+        console = self.console
+        help_format = self.app_stack.resolve("help_format", fallback=DEFAULT_FORMAT)
+        formatter = self.app_stack.resolve("help_formatter", fallback=DefaultFormatter())
+        default_parameter = self.app_stack.resolve("default_parameter")
+
+        # Get AST arguments
+        ast_args = ASTArgumentCollection.from_import_path(command_spec.import_path, default_parameter=default_parameter)
+
+        # Build usage string
+        usage_parts = [self.name[0], *command_chain]
+        for arg in ast_args.filter_by(show=True):
+            if arg.field_info.is_positional:
+                name = arg.field_info.name.upper()
+                usage_parts.append(name if arg.required else f"[{name}]")
+        if any(not a.field_info.is_positional for a in ast_args.filter_by(show=True)):
+            usage_parts.append("[OPTIONS]")
+        usage = " ".join(usage_parts) + "\n"
+
+        # Get description using shared helper
+        try:
+            raw_docstring = command_spec.help
+        except ValueError:
+            raw_docstring = None
+        description = format_docstring(raw_docstring, help_format)
+
+        # Render usage
+        if hasattr(formatter, "render_usage"):
+            formatter.render_usage(console, console.options, usage)
+        else:
+            console.print(usage)
+
+        # Render description
+        if hasattr(formatter, "render_description"):
+            formatter.render_description(console, console.options, description)
+        elif description:
+            console.print(description)
+
+        # Render parameter panels for each group
+        panels = []
+        for group in ast_args.groups:
+            if not group.show:
+                continue
+            group_args = ast_args.filter_by(group=group, show=True)
+            if not group_args:
+                continue
+            panel = create_parameter_help_panel(group, group_args, help_format)
+            panels.append((group, panel))
+
+        if panels:
+            sorted_groups, sorted_panels = sort_groups([g for g, _ in panels], [p for _, p in panels])
+            for _group, panel in zip(sorted_groups, sorted_panels, strict=False):
+                panel._remove_duplicates()
+                formatter(console, console.options, panel)
 
     def _assemble_help_panels(
         self,

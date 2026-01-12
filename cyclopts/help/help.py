@@ -344,9 +344,21 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
-def format_doc(app: "App", format: str) -> InlineText | SilentRich:
-    raw_doc_string = app.help
+def format_docstring(raw_doc_string: str | None, format: str) -> InlineText | SilentRich:
+    """Format a docstring for help output.
 
+    Parameters
+    ----------
+    raw_doc_string
+        The raw docstring to format.
+    format
+        The format to use (e.g., "restructuredtext", "markdown").
+
+    Returns
+    -------
+    InlineText | SilentRich
+        Formatted docstring, or SILENT if no docstring.
+    """
     if not raw_doc_string:
         return SILENT
 

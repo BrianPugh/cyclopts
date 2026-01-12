@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpPanel
 
 from cyclopts.command_spec import CommandSpec
-from cyclopts.help import format_doc, format_usage
+from cyclopts.help import format_docstring, format_usage
 
 
 def should_show_usage(app: "App") -> bool:
@@ -387,8 +387,7 @@ def extract_description(app: "App", help_format: str) -> Any | None:
     Optional[Any]
         The extracted description object, or None.
     """
-    description = format_doc(app, help_format)
-    return description
+    return format_docstring(app.help, help_format)
 
 
 def extract_usage(app: "App") -> Any | None:

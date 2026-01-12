@@ -968,3 +968,318 @@ def test_resolve_commands_catches_errors(tmp_path):
         # Should raise AttributeError for the nonexistent function
         with pytest.raises(AttributeError):
             app.resolve_commands()
+
+
+# ============================================================================
+# AST-based Parameter Help Tests
+# ============================================================================
+
+
+def test_lazy_command_help_shows_parameters_without_import(console, tmp_path):
+    """Test that --help for a lazy command shows parameters without importing."""
+    module_name = "ast_param_test_module"
+    source = dedent(f'''\
+        import sys
+        sys.modules["{module_name}"]._was_imported = True
+
+        def train(model: str, *, epochs: int = 10, lr: float = 0.001):
+            """Train a machine learning model.
+
+            Parameters
+            ----------
+            model
+                Model architecture name.
+            epochs
+                Number of training epochs.
+            lr
+                Learning rate.
+            """
+            pass
+        ''')
+
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+    sys.path.insert(0, str(tmp_path))
+
+    try:
+        # Create a sentinel module to track if import happens
+        sentinel = ModuleType(module_name)
+        sentinel._was_imported = False  # type: ignore[attr-defined]
+        sys.modules[module_name] = sentinel
+
+        app = App(name="ml", result_action="return_value")
+        app.command(f"{module_name}:train", name="train")
+
+        # Generate help for the command - should NOT import
+        with console.capture() as capture:
+            app(["train", "--help"], console=console)
+
+        output = capture.get()
+
+        # Should show command description
+        assert "Train a machine learning model" in output
+
+        # Should show parameters from AST extraction
+        assert "model" in output.lower()
+        assert "epochs" in output.lower()
+        assert "lr" in output.lower()
+
+        # Should show defaults
+        assert "10" in output
+        assert "0.001" in output
+
+        # CRITICAL: The module should NOT have been imported
+        assert not sentinel._was_imported, "Module was imported during 'train --help'! AST extraction should be used."
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
+def test_lazy_command_help_with_annotated_parameter(console, tmp_path):
+    """Test that --help extracts Parameter metadata from Annotated types."""
+    module_name = "ast_annotated_test"
+    source = dedent(f'''\
+        import sys
+        sys.modules["{module_name}"]._was_imported = True
+
+        from typing import Annotated
+        from cyclopts import Parameter
+
+        def process(
+            verbose: Annotated[bool, Parameter(negative="--quiet")] = False,
+            output: Annotated[str, Parameter(help="Output file path.")] = "out.txt"
+        ):
+            """Process data with options."""
+            pass
+        ''')
+
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+    sys.path.insert(0, str(tmp_path))
+
+    try:
+        sentinel = ModuleType(module_name)
+        sentinel._was_imported = False  # type: ignore[attr-defined]
+        sys.modules[module_name] = sentinel
+
+        app = App(name="test", result_action="return_value")
+        app.command(f"{module_name}:process", name="process")
+
+        with console.capture() as capture:
+            app(["process", "--help"], console=console)
+
+        output = capture.get()
+
+        # Should show the command
+        assert "Process data" in output
+
+        # Should show custom help from Parameter
+        assert "Output file path" in output
+
+        # Should show negative option from Parameter
+        assert "--quiet" in output
+
+        # Should NOT have imported the module
+        assert not sentinel._was_imported
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
+def test_lazy_command_help_with_positional_args(console, tmp_path):
+    """Test that positional arguments are displayed correctly in AST-based help."""
+    module_name = "ast_positional_test"
+    source = dedent(f'''\
+        import sys
+        sys.modules["{module_name}"]._was_imported = True
+
+        def greet(name: str, age: int, *, greeting: str = "Hello"):
+            """Greet a person.
+
+            Parameters
+            ----------
+            name
+                Person's name.
+            age
+                Person's age.
+            greeting
+                Greeting to use.
+            """
+            pass
+        ''')
+
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+    sys.path.insert(0, str(tmp_path))
+
+    try:
+        sentinel = ModuleType(module_name)
+        sentinel._was_imported = False  # type: ignore[attr-defined]
+        sys.modules[module_name] = sentinel
+
+        app = App(name="test", result_action="return_value")
+        app.command(f"{module_name}:greet", name="greet")
+
+        with console.capture() as capture:
+            app(["greet", "--help"], console=console)
+
+        output = capture.get()
+
+        # Should show positional args in usage
+        assert "NAME" in output
+        assert "AGE" in output
+
+        # Should show descriptions
+        assert "Person's name" in output
+        assert "Person's age" in output
+        assert "Greeting to use" in output
+
+        # Should show default
+        assert "Hello" in output
+
+        # Should NOT have imported
+        assert not sentinel._was_imported
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
+def test_lazy_command_help_with_converter_skipped(console, tmp_path):
+    """Test that converter (safe-to-skip kwarg) doesn't break AST extraction."""
+    module_name = "ast_converter_test"
+    source = dedent(f'''\
+        import sys
+        sys.modules["{module_name}"]._was_imported = True
+
+        from typing import Annotated
+        from cyclopts import Parameter
+
+        def my_converter(type_, tokens):
+            return int(tokens[0]) * 2
+
+        def double(
+            value: Annotated[int, Parameter(converter=my_converter, help="A value to double.")]
+        ):
+            """Double a value."""
+            pass
+        ''')
+
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+    sys.path.insert(0, str(tmp_path))
+
+    try:
+        sentinel = ModuleType(module_name)
+        sentinel._was_imported = False  # type: ignore[attr-defined]
+        sys.modules[module_name] = sentinel
+
+        app = App(name="test", result_action="return_value")
+        app.command(f"{module_name}:double", name="double")
+
+        with console.capture() as capture:
+            app(["double", "--help"], console=console)
+
+        output = capture.get()
+
+        # Should show the help text (converter was skipped, but help was extracted)
+        assert "A value to double" in output
+
+        # Should NOT have imported
+        assert not sentinel._was_imported
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
+def test_lazy_command_help_with_unevaluable_negative_degrades(tmp_path):
+    """Test that unevaluable help-relevant kwargs cause Parameter extraction to fail gracefully.
+
+    When a help-relevant kwarg like `negative=func()` can't be evaluated, the entire
+    Parameter extraction fails (correctly), falling back to default behavior. This is
+    different from safe-to-skip kwargs like `converter` which are simply skipped while
+    other kwargs are still extracted.
+    """
+    from cyclopts.ast_utils import extract_signature_from_import_path
+
+    module_name = "ast_negative_func_test"
+    source = dedent('''\
+        from typing import Annotated
+        from cyclopts import Parameter
+
+        def get_negative():
+            return "--disable"
+
+        def toggle(
+            enabled: Annotated[bool, Parameter(negative=get_negative(), help="Custom help")]
+        ):
+            """Toggle something."""
+            pass
+        ''')
+
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+    sys.path.insert(0, str(tmp_path))
+
+    try:
+        sig = extract_signature_from_import_path(f"{module_name}:toggle")
+
+        # The Parameter extraction should have failed because negative=get_negative()
+        # is not evaluable and 'negative' is not in the safe-to-skip list.
+        # This means no Parameter is extracted for 'enabled'.
+        assert "enabled" not in sig.parameters
+
+        # But the docstring and field info should still be available
+        assert "Toggle something" in sig.docstring
+        assert "enabled" in sig.fields
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+
+def test_lazy_command_help_converter_skipped_but_help_extracted(tmp_path):
+    """Test that safe-to-skip kwargs are skipped while help-relevant kwargs are extracted.
+
+    When `converter=my_func` (safe to skip) is combined with `help="..."` (help-relevant),
+    the converter is skipped but the help text is still extracted into the Parameter.
+    """
+    from cyclopts.ast_utils import extract_signature_from_import_path
+
+    module_name = "ast_converter_help_test"
+    source = dedent('''\
+        from typing import Annotated
+        from cyclopts import Parameter
+
+        def my_converter(type_, tokens):
+            return int(tokens[0]) * 2
+
+        def double(
+            value: Annotated[int, Parameter(converter=my_converter, help="A value to double.")]
+        ):
+            """Double a value."""
+            pass
+        ''')
+
+    module_path = tmp_path / f"{module_name}.py"
+    module_path.write_text(source)
+    sys.path.insert(0, str(tmp_path))
+
+    try:
+        sig = extract_signature_from_import_path(f"{module_name}:double")
+
+        # The Parameter SHOULD be extracted because converter is safe to skip
+        assert "value" in sig.parameters
+
+        # The help text should be present in the extracted Parameter
+        assert sig.parameters["value"].help == "A value to double."
+
+        # The converter should NOT be set (it was skipped)
+        assert sig.parameters["value"].converter is None
+    finally:
+        sys.path.remove(str(tmp_path))
+        if module_name in sys.modules:
+            del sys.modules[module_name]

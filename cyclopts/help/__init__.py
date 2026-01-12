@@ -7,7 +7,7 @@ __all__ = [
     "HelpPanel",
     "create_parameter_help_panel",
     "format_command_entries",
-    "format_doc",
+    "format_docstring",
     "format_usage",
     "InlineText",
     "DefaultFormatter",
@@ -24,7 +24,7 @@ from .help import (
     HelpPanel,
     create_parameter_help_panel,
     format_command_entries,
-    format_doc,
+    format_docstring,
     format_usage,
 )
 from .inline_text import InlineText
