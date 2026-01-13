@@ -236,7 +236,8 @@ def _parse_kw_and_flags(
                         raise CombinedShortOptionError(
                             msg=f"Cannot combine multiple value-taking options in token {cli_option}"
                         )
-                tokens_per_element, consume_all = match.argument.token_count(match.keys)
+                upcoming = tokens[i + 1 :]
+                tokens_per_element, consume_all = match.argument.token_count(match.keys, upcoming_tokens=upcoming)
 
                 # Consume the appropriate number of tokens
                 with suppress(IndexError):
@@ -358,7 +359,8 @@ def _parse_pos(
                         token=tokens_and_force_positional[0][0],
                     )
 
-        tokens_per_element, consume_all = argument.token_count()
+        upcoming = [t[0] for t in tokens_and_force_positional]
+        tokens_per_element, consume_all = argument.token_count(upcoming_tokens=upcoming)
         tokens_per_element = max(1, tokens_per_element)
 
         if consume_all and argument.field_info.kind is POSITIONAL_ONLY:

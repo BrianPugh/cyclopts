@@ -94,9 +94,10 @@ def test_token_count_union():
     assert (1, False) == token_count(Union[int, str, float])
 
 
-def test_token_count_union_error():
-    with pytest.raises(ValueError):
-        assert (1, False) == token_count(Union[int, tuple[int, int]])
+def test_token_count_union_multi_token():
+    # Union with mixed token counts: first multi-token type (tc > 1) determines count
+    # int has tc=1, tuple has tc=2. Tuple wins (left-to-right, stop at tc > 1).
+    assert (2, False) == token_count(Union[int, tuple[int, int]])
 
 
 def test_coerce_no_tokens():

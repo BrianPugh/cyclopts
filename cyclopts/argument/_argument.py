@@ -642,6 +642,18 @@ class Argument:
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
 
+                # Handle negative_none flag: implicit_value=None for Optional types
+                # Use self.hint (not self.resolved_hint) to preserve Optional/Union
+                if token.implicit_value is None:
+                    hint = self.hint
+                    if is_union(hint):
+                        if any(is_nonetype(arg) or arg is None for arg in get_args(hint)):
+                            assert len(expanded_tokens) == 1
+                            return None
+                    elif is_nonetype(hint) or hint is None:
+                        assert len(expanded_tokens) == 1
+                        return None
+
                 if token.keys:
                     lookup = keyword
                     for key in token.keys[:-1]:
@@ -840,7 +852,7 @@ class Argument:
             self.validate(self.field_info.default)
         return val
 
-    def token_count(self, keys: tuple[str, ...] = ()):
+    def token_count(self, keys: tuple[str, ...] = (), upcoming_tokens: Sequence[str] | None = None):
         """The number of string tokens this argument consumes.
 
         Parameters
@@ -849,6 +861,8 @@ class Argument:
             The **python** keys into this argument.
             If provided, returns the number of string tokens that specific
             data type within the argument consumes.
+        upcoming_tokens: Sequence[str] | None
+            Optional sequence of upcoming CLI tokens for token-aware parsing.
 
         Returns
         -------
@@ -889,7 +903,7 @@ class Argument:
             hint = self.hint
             if self._enum_flag_type and not keys:
                 return 1, True
-        tokens_per_element, consume_all = token_count(hint)
+        tokens_per_element, consume_all = token_count(hint, upcoming_tokens=upcoming_tokens)
         return tokens_per_element, consume_all
 
     @property

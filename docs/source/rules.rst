@@ -170,9 +170,98 @@ This is particularly useful for resetting a parameter to its unset state, or for
 
 .. note::
    **Union ordering matters.** For union types, Cyclopts iterates left-to-right and uses the first
-   successful coercion. If ``str`` appears before ``None`` in a union (e.g., ``str | None``),
+   successful coercion (see :ref:`Union <Coercion Rules - Union>`). If ``str`` appears before ``None`` in a union (e.g., ``str | None``),
    the string ``"none"`` will be parsed as the literal string ``"none"`` because ``str`` coercion
-   succeeds first. See Union_ for more details.
+   succeeds first.
+
+**Optional Iterables:**
+For types like ``list[T] | None``, union ordering **matters**.
+The type that comes first in the union gets first priority.
+
+* ``list[T] | None`` - The list comes first, so tokens go to the list. The ``"none"``/``"null"`` to :obj:`None` conversion applies to individual list *elements* (when ``T`` allows :obj:`None`).
+* ``None | list[T]`` - :obj:`None` comes first, so ``"none"``/``"null"`` tokens match :obj:`None` directly. To get a list, provide non-none tokens.
+
+To get :obj:`None` for the entire value:
+
+* Put :obj:`None` first in the union (e.g., ``None | list[T]``) and provide ``"none"``
+* Omit the argument entirely (use the default value)
+* Use a :attr:`negative flag <.Parameter.negative_none>` (e.g., ``--no-values``)
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(values: list[int | None] | None = None):
+       print(f"{values=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program
+   values=None
+
+   $ my-program 1 2 3
+   values=[1, 2, 3]
+
+   $ my-program 1 none 3
+   values=[1, None, 3]
+
+   $ my-program none
+   values=[None]
+
+   $ my-program --no-values
+   values=None
+
+With ``None`` first in the union:
+
+.. code-block:: python
+
+   @app.default
+   def default(values: None | list[int | None] = None):
+       print(f"{values=}")
+
+.. code-block:: console
+
+   $ my-program none
+   values=None
+
+   $ my-program 1 2 3
+   values=[1, 2, 3]
+
+**Multi-Token Types:**
+For unions with multi-token types (like ``tuple[int, int]``), the multi-token type dominates
+when it comes first. Single-token types (like :obj:`None`, :obj:`~typing.Literal`, or :class:`~enum.Enum`)
+must come **before** multi-token types to be matched:
+
+* ``None | tuple[int, int]`` - :obj:`None` comes first, so ``"none"`` becomes :obj:`None`.
+* ``tuple[int, int] | None`` - ``tuple`` comes first and expects 2 tokens, so ``"none"`` fails.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(config: None | tuple[int, int] = None):
+       print(f"{config=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program 10 20
+   config=(10, 20)
+
+   $ my-program none
+   config=None
+
+   $ my-program
+   config=None
 
 ****
 Bool
@@ -629,6 +718,66 @@ Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typ
    │ into one of {'foo', 'bar', 3}.                          │
    ╰─────────────────────────────────────────────────────────╯
 
+
+**Multi-Token Type Unions:**
+:obj:`~typing.Literal` types can be combined with multi-token types (like ``tuple[int, int]``) to provide preset options alongside custom values.
+**Union ordering matters**: the :obj:`~typing.Literal` must come **before** the multi-token type to be matched.
+
+.. code-block:: python
+
+   from cyclopts import App
+   from typing import Literal
+
+   app = App()
+
+   @app.default
+   def default(config: Literal["small", "large"] | tuple[int, int] = "small"):
+       print(f"{config=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program small
+   config='small'
+
+   $ my-program large
+   config='large'
+
+   $ my-program 1920 1080
+   config=(1920, 1080)
+
+This is useful for providing preset configurations while allowing custom values:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from typing import Literal
+
+   app = App()
+
+   @app.default
+   def resize(dimensions: Literal["hd", "4k"] | tuple[int, int] = "hd"):
+       if dimensions == "hd":
+           dimensions = (1920, 1080)
+       elif dimensions == "4k":
+           dimensions = (3840, 2160)
+       print(f"Resizing to {dimensions[0]}x{dimensions[1]}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program hd
+   Resizing to 1920x1080
+
+   $ my-program 800 600
+   Resizing to 800x600
+
+.. note::
+   :obj:`~typing.Literal` matching is **case-sensitive**. The token must exactly match one of the literal values.
+   If the multi-token type comes first (e.g., ``tuple[int, int] | Literal["hd"]``), the Literal won't match because
+   ``tuple`` expects 2 tokens.
 
 ****
 Enum

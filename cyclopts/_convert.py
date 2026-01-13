@@ -591,7 +591,19 @@ def _convert(
     elif is_union(origin_type):
         for t in inner_types:
             try:
-                out = convert(t, token)
+                # When token is a sequence (e.g., list of Token objects), we may need
+                # to unpack it for single-token types. Decide per-member based on that
+                # member's token_count, not globally.
+                if isinstance(token, Sequence) and len(token) == 1:
+                    tc, consume_all = token_count(t)
+                    if consume_all or tc > 1:
+                        # This type wants multiple tokens or all tokens - pass full list
+                        out = convert(t, token)
+                    else:
+                        # Single-token type - unpack the sequence
+                        out = convert(t, token[0])
+                else:
+                    out = convert(t, token)
                 break
             except ValidationError:
                 # ValidationError means coercion succeeded but the value failed validation.
@@ -858,7 +870,11 @@ def convert(
             raise NotImplementedError("Unreachable?")
 
 
-def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, bool]:
+def token_count(
+    type_: Any,
+    skip_converter_params: bool = False,
+    upcoming_tokens: Sequence[str] | None = None,
+) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -868,6 +884,10 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
     skip_converter_params: bool
         If True, don't extract converter parameters from __cyclopts__.
         Used to prevent infinite recursion when determining consume_all behavior.
+    upcoming_tokens: Sequence[str] | None
+        Optional sequence of upcoming CLI tokens. If provided and the first token
+        is a none-string ("none"/"null"), enables special handling for Optional
+        multi-token types where None comes first in the union.
 
     Returns
     -------
@@ -877,6 +897,36 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
+    # Token-aware handling for unions: iterate left-to-right checking for 1-token matches.
+    # Stop when we hit a multi-token type (tc > 1). This must happen BEFORE get_parameters()
+    # which strips Optional via resolve_optional().
+    if upcoming_tokens and len(upcoming_tokens) >= 1 and is_union(type_):
+        first_token = upcoming_tokens[0]
+        first_token_lower = first_token.lower()
+        is_none_string = first_token_lower in ("none", "null")
+
+        for arg in get_args(type_):
+            # Check for 1-token sentinel matches (in order)
+            if is_nonetype(arg) and is_none_string:
+                return 1, False
+
+            if get_origin(arg) is Literal:
+                # Check if token matches any string literal value
+                if first_token in get_args(arg):
+                    return 1, False
+
+            if isinstance(arg, type) and issubclass(arg, Enum) and not issubclass(arg, Flag):
+                # Check if token matches any enum member name (case-insensitive)
+                if any(first_token_lower == m.name.lower() for m in arg):
+                    return 1, False
+
+            # Get this type's token count
+            tc, consume_all = token_count(arg)  # No upcoming_tokens to avoid recursion
+            if tc > 1 or consume_all:
+                # Multi-token or consume_all type - stop checking, use this type's token count
+                return tc, consume_all
+            # tc == 1 and not consume_all: single-token type, continue to next union member
+
     # Check for explicit n_tokens in Parameter annotation before resolving
     # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
     from cyclopts.parameter import get_parameters
@@ -929,19 +979,20 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return token_count(type_.__value__)
     elif is_union(type_):
-        # Filter out NoneType to avoid token count conflicts (e.g., bool consumes 0, None consumes 1)
-        sub_args = [t for t in get_args(type_) if not is_nonetype(t)]
-        if not sub_args:
-            # Edge case: Union containing only NoneType
-            return 1, False
-        token_count_target = token_count(sub_args[0])
-        for sub_type_ in sub_args[1:]:
-            this = token_count(sub_type_)
-            if this != token_count_target:
-                raise ValueError(
-                    f"Cannot Union types that consume different numbers of tokens: {sub_args[0]} {sub_type_}"
-                )
-        return token_count_target
+        # Iterate left-to-right: first multi-token type (tc > 1) determines token count.
+        # If no multi-token type, check for consume_all types (e.g., list, set).
+        args = get_args(type_)
+        for arg in args:
+            tc, consume_all = token_count(arg)
+            if tc > 1:
+                return tc, consume_all
+        # Second pass: check for consume_all types
+        for arg in args:
+            tc, consume_all = token_count(arg)
+            if consume_all:
+                return tc, consume_all
+        # All types are single-token, non-consume_all
+        return 1, False
     elif is_builtin(type_):
         # Many builtins actually take in VAR_POSITIONAL when we really just want 1 argument.
         return 1, False
