@@ -915,6 +915,68 @@ def convert(
             raise NotImplementedError("Unreachable?")
 
 
+def _try_union_conversion(
+    union_args: tuple[Any, ...],
+    upcoming_tokens: Sequence[str],
+    name_transform: Callable[[str], str] = default_name_transform,
+) -> tuple[int, bool] | None:
+    """Try to determine token count for a union type by attempting conversion.
+
+    Iterates through union args left-to-right, attempting conversion with the
+    upcoming tokens. Returns the token count for the first type that successfully
+    converts.
+
+    Parameters
+    ----------
+    union_args
+        The type arguments of the union (from get_args()).
+    upcoming_tokens
+        Sequence of upcoming CLI tokens to try converting.
+    name_transform
+        Name transform function for conversion.
+
+    Returns
+    -------
+    tuple[int, bool] | None
+        (token_count, consume_all) if a type successfully converts, None otherwise.
+    """
+    from cyclopts.argument import Token
+
+    for arg in union_args:
+        # Pass upcoming_tokens for nested unions
+        tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
+
+        # Determine tokens to try for conversion
+        if consume_all:
+            tokens_to_try = upcoming_tokens
+        else:
+            if tc > len(upcoming_tokens):
+                continue  # Not enough tokens for this type
+            tokens_to_try = upcoming_tokens[:tc]
+
+        if not tokens_to_try:
+            continue
+
+        # Create Token object(s) for conversion
+        if len(tokens_to_try) == 1:
+            token_input: Token | list[Token] = Token(value=tokens_to_try[0])
+        else:
+            token_input = [Token(value=t) for t in tokens_to_try]
+
+        try:
+            _convert(arg, token_input, converter=None, name_transform=name_transform)
+            return tc, consume_all
+        except ValidationError:
+            # ValidationError means coercion succeeded but validation failed.
+            # Return this type's token count - the actual conversion (with proper
+            # argument context) will raise the error with full details.
+            return tc, consume_all
+        except Exception:
+            continue
+
+    return None
+
+
 def token_count(
     type_: Any,
     skip_converter_params: bool = False,
@@ -948,39 +1010,9 @@ def token_count(
     # get_parameters() strips None from Optional unions via resolve_optional().
     # For Annotated unions, we handle them in the later is_union() block.
     if upcoming_tokens and is_union(type_):
-        from cyclopts.argument import Token
-
-        for arg in get_args(type_):
-            # Pass upcoming_tokens for nested unions
-            tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
-
-            # Determine tokens to try for conversion
-            if consume_all:
-                tokens_to_try = upcoming_tokens
-            else:
-                if tc > len(upcoming_tokens):
-                    continue  # Not enough tokens for this type
-                tokens_to_try = upcoming_tokens[:tc]
-
-            if not tokens_to_try:
-                continue
-
-            # Create Token object(s) for conversion
-            if len(tokens_to_try) == 1:
-                token_input = Token(value=tokens_to_try[0])
-            else:
-                token_input = [Token(value=t) for t in tokens_to_try]
-
-            try:
-                _convert(arg, token_input, converter=None, name_transform=default_name_transform)
-                return tc, consume_all
-            except ValidationError:
-                # ValidationError means coercion succeeded but validation failed.
-                # Return this type's token count - the actual conversion (with proper
-                # argument context) will raise the error with full details.
-                return tc, consume_all
-            except Exception:
-                continue
+        result = _try_union_conversion(get_args(type_), upcoming_tokens)
+        if result is not None:
+            return result
         return 1, False
 
     # Check for explicit n_tokens in Parameter annotation before resolving
@@ -1039,47 +1071,16 @@ def token_count(
         args = get_args(type_)
 
         # If we have upcoming tokens, try conversion-based token counting.
-        # We try all types and pick the one that consumes the most tokens (best-fit).
         if upcoming_tokens:
-            from cyclopts.argument import Token
-
             # Extract name_transform from parent parameters
             name_transform = default_name_transform
             for param in parameters:
                 if param.name_transform is not None:
                     name_transform = param.name_transform
 
-            for arg in args:
-                # Pass upcoming_tokens for nested unions
-                tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
-
-                # Determine tokens to try for conversion
-                if consume_all:
-                    tokens_to_try = upcoming_tokens
-                else:
-                    if tc > len(upcoming_tokens):
-                        continue  # Not enough tokens for this type
-                    tokens_to_try = upcoming_tokens[:tc]
-
-                if not tokens_to_try:
-                    continue
-
-                # Create Token object(s) for conversion
-                if len(tokens_to_try) == 1:
-                    token_input = Token(value=tokens_to_try[0])
-                else:
-                    token_input = [Token(value=t) for t in tokens_to_try]
-
-                try:
-                    _convert(arg, token_input, converter=None, name_transform=name_transform)
-                    return tc, consume_all
-                except ValidationError:
-                    # ValidationError means coercion succeeded but validation failed.
-                    # Return this type's token count - the actual conversion (with proper
-                    # argument context) will raise the error with full details.
-                    return tc, consume_all
-                except Exception:
-                    continue
+            result = _try_union_conversion(args, upcoming_tokens, name_transform)
+            if result is not None:
+                return result
             return 1, False
 
         # Fallback without upcoming tokens: use structural analysis.
