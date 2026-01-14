@@ -232,37 +232,6 @@ With ``None`` first in the union:
    $ my-program 1 2 3
    values=[1, 2, 3]
 
-**Multi-Token Types:**
-For unions with multi-token types (like ``tuple[int, int]``), the multi-token type dominates
-when it comes first. Single-token types (like :obj:`None`, :obj:`~typing.Literal`, or :class:`~enum.Enum`)
-must come **before** multi-token types to be matched:
-
-* ``None | tuple[int, int]`` - :obj:`None` comes first, so ``"none"`` becomes :obj:`None`.
-* ``tuple[int, int] | None`` - ``tuple`` comes first and expects 2 tokens, so ``"none"`` fails.
-
-.. code-block:: python
-
-   from cyclopts import App
-
-   app = App()
-
-   @app.default
-   def default(config: None | tuple[int, int] = None):
-       print(f"{config=}")
-
-   app()
-
-.. code-block:: console
-
-   $ my-program 10 20
-   config=(10, 20)
-
-   $ my-program none
-   config=None
-
-   $ my-program
-   config=None
-
 ****
 Bool
 ****
@@ -671,6 +640,41 @@ The unioned types will be iterated **left-to-right** until a successful coercion
 
     $ my-program bar
     <class 'str'>
+
+^^^^^^^^^^^^^^^^^^^^^^^
+Multi-Token Type Unions
+^^^^^^^^^^^^^^^^^^^^^^^
+When a union contains types that consume different numbers of tokens (e.g., ``tuple[int, int]`` consumes 2, while ``int`` consumes 1),
+the first multi-token type determines how many tokens are consumed.
+Single-token types (like :obj:`None`, :obj:`~typing.Literal`, or :class:`~enum.Enum`) must come **before** multi-token types to be matched:
+
+* ``int | tuple[int, int]`` - Providing ``"5"`` works (int consumes 1 token). Providing ``"1 2"`` works (tuple consumes 2 tokens).
+* ``Literal["auto"] | tuple[int, int]`` - Providing ``"auto"`` works (Literal matched first). Providing ``"1 2"`` works (tuple fallback).
+* ``tuple[int, int] | Literal["auto"]`` - Providing ``"auto"`` **fails** because ``tuple`` comes first and expects 2 tokens.
+
+.. code-block:: python
+
+   from cyclopts import App
+   from typing import Literal
+
+   app = App()
+
+   @app.default
+   def default(config: Literal["auto"] | tuple[int, int] = "auto"):
+       print(f"{config=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program auto
+   config='auto'
+
+   $ my-program 10 20
+   config=(10, 20)
+
+   $ my-program
+   config='auto'
 
 
 ********

@@ -337,3 +337,38 @@ def test_bind_literal_case_sensitive(app, assert_parse_args):
     # Wrong case fails (tries tuple, which needs 2 tokens)
     with pytest.raises(MissingArgumentError):
         app.parse_args(["preset"], exit_on_error=False)
+
+
+def test_bind_int_or_tuple_coercion(app, assert_parse_args):
+    """Test int | tuple[str, int]: first token coercion determines token count.
+
+    When first token can be coerced to int, consume 1 token.
+    When first token cannot be coerced to int, fall back to tuple (2 tokens).
+    """
+
+    @app.default
+    def default(value: int | tuple[str, int] = 5):
+        pass
+
+    # Int works - single token
+    assert_parse_args(default, "42", 42)
+
+    # Non-int first token triggers tuple fallback - two tokens
+    assert_parse_args(default, "foo 10", ("foo", 10))
+
+    # Default works
+    assert_parse_args(default, "")
+
+
+def test_bind_str_or_tuple(app, assert_parse_args):
+    """Test str | tuple[int, int]: str can accept any string, so always uses 1 token."""
+
+    @app.default
+    def default(value: str | tuple[int, int]):
+        pass
+
+    # str accepts "foo" - single token
+    assert_parse_args(default, "foo", "foo")
+
+    # str also accepts "10" - single token (str comes first)
+    assert_parse_args(default, "10", "10")

@@ -28,7 +28,6 @@ from cyclopts.annotations import (
     NoneType,
     is_annotated,
     is_enum_flag,
-    is_nonetype,
     is_union,
     resolve,
     resolve_optional,
@@ -897,39 +896,29 @@ def token_count(
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
-    # Token-aware handling for unions: iterate left-to-right checking for 1-token matches.
-    # Stop when we hit a multi-token type (tc > 1). This must happen BEFORE get_parameters()
-    # which strips Optional via resolve_optional().
-    if upcoming_tokens and len(upcoming_tokens) >= 1 and is_union(type_):
-        first_token = upcoming_tokens[0]
-        first_token_lower = first_token.lower()
-        is_none_string = first_token_lower in ("none", "null")
+    from cyclopts.parameter import get_parameters
+
+    # Token-aware union handling MUST happen before get_parameters() because
+    # get_parameters() strips None from Optional unions via resolve_optional().
+    # For Annotated unions, we handle them in the later is_union() block.
+    if upcoming_tokens and is_union(type_):
+        from cyclopts.argument import Token
+
+        first_token_obj = Token(value=upcoming_tokens[0])
 
         for arg in get_args(type_):
-            # Check for 1-token sentinel matches (in order)
-            if is_nonetype(arg) and is_none_string:
-                return 1, False
-
-            if get_origin(arg) is Literal:
-                # Check if token matches any string literal value
-                if first_token in get_args(arg):
-                    return 1, False
-
-            if isinstance(arg, type) and issubclass(arg, Enum) and not issubclass(arg, Flag):
-                # Check if token matches any enum member name (case-insensitive)
-                if any(first_token_lower == m.name.lower() for m in arg):
-                    return 1, False
-
-            # Get this type's token count
-            tc, consume_all = token_count(arg)  # No upcoming_tokens to avoid recursion
+            tc, consume_all = token_count(arg)
             if tc > 1 or consume_all:
-                # Multi-token or consume_all type - stop checking, use this type's token count
                 return tc, consume_all
-            # tc == 1 and not consume_all: single-token type, continue to next union member
+            try:
+                _convert(arg, first_token_obj, converter=None, name_transform=default_name_transform)
+                return 1, False
+            except Exception:
+                continue
+        return 1, False
 
     # Check for explicit n_tokens in Parameter annotation before resolving
     # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
-    from cyclopts.parameter import get_parameters
 
     resolved_type, parameters = get_parameters(type_, skip_converter_params=skip_converter_params)
     for param in parameters:
@@ -937,6 +926,8 @@ def token_count(
             if param.n_tokens == -1:
                 return 1, True
             else:
+                # We still need to determine if we should consume_all or not.
+                #
                 # Recursively determine consume_all from the type's natural structure.
                 # Only recurse if the type has changed (e.g., Annotated wrapper was removed).
                 # If resolved_type is the same as type_, recursing would cause infinite loop.
@@ -979,9 +970,36 @@ def token_count(
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return token_count(type_.__value__)
     elif is_union(type_):
-        # Iterate left-to-right: first multi-token type (tc > 1) determines token count.
-        # If no multi-token type, check for consume_all types (e.g., list, set).
         args = get_args(type_)
+
+        # If we have upcoming tokens, try conversion-based token counting.
+        # Iterate left-to-right, trying to convert the first token with each
+        # single-token type. Stop when we hit a multi-token or consume_all type.
+        if upcoming_tokens:
+            from cyclopts.argument import Token
+
+            first_token_obj = Token(value=upcoming_tokens[0])
+
+            # Extract name_transform from parent parameters
+            name_transform = default_name_transform
+            for param in parameters:
+                if param.name_transform is not None:
+                    name_transform = param.name_transform
+
+            for arg in args:
+                tc, consume_all = token_count(arg)
+                if tc > 1 or consume_all:
+                    return tc, consume_all
+                # Single-token type: check if conversion succeeds
+                try:
+                    _convert(arg, first_token_obj, converter=None, name_transform=name_transform)
+                    return 1, False
+                except Exception:
+                    continue
+            return 1, False
+
+        # Fallback without upcoming tokens: use structural analysis.
+        # First multi-token type (tc > 1) determines token count.
         for arg in args:
             tc, consume_all = token_count(arg)
             if tc > 1:
