@@ -570,11 +570,7 @@ class Argument:
         from cyclopts.argument._collection import update_argument_collection
 
         if self.parameter.converter:
-            # Resolve string converters to methods on the type
-            if isinstance(self.parameter.converter, str):
-                converter = getattr(self.hint, self.parameter.converter)
-            else:
-                converter = self.parameter.converter
+            converter = self.parameter.resolve_converter(self.hint)
         elif converter is None:
             converter = partial(convert, name_transform=self.parameter.name_transform)
 

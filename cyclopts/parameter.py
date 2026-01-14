@@ -407,6 +407,33 @@ class Parameter:
             type_, parameters = get_parameters(type_)
             return type_, cls.combine(*default_parameters, *parameters)
 
+    def resolve_converter(self, type_: type) -> Callable | None:
+        """Resolve this parameter's converter, handling string converters.
+
+        If the converter is a string, it is looked up as a method on the given type.
+
+        Parameters
+        ----------
+        type_
+            The type to resolve string converters against.
+
+        Returns
+        -------
+        Callable | None
+            The resolved converter callable, or None if no converter is set.
+
+        Raises
+        ------
+        AttributeError
+            If the converter is a string and the method doesn't exist on the type.
+        """
+        if self.converter is None:
+            return None
+        if callable(self.converter):
+            return self.converter
+        # String converter - resolve to method on type (raises AttributeError if not found)
+        return getattr(type_, self.converter)
+
     def __call__(self, obj: T) -> T:
         """Decorator interface for annotating a function/class with a :class:`Parameter`.
 
@@ -529,11 +556,7 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     if not skip_converter_params:
         for param in annotated_params + type_cyclopts_config_params:
             if param.converter:
-                converter = param.converter
-
-                # Resolve string converters to methods on the type
-                if isinstance(converter, str):
-                    converter = getattr(hint, converter)
+                converter = param.resolve_converter(hint)
 
                 # Check for __cyclopts__ on the converter
                 if hasattr(converter, "__cyclopts__"):
