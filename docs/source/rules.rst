@@ -641,16 +641,28 @@ The unioned types will be iterated **left-to-right** until a successful coercion
     $ my-program bar
     <class 'str'>
 
+.. _Coercion Rules - Multi-Token Type Unions:
+
 ^^^^^^^^^^^^^^^^^^^^^^^
 Multi-Token Type Unions
 ^^^^^^^^^^^^^^^^^^^^^^^
 When a union contains types that consume different numbers of tokens (e.g., ``tuple[int, int]`` consumes 2, while ``int`` consumes 1),
-the first multi-token type determines how many tokens are consumed.
-Single-token types (like :obj:`None`, :obj:`~typing.Literal`, or :class:`~enum.Enum`) must come **before** multi-token types to be matched:
+Cyclopts uses **conversion-based token counting** with **left-to-right priority**:
 
-* ``int | tuple[int, int]`` - Providing ``"5"`` works (int consumes 1 token). Providing ``"1 2"`` works (tuple consumes 2 tokens).
-* ``Literal["auto"] | tuple[int, int]`` - Providing ``"auto"`` works (Literal matched first). Providing ``"1 2"`` works (tuple fallback).
-* ``tuple[int, int] | Literal["auto"]`` - Providing ``"auto"`` **fails** because ``tuple`` comes first and expects 2 tokens.
+1. Types are tried left-to-right
+2. Types that need more tokens than available are **skipped**
+3. For each candidate type, Cyclopts attempts conversion; the **first type that successfully converts** wins
+
+By example:
+
+* ``int | tuple[int, int]`` with ``"5"`` - int converts successfully, result is ``5``.
+* ``int | tuple[int, int]`` with ``"1 2"`` - int converts ``"1"`` successfully, leaving ``"2"`` **unused** (error). To use the tuple, place it first or ensure the first token can't convert to int.
+* ``tuple[int, int] | int`` with ``"1 2"`` - tuple converts both tokens, result is ``(1, 2)``.
+* ``tuple[int, int] | int`` with ``"5"`` - tuple needs 2 tokens but only 1 available, **skipped**; int converts ``"5"``, result is ``5``.
+* ``Literal["auto"] | tuple[int, int]`` with ``"auto"`` - Literal matches, result is ``"auto"``.
+* ``Literal["auto"] | tuple[int, int]`` with ``"1 2"`` - Literal doesn't match ``"1"``, tuple converts both, result is ``(1, 2)``.
+* ``tuple[int, int] | Literal["auto"]`` with ``"auto"`` - tuple needs 2 tokens but only 1 available, **skipped**; Literal matches, result is ``"auto"``.
+* ``tuple[int, int] | Literal["auto"]`` with ``"1 2"`` - tuple converts both tokens, result is ``(1, 2)``.
 
 .. code-block:: python
 
@@ -723,65 +735,8 @@ Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typ
    ╰─────────────────────────────────────────────────────────╯
 
 
-**Multi-Token Type Unions:**
-:obj:`~typing.Literal` types can be combined with multi-token types (like ``tuple[int, int]``) to provide preset options alongside custom values.
-**Union ordering matters**: the :obj:`~typing.Literal` must come **before** the multi-token type to be matched.
-
-.. code-block:: python
-
-   from cyclopts import App
-   from typing import Literal
-
-   app = App()
-
-   @app.default
-   def default(config: Literal["small", "large"] | tuple[int, int] = "small"):
-       print(f"{config=}")
-
-   app()
-
-.. code-block:: console
-
-   $ my-program small
-   config='small'
-
-   $ my-program large
-   config='large'
-
-   $ my-program 1920 1080
-   config=(1920, 1080)
-
-This is useful for providing preset configurations while allowing custom values:
-
-.. code-block:: python
-
-   from cyclopts import App
-   from typing import Literal
-
-   app = App()
-
-   @app.default
-   def resize(dimensions: Literal["hd", "4k"] | tuple[int, int] = "hd"):
-       if dimensions == "hd":
-           dimensions = (1920, 1080)
-       elif dimensions == "4k":
-           dimensions = (3840, 2160)
-       print(f"Resizing to {dimensions[0]}x{dimensions[1]}")
-
-   app()
-
-.. code-block:: console
-
-   $ my-program hd
-   Resizing to 1920x1080
-
-   $ my-program 800 600
-   Resizing to 800x600
-
 .. note::
    :obj:`~typing.Literal` matching is **case-sensitive**. The token must exactly match one of the literal values.
-   If the multi-token type comes first (e.g., ``tuple[int, int] | Literal["hd"]``), the Literal won't match because
-   ``tuple`` expects 2 tokens.
 
 ****
 Enum

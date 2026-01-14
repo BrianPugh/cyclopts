@@ -860,8 +860,13 @@ def convert(
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
-        tokens_per_element, _ = token_count(type_)
-        if tokens_per_element == 1:
+        # Pass tokens to token_count for consistent union type resolution
+        upcoming: list[str] = [t.value if hasattr(t, "value") else str(t) for t in tokens]  # pyright: ignore[reportAttributeAccessIssue]
+        tokens_per_element, consume_all = token_count(type_, upcoming_tokens=upcoming)
+        if consume_all:
+            # For consume_all types (like list[T] in unions), process all tokens together
+            return convert_priv(type_, tokens)  # pyright: ignore
+        elif tokens_per_element == 1:
             return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
         elif len(tokens) == tokens_per_element:
             return convert_priv(type_, tokens)  # pyright: ignore
@@ -904,15 +909,35 @@ def token_count(
     if upcoming_tokens and is_union(type_):
         from cyclopts.argument import Token
 
-        first_token_obj = Token(value=upcoming_tokens[0])
-
         for arg in get_args(type_):
-            tc, consume_all = token_count(arg)
-            if tc > 1 or consume_all:
-                return tc, consume_all
+            # Pass upcoming_tokens for nested unions
+            tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
+
+            # Determine tokens to try for conversion
+            if consume_all:
+                tokens_to_try = upcoming_tokens
+            else:
+                if tc > len(upcoming_tokens):
+                    continue  # Not enough tokens for this type
+                tokens_to_try = upcoming_tokens[:tc]
+
+            if not tokens_to_try:
+                continue
+
+            # Create Token object(s) for conversion
+            if len(tokens_to_try) == 1:
+                token_input = Token(value=tokens_to_try[0])
+            else:
+                token_input = [Token(value=t) for t in tokens_to_try]
+
             try:
-                _convert(arg, first_token_obj, converter=None, name_transform=default_name_transform)
-                return 1, False
+                _convert(arg, token_input, converter=None, name_transform=default_name_transform)
+                return tc, consume_all
+            except ValidationError:
+                # ValidationError means coercion succeeded but validation failed.
+                # Return this type's token count - the actual conversion (with proper
+                # argument context) will raise the error with full details.
+                return tc, consume_all
             except Exception:
                 continue
         return 1, False
@@ -973,12 +998,9 @@ def token_count(
         args = get_args(type_)
 
         # If we have upcoming tokens, try conversion-based token counting.
-        # Iterate left-to-right, trying to convert the first token with each
-        # single-token type. Stop when we hit a multi-token or consume_all type.
+        # We try all types and pick the one that consumes the most tokens (best-fit).
         if upcoming_tokens:
             from cyclopts.argument import Token
-
-            first_token_obj = Token(value=upcoming_tokens[0])
 
             # Extract name_transform from parent parameters
             name_transform = default_name_transform
@@ -987,13 +1009,34 @@ def token_count(
                     name_transform = param.name_transform
 
             for arg in args:
-                tc, consume_all = token_count(arg)
-                if tc > 1 or consume_all:
-                    return tc, consume_all
-                # Single-token type: check if conversion succeeds
+                # Pass upcoming_tokens for nested unions
+                tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
+
+                # Determine tokens to try for conversion
+                if consume_all:
+                    tokens_to_try = upcoming_tokens
+                else:
+                    if tc > len(upcoming_tokens):
+                        continue  # Not enough tokens for this type
+                    tokens_to_try = upcoming_tokens[:tc]
+
+                if not tokens_to_try:
+                    continue
+
+                # Create Token object(s) for conversion
+                if len(tokens_to_try) == 1:
+                    token_input = Token(value=tokens_to_try[0])
+                else:
+                    token_input = [Token(value=t) for t in tokens_to_try]
+
                 try:
-                    _convert(arg, first_token_obj, converter=None, name_transform=name_transform)
-                    return 1, False
+                    _convert(arg, token_input, converter=None, name_transform=name_transform)
+                    return tc, consume_all
+                except ValidationError:
+                    # ValidationError means coercion succeeded but validation failed.
+                    # Return this type's token count - the actual conversion (with proper
+                    # argument context) will raise the error with full details.
+                    return tc, consume_all
                 except Exception:
                     continue
             return 1, False

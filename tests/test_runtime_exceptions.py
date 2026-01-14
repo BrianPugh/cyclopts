@@ -185,7 +185,11 @@ def test_runtime_exception_missing_tuple(app, console):
     when insufficient tokens were supplied to a tuple type.
 
     https://github.com/BrianPugh/cyclopts/issues/443
+
+    With union type handling, if tuple needs 2 tokens but we have 1, we try
+    the next union member (None). If that also fails, we get CoercionError.
     """
+    from cyclopts.exceptions import CoercionError
 
     @app.default
     def main(
@@ -194,15 +198,17 @@ def test_runtime_exception_missing_tuple(app, console):
     ):
         pass
 
-    with console.capture() as capture, pytest.raises(MissingArgumentError):
+    # With the smarter union handling, "1" doesn't match tuple (needs 2 tokens)
+    # and doesn't match None (not "none"/"null"), so we get CoercionError
+    with console.capture() as capture, pytest.raises(CoercionError):
         app(["--network-delay", "1"], exit_on_error=False, error_console=console)
 
     actual = capture.get()
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Parameter "--network-delay" requires 2 positional arguments. Only  │
-        │ got 1.                                                             │
+        │ Invalid value for "--network-delay": unable to convert "1" into    │
+        │ tuple[int, int]|None.                                              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

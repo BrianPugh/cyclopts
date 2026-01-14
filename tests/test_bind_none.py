@@ -250,10 +250,11 @@ def test_bind_none_string_multi_token_none_first(app, assert_parse_args, none_st
 
 
 def test_bind_none_string_multi_token_tuple_first(app, assert_parse_args):
-    """Test tuple[int, int] | None: 'none' fails because tuple comes first and expects 2 tokens."""
-    import pytest as pt
+    """Test tuple[int, int] | None: 'none' works because None can handle it.
 
-    from cyclopts.exceptions import MissingArgumentError
+    Even though tuple comes first, it needs 2 tokens and we only have 1.
+    The algorithm skips tuple and finds that None can convert 'none'.
+    """
 
     @app.default
     def default(value: tuple[int, int] | None = None):
@@ -262,10 +263,8 @@ def test_bind_none_string_multi_token_tuple_first(app, assert_parse_args):
     # Normal tuple parsing still works
     assert_parse_args(default, "1 2", (1, 2))
 
-    # "none" fails - tuple expects 2 tokens, we only gave 1
-    # This raises MissingArgumentError at the binding stage (not CoercionError)
-    with pt.raises(MissingArgumentError):
-        app.parse_args(["none"], exit_on_error=False)
+    # "none" works - tuple needs 2 tokens but we have 1, so skip to None which handles it
+    assert_parse_args(default, "none", None)
 
 
 # Tests for Literal + multi-token type unions
@@ -296,19 +295,21 @@ def test_bind_literal_or_tuple(app, assert_parse_args, type_hint, literal_values
 
 
 def test_bind_tuple_or_literal_order_matters(app, assert_parse_args):
-    """Test tuple[int, int] | Literal["a"]: tuple comes first, so Literal won't match."""
-    from cyclopts.exceptions import MissingArgumentError
+    """Test tuple[int, int] | Literal["preset"]: both work based on token availability.
+
+    Tuple needs 2 tokens, Literal needs 1. If only 1 token is provided and it
+    matches the Literal, the Literal is used (tuple is skipped due to insufficient tokens).
+    """
 
     @app.default
     def default(config: tuple[int, int] | Literal["preset"]):  # pyright: ignore[reportInvalidTypeForm]
         pass
 
-    # Tuple works
+    # Tuple works with 2 tokens
     assert_parse_args(default, "10 20", (10, 20))
 
-    # Literal fails - tuple comes first and expects 2 tokens
-    with pytest.raises(MissingArgumentError):
-        app.parse_args(["preset"], exit_on_error=False)
+    # Literal works - tuple needs 2 tokens but we have 1, so skip to Literal which matches
+    assert_parse_args(default, "preset", "preset")
 
 
 def test_bind_literal_none_or_tuple(app, assert_parse_args):
@@ -326,7 +327,7 @@ def test_bind_literal_none_or_tuple(app, assert_parse_args):
 
 def test_bind_literal_case_sensitive(app, assert_parse_args):
     """Test that Literal matching is case-sensitive."""
-    from cyclopts.exceptions import MissingArgumentError
+    from cyclopts.exceptions import CoercionError
 
     @app.default
     def default(config: Literal["Preset"] | tuple[int, int]):
@@ -334,8 +335,9 @@ def test_bind_literal_case_sensitive(app, assert_parse_args):
 
     assert_parse_args(default, "Preset", "Preset")
 
-    # Wrong case fails (tries tuple, which needs 2 tokens)
-    with pytest.raises(MissingArgumentError):
+    # Wrong case fails - Literal doesn't match (case-sensitive), tuple needs 2 tokens
+    # but we have 1, so no type can handle the input → CoercionError
+    with pytest.raises(CoercionError):
         app.parse_args(["preset"], exit_on_error=False)
 
 
@@ -372,3 +374,195 @@ def test_bind_str_or_tuple(app, assert_parse_args):
 
     # str also accepts "10" - single token (str comes first)
     assert_parse_args(default, "10", "10")
+
+
+# Tests for multi-token type unions with different token counts
+
+
+def test_bind_tuple_different_sizes(app, assert_parse_args):
+    """Test tuple[int, int] | tuple[str, int, int]: left-to-right priority."""
+    from cyclopts.exceptions import UnusedCliTokensError
+
+    @app.default
+    def default(values: tuple[int, int] | tuple[str, int, int] = (1, 2)):
+        pass
+
+    # 2 int tokens → tuple[int, int] (first type succeeds)
+    assert_parse_args(default, "1 2", (1, 2))
+
+    # 3 tokens with non-int first → tuple[str, int, int]
+    # tuple[int, int] fails because "foo" can't convert to int
+    assert_parse_args(default, "foo 3 4", ("foo", 3, 4))
+
+    # 3 int tokens → tuple[int, int] takes first 2, leaves "5" unused
+    # Left-to-right priority: first successful type wins
+    with pytest.raises(UnusedCliTokensError):
+        app.parse_args(["3", "4", "5"], exit_on_error=False)
+
+    # Default works
+    assert_parse_args(default, "")
+
+
+def test_bind_tuple_sizes_order_matters(app, assert_parse_args):
+    """Test tuple[str, int, int] | tuple[int, int]: larger tuple first."""
+
+    @app.default
+    def default(values: tuple[str, int, int] | tuple[int, int]):
+        pass
+
+    # 3 tokens → tuple[str, int, int] (comes first, can consume all)
+    assert_parse_args(default, "foo 3 4", ("foo", 3, 4))
+
+    # 2 int tokens → tuple[str, int, int] fails (needs 3), tuple[int, int] succeeds
+    assert_parse_args(default, "1 2", (1, 2))
+
+
+def test_bind_list_or_tuple(app, assert_parse_args):
+    """Test list[int] | tuple[str, int]: consume_all vs fixed-count."""
+
+    @app.default
+    def default(values: list[int] | tuple[str, int]):
+        pass
+
+    # All ints → list[int] (consume_all)
+    assert_parse_args(default, "1 2 3", [1, 2, 3])
+
+    # Non-int first → list[int] fails, tuple[str, int] succeeds
+    assert_parse_args(default, "foo 42", ("foo", 42))
+
+
+def test_bind_tuple_or_list(app, assert_parse_args):
+    """Test tuple[str, int] | list[int]: left-to-right priority."""
+    from cyclopts.exceptions import UnusedCliTokensError
+
+    @app.default
+    def default(values: tuple[str, int] | list[int]):
+        pass
+
+    # 2 tokens with non-int first → tuple[str, int]
+    assert_parse_args(default, "foo 42", ("foo", 42))
+
+    # 2 int tokens → tuple[str, int] succeeds (left-to-right priority)
+    # "1" converts to str, "2" converts to int
+    assert_parse_args(default, "1 2", ("1", 2))
+
+    # 3 ints → tuple[str, int] takes first 2, leaves "3" unused
+    # Left-to-right priority: first successful type wins
+    with pytest.raises(UnusedCliTokensError):
+        app.parse_args(["1", "2", "3"], exit_on_error=False)
+
+
+def test_bind_nested_union(app, assert_parse_args):
+    """Test (int | str) | tuple[int, int]: nested union handling with left-to-right priority."""
+    from cyclopts.exceptions import UnusedCliTokensError
+
+    @app.default
+    def default(value: (int | str) | tuple[int, int]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    # Single int token → int (from inner union)
+    assert_parse_args(default, "42", 42)
+
+    # Single non-int token → str (from inner union)
+    assert_parse_args(default, "foo", "foo")
+
+    # Two int tokens → int succeeds on first token, leaves second unused
+    # Left-to-right priority: int comes first in the flattened union
+    with pytest.raises(UnusedCliTokensError):
+        app.parse_args(["1", "2"], exit_on_error=False)
+
+
+def test_bind_same_count_tuples(app, assert_parse_args):
+    """Test tuple[int, int] | tuple[str, str]: left-to-right tiebreaker for same token count."""
+
+    @app.default
+    def default(value: tuple[int, int] | tuple[str, str]):
+        pass
+
+    # Both tuples need 2 tokens. "1 2" can convert to both.
+    # Left-to-right priority: tuple[int, int] wins
+    assert_parse_args(default, "1 2", (1, 2))
+
+    # "foo bar" can only convert to tuple[str, str]
+    assert_parse_args(default, "foo bar", ("foo", "bar"))
+
+    # "1 foo" - tuple[int, int] fails (can't convert "foo" to int)
+    # tuple[str, str] succeeds
+    assert_parse_args(default, "1 foo", ("1", "foo"))
+
+
+def test_bind_not_enough_tokens_for_any_type(app):
+    """Test union where no type has enough tokens."""
+    from cyclopts.exceptions import CoercionError
+
+    @app.default
+    def default(value: tuple[int, int, int] | tuple[str, int, int]):
+        pass
+
+    # Only 1 token provided, both types need 3
+    # Results in CoercionError since no type can handle the input
+    with pytest.raises(CoercionError):
+        app.parse_args(["1"], exit_on_error=False)
+
+
+def test_bind_validation_error_in_union(app, assert_parse_args):
+    """Test validator behavior on inner union members.
+
+    Validators on inner union members (like Annotated[int, Parameter(validator=...)])
+    do not run during union type resolution. The union picks the first type that
+    can CONVERT successfully, regardless of whether validators would pass.
+    """
+    from cyclopts import Parameter, validators
+
+    @app.default
+    def default(value: Annotated[int, Parameter(validator=validators.Number(gt=10))] | str):
+        pass
+
+    # "5" converts to int successfully - validator doesn't block union resolution
+    # This documents current behavior: validators on inner union members
+    # don't participate in union type selection
+    assert_parse_args(default, "5", 5)
+
+    # "foo" can't convert to int, falls through to str
+    assert_parse_args(default, "foo", "foo")
+
+
+def test_bind_union_with_annotated_parameter(app, assert_parse_args):
+    """Test union types with Annotated and Parameter."""
+
+    @app.default
+    def default(value: Annotated[tuple[int, int] | None, Parameter(negative_none="no-")] = None):
+        pass
+
+    # Normal tuple parsing
+    assert_parse_args(default, "1 2", (1, 2))
+
+    # "none" string
+    assert_parse_args(default, "none", None)
+
+    # Negative flag
+    assert_parse_args(default, "--no-value", None)
+
+    # Default
+    assert_parse_args(default, "")
+
+
+def test_bind_enum_in_union(app, assert_parse_args):
+    """Test enum type in union with other types."""
+    from enum import Enum
+
+    class Color(Enum):
+        RED = "red"
+        GREEN = "green"
+        BLUE = "blue"
+
+    @app.default
+    def default(value: Color | int):
+        pass
+
+    # Enum value matches
+    assert_parse_args(default, "red", Color.RED)
+    assert_parse_args(default, "GREEN", Color.GREEN)
+
+    # Not an enum value, falls through to int
+    assert_parse_args(default, "42", 42)
