@@ -118,7 +118,7 @@ Delete a user.
 
 **Parameters:**
 
-``--force, --no-force, -f``
+``--force, -f, --no-force``
     Skip confirmation prompt. [Default: ``False``]
 
 ``--backup, --no-backup``

@@ -14,6 +14,7 @@ from attrs import define, field
 
 from cyclopts._convert import (
     ITERABLE_TYPES,
+    _validate_json_extra_keys,
     convert,
     instantiate_from_dict,
     token_count,
@@ -701,6 +702,7 @@ class Argument:
                         parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
                         raise CoercionError(token=token, target_type=self.hint) from e
+                    _validate_json_extra_keys(parsed_json, self.hint, token)
                     update_argument_collection(
                         {self.name.lstrip("-"): parsed_json},
                         token.source,
@@ -1088,9 +1090,23 @@ class Argument:
 
         error = exc.errors()[0]
         if error["type"] == "missing":
-            missing_argument = self.children_recursive.filter_by(keys_prefix=self.keys + error["loc"])[0]
-            raise MissingArgumentError(argument=missing_argument) from exc
-        elif isinstance(exc, pydantic.ValidationError):
+            # Try normal lookup first
+            loc = error["loc"]
+            missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + loc)
+
+            # For discriminated/tagged unions, Pydantic includes the discriminator value
+            # in the error location. e.g., for a Cat|Dog union discriminated by "type",
+            # a missing "rainbow" field on Cat will have loc=('cat', 'rainbow') instead
+            # of just ('rainbow'). Strip discriminator values to find the actual child.
+            while not missing_arguments and len(loc) > 1:
+                loc = loc[1:]
+                missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + loc)
+
+            if missing_arguments:
+                raise MissingArgumentError(argument=missing_arguments[0]) from exc
+            # Fall through to ValidationError if we can't find the missing argument
+
+        if isinstance(exc, pydantic.ValidationError):
             raise ValidationError(exception_message=str(exc), argument=self) from exc
         else:
             raise exc

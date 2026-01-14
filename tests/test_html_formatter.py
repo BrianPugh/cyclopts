@@ -25,8 +25,8 @@ def test_html_formatter_command_panel():
         format="command",
         title="Commands",
         entries=[
-            HelpEntry(names=("serve",), description="Start the server"),
-            HelpEntry(names=("build",), shorts=("-b",), description="Build the project"),
+            HelpEntry(positive_names=("serve",), description="Start the server"),
+            HelpEntry(positive_names=("build",), positive_shorts=("-b",), description="Build the project"),
         ],
     )
 
@@ -53,16 +53,16 @@ def test_html_formatter_parameter_panel():
         title="Parameters",
         entries=[
             HelpEntry(
-                names=("--port",),
-                shorts=("-p",),
+                positive_names=("--port",),
+                positive_shorts=("-p",),
                 description="Port number",
                 required=True,
                 type="int",
                 default="8080",
             ),
             HelpEntry(
-                names=("--verbose",),
-                shorts=("-v",),
+                positive_names=("--verbose",),
+                positive_shorts=("-v",),
                 description="Enable verbose mode",
                 required=False,
                 choices=("true", "false"),
@@ -96,7 +96,7 @@ def test_html_formatter_heading_level():
     """Test custom heading levels."""
     formatter = HtmlFormatter(heading_level=3)
     panel = HelpPanel(
-        format="command", title="Commands", entries=[HelpEntry(names=("test",), description="Test command")]
+        format="command", title="Commands", entries=[HelpEntry(positive_names=("test",), description="Test command")]
     )
 
     formatter(None, None, panel)
@@ -114,7 +114,7 @@ def test_html_formatter_with_panel_description():
         format="command",
         title="Commands",
         description="Available commands for the application",
-        entries=[HelpEntry(names=("test",), description="Test command")],
+        entries=[HelpEntry(positive_names=("test",), description="Test command")],
     )
 
     formatter(None, None, panel)
@@ -202,8 +202,8 @@ def test_parameter_table_with_all_metadata():
         title="Parameters",
         entries=[
             HelpEntry(
-                names=("--config",),
-                shorts=("-c",),
+                positive_names=("--config",),
+                positive_shorts=("-c",),
                 description="Configuration file path",
                 required=True,
                 type="Path",
@@ -234,14 +234,14 @@ def test_parameter_table_no_required_column():
         title="Options",
         entries=[
             HelpEntry(
-                names=("--debug",),
+                positive_names=("--debug",),
                 description="Enable debug mode",
                 type="bool",
                 default="False",
             ),
             HelpEntry(
-                names=("--quiet",),
-                shorts=("-q",),
+                positive_names=("--quiet",),
+                positive_shorts=("-q",),
                 description="Suppress output",
             ),
         ],
@@ -264,8 +264,8 @@ def test_command_with_no_description():
         format="command",
         title="Commands",
         entries=[
-            HelpEntry(names=("test",)),  # No description
-            HelpEntry(names=("run",), description="Run the application"),
+            HelpEntry(positive_names=("test",)),  # No description
+            HelpEntry(positive_names=("run",), description="Run the application"),
         ],
     )
 
@@ -284,7 +284,7 @@ def test_multiple_panels_accumulate():
 
     # First panel
     panel1 = HelpPanel(
-        format="command", title="Commands", entries=[HelpEntry(names=("help",), description="Show help")]
+        format="command", title="Commands", entries=[HelpEntry(positive_names=("help",), description="Show help")]
     )
 
     # Second panel
@@ -292,7 +292,7 @@ def test_multiple_panels_accumulate():
         format="parameter",
         title="Global Options",
         entries=[
-            HelpEntry(names=("--verbose",), description="Verbose output", type="bool"),
+            HelpEntry(positive_names=("--verbose",), description="Verbose output", type="bool"),
         ],
     )
 
@@ -317,7 +317,7 @@ def test_html_injection_prevention():
         title="Commands",
         entries=[
             HelpEntry(
-                names=("<script>alert('XSS')</script>",),
+                positive_names=("<script>alert('XSS')</script>",),
                 description="<b>Bold</b> and <i>italic</i> text",
             ),
         ],

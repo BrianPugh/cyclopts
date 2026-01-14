@@ -1082,8 +1082,8 @@ def test_plain_formatter_no_title(console: Console):
         description="",
         entries=[
             HelpEntry(
-                names=("--option",),
-                shorts=(),
+                positive_names=("--option",),
+                positive_shorts=(),
                 description="Test option",
                 default="value",
             )
@@ -1232,8 +1232,8 @@ def test_plain_formatter_command_only_shorts(console: Console):
         description="",
         entries=[
             HelpEntry(
-                names=(),
-                shorts=("-v", "-vv"),
+                positive_names=(),
+                positive_shorts=("-v", "-vv"),
                 description="Verbose output",
             )
         ],
@@ -1274,8 +1274,8 @@ def test_plain_formatter_rich_renderable(console: Console):
         description=table,
         entries=[
             HelpEntry(
-                names=("--option",),
-                shorts=(),
+                positive_names=("--option",),
+                positive_shorts=(),
                 description="Test",
             )
         ],
@@ -1309,8 +1309,8 @@ def test_plain_formatter_none_values(console: Console):
         description=None,
         entries=[
             HelpEntry(
-                names=("--test",),
-                shorts=(),
+                positive_names=("--test",),
+                positive_shorts=(),
                 description=None,  # No description
                 default=None,  # No default
             )
@@ -1348,8 +1348,8 @@ def test_plain_formatter_fallback_str_conversion(console: Console):
         description=CustomObject(),  # Object without __rich_console__ or .plain
         entries=[
             HelpEntry(
-                names=("--custom",),
-                shorts=(),
+                positive_names=("--custom",),
+                positive_shorts=(),
                 description=CustomObject(),
             )
         ],
@@ -1376,8 +1376,8 @@ def test_description_renderer_newline_metadata():
 
     # Create a test entry with metadata
     entry = HelpEntry(
-        names=("verbose",),
-        shorts=("--verbose",),
+        positive_names=("verbose",),
+        positive_shorts=("--verbose",),
         description="Enable verbose output",
         env_var=("VERBOSE", "VERB"),
         default="False",
@@ -1412,8 +1412,8 @@ def test_description_renderer_inline_metadata():
 
     # Create a test entry with metadata
     entry = HelpEntry(
-        names=("verbose",),
-        shorts=("--verbose",),
+        positive_names=("verbose",),
+        positive_shorts=("--verbose",),
         description="Enable verbose output",
         env_var=("VERBOSE",),
         default="False",
@@ -1523,7 +1523,7 @@ def test_description_renderer_no_extra_whitespace():
     from rich.console import Console
 
     entry = HelpEntry(
-        names=("test",),
+        positive_names=("test",),
         description="Test description",
         env_var=("TEST_VAR",),
         default="value",

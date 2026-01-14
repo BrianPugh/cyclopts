@@ -191,7 +191,11 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
         # Pydantic places ``Annotated`` data into pydantic.FieldInfo.metadata, while
         # pydantic.FieldInfo.annotation contains the "real" resolved type-hint.
         # We have to re-combine them into a single Annotated hint.
-        if pydantic_field.metadata:
+        # For discriminated unions, pydantic stores discriminator separately (not in metadata),
+        # so include pydantic_field itself to preserve the discriminator attribute.
+        if pydantic_field.discriminator:
+            annotation = Annotated[(pydantic_field.annotation, pydantic_field) + tuple(pydantic_field.metadata)]  # pyright: ignore
+        elif pydantic_field.metadata:
             annotation = Annotated[(pydantic_field.annotation,) + tuple(pydantic_field.metadata)]  # pyright: ignore
         else:
             annotation = pydantic_field.annotation

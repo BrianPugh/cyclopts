@@ -205,7 +205,7 @@ Delete a user.
 
 **Parameters:**
 
-``--force, --no-force, -f``
+``--force, -f, --no-force``
     Skip confirmation prompt. [Default: ``False``]
 
 ``--backup, --no-backup``
@@ -584,7 +584,7 @@ Stop the server.
 ``--timeout``
     Shutdown timeout in seconds. [Default: ``30``]
 
-``--force, --no-force, -f``
+``--force, -f, --no-force``
     Force immediate shutdown. [Default: ``False``]
 
 .. _cyclopts-complex-cli-server-restart:

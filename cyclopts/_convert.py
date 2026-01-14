@@ -304,6 +304,44 @@ def _convert_tuple(
     return out
 
 
+def _validate_json_extra_keys(
+    data: dict,
+    type_: type,
+    token: "Token | None" = None,
+) -> None:
+    """Validate that JSON data doesn't contain extra keys not in the type's fields.
+
+    Parameters
+    ----------
+    data : dict
+        The JSON dictionary to validate.
+    type_ : type
+        The target type (dataclass, etc.) to validate against.
+    token : Token | None
+        Optional token for error context.
+
+    Raises
+    ------
+    CoercionError
+        If the data contains keys not present in the type's fields.
+    """
+    field_infos = get_field_infos(type_)
+    # Collect all valid names including aliases (e.g., Pydantic camelCase aliases)
+    valid_names: set[str] = set()
+    for field_name, field_info in field_infos.items():
+        valid_names.add(field_name)
+        valid_names.update(field_info.names)
+    extra_keys = set(data.keys()) - valid_names
+    if extra_keys:
+        extra_key = sorted(extra_keys)[0]  # Report first extra key alphabetically for determinism
+        valid_fields = ", ".join(sorted(field_infos.keys()))
+        raise CoercionError(
+            msg=f'Unknown field "{extra_key}" in JSON for {type_.__name__}. Valid fields: {valid_fields}',
+            target_type=type_,
+            token=token,
+        )
+
+
 def _convert_json(
     type_: Any,
     data: dict,
@@ -331,6 +369,9 @@ def _convert_json(
     Instance of type_ with properly converted field values.
     """
     from cyclopts.token import Token
+
+    # Validate no extra keys in JSON data
+    _validate_json_extra_keys(data, type_)
 
     converted_data = {}
     for field_name, field_info in field_infos.items():

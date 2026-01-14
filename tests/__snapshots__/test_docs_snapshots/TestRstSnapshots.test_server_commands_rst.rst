@@ -18,7 +18,7 @@ Complex CLI application for comprehensive documentation testing.
 ``--verbose, -v``
     Verbosity level (-v, -vv, -vvv). [Default: ``0``]
 
-``--quiet, --no-quiet, -q``
+``--quiet, -q, --no-quiet``
     Suppress non-essential output. [Default: ``False``]
 
 ``--log-level``
@@ -111,7 +111,7 @@ Stop the server.
 ``--timeout``
     Shutdown timeout in seconds. [Default: ``30``]
 
-``--force, --no-force, -f``
+``--force, -f, --no-force``
     Force immediate shutdown. [Default: ``False``]
 
 .. _cyclopts-complex-cli-server-restart:

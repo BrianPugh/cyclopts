@@ -267,7 +267,9 @@ Bool
 
    * If the token is a **false-like value** ``{"no", "n", "0", "false", "f"}``, then it is parsed as :obj:`False`.
 
-   * Otherwise, a :exc:`CoercionError` will be raised.
+   * Otherwise, a :exc:`.CoercionError` will be raised.
+
+   Cyclopts is stricter than traditional :class:`bool` casting; the provided value **must** be one of the above. For example, ``2`` is **not** considered a true-like value and will raise an error.
 
    .. code-block:: console
 
@@ -276,6 +278,12 @@ Bool
 
       $ my-program foo 0
       False
+
+      $ my-program foo 2
+      ╭─ Error ───────────────────────────────────────╮
+      │ Invalid value for "--my-flag": unable to      │
+      │ convert "2" into bool.                        │
+      ╰───────────────────────────────────────────────╯
 
       $ my-program foo not-a-true-or-false-value
       ╭─ Error ─────────────────────────────────────────────────╮
@@ -324,7 +332,7 @@ Positional
 When arguments are provided positionally:
 
 * If :attr:`.Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will stop parsing for this parameter.
-  If the number of consumed tokens is not a multiple of the required number of tokens to create an element of the list, a :exc:`MissingArgumentError` will be raised.
+  If the number of consumed tokens is not a multiple of the required number of tokens to create an element of the list, a :exc:`.MissingArgumentError` will be raised.
 
   .. code-block:: python
 
@@ -401,7 +409,7 @@ When arguments are provided by keyword:
 
 * The keyword can be specified multiple times.
 
-* If :attr:`.Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will raise :exc:`MissingArgumentError` if insufficient tokens have been parsed.
+* If :attr:`.Parameter.allow_leading_hyphen` is :obj:`False` (default behavior), reaching an option-like token will raise :exc:`.MissingArgumentError` if insufficient tokens have been parsed.
 
   .. code-block:: python
 

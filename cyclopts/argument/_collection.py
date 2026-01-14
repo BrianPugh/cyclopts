@@ -599,6 +599,38 @@ def _meta_arguments(apps: Sequence["App"]) -> ArgumentCollection:
     return argument_collection
 
 
+def _is_valid_option_key(option_key: str, arguments: "ArgumentCollection") -> bool:
+    """Check if option_key corresponds to a valid root argument.
+
+    When processing nested config keys like {"p": {"timeout": 3}}, the fallback
+    alias matching needs to verify that "p" is actually a valid parameter before
+    matching nested fields. This prevents unknown keys like "np" from incorrectly
+    matching against valid nested arguments.
+
+    If no root argument exists (children-only collection, e.g., from JSON env var
+    processing), returns True since the option_key is implicitly valid.
+
+    Parameters
+    ----------
+    option_key : str
+        The top-level config key to validate (e.g., "p" from {"p": {"timeout": 3}}).
+    arguments : ArgumentCollection
+        The argument collection to validate against.
+
+    Returns
+    -------
+    bool
+        True if option_key is valid, False otherwise.
+    """
+    root_arg = next((arg for arg in arguments if arg.keys == ()), None)
+    if not root_arg:
+        return True  # Children-only collection, implicitly valid
+    cli_parent = to_cli_option_name(option_key)
+    return bool(
+        (root_arg.parameter.name and cli_parent in root_arg.parameter.name) or option_key in root_arg.field_info.names
+    )
+
+
 def update_argument_collection(
     config: dict,
     source: str,
@@ -666,7 +698,7 @@ def update_argument_collection(
             try:
                 argument, remaining_keys, _ = arguments.match(cli_option_name)
             except ValueError:
-                if subkeys:
+                if subkeys and _is_valid_option_key(option_key, arguments):
                     for arg in arguments:
                         if len(subkeys) != len(arg.keys):
                             continue

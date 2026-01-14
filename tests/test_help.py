@@ -2675,3 +2675,47 @@ def test_help_epilogue_override(console):
     actual = capture.get()
     assert "Child epilogue (overrides parent)." in actual
     assert "Parent epilogue." not in actual
+
+
+def test_help_boolean_alias_on_positive(app, console, assert_parse_args):
+    """Test that boolean flag aliases are displayed with the positive variant.
+
+    When an alias is specified for a boolean parameter, it should be shown
+    alongside the positive flag (--dry-run -n), not the negative flag.
+    """
+
+    @app.default
+    def foo(dry_run: Annotated[bool, Parameter(alias=["-n"])] = False):
+        """Test command.
+
+        Parameters
+        ----------
+        dry_run
+            Enable dry run mode.
+        """
+        pass
+
+    # Verify the alias parses correctly (should enable dry_run, i.e., True)
+    assert_parse_args(foo, "-n", dry_run=True)
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ DRY-RUN --dry-run -n  Enable dry run mode. [default: False]        │
+        │   --no-dry-run                                                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

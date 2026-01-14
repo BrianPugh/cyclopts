@@ -386,23 +386,24 @@ def test_json_list_missing_required_field(app):
         app(["--values", '{"name": "Alice"}'], exit_on_error=False)
 
 
-def test_json_list_extra_field_ignored(app, assert_parse_args):
-    """Test that extra fields in JSON are silently ignored.
+def test_json_list_extra_field_rejected(app):
+    """Test that extra fields in JSON are rejected.
 
-    The implementation only processes fields that exist in the dataclass,
-    so extra fields are ignored rather than causing an error.
+    This ensures consistent validation between single dataclass and list[dataclass].
+    Extra fields in JSON should raise an error to catch typos and invalid data.
     """
 
     @app.default
     def main(values: list[User]):
         pass
 
-    # Extra field 'city' is ignored
-    assert_parse_args(
-        main,
-        ["--values", '{"name": "Alice", "age": 30, "city": "NYC"}'],
-        [User("Alice", 30)],
-    )
+    # Extra field 'city' should be rejected
+    with pytest.raises(CycloptsError) as exc_info:
+        app(["--values", '{"name": "Alice", "age": 30, "city": "NYC"}'], exit_on_error=False)
+
+    error_str = str(exc_info.value)
+    assert 'Unknown field "city"' in error_str
+    assert "User" in error_str
 
 
 def test_json_list_null_value_in_array(app):
