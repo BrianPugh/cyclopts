@@ -29,6 +29,7 @@ from cyclopts.annotations import (
     NoneType,
     is_annotated,
     is_enum_flag,
+    is_nonetype,
     is_union,
     resolve,
     resolve_optional,
@@ -972,16 +973,16 @@ def _resolve_effective_converter(
     return converter, name_transform
 
 
-def _try_union_conversion(
+def _union_conversion(
     union_args: tuple[Any, ...],
     upcoming_tokens: "Sequence[Token]",
     name_transform: Callable[[str], str] = default_name_transform,
     converter: Callable | None = None,
-) -> tuple[int, bool] | None:
-    """Try to determine token count for a union type by attempting conversion.
+) -> tuple[Any, int, bool]:
+    """Convert tokens using a union type by attempting each member left-to-right.
 
-    Iterates through union args left-to-right, attempting conversion with the
-    upcoming tokens. Returns the token count for the first type that successfully
+    Iterates through union args, attempting conversion with the upcoming tokens.
+    Returns the converted value and token count for the first type that successfully
     converts.
 
     Parameters
@@ -997,8 +998,13 @@ def _try_union_conversion(
 
     Returns
     -------
-    tuple[int, bool] | None
-        (token_count, consume_all) if a type successfully converts, None otherwise.
+    tuple[Any, int, bool]
+        (converted_value, token_count, consume_all) for the first matching type.
+
+    Raises
+    ------
+    CoercionError
+        If no union member could convert the tokens.
     """
     for arg in union_args:
         # Resolve the effective converter and name_transform for this union member.
@@ -1024,17 +1030,20 @@ def _try_union_conversion(
         token_input = tokens_to_try[0] if len(tokens_to_try) == 1 else list(tokens_to_try)
 
         try:
-            _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)
-            return tc, consume_all
+            result = _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)
+            return result, tc, consume_all
         except ValidationError:
             # ValidationError means coercion succeeded but validation failed.
             # Return this type's token count - the actual conversion (with proper
             # argument context) will raise the error with full details.
-            return tc, consume_all
+            # Return None for result since caller (token_count) only uses tc/consume_all.
+            return None, tc, consume_all
         except Exception:
             continue
 
-    return None
+    # No union member could convert the tokens
+    token = upcoming_tokens[0] if upcoming_tokens else None
+    raise CoercionError(token=token, target_type=Union[union_args])  # pyright: ignore  # noqa: UP007
 
 
 def token_count(
@@ -1069,10 +1078,20 @@ def token_count(
     # get_parameters() strips None from Optional unions via resolve_optional().
     # For Annotated unions, we handle them in the later is_union() block.
     if upcoming_tokens and is_union(type_):
-        result = _try_union_conversion(get_args(type_), upcoming_tokens)
-        if result is not None:
-            return result
-        return 1, False
+        args = get_args(type_)
+        try:
+            _, tc, consume_all = _union_conversion(args, upcoming_tokens)
+            return tc, consume_all
+        except CoercionError:
+            # No union member matched. For Optional types (Union with exactly one
+            # non-None type), fall through to structural analysis so "not enough tokens"
+            # errors are raised properly. For other unions, return (1, False) since
+            # it's a value mismatch, not a structural mismatch.
+            non_none_types = [t for t in args if not is_nonetype(t)]
+            if len(non_none_types) != 1:
+                # Not an Optional - it's a real union with multiple non-None types
+                return 1, False
+            # Optional type - fall through to structural analysis of the non-None type
 
     # Check for explicit n_tokens in Parameter annotation before resolving
     # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
@@ -1143,12 +1162,21 @@ def token_count(
                 if param.converter is not None and callable(param.converter):
                     converter = param.converter
 
-            result = _try_union_conversion(args, upcoming_tokens, name_transform, converter)
-            if result is not None:
-                return result
-            return 1, False
+            try:
+                _, tc, consume_all = _union_conversion(args, upcoming_tokens, name_transform, converter)
+                return tc, consume_all
+            except CoercionError:
+                # No union member matched. For Optional types (Union with exactly one
+                # non-None type), fall through to structural analysis so "not enough tokens"
+                # errors are raised properly. For other unions, return (1, False) since
+                # it's a value mismatch, not a structural mismatch.
+                non_none_types = [t for t in args if not is_nonetype(t)]
+                if len(non_none_types) != 1:
+                    # Not an Optional - it's a real union with multiple non-None types
+                    return 1, False
+                # Optional type - fall through to structural analysis
 
-        # Fallback without upcoming tokens: use structural analysis.
+        # Fallback: use structural analysis.
         # First multi-token type (tc > 1) determines token count.
         for arg in args:
             tc, consume_all = token_count(arg)
