@@ -899,9 +899,9 @@ def convert(
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
-        # Pass tokens to token_count for consistent union type resolution
-        upcoming: list[str] = [t.value if hasattr(t, "value") else str(t) for t in tokens]  # pyright: ignore[reportAttributeAccessIssue]
-        tokens_per_element, consume_all = token_count(type_, upcoming_tokens=upcoming)
+        # Pass Token objects to token_count for consistent union type resolution
+        # tokens is Sequence[Token] at this point (strings were converted to Tokens earlier in this function)
+        tokens_per_element, consume_all = token_count(type_, upcoming_tokens=tokens)  # pyright: ignore[reportArgumentType]
         if consume_all:
             # For consume_all types (like list[T] in unions), process all tokens together
             return convert_priv(type_, tokens)  # pyright: ignore
@@ -954,7 +954,7 @@ def _resolve_effective_converter(
 
 def _try_union_conversion(
     union_args: tuple[Any, ...],
-    upcoming_tokens: Sequence[str],
+    upcoming_tokens: "Sequence[Token]",
     name_transform: Callable[[str], str] = default_name_transform,
     converter: Callable | None = None,
 ) -> tuple[int, bool] | None:
@@ -969,7 +969,7 @@ def _try_union_conversion(
     union_args
         The type arguments of the union (from get_args()).
     upcoming_tokens
-        Sequence of upcoming CLI tokens to try converting.
+        Sequence of upcoming CLI Token objects to try converting.
     name_transform
         Name transform function for conversion (fallback for union members).
     converter
@@ -980,8 +980,6 @@ def _try_union_conversion(
     tuple[int, bool] | None
         (token_count, consume_all) if a type successfully converts, None otherwise.
     """
-    from cyclopts.argument import Token
-
     for arg in union_args:
         # Resolve the effective converter and name_transform for this union member.
         # This handles @Parameter decorated classes with string converters.
@@ -1000,11 +998,10 @@ def _try_union_conversion(
         if not tokens_to_try:
             continue
 
-        # Create Token object(s) for conversion
-        if len(tokens_to_try) == 1:
-            token_input: Token | list[Token] = Token(value=tokens_to_try[0])
-        else:
-            token_input = [Token(value=t) for t in tokens_to_try]
+        # Use the Token objects directly - they were created upfront in bind.py
+        # This enables identity-based caching since the same Token objects
+        # will be used for both probing and actual conversion.
+        token_input = tokens_to_try[0] if len(tokens_to_try) == 1 else list(tokens_to_try)
 
         try:
             _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)
@@ -1023,7 +1020,7 @@ def _try_union_conversion(
 def token_count(
     type_: Any,
     skip_converter_params: bool = False,
-    upcoming_tokens: Sequence[str] | None = None,
+    upcoming_tokens: "Sequence[Token] | None" = None,
 ) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
@@ -1034,10 +1031,9 @@ def token_count(
     skip_converter_params: bool
         If True, don't extract converter parameters from __cyclopts__.
         Used to prevent infinite recursion when determining consume_all behavior.
-    upcoming_tokens: Sequence[str] | None
-        Optional sequence of upcoming CLI tokens. If provided and the first token
-        is a none-string ("none"/"null"), enables special handling for Optional
-        multi-token types where None comes first in the union.
+    upcoming_tokens: Sequence[Token] | None
+        Optional sequence of upcoming CLI Token objects. If provided, enables
+        token-aware parsing for union types by attempting conversion.
 
     Returns
     -------

@@ -850,7 +850,7 @@ class Argument:
             self.validate(self.field_info.default)
         return val
 
-    def token_count(self, keys: tuple[str, ...] = (), upcoming_tokens: Sequence[str] | None = None):
+    def token_count(self, keys: tuple[str, ...] = (), upcoming_tokens: "Sequence[Token] | None" = None):
         """The number of string tokens this argument consumes.
 
         Parameters
@@ -859,8 +859,8 @@ class Argument:
             The **python** keys into this argument.
             If provided, returns the number of string tokens that specific
             data type within the argument consumes.
-        upcoming_tokens: Sequence[str] | None
-            Optional sequence of upcoming CLI tokens for token-aware parsing.
+        upcoming_tokens: Sequence[Token] | None
+            Optional sequence of upcoming CLI Token objects for token-aware parsing.
 
         Returns
         -------
