@@ -558,7 +558,13 @@ def _convert_structured_type(
 
 
 def _convert_cache_key(type_, token, *, converter, name_transform) -> tuple:
-    """Generate cache key for _convert based on type and token content."""
+    """Generate cache key for _convert based on type and token content.
+
+    Note: We use the type directly (not id(type_)) because generic types like
+    set[str] are created as temporary objects that may be garbage collected
+    and their memory address reused by subsequent types.
+    Using the type directly leverages proper __eq__ and __hash__ for types.
+    """
     from cyclopts.argument import Token
 
     if isinstance(token, Token):
@@ -566,7 +572,7 @@ def _convert_cache_key(type_, token, *, converter, name_transform) -> tuple:
     else:
         token_key = tuple((t.value, id(t.implicit_value)) for t in token)
 
-    return (id(type_), token_key, id(converter) if converter else None, id(name_transform))
+    return (type_, token_key, id(converter) if converter else None, id(name_transform))
 
 
 @cache(_convert_cache_key)
