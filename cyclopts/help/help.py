@@ -61,11 +61,32 @@ def _text_factory():
 class HelpEntry:
     """Container for help table entry data."""
 
-    names: tuple[str, ...] = ()
-    """Long option names (e.g., "--verbose", "--help")."""
+    positive_names: tuple[str, ...] = ()
+    """Positive long option names (e.g., "--verbose", "--dry-run")."""
 
-    shorts: tuple[str, ...] = ()
-    """Short option names (e.g., "-v", "-h")."""
+    positive_shorts: tuple[str, ...] = ()
+    """Positive short option names (e.g., "-v", "-n")."""
+
+    negative_names: tuple[str, ...] = ()
+    """Negative long option names (e.g., "--no-verbose", "--no-dry-run")."""
+
+    negative_shorts: tuple[str, ...] = ()
+    """Negative short option names (e.g., "-N"). Rarely used."""
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        """All long option names (positive + negative). For backward compatibility."""
+        return self.positive_names + self.negative_names
+
+    @property
+    def shorts(self) -> tuple[str, ...]:
+        """All short option names (positive + negative). For backward compatibility."""
+        return self.positive_shorts + self.negative_shorts
+
+    @property
+    def all_options(self) -> tuple[str, ...]:
+        """All options in display order: positive longs, positive shorts, negative longs, negative shorts."""
+        return self.positive_names + self.positive_shorts + self.negative_names + self.negative_shorts
 
     description: Any = None
     """Help text description for this entry.
@@ -373,12 +394,12 @@ def create_parameter_help_panel(
             if arg_name != options[0]:
                 options = [arg_name, *options]
 
-        short_options, long_options = [], []
-        for option in options:
-            if _is_short(option):
-                short_options.append(option)
-            else:
-                long_options.append(option)
+        # Split options into positive/negative and long/short categories.
+        negatives = set(argument.negatives)
+        positive_names = [o for o in options if o not in negatives and not _is_short(o)]
+        positive_shorts = [o for o in options if o not in negatives and _is_short(o)]
+        negative_names = [o for o in options if o in negatives and not _is_short(o)]
+        negative_shorts = [o for o in options if o in negatives and _is_short(o)]
 
         help_description = InlineText.from_format(argument.parameter.help, format=format)
 
@@ -428,9 +449,11 @@ def create_parameter_help_panel(
 
         # populate row
         entry = HelpEntry(
-            names=tuple(long_options),
+            positive_names=tuple(positive_names),
+            positive_shorts=tuple(positive_shorts),
+            negative_names=tuple(negative_names),
+            negative_shorts=tuple(negative_shorts),
             description=help_description,
-            shorts=tuple(short_options),
             required=argument.required,
             type=resolve_annotated(argument.field_info.annotation),
             choices=choices,
@@ -470,13 +493,14 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
         app = registered_command.app
         if not app.show:
             continue
+        # Commands don't have negative variants, so all names are "positive"
         short_names, long_names = [], []
         for name in names:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
         entry = HelpEntry(
-            names=tuple(long_names),
-            shorts=tuple(short_names),
+            positive_names=tuple(long_names),
+            positive_shorts=tuple(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
             sort_key=resolve_callables(app.sort_key, app),
         )

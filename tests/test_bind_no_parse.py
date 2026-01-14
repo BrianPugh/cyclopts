@@ -139,3 +139,26 @@ def test_parse_regex_invalid_positional_no_default():
     # not at registration time (since validate_command only sees direct annotations)
     with pytest.raises(ValueError, match="KEYWORD_ONLY"):
         app.parse_args([])
+
+
+def test_no_parse_did_you_mean_excludes_non_parsed(app):
+    """Issue #730: UnknownOptionError should not suggest parse=False parameters.
+
+    When a parameter has parse=False, it should not be included in the
+    "Did you mean" suggestions for unknown options, since it's not a valid
+    CLI option.
+    """
+    from cyclopts.exceptions import UnknownOptionError
+
+    @app.default
+    def action(*, verbose: Annotated[bool, Parameter(parse=False)] = False):
+        pass
+
+    with pytest.raises(UnknownOptionError) as e:
+        app.parse_args(["--verbose"], exit_on_error=False)
+
+    # The error message should NOT suggest "--verbose" since it has parse=False
+    error_message = str(e.value)
+    assert 'Unknown option: "--verbose"' in error_message
+    # Should NOT have "Did you mean" since there's no valid similar option
+    assert "Did you mean" not in error_message

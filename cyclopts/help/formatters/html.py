@@ -113,43 +113,28 @@ class HtmlFormatter:
         self._output.write('<ul class="commands-list">\n')
 
         for entry in entries:
-            # Get command name(s)
-            names = []
-            if entry.names:
-                names.extend(entry.names)
-            if entry.shorts:
-                names.extend(entry.shorts)
-
-            # Generate anchor link if we have app context
-            if self.app_name and names:
-                # Build the anchor ID for this command
-                primary_name = names[0]
-                aliases = names[1:]
+            names = entry.all_options
+            if not names:
+                name_html = ""
+            elif self.app_name:
+                # Generate anchor link
+                primary_name, aliases = names[0], names[1:]
                 if self.command_chain:
-                    # We're in a subcommand, build full chain
                     full_chain = self.command_chain + [primary_name]
                     anchor_id = f"{self.app_name}-{'-'.join(full_chain[1:])}".lower()
                 else:
-                    # Top-level command
                     anchor_id = f"{self.app_name}-{primary_name}".lower()
-
-                # Create linked command name with aliases in parentheses
                 name_html = f'<a href="#{anchor_id}"><code>{escape_html(primary_name)}</code></a>'
                 if aliases:
-                    # Add aliases in parentheses
                     aliases_str = ", ".join(escape_html(n) for n in aliases)
                     name_html = f"{name_html} ({aliases_str})"
             else:
-                # Fallback to non-linked format with aliases in parentheses
-                if names:
-                    primary_name = names[0]
-                    aliases = names[1:]
-                    name_html = f"<code>{escape_html(primary_name)}</code>"
-                    if aliases:
-                        aliases_str = ", ".join(escape_html(n) for n in aliases)
-                        name_html = f"{name_html} ({aliases_str})"
-                else:
-                    name_html = ""
+                # Non-linked format with aliases in parentheses
+                primary_name, aliases = names[0], names[1:]
+                name_html = f"<code>{escape_html(primary_name)}</code>"
+                if aliases:
+                    aliases_str = ", ".join(escape_html(n) for n in aliases)
+                    name_html = f"{name_html} ({aliases_str})"
 
             desc_html = escape_html(extract_text(entry.description, console))
 
@@ -177,15 +162,8 @@ class HtmlFormatter:
         self._output.write('<ul class="parameters-list">\n')
 
         for entry in entries:
-            # Build parameter names
-            names = []
-            if entry.names:
-                names.extend(entry.names)
-            if entry.shorts:
-                names.extend(entry.shorts)
-
             # Format name with code tags
-            if names:
+            if names := entry.all_options:
                 name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names)
             else:
                 name_html = ""

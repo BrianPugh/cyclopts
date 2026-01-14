@@ -109,20 +109,15 @@ class PlainFormatter:
 
         # Print each entry in the panel
         for entry in panel.entries:
-            # Extract the components
-            # Join names and shorts if they are tuples
-            names_text = " ".join(entry.names) if entry.names else ""
-            shorts_text = " ".join(entry.shorts) if entry.shorts else ""
             desc = _to_plain_text(entry.description, console)
 
             # Format the entry line
-            if names_text or shorts_text:
-                # Handle parameters section specially
+            if entry.all_options:
                 if panel.format == "parameter":
-                    self._format_parameter_entry(entry.names, entry.shorts, desc, console, entry)
+                    self._format_parameter_entry(entry.all_options, desc, console, entry)
                 else:
-                    # For commands or other panels
-                    self._format_command_entry(entry.names, entry.shorts, desc, console)
+                    # Command formatter needs separate longs/shorts for its specific layout
+                    self._format_command_entry(entry.positive_names, entry.positive_shorts, desc, console)
 
         # Add trailing newline for visual separation between panels
         console.print()
@@ -179,8 +174,7 @@ class PlainFormatter:
 
     def _format_parameter_entry(
         self,
-        names: tuple[str, ...],
-        shorts: tuple[str, ...],
+        options: tuple[str, ...],
         desc: str,
         console: "Console",
         entry: "HelpEntry",
@@ -189,10 +183,8 @@ class PlainFormatter:
 
         Parameters
         ----------
-        names : tuple[str, ...]
-            Parameter long names.
-        shorts : tuple[str, ...]
-            Short forms of the parameter.
+        options : tuple[str, ...]
+            All parameter options in display order.
         desc : str
             Parameter description.
         console : ~rich.console.Console
@@ -200,10 +192,7 @@ class PlainFormatter:
         entry : HelpEntry
             The full help entry with metadata fields.
         """
-        # Combine all names and shorts
-        all_options = list(names) + list(shorts)
-
-        if not all_options:
+        if not options:
             return
 
         # Build the description with metadata
@@ -228,22 +217,13 @@ class PlainFormatter:
 
         full_desc = " ".join(desc_parts)
 
-        # Format output based on number of options
-        if len(all_options) > 1:
-            # Multiple options - show them all on first line with description
-            options_str = ", ".join(all_options)
-            if full_desc:
-                text = f"{options_str}: {full_desc}"
-            else:
-                text = options_str
-            self._print_plain(console, textwrap.indent(text, self.indent))
+        # Format: "option1, option2, ...: description"
+        options_str = ", ".join(options)
+        if full_desc:
+            text = f"{options_str}: {full_desc}"
         else:
-            # Single option
-            if full_desc:
-                text = f"{all_options[0]}: {full_desc}"
-            else:
-                text = all_options[0]
-            self._print_plain(console, textwrap.indent(text, self.indent))
+            text = options_str
+        self._print_plain(console, textwrap.indent(text, self.indent))
 
     def _format_command_entry(
         self,

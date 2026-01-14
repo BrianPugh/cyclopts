@@ -447,6 +447,42 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
     assert actual == expected
 
 
+def test_pydantic_annotated_field_discriminator_basemodel_container(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/726
+
+    Discriminated unions should work when the container is also a pydantic.BaseModel.
+    """
+
+    class DatasetImage(pydantic.BaseModel):
+        type: Literal["image"] = "image"
+        path: str
+
+    class DatasetVideo(pydantic.BaseModel):
+        type: Literal["video"] = "video"
+        path: str
+        fps: int
+
+    class Config(pydantic.BaseModel):
+        dataset: Annotated[DatasetImage | DatasetVideo, pydantic.Field(discriminator="type")]
+
+    @app.default
+    def main(
+        config: Annotated[Config | None, Parameter(name="*")] = None,
+    ):
+        pass
+
+    assert_parse_args(
+        main,
+        "--dataset.type=image --dataset.path foo.png",
+        Config(dataset=DatasetImage(path="foo.png")),
+    )
+    assert_parse_args(
+        main,
+        "--dataset.type=video --dataset.path foo.mp4 --dataset.fps 30",
+        Config(dataset=DatasetVideo(path="foo.mp4", fps=30)),
+    )
+
+
 def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatch):
     """
     Test that Pydantic's own JSON serialization (which uses aliases by default)
@@ -554,6 +590,37 @@ def test_pydantic_annotated_field_discriminator_dataclass(app, assert_parse_args
         "--dataset.type=video --dataset.path foo.mp4 --dataset.resolution 640 480 --dataset.fps 30",
         Config(DatasetVideo(type="video", path="foo.mp4", resolution=(640, 480), fps=30)),  # pyright: ignore
     )
+
+
+def test_pydantic_annotated_field_discriminator_missing_argument(app):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/725
+
+    Missing required field in a discriminated union should raise MissingArgumentError,
+    not an IndexError.
+    """
+
+    @dataclass
+    class Cat:
+        rainbow: bool
+        type: Literal["cat"]
+
+    @dataclass
+    class Dog:
+        type: Literal["dog"]
+
+    @dataclass
+    class AnimalParameter:
+        animal: Annotated[Cat | Dog, pydantic.Field(discriminator="type")]
+
+    @app.default
+    def main(animal_parameter: Annotated[AnimalParameter, Parameter(name="*")]):
+        pass
+
+    with pytest.raises(MissingArgumentError) as exc_info:
+        app(["--animal.type", "cat"], exit_on_error=False)
+
+    assert exc_info.value.argument is not None
+    assert exc_info.value.argument.parameter.name == ("--animal.rainbow",)
 
 
 def test_pydantic_list_empty_flag(app, assert_parse_args):
