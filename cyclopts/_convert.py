@@ -584,10 +584,8 @@ def _convert(
             def converter_with_token(t_, value):
                 assert cparam.converter
 
-                # Resolve string converters to methods on the type
-                resolved_converter = cparam.converter
-                if isinstance(resolved_converter, str):
-                    resolved_converter = getattr(t_, resolved_converter)
+                resolved_converter = cparam.resolve_converter(t_)
+                assert resolved_converter  # For pyright: cparam.converter is truthy, so this won't be None
 
                 # Detect bound methods (classmethods/instance methods)
                 # Bound methods already have their first parameter bound
@@ -915,10 +913,50 @@ def convert(
             raise NotImplementedError("Unreachable?")
 
 
+def _resolve_effective_converter(
+    type_: Any,
+    fallback_converter: Callable | None = None,
+    fallback_name_transform: Callable[[str], str] = default_name_transform,
+) -> tuple[Callable | None, Callable[[str], str]]:
+    """Resolve effective converter and name_transform for a type.
+
+    Examines the type's Parameter annotations (from both Annotated and
+    __cyclopts__ attributes) and resolves string converters to callables.
+
+    Parameters
+    ----------
+    type_
+        The type to resolve converter for.
+    fallback_converter
+        Converter to use if type has no converter specified.
+    fallback_name_transform
+        Name transform to use if type has no name_transform specified.
+
+    Returns
+    -------
+    tuple[Callable | None, Callable[[str], str]]
+        (converter, name_transform) - the effective converter and name_transform.
+    """
+    from cyclopts.parameter import get_parameters
+
+    converter = fallback_converter
+    name_transform = fallback_name_transform
+
+    _, parameters = get_parameters(type_)
+    for param in parameters:
+        if param.converter is not None:
+            converter = param.resolve_converter(type_)
+        if param._name_transform is not None:
+            name_transform = param._name_transform
+
+    return converter, name_transform
+
+
 def _try_union_conversion(
     union_args: tuple[Any, ...],
     upcoming_tokens: Sequence[str],
     name_transform: Callable[[str], str] = default_name_transform,
+    converter: Callable | None = None,
 ) -> tuple[int, bool] | None:
     """Try to determine token count for a union type by attempting conversion.
 
@@ -933,7 +971,9 @@ def _try_union_conversion(
     upcoming_tokens
         Sequence of upcoming CLI tokens to try converting.
     name_transform
-        Name transform function for conversion.
+        Name transform function for conversion (fallback for union members).
+    converter
+        Optional custom converter function from Parameter annotation (fallback).
 
     Returns
     -------
@@ -943,6 +983,9 @@ def _try_union_conversion(
     from cyclopts.argument import Token
 
     for arg in union_args:
+        # Resolve the effective converter and name_transform for this union member.
+        # This handles @Parameter decorated classes with string converters.
+        effective_converter, effective_name_transform = _resolve_effective_converter(arg, converter, name_transform)
         # Pass upcoming_tokens for nested unions
         tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
 
@@ -964,7 +1007,7 @@ def _try_union_conversion(
             token_input = [Token(value=t) for t in tokens_to_try]
 
         try:
-            _convert(arg, token_input, converter=None, name_transform=name_transform)
+            _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)
             return tc, consume_all
         except ValidationError:
             # ValidationError means coercion succeeded but validation failed.
@@ -1072,13 +1115,19 @@ def token_count(
 
         # If we have upcoming tokens, try conversion-based token counting.
         if upcoming_tokens:
-            # Extract name_transform from parent parameters
+            # Extract name_transform and converter from parent parameters
             name_transform = default_name_transform
+            converter = None
             for param in parameters:
                 if param.name_transform is not None:
                     name_transform = param.name_transform
+                # Only use callable converters; string converters are method names
+                # that need to be resolved against a specific type, which doesn't
+                # make sense when probing individual union members.
+                if param.converter is not None and callable(param.converter):
+                    converter = param.converter
 
-            result = _try_union_conversion(args, upcoming_tokens, name_transform)
+            result = _try_union_conversion(args, upcoming_tokens, name_transform, converter)
             if result is not None:
                 return result
             return 1, False

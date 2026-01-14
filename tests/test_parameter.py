@@ -97,7 +97,10 @@ def test_parameter_from_annotation_optional_annotated():
         help="Display this message and exit.",
     )
 
-    assert (bool, expected_cparam) == Parameter.from_annotation(Optional[Annotated[bool, expected_cparam]], Parameter())
+    # None is preserved in unions since it's a meaningful type (users can pass "none"/"null")
+    assert (bool | None, expected_cparam) == Parameter.from_annotation(
+        Optional[Annotated[bool, expected_cparam]], Parameter()
+    )
 
 
 def test_parameter_from_annotation_empty_annotation():

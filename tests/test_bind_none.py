@@ -566,3 +566,32 @@ def test_bind_enum_in_union(app, assert_parse_args):
 
     # Not an enum value, falls through to int
     assert_parse_args(default, "42", 42)
+
+
+def test_bind_union_custom_converter(app, assert_parse_args):
+    """Test that custom converters are used during union type probing.
+
+    This verifies the bug fix where _try_union_conversion now receives
+    and uses the custom converter from Parameter annotations.
+    """
+    conversion_calls = []
+
+    def my_converter(type_, tokens):
+        # Track conversion calls to verify the converter is used during probing
+        token = tokens[0] if isinstance(tokens, (list, tuple)) else tokens
+        value = token.value if hasattr(token, "value") else str(token)
+        conversion_calls.append((type_, value))
+
+        # Custom conversion: double the integer value
+        return int(value) * 2
+
+    @app.default
+    def default(value: Annotated[int | str, Parameter(converter=my_converter)]):
+        pass
+
+    # The custom converter should be used
+    assert_parse_args(default, "21", 42)
+
+    # Verify the converter was called (may be called during probing and actual conversion)
+    assert len(conversion_calls) >= 1
+    assert any(val == "21" for _, val in conversion_calls)

@@ -31,7 +31,7 @@ from cyclopts.annotations import (
     is_union,
     resolve,
     resolve_annotated,
-    resolve_optional,
+    resolve_type_alias,
 )
 from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
@@ -532,17 +532,28 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     Returns
     -------
     hint
-        Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
+        Annotation hint with :obj:`Annotated` resolved.
     list[Parameter]
         List of parameters discovered, ordered by priority (lowest to highest):
         converter-decoration < type-decoration < annotation.
     """
-    hint = resolve_optional(hint)
+    # NOTE: We intentionally do NOT call resolve_optional() here.
+    # None is a meaningful type that users can explicitly provide via "none"/"null" strings,
+    # so we preserve it in unions for proper handling downstream.
+
+    # Resolve TypeAliasType (Python 3.12+ 'type' statement) first
+    hint = resolve_type_alias(hint)
 
     # Extract parameters from type's __cyclopts__ attribute
+    # For Optional patterns (T | None), check the non-None member for __cyclopts__
     type_cyclopts_config_params = []
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
         type_cyclopts_config_params.extend(cyclopts_config.parameters)
+    elif is_union(hint):  # pyright: ignore[reportArgumentType]
+        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+        if len(non_none_args) == 1:
+            if cyclopts_config := getattr(non_none_args[0], "__cyclopts__", None):
+                type_cyclopts_config_params.extend(cyclopts_config.parameters)
 
     # Extract parameters from Annotated metadata
     annotated_params = []
@@ -550,6 +561,17 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
         inner = get_args(hint)
         hint = inner[0]
         annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+    elif is_union(hint):  # pyright: ignore[reportArgumentType]
+        # For Optional patterns (T | None with exactly one non-None type),
+        # extract Annotated parameters from the non-None member.
+        # Don't do this for real unions (T | U) as each member's parameters
+        # should only apply when that specific type is selected.
+        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+        if len(non_none_args) == 1 and is_annotated(non_none_args[0]):
+            inner = get_args(non_none_args[0])
+            annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+            # Unwrap Annotated but preserve the Optional: Annotated[T, ...] | None -> T | None
+            hint = inner[0] | NoneType  # pyright: ignore[reportAssignmentType]
 
     # Check if any parameter has a converter with __cyclopts__ and extract its parameters
     converter_params = []
