@@ -568,30 +568,59 @@ def test_bind_enum_in_union(app, assert_parse_args):
     assert_parse_args(default, "42", 42)
 
 
-def test_bind_union_custom_converter(app, assert_parse_args):
-    """Test that custom converters are used during union type probing.
+@pytest.mark.parametrize(
+    "cli_input,expected_result",
+    [
+        ("21", 42),
+        ("hello", "HELLO"),
+        ("none", "NONE"),  # Custom converter handles everything, including "none"
+    ],
+)
+def test_bind_union_custom_converter(app, assert_parse_args, mocker, cli_input, expected_result):
+    """Test custom converter with union type including None.
 
-    This verifies the bug fix where _try_union_conversion now receives
-    and uses the custom converter from Parameter annotations.
+    When a custom converter is provided, it takes full responsibility for conversion.
+    The converter receives the resolved type (int | str, with None stripped).
     """
-    conversion_calls = []
 
-    def my_converter(type_, tokens):
-        # Track conversion calls to verify the converter is used during probing
+    def _my_converter(type_, tokens):
         token = tokens[0] if isinstance(tokens, (list, tuple)) else tokens
         value = token.value if hasattr(token, "value") else str(token)
-        conversion_calls.append((type_, value))
+        # Try int conversion, fall back to uppercase string
+        try:
+            return int(value) * 2
+        except ValueError:
+            return value.upper()
 
-        # Custom conversion: double the integer value
-        return int(value) * 2
+    my_converter = mocker.Mock(side_effect=_my_converter)
 
     @app.default
-    def default(value: Annotated[int | str, Parameter(converter=my_converter)]):
+    def default(value: Annotated[int | None | str, Parameter(converter=my_converter)]):
         pass
 
-    # The custom converter should be used
+    assert_parse_args(default, cli_input, expected_result)
+    my_converter.assert_called_once()
+
+
+def test_bind_optional_custom_converter_receives_resolved_type(app, assert_parse_args, mocker):
+    """Test that custom converters receive the resolved Optional type.
+
+    For `int | None`, the converter should receive `int`, not `int | None`.
+    This keeps user converters simple - they don't need to handle None.
+    """
+
+    def _my_converter(type_, tokens):
+        token = tokens[0] if isinstance(tokens, (list, tuple)) else tokens
+        value = token.value if hasattr(token, "value") else str(token)
+        return int(value) * 2
+
+    my_converter = mocker.Mock(side_effect=_my_converter)
+
+    @app.default
+    def default(value: Annotated[int | None, Parameter(converter=my_converter)]):
+        pass
+
     assert_parse_args(default, "21", 42)
 
-    # Verify the converter was called (may be called during probing and actual conversion)
-    assert len(conversion_calls) >= 1
-    assert any(val == "21" for _, val in conversion_calls)
+    # Converter should receive `int`, not `int | None`
+    my_converter.assert_called_once_with(int, mocker.ANY)

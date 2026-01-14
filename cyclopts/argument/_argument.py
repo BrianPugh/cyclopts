@@ -579,9 +579,14 @@ class Argument:
         def safe_converter(hint, tokens):
             # Use resolved hint (without Annotated wrapper) for error messages
             error_hint = resolve_annotated(hint)
+            # For user-provided converters, resolve Optional so they receive the
+            # non-None type (e.g., `int` instead of `int | None`).
+            # This makes the user's converter simpler for common scenarios of ``CustomType | None``
+            # Built-in convert() gets the full union for none-coercion support.
+            converter_hint = resolve_optional(hint) if self.parameter.converter else hint
             if isinstance(tokens, dict):
                 try:
-                    return converter(hint, tokens)  # pyright: ignore
+                    return converter(converter_hint, tokens)  # pyright: ignore
                 except (AssertionError, ValueError, TypeError) as e:
                     raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=error_hint) from e
             else:
@@ -592,7 +597,7 @@ class Argument:
                         return converter(tokens)  # pyright: ignore[reportCallIssue]
                     else:
                         # Regular function - pass type and tokens
-                        return converter(hint, tokens)  # pyright: ignore[reportCallIssue]
+                        return converter(converter_hint, tokens)  # pyright: ignore[reportCallIssue]
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(
