@@ -19,11 +19,6 @@ from typing import (
     get_origin,
 )
 
-if sys.version_info >= (3, 12):
-    from typing import TypeAliasType
-else:
-    TypeAliasType = None
-
 from cyclopts._cache import cache
 from cyclopts.annotations import (
     NoneType,
