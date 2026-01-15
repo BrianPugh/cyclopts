@@ -1791,11 +1791,13 @@ Cyclopts has several builtin validators for common CLI inputs.
 Types
 -----
 Cyclopts has builtin pre-defined annotated-types for common conversion and validation configurations.
-All definitions in this section are simply predefined annotations for convenience:
+Most definitions in this section are simply predefined annotations for convenience:
 
 .. code-block:: python
 
    Annotated[..., Parameter(...)]
+
+Custom classes that provide additional functionality beyond simple annotations will be noted.
 
 Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated to further configure behavior. E.g:
 
@@ -1811,16 +1813,22 @@ Path
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
 All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``list[Path]``).
 
-.. autoclass:: cyclopts.types.StdioPath
-   :members: is_stdio
+.. class:: cyclopts.types.StdioPath
 
    .. note::
-      Requires **Python 3.12+** due to Path subclassing support introduced in that version.
+      This is a custom class, not a simple :obj:`~typing.Annotated` type alias.
+
+      Requires **Python 3.12+** due to :class:`~pathlib.Path` subclassing support.
 
    A :class:`~pathlib.Path` subclass that treats ``-`` as stdin (for reading) or stdout (for writing).
    This follows `common Unix convention <https://clig.dev/#arguments-and-flags>`_.
 
    :class:`StdioPath` is pre-configured with ``allow_leading_hyphen=True``, so ``-`` can be passed as an argument without being interpreted as an option.
+
+   .. attribute:: is_stdio
+      :type: bool
+
+      Returns :obj:`True` if this path represents stdin/stdout (i.e., was created from ``"-"``).
 
    Basic usage:
 
