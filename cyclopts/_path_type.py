@@ -3,6 +3,7 @@
 Requires Python 3.12+ for proper Path subclassing support.
 """
 
+import io
 import sys
 from pathlib import Path
 from typing import IO, TYPE_CHECKING
@@ -20,26 +21,21 @@ class _NonClosingIOWrapper:
     without being closed when the context exits.
     """
 
-    def __init__(self, stream: IO):
+    def __init__(self, stream: IO, detach_on_exit: bool = False):
         self._stream = stream
+        self._detach_on_exit = detach_on_exit
 
     def __enter__(self):
         return self._stream
 
     def __exit__(self, *args):
-        pass  # Don't close the stream
+        # Flush any buffered data (important for TextIOWrapper)
+        self._stream.flush()
+        if self._detach_on_exit:
+            self._stream.detach()  # Detach TextIOWrapper without closing underlying buffer
 
     def __getattr__(self, name):
         return getattr(self._stream, name)
-
-
-def _get_stream(mode: str) -> IO:
-    """Get the appropriate stdio stream based on mode."""
-    is_write = "w" in mode or "a" in mode
-    is_binary = "b" in mode
-    if is_write:
-        return sys.stdout.buffer if is_binary else sys.stdout
-    return sys.stdin.buffer if is_binary else sys.stdin
 
 
 @Parameter(allow_leading_hyphen=True)
@@ -106,13 +102,37 @@ class StdioPath(Path):
         For regular paths, behaves like the standard Path.open().
         """
         if self._is_stdio:
-            return _NonClosingIOWrapper(_get_stream(mode))
+            is_binary = "b" in mode
+            is_write = "w" in mode or "a" in mode
+            # Always get the buffer stream
+            buffer_stream = sys.stdout.buffer if is_write else sys.stdin.buffer
+            if is_binary:
+                stream = _NonClosingIOWrapper(buffer_stream)
+            else:
+                # For text mode, wrap the binary stream with TextIOWrapper
+                text_stream = io.TextIOWrapper(
+                    buffer_stream,
+                    encoding=encoding or "utf-8",
+                    errors=errors or "strict",
+                    newline=newline,
+                )
+                stream = _NonClosingIOWrapper(text_stream, detach_on_exit=True)
+            return stream
         return super().open(mode, buffering, encoding, errors, newline)
 
     def read_text(self, encoding: str | None = None, errors: str | None = None, newline: str | None = None) -> str:
         """Read entire contents as text."""
         if self._is_stdio:
-            return sys.stdin.buffer.read().decode(encoding or "utf-8", errors or "strict")
+            wrapper = io.TextIOWrapper(
+                sys.stdin.buffer,
+                encoding=encoding or "utf-8",
+                errors=errors or "strict",
+                newline=newline,
+            )
+            try:
+                return wrapper.read()
+            finally:
+                wrapper.detach()  # Detach without closing stdin.buffer
         return super().read_text(encoding=encoding, errors=errors, newline=newline)
 
     def read_bytes(self) -> bytes:
@@ -130,8 +150,24 @@ class StdioPath(Path):
     ) -> int:
         """Write text data."""
         if self._is_stdio:
-            sys.stdout.buffer.write(data.encode(encoding or "utf-8", errors or "strict"))
-            return len(data)
+            wrapper = io.TextIOWrapper(
+                sys.stdout.buffer,
+                encoding=encoding or "utf-8",
+                errors=errors or "strict",
+                newline=newline,
+            )
+            try:
+                wrapper.write(data)
+                wrapper.flush()
+                # TextIOWrapper doesn't return bytes written, so calculate from encoded data
+                # Apply same newline translation that TextIOWrapper does
+                if newline is None or newline == "":
+                    encoded_data = data
+                else:
+                    encoded_data = data.replace("\n", newline)
+                return len(encoded_data.encode(encoding or "utf-8", errors or "strict"))
+            finally:
+                wrapper.detach()  # Detach without closing stdout.buffer
         return super().write_text(data, encoding=encoding, errors=errors, newline=newline)
 
     def write_bytes(self, data: "Buffer") -> int:

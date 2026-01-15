@@ -92,16 +92,17 @@ def test_stdio_path_exists_true_for_existing(tmp_path):
 
 def test_stdio_path_open_read_text_from_stdin(monkeypatch):
     p = StdioPath("-")
-    monkeypatch.setattr(sys, "stdin", StringIO("hello world"))
+    fake_stdin = type("FakeStdin", (), {"buffer": BytesIO(b"hello world")})()
+    monkeypatch.setattr(sys, "stdin", fake_stdin)
     with p.open("r") as f:
         assert f.read() == "hello world"
 
 
-def test_stdio_path_open_write_text_to_stdout(capsys):
+def test_stdio_path_open_write_text_to_stdout(capfdbinary):
     p = StdioPath("-")
     with p.open("w") as f:
         f.write("hello world")
-    assert capsys.readouterr().out == "hello world"
+    assert capfdbinary.readouterr().out == b"hello world"
 
 
 def test_stdio_path_open_read_binary_from_stdin(monkeypatch):
