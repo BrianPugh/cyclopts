@@ -227,7 +227,7 @@ def test_stdio_path_regular_path(app, assert_parse_args, tmp_path):
     def main(path: StdioPath):
         pass
 
-    assert_parse_args(main, str(f), StdioPath(f))
+    assert_parse_args(main, [str(f)], StdioPath(f))
 
 
 def test_stdio_path_with_annotated(app, assert_parse_args):

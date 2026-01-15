@@ -133,7 +133,11 @@ class StdioPath(Path):
                 return wrapper.read()
             finally:
                 wrapper.detach()  # Detach without closing stdin.buffer
-        return super().read_text(encoding=encoding, errors=errors, newline=newline)
+        # newline parameter added in Python 3.13
+        if sys.version_info >= (3, 13):
+            return super().read_text(encoding=encoding, errors=errors, newline=newline)
+        else:
+            return super().read_text(encoding=encoding, errors=errors)
 
     def read_bytes(self) -> bytes:
         """Read entire contents as bytes."""
