@@ -323,8 +323,8 @@ def _parse_kw_and_flags(
                     )
                 else:
                     # Normal case: append the pre-created Token objects directly
-                    for token in consumed_tokens:
-                        match.argument.append(token)
+                    for consumed_token in consumed_tokens:
+                        match.argument.append(consumed_token)
 
     unused_tokens.extend(positional_only_tokens)
     return unused_tokens
