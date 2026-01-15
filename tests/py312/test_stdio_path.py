@@ -33,8 +33,10 @@ def test_stdio_path_str_dash():
 
 
 def test_stdio_path_str_regular():
-    p = StdioPath("/tmp/test.txt")
-    assert str(p) == "/tmp/test.txt"
+    path_str = "/tmp/test.txt"
+    p = StdioPath(path_str)
+    # Path normalizes separators on different platforms
+    assert str(p) == str(Path(path_str))
 
 
 def test_stdio_path_repr_dash():
@@ -43,8 +45,10 @@ def test_stdio_path_repr_dash():
 
 
 def test_stdio_path_repr_regular():
-    p = StdioPath("/tmp/test.txt")
-    assert repr(p) == "StdioPath('/tmp/test.txt')"
+    path_str = "/tmp/test.txt"
+    p = StdioPath(path_str)
+    # Path normalizes separators on different platforms
+    assert repr(p) == f"StdioPath({str(Path(path_str))!r})"
 
 
 def test_stdio_path_fspath_dash():
@@ -57,8 +61,10 @@ def test_stdio_path_fspath_dash():
 def test_stdio_path_fspath_regular():
     import os
 
-    p = StdioPath("/tmp/test.txt")
-    assert os.fspath(p) == "/tmp/test.txt"
+    path_str = "/tmp/test.txt"
+    p = StdioPath(path_str)
+    # Path normalizes separators on different platforms
+    assert os.fspath(p) == os.fspath(Path(path_str))
 
 
 # exists() behavior
