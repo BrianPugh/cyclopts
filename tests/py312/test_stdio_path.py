@@ -251,4 +251,4 @@ def test_stdio_path_multiple_args(app, assert_parse_args, tmp_path):
     ):
         pass
 
-    assert_parse_args(main, f"- {f}", StdioPath("-"), StdioPath(f))
+    assert_parse_args(main, ["-", str(f)], StdioPath("-"), StdioPath(f))

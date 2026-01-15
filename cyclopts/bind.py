@@ -56,8 +56,7 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     if tokens is None:
         tokens = sys.argv[1:]  # Remove the executable
     elif isinstance(tokens, str):
-        # Use posix=False on Windows to preserve backslashes in paths
-        tokens = shlex.split(tokens, posix=(os.name != "nt"))
+        tokens = shlex.split(tokens)
     else:
         tokens = list(tokens)
     return tokens
