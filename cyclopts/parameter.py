@@ -512,17 +512,17 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     """
     hint = resolve_optional(hint)
 
-    # Extract parameters from type's __cyclopts__ attribute
-    type_cyclopts_config_params = []
-    if cyclopts_config := getattr(hint, "__cyclopts__", None):
-        type_cyclopts_config_params.extend(cyclopts_config.parameters)
-
     # Extract parameters from Annotated metadata
     annotated_params = []
     if is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
         annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+
+    # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
+    type_cyclopts_config_params = []
+    if cyclopts_config := getattr(hint, "__cyclopts__", None):
+        type_cyclopts_config_params.extend(cyclopts_config.parameters)
 
     # Check if any parameter has a converter with __cyclopts__ and extract its parameters
     converter_params = []
