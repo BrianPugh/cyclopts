@@ -624,3 +624,22 @@ def test_bind_optional_custom_converter_receives_resolved_type(app, assert_parse
 
     # Converter should receive `int`, not `int | None`
     my_converter.assert_called_once_with(int, mocker.ANY)
+
+
+def test_bind_validation_error_propagation_in_union(app):
+    """Test that ValidationError is properly propagated during union probing.
+
+    When a union member successfully converts but fails validation,
+    the ValidationError should be raised (not swallowed).
+    """
+    from cyclopts import validators
+    from cyclopts.exceptions import ValidationError
+
+    @app.default
+    def default(value: Annotated[int, Parameter(validator=validators.Number(gt=100))] | None):
+        pass
+
+    # Value 50 converts to int but fails validation (not > 100)
+    # ValidationError should propagate
+    with pytest.raises(ValidationError):
+        app.parse_args(["50"], exit_on_error=False)
