@@ -91,3 +91,28 @@ def test_parameter_decorator_dataclass_inheritance(app, assert_parse_args):
     assert_parse_args(
         create, "create --a.name=Bob --a.age=100 --a.no-privileged", admin=Admin("Bob", 100, privileged=False)
     )
+
+
+def test_parameter_class_decorator_with_annotated(app, assert_parse_args):
+    """Test that @Parameter on a class works when the type is wrapped in Annotated.
+
+    This is a regression test for a bug where __cyclopts__ was checked before
+    unwrapping Annotated, so class-level Parameter settings were ignored.
+    """
+
+    @Parameter(allow_leading_hyphen=True)
+    class MyType:
+        def __init__(self, value: str):
+            self.value = value
+
+        def __eq__(self, other):
+            return self.value == other.value
+
+    @app.default
+    def foo(arg: Annotated[MyType, Parameter(help="Custom help text.")]):
+        pass
+
+    # The class-level allow_leading_hyphen=True should be respected
+    # even when MyType is wrapped in Annotated with additional Parameter config
+    assert_parse_args(foo, "-", arg=MyType("-"))
+    assert_parse_args(foo, "--foo", arg=MyType("--foo"))

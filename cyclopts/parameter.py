@@ -544,17 +544,6 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     # Resolve TypeAliasType (Python 3.12+ 'type' statement) first
     hint = resolve_type_alias(hint)
 
-    # Extract parameters from type's __cyclopts__ attribute
-    # For Optional patterns (T | None), check the non-None member for __cyclopts__
-    type_cyclopts_config_params = []
-    if cyclopts_config := getattr(hint, "__cyclopts__", None):
-        type_cyclopts_config_params.extend(cyclopts_config.parameters)
-    elif is_union(hint):  # pyright: ignore[reportArgumentType]
-        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
-        if len(non_none_args) == 1:
-            if cyclopts_config := getattr(non_none_args[0], "__cyclopts__", None):
-                type_cyclopts_config_params.extend(cyclopts_config.parameters)
-
     # Extract parameters from Annotated metadata
     annotated_params = []
     if is_annotated(hint):
@@ -572,6 +561,17 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
             annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
             # Unwrap Annotated but preserve the Optional: Annotated[T, ...] | None -> T | None
             hint = inner[0] | NoneType  # pyright: ignore[reportAssignmentType]
+
+    # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
+    # For Optional patterns (T | None), check the non-None member for __cyclopts__
+    type_cyclopts_config_params = []
+    if cyclopts_config := getattr(hint, "__cyclopts__", None):
+        type_cyclopts_config_params.extend(cyclopts_config.parameters)
+    elif is_union(hint):  # pyright: ignore[reportArgumentType]
+        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+        if len(non_none_args) == 1:
+            if cyclopts_config := getattr(non_none_args[0], "__cyclopts__", None):
+                type_cyclopts_config_params.extend(cyclopts_config.parameters)
 
     # Check if any parameter has a converter with __cyclopts__ and extract its parameters
     converter_params = []
