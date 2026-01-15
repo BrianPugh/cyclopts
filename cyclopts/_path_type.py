@@ -1,4 +1,4 @@
-"""StdioPath - A Path subclass that treats "-" as stdin/stdout.
+""":class:`StdioPath` - A Path subclass that treats ``-`` as stdin/stdout.
 
 Requires Python 3.12+ for proper Path subclassing support.
 """
@@ -40,23 +40,7 @@ class _NonClosingIOWrapper:
 
 @Parameter(allow_leading_hyphen=True)
 class StdioPath(Path):
-    """A Path subclass that treats "-" as stdin (for reading) or stdout (for writing).
-
-    Requires Python 3.12+ for proper Path subclassing support.
-
-    This enables the common Unix convention where "-" represents stdin/stdout
-    in command-line applications, while also allowing regular file paths.
-
-    Examples
-    --------
-    >>> p = StdioPath("-")
-    >>> with p.open("r") as f:
-    ...     data = f.read()  # Reads from stdin
-
-    >>> p = StdioPath("output.txt")
-    >>> with p.open("w") as f:
-    ...     f.write("hello")  # Writes to output.txt
-    """
+    """A :class:`~pathlib.Path` subclass that treats ``-`` as stdin/stdout."""
 
     __slots__ = ("_is_stdio",)
 

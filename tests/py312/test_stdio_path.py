@@ -252,3 +252,18 @@ def test_stdio_path_multiple_args(app, assert_parse_args, tmp_path):
         pass
 
     assert_parse_args(main, ["-", str(f)], StdioPath("-"), StdioPath(f))
+
+
+def test_stdio_path_keyword_args(app, assert_parse_args, tmp_path):
+    """StdioPath should accept '-' as a keyword argument."""
+    f = tmp_path / "out.txt"
+
+    @app.default
+    def main(
+        input_path: Annotated[StdioPath, Parameter(help="Input")],
+        output_path: Annotated[StdioPath, Parameter(help="Output")],
+    ):
+        pass
+
+    assert_parse_args(main, ["--input-path", "-", "--output-path", str(f)], StdioPath("-"), StdioPath(f))
+    assert_parse_args(main, ["--input-path=-", f"--output-path={f}"], StdioPath("-"), StdioPath(f))

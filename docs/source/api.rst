@@ -1811,6 +1811,52 @@ Path
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
 All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``list[Path]``).
 
+.. autoclass:: cyclopts.types.StdioPath
+   :members: is_stdio
+
+   .. note::
+      Requires **Python 3.12+** due to Path subclassing support introduced in that version.
+
+   A :class:`~pathlib.Path` subclass that treats ``-`` as stdin (for reading) or stdout (for writing).
+   This follows `common Unix convention <https://clig.dev/#arguments-and-flags>`_.
+
+   :class:`StdioPath` is pre-configured with ``allow_leading_hyphen=True``, so ``-`` can be passed as an argument without being interpreted as an option.
+
+   Basic usage:
+
+   .. code-block:: python
+
+      from cyclopts import App
+      from cyclopts.types import StdioPath
+
+      app = App()
+
+      @app.default
+      def main(input_file: StdioPath):
+          data = input_file.read_text()
+          print(data.upper())
+
+      app()
+
+   .. code-block:: console
+
+      $ echo "hello" | python my_script.py -
+      HELLO
+
+      $ python my_script.py data.txt
+      <contents of data.txt uppercased>
+
+   To default to stdin/stdout when no argument is provided:
+
+   .. code-block:: python
+
+      @app.default
+      def main(input_file: StdioPath = StdioPath("-")):
+          data = input_file.read_text()
+          print(data.upper())
+
+   See :ref:`Reading/Writing From File or Stdin/Stdout` for more examples.
+
 .. autodata:: cyclopts.types.ExistingPath
 
 .. autodata:: cyclopts.types.NonExistentPath
