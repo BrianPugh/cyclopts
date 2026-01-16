@@ -76,7 +76,7 @@ jobs:
       - name: Run tests
         if: steps.check_test_files.outputs.files_exists == 'true'
         run: |
-          uv run pytest --cov=cyclopts --cov-config=pyproject.toml --cov-report term --cov-report xml --junitxml=testresults.xml
+          uv run pytest --run-slow --cov=cyclopts --cov-config=pyproject.toml --cov-report term --cov-report xml --junitxml=testresults.xml
           uv run coverage report
 
       - name: Upload coverage to Codecov

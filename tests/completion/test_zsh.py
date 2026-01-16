@@ -111,6 +111,7 @@ def test_path_completion(zsh_tester):
     assert "_files" in tester.completion_script
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(
     sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
 )
@@ -160,6 +161,7 @@ def test_end_to_end_completion(zsh_tester):
             child.close()
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(
     sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
 )
@@ -470,6 +472,7 @@ def test_empty_iterable_flag_completion(zsh_tester):
     assert tester.validate_script_syntax()
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(
     sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
 )
