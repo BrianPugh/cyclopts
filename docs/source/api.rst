@@ -1802,11 +1802,13 @@ Cyclopts has several builtin validators for common CLI inputs.
 Types
 -----
 Cyclopts has builtin pre-defined annotated-types for common conversion and validation configurations.
-All definitions in this section are simply predefined annotations for convenience:
+Most definitions in this section are simply predefined annotations for convenience:
 
 .. code-block:: python
 
    Annotated[..., Parameter(...)]
+
+Custom classes that provide additional functionality beyond simple annotations will be noted.
 
 Due to Cyclopts's advanced :class:`.Parameter` resolution engine, these annotations can themselves be annotated to further configure behavior. E.g:
 
@@ -1821,6 +1823,87 @@ Path
 ^^^^
 :class:`~pathlib.Path` annotated types for checking existence, type, and performing path-resolution.
 All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]`` or ``list[Path]``).
+
+.. class:: cyclopts.types.StdioPath
+
+   .. note::
+      This is a custom class, not a simple :obj:`~typing.Annotated` type alias.
+
+      Requires **Python 3.12+** due to :class:`~pathlib.Path` subclassing support.
+
+   A :class:`~pathlib.Path` subclass that treats ``-`` as stdin (for reading) or stdout (for writing).
+   This follows `common Unix convention <https://clig.dev/#arguments-and-flags>`_.
+
+   :class:`StdioPath` is pre-configured with ``allow_leading_hyphen=True``, so ``-`` can be passed as an argument without being interpreted as an option.
+
+   .. attribute:: STDIO_STRING
+      :type: str
+      :value: "-"
+
+      Class attribute defining the string that triggers stdio behavior.
+      Override in subclasses to use a different string.
+
+   .. attribute:: is_stdio
+      :type: bool
+
+      Returns :obj:`True` if this path represents stdin/stdout (i.e., ``str(self) == STDIO_STRING``).
+      Override this property in subclasses for custom matching logic (e.g., matching multiple strings).
+
+   Basic usage:
+
+   .. code-block:: python
+
+      from cyclopts import App
+      from cyclopts.types import StdioPath
+
+      app = App()
+
+      @app.default
+      def main(input_file: StdioPath):
+          data = input_file.read_text()
+          print(data.upper())
+
+      app()
+
+   .. code-block:: console
+
+      $ echo "hello" | python my_script.py -
+      HELLO
+
+      $ python my_script.py data.txt
+      <contents of data.txt uppercased>
+
+   To default to stdin/stdout when no argument is provided:
+
+   .. code-block:: python
+
+      @app.default
+      def main(input_file: StdioPath = StdioPath("-")):
+          data = input_file.read_text()
+          print(data.upper())
+
+   See :ref:`Reading/Writing From File or Stdin/Stdout` for more examples.
+
+   **Subclassing**
+
+   To use a different trigger string or custom matching logic, subclass :class:`StdioPath`:
+
+   .. code-block:: python
+
+      from cyclopts.types import StdioPath
+
+      # Simple: different trigger string
+      class StdinPath(StdioPath):
+          STDIO_STRING = "STDIN"
+
+      class StdoutPath(StdioPath):
+          STDIO_STRING = "STDOUT"
+
+      # Advanced: match multiple strings
+      class MultiStdioPath(StdioPath):
+          @property
+          def is_stdio(self) -> bool:
+              return str(self) in ("-", "STDIN", "STDOUT")
 
 .. autodata:: cyclopts.types.ExistingPath
 

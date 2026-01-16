@@ -1,4 +1,5 @@
 import json
+import sys
 from collections.abc import Sequence
 from functools import partial
 from pathlib import Path
@@ -8,10 +9,12 @@ from cyclopts import validators
 from cyclopts.parameter import Parameter
 
 if TYPE_CHECKING:
+    from cyclopts._path_type import StdioPath as StdioPath
     from cyclopts.token import Token
 
 __all__ = [
     # Path
+    "StdioPath",
     "ExistingPath",
     "NonExistentPath",
     "ExistingFile",
@@ -347,3 +350,13 @@ URL = Annotated[str, Parameter(validator=_url_validator)]
 
 Port = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535))]
 "An :class:`int` limited to range ``[0, 65535]``."
+
+
+def __getattr__(name: str):
+    if name == "StdioPath":
+        if sys.version_info < (3, 12):
+            raise ImportError("StdioPath requires Python 3.12+ (Path subclassing support)")
+        from cyclopts._path_type import StdioPath
+
+        return StdioPath
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
