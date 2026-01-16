@@ -1825,10 +1825,18 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
 
    :class:`StdioPath` is pre-configured with ``allow_leading_hyphen=True``, so ``-`` can be passed as an argument without being interpreted as an option.
 
+   .. attribute:: STDIO_STRING
+      :type: str
+      :value: "-"
+
+      Class attribute defining the string that triggers stdio behavior.
+      Override in subclasses to use a different string.
+
    .. attribute:: is_stdio
       :type: bool
 
-      Returns :obj:`True` if this path represents stdin/stdout (i.e., was created from ``"-"``).
+      Returns :obj:`True` if this path represents stdin/stdout (i.e., ``str(self) == STDIO_STRING``).
+      Override this property in subclasses for custom matching logic (e.g., matching multiple strings).
 
    Basic usage:
 
@@ -1864,6 +1872,27 @@ All of these types will also work on sequence of paths (e.g. ``tuple[Path, Path]
           print(data.upper())
 
    See :ref:`Reading/Writing From File or Stdin/Stdout` for more examples.
+
+   **Subclassing**
+
+   To use a different trigger string or custom matching logic, subclass :class:`StdioPath`:
+
+   .. code-block:: python
+
+      from cyclopts.types import StdioPath
+
+      # Simple: different trigger string
+      class StdinPath(StdioPath):
+          STDIO_STRING = "STDIN"
+
+      class StdoutPath(StdioPath):
+          STDIO_STRING = "STDOUT"
+
+      # Advanced: match multiple strings
+      class MultiStdioPath(StdioPath):
+          @property
+          def is_stdio(self) -> bool:
+              return str(self) in ("-", "STDIN", "STDOUT")
 
 .. autodata:: cyclopts.types.ExistingPath
 

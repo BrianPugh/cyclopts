@@ -42,34 +42,24 @@ class _NonClosingIOWrapper:
 class StdioPath(Path):
     """A :class:`~pathlib.Path` subclass that treats ``-`` as stdin/stdout."""
 
-    __slots__ = ("_is_stdio",)
-
-    def __new__(cls, *args, **kwargs):
-        if args and str(args[0]) == "-":
-            obj = object.__new__(cls)
-            obj._is_stdio = True
-            return obj
-        obj = super().__new__(cls, *args, **kwargs)
-        obj._is_stdio = False
-        return obj
+    STDIO_STRING: str = "-"
+    """The string that represents stdin/stdout. Override in subclasses for custom behavior."""
 
     @property
     def is_stdio(self) -> bool:
-        """Return True if this represents stdin/stdout (created from '-')."""
-        return self._is_stdio
+        """Return True if this represents stdin/stdout.
 
-    def __str__(self):
-        return "-" if self._is_stdio else super().__str__()
+        Override this property in subclasses for custom matching logic
+        (e.g., matching multiple strings or using pattern matching).
+        """
+        return str(self) == self.STDIO_STRING
 
     def __repr__(self):
-        return f"StdioPath({str(self)!r})"
-
-    def __fspath__(self):
-        return "-" if self._is_stdio else super().__fspath__()
+        return f"{type(self).__name__}({str(self)!r})"
 
     def exists(self, *, follow_symlinks: bool = True) -> bool:
         """Return True if path exists. Always True for stdio."""
-        return True if self._is_stdio else super().exists(follow_symlinks=follow_symlinks)
+        return True if self.is_stdio else super().exists(follow_symlinks=follow_symlinks)
 
     def open(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
@@ -85,7 +75,7 @@ class StdioPath(Path):
         (stdin for reading, stdout for writing) that doesn't close on context exit.
         For regular paths, behaves like the standard Path.open().
         """
-        if self._is_stdio:
+        if self.is_stdio:
             is_binary = "b" in mode
             is_write = "w" in mode or "a" in mode
             # Always get the buffer stream
@@ -106,7 +96,7 @@ class StdioPath(Path):
 
     def read_text(self, encoding: str | None = None, errors: str | None = None, newline: str | None = None) -> str:
         """Read entire contents as text."""
-        if self._is_stdio:
+        if self.is_stdio:
             wrapper = io.TextIOWrapper(
                 sys.stdin.buffer,
                 encoding=encoding or "utf-8",
@@ -125,7 +115,7 @@ class StdioPath(Path):
 
     def read_bytes(self) -> bytes:
         """Read entire contents as bytes."""
-        if self._is_stdio:
+        if self.is_stdio:
             return sys.stdin.buffer.read()
         return super().read_bytes()
 
@@ -137,7 +127,7 @@ class StdioPath(Path):
         newline: str | None = None,
     ) -> int:
         """Write text data."""
-        if self._is_stdio:
+        if self.is_stdio:
             wrapper = io.TextIOWrapper(
                 sys.stdout.buffer,
                 encoding=encoding or "utf-8",
@@ -160,6 +150,6 @@ class StdioPath(Path):
 
     def write_bytes(self, data: "Buffer") -> int:
         """Write binary data."""
-        if self._is_stdio:
+        if self.is_stdio:
             return sys.stdout.buffer.write(data)
         return super().write_bytes(data)

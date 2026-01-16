@@ -267,3 +267,48 @@ def test_stdio_path_keyword_args(app, assert_parse_args, tmp_path):
 
     assert_parse_args(main, ["--input-path", "-", "--output-path", str(f)], StdioPath("-"), StdioPath(f))
     assert_parse_args(main, ["--input-path=-", f"--output-path={f}"], StdioPath("-"), StdioPath(f))
+
+
+# Subclassing tests
+
+
+def test_stdio_path_subclass_custom_string():
+    """Subclasses can override STDIO_STRING for a different trigger."""
+
+    class StdinPath(StdioPath):
+        STDIO_STRING = "STDIN"
+
+    class StdoutPath(StdioPath):
+        STDIO_STRING = "STDOUT"
+
+    p_in = StdinPath("STDIN")
+    assert p_in.is_stdio is True
+    assert str(p_in) == "STDIN"
+    assert repr(p_in) == "StdinPath('STDIN')"
+
+    p_out = StdoutPath("STDOUT")
+    assert p_out.is_stdio is True
+    assert str(p_out) == "STDOUT"
+    assert repr(p_out) == "StdoutPath('STDOUT')"
+
+    # "-" should not trigger stdio for these subclasses
+    assert StdinPath("-").is_stdio is False
+    assert StdoutPath("-").is_stdio is False
+
+    # Regular paths should not be stdio
+    assert StdinPath("/tmp/test.txt").is_stdio is False
+    assert StdoutPath("/tmp/test.txt").is_stdio is False
+
+
+def test_stdio_path_subclass_custom_matching():
+    """Subclasses can override is_stdio for custom matching logic."""
+
+    class MultiStdioPath(StdioPath):
+        @property
+        def is_stdio(self) -> bool:
+            return str(self) in ("-", "STDIN", "STDOUT")
+
+    assert MultiStdioPath("-").is_stdio is True
+    assert MultiStdioPath("STDIN").is_stdio is True
+    assert MultiStdioPath("STDOUT").is_stdio is True
+    assert MultiStdioPath("/tmp/test.txt").is_stdio is False
