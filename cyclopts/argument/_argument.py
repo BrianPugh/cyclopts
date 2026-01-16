@@ -29,7 +29,6 @@ from cyclopts.annotations import (
     is_pydantic,
     is_typeddict,
     is_union,
-    resolve,
     resolve_annotated,
     resolve_optional,
 )
@@ -89,9 +88,10 @@ class Argument:
     Fully resolved user-provided :class:`.Parameter`.
     """
 
-    hint: Any = field(default=str, converter=resolve)
+    hint: Any = field(default=str)
     """
     The type hint for this argument; may be different from :attr:`.FieldInfo.annotation`.
+    Annotated wrappers are stripped, but Optional is preserved for none-coercion.
     """
 
     index: int | None = field(default=None)
@@ -171,16 +171,13 @@ class Argument:
 
         self.children = ArgumentCollection()
 
-        hint = resolve(self.hint)
+        hint = self.resolved_hint
         hints = get_args(hint) if is_union(hint) else (hint,)
 
         if self.parameter.count:
             # Perform type-annotation validation.
-            resolved_hint = resolve_optional(hint)
             # Technically, bool is a subclass of int, so we need to explicitly check.
-            if resolved_hint is bool or not (
-                resolved_hint is int or (isinstance(resolved_hint, type) and issubclass(resolved_hint, int))
-            ):
+            if hint is bool or not (hint is int or (isinstance(hint, type) and issubclass(hint, int))):
                 raise ValueError(
                     f"Parameter(count=True) requires an int type hint, got {self.hint}. "
                     f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
@@ -304,8 +301,13 @@ class Argument:
         self._marked_converted = value
 
     @property
+    def resolved_hint(self) -> Any:
+        """Hint with Optional stripped for dispatch and type matching."""
+        return resolve_optional(self.hint)
+
+    @property
     def _accepts_arbitrary_keywords(self) -> bool:
-        args = get_args(self.hint) if is_union(self.hint) else (self.hint,)
+        args = get_args(self.resolved_hint) if is_union(self.resolved_hint) else (self.resolved_hint,)
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
     @property
@@ -358,10 +360,9 @@ class Argument:
                 return False
             return True
 
-        hint = resolve(self.hint)
-        origin = get_origin(hint)
+        origin = get_origin(self.resolved_hint)
         if origin in ITERABLE_TYPES:
-            args = get_args(hint)
+            args = get_args(self.resolved_hint)
             if args and args[0] is not str:
                 return True
 
@@ -466,7 +467,9 @@ class Argument:
                 name = transform(name)
             if startswith(term, name):
                 trailing = term[len(name) :]
-                implicit_value = True if self.hint is bool or self.hint in ITERATIVE_BOOL_IMPLICIT_VALUE else UNSET
+                implicit_value = (
+                    True if self.resolved_hint is bool or self.resolved_hint in ITERATIVE_BOOL_IMPLICIT_VALUE else UNSET
+                )
                 if trailing:
                     if trailing[0] == delimiter:
                         trailing = trailing[1:]
@@ -567,22 +570,25 @@ class Argument:
         from cyclopts.argument._collection import update_argument_collection
 
         if self.parameter.converter:
-            # Resolve string converters to methods on the type
-            if isinstance(self.parameter.converter, str):
-                converter = getattr(self.hint, self.parameter.converter)
-            else:
-                converter = self.parameter.converter
+            converter = self.parameter.resolve_converter(self.hint)
         elif converter is None:
             converter = partial(convert, name_transform=self.parameter.name_transform)
 
         assert converter is not None  # Ensure converter is set at this point
 
         def safe_converter(hint, tokens):
+            # Use resolved hint (without Annotated wrapper) for error messages
+            error_hint = resolve_annotated(hint)
+            # For user-provided converters, resolve Optional so they receive the
+            # non-None type (e.g., `int` instead of `int | None`).
+            # This makes the user's converter simpler for common scenarios of ``CustomType | None``
+            # Built-in convert() gets the full union for none-coercion support.
+            converter_hint = resolve_optional(hint) if self.parameter.converter else hint
             if isinstance(tokens, dict):
                 try:
-                    return converter(hint, tokens)  # pyright: ignore
+                    return converter(converter_hint, tokens)  # pyright: ignore
                 except (AssertionError, ValueError, TypeError) as e:
-                    raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=hint) from e
+                    raise CoercionError(msg=e.args[0] if e.args else None, argument=self, target_type=error_hint) from e
             else:
                 try:
                     # Detect bound methods (classmethods/instance methods)
@@ -591,11 +597,11 @@ class Argument:
                         return converter(tokens)  # pyright: ignore[reportCallIssue]
                     else:
                         # Regular function - pass type and tokens
-                        return converter(hint, tokens)  # pyright: ignore[reportCallIssue]
+                        return converter(converter_hint, tokens)  # pyright: ignore[reportCallIssue]
                 except (AssertionError, ValueError, TypeError) as e:
                     token = tokens[0] if len(tokens) == 1 else None
                     raise CoercionError(
-                        msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
+                        msg=e.args[0] if e.args else None, argument=self, target_type=error_hint, token=token
                     ) from e
 
         if not self.parse:
@@ -632,12 +638,23 @@ class Argument:
 
             expanded_tokens = list(expand_tokens(self.tokens))
             for token in expanded_tokens:
-                resolved_hint = resolve_optional(self.hint)
                 if token.implicit_value is not UNSET and isinstance(
-                    token.implicit_value, get_origin(resolved_hint) or resolved_hint
+                    token.implicit_value, get_origin(self.resolved_hint) or self.resolved_hint
                 ):
                     assert len(expanded_tokens) == 1
                     return token.implicit_value
+
+                # Handle negative_none flag: implicit_value=None for Optional types
+                # Use self.hint (not self.resolved_hint) to preserve Optional/Union
+                if token.implicit_value is None:
+                    hint = self.hint
+                    if is_union(hint):
+                        if any(is_nonetype(arg) or arg is None for arg in get_args(hint)):
+                            assert len(expanded_tokens) == 1
+                            return None
+                    elif is_nonetype(hint) or hint is None:
+                        assert len(expanded_tokens) == 1
+                        return None
 
                 if token.keys:
                     lookup = keyword
@@ -650,6 +667,8 @@ class Argument:
                 if positional and keyword:  # pragma: no cover
                     raise MixedArgumentError(argument=self)
 
+            # self.hint has Annotated stripped but Optional preserved for none-coercion.
+            # For VAR_POSITIONAL/VAR_KEYWORD, self.hint has the tuple/dict wrapper.
             if positional:
                 if self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                     hint = get_args(self.hint)[0]
@@ -721,7 +740,8 @@ class Argument:
                 if not out:
                     out = UNSET
             elif data:
-                out = instantiate_from_dict(self.hint, data)
+                # Use resolved_hint to get the actual class type (Optional stripped)
+                out = instantiate_from_dict(self.resolved_hint, data)
             elif self.required:
                 raise MissingArgumentError(argument=self)  # pragma: no cover
             else:
@@ -835,7 +855,7 @@ class Argument:
             self.validate(self.field_info.default)
         return val
 
-    def token_count(self, keys: tuple[str, ...] = ()):
+    def token_count(self, keys: tuple[str, ...] = (), upcoming_tokens: "Sequence[Token] | None" = None):
         """The number of string tokens this argument consumes.
 
         Parameters
@@ -844,6 +864,8 @@ class Argument:
             The **python** keys into this argument.
             If provided, returns the number of string tokens that specific
             data type within the argument consumes.
+        upcoming_tokens: Sequence[Token] | None
+            Optional sequence of upcoming CLI Token objects for token-aware parsing.
 
         Returns
         -------
@@ -884,7 +906,7 @@ class Argument:
             hint = self.hint
             if self._enum_flag_type and not keys:
                 return 1, True
-        tokens_per_element, consume_all = token_count(hint)
+        tokens_per_element, consume_all = token_count(hint, upcoming_tokens=upcoming_tokens)
         return tokens_per_element, consume_all
 
     @property
@@ -1029,7 +1051,8 @@ class Argument:
                 result = child._json()
                 if result:
                     out[keys[0]] = result
-            elif (get_origin(child.hint) or child.hint) in ITERABLE_TYPES:
+            # Use resolved_hint for checking iterable types (e.g., list[str] | None -> list[str])
+            elif (get_origin(child.resolved_hint) or child.resolved_hint) in ITERABLE_TYPES:
                 for token in child.tokens:
                     if token.implicit_value is not UNSET:
                         out.setdefault(keys[-1], []).extend(token.implicit_value)
