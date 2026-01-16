@@ -10,6 +10,22 @@ import cyclopts
 from cyclopts import Group, Parameter
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="Run slow tests (e.g., documentation build tests)",
+    )
+
+
+def pytest_configure(config):
+    # If --run-slow is passed, remove the default "-m 'not slow'" filter
+    if config.getoption("--run-slow"):
+        # Override the marker expression to include all tests
+        config.option.markexpr = ""
+
+
 class MarkdownSnapshotExtension(SingleFileSnapshotExtension):
     _write_mode = WriteMode.TEXT
     file_extension = "md"

@@ -218,6 +218,12 @@ convention = "numpy"
 [tool.ruff.lint.pep8-naming]
 staticmethod-decorators = ["pydantic.validator", "pydantic.root_validator"]
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselected by default, use --run-slow to include)",
+]
+addopts = "-m 'not slow'"
+
 [tool.codespell]
 skip = 'uv.lock,'
 

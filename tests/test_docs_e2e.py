@@ -31,6 +31,7 @@ def _run_command(cmd: list[str], cwd: Path, env: dict | None = None) -> subproce
     )
 
 
+@pytest.mark.slow
 class TestMkDocsBuild:
     """Test MkDocs documentation builds."""
 
@@ -256,6 +257,7 @@ class TestMkDocsBuild:
         assert "internal" in content.lower(), "Hidden command should appear with include_hidden=true"
 
 
+@pytest.mark.slow
 class TestSphinxBuild:
     """Test Sphinx documentation builds."""
 
