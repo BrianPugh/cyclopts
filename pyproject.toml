@@ -124,7 +124,7 @@ omit = ["cyclopts/protocols.py"]
 venvPath = "."
 venv = ".venv"
 extraPaths = ["tests/apps/complex-demo"]
-ignore = ["docs/", "tests/py312/"]
+ignore = ["docs/", "tests/py312/", "cyclopts/_path_type.py"]
 reportUnsupportedDunderAll = "none"
 
 [tool.ruff]
