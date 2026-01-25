@@ -518,6 +518,8 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
         inner = get_args(hint)
         hint = inner[0]
         annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+        # Resolve Optional again after unwrapping Annotated, since hint could be Type | None
+        hint = resolve_optional(hint)
 
     # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
     type_cyclopts_config_params = []

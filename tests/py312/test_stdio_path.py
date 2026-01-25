@@ -269,6 +269,59 @@ def test_stdio_path_keyword_args(app, assert_parse_args, tmp_path):
     assert_parse_args(main, ["--input-path=-", f"--output-path={f}"], StdioPath("-"), StdioPath(f))
 
 
+def test_stdio_path_optional_without_annotated(app, assert_parse_args):
+    """StdioPath | None with default value should accept '-' as positional argument.
+
+    Regression test for issue #740.
+    """
+
+    @app.default
+    def main(
+        input_: StdioPath,
+        output: StdioPath | None = None,
+    ):
+        pass
+
+    assert_parse_args(main, ["-", "-"], StdioPath("-"), StdioPath("-"))
+
+
+def test_stdio_path_annotated_without_default(app, assert_parse_args):
+    """Annotated StdioPath without default should accept '-' as positional argument.
+
+    Regression test for issue #740.
+    """
+
+    @app.default
+    def main(
+        input_: StdioPath,
+        output: Annotated[StdioPath, Parameter(name=["--output", "-o"])],
+    ):
+        pass
+
+    assert_parse_args(main, ["-", "-"], StdioPath("-"), StdioPath("-"))
+    assert_parse_args(main, ["-", "--output", "-"], StdioPath("-"), StdioPath("-"))
+    assert_parse_args(main, ["-", "-o", "-"], StdioPath("-"), StdioPath("-"))
+
+
+def test_stdio_path_annotated_optional_with_default(app, assert_parse_args):
+    """Annotated StdioPath | None with default should accept '-' as positional argument.
+
+    Regression test for issue #740.
+    This is the specific combination that was broken.
+    """
+
+    @app.default
+    def main(
+        input_: StdioPath,
+        output: Annotated[StdioPath | None, Parameter(name=["--output", "-o"])] = None,
+    ):
+        pass
+
+    assert_parse_args(main, ["-", "-"], StdioPath("-"), StdioPath("-"))
+    assert_parse_args(main, ["-", "--output", "-"], StdioPath("-"), StdioPath("-"))
+    assert_parse_args(main, ["-", "-o", "-"], StdioPath("-"), StdioPath("-"))
+
+
 # Subclassing tests
 
 
