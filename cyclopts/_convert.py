@@ -696,24 +696,53 @@ def _convert(
     elif origin_type in ITERABLE_TYPES:
         # NOT including tuple; handled in ``origin_type is tuple`` body above.
         # Note: origin_type has already been normalized from abstract to concrete
-        count, _ = token_count(inner_types[0])
+        inner_type = inner_types[0]
         if not isinstance(token, Sequence):
             raise ValueError
 
-        # Check if tokens are JSON strings
-        inner_type = inner_types[0]
-        if (
-            count > 1
-            and any(isinstance(t, Token) and t.value.strip().startswith("{") for t in token)
-            and inner_type is not str
-        ):
-            # Each token is a complete JSON representation of the dataclass
-            gen = token
-        elif count > 1:
-            gen = zip(*[iter(token)] * count, strict=False)
+        if is_union(inner_type):
+            # Dynamic per-element parsing for unions with potentially different token counts.
+            # This enables list[tuple[int, int] | str] where elements can consume different
+            # numbers of tokens based on successful conversion.
+            result = []
+            remaining = list(token)
+            while remaining:
+                # Get dynamic token count based on upcoming tokens
+                tc, consume_all = token_count(inner_type, upcoming_tokens=remaining)
+                tc = max(1, tc)
+
+                if consume_all:
+                    # Element type consumes all remaining tokens (e.g., nested list)
+                    element_tokens = remaining
+                    remaining = []
+                else:
+                    element_tokens = remaining[:tc]
+                    remaining = remaining[tc:]
+
+                # Convert expects single Token for tc=1, list for tc>1
+                converted = convert(inner_type, element_tokens[0] if len(element_tokens) == 1 else element_tokens)
+                result.append(converted)
+
+                if consume_all:
+                    break
+
+            out = origin_type(result)
         else:
-            gen = token
-        out = origin_type(convert(inner_types[0], e) for e in gen)
+            # Static parsing for non-union element types
+            count, _ = token_count(inner_type)
+            # Check if tokens are JSON strings - each token is a complete JSON object
+            if (
+                count > 1
+                and any(isinstance(t, Token) and t.value.strip().startswith("{") for t in token)
+                and inner_type is not str
+            ):
+                # Each token is a complete JSON representation of the element type
+                gen = token
+            elif count > 1:
+                gen = zip(*[iter(token)] * count, strict=False)
+            else:
+                gen = token
+            out = origin_type(convert(inner_type, e) for e in gen)
     elif is_class_and_subclass(type_, Flag):
         # TODO: this might never execute since enum.Flag is now handled in ``convert``.
         out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
@@ -1137,7 +1166,12 @@ def token_count(
     elif is_enum_flag(type_):
         return 1, True
     elif origin_type in ITERABLE_TYPES and len(get_args(type_)):
-        return token_count(get_args(type_)[0])[0], True
+        inner_type = get_args(type_)[0]
+        # For union element types, return (1, True) to let conversion handle
+        # dynamic per-element parsing. This supports unions with varying token counts.
+        if is_union(inner_type):
+            return 1, True
+        return token_count(inner_type)[0], True
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return token_count(type_.__value__)
     elif is_union(type_):

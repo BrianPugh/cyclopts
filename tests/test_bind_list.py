@@ -211,3 +211,106 @@ def test_abstract_collection_types(app, assert_parse_args, hint, expected):
         return test
 
     assert_parse_args(main, "1 2 3", expected)
+
+
+#############################
+# Multi-Token Union Elements
+#############################
+
+
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        # Two ints -> one tuple
+        ("1 2", [(1, 2)]),
+        # Four ints -> two tuples
+        ("1 2 3 4", [(1, 2), (3, 4)]),
+        # Single string
+        ("hello", ["hello"]),
+        # Multiple strings
+        ("hello world", ["hello", "world"]),
+        # Mix of tuples and strings
+        ("1 2 hello 3 4", [(1, 2), "hello", (3, 4)]),
+        # Odd number of numeric tokens - last becomes string
+        ("1 2 3", [(1, 2), "3"]),
+        # String between tuples
+        ("1 2 foo 3 4 bar", [(1, 2), "foo", (3, 4), "bar"]),
+    ],
+)
+def test_list_multi_token_union_tuple_or_str(app, assert_parse_args, cmd, expected):
+    """Test list with union of multi-token type (tuple) and single-token type (str)."""
+
+    @app.default
+    def main(values: list[tuple[int, int] | str]):
+        pass
+
+    assert_parse_args(main, cmd, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd,expected",
+    [
+        # Two ints -> one tuple
+        ("1 2", [(1, 2)]),
+        # "none" -> None
+        ("none", [None]),
+        # Mix of tuples and None
+        ("1 2 none 3 4", [(1, 2), None, (3, 4)]),
+        # Multiple None values
+        ("none null NONE", [None, None, None]),
+    ],
+)
+def test_list_multi_token_union_tuple_or_none(app, assert_parse_args, cmd, expected):
+    """Test list with union of multi-token type (tuple) and None."""
+
+    @app.default
+    def main(values: list[tuple[int, int] | None]):
+        pass
+
+    assert_parse_args(main, cmd, expected)
+
+
+def test_list_multi_token_union_literal(app, assert_parse_args):
+    """Test list with union of multi-token type (tuple) and Literal."""
+    from typing import Literal
+
+    @app.default
+    def main(values: list[tuple[int, int] | Literal["auto"]]):
+        pass
+
+    assert_parse_args(main, "auto 1 2 auto", ["auto", (1, 2), "auto"])
+
+
+def test_set_multi_token_union(app, assert_parse_args):
+    """Test set with union of multi-token type works."""
+
+    @app.default
+    def main(values: set[tuple[int, int] | str]):
+        pass
+
+    # Note: set order is not guaranteed, so we check the bound values
+    _, bound, _ = app.parse_args("1 2 hello 3 4", print_error=False, exit_on_error=False)
+    assert bound.arguments["values"] == {(1, 2), "hello", (3, 4)}
+
+
+def test_list_union_str_first_always_matches_str(app, assert_parse_args):
+    """When str is first in union, it should always match (left-to-right semantics)."""
+
+    @app.default
+    def main(values: list[str | tuple[int, int]]):
+        pass
+
+    # All values become strings because str matches first
+    assert_parse_args(main, "1 2 hello", ["1", "2", "hello"])
+
+
+def test_list_multi_token_union_three_token_type(app, assert_parse_args):
+    """Test list with 3-token tuple type."""
+
+    @app.default
+    def main(values: list[tuple[int, int, int] | str]):
+        pass
+
+    assert_parse_args(main, "1 2 3 hello 4 5 6", [(1, 2, 3), "hello", (4, 5, 6)])
+    # When not enough tokens for tuple, falls back to str
+    assert_parse_args(main, "1 2", ["1", "2"])

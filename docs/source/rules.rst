@@ -326,6 +326,9 @@ List
 ****
 Unlike more simple types like :obj:`str` and :obj:`int`, lists use different parsing rules depending on whether the values are provided positionally or by keyword.
 
+For lists with union element types that have varying token counts (e.g., ``list[tuple[int, int] | str]``),
+see :ref:`Iterables with Multi-Token Union Elements <Coercion Rules - Iterables with Multi-Token Union Elements>`.
+
 ^^^^^^^^^^
 Positional
 ^^^^^^^^^^
@@ -695,6 +698,63 @@ By example:
 
    $ my-program
    config='auto'
+
+.. _Coercion Rules - Iterables with Multi-Token Union Elements:
+
+"""""""""""""""""""""""""""""""""""""""""
+Iterables with Multi-Token Union Elements
+"""""""""""""""""""""""""""""""""""""""""
+When a ``list``, ``set``, or other iterable has an element type that is a union with varying token counts,
+Cyclopts dynamically determines how many tokens each element should consume.
+Each element is parsed independently using left-to-right union semantics:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(values: list[tuple[int, int] | str]):
+       print(f"{values=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program 1 2 hello 3 4
+   values=[(1, 2), 'hello', (3, 4)]
+
+   $ my-program foo bar 1 2
+   values=['foo', 'bar', (1, 2)]
+
+   $ my-program 1 2 3
+   values=[(1, 2), '3']
+
+In the last example, after consuming ``1 2`` as a tuple, only one token (``3``) remains.
+Since ``tuple[int, int]`` requires 2 tokens, it is skipped and ``str`` matches instead.
+
+This also works with ``None`` and ``Literal`` types in the union:
+
+.. code-block:: python
+
+   @app.default
+   def default(values: list[tuple[int, int] | None]):
+       print(f"{values=}")
+
+.. code-block:: console
+
+   $ my-program 1 2 none 3 4
+   values=[(1, 2), None, (3, 4)]
+
+.. note::
+   Union ordering matters. If ``str`` appears first (e.g., ``list[str | tuple[int, int]]``),
+   all tokens will match as strings since ``str`` always succeeds:
+
+   .. code-block:: console
+
+      $ my-program 1 2 hello
+      values=['1', '2', 'hello']
 
 
 ********
