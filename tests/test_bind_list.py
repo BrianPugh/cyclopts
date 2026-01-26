@@ -314,3 +314,125 @@ def test_list_multi_token_union_three_token_type(app, assert_parse_args):
     assert_parse_args(main, "1 2 3 hello 4 5 6", [(1, 2, 3), "hello", (4, 5, 6)])
     # When not enough tokens for tuple, falls back to str
     assert_parse_args(main, "1 2", ["1", "2"])
+
+
+def test_list_multi_token_non_union_keyword(app, assert_parse_args):
+    """Test list with non-union multi-token type using keyword arguments.
+
+    For non-union element types, each --values captures the exact number of
+    tokens needed for one element (2 for tuple[int, str]).
+    """
+
+    @app.default
+    def main(values: list[tuple[int, str]]):
+        pass
+
+    # Each --values captures 2 tokens (one complete tuple)
+    assert_parse_args(main, "--values 1 one", [(1, "one")])
+
+    # Multiple tuples via keyword
+    assert_parse_args(main, "--values 1 one --values 2 two", [(1, "one"), (2, "two")])
+
+    # Three tuples
+    assert_parse_args(main, "--values 1 a --values 2 b --values 3 c", [(1, "a"), (2, "b"), (3, "c")])
+
+
+def test_list_multi_token_union_keyword(app, assert_parse_args):
+    """Test list with union of multi-token types using keyword arguments.
+
+    For union element types with varying token counts, each --values captures
+    one token. Tokens are accumulated across multiple --values invocations,
+    then dynamic conversion is applied to all accumulated tokens together.
+    """
+
+    @app.default
+    def main(values: list[tuple[int, int] | str]):
+        pass
+
+    # Each --values captures one token; tokens are combined then converted dynamically
+    # Two numeric tokens -> one tuple
+    assert_parse_args(main, "--values 1 --values 2", [(1, 2)])
+
+    # Four numeric tokens -> two tuples
+    assert_parse_args(main, "--values 1 --values 2 --values 3 --values 4", [(1, 2), (3, 4)])
+
+    # Mixed: numeric and string tokens
+    assert_parse_args(main, "--values 1 --values 2 --values hello --values 3 --values 4", [(1, 2), "hello", (3, 4)])
+
+    # All strings
+    assert_parse_args(main, "--values hello --values world", ["hello", "world"])
+
+
+def test_list_multi_token_union_two_multi_token_types(app, assert_parse_args):
+    """Test list with union of two different multi-token tuple types.
+
+    With tuple[int, int] | tuple[int, int, int], left-to-right semantics apply:
+    - First try tuple[int, int] (needs 2 tokens)
+    - If that fails, try tuple[int, int, int] (needs 3 tokens)
+
+    Since tuple[int, int] comes first and always succeeds when 2+ int tokens
+    are available, tuple[int, int, int] will only match when exactly 3 tokens
+    remain and the first 2 can't form a valid tuple[int, int] (which won't happen
+    with ints). So effectively tuple[int, int] always wins.
+    """
+
+    @app.default
+    def main(values: list[tuple[int, int] | tuple[int, int, int]]):
+        pass
+
+    # 4 tokens -> two tuple[int, int] (first type matches)
+    assert_parse_args(main, "1 2 3 4", [(1, 2), (3, 4)])
+
+    # 6 tokens -> three tuple[int, int]
+    assert_parse_args(main, "1 2 3 4 5 6", [(1, 2), (3, 4), (5, 6)])
+
+
+def test_list_multi_token_union_three_token_first(app, assert_parse_args):
+    """Test with 3-token type first in union - it gets priority."""
+
+    @app.default
+    def main(values: list[tuple[int, int, int] | tuple[int, int]]):
+        pass
+
+    # 6 tokens -> two tuple[int, int, int] (first type matches when enough tokens)
+    assert_parse_args(main, "1 2 3 4 5 6", [(1, 2, 3), (4, 5, 6)])
+
+    # 4 tokens -> first takes 3, leaving 1 which isn't enough for either
+    # tuple[int, int, int] needs 3, only 1 left -> skip
+    # tuple[int, int] needs 2, only 1 left -> skip
+    # This should raise an error or the last token is unparsable
+    # Actually, let's test 5 tokens: first takes 3, leaving 2 for tuple[int, int]
+    assert_parse_args(main, "1 2 3 4 5", [(1, 2, 3), (4, 5)])
+
+
+def test_list_multi_token_union_consume_all(app, assert_parse_args):
+    """Test list with union where one type has consume_all (tuple[T, ...])."""
+
+    @app.default
+    def main(values: list[tuple[int, int] | tuple[str, ...]]):
+        pass
+
+    # Two ints -> tuple[int, int] matches first
+    assert_parse_args(main, "1 2", [(1, 2)])
+
+    # Four ints -> two tuple[int, int]
+    assert_parse_args(main, "1 2 3 4", [(1, 2), (3, 4)])
+
+    # Strings that can't be ints -> tuple[str, ...] consumes all
+    assert_parse_args(main, "hello world foo", [("hello", "world", "foo")])
+
+    # Mix: two ints first, then strings trigger consume_all for rest
+    # Actually this is tricky - after (1,2), remaining is ["hello", "world"]
+    # tuple[int, int] fails on "hello", tuple[str, ...] consumes all remaining
+    assert_parse_args(main, "1 2 hello world", [(1, 2), ("hello", "world")])
+
+
+def test_frozenset_multi_token_union(app, assert_parse_args):
+    """Test frozenset with union of multi-token type works like set."""
+
+    @app.default
+    def main(values: frozenset[tuple[int, int] | str]):
+        pass
+
+    _, bound, _ = app.parse_args("1 2 hello 3 4", print_error=False, exit_on_error=False)
+    assert bound.arguments["values"] == frozenset({(1, 2), "hello", (3, 4)})
