@@ -139,6 +139,100 @@ Complex
 Token gets cast as ``complex(token)``. For example, ``complex("3+5j")``
 
 ****
+None
+****
+For optional parameters (e.g., ``int | None``), the strings ``"none"`` and ``"null"`` (case-insensitive) can be used to explicitly pass :obj:`None`.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(value: int | None = 5):
+       print(f"{value=} {type(value)=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program 10
+   value=10 type(value)=<class 'int'>
+
+   $ my-program none
+   value=None type(value)=<class 'NoneType'>
+
+   $ my-program NULL
+   value=None type(value)=<class 'NoneType'>
+
+This is particularly useful for resetting a parameter to its unset state, or for explicitly indicating "no value" in configuration scenarios.
+
+.. note::
+   **Union ordering matters.** For union types, Cyclopts iterates left-to-right and uses the first
+   successful coercion (see :ref:`Union <Coercion Rules - Union>`). If ``str`` appears before ``None`` in a union (e.g., ``str | None``),
+   the string ``"none"`` will be parsed as the literal string ``"none"`` because ``str`` coercion
+   succeeds first.
+
+**Optional Iterables:**
+For types like ``list[T] | None``, union ordering **matters**.
+The type that comes first in the union gets first priority.
+
+* ``list[T] | None`` - The list comes first, so tokens go to the list. The ``"none"``/``"null"`` to :obj:`None` conversion applies to individual list *elements* (when ``T`` allows :obj:`None`).
+* ``None | list[T]`` - :obj:`None` comes first, so ``"none"``/``"null"`` tokens match :obj:`None` directly. To get a list, provide non-none tokens.
+
+To get :obj:`None` for the entire value:
+
+* Put :obj:`None` first in the union (e.g., ``None | list[T]``) and provide ``"none"``
+* Omit the argument entirely (use the default value)
+* Use a :attr:`negative flag <.Parameter.negative_none>` (e.g., ``--no-values``)
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(values: list[int | None] | None = None):
+       print(f"{values=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program
+   values=None
+
+   $ my-program 1 2 3
+   values=[1, 2, 3]
+
+   $ my-program 1 none 3
+   values=[1, None, 3]
+
+   $ my-program none
+   values=[None]
+
+   $ my-program --no-values
+   values=None
+
+With ``None`` first in the union:
+
+.. code-block:: python
+
+   @app.default
+   def default(values: None | list[int | None] = None):
+       print(f"{values=}")
+
+.. code-block:: console
+
+   $ my-program none
+   values=None
+
+   $ my-program 1 2 3
+   values=[1, 2, 3]
+
+****
 Bool
 ****
 1. If specified as a **keyword**, booleans are interpreted flags that take no parameter.
@@ -231,6 +325,9 @@ Bool
 List
 ****
 Unlike more simple types like :obj:`str` and :obj:`int`, lists use different parsing rules depending on whether the values are provided positionally or by keyword.
+
+For lists with union element types that have varying token counts (e.g., ``list[tuple[int, int] | str]``),
+see :ref:`Iterables with Multi-Token Union Elements <Coercion Rules - Iterables with Multi-Token Union Elements>`.
 
 ^^^^^^^^^^
 Positional
@@ -533,7 +630,6 @@ Union
 *****
 
 The unioned types will be iterated **left-to-right** until a successful coercion is performed.
-:obj:`None` type hints are ignored.
 
 .. code-block:: python
 
@@ -555,6 +651,110 @@ The unioned types will be iterated **left-to-right** until a successful coercion
 
     $ my-program bar
     <class 'str'>
+
+.. _Coercion Rules - Multi-Token Type Unions:
+
+^^^^^^^^^^^^^^^^^^^^^^^
+Multi-Token Type Unions
+^^^^^^^^^^^^^^^^^^^^^^^
+When a union contains types that consume different numbers of tokens (e.g., ``tuple[int, int]`` consumes 2, while ``int`` consumes 1),
+Cyclopts uses **conversion-based token counting** with **left-to-right priority**:
+
+1. Types are tried left-to-right
+2. Types that need more tokens than available are **skipped**
+3. For each candidate type, Cyclopts attempts conversion; the **first type that successfully converts** wins
+
+By example:
+
+* ``int | tuple[int, int]`` with ``"5"`` - int converts successfully, result is ``5``.
+* ``int | tuple[int, int]`` with ``"1 2"`` - int converts ``"1"`` successfully, leaving ``"2"`` **unused** (error). To use the tuple, place it first or ensure the first token can't convert to int.
+* ``tuple[int, int] | int`` with ``"1 2"`` - tuple converts both tokens, result is ``(1, 2)``.
+* ``tuple[int, int] | int`` with ``"5"`` - tuple needs 2 tokens but only 1 available, **skipped**; int converts ``"5"``, result is ``5``.
+* ``Literal["auto"] | tuple[int, int]`` with ``"auto"`` - Literal matches, result is ``"auto"``.
+* ``Literal["auto"] | tuple[int, int]`` with ``"1 2"`` - Literal doesn't match ``"1"``, tuple converts both, result is ``(1, 2)``.
+* ``tuple[int, int] | Literal["auto"]`` with ``"auto"`` - tuple needs 2 tokens but only 1 available, **skipped**; Literal matches, result is ``"auto"``.
+* ``tuple[int, int] | Literal["auto"]`` with ``"1 2"`` - tuple converts both tokens, result is ``(1, 2)``.
+
+.. code-block:: python
+
+   from cyclopts import App
+   from typing import Literal
+
+   app = App()
+
+   @app.default
+   def default(config: Literal["auto"] | tuple[int, int] = "auto"):
+       print(f"{config=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program auto
+   config='auto'
+
+   $ my-program 10 20
+   config=(10, 20)
+
+   $ my-program
+   config='auto'
+
+.. _Coercion Rules - Iterables with Multi-Token Union Elements:
+
+"""""""""""""""""""""""""""""""""""""""""
+Iterables with Multi-Token Union Elements
+"""""""""""""""""""""""""""""""""""""""""
+When a ``list``, ``set``, or other iterable has an element type that is a union with varying token counts,
+Cyclopts dynamically determines how many tokens each element should consume.
+Each element is parsed independently using left-to-right union semantics:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App()
+
+   @app.default
+   def default(values: list[tuple[int, int] | str]):
+       print(f"{values=}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-program 1 2 hello 3 4
+   values=[(1, 2), 'hello', (3, 4)]
+
+   $ my-program foo bar 1 2
+   values=['foo', 'bar', (1, 2)]
+
+   $ my-program 1 2 3
+   values=[(1, 2), '3']
+
+In the last example, after consuming ``1 2`` as a tuple, only one token (``3``) remains.
+Since ``tuple[int, int]`` requires 2 tokens, it is skipped and ``str`` matches instead.
+
+This also works with ``None`` and ``Literal`` types in the union:
+
+.. code-block:: python
+
+   @app.default
+   def default(values: list[tuple[int, int] | None]):
+       print(f"{values=}")
+
+.. code-block:: console
+
+   $ my-program 1 2 none 3 4
+   values=[(1, 2), None, (3, 4)]
+
+.. note::
+   Union ordering matters. If ``str`` appears first (e.g., ``list[str | tuple[int, int]]``),
+   all tokens will match as strings since ``str`` always succeeds:
+
+   .. code-block:: console
+
+      $ my-program 1 2 hello
+      values=['1', '2', 'hello']
 
 
 ********
@@ -602,6 +802,9 @@ Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typ
    │ into one of {'foo', 'bar', 3}.                          │
    ╰─────────────────────────────────────────────────────────╯
 
+
+.. note::
+   :obj:`~typing.Literal` matching is **case-sensitive**. The token must exactly match one of the literal values.
 
 ****
 Enum

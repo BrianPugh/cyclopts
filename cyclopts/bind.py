@@ -9,7 +9,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
 
 from cyclopts._convert import _bool
-from cyclopts.annotations import resolve_optional
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -237,20 +236,53 @@ def _parse_kw_and_flags(
                         raise CombinedShortOptionError(
                             msg=f"Cannot combine multiple value-taking options in token {cli_option}"
                         )
-                tokens_per_element, consume_all = match.argument.token_count(match.keys)
+                # Create Token objects upfront for all upcoming tokens.
+                # Token creation is cheap (small frozen dataclass), and this enables
+                # identity-based caching since the same Token objects will be used
+                # for both probing (in token_count) and actual conversion.
+                # Note: index is 0-based per invocation (not cumulative) for proper
+                # repeat argument detection via Token.address.
+
+                # Include any values already extracted from "=" syntax (e.g., --key=value)
+                # These need to be part of the token sequence for proper probing.
+                pre_extracted_values = list(cli_values)  # Values from "=" or attached GNU-style
+                all_upcoming_values = pre_extracted_values + list(tokens[i + 1 :])
+                upcoming_tokens = [
+                    CliToken(keyword=match.matched_token, value=v, index=j, keys=match.keys)
+                    for j, v in enumerate(all_upcoming_values)
+                ]
+                tokens_per_element, consume_all = match.argument.token_count(
+                    match.keys, upcoming_tokens=upcoming_tokens
+                )
 
                 # Consume the appropriate number of tokens
+                consumed_tokens: list[Token] = []
+                pre_extracted_count = len(pre_extracted_values)
+
                 with suppress(IndexError):
                     if consume_all and match.argument.parameter.consume_multiple:
-                        for j in itertools.count():
-                            token = tokens[i + 1 + j]
-                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token):
+                        # First, include the pre-extracted tokens
+                        for j in range(pre_extracted_count):
+                            consumed_tokens.append(upcoming_tokens[j])
+                        # Then consume from the remaining tokens
+                        for j in itertools.count(pre_extracted_count):
+                            token = upcoming_tokens[j]
+                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token.value):
                                 break
-                            cli_values.append(token)
+                            consumed_tokens.append(token)
+                            cli_values.append(token.value)
                             skip_next_iterations += 1
                     else:
-                        consume_count += tokens_per_element
-                        for j in range(consume_count):
+                        # consume_count is negative if we already have pre-extracted values
+                        additional_to_consume = consume_count + tokens_per_element
+
+                        # First, include pre-extracted tokens (up to tokens_per_element)
+                        for j in range(min(pre_extracted_count, tokens_per_element)):
+                            consumed_tokens.append(upcoming_tokens[j])
+
+                        # Then consume additional tokens from CLI
+                        for j in range(additional_to_consume):
+                            idx = pre_extracted_count + j
                             if len(cli_values) == 1 and (
                                 match.argument._should_attempt_json_dict(cli_values)
                                 or match.argument._should_attempt_json_list(cli_values, match.keys)
@@ -260,22 +292,22 @@ def _parse_kw_and_flags(
                                 # consume any additional tokens.
                                 break
 
-                            token = tokens[i + 1 + j]
-                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token):
+                            token = upcoming_tokens[idx]
+                            if not match.argument.parameter.allow_leading_hyphen and is_option_like(token.value):
                                 raise MissingArgumentError(
                                     argument=match.argument,
                                     tokens_so_far=cli_values,
                                     keyword=match.matched_token,
                                 )
-                            cli_values.append(token)
+                            consumed_tokens.append(token)
+                            cli_values.append(token.value)
                             skip_next_iterations += 1
 
-                if not cli_values:
+                if not consumed_tokens:
                     # No values were consumed after the keyword
                     if consume_all and match.argument.parameter.consume_multiple:
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
-                        hint = resolve_optional(match.argument.hint)
-                        empty_container = (get_origin(hint) or hint)()
+                        empty_container = (get_origin(match.argument.resolved_hint) or match.argument.resolved_hint)()
                         match.argument.append(
                             CliToken(keyword=match.matched_token, implicit_value=empty_container, keys=match.keys)
                         )
@@ -284,17 +316,15 @@ def _parse_kw_and_flags(
                         raise MissingArgumentError(
                             argument=match.argument, tokens_so_far=cli_values, keyword=match.matched_token
                         )
-                elif len(cli_values) % tokens_per_element:
+                elif len(consumed_tokens) % tokens_per_element:
                     # For multi-token elements (e.g., tuples), ensure we have complete sets
                     raise MissingArgumentError(
                         argument=match.argument, tokens_so_far=cli_values, keyword=match.matched_token
                     )
                 else:
-                    # Normal case: append the consumed values
-                    for index, cli_value in enumerate(cli_values):
-                        match.argument.append(
-                            CliToken(keyword=match.matched_token, value=cli_value, index=index, keys=match.keys)
-                        )
+                    # Normal case: append the pre-created Token objects directly
+                    for consumed_token in consumed_tokens:
+                        match.argument.append(consumed_token)
 
     unused_tokens.extend(positional_only_tokens)
     return unused_tokens
@@ -360,7 +390,11 @@ def _parse_pos(
                         token=tokens_and_force_positional[0][0],
                     )
 
-        tokens_per_element, consume_all = argument.token_count()
+        # Create Token objects for token_count() to enable union type probing.
+        # Token creation is cheap (small frozen dataclass). For positional args,
+        # we create separate tokens for actual use with per-element indices.
+        upcoming_tokens = [CliToken(value=t[0], index=j) for j, t in enumerate(tokens_and_force_positional)]
+        tokens_per_element, consume_all = argument.token_count(upcoming_tokens=upcoming_tokens)
         tokens_per_element = max(1, tokens_per_element)
 
         if consume_all and argument.field_info.kind is POSITIONAL_ONLY:
@@ -381,10 +415,10 @@ def _parse_pos(
                     tokens_so_far=[x[0] for x in tokens_and_force_positional],
                 )
 
-            for index, (token, force_positional) in enumerate(tokens_and_force_positional[:tokens_per_element]):
-                if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token):
-                    raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
-                new_tokens.append(CliToken(value=token, index=index))
+            for index, (token_str, force_positional) in enumerate(tokens_and_force_positional[:tokens_per_element]):
+                if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token_str):
+                    raise UnknownOptionError(token=CliToken(value=token_str), argument_collection=argument_collection)
+                new_tokens.append(CliToken(value=token_str, index=index))
             tokens_and_force_positional = tokens_and_force_positional[tokens_per_element:]
             if not consume_all:
                 break

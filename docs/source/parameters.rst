@@ -282,6 +282,9 @@ Tokens are Cyclopt's way of bookkeeping user inputs; in the last command the ``t
       ),
    )
 
+.. note::
+   For :obj:`~typing.Optional` types (e.g., ``int | None``), the converter receives the **resolved non-optional type** (e.g., ``int``) to simplify most use-cases.
+
 ^^^^^^^^^^^^^^^^^^^^^^^^
 Controlling Token Count
 ^^^^^^^^^^^^^^^^^^^^^^^^

@@ -19,12 +19,16 @@ from typing import (
     get_origin,
 )
 
-if sys.version_info >= (3, 12):
-    from typing import TypeAliasType
-else:
-    TypeAliasType = None
-
-from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
+from cyclopts._cache import cache
+from cyclopts.annotations import (
+    NoneType,
+    is_annotated,
+    is_enum_flag,
+    is_nonetype,
+    is_union,
+    resolve,
+    resolve_optional,
+)
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import FieldInfo, get_field_infos
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
@@ -75,6 +79,7 @@ ITERABLE_TYPES = {
     tuple,
 }
 
+
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
 
@@ -87,6 +92,13 @@ def _bool(s: str) -> bool:
     else:
         # Cyclopts is a little bit conservative when coercing strings into boolean.
         raise CoercionError(target_type=bool)
+
+
+def _none(s: str) -> None:
+    """Convert 'none' or 'null' strings (case-insensitive) to None."""
+    if s.lower() in {"none", "null"}:
+        return None
+    raise CoercionError(target_type=NoneType)
 
 
 def _int(s: str) -> int:
@@ -242,6 +254,7 @@ _converters: dict[Any, Callable] = {
     date: _date,
     datetime: _datetime,
     timedelta: _timedelta,
+    NoneType: _none,
 }
 
 
@@ -540,6 +553,25 @@ def _convert_structured_type(
     return instantiate_from_dict(type_, data)
 
 
+def _convert_cache_key(type_, token, *, converter, name_transform) -> tuple:
+    """Generate cache key for _convert based on type and token content.
+
+    Note: We use the type directly (not id(type_)) because generic types like
+    set[str] are created as temporary objects that may be garbage collected
+    and their memory address reused by subsequent types.
+    Using the type directly leverages proper __eq__ and __hash__ for types.
+    """
+    from cyclopts.argument import Token
+
+    if isinstance(token, Token):
+        token_key = (token.value, id(token.implicit_value))
+    else:
+        token_key = tuple((t.value, id(t.implicit_value)) for t in token)
+
+    return (type_, token_key, id(converter) if converter else None, id(name_transform))
+
+
+@cache(_convert_cache_key)
 def _convert(
     type_,
     token: Union["Token", Sequence["Token"]],
@@ -568,10 +600,8 @@ def _convert(
             def converter_with_token(t_, value):
                 assert cparam.converter
 
-                # Resolve string converters to methods on the type
-                resolved_converter = cparam.converter
-                if isinstance(resolved_converter, str):
-                    resolved_converter = getattr(t_, resolved_converter)
+                resolved_converter = cparam.resolve_converter(t_)
+                assert resolved_converter  # For pyright: cparam.converter is truthy, so this won't be None
 
                 # Detect bound methods (classmethods/instance methods)
                 # Bound methods already have their first parameter bound
@@ -614,11 +644,25 @@ def _convert(
         out = convert(type_.__value__, token)
     elif is_union(origin_type):
         for t in inner_types:
-            if is_nonetype(t):
-                continue
             try:
-                out = convert(t, token)
+                # When token is a sequence (e.g., list of Token objects), we may need
+                # to unpack it for single-token types. Decide per-member based on that
+                # member's token_count, not globally.
+                if isinstance(token, Sequence) and len(token) == 1:
+                    tc, consume_all = token_count(t)
+                    if consume_all or tc > 1:
+                        # This type wants multiple tokens or all tokens - pass full list
+                        out = convert(t, token)
+                    else:
+                        # Single-token type - unpack the sequence
+                        out = convert(t, token[0])
+                else:
+                    out = convert(t, token)
                 break
+            except ValidationError:
+                # ValidationError means coercion succeeded but the value failed validation.
+                # Propagate immediately since the input matched this type's structure.
+                raise
             except Exception:
                 pass
         else:
@@ -652,24 +696,53 @@ def _convert(
     elif origin_type in ITERABLE_TYPES:
         # NOT including tuple; handled in ``origin_type is tuple`` body above.
         # Note: origin_type has already been normalized from abstract to concrete
-        count, _ = token_count(inner_types[0])
+        inner_type = inner_types[0]
         if not isinstance(token, Sequence):
             raise ValueError
 
-        # Check if tokens are JSON strings
-        inner_type = inner_types[0]
-        if (
-            count > 1
-            and any(isinstance(t, Token) and t.value.strip().startswith("{") for t in token)
-            and inner_type is not str
-        ):
-            # Each token is a complete JSON representation of the dataclass
-            gen = token
-        elif count > 1:
-            gen = zip(*[iter(token)] * count, strict=False)
+        if is_union(inner_type):
+            # Dynamic per-element parsing for unions with potentially different token counts.
+            # This enables list[tuple[int, int] | str] where elements can consume different
+            # numbers of tokens based on successful conversion.
+            result = []
+            remaining = list(token)
+            while remaining:
+                # Get dynamic token count based on upcoming tokens
+                tc, consume_all = token_count(inner_type, upcoming_tokens=remaining)
+                tc = max(1, tc)
+
+                if consume_all:
+                    # Element type consumes all remaining tokens (e.g., nested list)
+                    element_tokens = remaining
+                    remaining = []
+                else:
+                    element_tokens = remaining[:tc]
+                    remaining = remaining[tc:]
+
+                # Convert expects single Token for tc=1, list for tc>1
+                converted = convert(inner_type, element_tokens[0] if len(element_tokens) == 1 else element_tokens)
+                result.append(converted)
+
+                if consume_all:
+                    break
+
+            out = origin_type(result)
         else:
-            gen = token
-        out = origin_type(convert(inner_types[0], e) for e in gen)
+            # Static parsing for non-union element types
+            count, _ = token_count(inner_type)
+            # Check if tokens are JSON strings - each token is a complete JSON object
+            if (
+                count > 1
+                and any(isinstance(t, Token) and t.value.strip().startswith("{") for t in token)
+                and inner_type is not str
+            ):
+                # Each token is a complete JSON representation of the element type
+                gen = token
+            elif count > 1:
+                gen = zip(*[iter(token)] * count, strict=False)
+            else:
+                gen = token
+            out = origin_type(convert(inner_type, e) for e in gen)
     elif is_class_and_subclass(type_, Flag):
         # TODO: this might never execute since enum.Flag is now handled in ``convert``.
         out = convert_enum_flag(type_, token if isinstance(token, Sequence) else [token], name_transform)
@@ -816,7 +889,7 @@ def convert(
 
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
-    type_ = resolve(type_)
+    type_ = resolve(type_, optional=False)
 
     if type_ is Any:
         type_ = str
@@ -833,34 +906,51 @@ def convert(
     # Normalize abstract origin types to concrete types early
     if origin_type in _abstract_to_concrete_type_mapping:
         origin_type = _abstract_to_concrete_type_mapping[origin_type]
-    maybe_origin_type = origin_type or type_
+
+    # For dispatch purposes, resolve Optional-like Unions (T | None) to T.
+    # This allows the if/elif chain below to handle the token sequence correctly
+    # (e.g., unpacking single tokens), while _convert handles the union iteration.
+    dispatch_type = type_
+    dispatch_origin = origin_type or type_
+
+    if is_union(origin_type):
+        resolved = resolve_optional(type_)
+        if resolved is not type_:
+            # Optional pattern (T | None): dispatch based on T's requirements
+            dispatch_type = resolved
+            dispatch_origin = get_origin(resolved) or resolved
 
     if origin_type is tuple:
         return convert_tuple(type_, *tokens)  # pyright: ignore
-    elif maybe_origin_type in ITERABLE_TYPES:
+    elif dispatch_origin in ITERABLE_TYPES:
         return convert_priv(type_, tokens)  # pyright: ignore
-    elif maybe_origin_type is dict:
+    elif dispatch_origin is dict:
         if not isinstance(tokens, dict):
             raise ValueError  # Programming error
         try:
-            value_type = get_args(type_)[1]
+            value_type = get_args(dispatch_type)[1]
         except IndexError:
             value_type = str
         dict_converted = {
             k: convert(value_type, v, converter=converter, name_transform=name_transform) for k, v in tokens.items()
         }
-        return _converters.get(maybe_origin_type, maybe_origin_type)(**dict_converted)
+        return dict(**dict_converted)
     elif isinstance(tokens, dict):
         raise ValueError(f"Dictionary of tokens provided for unknown {type_!r}.")  # Programming error
-    elif is_enum_flag(maybe_origin_type):
+    elif is_enum_flag(dispatch_origin):
         # Unlike other types that can accept multiple tokens, the result is not a sequence, it's a single
         # enum.Flag object.
-        return convert_enum_flag(maybe_origin_type, tokens, name_transform)
+        return convert_enum_flag(dispatch_origin, tokens, name_transform)
     else:
         if len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
-        tokens_per_element, _ = token_count(type_)
-        if tokens_per_element == 1:
+        # Pass Token objects to token_count for consistent union type resolution
+        # tokens is Sequence[Token] at this point (strings were converted to Tokens earlier in this function)
+        tokens_per_element, consume_all = token_count(type_, upcoming_tokens=tokens)  # pyright: ignore[reportArgumentType]
+        if consume_all:
+            # For consume_all types (like list[T] in unions), process all tokens together
+            return convert_priv(type_, tokens)  # pyright: ignore
+        elif tokens_per_element == 1:
             return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
         elif len(tokens) == tokens_per_element:
             return convert_priv(type_, tokens)  # pyright: ignore
@@ -868,7 +958,123 @@ def convert(
             raise NotImplementedError("Unreachable?")
 
 
-def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, bool]:
+def _resolve_effective_converter(
+    type_: Any,
+    fallback_converter: Callable | None = None,
+    fallback_name_transform: Callable[[str], str] = default_name_transform,
+) -> tuple[Callable | None, Callable[[str], str]]:
+    """Resolve effective converter and name_transform for a type.
+
+    Examines the type's Parameter annotations (from both Annotated and
+    __cyclopts__ attributes) and resolves string converters to callables.
+
+    Parameters
+    ----------
+    type_
+        The type to resolve converter for.
+    fallback_converter
+        Converter to use if type has no converter specified.
+    fallback_name_transform
+        Name transform to use if type has no name_transform specified.
+
+    Returns
+    -------
+    tuple[Callable | None, Callable[[str], str]]
+        (converter, name_transform) - the effective converter and name_transform.
+    """
+    from cyclopts.parameter import get_parameters
+
+    converter = fallback_converter
+    name_transform = fallback_name_transform
+
+    _, parameters = get_parameters(type_)
+    for param in parameters:
+        if param.converter is not None:
+            converter = param.resolve_converter(type_)
+        if param._name_transform is not None:
+            name_transform = param._name_transform
+
+    return converter, name_transform
+
+
+def _union_conversion(
+    union_args: tuple[Any, ...],
+    upcoming_tokens: "Sequence[Token]",
+    name_transform: Callable[[str], str] = default_name_transform,
+    converter: Callable | None = None,
+) -> tuple[Any, int, bool]:
+    """Convert tokens using a union type by attempting each member left-to-right.
+
+    Iterates through union args, attempting conversion with the upcoming tokens.
+    Returns the converted value and token count for the first type that successfully
+    converts.
+
+    Parameters
+    ----------
+    union_args
+        The type arguments of the union (from get_args()).
+    upcoming_tokens
+        Sequence of upcoming CLI Token objects to try converting.
+    name_transform
+        Name transform function for conversion (fallback for union members).
+    converter
+        Optional custom converter function from Parameter annotation (fallback).
+
+    Returns
+    -------
+    tuple[Any, int, bool]
+        (converted_value, token_count, consume_all) for the first matching type.
+
+    Raises
+    ------
+    CoercionError
+        If no union member could convert the tokens.
+    """
+    for arg in union_args:
+        # Resolve the effective converter and name_transform for this union member.
+        # This handles @Parameter decorated classes with string converters.
+        effective_converter, effective_name_transform = _resolve_effective_converter(arg, converter, name_transform)
+        # Pass upcoming_tokens for nested unions
+        tc, consume_all = token_count(arg, upcoming_tokens=upcoming_tokens)
+
+        # Determine tokens to try for conversion
+        if consume_all:
+            tokens_to_try = upcoming_tokens
+        else:
+            if tc > len(upcoming_tokens):
+                continue  # Not enough tokens for this type
+            tokens_to_try = upcoming_tokens[:tc]
+
+        if not tokens_to_try:
+            continue
+
+        # Use the Token objects directly - they were created upfront in bind.py
+        # This enables identity-based caching since the same Token objects
+        # will be used for both probing and actual conversion.
+        token_input = tokens_to_try[0] if len(tokens_to_try) == 1 else list(tokens_to_try)
+
+        try:
+            result = _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)
+            return result, tc, consume_all
+        except ValidationError:
+            # ValidationError means coercion succeeded but validation failed.
+            # Return this type's token count - the actual conversion (with proper
+            # argument context) will raise the error with full details.
+            # Return None for result since caller (token_count) only uses tc/consume_all.
+            return None, tc, consume_all
+        except Exception:
+            continue
+
+    # No union member could convert the tokens
+    token = upcoming_tokens[0] if upcoming_tokens else None
+    raise CoercionError(token=token, target_type=Union[union_args])  # pyright: ignore  # noqa: UP007
+
+
+def token_count(
+    type_: Any,
+    skip_converter_params: bool = False,
+    upcoming_tokens: "Sequence[Token] | None" = None,
+) -> tuple[int, bool]:
     """The number of tokens after a keyword the parameter should consume.
 
     Parameters
@@ -878,6 +1084,9 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
     skip_converter_params: bool
         If True, don't extract converter parameters from __cyclopts__.
         Used to prevent infinite recursion when determining consume_all behavior.
+    upcoming_tokens: Sequence[Token] | None
+        Optional sequence of upcoming CLI Token objects. If provided, enables
+        token-aware parsing for union types by attempting conversion.
 
     Returns
     -------
@@ -887,9 +1096,29 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
+    from cyclopts.parameter import get_parameters
+
+    # Token-aware union handling MUST happen before get_parameters() because
+    # get_parameters() strips None from Optional unions via resolve_optional().
+    # For Annotated unions, we handle them in the later is_union() block.
+    if upcoming_tokens and is_union(type_):
+        args = get_args(type_)
+        try:
+            _, tc, consume_all = _union_conversion(args, upcoming_tokens)
+            return tc, consume_all
+        except CoercionError:
+            # No union member matched. For Optional types (Union with exactly one
+            # non-None type), fall through to structural analysis so "not enough tokens"
+            # errors are raised properly. For other unions, return (1, False) since
+            # it's a value mismatch, not a structural mismatch.
+            non_none_types = [t for t in args if not is_nonetype(t)]
+            if len(non_none_types) != 1:
+                # Not an Optional - it's a real union with multiple non-None types
+                return 1, False
+            # Optional type - fall through to structural analysis of the non-None type
+
     # Check for explicit n_tokens in Parameter annotation before resolving
     # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
-    from cyclopts.parameter import get_parameters
 
     resolved_type, parameters = get_parameters(type_, skip_converter_params=skip_converter_params)
     for param in parameters:
@@ -897,6 +1126,8 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
             if param.n_tokens == -1:
                 return 1, True
             else:
+                # We still need to determine if we should consume_all or not.
+                #
                 # Recursively determine consume_all from the type's natural structure.
                 # Only recurse if the type has changed (e.g., Annotated wrapper was removed).
                 # If resolved_type is the same as type_, recursing would cause infinite loop.
@@ -935,19 +1166,58 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
     elif is_enum_flag(type_):
         return 1, True
     elif origin_type in ITERABLE_TYPES and len(get_args(type_)):
-        return token_count(get_args(type_)[0])[0], True
+        inner_type = get_args(type_)[0]
+        # For union element types, return (1, True) to let conversion handle
+        # dynamic per-element parsing. This supports unions with varying token counts.
+        if is_union(inner_type):
+            return 1, True
+        return token_count(inner_type)[0], True
     elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
         return token_count(type_.__value__)
     elif is_union(type_):
-        sub_args = get_args(type_)
-        token_count_target = token_count(sub_args[0])
-        for sub_type_ in sub_args[1:]:
-            this = token_count(sub_type_)
-            if this != token_count_target:
-                raise ValueError(
-                    f"Cannot Union types that consume different numbers of tokens: {sub_args[0]} {sub_type_}"
-                )
-        return token_count_target
+        args = get_args(type_)
+
+        # If we have upcoming tokens, try conversion-based token counting.
+        if upcoming_tokens:
+            # Extract name_transform and converter from parent parameters
+            name_transform = default_name_transform
+            converter = None
+            for param in parameters:
+                if param.name_transform is not None:
+                    name_transform = param.name_transform
+                # Only use callable converters; string converters are method names
+                # that need to be resolved against a specific type, which doesn't
+                # make sense when probing individual union members.
+                if param.converter is not None and callable(param.converter):
+                    converter = param.converter
+
+            try:
+                _, tc, consume_all = _union_conversion(args, upcoming_tokens, name_transform, converter)
+                return tc, consume_all
+            except CoercionError:
+                # No union member matched. For Optional types (Union with exactly one
+                # non-None type), fall through to structural analysis so "not enough tokens"
+                # errors are raised properly. For other unions, return (1, False) since
+                # it's a value mismatch, not a structural mismatch.
+                non_none_types = [t for t in args if not is_nonetype(t)]
+                if len(non_none_types) != 1:
+                    # Not an Optional - it's a real union with multiple non-None types
+                    return 1, False
+                # Optional type - fall through to structural analysis
+
+        # Fallback: use structural analysis.
+        # First multi-token type (tc > 1) determines token count.
+        for arg in args:
+            tc, consume_all = token_count(arg)
+            if tc > 1:
+                return tc, consume_all
+        # Second pass: check for consume_all types
+        for arg in args:
+            tc, consume_all = token_count(arg)
+            if consume_all:
+                return tc, consume_all
+        # All types are single-token, non-consume_all
+        return 1, False
     elif is_builtin(type_):
         # Many builtins actually take in VAR_POSITIONAL when we really just want 1 argument.
         return 1, False

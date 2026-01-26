@@ -8,6 +8,17 @@ from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 
 import cyclopts
 from cyclopts import Group, Parameter
+from cyclopts._convert import _convert
+
+
+@pytest.fixture(autouse=True)
+def clear_conversion_cache():
+    """Clear the conversion cache before each test.
+
+    This prevents unbounded cache growth during test runs and ensures
+    clean state for tests that inspect conversion behavior.
+    """
+    _convert.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
 
 def pytest_addoption(parser):

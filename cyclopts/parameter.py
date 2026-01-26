@@ -31,7 +31,7 @@ from cyclopts.annotations import (
     is_union,
     resolve,
     resolve_annotated,
-    resolve_optional,
+    resolve_type_alias,
 )
 from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
@@ -407,6 +407,33 @@ class Parameter:
             type_, parameters = get_parameters(type_)
             return type_, cls.combine(*default_parameters, *parameters)
 
+    def resolve_converter(self, type_: type) -> Callable | None:
+        """Resolve this parameter's converter, handling string converters.
+
+        If the converter is a string, it is looked up as a method on the given type.
+
+        Parameters
+        ----------
+        type_
+            The type to resolve string converters against.
+
+        Returns
+        -------
+        Callable | None
+            The resolved converter callable, or None if no converter is set.
+
+        Raises
+        ------
+        AttributeError
+            If the converter is a string and the method doesn't exist on the type.
+        """
+        if self.converter is None:
+            return None
+        if callable(self.converter):
+            return self.converter
+        # String converter - resolve to method on type (raises AttributeError if not found)
+        return getattr(type_, self.converter)
+
     def __call__(self, obj: T) -> T:
         """Decorator interface for annotating a function/class with a :class:`Parameter`.
 
@@ -505,12 +532,17 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     Returns
     -------
     hint
-        Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
+        Annotation hint with :obj:`Annotated` resolved.
     list[Parameter]
         List of parameters discovered, ordered by priority (lowest to highest):
         converter-decoration < type-decoration < annotation.
     """
-    hint = resolve_optional(hint)
+    # NOTE: We intentionally do NOT call resolve_optional() here.
+    # None is a meaningful type that users can explicitly provide via "none"/"null" strings,
+    # so we preserve it in unions for proper handling downstream.
+
+    # Resolve TypeAliasType (Python 3.12+ 'type' statement) first
+    hint = resolve_type_alias(hint)
 
     # Extract parameters from Annotated metadata
     annotated_params = []
@@ -518,24 +550,35 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
         inner = get_args(hint)
         hint = inner[0]
         annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
-        # Resolve Optional again after unwrapping Annotated, since hint could be Type | None
-        hint = resolve_optional(hint)
+    elif is_union(hint):  # pyright: ignore[reportArgumentType]
+        # For Optional patterns (T | None with exactly one non-None type),
+        # extract Annotated parameters from the non-None member.
+        # Don't do this for real unions (T | U) as each member's parameters
+        # should only apply when that specific type is selected.
+        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+        if len(non_none_args) == 1 and is_annotated(non_none_args[0]):
+            inner = get_args(non_none_args[0])
+            annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+            # Unwrap Annotated but preserve the Optional: Annotated[T, ...] | None -> T | None
+            hint = inner[0] | NoneType  # pyright: ignore[reportAssignmentType]
 
     # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
+    # For Optional patterns (T | None), check the non-None member for __cyclopts__
     type_cyclopts_config_params = []
     if cyclopts_config := getattr(hint, "__cyclopts__", None):
         type_cyclopts_config_params.extend(cyclopts_config.parameters)
+    elif is_union(hint):  # pyright: ignore[reportArgumentType]
+        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+        if len(non_none_args) == 1:
+            if cyclopts_config := getattr(non_none_args[0], "__cyclopts__", None):
+                type_cyclopts_config_params.extend(cyclopts_config.parameters)
 
     # Check if any parameter has a converter with __cyclopts__ and extract its parameters
     converter_params = []
     if not skip_converter_params:
         for param in annotated_params + type_cyclopts_config_params:
             if param.converter:
-                converter = param.converter
-
-                # Resolve string converters to methods on the type
-                if isinstance(converter, str):
-                    converter = getattr(hint, converter)
+                converter = param.resolve_converter(hint)
 
                 # Check for __cyclopts__ on the converter
                 if hasattr(converter, "__cyclopts__"):

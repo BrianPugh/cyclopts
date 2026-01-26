@@ -25,6 +25,7 @@ from typing import (
 
 from attrs import Factory, define, field
 
+from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
@@ -1608,6 +1609,8 @@ class App:
                 if e.console is None:
                     e.console = command_app.error_console
                 raise
+            finally:
+                _convert.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
 
         return command, bound, unused_tokens, ignored, argument_collection
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 if TYPE_CHECKING:
     from cyclopts.core import App
 
+from cyclopts.annotations import resolve
 from cyclopts.exceptions import (
     UnknownOptionError,
 )
@@ -251,7 +252,8 @@ class ArgumentCollection(list[Argument]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
-        hint, hint_parameters = get_parameters(hint)
+        _, hint_parameters = get_parameters(hint)
+        hint = resolve(hint, optional=False)  # Strip Annotated, keep Optional
         cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:
@@ -355,7 +357,8 @@ class ArgumentCollection(list[Argument]):
 
         out.append(argument)
         if argument._accepts_keywords:
-            hint_docstring_lookup = extract_docstring_help(argument.hint) if parse_docstring else {}
+            # Use resolved_hint for extracting docstrings (needs a class, not Optional[class])
+            hint_docstring_lookup = extract_docstring_help(argument.resolved_hint) if parse_docstring else {}
             hint_docstring_lookup.update(docstring_lookup)
 
             for sub_field_name, sub_field_info in argument._lookup.items():
