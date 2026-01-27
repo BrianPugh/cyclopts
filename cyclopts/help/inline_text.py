@@ -96,8 +96,16 @@ class InlineText:
             last_line = lines_of_segments[-1]
 
             # Check for newline at end
-            has_newline = last_line and last_line[-1].text == "\n"
-            newline_segment = last_line.pop() if has_newline else None
+            has_newline = last_line and last_line[-1].text.endswith("\n")
+            if has_newline:
+                last_seg = last_line[-1]
+                if last_seg.text == "\n":
+                    newline_segment = last_line.pop()
+                else:
+                    last_line[-1] = Segment(last_seg.text[:-1], style=last_seg.style, control=last_seg.control)
+                    newline_segment = Segment("\n")
+            else:
+                newline_segment = None
 
             # rstrip the last segment
             if last_line:
