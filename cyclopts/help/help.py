@@ -324,7 +324,105 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
-def format_doc(app: "App", format: str) -> InlineText | SilentRich:
+def _format_section_header(title: str, format: str) -> str:
+    if format == "rich":
+        return f"[bold]{title}[/bold]"
+    elif format in ("restructuredtext", "rst", "markdown", "md"):
+        return f"**{title}**"
+    else:  # plaintext
+        return title
+
+
+def _extract_meta_text(item, format: str) -> tuple[str, str] | None:
+    """Extract a ``(section_key, text)`` pair from a docstring meta item.
+
+    Returns ``None`` if the item has no meaningful text content.
+    Handles the ``DocstringExample`` special case where content is split
+    across ``snippet`` and ``description`` attributes.  When the content
+    contains ``>>>`` (doctest syntax), it is wrapped in a fenced code
+    block for markdown to prevent ``>>>`` being interpreted as nested
+    blockquotes.  Descriptive examples (no ``>>>``) are returned as
+    plain text so that natural markdown formatting (e.g. indented code
+    blocks) is preserved.
+    """
+    from docstring_parser.common import DocstringExample
+
+    if isinstance(item, DocstringExample):
+        parts = []
+        if item.snippet:
+            parts.append(item.snippet)
+        if item.description:
+            parts.append(item.description.rstrip())
+        if not parts:
+            return None
+        text = "\n".join(parts)
+        if format in ("markdown", "md") and ">>>" in text:
+            text = "```\n" + text + "\n```"
+        return ("examples", text)
+
+    key = item.args[0]
+    text = item.description.rstrip() if item.description else ""
+    return (key, text) if text else None
+
+
+def _coalesce_consecutive(items: list[tuple[str, str]]) -> list[tuple[str, list[str]]]:
+    r"""Coalesce consecutive items with the same section key.
+
+    This is primarily needed for ``DocstringExample`` items.
+    ``docstring_parser`` creates a separate ``DocstringExample`` for each ``>>>``
+    block, so a single "Examples" docstring section with three code blocks produces
+    three items.  This function merges consecutive same-key items back into one
+    section so they render under a single header.
+
+    Non-example meta items typically produce one item per section, so they pass
+    through as single-item entries.
+
+    For example, given a docstring like::
+
+    Examples
+    --------
+        >>> print(1)
+        1
+
+        >>> print(2)
+        2
+
+    Notes
+    -----
+        Some notes.
+
+    ``docstring_parser`` produces three meta items.  After ``_extract_meta_text``,
+    these become::
+
+        [("examples", ">>> print(1)\n1"), ("examples", ">>> print(2)\n2"), ("notes", "Some notes.")]
+
+    This function coalesces the two consecutive "examples" entries::
+
+        [("examples", [">>> print(1)\n1", ">>> print(2)\n2"]), ("notes", ["Some notes."])]
+
+    Without this, each ``>>>`` block would render with its own "Examples" header.
+    """
+    sections: list[tuple[str, list[str]]] = []
+    for key, text in items:
+        if sections and sections[-1][0] == key:
+            sections[-1][1].append(text)
+        else:
+            sections.append((key, [text]))
+
+    return sections
+
+
+def format_doc(app: "App", format: str) -> "RenderableType | SilentRich":
+    from docstring_parser.common import (
+        DocstringDeprecated,
+        DocstringParam,
+        DocstringRaises,
+        DocstringReturns,
+    )
+    from rich.console import Group as RichGroup
+    from rich.console import NewLine
+    from rich.padding import Padding
+
     raw_doc_string = app.help
 
     if not raw_doc_string:
@@ -332,15 +430,50 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
 
     parsed = docstring_parse(raw_doc_string, format)
 
-    components: list[str] = []
+    renderables: list[RenderableType] = []
+
+    # Build description (short + long)
+    desc_components: list[str] = []
     if parsed.short_description:
-        components.append(parsed.short_description + "\n")
+        desc_components.append(parsed.short_description + "\n")
 
     if parsed.long_description:
         if parsed.short_description:
-            components.append("\n")
-        components.append(parsed.long_description + "\n")
-    return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
+            desc_components.append("\n")
+        desc_components.append(parsed.long_description + "\n")
+
+    if desc_components:
+        description = InlineText.from_format(_smart_join(desc_components), format=format, force_empty_end=True)
+        renderables.append(description)
+
+    # Build extra sections (Examples, Notes, etc.) with indented bodies
+    _skip_types = (DocstringParam, DocstringReturns, DocstringRaises, DocstringDeprecated)
+
+    items = [
+        pair for item in parsed.meta if not isinstance(item, _skip_types) if (pair := _extract_meta_text(item, format))
+    ]
+
+    sections = _coalesce_consecutive(items)
+
+    for key, texts in sections:
+        title = key.replace("_", " ").title()
+        header = InlineText.from_format(
+            _format_section_header(title, format),
+            format=format,
+            force_empty_end=True,
+        )
+        body = InlineText.from_format("\n\n".join(texts), format=format)
+        renderables.append(header)
+        renderables.append(Padding(body, (0, 0, 0, 4)))
+        renderables.append(NewLine())
+
+    if not renderables:
+        return SILENT
+
+    if len(renderables) == 1:
+        return renderables[0]
+
+    return RichGroup(*renderables)
 
 
 def create_parameter_help_panel(

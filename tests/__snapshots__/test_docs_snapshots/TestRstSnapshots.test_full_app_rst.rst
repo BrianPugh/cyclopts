@@ -804,8 +804,13 @@ numpy-style
 
 Command with NumPy-style docstring.
 
-This command demonstrates NumPy docstring format which is the
-default for cyclopts.
+This command demonstrates NumPy docstring format which is the default for cyclopts.
+
+Examples
+
+    ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+    │ >>> numpy_style("test", count=5)                                                                                 │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 **Parameters:**
 
@@ -827,6 +832,12 @@ google-style
 Command with Google-style docstring.
 
 This command demonstrates Google docstring format.
+
+Examples
+
+    ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+    │ >>> google_style("test", count=5)                                                                                │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 **Parameters:**
 
