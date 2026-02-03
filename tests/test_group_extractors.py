@@ -1,6 +1,10 @@
+import sys
+from types import ModuleType
+
 import pytest
 
 from cyclopts import App, Group, Parameter
+from cyclopts.command_spec import CommandSpec
 from cyclopts.group_extractors import RegisteredCommand, groups_from_app
 
 
@@ -89,3 +93,45 @@ def test_same_app_registered_multiple_times():
     registered_command = groups[0][1][0]
     assert set(registered_command.names) == {"first", "second"}
     assert registered_command.app is sub
+
+
+def test_groups_from_app_resolve_lazy():
+    """Test that resolve_lazy parameter controls whether lazy commands are resolved."""
+    test_module = ModuleType("test_lazy_module")
+    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
+    sys.modules["test_lazy_module"] = test_module
+
+    try:
+        app = App(help_flags=[], version_flags=[])
+
+        # Register a lazy command
+        app.command("test_lazy_module:cmd", name="lazy-cmd")
+
+        # Also register a regular command
+        @app.command
+        def regular():
+            pass
+
+        # Verify lazy command is not resolved
+        assert isinstance(app._commands["lazy-cmd"], CommandSpec)
+        assert not app._commands["lazy-cmd"].is_resolved
+
+        # With resolve_lazy=False (default), should skip lazy commands
+        groups = groups_from_app(app, resolve_lazy=False)
+        all_names = [name for _, cmds in groups for cmd in cmds for name in cmd.names]
+        assert "regular" in all_names
+        assert "lazy-cmd" not in all_names
+
+        # Lazy command should still be unresolved
+        assert not app._commands["lazy-cmd"].is_resolved
+
+        # With resolve_lazy=True, should include lazy commands
+        groups = groups_from_app(app, resolve_lazy=True)
+        all_names = [name for _, cmds in groups for cmd in cmds for name in cmd.names]
+        assert "regular" in all_names
+        assert "lazy-cmd" in all_names
+
+        # Lazy command should now be resolved
+        assert app._commands["lazy-cmd"].is_resolved
+    finally:
+        del sys.modules["test_lazy_module"]
