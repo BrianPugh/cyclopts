@@ -447,7 +447,7 @@ def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "
     return usage_line.strip()
 
 
-def iterate_commands(app: "App", include_hidden: bool = False):
+def iterate_commands(app: "App", include_hidden: bool = False, resolve_lazy: bool = True):
     """Iterate through app commands, yielding valid resolved subapps.
 
     Automatically resolves CommandSpec instances to App instances.
@@ -459,6 +459,11 @@ def iterate_commands(app: "App", include_hidden: bool = False):
         The App instance.
     include_hidden : bool
         Whether to include hidden commands.
+    resolve_lazy : bool
+        If ``True`` (default), resolve lazy commands (import their modules) to
+        include them in the output. If ``False``, skip unresolved lazy commands.
+        Set to ``True`` when generating static artifacts that need all commands,
+        such as documentation or shell completion scripts.
 
     Yields
     ------
@@ -474,7 +479,12 @@ def iterate_commands(app: "App", include_hidden: bool = False):
         if _is_builtin_flag(app, name):
             continue
 
-        subapp = app_or_spec.resolve(app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
+        if isinstance(app_or_spec, CommandSpec):
+            if not app_or_spec.is_resolved and not resolve_lazy:
+                continue
+            subapp = app_or_spec.resolve(app)
+        else:
+            subapp = app_or_spec
 
         if not isinstance(subapp, type(app)):
             continue
