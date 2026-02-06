@@ -711,3 +711,49 @@ def test_lazy_nested_commands_appear_in_completion_script(lazy_module):
 
     # The lazy command should now be resolved
     assert app._commands["user"].is_resolved
+
+
+def test_iterate_commands_resolve_lazy(lazy_module):
+    """Test that iterate_commands respects the resolve_lazy parameter."""
+    from cyclopts.docs.base import iterate_commands
+
+    test_module = lazy_module()
+
+    def lazy_cmd():
+        """A lazy command."""
+        pass
+
+    test_module.lazy_cmd = lazy_cmd  # type: ignore[attr-defined]
+
+    app = App(name="myapp", help_flags=[], version_flags=[])
+
+    # Register lazy command
+    app.command("test_lazy_module:lazy_cmd", name="lazy")
+
+    # Also register a regular command
+    @app.command
+    def regular():
+        """A regular command."""
+        pass
+
+    # Verify lazy command is not resolved yet
+    assert isinstance(app._commands["lazy"], CommandSpec)
+    assert not app._commands["lazy"].is_resolved
+
+    # With resolve_lazy=False, should skip unresolved lazy commands
+    commands_without_lazy = list(iterate_commands(app, resolve_lazy=False))
+    command_names = [name for name, _ in commands_without_lazy]
+    assert "regular" in command_names
+    assert "lazy" not in command_names
+
+    # Lazy command should still be unresolved
+    assert not app._commands["lazy"].is_resolved
+
+    # With resolve_lazy=True (default), should include lazy commands
+    commands_with_lazy = list(iterate_commands(app, resolve_lazy=True))
+    command_names = [name for name, _ in commands_with_lazy]
+    assert "regular" in command_names
+    assert "lazy" in command_names
+
+    # Lazy command should now be resolved
+    assert app._commands["lazy"].is_resolved
