@@ -77,7 +77,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
                     arguments.extend(app_arguments)
 
         commands = []
-        for group, registered_commands in groups_from_app(command_app):
+        for group, registered_commands in groups_from_app(command_app, resolve_lazy=True):
             if group.show:
                 for registered_command in registered_commands:
                     if registered_command.app.show and registered_command not in commands:
