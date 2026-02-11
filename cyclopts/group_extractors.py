@@ -43,8 +43,18 @@ def _create_or_append(
         group_mapping.append((group, [element]))
 
 
-def groups_from_app(app: "App") -> list[tuple[Group, list[RegisteredCommand]]]:
+def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group, list[RegisteredCommand]]]:
     """Extract Group/App association from all commands of ``app``.
+
+    Parameters
+    ----------
+    app : App
+        The application to extract groups from.
+    resolve_lazy : bool
+        If ``True``, resolve lazy commands (import their modules) to include them
+        in the output. If ``False`` (default), skip unresolved lazy commands.
+        Set to ``True`` when generating static artifacts that need all commands,
+        such as shell completion scripts.
 
     Returns
     -------
@@ -71,7 +81,8 @@ def groups_from_app(app: "App") -> list[tuple[Group, list[RegisteredCommand]]]:
     for name in app:
         cmd = app._get_item(name, recurse_meta=True)
         if isinstance(cmd, CommandSpec) and not cmd.is_resolved:
-            continue
+            if not resolve_lazy:
+                continue
         subapp = app[name]
         app_id = id(subapp)
         app_names.setdefault(app_id, []).append(name)
@@ -115,10 +126,10 @@ def groups_from_app(app: "App") -> list[tuple[Group, list[RegisteredCommand]]]:
     return group_mapping
 
 
-def inverse_groups_from_app(input_app: "App") -> list[tuple["App", list[Group]]]:
+def inverse_groups_from_app(input_app: "App", resolve_lazy: bool = False) -> list[tuple["App", list[Group]]]:
     out = []
     seen_apps = []
-    for group, registered_commands in groups_from_app(input_app):
+    for group, registered_commands in groups_from_app(input_app, resolve_lazy=resolve_lazy):
         for registered_command in registered_commands:
             app = registered_command.app
             try:
