@@ -169,6 +169,54 @@ def test_coerce_enum():
         convert(SoftwareEnvironment, ["invalid-choice"])
 
 
+def test_coerce_enum_invalid_choice():
+    class GroupedConstants(Enum):
+        foo = auto()
+        bar = auto()
+
+    assert_convert_coercion_error(
+        GroupedConstants,
+        ["invalid-choice"],
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+    )
+
+
+def test_coerce_enum_invalid_choice_keyword():
+    class GroupedConstants(Enum):
+        foo = auto()
+        bar = auto()
+
+    assert_convert_coercion_error(
+        GroupedConstants,
+        [Token(keyword="--MY_KEYWORD", value="invalid-choice")],
+        msg="""Invalid value for "--MY_KEYWORD": unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+    )
+
+
+def test_coerce_enum_invalid_choice_non_cli_token():
+    class GroupedConstants(Enum):
+        foo = auto()
+        bar = auto()
+
+    assert_convert_coercion_error(
+        GroupedConstants,
+        [Token(value="invalid-choice", source="TEST")],
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+    )
+
+
+def test_coerce_enum_invalid_choice_keyword_non_cli_token():
+    class GroupedConstants(Enum):
+        foo = auto()
+        bar = auto()
+
+    assert_convert_coercion_error(
+        GroupedConstants,
+        [Token(keyword="--MY-KEYWORD", value="invalid-choice", source="TEST")],
+        msg="""Invalid value for "--MY-KEYWORD" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+    )
+
+
 def test_coerce_tuple_basic_single():
     _assert_tuple((1,), convert(tuple[int], ["1"]))
 
