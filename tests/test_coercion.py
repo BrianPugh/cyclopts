@@ -14,6 +14,7 @@ import pytest
 
 from cyclopts import CoercionError, Token
 from cyclopts._convert import convert, token_count
+from cyclopts.utils import default_name_transform
 
 
 def _assert_tuple(expected, actual):
@@ -171,8 +172,8 @@ def test_coerce_enum():
 
 def test_coerce_enum_invalid_choice():
     class GroupedConstants(Enum):
-        foo = auto()
-        bar = auto()
+        FOO = auto()
+        BAR = auto()
 
     assert_convert_coercion_error(
         GroupedConstants,
@@ -181,39 +182,29 @@ def test_coerce_enum_invalid_choice():
     )
 
 
-def test_coerce_enum_invalid_choice_keyword():
-    class GroupedConstants(Enum):
-        foo = auto()
-        bar = auto()
+def test_coerce_enum_invalid_choice_name_transform():
+    class SoftwareEnvironment(Enum):
+        DEV_LOCAL = 1
+        STAGING_US = 2
+        PROD_WEST = 3
 
     assert_convert_coercion_error(
-        GroupedConstants,
-        [Token(keyword="--MY_KEYWORD", value="invalid-choice")],
-        msg="""Invalid value for "--MY_KEYWORD": unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+        SoftwareEnvironment,
+        ["invalid"],
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid" into one of {'dev-local', 'staging-us', 'prod-west'}.""",
     )
 
 
-def test_coerce_enum_invalid_choice_non_cli_token():
-    class GroupedConstants(Enum):
-        foo = auto()
-        bar = auto()
+def test_coerce_enum_invalid_choice_custom_name_transform():
+    class SoftwareEnvironment(Enum):
+        dev_local = 1
+        staging_us = 2
 
     assert_convert_coercion_error(
-        GroupedConstants,
-        [Token(value="invalid-choice", source="TEST")],
-        msg="""Invalid value for "MOCKED_ARGUMENT_NAME" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
-    )
-
-
-def test_coerce_enum_invalid_choice_keyword_non_cli_token():
-    class GroupedConstants(Enum):
-        foo = auto()
-        bar = auto()
-
-    assert_convert_coercion_error(
-        GroupedConstants,
-        [Token(keyword="--MY-KEYWORD", value="invalid-choice", source="TEST")],
-        msg="""Invalid value for "--MY-KEYWORD" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+        SoftwareEnvironment,
+        ["invalid"],
+        name_transform=str.upper,
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid" into one of {'DEV_LOCAL', 'STAGING_US'}.""",
     )
 
 
@@ -334,9 +325,13 @@ def test_coerce_literal():
     assert 3 == convert(Literal["foo", "bar", 3], ["3"])
 
 
-def assert_convert_coercion_error(*args, msg, **kwargs):
+def assert_convert_coercion_error(*args, msg, name_transform=None, **kwargs):
+    if name_transform is None:
+        name_transform = default_name_transform
     mock_argument = Mock()
     mock_argument.name = "mocked_argument_name"
+    mock_argument.parameter.name_transform = name_transform
+    kwargs.setdefault("name_transform", name_transform)
     with pytest.raises(CoercionError) as e:
         try:
             convert(*args, **kwargs)
