@@ -1,6 +1,7 @@
 import inspect
 import json
 from collections.abc import Callable, Sequence
+from enum import Enum
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, Optional, get_args, get_origin
 
@@ -240,6 +241,10 @@ class CoercionError(CycloptsError):
 
         if get_origin(self.target_type) is Literal:
             choices = "{" + ", ".join(repr(x) for x in get_args(self.target_type)) + "}"
+            target_type_name = f"one of {choices}"
+        elif isinstance(self.target_type, type) and issubclass(self.target_type, Enum):
+            nt = self.argument.parameter.name_transform
+            choices = "{" + ", ".join(repr(nt(x)) for x in self.target_type.__members__) + "}"
             target_type_name = f"one of {choices}"
         else:
             target_type_name = get_hint_name(self.target_type)
