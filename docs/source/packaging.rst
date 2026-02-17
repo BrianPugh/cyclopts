@@ -53,10 +53,10 @@ Modern Python projects typically use ``pyproject.toml`` for configuration. The s
 
    # pyproject.toml
    [project.scripts]
-   my-package = "mypackage.__main__:main"
+   my-package = "mypackage.__main__:app"
 
-This creates an executable named ``my-package`` that executes function ``main`` (from the right of the colon) from the python module ``mypackage.__main__``.
-Note that this configuration is independent of any special naming, like ``__main__`` or ``main``.
+This creates an executable named ``my-package`` that executes the callable ``app`` object (from the right of the colon) from the python module ``mypackage.__main__``.
+Note that this configuration is independent of any special naming, like ``__main__`` or ``app``.
 
 ^^^^^^^^^^^^^^^^^^^^^
 Legacy Configurations
@@ -75,7 +75,7 @@ For older projects, you may encounter these alternative formats:
         # There should be a lot more fields populated here.
         entry_points={
             "console_scripts": [
-                "my-package = mypackage.__main__:main",
+                "my-package = mypackage.__main__:app",
             ]
         },
     )
@@ -87,7 +87,7 @@ For older projects, you may encounter these alternative formats:
     # setup.cfg
     [options.entry_points]
     console_scripts =
-        my-package = mypackage.__main__:main
+        my-package = mypackage.__main__:app
 
 **Poetry:**
 
@@ -95,7 +95,7 @@ For older projects, you may encounter these alternative formats:
 
    # pyproject.toml
    [tool.poetry.scripts]
-   my-package = "mypackage.__main__:main"
+   my-package = "mypackage.__main__:app"
 
 The setuptools entrypoint_ documentation goes into further detail.
 
