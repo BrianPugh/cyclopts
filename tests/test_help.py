@@ -475,6 +475,25 @@ def test_help_format_group_parameters_short_name(capture_format_group_parameters
     assert actual == expected
 
 
+def test_help_format_group_parameters_short_name_first(capture_format_group_parameters):
+    """Label should derive from long-form name even when short flag is listed first."""
+
+    def cmd(
+        foo: Annotated[str, Parameter(name=["-f", "--foo"], help="Docstring for foo.")],
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo -f  Docstring for foo. [required]                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_from_docstring(capture_format_group_parameters):
     def cmd(foo: str, bar: str):
         """
@@ -2628,6 +2647,47 @@ def test_help_boolean_alias_on_positive(app, console, assert_parse_args):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ DRY-RUN --dry-run -n  Enable dry run mode. [default: False]        │
         │   --no-dry-run                                                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_uppercase_short_negative_flag(app, console):
+    """Uppercase short negative flags like -N should display correctly.
+
+    https://github.com/BrianPugh/cyclopts/issues/747
+    """
+
+    @app.default
+    def main(
+        dry_run: Annotated[
+            bool,
+            Parameter(
+                name=["-n", "--dry-run"],
+                negative=["-N", "--no-dry-run"],
+            ),
+        ] = True,
+    ):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ DRY-RUN --dry-run -n  [default: True]                              │
+        │   --no-dry-run -N                                                  │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
