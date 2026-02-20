@@ -199,3 +199,33 @@ def test_boolean_flag_snake_case_negative(app, cmd_str, expected, assert_parse_a
         pass
 
     assert_parse_args(foo, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("-n", True),
+        ("--dry-run", True),
+        ("-N", False),
+        ("--no-dry-run", False),
+    ],
+)
+def test_boolean_flag_uppercase_short_negative(app, cmd_str, expected, assert_parse_args):
+    """Uppercase short negative flags like -N should parse correctly.
+
+    https://github.com/BrianPugh/cyclopts/issues/747
+    """
+
+    @app.default
+    def foo(
+        dry_run: Annotated[
+            bool,
+            Parameter(
+                name=["-n", "--dry-run"],
+                negative=["-N", "--no-dry-run"],
+            ),
+        ] = True,
+    ):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)

@@ -14,6 +14,7 @@ import pytest
 
 from cyclopts import CoercionError, Token
 from cyclopts._convert import convert, token_count
+from cyclopts.utils import default_name_transform
 
 # Case variations of "none" and "null" strings that should be parsed as None
 NONE_STRINGS = ["none", "null", "NONE", "NULL", "None", "Null"]
@@ -206,6 +207,44 @@ def test_coerce_enum():
         convert(SoftwareEnvironment, ["invalid-choice"])
 
 
+def test_coerce_enum_invalid_choice():
+    class GroupedConstants(Enum):
+        FOO = auto()
+        BAR = auto()
+
+    assert_convert_coercion_error(
+        GroupedConstants,
+        ["invalid-choice"],
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+    )
+
+
+def test_coerce_enum_invalid_choice_name_transform():
+    class SoftwareEnvironment(Enum):
+        DEV_LOCAL = 1
+        STAGING_US = 2
+        PROD_WEST = 3
+
+    assert_convert_coercion_error(
+        SoftwareEnvironment,
+        ["invalid"],
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid" into one of {'dev-local', 'staging-us', 'prod-west'}.""",
+    )
+
+
+def test_coerce_enum_invalid_choice_custom_name_transform():
+    class SoftwareEnvironment(Enum):
+        dev_local = 1
+        staging_us = 2
+
+    assert_convert_coercion_error(
+        SoftwareEnvironment,
+        ["invalid"],
+        name_transform=str.upper,
+        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid" into one of {'DEV_LOCAL', 'STAGING_US'}.""",
+    )
+
+
 def test_coerce_tuple_basic_single():
     _assert_tuple((1,), convert(tuple[int], ["1"]))
 
@@ -323,9 +362,13 @@ def test_coerce_literal():
     assert 3 == convert(Literal["foo", "bar", 3], ["3"])
 
 
-def assert_convert_coercion_error(*args, msg, **kwargs):
+def assert_convert_coercion_error(*args, msg, name_transform=None, **kwargs):
+    if name_transform is None:
+        name_transform = default_name_transform
     mock_argument = Mock()
     mock_argument.name = "mocked_argument_name"
+    mock_argument.parameter.name_transform = name_transform
+    kwargs.setdefault("name_transform", name_transform)
     with pytest.raises(CoercionError) as e:
         try:
             convert(*args, **kwargs)
