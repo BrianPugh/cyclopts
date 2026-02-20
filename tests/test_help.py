@@ -475,6 +475,25 @@ def test_help_format_group_parameters_short_name(capture_format_group_parameters
     assert actual == expected
 
 
+def test_help_format_group_parameters_short_name_first(capture_format_group_parameters):
+    """Label should derive from long-form name even when short flag is listed first."""
+
+    def cmd(
+        foo: Annotated[str, Parameter(name=["-f", "--foo"], help="Docstring for foo.")],
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  FOO --foo -f  Docstring for foo. [required]                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_from_docstring(capture_format_group_parameters):
     def cmd(foo: str, bar: str):
         """
