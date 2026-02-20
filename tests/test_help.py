@@ -2632,3 +2632,44 @@ def test_help_boolean_alias_on_positive(app, console, assert_parse_args):
         """
     )
     assert actual == expected
+
+
+def test_help_uppercase_short_negative_flag(app, console):
+    """Uppercase short negative flags like -N should display correctly.
+
+    https://github.com/BrianPugh/cyclopts/issues/747
+    """
+
+    @app.default
+    def main(
+        dry_run: Annotated[
+            bool,
+            Parameter(
+                name=["-n", "--dry-run"],
+                negative=["-N", "--no-dry-run"],
+            ),
+        ] = True,
+    ):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ DRY-RUN --dry-run -n  [default: True]                              │
+        │   --no-dry-run -N                                                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected

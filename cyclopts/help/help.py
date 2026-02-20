@@ -382,7 +382,7 @@ def create_parameter_help_panel(
         seen_transformed = set()
         unique_options = []
         for option in options:
-            transformed = argument.parameter.name_transform(option)
+            transformed = option if _is_short(option) else argument.parameter.name_transform(option)
             if transformed not in seen_transformed:
                 seen_transformed.add(transformed)
                 unique_options.append(option)
@@ -390,7 +390,9 @@ def create_parameter_help_panel(
 
         # Add an all-uppercase name if it's an argument
         if argument.index is not None:
-            arg_name = options[0].lstrip("-").upper()
+            # Prefer the first long-form name for the label; fall back to options[0].
+            label_source = next((o for o in options if o.startswith("--")), options[0])
+            arg_name = label_source.lstrip("-").upper()
             if arg_name != options[0]:
                 options = [arg_name, *options]
 
