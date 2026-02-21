@@ -8,6 +8,54 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from rich.console import Group as RichGroup
+
+
+def _indent_text(text: str, left: int) -> str:
+    """Prepend *left* spaces to each non-empty line of *text*."""
+    indent = " " * left
+    return "\n".join(indent + line if line else line for line in text.split("\n"))
+
+
+def _extract_group_text(group: "RichGroup", console: Optional["Console"], preserve_markup: bool) -> str:
+    r"""Extract text from a :class:`rich.console.Group`.
+
+    Unlike the main :func:`extract_text` path (which ``rstrip``\\s each
+    result), this function preserves inter-element spacing so that blank
+    lines between sections survive the round-trip.  It reconstructs
+    spacing by:
+
+    * reading ``.markup`` directly (skipping rstrip) for InlineText children,
+    * normalising to ``"\\n\\n"`` for ``force_empty_end``, and
+    * appending ``"\\n"`` after Padding content.
+    """
+    from rich.console import NewLine
+    from rich.padding import Padding
+
+    parts: list[str] = []
+    for child in group.renderables:
+        if isinstance(child, NewLine):
+            parts.append("\n" * child.count)
+        elif isinstance(child, Padding):
+            inner = extract_text(child.renderable, console, preserve_markup)
+            if child.left and not preserve_markup:
+                inner = _indent_text(inner, child.left)
+            parts.append(inner + "\n")
+        elif hasattr(child, "primary_renderable"):
+            primary = getattr(child, "primary_renderable", None)
+            if primary is not None:
+                if preserve_markup and hasattr(primary, "markup"):
+                    text = primary.markup
+                else:
+                    text = extract_text(primary, console, preserve_markup)
+                if getattr(child, "force_empty_end", False):
+                    text = text.rstrip("\n") + "\n\n"
+                parts.append(text)
+            else:
+                parts.append(extract_text(child, console, preserve_markup))
+        else:
+            parts.append(extract_text(child, console, preserve_markup))
+    return "".join(parts).rstrip()
 
 
 def extract_text(obj: Any, console: Optional["Console"] = None, preserve_markup: bool = False) -> str:
@@ -28,8 +76,24 @@ def extract_text(obj: Any, console: Optional["Console"] = None, preserve_markup:
     str
         Text representation (plain or with markup preserved).
     """
+    from rich.console import Group as RichGroup
+    from rich.console import NewLine
+    from rich.padding import Padding
+
     if obj is None:
         return ""
+
+    if isinstance(obj, RichGroup):
+        return _extract_group_text(obj, console, preserve_markup)
+
+    if isinstance(obj, Padding):
+        inner = extract_text(obj.renderable, console, preserve_markup)
+        if obj.left and not preserve_markup:
+            inner = _indent_text(inner, obj.left)
+        return inner
+
+    if isinstance(obj, NewLine):
+        return "\n" * obj.count
 
     if hasattr(obj, "primary_renderable"):
         primary = getattr(obj, "primary_renderable", None)
