@@ -151,15 +151,15 @@ def test_requires_equals_mixed_parameters_reject(app):
         app.parse_args("--strict hello --loose world", print_error=False, exit_on_error=False)
 
 
-def test_requires_equals_takes_priority_over_consume_multiple(app):
-    """requires_equals takes priority over consume_multiple; space-separated values are rejected."""
+def test_requires_equals_and_consume_multiple_mutually_exclusive(app):
+    """requires_equals and consume_multiple cannot be used together."""
 
     @app.default
     def main(*, urls: Annotated[list[str], Parameter(requires_equals=True, consume_multiple=True)]):
         pass
 
-    with pytest.raises(RequiresEqualsError):
-        app.parse_args("--urls a b c", print_error=False, exit_on_error=False)
+    with pytest.raises(ValueError, match="cannot be used together"):
+        app.parse_args("--urls=a", print_error=False, exit_on_error=False)
 
 
 def test_requires_equals_consume_multiple_repeated_equals(app):
