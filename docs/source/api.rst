@@ -1091,6 +1091,10 @@ API
       * Short options (e.g., ``-o value``) are **not** affected.
       * Boolean flags (e.g., ``--verbose``) work regardless of this setting.
       * Can be set app-wide via :attr:`.App.default_parameter`.
+      * Takes priority over :attr:`consume_multiple`. When both are set,
+        space-separated values are rejected. To provide multiple values,
+        repeat the option (e.g., ``--urls=a --urls=b``). To pass an empty
+        iterable, use the negative flag (e.g., ``--empty-urls``).
 
       .. code-block:: python
 

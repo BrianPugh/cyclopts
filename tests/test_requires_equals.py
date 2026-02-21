@@ -149,3 +149,25 @@ def test_requires_equals_mixed_parameters_reject(app):
 
     with pytest.raises(RequiresEqualsError):
         app.parse_args("--strict hello --loose world", print_error=False, exit_on_error=False)
+
+
+def test_requires_equals_takes_priority_over_consume_multiple(app):
+    """requires_equals takes priority over consume_multiple; space-separated values are rejected."""
+
+    @app.default
+    def main(*, urls: Annotated[list[str], Parameter(requires_equals=True, consume_multiple=True)]):
+        pass
+
+    with pytest.raises(RequiresEqualsError):
+        app.parse_args("--urls a b c", print_error=False, exit_on_error=False)
+
+
+def test_requires_equals_consume_multiple_repeated_equals(app):
+    """With requires_equals, list values can be provided by repeating --option=value."""
+
+    @app.default
+    def main(*, urls: Annotated[list[str], Parameter(requires_equals=True)]):
+        pass
+
+    _, bound, _ = app.parse_args("--urls=a --urls=b --urls=c", print_error=False, exit_on_error=False)
+    assert bound.arguments == {"urls": ["a", "b", "c"]}
