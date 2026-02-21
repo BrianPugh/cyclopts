@@ -2929,3 +2929,57 @@ def test_help_docstring_params_excluded_from_extra_sections(console, normalize_t
         """
     )
     assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_google_style_sections(console, normalize_trailing_whitespace):
+    """Test Google-style docstring sections (with colons) render correctly."""
+    app = App(name="test", version_flags=[], result_action="return_value")
+
+    @app.default
+    def command():
+        """This is another test command.
+
+        This command has a longer description in the second paragraph.
+        We want to see how cyclopts handles multiple paragraphs.
+
+        And here's a third paragraph for good measure.
+
+        Examples:
+
+            test command2 --option1 value1
+            test command2 --option2 value2
+
+        Notes:
+            This is a notes section.
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: test
+
+        This is another test command.
+
+        This command has a longer description in the second paragraph. We
+        want to see how cyclopts handles multiple paragraphs.
+
+        And here's a third paragraph for good measure.
+
+        Examples
+
+            test command2 --option1 value1
+            test command2 --option2 value2
+
+        Notes
+
+            This is a notes section.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
