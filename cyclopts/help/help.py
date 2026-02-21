@@ -20,6 +20,7 @@ from cyclopts.help.silent import SILENT, SilentRich
 from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
 
 if TYPE_CHECKING:
+    from docstring_parser.common import DocstringMeta
     from rich.console import RenderableType
 
     from cyclopts.argument import ArgumentCollection
@@ -333,17 +334,14 @@ def _format_section_header(title: str, format: str) -> str:
         return title
 
 
-def _extract_meta_text(item, format: str) -> tuple[str, str] | None:
+def _extract_meta_text(item: "DocstringMeta", format: str) -> tuple[str, str] | None:
     """Extract a ``(section_key, text)`` pair from a docstring meta item.
 
     Returns ``None`` if the item has no meaningful text content.
     Handles the ``DocstringExample`` special case where content is split
     across ``snippet`` and ``description`` attributes.  When the content
-    contains ``>>>`` (doctest syntax), it is wrapped in a fenced code
-    block for markdown to prevent ``>>>`` being interpreted as nested
-    blockquotes.  Descriptive examples (no ``>>>``) are returned as
-    plain text so that natural markdown formatting (e.g. indented code
-    blocks) is preserved.
+    contains ``>>>`` (doctest syntax), it is wrapped in a code block
+    to prevent ``>`` being interpreted as blockquotes in markdown.
     """
     from docstring_parser.common import DocstringExample
 
@@ -356,8 +354,12 @@ def _extract_meta_text(item, format: str) -> tuple[str, str] | None:
         if not parts:
             return None
         text = "\n".join(parts)
-        if format in ("markdown", "md") and ">>>" in text:
-            text = "```\n" + text + "\n```"
+        if ">>>" in text:
+            if format in ("markdown", "md"):
+                text = "```\n" + text + "\n```"
+            elif format in ("restructuredtext", "rst"):
+                indented = "\n".join("    " + line for line in text.split("\n"))
+                text = "::\n\n" + indented
         return ("examples", text)
 
     key = item.args[0]

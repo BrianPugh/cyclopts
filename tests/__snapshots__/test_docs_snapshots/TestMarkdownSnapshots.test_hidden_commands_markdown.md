@@ -90,14 +90,16 @@ documentation system needs to handle correctly.
 complex-cli numpy-style NAME [ARGS]
 ```
 
-Command with NumPy-style docstring.                                                                                     
+Command with NumPy-style docstring.
 
-This command demonstrates NumPy docstring format which is the default for cyclopts.
+This command demonstrates NumPy docstring format which is the
+default for cyclopts.
 
-Examples
+**Examples**
 
-                                                                                                                        
-     >>> numpy_style("test", count=5)
+```
+>>> numpy_style("test", count=5)
+```
 
 ### complex-cli google-style
 
@@ -105,14 +107,15 @@ Examples
 complex-cli google-style NAME [ARGS]
 ```
 
-Command with Google-style docstring.                                                                                    
+Command with Google-style docstring.
 
 This command demonstrates Google docstring format.
 
-Examples
+**Examples**
 
-                                                                                                                        
-     >>> google_style("test", count=5)
+```
+>>> google_style("test", count=5)
+```
 
 ### complex-cli sphinx-style
 
