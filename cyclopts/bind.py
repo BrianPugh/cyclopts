@@ -17,6 +17,7 @@ from cyclopts.exceptions import (
     CombinedShortOptionError,
     CycloptsError,
     MissingArgumentError,
+    RequiresEqualsError,
     UnknownOptionError,
     ValidationError,
 )
@@ -225,6 +226,11 @@ def _parse_kw_and_flags(
                     match.argument.append(CliToken(keyword=match.matched_token, implicit_value=match.implicit_value))
             else:
                 # This is a value-taking option (not a flag or counting parameter)
+                if match.argument.parameter.requires_equals and match.matched_token.startswith("--") and not cli_values:
+                    raise RequiresEqualsError(
+                        argument=match.argument,
+                        keyword=match.matched_token,
+                    )
                 # Error only if we're trying to combine multiple value-taking options without values
                 # (e.g., -fu where both -f and -u take values would be invalid)
                 # But -fu where -f is a flag and -u takes a value is valid (GNU-style)

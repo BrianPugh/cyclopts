@@ -30,6 +30,7 @@ __all__ = [
     "MissingArgumentError",
     "MixedArgumentError",
     "RepeatArgumentError",
+    "RequiresEqualsError",
     "UnknownOptionError",
     "UnusedCliTokensError",
     "ValidationError",
@@ -381,6 +382,22 @@ class MissingArgumentError(CycloptsError):
             strings.append(f" Parsed: {self.tokens_so_far}.")
 
         return super().__str__() + " ".join(strings)
+
+
+@define(kw_only=True)
+class RequiresEqualsError(CycloptsError):
+    """A long option requires ``=`` to assign a value (e.g., ``--option=value``)."""
+
+    keyword: str | None = None
+    """The keyword that was used (e.g., '--name')."""
+
+    def __str__(self):
+        assert self.argument is not None
+        param_name = self.keyword or self.argument.name
+        return (
+            super().__str__()
+            + f'Parameter "{param_name}" requires a value assigned with "=". Use "{param_name}=VALUE".'
+        )
 
 
 @define(kw_only=True)
