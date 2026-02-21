@@ -186,6 +186,13 @@ class Argument:
                     f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
                 )
 
+        if self.parameter.requires_equals and self.parameter.consume_multiple:
+            raise ValueError(
+                "Parameter(requires_equals=True) and Parameter(consume_multiple=True) cannot be used together. "
+                "requires_equals enforces '--option=value' syntax, which is incompatible with "
+                "consume_multiple's space-separated value consumption."
+            )
+
         if not self.parse:
             # Validate that non-parsed parameters are keyword-only or have defaults
             is_keyword_only = self.field_info.kind is self.field_info.KEYWORD_ONLY

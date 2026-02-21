@@ -240,6 +240,11 @@ class Parameter:
         kw_only=True,
     )
 
+    requires_equals: bool = field(
+        default=False,
+        kw_only=True,
+    )
+
     _name_transform: Callable[[str], str] | None = field(
         alias="name_transform",
         default=None,
