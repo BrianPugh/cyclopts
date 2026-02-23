@@ -95,6 +95,12 @@ Command with NumPy-style docstring.
 This command demonstrates NumPy docstring format which is the
 default for cyclopts.
 
+**Examples**
+
+```
+>>> numpy_style("test", count=5)
+```
+
 ### complex-cli google-style
 
 ```console
@@ -104,6 +110,12 @@ complex-cli google-style NAME [ARGS]
 Command with Google-style docstring.
 
 This command demonstrates Google docstring format.
+
+**Examples**
+
+```
+>>> google_style("test", count=5)
+```
 
 ### complex-cli sphinx-style
 
