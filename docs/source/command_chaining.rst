@@ -4,10 +4,12 @@
 Command Chaining
 ================
 
-Cyclopts does not natively support command chaining.
-This is because Cyclopts opted for more flexible and robust CLI parsing, rather than a compromised, inconsistent parsing experience.
-With that said, Cyclopts gives you the tools to create your own command chaining experience.
-In this example, we will use a special delimiter token (e.g. ``"AND"``) to separate commands.
+Cyclopts does not natively support command chaining, but the :ref:`Meta App` makes it easy to implement yourself.
+
+With Delimiter
+==============
+
+In this example, we use a special delimiter token (e.g. ``"AND"``) to separate commands.
 
 .. code-block:: python
 
@@ -42,3 +44,50 @@ In this example, we will use a special delimiter token (e.g. ``"AND"``) to separ
        # FOO val=123
        # FOO val=456
        # BAR flag=True
+
+Without Delimiter
+=================
+
+If your command names and argument values never collide, you can split tokens at recognized command names without requiring a delimiter.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App()
+
+
+   def split_commands(app: App, tokens: tuple[str, ...]) -> list[list[str]]:
+       """Split tokens into groups, starting a new group at each known command name."""
+       groups: list[list[str]] = []
+       for token in tokens:
+           if token in app:
+               groups.append([])
+           if groups:
+               groups[-1].append(token)
+       return groups
+
+
+   @app.command
+   def foo(val: int):
+       print(f"FOO {val=}")
+
+   @app.command
+   def bar(flag: bool):
+       print(f"BAR {flag=}")
+
+   @app.meta.default
+   def main(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+       for group in split_commands(app, tokens):
+           app(group)
+
+   if __name__ == "__main__":
+       app.meta(["foo", "123", "bar", "--flag"])
+       # FOO val=123
+       # BAR flag=True
+
+.. warning::
+
+   If an argument value matches a command name, it will be incorrectly treated as a new command boundary.
+   Use the delimiter approach if this could be an issue for your application.
