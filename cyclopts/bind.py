@@ -17,6 +17,7 @@ from cyclopts.exceptions import (
     CombinedShortOptionError,
     CycloptsError,
     MissingArgumentError,
+    RequiresEqualsError,
     UnknownOptionError,
     ValidationError,
 )
@@ -238,6 +239,12 @@ def _parse_kw_and_flags(
                             msg=f"Cannot combine multiple value-taking options in token {cli_option}"
                         )
                 tokens_per_element, consume_all = match.argument.token_count(match.keys)
+
+                if match.argument.parameter.requires_equals and match.matched_token.startswith("--") and not cli_values:
+                    raise RequiresEqualsError(
+                        argument=match.argument,
+                        keyword=match.matched_token,
+                    )
 
                 # Consume the appropriate number of tokens
                 with suppress(IndexError):

@@ -1080,6 +1080,46 @@ API
       Allow parsing non-numeric values that begin with a hyphen ``-``.
       This is disabled (:obj:`False`) by default, allowing for more helpful error messages for unknown CLI options.
 
+   .. attribute:: requires_equals
+      :type: bool
+      :value: False
+
+      Require long options to use ``=`` to separate the option name from its value (e.g., ``--option=value``).
+      When enabled, the space-separated form ``--option value`` is rejected with a :class:`RequiresEqualsError`.
+
+      * Only applies to long-form options (those starting with ``--``).
+      * Short options (e.g., ``-o value``) are **not** affected.
+      * Boolean flags (e.g., ``--verbose``) work regardless of this setting.
+      * Can be set app-wide via :attr:`.App.default_parameter`.
+      * Cannot be combined with :attr:`consume_multiple` (raises :class:`ValueError`).
+        To provide multiple values for a list parameter, repeat the option
+        (e.g., ``--urls=a --urls=b``). To pass an empty iterable, use the
+        negative flag (e.g., ``--empty-urls``).
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(*, name: Annotated[str, Parameter(requires_equals=True)]):
+             print(f"Hello {name}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --name=alice
+         Hello alice
+
+         $ my-script --name alice
+         ╭─ Error ───────────────────────────────────────────────────────╮
+         │ Parameter "--name" requires a value assigned with "=".        │
+         │ Use "--name=VALUE".                                           │
+         ╰───────────────────────────────────────────────────────────────╯
+
    .. attribute:: parse
       :type: Union[None, bool, str, re.Pattern]
       :value: None
@@ -2423,6 +2463,10 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.MissingArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.RequiresEqualsError
    :show-inheritance:
    :members:
 
