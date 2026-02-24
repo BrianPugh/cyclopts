@@ -58,15 +58,15 @@ If your command names and argument values never collide, you can split tokens at
    app = App()
 
 
-   def split_commands(app: App, tokens: tuple[str, ...]) -> list[list[str]]:
+   def split_commands(app, tokens):
        """Split tokens into groups, starting a new group at each known command name."""
-       groups: list[list[str]] = []
+       groups = []
        for token in tokens:
            if token in app:
                groups.append([])
            if groups:
                groups[-1].append(token)
-       return groups
+       return groups or [[]]
 
 
    @app.command
