@@ -1,6 +1,7 @@
 """Tests for lazy command loading via import path strings."""
 
 import sys
+import textwrap
 from types import ModuleType
 
 import pytest
@@ -350,6 +351,119 @@ def test_lazy_command_custom_name_in_help(app, console, lazy_module):
     assert "list-users" not in output
     # Help text should appear now that it's resolved
     assert "List all user accounts" in output
+
+
+def test_lazy_command_custom_name_execution(app, lazy_module):
+    """Test executing a lazy command by its custom name.
+
+    Verifies the documented Name vs Function Name behavior: a lazy command
+    registered with ``name="list"`` for function ``list_users`` must be
+    invocable by the custom name and resolve to the correct function.
+    """
+    test_module = lazy_module()
+
+    def list_users(limit: int = 10):
+        """List all user accounts."""
+        return f"listing {limit} users"
+
+    test_module.list_users = list_users  # type: ignore[attr-defined]
+
+    app.command("test_lazy_module:list_users", name="list")
+
+    assert not app._commands["list"].is_resolved
+
+    # Execute by custom name — should resolve and run the correct function
+    result = app(["list", "--limit", "5"])
+    assert result == "listing 5 users"
+    assert app._commands["list"].is_resolved
+
+
+def test_lazy_command_non_leaf_help_does_not_resolve(console, lazy_module):
+    """Test that --help on a non-leaf command does not resolve lazy children.
+
+    Running ``myapp user --help`` should not resolve any of user's lazy
+    child commands.  The usage line should show COMMAND, but the lazy
+    children should remain unresolved and absent from the help output.
+    """
+    mod_create = lazy_module("test_lazy_create")
+    mod_delete = lazy_module("test_lazy_delete")
+
+    def create_user(name: str):
+        """Create a new user."""
+        return f"creating {name}"
+
+    def delete_user(name: str):
+        """Delete a user."""
+        return f"deleting {name}"
+
+    mod_create.create_user = create_user  # type: ignore[attr-defined]
+    mod_delete.delete_user = delete_user  # type: ignore[attr-defined]
+
+    app = App(name="myapp", result_action="return_value")
+    user_app = app.command(App(name="user", help="Manage users."))
+    user_app.command("test_lazy_create:create_user", name="create")
+    user_app.command("test_lazy_delete:delete_user", name="delete")
+
+    assert isinstance(user_app._commands["create"], CommandSpec)
+    assert isinstance(user_app._commands["delete"], CommandSpec)
+    assert not user_app._commands["create"].is_resolved
+    assert not user_app._commands["delete"].is_resolved
+
+    with console.capture() as capture:
+        app(["user", "--help"], console=console)
+
+    expected = textwrap.dedent(
+        """\
+        Usage: myapp user COMMAND
+
+        Manage users.
+
+        TODO THIS IS WRONG, WE REALLY WANT TO LIST COMMANDS HERE.
+        """
+    )
+    assert capture.get() == expected
+    assert not user_app._commands["create"].is_resolved
+    assert not user_app._commands["delete"].is_resolved
+
+
+def test_lazy_command_custom_name_subcommand_help(console, lazy_module):
+    """Test that subcommand --help resolves and shows the custom name.
+
+    Parent --help does NOT resolve lazy commands, but targeting a specific
+    lazy subcommand (e.g., ``app subcmd --help``) resolves only that command.
+    The custom name (not the function name) should appear in the output.
+    """
+    test_module = lazy_module()
+
+    def list_users(limit: int = 10):
+        """List all user accounts."""
+        return f"listing {limit} users"
+
+    test_module.list_users = list_users  # type: ignore[attr-defined]
+
+    app = App(name="myapp", result_action="return_value")
+    app.command("test_lazy_module:list_users", name="list")
+
+    assert isinstance(app._commands["list"], CommandSpec)
+    assert not app._commands["list"].is_resolved
+
+    # Subcommand --help resolves the targeted command
+    with console.capture() as capture:
+        app(["list", "--help"], console=console)
+
+    expected = textwrap.dedent(
+        """\
+        Usage: myapp list [ARGS]
+
+        List all user accounts.
+
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ LIMIT --limit  [default: 10]                                       │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert capture.get() == expected
+    assert app._commands["list"].is_resolved
 
 
 def test_lazy_function_inherits_parent_help_flags(lazy_module):
