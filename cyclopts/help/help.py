@@ -273,7 +273,7 @@ def format_usage(
         app = app[command]
 
     # Check for non-help/version commands without resolving lazy CommandSpecs.
-    help_version_flags = set(app.help_flags + app.version_flags)
+    help_version_flags = {*app.help_flags, *app.version_flags}
     if any(x not in help_version_flags for x in app):
         usage.append("COMMAND")
 

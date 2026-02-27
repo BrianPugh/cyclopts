@@ -626,6 +626,8 @@ def test_format_usage_does_not_resolve_lazy_commands(lazy_module):
     app.command("test_lazy_fmt_b:b_app", name="cmd-b")
 
     # Both should be unresolved
+    assert isinstance(app._commands["cmd-a"], CommandSpec)
+    assert isinstance(app._commands["cmd-b"], CommandSpec)
     assert not app._commands["cmd-a"].is_resolved
     assert not app._commands["cmd-b"].is_resolved
 
@@ -643,6 +645,8 @@ def test_format_usage_does_not_resolve_lazy_commands(lazy_module):
     assert "COMMAND" in output
 
     # Neither lazy command should have been resolved
+    assert isinstance(app._commands["cmd-a"], CommandSpec)
+    assert isinstance(app._commands["cmd-b"], CommandSpec)
     assert not app._commands["cmd-a"].is_resolved, (
         "Lazy command 'cmd-a' was resolved during --help rendering. format_usage() should not trigger lazy resolution."
     )
