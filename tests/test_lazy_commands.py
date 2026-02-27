@@ -154,7 +154,13 @@ def test_lazy_command_collision(app):
 
 
 def test_lazy_command_help(app, console, lazy_module):
-    """Test that help generation works with lazy commands."""
+    """Test that help generation works with lazy commands.
+
+    Unresolved lazy commands are intentionally excluded from the parent
+    --help output (groups_from_app skips them with resolve_lazy=False).
+    The COMMAND placeholder in the usage line should still appear, and
+    the lazy command should NOT be resolved.
+    """
     test_module = lazy_module()
 
     def cmd(x):
@@ -165,15 +171,15 @@ def test_lazy_command_help(app, console, lazy_module):
 
     app.command("test_lazy_module:cmd", name="lazy-cmd")
 
-    # Generate help - should resolve the lazy command
+    # Generate help — should NOT resolve the lazy command
     with console.capture() as capture:
         app(["--help"], console=console)
 
     output = capture.get()
-    # The command name used for registration should appear
-    assert "lazy-cmd" in output or "cmd" in output
-    # The help should show the command documentation
-    assert "Test command documentation" in output
+    # Usage line should indicate commands exist
+    assert "COMMAND" in output
+    # The lazy command should NOT have been resolved
+    assert not app._commands["lazy-cmd"].is_resolved
 
 
 def test_lazy_and_immediate_commands_mixed(app, lazy_module):
@@ -311,10 +317,10 @@ def test_lazy_subcommands(app, lazy_module):
 
 
 def test_lazy_command_custom_name_in_help(app, console, lazy_module):
-    """Test that custom name (not function name) appears in help.
+    """Test that custom name appears in help after the command is resolved.
 
-    Regression test for bug where lazy commands with custom names
-    showed the function name instead of the custom name in help output.
+    Unresolved lazy commands are skipped from parent --help output.
+    Once resolved (e.g., via subcommand --help), the custom name is used.
     """
     test_module = lazy_module()
 
@@ -327,17 +333,22 @@ def test_lazy_command_custom_name_in_help(app, console, lazy_module):
     # Register with custom name "list" instead of function name "list_users"
     app.command("test_lazy_module:list_users", name="list")
 
-    # Generate help
+    # Before resolution: parent --help should not resolve it
+    assert not app._commands["list"].is_resolved
+
+    # Explicitly resolve to check name is correct
+    resolved = app["list"]
+    assert resolved.name[0] == "list"
+
+    # After resolution it should appear in help
     with console.capture() as capture:
         app(["--help"], console=console)
 
     output = capture.get()
-
-    # Should show custom name "list", NOT "list-users" (transformed function name)
     assert "list" in output.lower()
     # Make sure it's not showing the function name
     assert "list-users" not in output
-    # Help text should still appear
+    # Help text should appear now that it's resolved
     assert "List all user accounts" in output
 
 
@@ -590,6 +601,55 @@ def test_lazy_command_not_resolved_when_executing_different_command(lazy_module)
     assert not app._commands["c"].is_resolved, (
         "Lazy command 'c' was resolved even though it was not executed. "
         "This indicates that lazy loading is not working correctly."
+    )
+
+
+def test_format_usage_does_not_resolve_lazy_commands(lazy_module):
+    """Test that format_usage() does not resolve lazy commands.
+
+    Regression test: format_usage() accessed _registered_commands which
+    called __getitem__ on every command, triggering resolution of all
+    lazy CommandSpecs.  The fix in #710 addressed groups_from_app but
+    missed this code path.
+    """
+    module_a = lazy_module("test_lazy_fmt_a")
+    module_b = lazy_module("test_lazy_fmt_b")
+
+    a_app = App(name="cmd-a")
+    module_a.a_app = a_app  # type: ignore[attr-defined]
+
+    b_app = App(name="cmd-b")
+    module_b.b_app = b_app  # type: ignore[attr-defined]
+
+    app = App(name="myapp", help_flags=["--help"], version_flags=[], result_action="return_value")
+    app.command("test_lazy_fmt_a:a_app", name="cmd-a")
+    app.command("test_lazy_fmt_b:b_app", name="cmd-b")
+
+    # Both should be unresolved
+    assert not app._commands["cmd-a"].is_resolved
+    assert not app._commands["cmd-b"].is_resolved
+
+    # Render --help (output goes to console, we just care about resolution)
+    from io import StringIO
+
+    from rich.console import Console
+
+    buf = StringIO()
+    console = Console(file=buf, width=70, force_terminal=True)
+    app(["--help"], console=console)
+
+    # The usage line should include COMMAND (lazy commands are visible)
+    output = buf.getvalue()
+    assert "COMMAND" in output
+
+    # Neither lazy command should have been resolved
+    assert not app._commands["cmd-a"].is_resolved, (
+        "Lazy command 'cmd-a' was resolved during --help rendering. "
+        "format_usage() should not trigger lazy resolution."
+    )
+    assert not app._commands["cmd-b"].is_resolved, (
+        "Lazy command 'cmd-b' was resolved during --help rendering. "
+        "format_usage() should not trigger lazy resolution."
     )
 
 
