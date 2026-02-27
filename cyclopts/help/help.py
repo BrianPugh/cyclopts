@@ -272,29 +272,9 @@ def format_usage(
     for command in command_chain:
         app = app[command]
 
-    # Check for visible commands without resolving lazy CommandSpecs.
-    # Using _registered_commands would call __getitem__ on every command,
-    # triggering resolution of all lazy-loaded CommandSpecs.
-    from cyclopts.command_spec import CommandSpec
-
-    _has_visible_command = False
-    for _cmd_name in app:
-        if _cmd_name in (app.help_flags or ()) or _cmd_name in (app.version_flags or ()):
-            continue
-        _cmd = app._get_item(_cmd_name, recurse_meta=True)
-        if isinstance(_cmd, CommandSpec) and not _cmd.is_resolved:
-            # Unresolved lazy commands are visible by default
-            _has_visible_command = True
-            break
-        elif isinstance(_cmd, CommandSpec):
-            if _cmd._resolved.show:
-                _has_visible_command = True
-                break
-        elif _cmd.show:
-            _has_visible_command = True
-            break
-
-    if _has_visible_command:
+    # Check for non-help/version commands without resolving lazy CommandSpecs.
+    help_version_flags = set(app.help_flags + app.version_flags)
+    if any(x not in help_version_flags for x in app):
         usage.append("COMMAND")
 
     if app.default_command:

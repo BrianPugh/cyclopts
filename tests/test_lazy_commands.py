@@ -644,12 +644,10 @@ def test_format_usage_does_not_resolve_lazy_commands(lazy_module):
 
     # Neither lazy command should have been resolved
     assert not app._commands["cmd-a"].is_resolved, (
-        "Lazy command 'cmd-a' was resolved during --help rendering. "
-        "format_usage() should not trigger lazy resolution."
+        "Lazy command 'cmd-a' was resolved during --help rendering. format_usage() should not trigger lazy resolution."
     )
     assert not app._commands["cmd-b"].is_resolved, (
-        "Lazy command 'cmd-b' was resolved during --help rendering. "
-        "format_usage() should not trigger lazy resolution."
+        "Lazy command 'cmd-b' was resolved during --help rendering. format_usage() should not trigger lazy resolution."
     )
 
 
