@@ -96,7 +96,12 @@ def test_same_app_registered_multiple_times():
 
 
 def test_groups_from_app_resolve_lazy():
-    """Test that resolve_lazy parameter controls whether lazy commands are resolved."""
+    """Test that resolve_lazy parameter controls whether lazy commands are resolved.
+
+    With resolve_lazy=False (default), unresolved lazy commands appear as stubs
+    with their pre-specified help text but without triggering module imports.
+    With resolve_lazy=True, lazy commands are fully imported and resolved.
+    """
     test_module = ModuleType("test_lazy_module")
     test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
     sys.modules["test_lazy_module"] = test_module
@@ -104,8 +109,8 @@ def test_groups_from_app_resolve_lazy():
     try:
         app = App(help_flags=[], version_flags=[])
 
-        # Register a lazy command
-        app.command("test_lazy_module:cmd", name="lazy-cmd")
+        # Register a lazy command with pre-specified help
+        app.command("test_lazy_module:cmd", name="lazy-cmd", help="Lazy help text.")
 
         # Also register a regular command
         @app.command
@@ -116,16 +121,21 @@ def test_groups_from_app_resolve_lazy():
         assert isinstance(app._commands["lazy-cmd"], CommandSpec)
         assert not app._commands["lazy-cmd"].is_resolved
 
-        # With resolve_lazy=False (default), should skip lazy commands
+        # With resolve_lazy=False (default), lazy commands appear as stubs
         groups = groups_from_app(app, resolve_lazy=False)
         all_names = [name for _, cmds in groups for cmd in cmds for name in cmd.names]
         assert "regular" in all_names
-        assert "lazy-cmd" not in all_names
+        assert "lazy-cmd" in all_names
 
-        # Lazy command should still be unresolved
+        # The stub should carry the pre-specified help text
+        lazy_cmds = [cmd for _, cmds in groups for cmd in cmds if "lazy-cmd" in cmd.names]
+        assert len(lazy_cmds) == 1
+        assert lazy_cmds[0].app.help == "Lazy help text."
+
+        # Lazy command should still be unresolved (stub, not imported)
         assert not app._commands["lazy-cmd"].is_resolved
 
-        # With resolve_lazy=True, should include lazy commands
+        # With resolve_lazy=True, should include fully resolved lazy commands
         groups = groups_from_app(app, resolve_lazy=True)
         all_names = [name for _, cmds in groups for cmd in cmds for name in cmd.names]
         assert "regular" in all_names
@@ -135,3 +145,32 @@ def test_groups_from_app_resolve_lazy():
         assert app._commands["lazy-cmd"].is_resolved
     finally:
         del sys.modules["test_lazy_module"]
+
+
+def test_groups_from_app_lazy_hidden():
+    """Test that lazy commands with show=False are excluded from groups."""
+    test_module = ModuleType("test_lazy_module_hidden")
+    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
+    sys.modules["test_lazy_module_hidden"] = test_module
+
+    try:
+        app = App(help_flags=[], version_flags=[])
+
+        # Register a hidden lazy command
+        app.command("test_lazy_module_hidden:cmd", name="hidden-cmd", show=False)
+
+        # Also register a visible regular command
+        @app.command
+        def visible():
+            pass
+
+        groups = groups_from_app(app, resolve_lazy=False)
+        all_names = [name for _, cmds in groups for cmd in cmds for name in cmd.names]
+        assert "visible" in all_names
+        assert "hidden-cmd" not in all_names
+
+        # Should not have resolved the hidden command
+        assert isinstance(app._commands["hidden-cmd"], CommandSpec)
+        assert not app._commands["hidden-cmd"].is_resolved
+    finally:
+        del sys.modules["test_lazy_module_hidden"]

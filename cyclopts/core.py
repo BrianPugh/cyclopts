@@ -1313,7 +1313,16 @@ class App:
 
             # Create CommandSpec with the resolved name (first name if multiple)
             # The name will be used when wrapping functions in an App
-            spec = CommandSpec(import_path=obj, name=name[0] if name else None, app_kwargs=kwargs)
+            # Extract CommandSpec-specific fields from kwargs before storing
+            spec_help: str | None = kwargs.pop("help", None)  # type: ignore[assignment]
+            spec_show: bool = kwargs.pop("show", True)  # type: ignore[assignment]
+            spec = CommandSpec(
+                import_path=obj,
+                name=name[0] if name else None,
+                app_kwargs=kwargs,
+                help=spec_help,
+                show=spec_show,
+            )
 
             # Register the CommandSpec
             for n in name + alias:

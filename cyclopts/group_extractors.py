@@ -82,6 +82,20 @@ def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group,
         cmd = app._get_item(name, recurse_meta=True)
         if isinstance(cmd, CommandSpec) and not cmd.is_resolved:
             if not resolve_lazy:
+                if not cmd.show:
+                    continue
+                # Create a lightweight stub App for help display without importing
+                cmd_id = id(cmd)
+                app_names.setdefault(cmd_id, []).append(name)
+                if cmd_id not in unique_apps:
+                    from cyclopts.core import App as _App
+
+                    unique_apps[cmd_id] = _App(
+                        name=name,
+                        help=cmd.help or "",
+                        version_flags=[],
+                        help_flags=[],
+                    )
                 continue
         subapp = app[name]
         app_id = id(subapp)
