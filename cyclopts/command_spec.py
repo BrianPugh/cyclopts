@@ -42,6 +42,8 @@ class CommandSpec:
     import_path: str
     name: str | tuple[str, ...] | None = None
     app_kwargs: dict[str, Any] = Factory(dict)
+    help: str | None = None
+    show: bool = True
 
     _resolved: "App | None" = field(init=False, default=None, repr=False)
 
