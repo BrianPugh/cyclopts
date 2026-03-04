@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from cyclopts._convert import ITERABLE_TYPES
-from cyclopts.annotations import is_union
+from cyclopts.annotations import is_annotated, is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
 from cyclopts.group_extractors import RegisteredCommand, groups_from_app
@@ -109,6 +109,9 @@ def get_completion_action(type_hint: Any) -> CompletionAction:
     CompletionAction
         Completion action for type.
     """
+    if is_annotated(type_hint):
+        return get_completion_action(get_args(type_hint)[0])
+
     if is_union(type_hint):
         for arg in get_args(type_hint):
             if arg is not type(None):

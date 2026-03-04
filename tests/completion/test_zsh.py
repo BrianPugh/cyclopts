@@ -15,6 +15,7 @@ from .apps import (
     app_basic,
     app_disabled_negative,
     app_enum,
+    app_list_annotated_path,
     app_list_path,
     app_markup,
     app_negative,
@@ -907,6 +908,20 @@ def test_list_path_completion(zsh_tester):
     script = tester.completion_script
 
     assert "_files" in script, "list[Path] should generate file completion"
+    assert tester.validate_script_syntax()
+
+
+def test_list_annotated_path_completion(zsh_tester):
+    """Test that list[Annotated[Path, ...]] arguments generate file completion.
+
+    When a type like ExistingFile (Annotated[Path, Parameter(...)]) is used
+    inside a collection like list[], the Annotated wrapper must be unwrapped
+    to detect the underlying Path type for completion.
+    """
+    tester = zsh_tester(app_list_annotated_path, "listannotatedpath")
+    script = tester.completion_script
+
+    assert "_files" in script, "list[ExistingFile] should generate file completion"
     assert tester.validate_script_syntax()
 
 
