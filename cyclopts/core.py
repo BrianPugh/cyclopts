@@ -2356,7 +2356,7 @@ class App:
             Shell type for completion. If not specified, attempts to auto-detect current shell.
         output : Path | None
             Output path for the completion script. If not specified, uses shell-specific default:
-            - zsh: ~/.zsh/completions/_<prog_name>
+            - zsh: ~/.zsh/completions/_<prog_name> (or $ZSH_CUSTOM/completions/_<prog_name> with oh-my-zsh)
             - bash: ~/.local/share/bash-completion/completions/<prog_name>
             - fish: ~/.config/fish/completions/<prog_name>.fish
         add_to_startup : bool

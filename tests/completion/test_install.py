@@ -15,7 +15,17 @@ def temp_home(tmp_path, monkeypatch):
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
     else:
         monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("ZSH", raising=False)
     return tmp_path
+
+
+@pytest.fixture
+def omz_dir(temp_home, monkeypatch):
+    """Create a fake oh-my-zsh installation with $ZSH set."""
+    omz = temp_home / ".oh-my-zsh"
+    (omz / "custom").mkdir(parents=True)
+    monkeypatch.setenv("ZSH", str(omz))
+    return omz
 
 
 def test_install_completion_bash_add_to_startup_true(temp_home):
@@ -323,3 +333,97 @@ def test_install_completion_command_fish(temp_home, monkeypatch, capsys):
     assert "Completion script installed" in captured.out
     assert "automatically loaded in fish" in captured.out
     assert "source ~/.config/fish/config.fish" in captured.out
+
+
+def test_install_completion_zsh_ohmyzsh_default_path(omz_dir):
+    """Test that $ZSH set with valid dir installs to $ZSH/custom/completions/_testapp."""
+    app = App(name="testapp")
+    install_path = app.install_completion(shell="zsh", add_to_startup=True)
+
+    assert install_path == omz_dir / "custom" / "completions" / "_testapp"
+    assert install_path.exists()
+
+
+def test_install_completion_zsh_ohmyzsh_zsh_custom_env(omz_dir, temp_home, monkeypatch):
+    """Test that $ZSH_CUSTOM takes precedence over $ZSH/custom."""
+    custom_dir = temp_home / "my-custom-omz"
+    custom_dir.mkdir()
+    monkeypatch.setenv("ZSH_CUSTOM", str(custom_dir))
+
+    app = App(name="testapp")
+    install_path = app.install_completion(shell="zsh", add_to_startup=True)
+
+    assert install_path == custom_dir / "completions" / "_testapp"
+    assert install_path.exists()
+
+
+def test_install_completion_zsh_ohmyzsh_no_zshrc_modification(omz_dir, temp_home):
+    """Test that .zshrc is not created/modified when oh-my-zsh detected."""
+    zshrc = temp_home / ".zshrc"
+    app = App(name="testapp")
+    app.install_completion(shell="zsh", add_to_startup=True)
+
+    assert not zshrc.exists()
+
+
+def test_install_completion_zsh_ohmyzsh_dir_missing(temp_home, monkeypatch):
+    """Test that $ZSH pointing to nonexistent dir falls back to vanilla path."""
+    monkeypatch.setenv("ZSH", str(temp_home / "nonexistent"))
+
+    app = App(name="testapp")
+    install_path = app.install_completion(shell="zsh", add_to_startup=False)
+
+    expected = temp_home / ".zsh" / "completions" / "_testapp"
+    assert install_path == expected
+    assert install_path.exists()
+
+
+def test_install_completion_zsh_add_to_startup_prepends(temp_home):
+    """Test that for vanilla zsh, fpath line appears before existing .zshrc content."""
+    app = App(name="testapp")
+    zshrc = temp_home / ".zshrc"
+
+    existing_content = "# Existing config\nautoload -Uz compinit && compinit\n"
+    zshrc.write_text(existing_content)
+
+    app.install_completion(shell="zsh", add_to_startup=True)
+
+    zshrc_content = zshrc.read_text()
+    fpath_pos = zshrc_content.index("fpath=")
+    existing_pos = zshrc_content.index("# Existing config")
+    assert fpath_pos < existing_pos, "fpath line should be prepended before existing content"
+
+
+def test_install_completion_zsh_ohmyzsh_message(omz_dir, monkeypatch, capsys):
+    """Test that printed output mentions oh-my-zsh and doesn't mention .zshrc."""
+    app = App(name="testapp")
+    app.register_install_completion_command(add_to_startup=True)
+
+    monkeypatch.setattr("cyclopts.completion.detect.detect_shell", lambda: "zsh")
+
+    with patch("sys.exit"):
+        try:
+            app(["--install-completion"], exit_on_error=False)
+        except SystemExit:
+            pass
+
+    captured = capsys.readouterr()
+    assert "oh-my-zsh" in captured.out
+    assert ".zshrc" not in captured.out
+    assert "exec zsh" in captured.out
+
+
+def test_install_completion_bash_add_to_startup_appends(temp_home):
+    """Regression test: bash still appends to .bashrc."""
+    app = App(name="testapp")
+    bashrc = temp_home / ".bashrc"
+
+    existing_content = "# Existing bash config\nexport PATH=/usr/local/bin:$PATH\n"
+    bashrc.write_text(existing_content)
+
+    app.install_completion(shell="bash", add_to_startup=True)
+
+    bashrc_content = bashrc.read_text()
+    existing_pos = bashrc_content.index("# Existing bash config")
+    completion_pos = bashrc_content.index("# Load testapp completion")
+    assert existing_pos < completion_pos, "bash completion should be appended after existing content"

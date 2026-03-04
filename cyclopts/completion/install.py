@@ -4,12 +4,40 @@ This module handles the installation of completion scripts to shell-specific
 locations and the updating of shell RC files to load completions.
 """
 
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
 from cyclopts.parameter import Parameter
+
+
+def _detect_omz_completions_dir() -> Path | None:
+    """Detect oh-my-zsh custom completions directory.
+
+    Uses ``$ZSH_CUSTOM/completions`` (the recommended location for user
+    completions in oh-my-zsh). Falls back to ``$ZSH/custom/completions``
+    when ``$ZSH_CUSTOM`` is not set.
+
+    Returns
+    -------
+    Path | None
+        Path to the oh-my-zsh custom completions directory, or None if
+        oh-my-zsh is not detected.
+    """
+    zsh_custom_str = os.environ.get("ZSH_CUSTOM")
+    if zsh_custom_str:
+        zsh_custom = Path(zsh_custom_str)
+        if zsh_custom.is_dir():
+            return zsh_custom / "completions"
+    zsh_dir_str = os.environ.get("ZSH")
+    if not zsh_dir_str:
+        return None
+    zsh_dir = Path(zsh_dir_str)
+    if zsh_dir.is_dir():
+        return zsh_dir / "custom" / "completions"
+    return None
 
 
 def get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_name: str) -> Path:
@@ -34,6 +62,11 @@ def get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_name
     """
     home = Path.home()
     if shell == "zsh":
+        omz_completions = _detect_omz_completions_dir()
+        if omz_completions is not None:
+            omz_completions.mkdir(parents=True, exist_ok=True)
+            return omz_completions / f"_{prog_name}"
+        # Vanilla zsh fallback
         zsh_completions = home / ".zsh" / "completions"
         zsh_completions.mkdir(parents=True, exist_ok=True)
         return zsh_completions / f"_{prog_name}"
@@ -74,6 +107,8 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
         config_line = f'[ -f "{script_path}" ] && . "{script_path}"'
         comment = f"# Load {prog_name} completion"
     elif shell == "zsh":
+        if _detect_omz_completions_dir():
+            return False
         rc_file = Path.home() / ".zshrc"
         completion_dir = script_path.parent
         config_line = f"fpath=({completion_dir} $fpath)"
@@ -91,14 +126,19 @@ def add_to_rc_file(script_path: Path, prog_name: str, shell: Literal["bash", "zs
             return False
         elif config_line in content:
             return False
-        needs_newline = content and not content.endswith("\n")
     else:
-        needs_newline = False
+        content = ""
 
-    with rc_file.open("a") as f:
-        if needs_newline:
-            f.write("\n")
-        f.write(f"{comment}\n{config_line}\n")
+    if shell == "zsh":
+        # Prepend to ensure fpath is set before any compinit call
+        rc_file.write_text(f"{comment}\n{config_line}\n{content}")
+    else:
+        # Bash: append
+        needs_newline = content and not content.endswith("\n")
+        with rc_file.open("a") as f:
+            if needs_newline:
+                f.write("\n")
+            f.write(f"{comment}\n{config_line}\n")
 
     return True
 
@@ -158,7 +198,10 @@ def create_install_completion_command(
         print(f"✓ Completion script installed to {install_path}")
 
         if shell == "zsh":
-            if add_to_startup:
+            if _detect_omz_completions_dir():
+                print("✓ Detected oh-my-zsh: completions directory is already in $fpath.")
+                print("\nRestart your shell or run: exec zsh")
+            elif add_to_startup:
                 zshrc = Path.home() / ".zshrc"
                 completion_dir = install_path.parent
                 print(f"✓ Added {completion_dir} to fpath in {zshrc}")
