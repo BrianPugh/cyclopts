@@ -911,6 +911,20 @@ def test_list_path_completion(zsh_tester):
     assert tester.validate_script_syntax()
 
 
+def test_list_path_positional_variadic(zsh_tester):
+    """Test that list[Path] positional generates variadic '*' spec, not just '1:'.
+
+    A list parameter that can consume multiple positional values should offer
+    file completion for ALL positions, not just the first.
+    """
+    tester = zsh_tester(app_list_path, "listpath")
+    script = tester.completion_script
+
+    assert "'*:" in script, "list[Path] positional should use variadic '*' spec for all positions"
+    assert "_files" in script
+    assert tester.validate_script_syntax()
+
+
 def test_list_annotated_path_completion(zsh_tester):
     """Test that list[Annotated[Path, ...]] arguments generate file completion.
 

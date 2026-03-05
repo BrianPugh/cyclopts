@@ -12,6 +12,7 @@ from .apps import (
     app_deploy,
     app_disabled_negative,
     app_enum,
+    app_list_annotated_path,
     app_list_path,
     app_multiple_positionals,
     app_negative,
@@ -703,6 +704,40 @@ def test_list_path_completion(bash_tester):
     script = tester.completion_script
 
     assert "compgen -f" in script, "list[Path] should generate file completion"
+    assert tester.validate_script_syntax()
+
+
+def test_list_annotated_path_completion(bash_tester):
+    """Test that list[Annotated[Path, ...]] arguments generate file completion."""
+    tester = bash_tester(app_list_annotated_path, "listannotatedpath")
+    script = tester.completion_script
+
+    assert "compgen -f" in script, "list[ExistingFile] should generate file completion"
+    assert tester.validate_script_syntax()
+
+
+def test_list_path_multi_positional_default_case(bash_tester):
+    """Test that list[Path] positional uses file completion in the default case.
+
+    When a list parameter can consume multiple positional values, the bash
+    default case (*) should use the list's completion instead of empty COMPREPLY.
+    """
+    from pathlib import Path
+    from typing import Literal
+
+    app = App(name="testapp")
+
+    @app.command
+    def cmd(first: Literal["a", "b"], files: list[Path], /):
+        pass
+
+    tester = bash_tester(app, "testapp")
+    script = tester.completion_script
+
+    # The default case should provide file completion for the list[Path] arg
+    assert script.count("compgen -f") >= 2, (
+        "list[Path] should have file completion in both its position and the default case"
+    )
     assert tester.validate_script_syntax()
 
 

@@ -9,6 +9,7 @@ from textwrap import dedent
 from textwrap import indent as textwrap_indent
 from typing import TYPE_CHECKING
 
+from cyclopts.annotations import is_iterable_type
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
@@ -164,9 +165,11 @@ def _generate_nested_positional_specs(
     """
     specs = []
 
-    # Check if we have variadic positionals
-    variadic_args = [arg for arg in positional_args if arg.is_var_positional()]
-    non_variadic_args = [arg for arg in positional_args if not arg.is_var_positional()]
+    # Check if we have variadic positionals (including collection types like list[X])
+    variadic_args = [arg for arg in positional_args if arg.is_var_positional() or is_iterable_type(arg.hint)]
+    non_variadic_args = [
+        arg for arg in positional_args if not arg.is_var_positional() and not is_iterable_type(arg.hint)
+    ]
 
     # Generate specs for non-variadic positionals
     for arg in non_variadic_args:
@@ -565,8 +568,8 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
-    if argument.is_var_positional():
-        # Variadic positional (*args)
+    if argument.is_var_positional() or is_iterable_type(argument.hint):
+        # Variadic positional (*args) or collection type (list[X], set[X], etc.)
         return f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
 
     # Regular positional - zsh uses 1-based indexing
