@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from cyclopts import App, Parameter
+from cyclopts.types import ExistingFile
 
 app_basic = App(name="basic")
 
@@ -213,6 +214,17 @@ def list_path_main(
     files: Annotated[list[Path], Parameter(help="List of files")],
 ):
     """App with list[Path] parameter."""
+    pass
+
+
+app_list_annotated_path = App(name="listannotatedpath")
+
+
+@app_list_annotated_path.default
+def list_annotated_path_main(
+    files: list[ExistingFile],
+):
+    """App with list[ExistingFile] parameter."""
     pass
 
 

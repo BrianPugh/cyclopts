@@ -7,6 +7,7 @@ Targets bash 3.2+ with no external dependencies.
 import re
 from typing import TYPE_CHECKING
 
+from cyclopts.annotations import is_iterable_type
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
@@ -457,8 +458,24 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
             lines.append(f"{indent}    ;;")
 
         # Default case for positions beyond defined positionals
+        # If any positional is a collection type, use it as the default
+        iterable_arg = next((arg for arg in positional_args if is_iterable_type(arg.hint)), None)
         lines.append(f"{indent}  *)")
-        lines.append(f"{indent}    COMPREPLY=()")
+        if iterable_arg:
+            choices = iterable_arg.get_choices(force=True)
+            action = get_completion_action(iterable_arg.hint)
+            if choices:
+                escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
+                choices_str = " ".join(escaped_choices)
+                lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
+            else:
+                compgen_flag = _map_completion_action_to_bash(action)
+                if compgen_flag:
+                    lines.append(f'{indent}    COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )')
+                else:
+                    lines.append(f"{indent}    COMPREPLY=()")
+        else:
+            lines.append(f"{indent}    COMPREPLY=()")
         lines.append(f"{indent}    ;;")
         lines.append(f"{indent}esac")
 

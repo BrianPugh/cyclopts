@@ -12,8 +12,9 @@ if TYPE_CHECKING:
 
 F = TypeVar("F", bound=Flag)
 
-from cyclopts._convert import ITERABLE_TYPES, convert_enum_flag
+from cyclopts._convert import convert_enum_flag
 from cyclopts.annotations import (
+    ITERABLE_TYPES,
     is_class_and_subclass,
     is_union,
     resolve_annotated,

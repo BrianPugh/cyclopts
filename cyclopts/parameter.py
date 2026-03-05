@@ -23,8 +23,8 @@ else:
     from typing_extensions import Self
 
 import cyclopts._env_var
-from cyclopts._convert import ITERABLE_TYPES
 from cyclopts.annotations import (
+    ITERABLE_TYPES,
     NoneType,
     is_annotated,
     is_nonetype,
