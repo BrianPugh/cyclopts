@@ -24,7 +24,7 @@ if sys.version_info >= (3, 12):
 else:
     TypeAliasType = None
 
-from cyclopts.annotations import is_annotated, is_enum_flag, is_nonetype, is_union, resolve
+from cyclopts.annotations import ITERABLE_TYPES, is_annotated, is_enum_flag, is_nonetype, is_union, resolve
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import FieldInfo, get_field_infos
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
@@ -63,16 +63,6 @@ _abstract_to_concrete_type_mapping: dict[type, type] = {
     collections.abc.MutableSequence: list,
     collections.abc.Mapping: dict,
     collections.abc.MutableMapping: dict,
-}
-
-ITERABLE_TYPES = {
-    Iterable,
-    typing.Sequence,
-    Sequence,
-    frozenset,
-    list,
-    set,
-    tuple,
 }
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]

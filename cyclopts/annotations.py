@@ -1,5 +1,7 @@
 import inspect
 import sys
+import typing
+from collections.abc import Iterable, Sequence
 from enum import Flag
 from types import UnionType
 from typing import Annotated, Any, Union, get_args, get_origin
@@ -21,6 +23,16 @@ else:  # pragma: no cover
 # from types import NoneType is available >=3.10
 NoneType = type(None)
 AnnotatedType = type(Annotated[int, 0])
+
+ITERABLE_TYPES = {
+    Iterable,
+    typing.Sequence,
+    Sequence,
+    frozenset,
+    list,
+    set,
+    tuple,
+}
 
 
 def is_nonetype(hint):
@@ -74,6 +86,16 @@ def is_enum_flag(hint) -> bool:
 
 def is_annotated(hint) -> bool:
     return type(hint) is AnnotatedType
+
+
+def is_iterable_type(hint) -> bool:
+    """Check if a type hint is a collection/iterable type (list, set, tuple, etc.).
+
+    Handles Annotated, Optional, TypeAlias, and NewType wrappers.
+    """
+    hint = resolve(hint)
+    origin = get_origin(hint)
+    return is_class_and_subclass(origin, tuple(ITERABLE_TYPES))
 
 
 def contains_hint(hint, target_type) -> bool:
