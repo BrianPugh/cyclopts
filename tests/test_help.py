@@ -2692,3 +2692,294 @@ def test_help_uppercase_short_negative_flag(app, console):
         """
     )
     assert actual == expected
+
+
+def test_help_docstring_examples_section(console, normalize_trailing_whitespace):
+    app = App(name="app", version_flags=[], result_action="return_value")
+
+    @app.default
+    def main(x: int):
+        """Short description.
+
+        Examples
+        --------
+        To run with a value of 1:
+
+            $ app 1
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app X
+
+        Short description.
+
+        Examples
+
+            To run with a value of 1:
+
+
+             $ app 1
+
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  X --x  [required]                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_notes_section(console, normalize_trailing_whitespace):
+    app = App(name="app", version_flags=[], result_action="return_value")
+
+    @app.default
+    def main(x: int):
+        """Short description.
+
+        Notes
+        -----
+        This is an important note about the function.
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app X
+
+        Short description.
+
+        Notes
+
+            This is an important note about the function.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  X --x  [required]                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_multiple_sections_ordering(console, normalize_trailing_whitespace):
+    app = App(name="app", version_flags=[], result_action="return_value")
+
+    @app.default
+    def main(x: int):
+        """Short description.
+
+        Notes
+        -----
+        Some notes here.
+
+        Examples
+        --------
+        Basic usage:
+
+            $ app 1
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app X
+
+        Short description.
+
+        Notes
+
+            Some notes here.
+
+        Examples
+
+            Basic usage:
+
+
+             $ app 1
+
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  X --x  [required]                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_examples_multiple_snippets(console, normalize_trailing_whitespace):
+    app = App(name="app", version_flags=[], result_action="return_value")
+
+    @app.default
+    def main(x: int):
+        """Short description.
+
+        Examples
+        --------
+        Basic usage:
+
+            $ app 1
+
+        Negative value:
+
+            $ app -- -5
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app X
+
+        Short description.
+
+        Examples
+
+            Basic usage:
+
+
+             $ app 1
+
+
+            Negative value:
+
+
+             $ app -- -5
+
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  X --x  [required]                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_params_excluded_from_extra_sections(console, normalize_trailing_whitespace):
+    """Parameters, Returns, Raises, and Deprecated sections should not appear in the description."""
+    app = App(name="app", version_flags=[], result_action="return_value")
+
+    @app.default
+    def main(x: int):
+        """Short description.
+
+        Notes
+        -----
+        A note.
+
+        Parameters
+        ----------
+        x : int
+            The x value.
+
+        Returns
+        -------
+        int
+            The result.
+
+        Raises
+        ------
+        ValueError
+            If bad.
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app X
+
+        Short description.
+
+        Notes
+
+            A note.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  X --x  The x value. [required]                                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
+
+
+def test_help_docstring_google_style_sections(console, normalize_trailing_whitespace):
+    """Test Google-style docstring sections (with colons) render correctly."""
+    app = App(name="test", version_flags=[], result_action="return_value")
+
+    @app.default
+    def command():
+        """This is another test command.
+
+        This command has a longer description in the second paragraph.
+        We want to see how cyclopts handles multiple paragraphs.
+
+        And here's a third paragraph for good measure.
+
+        Examples:
+
+            test command2 --option1 value1
+            test command2 --option2 value2
+
+        Notes:
+            This is a notes section.
+        """
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: test
+
+        This is another test command.
+
+        This command has a longer description in the second paragraph. We
+        want to see how cyclopts handles multiple paragraphs.
+
+        And here's a third paragraph for good measure.
+
+        Examples
+
+            test command2 --option1 value1
+            test command2 --option2 value2
+
+        Notes
+
+            This is a notes section.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert normalize_trailing_whitespace(actual) == expected
