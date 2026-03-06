@@ -248,9 +248,9 @@ def test_lazy_command_app_kwargs(app, lazy_module):
     assert spec.help == "Custom help text"
     assert spec.show is True
 
-    # After resolution: the App gets help from the function's docstring
+    # After resolution: explicit help= from registration takes precedence
     resolved = app["custom"]
-    assert resolved.help == "Test function."
+    assert resolved.help == "Custom help text"
 
 
 def test_lazy_command_parse_commands(app, lazy_module):
@@ -410,8 +410,8 @@ def test_lazy_command_non_leaf_help_does_not_resolve(console, lazy_module):
 
     app = App(name="myapp", result_action="return_value")
     user_app = app.command(App(name="user", help="Manage users."))
-    user_app.command("test_lazy_create:create_user", name="create")
-    user_app.command("test_lazy_delete:delete_user", name="delete")
+    user_app.command("test_lazy_create:create_user", name="create", help="Create a new user.")
+    user_app.command("test_lazy_delete:delete_user", name="delete", help="Delete a user.")
 
     assert isinstance(user_app._commands["create"], CommandSpec)
     assert isinstance(user_app._commands["delete"], CommandSpec)
@@ -421,12 +421,75 @@ def test_lazy_command_non_leaf_help_does_not_resolve(console, lazy_module):
     with console.capture() as capture:
         app(["user", "--help"], console=console)
 
-    output = capture.get()
-    assert "COMMAND" in output
-    assert "create" in output
-    assert "delete" in output
+    actual = capture.get()
+    expected = textwrap.dedent(
+        """\
+        Usage: myapp user COMMAND
+
+        Manage users.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ create  Create a new user.                                         │
+        │ delete  Delete a user.                                             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
     assert not user_app._commands["create"].is_resolved
     assert not user_app._commands["delete"].is_resolved
+
+
+def test_lazy_command_app_with_explicit_help(console, lazy_module):
+    """Test lazily registering an App object with explicit help at registration.
+
+    When a lazy import resolves to an App, the explicit ``help`` provided
+    at registration time should be used (both before and after resolution).
+    """
+    test_module = lazy_module()
+
+    sub_app = App(name="deploy", help="App's own help.")
+
+    @sub_app.default
+    def deploy_handler(target: str):
+        """Deploy handler docstring."""
+        return f"deploying {target}"
+
+    test_module.deploy_app = sub_app  # type: ignore[attr-defined]
+
+    app = App(name="myapp", result_action="return_value")
+    app.command("test_lazy_module:deploy_app", name="deploy", help="Deploy the application.")
+
+    expected = textwrap.dedent(
+        """\
+        Usage: myapp COMMAND
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ deploy       Deploy the application.                               │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert isinstance(app._commands["deploy"], CommandSpec)
+
+    # Before resolution: explicit help should appear in parent --help
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    assert capture.get() == expected
+    assert not app._commands["deploy"].is_resolved
+
+    # Resolve and check that explicit help is still used
+    result = app(["deploy", "--target", "prod"])
+    assert result == "deploying prod"
+    assert app._commands["deploy"].is_resolved
+
+    # After resolution: explicit help should still appear in parent --help
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    assert capture.get() == expected
 
 
 def test_lazy_command_custom_name_subcommand_help(console, lazy_module):

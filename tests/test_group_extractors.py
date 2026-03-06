@@ -130,6 +130,7 @@ def test_groups_from_app_resolve_lazy():
         # The stub should carry the pre-specified help text
         lazy_cmds = [cmd for _, cmds in groups for cmd in cmds if "lazy-cmd" in cmd.names]
         assert len(lazy_cmds) == 1
+        assert isinstance(lazy_cmds[0].app, CommandSpec)
         assert lazy_cmds[0].app.help == "Lazy help text."
 
         # Lazy command should still be unresolved (stub, not imported)

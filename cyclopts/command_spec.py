@@ -43,7 +43,13 @@ class CommandSpec:
     name: str | tuple[str, ...] | None = None
     app_kwargs: dict[str, Any] = Factory(dict)
     help: str | None = None
-    show: bool = True
+    _show: bool | None = field(default=None, alias="show")
+
+    @property
+    def show(self) -> bool:
+        if self._show is None:
+            return True
+        return self._show
 
     _resolved: "App | None" = field(init=False, default=None, repr=False)
 
@@ -139,6 +145,12 @@ class CommandSpec:
 
             self._resolved = App(name=self.name, **app_kwargs)
             self._resolved.default(target)
+
+        # Apply registration-time overrides to the resolved App
+        if self.help is not None:
+            self._resolved.help = self.help
+        if self._show is not None:
+            self._resolved.show = self._show
 
         # Hide help and version flags from subapp help output
         # This matches the behavior of direct App/function registration in core.py

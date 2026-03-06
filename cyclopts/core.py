@@ -1315,7 +1315,7 @@ class App:
             # The name will be used when wrapping functions in an App
             # Extract CommandSpec-specific fields from kwargs before storing
             spec_help: str | None = kwargs.pop("help", None)  # type: ignore[assignment]
-            spec_show: bool = kwargs.pop("show", True)  # type: ignore[assignment]
+            spec_show: bool | None = kwargs.pop("show", None)  # type: ignore[assignment]
             spec = CommandSpec(
                 import_path=obj,
                 name=name[0] if name else None,
