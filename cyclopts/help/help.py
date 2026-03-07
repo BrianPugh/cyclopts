@@ -13,7 +13,6 @@ from typing import (
 from attrs import converters, define, evolve, field
 
 from cyclopts.annotations import resolve_annotated
-from cyclopts.command_spec import CommandSpec
 from cyclopts.core import _get_root_module_name
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
@@ -499,10 +498,7 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
         for name in names:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
-        if isinstance(app, CommandSpec):
-            sort_key = None
-        else:
-            sort_key = resolve_callables(app.sort_key, app)
+        sort_key = resolve_callables(app.sort_key, app)
 
         entry = HelpEntry(
             positive_names=tuple(long_names),

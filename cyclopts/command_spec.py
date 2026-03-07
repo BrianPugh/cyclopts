@@ -43,6 +43,7 @@ class CommandSpec:
     name: str | tuple[str, ...] | None = None
     app_kwargs: dict[str, Any] = Factory(dict)
     help: str | None = None
+    sort_key: Any = None
     _show: bool | None = field(default=None, alias="show")
 
     @property
@@ -149,6 +150,8 @@ class CommandSpec:
         # Apply registration-time overrides to the resolved App
         if self.help is not None:
             self._resolved.help = self.help
+        if self.sort_key is not None:
+            self._resolved.sort_key = self.sort_key
         if self._show is not None:
             self._resolved.show = self._show
 
