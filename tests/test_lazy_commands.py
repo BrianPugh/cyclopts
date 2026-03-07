@@ -128,6 +128,31 @@ def test_lazy_command_name_transform(app, lazy_module):
     assert "create_user" not in app
 
 
+def test_lazy_command_inherits_name_transform(lazy_module):
+    """Test that a lazily-resolved sub-app inherits name_transform from parent."""
+
+    def upper_transform(s: str) -> str:
+        return s.upper()
+
+    parent = App(name="parent", name_transform=upper_transform)
+
+    # Create a lazy module with a sub-app that has no custom name_transform
+    test_module = lazy_module("test_nt_module")
+    child = App(name="CHILD")
+    test_module.child = child
+
+    parent.command("test_nt_module:child", name="CHILD")
+    resolved = parent["CHILD"]
+
+    # After resolution, the child should have inherited the parent's name_transform.
+    # Register a sub-command on the resolved child to verify.
+    @resolved.command
+    def sub_command():
+        pass
+
+    assert "SUB_COMMAND" in resolved
+
+
 def test_lazy_command_with_alias(app, lazy_module):
     """Test lazy command with alias."""
     test_module = lazy_module()

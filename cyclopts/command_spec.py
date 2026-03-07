@@ -154,6 +154,8 @@ class CommandSpec:
             self._resolved.sort_key = self.sort_key
         if self._show is not None:
             self._resolved.show = self._show
+        if self._resolved._name_transform is None:
+            self._resolved.name_transform = parent_app.name_transform
 
         # Hide help and version flags from subapp help output
         # This matches the behavior of direct App/function registration in core.py
