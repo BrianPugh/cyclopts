@@ -8,6 +8,7 @@ from attrs import Factory, define, field
 
 if TYPE_CHECKING:
     from cyclopts.core import App
+    from cyclopts.group import Group
 
 
 @define
@@ -44,6 +45,7 @@ class CommandSpec:
     app_kwargs: dict[str, Any] = Factory(dict)
     help: str | None = None
     sort_key: Any = None
+    group: "Group | str | tuple[Group | str, ...] | None" = None
     _show: bool | None = field(default=None, alias="show")
 
     @property
@@ -152,6 +154,8 @@ class CommandSpec:
             self._resolved.help = self.help
         if self.sort_key is not None:
             self._resolved.sort_key = self.sort_key
+        if self.group is not None:
+            self._resolved.group = self.group
         if self._show is not None:
             self._resolved.show = self._show
         if self._resolved._name_transform is None:

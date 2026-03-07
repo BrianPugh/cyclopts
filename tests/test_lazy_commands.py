@@ -870,6 +870,49 @@ def test_format_usage_does_not_resolve_lazy_commands(lazy_module):
     )
 
 
+def test_lazy_command_custom_group_in_help(console, lazy_module):
+    """Test that lazy commands with group= appear in the correct group in help output."""
+    from cyclopts import Group
+
+    mod_a = lazy_module("test_lazy_grp_a")
+    mod_b = lazy_module("test_lazy_grp_b")
+
+    mod_a.cmd_a = lambda: None  # type: ignore[attr-defined]
+    mod_b.cmd_b = lambda: None  # type: ignore[attr-defined]
+
+    admin_group = Group("Admin", sort_key=1)
+
+    app = App(name="myapp", result_action="return_value", help_flags=["--help"], version_flags=[])
+    app.command("test_lazy_grp_a:cmd_a", name="admin-cmd", group=admin_group, help="An admin command.")
+    app.command("test_lazy_grp_b:cmd_b", name="user-cmd", help="A user command.")
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+
+    # admin-cmd should be in the Admin group, not Commands
+    assert "Admin" in actual
+    assert "Commands" in actual
+
+    # Verify group assignment by checking the output structure
+    admin_idx = actual.index("Admin")
+    commands_idx = actual.index("Commands")
+    admin_cmd_idx = actual.index("admin-cmd")
+    user_cmd_idx = actual.index("user-cmd")
+
+    # admin-cmd should appear after the Admin header
+    assert admin_cmd_idx > admin_idx
+    # user-cmd should appear after the Commands header
+    assert user_cmd_idx > commands_idx
+
+    # Neither lazy command should have been resolved
+    assert isinstance(app._commands["admin-cmd"], CommandSpec)
+    assert not app._commands["admin-cmd"].is_resolved
+    assert isinstance(app._commands["user-cmd"], CommandSpec)
+    assert not app._commands["user-cmd"].is_resolved
+
+
 def test_lazy_subapp_help_excludes_help_version_flags(console, lazy_module):
     """Test that lazy-loaded subapps don't show --help/--version in their help.
 

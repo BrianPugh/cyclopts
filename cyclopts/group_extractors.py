@@ -75,9 +75,9 @@ def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group,
     # Use __iter__ and __getitem__ to properly handle meta parents
     #
     # Skip unresolved lazy commands to avoid importing modules unnecessarily.
-    # Limitation: Group objects defined in unresolved lazy modules won't be
-    # available until those modules are imported. To avoid this, define Group
-    # objects in non-lazy modules. See docs/source/lazy_loading.rst for details.
+    # Group assignment for unresolved commands uses the group= field from
+    # CommandSpec (set at registration time). Groups defined only inside
+    # lazy modules won't be available until those modules are imported.
     app_names: dict[int, list[str]] = {}
     unique_apps: dict[int, App] = {}
     lazy_names: dict[int, list[str]] = {}
@@ -86,11 +86,8 @@ def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group,
         cmd = app._get_item(name, recurse_meta=True)
         if isinstance(cmd, CommandSpec) and not cmd.is_resolved:
             if not resolve_lazy:
-                # Skip hidden lazy commands early. Unresolved commands can't
-                # determine their custom group (it's in app_kwargs), so they'd
-                # only ever land in the default group. Filtering here avoids
-                # that wasted work and prevents a hidden command from keeping
-                # an otherwise-empty default group alive.
+                # Skip hidden lazy commands early to avoid keeping
+                # an otherwise-empty group alive.
                 if not cmd.show:
                     continue
                 cmd_id = id(cmd)
@@ -132,11 +129,30 @@ def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group,
         else:
             _create_or_append(group_mapping, group_commands, registered_command)
 
-    # Assign unresolved lazy commands to the default group
+    # Extract Group objects from unresolved lazy commands
+    for cmd in unique_lazy.values():
+        if cmd.group is not None:
+            groups = cmd.group if isinstance(cmd.group, tuple) else (cmd.group,)
+            for group in groups:
+                if isinstance(group, Group):
+                    for mapping in group_mapping:
+                        if mapping[0] is group:
+                            break
+                        elif mapping[0].name == group.name:
+                            raise ValueError(f'Command Group "{group.name}" already exists.')
+                    else:
+                        group_mapping.append((group, []))
+
+    # Assign unresolved lazy commands to their group (or default)
     for cmd_id, cmd in unique_lazy.items():
         names = tuple(lazy_names[cmd_id])
         registered_command = RegisteredCommand(names, cmd)
-        _create_or_append(group_mapping, group_commands, registered_command)
+        if cmd.group is not None:
+            groups = cmd.group if isinstance(cmd.group, tuple) else (cmd.group,)
+            for group in groups:
+                _create_or_append(group_mapping, group, registered_command)
+        else:
+            _create_or_append(group_mapping, group_commands, registered_command)
 
     # Remove empty groups
     group_mapping = [x for x in group_mapping if x[1]]

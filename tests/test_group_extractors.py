@@ -175,3 +175,65 @@ def test_groups_from_app_lazy_hidden():
         assert not app._commands["hidden-cmd"].is_resolved
     finally:
         del sys.modules["test_lazy_module_hidden"]
+
+
+def test_groups_from_app_lazy_custom_group():
+    """Test that lazy commands with group= are placed in the correct group."""
+    test_module = ModuleType("test_lazy_module_group")
+    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
+    sys.modules["test_lazy_module_group"] = test_module
+
+    try:
+        admin_group = Group("Admin")
+        app = App(help_flags=[], version_flags=[])
+
+        # Register a lazy command with a custom group
+        app.command("test_lazy_module_group:cmd", name="admin-cmd", group=admin_group, help="Admin command.")
+
+        # Also register a regular command (no custom group)
+        @app.command
+        def regular():
+            pass
+
+        groups = groups_from_app(app, resolve_lazy=False)
+
+        # Find the Admin group and default Commands group
+        admin_cmds = [cmd for g, cmds in groups if g.name == "Admin" for cmd in cmds]
+        default_cmds = [cmd for g, cmds in groups if g.name == "Commands" for cmd in cmds]
+
+        assert len(admin_cmds) == 1
+        assert "admin-cmd" in admin_cmds[0].names
+        assert isinstance(admin_cmds[0].app, CommandSpec)
+
+        assert len(default_cmds) == 1
+        assert "regular" in default_cmds[0].names
+
+        # Should not have resolved the lazy command
+        assert isinstance(app._commands["admin-cmd"], CommandSpec)
+        assert not app._commands["admin-cmd"].is_resolved
+    finally:
+        del sys.modules["test_lazy_module_group"]
+
+
+def test_groups_from_app_lazy_custom_group_string():
+    """Test that lazy commands with group= as a string work correctly."""
+    test_module = ModuleType("test_lazy_module_group_str")
+    test_module.cmd = lambda: "result"  # type: ignore[attr-defined]
+    sys.modules["test_lazy_module_group_str"] = test_module
+
+    try:
+        app = App(help_flags=[], version_flags=[])
+
+        # Register a lazy command with a string group name
+        app.command("test_lazy_module_group_str:cmd", name="grouped-cmd", group="Extras", help="Extra command.")
+
+        groups = groups_from_app(app, resolve_lazy=False)
+
+        extras_cmds = [cmd for g, cmds in groups if g.name == "Extras" for cmd in cmds]
+        assert len(extras_cmds) == 1
+        assert "grouped-cmd" in extras_cmds[0].names
+
+        assert isinstance(app._commands["grouped-cmd"], CommandSpec)
+        assert not app._commands["grouped-cmd"].is_resolved
+    finally:
+        del sys.modules["test_lazy_module_group_str"]
