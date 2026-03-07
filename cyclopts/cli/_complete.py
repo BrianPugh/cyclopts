@@ -13,12 +13,12 @@ if TYPE_CHECKING:
 MAX_DESCRIPTION_LENGTH = 60
 
 
-def _extract_short_description(help_text: str) -> str:
+def _extract_short_description(help_text: str | None) -> str:
     """Extract first line of help text as a short description.
 
     Parameters
     ----------
-    help_text : str
+    help_text : str | None
         Full help text to extract from.
 
     Returns
@@ -32,7 +32,7 @@ def _extract_short_description(help_text: str) -> str:
         parsed = docstring_parse(help_text, "plaintext")
         return parsed.short_description or ""
     except Exception:
-        return str(help_text).split("\n")[0]
+        return str(help_text or "").split("\n")[0]
 
 
 def _print_subcommand_completions(app_obj: "App") -> None:
@@ -50,9 +50,7 @@ def _print_subcommand_completions(app_obj: "App") -> None:
             if registered_command.app.show:
                 for name in registered_command.names:
                     if not name.startswith("-"):
-                        short_desc = ""
-                        if registered_command.app.help:
-                            short_desc = _extract_short_description(registered_command.app.help)
+                        short_desc = _extract_short_description(registered_command.app.help)
 
                         if short_desc:
                             print(f"{name}:{short_desc}")

@@ -28,9 +28,12 @@ if TYPE_CHECKING:
 
 
 @lru_cache(maxsize=16)
-def docstring_parse(doc: str, format: str):
+def docstring_parse(doc: str | None, format: str):
     """Addon to :func:`docstring_parser.parse` that supports multi-line `short_description`."""
     import docstring_parser
+
+    if not doc:
+        return docstring_parser.parse("")
 
     cleaned_doc = inspect.cleandoc(doc)
     short_description_and_maybe_remainder = cleaned_doc.split("\n\n", 1)
@@ -504,9 +507,7 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
         entry = HelpEntry(
             positive_names=tuple(long_names),
             positive_shorts=tuple(short_names),
-            description=InlineText.from_format(
-                docstring_parse(app.help or "", format).short_description, format=format
-            ),
+            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
             sort_key=sort_key,
         )
         if entry not in entries:

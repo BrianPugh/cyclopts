@@ -667,14 +667,11 @@ def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: st
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    if not cmd_app.help:
-        return ""
-
     try:
         parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(cmd_app.help)
+        text = str(cmd_app.help or "")
 
     text = strip_markup(text, format=help_format)
     return _escape_zsh_description(text)

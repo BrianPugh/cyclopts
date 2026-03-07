@@ -534,13 +534,10 @@ def _get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) ->
     """
     from cyclopts.help.help import docstring_parse
 
-    if not cmd_app.help:
-        return ""
-
     try:
         parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(cmd_app.help)
+        text = str(cmd_app.help or "")
 
     return strip_markup(text, format=help_format)
