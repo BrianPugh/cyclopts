@@ -27,9 +27,12 @@ if TYPE_CHECKING:
 
 
 @lru_cache(maxsize=16)
-def docstring_parse(doc: str, format: str):
+def docstring_parse(doc: str | None, format: str):
     """Addon to :func:`docstring_parser.parse` that supports multi-line `short_description`."""
     import docstring_parser
+
+    if not doc:
+        return docstring_parser.parse("")
 
     cleaned_doc = inspect.cleandoc(doc)
     short_description_and_maybe_remainder = cleaned_doc.split("\n\n", 1)
@@ -272,7 +275,9 @@ def format_usage(
     for command in command_chain:
         app = app[command]
 
-    if any(app[x].show for x in app._registered_commands):
+    # Check for visible non-help/version commands without resolving lazy CommandSpecs.
+    help_version_flags = {*app.help_flags, *app.version_flags}
+    if any(x not in help_version_flags and app._get_item(x, recurse_meta=True).show for x in app):
         usage.append("COMMAND")
 
     if app.default_command:
@@ -484,20 +489,22 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
     """
     entries = []
     for registered_command in apps_with_names:
-        names = registered_command.names
         app = registered_command.app
         if not app.show:
             continue
+        names = registered_command.names
         # Commands don't have negative variants, so all names are "positive"
         short_names, long_names = [], []
         for name in names:
             short_names.append(name) if _is_short(name) else long_names.append(name)
 
+        sort_key = resolve_callables(app.sort_key, app)
+
         entry = HelpEntry(
             positive_names=tuple(long_names),
             positive_shorts=tuple(short_names),
             description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
-            sort_key=resolve_callables(app.sort_key, app),
+            sort_key=sort_key,
         )
         if entry not in entries:
             entries.append(entry)

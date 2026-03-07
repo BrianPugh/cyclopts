@@ -24,6 +24,7 @@ from cyclopts.help.help import docstring_parse
 if TYPE_CHECKING:
     from cyclopts import App
     from cyclopts.argument import Argument, ArgumentCollection
+    from cyclopts.command_spec import CommandSpec
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -579,15 +580,17 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
 
-def _generate_keyword_specs_for_command(names: tuple[str, ...], cmd_app: "App", help_format: str) -> list[str]:
+def _generate_keyword_specs_for_command(
+    names: tuple[str, ...], cmd_app: "App | CommandSpec", help_format: str
+) -> list[str]:
     """Generate zsh _arguments specs for a command that looks like a flag.
 
     Parameters
     ----------
     names : tuple[str, ...]
         Registered names for the command.
-    cmd_app : App
-        Command app with flag-like names.
+    cmd_app : App | CommandSpec
+        Command app or spec.
     help_format : str
         Help text format.
 
@@ -652,13 +655,13 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
     return _escape_zsh_description(text)
 
 
-def _safe_get_description_from_app(cmd_app: "App", help_format: str) -> str:
+def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:
     """Extract plain text description from App, escaping zsh special chars.
 
     Parameters
     ----------
-    cmd_app : App
-        Command app with help text.
+    cmd_app : App | CommandSpec
+        Command app or spec with help text.
     help_format : str
         Help text format.
 
@@ -667,14 +670,11 @@ def _safe_get_description_from_app(cmd_app: "App", help_format: str) -> str:
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    if not cmd_app.help:
-        return ""
-
     try:
         parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(cmd_app.help)
+        text = str(cmd_app.help or "")
 
     text = strip_markup(text, format=help_format)
     return _escape_zsh_description(text)
