@@ -18,6 +18,7 @@ from cyclopts.completion._base import (
 
 if TYPE_CHECKING:
     from cyclopts import App
+    from cyclopts.command_spec import CommandSpec
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -301,7 +302,7 @@ def _generate_subcommand_completions(
             if cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description(registered_command.app.help or "", data.help_format)
+            desc = _get_description_from_app(registered_command.app, data.help_format)
             escaped_desc = _escape_fish_description(desc)
             escaped_cmd = _escape_fish_string(cmd_name)
 
@@ -480,7 +481,7 @@ def _generate_command_option_completions(
             if not cmd_name.startswith("-"):
                 continue
 
-            desc = _get_description(registered_command.app.help or "", help_format)
+            desc = _get_description_from_app(registered_command.app, help_format)
             escaped_desc = _escape_fish_description(desc)
 
             if cmd_name.startswith("--"):
@@ -516,13 +517,13 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
     return f"-n '{func_name} {escaped_commands}'"
 
 
-def _get_description(help_text: str, help_format: str) -> str:
-    """Extract short description from help text.
+def _get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:
+    """Extract description from App.
 
     Parameters
     ----------
-    help_text : str
-        Help text string.
+    cmd_app : App | CommandSpec
+        Command app or spec.
     help_format : str
         Help text format.
 
@@ -533,13 +534,13 @@ def _get_description(help_text: str, help_format: str) -> str:
     """
     from cyclopts.help.help import docstring_parse
 
-    if not help_text:
+    if not cmd_app.help:
         return ""
 
     try:
-        parsed = docstring_parse(help_text, "plaintext")
+        parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(help_text)
+        text = str(cmd_app.help)
 
     return strip_markup(text, format=help_format)

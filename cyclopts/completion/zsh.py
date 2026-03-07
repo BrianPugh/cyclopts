@@ -23,6 +23,7 @@ from cyclopts.help.help import docstring_parse
 if TYPE_CHECKING:
     from cyclopts import App
     from cyclopts.argument import Argument, ArgumentCollection
+    from cyclopts.command_spec import CommandSpec
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -314,7 +315,7 @@ def _generate_completion_for_path(
     for registered_command in commands:
         if any(name.startswith("-") for name in registered_command.names):
             specs = _generate_keyword_specs_for_command(
-                registered_command.names, registered_command.app.help or "", data.help_format
+                registered_command.names, registered_command.app, data.help_format
             )
             args_specs.extend(specs)
             flag_command_names.update(registered_command.names)
@@ -369,7 +370,7 @@ def _generate_completion_for_path(
         for registered_command in commands:
             for cmd_name in registered_command.names:
                 if not cmd_name.startswith("-"):
-                    desc = _safe_get_description(registered_command.app.help or "", data.help_format)
+                    desc = _safe_get_description_from_app(registered_command.app, data.help_format)
                     escaped_cmd_name = _escape_completion_choice(cmd_name)
                     cmd_list.append(f"'{escaped_cmd_name}:{desc}'")
 
@@ -576,15 +577,17 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
 
-def _generate_keyword_specs_for_command(names: tuple[str, ...], help_text: str, help_format: str) -> list[str]:
+def _generate_keyword_specs_for_command(
+    names: tuple[str, ...], cmd_app: "App | CommandSpec", help_format: str
+) -> list[str]:
     """Generate zsh _arguments specs for a command that looks like a flag.
 
     Parameters
     ----------
     names : tuple[str, ...]
         Registered names for the command.
-    help_text : str
-        Help text string.
+    cmd_app : App | CommandSpec
+        Command app or spec.
     help_format : str
         Help text format.
 
@@ -594,7 +597,7 @@ def _generate_keyword_specs_for_command(names: tuple[str, ...], help_text: str, 
         List of zsh argument specs.
     """
     specs = []
-    desc = _safe_get_description(help_text, help_format)
+    desc = _safe_get_description_from_app(cmd_app, help_format)
 
     for name in names:
         if name.startswith("-"):
@@ -649,13 +652,13 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
     return _escape_zsh_description(text)
 
 
-def _safe_get_description(help_text: str, help_format: str) -> str:
-    """Extract plain text description from help text, escaping zsh special chars.
+def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:
+    """Extract plain text description from App, escaping zsh special chars.
 
     Parameters
     ----------
-    help_text : str
-        Help text string.
+    cmd_app : App | CommandSpec
+        Command app or spec with help text.
     help_format : str
         Help text format.
 
@@ -664,14 +667,14 @@ def _safe_get_description(help_text: str, help_format: str) -> str:
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    if not help_text:
+    if not cmd_app.help:
         return ""
 
     try:
-        parsed = docstring_parse(help_text, "plaintext")
+        parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(help_text)
+        text = str(cmd_app.help)
 
     text = strip_markup(text, format=help_format)
     return _escape_zsh_description(text)
