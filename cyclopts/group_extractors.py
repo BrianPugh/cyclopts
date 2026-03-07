@@ -86,6 +86,11 @@ def groups_from_app(app: "App", resolve_lazy: bool = False) -> list[tuple[Group,
         cmd = app._get_item(name, recurse_meta=True)
         if isinstance(cmd, CommandSpec) and not cmd.is_resolved:
             if not resolve_lazy:
+                # Skip hidden lazy commands early. Unresolved commands can't
+                # determine their custom group (it's in app_kwargs), so they'd
+                # only ever land in the default group. Filtering here avoids
+                # that wasted work and prevents a hidden command from keeping
+                # an otherwise-empty default group alive.
                 if not cmd.show:
                     continue
                 cmd_id = id(cmd)
