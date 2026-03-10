@@ -348,7 +348,9 @@ When arguments are provided by keyword:
      ╰─────────────────────────────────────────────────────────────╯
 
 
-* If :attr:`.Parameter.consume_multiple` is :obj:`True`, all remaining tokens will be consumed (until an option-like token is reached if :attr:`.Parameter.allow_leading_hyphen` is :obj:`False`)
+* If :attr:`.Parameter.consume_multiple` is :obj:`True`, all remaining tokens will be consumed (until an option-like token is reached if :attr:`.Parameter.allow_leading_hyphen` is :obj:`False`).
+
+  :attr:`.Parameter.consume_multiple` also accepts an :class:`int` (minimum element count) or a ``tuple[int, int]`` for ``(min, max)`` bounds. See the :attr:`.Parameter.consume_multiple` API docs for details.
 
   .. code-block:: python
 

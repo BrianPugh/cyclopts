@@ -77,6 +77,42 @@ def _negative_converter(default: tuple[str, ...]):
     return converter
 
 
+def _consume_multiple_converter(value) -> tuple[int, int | None] | None:
+    """Normalize consume_multiple into (min, max) or None.
+
+    Returns
+    -------
+    tuple[int, int | None] | None
+        ``None`` if consume_multiple is disabled (``None`` or ``False``).
+        ``(min, max)`` where ``max=None`` means unlimited.
+    """
+    if value is None or value is False:
+        return None
+    if value is True:
+        return (0, None)
+    if isinstance(value, int):
+        if value < 0:
+            raise ValueError(f"consume_multiple int value must be non-negative, got {value}.")
+        return (value, None)
+    if isinstance(value, Sequence):
+        if len(value) != 2:
+            raise ValueError(f"consume_multiple sequence must have exactly 2 elements (min, max), got {len(value)}.")
+        mn, mx = value
+        if mx is None:
+            # Already-normalized form (min, None); pass through.
+            return (mn, None)
+        if not isinstance(mn, int) or isinstance(mn, bool) or not isinstance(mx, int) or isinstance(mx, bool):
+            raise TypeError(
+                f"consume_multiple sequence elements must be int, got ({type(mn).__name__}, {type(mx).__name__})."
+            )
+        if mn < 0 or mx < 0:
+            raise ValueError(f"consume_multiple sequence values must be non-negative, got ({mn}, {mx}).")
+        if mn > mx:
+            raise ValueError(f"consume_multiple min must be <= max, got ({mn}, {mx}).")
+        return (mn, mx)
+    raise TypeError(f"consume_multiple must be None, bool, int, or a (min, max) sequence, got {type(value).__name__}.")
+
+
 def _parse_converter(value):
     """Convert string patterns to compiled regex, pass through other types.
 
@@ -256,9 +292,9 @@ class Parameter:
         kw_only=True,
     )
 
-    consume_multiple: bool = field(
+    consume_multiple: None | bool | int | Sequence[int] | tuple[int, int | None] = field(
         default=None,
-        converter=attrs.converters.default_if_none(False),
+        converter=_consume_multiple_converter,
         kw_only=True,
     )
 

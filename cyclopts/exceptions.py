@@ -28,6 +28,7 @@ __all__ = [
     "DocstringError",
     "UnknownCommandError",
     "MissingArgumentError",
+    "ConsumeMultipleError",
     "MixedArgumentError",
     "RepeatArgumentError",
     "RequiresEqualsError",
@@ -382,6 +383,31 @@ class MissingArgumentError(CycloptsError):
             strings.append(f" Parsed: {self.tokens_so_far}.")
 
         return super().__str__() + " ".join(strings)
+
+
+@define(kw_only=True)
+class ConsumeMultipleError(MissingArgumentError):
+    """The number of values provided doesn't meet consume_multiple constraints."""
+
+    min_required: int = 0
+    max_allowed: int | None = None
+    actual_count: int = 0
+
+    def __str__(self):
+        assert self.argument is not None
+        param_name = self.keyword or self.argument.name
+
+        if self.actual_count < self.min_required:
+            constraint = f"requires at least {self.min_required}"
+        else:
+            constraint = f"accepts at most {self.max_allowed}"
+
+        if self.command_chain:
+            base = f'Command "{" ".join(self.command_chain)}" parameter "{param_name}" {constraint} elements. Got {self.actual_count}.'
+        else:
+            base = f'Parameter "{param_name}" {constraint} elements. Got {self.actual_count}.'
+
+        return CycloptsError.__str__(self) + base
 
 
 @define(kw_only=True)

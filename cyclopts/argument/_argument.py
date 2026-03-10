@@ -188,7 +188,7 @@ class Argument:
 
         if self.parameter.requires_equals and self.parameter.consume_multiple:
             raise ValueError(
-                "Parameter(requires_equals=True) and Parameter(consume_multiple=True) cannot be used together. "
+                "Parameter(requires_equals=True) and Parameter(consume_multiple=...) cannot be used together. "
                 "requires_equals enforces '--option=value' syntax, which is incompatible with "
                 "consume_multiple's space-separated value consumption."
             )

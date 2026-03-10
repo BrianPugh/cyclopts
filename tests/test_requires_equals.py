@@ -162,6 +162,28 @@ def test_requires_equals_and_consume_multiple_mutually_exclusive(app):
         app.parse_args("--urls=a", print_error=False, exit_on_error=False)
 
 
+def test_requires_equals_and_consume_multiple_int_mutually_exclusive(app):
+    """requires_equals and consume_multiple=1 cannot be used together."""
+
+    @app.default
+    def main(*, urls: Annotated[list[str], Parameter(requires_equals=True, consume_multiple=1)]):
+        pass
+
+    with pytest.raises(ValueError, match="cannot be used together"):
+        app.parse_args("--urls=a", print_error=False, exit_on_error=False)
+
+
+def test_requires_equals_and_consume_multiple_tuple_mutually_exclusive(app):
+    """requires_equals and consume_multiple=(1, 3) cannot be used together."""
+
+    @app.default
+    def main(*, urls: Annotated[list[str], Parameter(requires_equals=True, consume_multiple=(1, 3))]):
+        pass
+
+    with pytest.raises(ValueError, match="cannot be used together"):
+        app.parse_args("--urls=a", print_error=False, exit_on_error=False)
+
+
 def test_requires_equals_consume_multiple_repeated_equals(app):
     """With requires_equals, list values can be provided by repeating --option=value."""
 

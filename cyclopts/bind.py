@@ -15,6 +15,7 @@ from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
     CombinedShortOptionError,
+    ConsumeMultipleError,
     CycloptsError,
     MissingArgumentError,
     RequiresEqualsError,
@@ -247,8 +248,12 @@ def _parse_kw_and_flags(
                     )
 
                 # Consume the appropriate number of tokens
+                # cm_bounds is either None or (min, max) — guaranteed by _consume_multiple_converter
+                cm_bounds = match.argument.parameter.consume_multiple
+                assert cm_bounds is None or isinstance(cm_bounds, tuple)
+                cm_min, cm_max = cm_bounds if cm_bounds is not None else (0, None)
                 with suppress(IndexError):
-                    if consume_all and match.argument.parameter.consume_multiple:
+                    if consume_all and cm_bounds is not None:
                         for j in itertools.count():
                             token = tokens[i + 1 + j]
                             if not match.argument.parameter.allow_leading_hyphen and is_option_like(token):
@@ -279,7 +284,17 @@ def _parse_kw_and_flags(
 
                 if not cli_values:
                     # No values were consumed after the keyword
-                    if consume_all and match.argument.parameter.consume_multiple:
+                    if consume_all and cm_bounds is not None:
+                        if cm_min > 0:
+                            # Minimum count not met — treat as missing argument
+                            raise ConsumeMultipleError(
+                                argument=match.argument,
+                                tokens_so_far=cli_values,
+                                keyword=match.matched_token,
+                                min_required=cm_min,
+                                max_allowed=cm_max,
+                                actual_count=0,
+                            )
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
                         hint = resolve_optional(match.argument.hint)
                         empty_container = (get_origin(hint) or hint)()
@@ -297,6 +312,27 @@ def _parse_kw_and_flags(
                         argument=match.argument, tokens_so_far=cli_values, keyword=match.matched_token
                     )
                 else:
+                    # Check min/max count for consume_multiple
+                    if cm_bounds is not None:
+                        n_elements = len(cli_values) // max(1, tokens_per_element)
+                        if n_elements < cm_min:
+                            raise ConsumeMultipleError(
+                                argument=match.argument,
+                                tokens_so_far=cli_values,
+                                keyword=match.matched_token,
+                                min_required=cm_min,
+                                max_allowed=cm_max,
+                                actual_count=n_elements,
+                            )
+                        if cm_max is not None and n_elements > cm_max:
+                            raise ConsumeMultipleError(
+                                argument=match.argument,
+                                tokens_so_far=cli_values,
+                                keyword=match.matched_token,
+                                min_required=cm_min,
+                                max_allowed=cm_max,
+                                actual_count=n_elements,
+                            )
                     # Normal case: append the consumed values
                     for index, cli_value in enumerate(cli_values):
                         match.argument.append(
