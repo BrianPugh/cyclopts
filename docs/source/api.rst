@@ -1328,12 +1328,20 @@ API
       :attr:`~.Parameter.n_tokens`.
 
    .. attribute:: consume_multiple
-      :type: Optional[bool]
+      :type: None | bool | int | Sequence[int]
       :value: None
 
-      Lists use `different parsing rules <rules.html#list>`__ depending on whether the values are provided positionally or by keyword. If the parameter is specified **positionally**, :attr:`.Parameter.consume_multiple` is ignored.
+      Controls how many CLI tokens a list/iterable parameter consumes when specified **by keyword**.
+      If the parameter is specified **positionally**, :attr:`.Parameter.consume_multiple` is ignored.
 
-      If the parameter is specified **by keyword** and ``consume_multiple=True``, all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token (typically a keyword) is reached (unless :attr:`.Parameter.allow_leading_hyphen` is :obj:`True`, in which case it will also be consumed).
+      The following value types are supported:
+
+      * :obj:`False` (default) — only a single *element* worth of CLI tokens will be consumed per keyword occurrence.
+      * :obj:`True` — all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token is reached. Providing the keyword with no values creates an empty container.
+      * :class:`int` — like :obj:`True`, but the integer specifies the **minimum** number of *elements* required. For example, ``consume_multiple=1`` requires at least one value (preventing empty lists), and ``consume_multiple=0`` is equivalent to :obj:`True`.
+      * :class:`~collections.abc.Sequence`\[:class:`int`\] — a ``(min, max)`` pair (e.g. a tuple or list of two ints). All remaining CLI tokens are consumed greedily, and a :class:`ConsumeMultipleError` is raised if the number of elements is outside the ``(min, max)`` bounds.
+
+      **Example: consume_multiple=True**
 
       .. code-block:: python
 
@@ -1372,7 +1380,64 @@ API
          $ my-program --name "my_file" --empty-ext
          # No output - ext is an empty list []
 
-      If the parameter is specified **by keyword** and ``consume_multiple=False`` (the default), only a single element worth of CLI tokens will be consumed.
+      **Example: consume_multiple=1 (require at least one value)**
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(
+             urls: Annotated[list[str] | None, Parameter(consume_multiple=1)] = None,
+         ):
+             print(urls)
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --urls http://a.com http://b.com
+         ['http://a.com', 'http://b.com']
+
+         $ my-program --urls
+         ╭─ Error ────────────────────────────────────────────╮
+         │ Parameter "--urls" requires an argument.            │
+         ╰────────────────────────────────────────────────────╯
+
+      **Example: consume_multiple=(1, 3) (min/max bounds)**
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(
+             files: Annotated[list[str], Parameter(consume_multiple=(1, 3))],
+         ):
+             print(f"Files: {files}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --files a.txt b.txt
+         Files: ['a.txt', 'b.txt']
+
+         $ my-program --files a.txt b.txt c.txt d.txt
+         ╭─ Error ─────────────────────────────────────────╮
+         │ Parameter "--files" accepts at most 3 elements. │
+         │ Got 4.                                          │
+         ╰─────────────────────────────────────────────────╯
+
+      In this example, ``--files`` raises a :class:`ConsumeMultipleError` if fewer than 1 or more than 3 values are provided.
+
+      **Example: consume_multiple=False (default)**
 
       .. code-block:: python
 
@@ -2463,6 +2528,10 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.MissingArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.ConsumeMultipleError
    :show-inheritance:
    :members:
 
