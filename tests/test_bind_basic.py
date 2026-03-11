@@ -971,3 +971,47 @@ def test_single_char_option_with_negative_value(app, assert_parse_args):
     # -o-5 should be: -o with value "-5"
     # This tests that the "-5" part is treated as a value, not as a separate option
     assert_parse_args(main, "-o-5", offset=-5)
+
+
+def test_positional_only_list_interleaved_with_keywords_error(app):
+    """Positional tokens after keyword args should not be consumed by a positional-only list.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
+        pass
+
+    with pytest.raises((ArgumentOrderError, UnusedCliTokensError)):
+        app.parse_args("a b c --bar 8 --baz 10 d", print_error=False, exit_on_error=False)
+
+
+def test_positional_only_list_then_keywords(app):
+    """Positional tokens before keywords should work fine.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
+        pass
+
+    _, actual_bind, _ = app.parse_args("a b c d --bar 8 --baz 10", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "c", "d"],)
+    assert actual_bind.kwargs == {"bar": 8, "baz": 10}
+
+
+def test_positional_only_list_keywords_first(app):
+    """Keywords before positional tokens should work fine.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
+        pass
+
+    _, actual_bind, _ = app.parse_args("--bar 8 --baz 10 a b c d", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "c", "d"],)
+    assert actual_bind.kwargs == {"bar": 8, "baz": 10}
