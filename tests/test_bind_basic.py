@@ -983,7 +983,7 @@ def test_positional_only_list_interleaved_with_keywords_error(app):
     def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
         pass
 
-    with pytest.raises((ArgumentOrderError, UnusedCliTokensError)):
+    with pytest.raises(UnusedCliTokensError):
         app.parse_args("a b c --bar 8 --baz 10 d", print_error=False, exit_on_error=False)
 
 
@@ -1015,3 +1015,39 @@ def test_positional_only_list_keywords_first(app):
     _, actual_bind, _ = app.parse_args("--bar 8 --baz 10 a b c d", print_error=False, exit_on_error=False)
     assert actual_bind.args == (["a", "b", "c", "d"],)
     assert actual_bind.kwargs == {"bar": 8, "baz": 10}
+
+
+def test_positional_only_list_interleaved_with_delimiter(app):
+    """Tokens after -- should still be consumed even with interleaving before the delimiter.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0):
+        pass
+
+    _, actual_bind, _ = app.parse_args("a b --bar 8 -- d e", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "d", "e"],)
+    assert actual_bind.kwargs == {"bar": 8}
+
+
+def test_positional_only_list_and_scalar_interleaved_error(app):
+    """Multiple positional-only params (list + scalar) should also reject interleaving.
+
+    Regression test for issue #763.
+    """
+    from pathlib import Path
+
+    @app.default
+    def main(inputs: list[str], output: Path, /, *, verbose: bool = False):
+        pass
+
+    # Non-interleaved: should work
+    _, actual_bind, _ = app.parse_args("a b c out.csv --verbose", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "c"], Path("out.csv"))
+    assert actual_bind.kwargs == {"verbose": True}
+
+    # Interleaved: should error
+    with pytest.raises(UnusedCliTokensError):
+        app.parse_args("a b --verbose c out.csv", print_error=False, exit_on_error=False)
