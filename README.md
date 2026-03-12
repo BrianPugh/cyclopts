@@ -262,4 +262,4 @@ Cyclopts is much more terse, much more readable, and much more intuitive to use.
 
 # Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and how to submit a pull request.
+Contributions are welcome! See [CONTRIBUTING.md](https://github.com/BrianPugh/cyclopts/blob/main/CONTRIBUTING.md) for development setup, coding standards, and how to submit a pull request.
