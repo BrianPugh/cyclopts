@@ -1165,7 +1165,7 @@ class App:
 
                 # Try to consume tokens with this meta app's parameters
                 # stop_at_first_unknown=True ensures we only consume contiguous leading options
-                unused_tokens = _parse_kw_and_flags(
+                unused_tokens, _ = _parse_kw_and_flags(
                     argument_collection,
                     unused_tokens,
                     end_of_options_delimiter=end_of_options_delimiter,
