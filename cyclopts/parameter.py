@@ -308,6 +308,11 @@ class Parameter:
         kw_only=True,
     )
 
+    allow_repeating: bool | None = field(
+        default=None,
+        kw_only=True,
+    )
+
     n_tokens: int | None = field(
         default=None,
         kw_only=True,

@@ -1522,6 +1522,43 @@ API
 
       See :ref:`Coercion Rules` for more details.
 
+   .. attribute:: allow_repeating
+      :type: Optional[bool]
+      :value: None
+
+      Controls whether a keyword option can be specified multiple times on the CLI (e.g., ``--foo a --foo b``).
+
+      * :obj:`None` (default): iterable types accumulate values, scalar types raise :exc:`RepeatArgumentError`.
+      * :obj:`False`: always raise :exc:`RepeatArgumentError` on repeated options. Useful with :attr:`consume_multiple` to allow
+        ``--foo a b c`` but disallow ``--foo a --foo b``.
+      * :obj:`True`: always allow repeated options. Iterable types accumulate as usual. Scalar types
+        use "last wins" semantics (the last value specified is used).
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(
+             values: Annotated[list[str], Parameter(consume_multiple=True, allow_repeating=False)],
+         ):
+             print(values)
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --values a b c
+         ['a', 'b', 'c']
+
+         $ my-script --values a --values b
+         ╭─ Error ──────────────────────────────────────────────────╮
+         │ Parameter "--values" was specified multiple times.       │
+         ╰─────────────────────────────────────────────────────────╯
+
    .. attribute:: n_tokens
       :type: Optional[int]
       :value: None

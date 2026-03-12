@@ -386,6 +386,64 @@ def test_exception_repeat_argument_kwargs(app, cmd_str):
         app.parse_args(cmd_str, print_error=False, exit_on_error=False)
 
 
+@pytest.mark.parametrize("type_hint", [list[str], str])
+def test_allow_repeating_false(app, type_hint):
+    @app.default
+    def default(foo: Annotated[type_hint, Parameter(allow_repeating=False)]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    with pytest.raises(RepeatArgumentError):
+        app.parse_args("--foo a --foo b", print_error=False, exit_on_error=False)
+
+
+def test_allow_repeating_false_consume_multiple(app, assert_parse_args):
+    @app.default
+    def default(foo: Annotated[list[str], Parameter(allow_repeating=False, consume_multiple=True)]):
+        pass
+
+    assert_parse_args(default, "--foo a b c", foo=["a", "b", "c"])
+
+
+def test_allow_repeating_false_consume_multiple_repeated(app):
+    @app.default
+    def default(foo: Annotated[list[str], Parameter(allow_repeating=False, consume_multiple=True)]):
+        pass
+
+    with pytest.raises(RepeatArgumentError):
+        app.parse_args("--foo a --foo b", print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "consume_multiple,cmd_str,expected",
+    [
+        (False, "--foo a --foo b", ["a", "b"]),
+        (True, "--foo a --foo b", ["a", "b"]),
+        (True, "--foo a b --foo c d", ["a", "b", "c", "d"]),
+    ],
+)
+def test_allow_repeating_true_list(app, assert_parse_args, consume_multiple, cmd_str, expected):
+    @app.default
+    def default(foo: Annotated[list[str], Parameter(allow_repeating=True, consume_multiple=consume_multiple)]):
+        pass
+
+    assert_parse_args(default, cmd_str, foo=expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("--foo a --foo b", "b"),
+        ("--foo a --foo b --foo c", "c"),
+    ],
+)
+def test_allow_repeating_true_scalar(app, assert_parse_args, cmd_str, expected):
+    @app.default
+    def default(foo: Annotated[str, Parameter(allow_repeating=True)]):
+        pass
+
+    assert_parse_args(default, cmd_str, foo=expected)
+
+
 def test_exception_unused_token(app):
     @app.default
     def default(foo: str):

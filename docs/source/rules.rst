@@ -370,6 +370,33 @@ When arguments are provided by keyword:
      $ my-program foo --values 1 2 3
      [1, 2, 3]
 
+* If :attr:`.Parameter.allow_repeating` is :obj:`False`, a keyword option cannot be specified more than once.
+  This is especially useful in combination with :attr:`.Parameter.consume_multiple` to allow ``--foo a b c`` but reject ``--foo a --foo b``.
+  If :attr:`.Parameter.allow_repeating` is :obj:`True`, scalar types use "last wins" semantics instead of raising an error.
+
+  .. code-block:: python
+
+     from cyclopts import App, Parameter
+     from typing import Annotated
+
+     app = App()
+
+     @app.default
+     def foo(values: Annotated[list[int], Parameter(consume_multiple=True, allow_repeating=False)]):
+        print(values)
+
+     app()
+
+  .. code-block:: console
+
+     $ my-program --values 1 2 3
+     [1, 2, 3]
+
+     $ my-program --values 1 --values 2
+     ╭─ Error ──────────────────────────────────────────────────╮
+     │ Parameter "--values" was specified multiple times.       │
+     ╰─────────────────────────────────────────────────────────╯
+
 ^^^^^^^^^^
 Empty List
 ^^^^^^^^^^
