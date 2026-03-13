@@ -318,10 +318,11 @@ To disable the help-page entirely, set ``help_flags`` to an empty string or iter
    app = cyclopts.App(help_flags="")
    app = cyclopts.App(help_flags=[])
 
--------------
-Help Epilogue
--------------
+--------------------------
+Help Prologue and Epilogue
+--------------------------
 An epilogue is text displayed at the end of the help screen, after all command and parameter panels.
+A prologue is text display at the beginning of the help screen, before the usage section.
 This is commonly used for version information, support contact details, or additional notes.
 
 The epilogue is set via the :attr:`.App.help_epilogue` attribute:
@@ -357,8 +358,35 @@ The epilogue is set via the :attr:`.App.help_epilogue` attribute:
 
    Support: support@example.com
 
-Like :attr:`.App.help_format`, epilogues inherit from parent to child apps.
-This allows you to set a single epilogue that applies across your entire application:
+The prologue is set via the :attr:`.App.help_prologue` attribute:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(
+       name="myapp",
+       help="My application help.",
+       help_prologue=f"myapp, v1.0.0 (http://example.myapp.com)"
+   )
+   app()
+
+.. code-block:: console
+
+   $ my-script --help
+   myapp, v1.0.0 (http://example.myapp.com)
+
+   Usage: myapp COMMAND
+
+   My application help.
+
+   ╭─ Commands ────────────────────────────────────────────────────────────╮
+   │ --help -h  Display this message and exit.                             │
+   │ --version  Display application version.                               │
+   ╰───────────────────────────────────────────────────────────────────────╯
+
+Like :attr:`.App.help_format`, epilogues and prologues inherit from parent to child apps.
+This allows you to set a single epilogue or prologue that applies across your entire application:
 
 .. code-block:: python
 
@@ -397,12 +425,17 @@ This allows you to set a single epilogue that applies across your entire applica
 
    Admin Tools v2.0 | USE WITH CAUTION    # Overridden by child
 
-To disable the epilogue for a specific subcommand, set it to an empty string:
+To disable the epilogue or prologue for a specific subcommand, set it to an empty string:
 
 .. code-block:: python
 
    no_epilogue = App(name="internal", help_epilogue="")
    parent.command(no_epilogue)
+
+.. code-block:: python
+
+   no_prologue = App(name="internal", help_prologue="")
+   parent.command(no_prologue)
 
 --------------------
 Help Customization

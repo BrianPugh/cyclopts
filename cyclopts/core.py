@@ -317,6 +317,7 @@ class App:
         default=None, kw_only=True
     )
     help_on_error: bool | None = field(default=None, kw_only=True)
+    help_prologue: str | None = field(default=None, kw_only=True)
     help_epilogue: str | None = field(default=None, kw_only=True)
 
     version_format: Literal["markdown", "md", "plaintext", "restructuredtext", "rst", "rich"] | None = field(
@@ -2055,6 +2056,14 @@ class App:
 
             # Prepare panels with their associated groups
             help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
+
+            # Render prologue
+            if help_prologue := executing_app.app_stack.resolve("help_prologue"):
+                from cyclopts.help import InlineText
+
+                prologue = InlineText.from_format(help_prologue, format=help_format)
+                console.print(prologue)
+                console.print()  # Add blank line after prologue
 
             # Render usage
             default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=DefaultFormatter())

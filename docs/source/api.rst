@@ -145,6 +145,43 @@ API
 
       See :ref:`Help Customization` for detailed examples and advanced usage.
 
+   .. attribute:: help_prologue
+      :type: Optional[str]
+      :value: None
+
+      Text to display at the beginning of the help screen, before the usage section.
+      If :obj:`None`, no prologue is displayed.
+      If not set, attempts to inherit from parenting :class:`.App`.
+
+      The prologue supports the same formatting as :attr:`help` based on :attr:`help_format` (markdown, plaintext, restructuredtext, or rich).
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(
+             name="myapp",
+             help="My application help.",
+             help_prologue=f"myapp, v1.0.0 (http://example.myapp.com)"
+         )
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         myapp, v1.0.0 (http://example.myapp.com)
+
+         Usage: myapp COMMAND
+
+         My application help.
+
+         ╭─ Commands ────────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                             │
+         │ --version  Display application version.                               │
+         ╰───────────────────────────────────────────────────────────────────────╯
+
    .. attribute:: help_epilogue
       :type: Optional[str]
       :value: None
