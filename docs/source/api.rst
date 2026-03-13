@@ -172,6 +172,7 @@ API
 
          $ my-script --help
          myapp, v1.0.0 (http://example.myapp.com)
+
          Usage: myapp COMMAND
 
          My application help.

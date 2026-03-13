@@ -375,6 +375,7 @@ The prologue is set via the :attr:`.App.help_prologue` attribute:
 
    $ my-script --help
    myapp, v1.0.0 (http://example.myapp.com)
+
    Usage: myapp COMMAND
 
    My application help.
