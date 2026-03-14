@@ -249,6 +249,16 @@ API
       Populate exception strings with more information intended for developers.
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`False`.
 
+   .. attribute:: error_formatter
+      :type: Optional[Callable[[CycloptsError], Any]]
+      :value: None
+
+      A callable that formats :exc:`.CycloptsError` exceptions for display.
+      The callable receives the exception and should return any Rich-printable object (string, :class:`~rich.text.Text`, :class:`~rich.panel.Panel`, etc.).
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :func:`.CycloptsPanel`.
+
+      See :ref:`Custom Error Formatting` for examples.
+
    .. attribute:: version_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
       :value: None
