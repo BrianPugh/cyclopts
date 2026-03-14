@@ -381,6 +381,8 @@ class App:
         default=None, converter=help_formatter_converter, kw_only=True
     )
 
+    error_formatter: Callable[["CycloptsError"], Any] | None = field(default=None, kw_only=True)
+
     # This can ONLY ever be None or Tuple[ResultActionSingle, ...] due to converter.
     # The other types is to make type checkers happy for Cyclopts users.
     result_action: ResultAction | ResultActionSingle | None = field(
@@ -1683,6 +1685,7 @@ class App:
         help_on_error: bool | None = None,
         verbose: bool | None = None,
         end_of_options_delimiter: str | None = None,
+        error_formatter: Callable[["CycloptsError"], Any] | None = None,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
@@ -1749,6 +1752,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "end_of_options_delimiter": end_of_options_delimiter,
+                "error_formatter": error_formatter,
             }.items()
             if v is not None
         }
@@ -1772,7 +1776,11 @@ class App:
                 if help_on_error if help_on_error is not None else False:
                     self.help_print(tokens, console=e.console)
                 if print_error if print_error is not None else True:
-                    e.console.print(CycloptsPanel(e))
+                    resolved_error_formatter = self.app_stack.resolve("error_formatter")
+                    if resolved_error_formatter is not None:
+                        e.console.print(resolved_error_formatter(e))
+                    else:
+                        e.console.print(CycloptsPanel(e))
                 if exit_on_error if exit_on_error is not None else True:
                     sys.exit(1)
                 raise
@@ -1798,6 +1806,7 @@ class App:
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
         result_action: ResultAction | None = None,
+        error_formatter: Callable[["CycloptsError"], Any] | None = None,
     ) -> Any:
         """Interprets and executes a command.
 
@@ -1860,6 +1869,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": result_action,
+                "error_formatter": error_formatter,
             }.items()
             if v is not None
         }
@@ -1897,6 +1907,7 @@ class App:
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
         result_action: ResultAction | None = None,
+        error_formatter: Callable[["CycloptsError"], Any] | None = None,
     ) -> Any:
         """Async equivalent of :meth:`__call__` for use within existing event loops.
 
@@ -1987,6 +1998,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": result_action,
+                "error_formatter": error_formatter,
             }.items()
             if v is not None
         }

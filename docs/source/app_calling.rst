@@ -94,6 +94,7 @@ These behaviors can be controlled via :class:`.App` attributes or method paramet
 - :attr:`.App.print_error` - Formatted errors are printed (defaults to :obj:`True`)
 - :attr:`.App.help_on_error` - The help-page is printed before errors (defaults to :obj:`False`)
 - :attr:`.App.verbose` - Include verbose error information that might be useful for **developers** using Cyclopts (defaults to :obj:`False`)
+- :attr:`.App.error_formatter` - Customize how error messages are formatted (defaults to :func:`.CycloptsPanel`)
 
 These attributes are inherited by child apps and can be overridden by providing parameters to method calls.
 
@@ -147,3 +148,46 @@ These attributes are inherited by child apps and can be overridden by providing 
    print("Execution continues since we caught the exception.")
 
 With ``exit_on_error=False``, the ``UnknownCommandError`` is raised the same as a normal python exception.
+
+.. _Custom Error Formatting:
+
+-----------------------
+Custom Error Formatting
+-----------------------
+By default, Cyclopts displays errors using :func:`.CycloptsPanel`, which renders a Rich panel:
+
+.. code-block:: text
+
+   ╭─ Error ───────────────────────────────────────────────╮
+   │ Invalid value "foo" for "VALUE": unable to convert    │
+   │ "foo" into int.                                       │
+   ╰───────────────────────────────────────────────────────╯
+
+To customize this, set :attr:`.App.error_formatter` to a callable that receives a :exc:`.CycloptsError` and returns any Rich-printable object.
+
+.. code-block:: python
+
+   from cyclopts import App, CycloptsError
+
+   def my_error_formatter(e: CycloptsError):
+       return f"[bold red]error[/bold red]: {e}"
+
+   app = App(error_formatter=my_error_formatter)
+
+   @app.default
+   def main(value: int):
+       pass
+
+.. code-block:: text
+
+   $ my-app foo
+   error: Invalid value "foo" for "VALUE": unable to convert "foo" into int.
+
+The formatter receives the full :exc:`.CycloptsError` exception, which contains context like the :attr:`~.CycloptsError.command_chain`, :attr:`~.CycloptsError.argument`, and :attr:`~.CycloptsError.target`.
+Use ``str(e)`` for just the message text.
+
+Like other error-handling attributes, ``error_formatter`` can also be passed as a runtime override:
+
+.. code-block:: python
+
+   app.parse_args("foo", error_formatter=my_error_formatter)
