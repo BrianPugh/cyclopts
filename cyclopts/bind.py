@@ -621,6 +621,7 @@ def create_bound_arguments(
     configs: Iterable[Callable],
     *,
     end_of_options_delimiter: str = "--",
+    positional_tokens: list[str] | None = None,
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -631,9 +632,15 @@ def create_bound_arguments(
     argument_collection: ArgumentCollection
     tokens: list[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
+        If ``positional_tokens`` is provided, only used for keyword/flag parsing.
     configs: Iterable[Callable]
     end_of_options_delimiter: str
         Everything after this special token is forced to be supplied as a positional argument.
+    positional_tokens: list[str] | None
+        If provided, these tokens are used for positional argument parsing
+        instead of the leftover tokens from keyword/flag parsing. This is
+        used by flag scoping to separate which tokens are eligible for
+        keyword/flag matching vs positional assignment.
 
     Returns
     -------
@@ -649,6 +656,9 @@ def create_bound_arguments(
         unused_tokens, contiguous_positional_count = _parse_kw_and_flags(
             argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
         )
+        if positional_tokens is not None:
+            unused_tokens = positional_tokens
+            contiguous_positional_count = None
         unused_tokens = _parse_pos(
             argument_collection,
             unused_tokens,

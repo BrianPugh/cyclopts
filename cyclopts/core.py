@@ -29,7 +29,7 @@ from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
-from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
+from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens, segment_tokens_by_command
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
 from cyclopts.exceptions import (
@@ -1618,13 +1618,52 @@ class App:
                             for argument in argument_collection.filter_by(parse=False)
                         }
 
-                        bound, unused_tokens = create_bound_arguments(
-                            command_app.default_command,
-                            argument_collection,
-                            unused_tokens,
-                            config,
-                            end_of_options_delimiter=end_of_options_delimiter,
-                        )
+                        # Determine if flag scoping should be applied.
+                        # Scoping is active when:
+                        # 1. flag_scope is set
+                        # 2. The flat parse found no commands (command_app is
+                        #    the meta app itself, not a resolved subcommand)
+                        # 3. The full parse (with parent meta) finds subcommands
+                        #    that the meta app will forward tokens to
+                        # TODO: Once bubble-up is implemented (Phase 3c), change to:
+                        #   flag_scope = self.app_stack.resolve("flag_scope", fallback="bubble-up")
+                        # At that point flag_scope is always a string and the
+                        # ``is not None`` checks below become unnecessary.
+                        flag_scope = self.app_stack.resolve("flag_scope")
+                        full_command_indices: list[int] = []
+                        if flag_scope is not None and not command_chain:
+                            _, _, _, full_command_indices = self._parse_commands(tokens, include_parent_meta=True)
+
+                        if flag_scope is not None and full_command_indices:
+                            # Split tokens into per-command-level segments.
+                            segments = segment_tokens_by_command(tokens, full_command_indices)
+                            # segments[0] = tokens before the first command (meta-level flags)
+                            # Remaining segments = command name + tokens for child commands
+                            meta_kw_tokens = segments[0]
+
+                            # Reconstruct the positional tokens for the meta app's *tokens:
+                            # command name(s) + all post-command tokens.
+                            positional_tokens: list[str] = []
+                            for i, cmd_idx in enumerate(full_command_indices):
+                                positional_tokens.append(tokens[cmd_idx])  # command name
+                                positional_tokens.extend(segments[i + 1])  # tokens after this command
+
+                            bound, unused_tokens = create_bound_arguments(
+                                command_app.default_command,
+                                argument_collection,
+                                meta_kw_tokens,
+                                config,
+                                end_of_options_delimiter=end_of_options_delimiter,
+                                positional_tokens=positional_tokens,
+                            )
+                        else:
+                            bound, unused_tokens = create_bound_arguments(
+                                command_app.default_command,
+                                argument_collection,
+                                unused_tokens,
+                                config,
+                                end_of_options_delimiter=end_of_options_delimiter,
+                            )
                         try:
                             for validator in command_app.validator:
                                 validator(**bound.arguments)
