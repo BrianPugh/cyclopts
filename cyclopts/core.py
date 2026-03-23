@@ -938,6 +938,104 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
+    def _parse_commands(
+        self,
+        tokens: list[str],
+        *,
+        include_parent_meta: bool = True,
+    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str], list[int]]:
+        """Internal command parsing with richer return data.
+
+        Unlike the public :meth:`parse_commands`, this method:
+        - Accepts already-normalized tokens (list[str]).
+        - Returns command indices into the original token list.
+
+        Parameters
+        ----------
+        tokens: list[str]
+            Already-normalized token list.
+        include_parent_meta: bool
+            Controls whether parent meta apps are included in the execution path.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Strings that are interpreted as a valid command chain.
+        tuple[App, ...]
+            The execution path - apps that will be invoked in order.
+        list[str]
+            The remaining non-command tokens.
+        list[int]
+            Index (into the original token list) of each command token found.
+        """
+        command_chain = []
+        app = self
+        apps: list[App] = []
+        unused_tokens = tokens
+        command_indices: list[int] = []
+        # Track the current offset into the original token list.
+        # This is needed because _consume_leading_meta_options can
+        # remove tokens, shifting the relationship between unused_tokens
+        # and the original token indices.
+        token_offset = 0
+
+        def add_parent_metas(app):
+            """If ``app`` is a meta-app, also add it's "normal" app.
+
+            We assume that ``app._meta`` will always invoke the ``app``.
+            """
+            if not include_parent_meta:
+                return
+            meta_parents = []
+            meta_parent = app
+            while (meta_parent := meta_parent._meta_parent) is not None:
+                meta_parents.append(meta_parent)
+            # The "root" non-meta app gets highest priority (first)
+            apps.extend(meta_parents[::-1])
+
+        add_parent_metas(app)
+        apps.append(app)
+        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+
+        unused_tokens = tokens
+        while unused_tokens:
+            token = unused_tokens[0]
+            app_or_spec = command_mapping.get(token)
+
+            if app_or_spec is None:
+                # Token is not a command. Try to consume it as a meta app parameter.
+                # This is only relevant when ``include_parent_meta==True``, because
+                # otherwise it will be handled by the natural parsing process.
+                if include_parent_meta:
+                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
+                    if len(remaining) < len(unused_tokens):
+                        # Some meta parameters were consumed, continue looking for commands
+                        token_offset += len(unused_tokens) - len(remaining)
+                        unused_tokens = remaining
+                        continue
+                # Not a command or meta parameter, stop parsing commands
+                break
+
+            # Resolve CommandSpec if needed (lazy loading)
+            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
+            # Pass the current app as parent to inherit its defaults
+            if isinstance(app_or_spec, CommandSpec):
+                parent_app = app  # Save parent before overwriting
+                app = app_or_spec.resolve(parent_app)
+            else:
+                app = app_or_spec
+
+            # Found a command - add it to the chain
+            add_parent_metas(app)
+            apps.append(app)
+            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+            command_chain.append(token)
+            command_indices.append(token_offset)
+            token_offset += 1
+            unused_tokens = unused_tokens[1:]
+
+        return tuple(command_chain), tuple(apps), unused_tokens, command_indices
+
     def parse_commands(
         self,
         tokens: None | str | Iterable[str] = None,
@@ -976,66 +1074,11 @@ class App:
         list[str]
             The remaining non-command tokens.
         """
-        tokens = normalize_tokens(tokens)
-
-        command_chain = []
-        app = self
-        apps: list[App] = []
-        unused_tokens = tokens
-
-        def add_parent_metas(app):
-            """If ``app`` is a meta-app, also add it's "normal" app.
-
-            We assume that ``app._meta`` will always invoke the ``app``.
-            """
-            if not include_parent_meta:
-                return
-            meta_parents = []
-            meta_parent = app
-            while (meta_parent := meta_parent._meta_parent) is not None:
-                meta_parents.append(meta_parent)
-            # The "root" non-meta app gets highest priority (first)
-            apps.extend(meta_parents[::-1])
-
-        add_parent_metas(app)
-        apps.append(app)
-        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-
-        unused_tokens = tokens
-        while unused_tokens:
-            token = unused_tokens[0]
-            app_or_spec = command_mapping.get(token)
-
-            if app_or_spec is None:
-                # Token is not a command. Try to consume it as a meta app parameter.
-                # This is only relevant when ``include_parent_meta==True``, because
-                # otherwise it will be handled by the natural parsing process.
-                if include_parent_meta:
-                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
-                    if len(remaining) < len(unused_tokens):
-                        # Some meta parameters were consumed, continue looking for commands
-                        unused_tokens = remaining
-                        continue
-                # Not a command or meta parameter, stop parsing commands
-                break
-
-            # Resolve CommandSpec if needed (lazy loading)
-            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
-            # Pass the current app as parent to inherit its defaults
-            if isinstance(app_or_spec, CommandSpec):
-                parent_app = app  # Save parent before overwriting
-                app = app_or_spec.resolve(parent_app)
-            else:
-                app = app_or_spec
-
-            # Found a command - add it to the chain
-            add_parent_metas(app)
-            apps.append(app)
-            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-            command_chain.append(token)
-            unused_tokens = unused_tokens[1:]
-
-        return tuple(command_chain), tuple(apps), unused_tokens
+        command_chain, apps, unused_tokens, _ = self._parse_commands(
+            normalize_tokens(tokens),
+            include_parent_meta=include_parent_meta,
+        )
+        return command_chain, apps, unused_tokens
 
     def _get_resolution_context(self, execution_path: Sequence["App"]) -> list["App"]:
         """Get all apps that contribute to parameter resolution for the given execution path.
