@@ -149,6 +149,8 @@ def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
         app._group_arguments = copy(parent_app._group_arguments)
     if app.version is None and parent_app.version is not None:
         app.version = parent_app.version
+    if app.flag_scope is None and parent_app.flag_scope is not None:
+        app.flag_scope = parent_app.flag_scope
 
 
 def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") -> None:
@@ -342,6 +344,8 @@ class App:
     )
 
     end_of_options_delimiter: str | None = field(default=None, kw_only=True)
+
+    flag_scope: Literal["bubble-up", "strict"] | None = field(default=None, kw_only=True)
 
     print_error: bool | None = field(default=None, kw_only=True)
 

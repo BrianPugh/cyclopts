@@ -14,6 +14,7 @@ def test_app_has_extra_attributes_as_attributes():
     assert app.verbose is None
     assert app.end_of_options_delimiter is None
     assert app.result_action is None
+    assert app.flag_scope is None
 
 
 def test_app_attributes_can_be_set():
@@ -226,3 +227,76 @@ def test_true_inheritance_without_fallback_override():
     with pytest.raises(SystemExit):
         # The immediately supplied argument should have highest priority.
         parent_app("child --unknown-flag", exit_on_error=True)
+
+
+def test_flag_scope_default_none():
+    """Test that flag_scope defaults to None."""
+    app = App()
+    assert app.flag_scope is None
+
+
+@pytest.mark.parametrize("scope", ["bubble-up", "strict"])
+def test_flag_scope_can_be_set(scope):
+    """Test that flag_scope can be set on App."""
+    app = App(flag_scope=scope)
+    assert app.flag_scope == scope
+
+
+def test_flag_scope_inherits_from_parent():
+    """Test that child apps inherit flag_scope from parent."""
+    parent_app = App(flag_scope="strict")
+
+    child_app = App(name="child")
+    parent_app.command(child_app)
+
+    @child_app.default
+    def child_command():
+        return "child_success"
+
+    # Child should inherit parent's flag_scope via _apply_parent_defaults_to_app
+    assert child_app.flag_scope == "strict"
+
+
+def test_flag_scope_child_override():
+    """Test that child apps can override parent's flag_scope."""
+    parent_app = App(flag_scope="bubble-up")
+
+    child_app = App(name="child", flag_scope="strict")
+    parent_app.command(child_app)
+
+    @child_app.default
+    def child_command():
+        return "child_success"
+
+    assert child_app.flag_scope == "strict"
+
+
+def test_flag_scope_resolves_through_app_stack():
+    """Test that flag_scope resolves correctly through the app stack."""
+    parent_app = App(flag_scope="strict", result_action="return_value")
+
+    child_app = App(name="child")
+    parent_app.command(child_app)
+
+    @child_app.default
+    def child_command():
+        return "child_success"
+
+    # When resolved through the app stack, the parent's flag_scope should be visible
+    with parent_app.app_stack([parent_app, child_app]):
+        resolved = parent_app.app_stack.resolve("flag_scope")
+        assert resolved == "strict"
+
+
+def test_flag_scope_none_does_not_override_parent():
+    """Test that a child with flag_scope=None inherits from parent."""
+    parent_app = App(flag_scope="bubble-up")
+
+    child_app = App(name="child", flag_scope=None)
+    parent_app.command(child_app)
+
+    @child_app.default
+    def child_command():
+        return "child_success"
+
+    assert child_app.flag_scope == "bubble-up"
