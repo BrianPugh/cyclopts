@@ -63,6 +63,40 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     return tokens
 
 
+def segment_tokens_by_command(
+    tokens: list[str],
+    command_indices: list[int],
+) -> list[list[str]]:
+    """Split tokens into segments, one per command level.
+
+    Segments are delimited by command tokens. Command tokens themselves
+    are excluded from the segments.
+
+    Parameters
+    ----------
+    tokens: list[str]
+        The full normalized token list.
+    command_indices: list[int]
+        Indices in ``tokens`` where command names were found.
+        Returned by :meth:`App._parse_commands`.
+
+    Returns
+    -------
+    list[list[str]]
+        ``segments[0]`` contains tokens before the first command,
+        ``segments[i]`` contains tokens after the i-th command but
+        before the (i+1)-th command. There are always
+        ``len(command_indices) + 1`` segments.
+    """
+    segments: list[list[str]] = []
+    prev = 0
+    for idx in command_indices:
+        segments.append(tokens[prev:idx])
+        prev = idx + 1  # skip the command token itself
+    segments.append(tokens[prev:])
+    return segments
+
+
 def _common_root_keys(argument_collection) -> tuple[str, ...]:
     if not argument_collection:
         return ()
