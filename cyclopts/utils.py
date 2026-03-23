@@ -451,6 +451,22 @@ def create_error_console_from_console(console: "Console") -> "Console":
     )
 
 
+def parse_version(version_string: str) -> tuple[int, ...]:
+    """Parse a PEP 440 version string into a tuple of ints, stripping pre-release suffixes.
+
+    Parameters
+    ----------
+    version_string: str
+        A version string like ``"2.11.2"`` or ``"2.0.0b2"``.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Tuple of the numeric components, e.g. ``(2, 11, 2)`` or ``(2, 0, 0)``.
+    """
+    return tuple(int(m.group()) for x in version_string.split(".") if (m := re.match(r"\d+", x)))
+
+
 def import_app(module_path: str):
     """Import a Cyclopts App from a module path.
 

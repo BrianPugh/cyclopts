@@ -1,6 +1,6 @@
 import pytest
 
-from cyclopts.utils import Sentinel, _pascal_to_snake, grouper
+from cyclopts.utils import Sentinel, _pascal_to_snake, grouper, parse_version
 
 
 def test_grouper():
@@ -75,3 +75,18 @@ def test_pascal_to_snake(input_str, expected):
     - Converts all characters to lowercase
     """
     assert _pascal_to_snake(input_str) == expected
+
+
+@pytest.mark.parametrize(
+    "version_string,expected",
+    [
+        ("2.11.2", (2, 11, 2)),
+        ("2.0.0b2", (2, 0, 0)),
+        ("2.11.0a1", (2, 11, 0)),
+        ("3.0.0rc1", (3, 0, 0)),
+        ("1.10.19", (1, 10, 19)),
+        ("2.0.0.dev1", (2, 0, 0)),
+    ],
+)
+def test_parse_version(version_string, expected):
+    assert parse_version(version_string) == expected
