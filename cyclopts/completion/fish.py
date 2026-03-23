@@ -18,6 +18,7 @@ from cyclopts.completion._base import (
 
 if TYPE_CHECKING:
     from cyclopts import App
+    from cyclopts.command_spec import CommandSpec
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -516,13 +517,13 @@ def _get_condition_for_path(command_path: tuple[str, ...], prog_name: str) -> st
     return f"-n '{func_name} {escaped_commands}'"
 
 
-def _get_description_from_app(cmd_app: "App", help_format: str) -> str:
+def _get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:
     """Extract description from App.
 
     Parameters
     ----------
-    cmd_app : App
-        Command app.
+    cmd_app : App | CommandSpec
+        Command app or spec.
     help_format : str
         Help text format.
 
@@ -533,13 +534,10 @@ def _get_description_from_app(cmd_app: "App", help_format: str) -> str:
     """
     from cyclopts.help.help import docstring_parse
 
-    if not cmd_app.help:
-        return ""
-
     try:
         parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(cmd_app.help)
+        text = str(cmd_app.help or "")
 
     return strip_markup(text, format=help_format)

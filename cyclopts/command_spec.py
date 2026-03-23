@@ -8,6 +8,7 @@ from attrs import Factory, define, field
 
 if TYPE_CHECKING:
     from cyclopts.core import App
+    from cyclopts.group import Group
 
 
 @define
@@ -42,6 +43,16 @@ class CommandSpec:
     import_path: str
     name: str | tuple[str, ...] | None = None
     app_kwargs: dict[str, Any] = Factory(dict)
+    help: str | None = None
+    sort_key: Any = None
+    group: "Group | str | tuple[Group | str, ...] | None" = None
+    _show: bool | None = field(default=None, alias="show")
+
+    @property
+    def show(self) -> bool:
+        if self._show is None:
+            return True
+        return self._show
 
     _resolved: "App | None" = field(init=False, default=None, repr=False)
 
@@ -137,6 +148,18 @@ class CommandSpec:
 
             self._resolved = App(name=self.name, **app_kwargs)
             self._resolved.default(target)
+
+        # Apply registration-time overrides to the resolved App
+        if self.help is not None:
+            self._resolved.help = self.help
+        if self.sort_key is not None:
+            self._resolved.sort_key = self.sort_key
+        if self.group is not None:
+            self._resolved.group = self.group
+        if self._show is not None:
+            self._resolved.show = self._show
+        if self._resolved._name_transform is None:
+            self._resolved.name_transform = parent_app.name_transform
 
         # Hide help and version flags from subapp help output
         # This matches the behavior of direct App/function registration in core.py

@@ -1,10 +1,12 @@
 import inspect
 from collections import namedtuple
+from collections.abc import Iterable, Sequence
+from pathlib import Path
 from typing import Annotated, Any, Literal, Optional, Union
 
 import pytest
 
-from cyclopts.annotations import contains_hint, get_hint_name, resolve
+from cyclopts.annotations import contains_hint, get_hint_name, is_iterable_type, resolve
 
 
 def test_resolve_annotated():
@@ -88,3 +90,33 @@ class CustomStr(str):
 )
 def test_contains_hint(hint, target_type, expected):
     assert contains_hint(hint, target_type) == expected
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        # Basic collection types
+        (list[str], True),
+        (set[int], True),
+        (tuple[str, ...], True),
+        (frozenset[str], True),
+        # Abstract collection types
+        (Sequence[str], True),
+        (Iterable[str], True),
+        # Annotated wrappers
+        (Annotated[list[str], "metadata"], True),
+        # Optional wrappers
+        (Optional[list[str]], True),
+        # Nested Annotated inside collection
+        (list[Annotated[Path, "metadata"]], True),
+        # Non-iterable types
+        (str, False),
+        (int, False),
+        (Path, False),
+        (dict[str, str], True),
+        (Annotated[str, "metadata"], False),
+        (Optional[str], False),
+    ],
+)
+def test_is_iterable_type(hint, expected):
+    assert is_iterable_type(hint) == expected

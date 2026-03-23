@@ -259,3 +259,7 @@ The Typer implementation is 47 lines long, while the Cyclopts implementation is 
 Not only is the Cyclopts implementation significantly shorter, but the code is easier to read.
 Since Typer does not support Unions, the choices for ``replica`` could not be displayed on the help page.
 Cyclopts is much more terse, much more readable, and much more intuitive to use.
+
+# Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](https://github.com/BrianPugh/cyclopts/blob/main/CONTRIBUTING.md) for development setup, coding standards, and how to submit a pull request.

@@ -386,6 +386,64 @@ def test_exception_repeat_argument_kwargs(app, cmd_str):
         app.parse_args(cmd_str, print_error=False, exit_on_error=False)
 
 
+@pytest.mark.parametrize("type_hint", [list[str], str])
+def test_allow_repeating_false(app, type_hint):
+    @app.default
+    def default(foo: Annotated[type_hint, Parameter(allow_repeating=False)]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    with pytest.raises(RepeatArgumentError):
+        app.parse_args("--foo a --foo b", print_error=False, exit_on_error=False)
+
+
+def test_allow_repeating_false_consume_multiple(app, assert_parse_args):
+    @app.default
+    def default(foo: Annotated[list[str], Parameter(allow_repeating=False, consume_multiple=True)]):
+        pass
+
+    assert_parse_args(default, "--foo a b c", foo=["a", "b", "c"])
+
+
+def test_allow_repeating_false_consume_multiple_repeated(app):
+    @app.default
+    def default(foo: Annotated[list[str], Parameter(allow_repeating=False, consume_multiple=True)]):
+        pass
+
+    with pytest.raises(RepeatArgumentError):
+        app.parse_args("--foo a --foo b", print_error=False, exit_on_error=False)
+
+
+@pytest.mark.parametrize(
+    "consume_multiple,cmd_str,expected",
+    [
+        (False, "--foo a --foo b", ["a", "b"]),
+        (True, "--foo a --foo b", ["a", "b"]),
+        (True, "--foo a b --foo c d", ["a", "b", "c", "d"]),
+    ],
+)
+def test_allow_repeating_true_list(app, assert_parse_args, consume_multiple, cmd_str, expected):
+    @app.default
+    def default(foo: Annotated[list[str], Parameter(allow_repeating=True, consume_multiple=consume_multiple)]):
+        pass
+
+    assert_parse_args(default, cmd_str, foo=expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("--foo a --foo b", "b"),
+        ("--foo a --foo b --foo c", "c"),
+    ],
+)
+def test_allow_repeating_true_scalar(app, assert_parse_args, cmd_str, expected):
+    @app.default
+    def default(foo: Annotated[str, Parameter(allow_repeating=True)]):
+        pass
+
+    assert_parse_args(default, cmd_str, foo=expected)
+
+
 def test_exception_unused_token(app):
     @app.default
     def default(foo: str):
@@ -971,3 +1029,83 @@ def test_single_char_option_with_negative_value(app, assert_parse_args):
     # -o-5 should be: -o with value "-5"
     # This tests that the "-5" part is treated as a value, not as a separate option
     assert_parse_args(main, "-o-5", offset=-5)
+
+
+def test_positional_only_list_interleaved_with_keywords_error(app):
+    """Positional tokens after keyword args should not be consumed by a positional-only list.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
+        pass
+
+    with pytest.raises(UnusedCliTokensError):
+        app.parse_args("a b c --bar 8 --baz 10 d", print_error=False, exit_on_error=False)
+
+
+def test_positional_only_list_then_keywords(app):
+    """Positional tokens before keywords should work fine.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
+        pass
+
+    _, actual_bind, _ = app.parse_args("a b c d --bar 8 --baz 10", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "c", "d"],)
+    assert actual_bind.kwargs == {"bar": 8, "baz": 10}
+
+
+def test_positional_only_list_keywords_first(app):
+    """Keywords before positional tokens should work fine.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0, baz: int = 0):
+        pass
+
+    _, actual_bind, _ = app.parse_args("--bar 8 --baz 10 a b c d", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "c", "d"],)
+    assert actual_bind.kwargs == {"bar": 8, "baz": 10}
+
+
+def test_positional_only_list_interleaved_with_delimiter(app):
+    """Tokens after -- should still be consumed even with interleaving before the delimiter.
+
+    Regression test for issue #763.
+    """
+
+    @app.default
+    def main(foo: list[str] | None = None, /, *, bar: int = 0):
+        pass
+
+    _, actual_bind, _ = app.parse_args("a b --bar 8 -- d e", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "d", "e"],)
+    assert actual_bind.kwargs == {"bar": 8}
+
+
+def test_positional_only_list_and_scalar_interleaved_error(app):
+    """Multiple positional-only params (list + scalar) should also reject interleaving.
+
+    Regression test for issue #763.
+    """
+    from pathlib import Path
+
+    @app.default
+    def main(inputs: list[str], output: Path, /, *, verbose: bool = False):
+        pass
+
+    # Non-interleaved: should work
+    _, actual_bind, _ = app.parse_args("a b c out.csv --verbose", print_error=False, exit_on_error=False)
+    assert actual_bind.args == (["a", "b", "c"], Path("out.csv"))
+    assert actual_bind.kwargs == {"verbose": True}
+
+    # Interleaved: should error
+    with pytest.raises(UnusedCliTokensError):
+        app.parse_args("a b --verbose c out.csv", print_error=False, exit_on_error=False)

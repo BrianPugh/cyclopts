@@ -2498,6 +2498,204 @@ def test_help_flag_after_end_of_options_delimiter(app):
     assert result == ("foo", "--help", "-h")
 
 
+def test_help_prologue_basic(app, console):
+    """Test basic prologue rendering."""
+    app.help_prologue = "This is a prologue."
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        This is a prologue.
+
+        Usage: app
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_prologue_multiline(app, console):
+    """Test prologue with multiple lines using markdown double newlines."""
+    app.help_prologue = "Line 1\n\nLine 2\n\nLine 3"
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    # With markdown (default), double newlines create separate paragraphs
+    assert "Line 1" in actual
+    assert "Line 2" in actual
+    assert "Line 3" in actual
+
+
+def test_help_prologue_none(app, console):
+    """Test that None prologue doesn't add extra lines."""
+    app.help_prologue = None
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_prologue_empty_string(app, console):
+    """Test that empty string prologue doesn't render."""
+    app.help_prologue = ""
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_prologue_markdown(app, console):
+    """Test prologue with markdown formatting."""
+    app.help_prologue = "**Version 1.0.0**\n\nFor more info, visit *https://example.com*"
+    app.help_format = "markdown"
+    with console.capture() as capture:
+        app([], console=console)
+
+    actual = capture.get()
+    assert "Version 1.0.0" in actual
+    assert "https://example.com" in actual
+
+
+def test_help_prologue_subcommand(app, console):
+    """Test that subcommands can have their own prologue."""
+    subapp = App(
+        name="sub",
+        help="Subcommand help.",
+        help_prologue="Subcommand prologue.",
+    )
+    app.command(subapp)
+
+    with console.capture() as capture:
+        app(["sub"], console=console)
+
+    actual = capture.get()
+    assert "Subcommand prologue." in actual
+    assert actual.startswith("Subcommand prologue.\n")
+
+
+def test_help_prologue_with_parameters(app, console):
+    """Test prologue with parameters in help output."""
+
+    @app.default
+    def main(verbose: bool = False, count: int = 1):
+        """Main function."""
+        pass
+
+    app.help_prologue = "Header text here."
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    assert "verbose" in actual.lower()
+    assert "count" in actual.lower()
+    assert "Header text here." in actual
+    # Note: With parameters, the prologue should still appear at the beginning
+    assert "Header text here." in actual
+
+
+def test_help_prologue_inheritance(console):
+    """Test that prologue inherits from parent to child (like help_format)."""
+    parent = App(
+        name="parent",
+        help="Parent help.",
+        help_prologue="Parent prologue.",
+        result_action="return_value",
+    )
+
+    child = App(
+        name="child",
+        help="Child help.",
+        # No help_prologue - should inherit parent's prologue
+    )
+
+    parent.command(child)
+
+    # Parent should show its prologue
+    with console.capture() as capture:
+        parent(["--help"], console=console)
+
+    actual = capture.get()
+    assert "Parent prologue." in actual
+
+    # Child should inherit and show parent's prologue
+    with console.capture() as capture:
+        parent(["child", "--help"], console=console)
+
+    actual = capture.get()
+    assert "Parent prologue." in actual
+    assert "Child help." in actual
+
+
+def test_help_prologue_override(console):
+    """Test that child can override parent's prologue."""
+    parent = App(
+        name="parent",
+        help="Parent help.",
+        help_prologue="Parent prologue.",
+        result_action="return_value",
+    )
+
+    child = App(
+        name="child",
+        help="Child help.",
+        help_prologue="Child prologue (overrides parent).",
+    )
+
+    parent.command(child)
+
+    # Parent shows its prologue
+    with console.capture() as capture:
+        parent(["--help"], console=console)
+
+    actual = capture.get()
+    assert "Parent prologue." in actual
+    assert "Child prologue" not in actual
+
+    # Child shows its own prologue (not parent's)
+    with console.capture() as capture:
+        parent(["child", "--help"], console=console)
+
+    actual = capture.get()
+    assert "Child prologue (overrides parent)." in actual
+    assert "Parent prologue." not in actual
+
+
 def test_help_epilogue_basic(app, console):
     """Test basic epilogue rendering."""
     app.help_epilogue = "This is an epilogue."

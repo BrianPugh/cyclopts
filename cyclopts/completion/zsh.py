@@ -9,6 +9,7 @@ from textwrap import dedent
 from textwrap import indent as textwrap_indent
 from typing import TYPE_CHECKING
 
+from cyclopts.annotations import is_iterable_type
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
@@ -23,6 +24,7 @@ from cyclopts.help.help import docstring_parse
 if TYPE_CHECKING:
     from cyclopts import App
     from cyclopts.argument import Argument, ArgumentCollection
+    from cyclopts.command_spec import CommandSpec
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:
@@ -164,9 +166,11 @@ def _generate_nested_positional_specs(
     """
     specs = []
 
-    # Check if we have variadic positionals
-    variadic_args = [arg for arg in positional_args if arg.is_var_positional()]
-    non_variadic_args = [arg for arg in positional_args if not arg.is_var_positional()]
+    # Check if we have variadic positionals (including collection types like list[X])
+    variadic_args = [arg for arg in positional_args if arg.is_var_positional() or is_iterable_type(arg.hint)]
+    non_variadic_args = [
+        arg for arg in positional_args if not arg.is_var_positional() and not is_iterable_type(arg.hint)
+    ]
 
     # Generate specs for non-variadic positionals
     for arg in non_variadic_args:
@@ -565,8 +569,8 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
-    if argument.is_var_positional():
-        # Variadic positional (*args)
+    if argument.is_var_positional() or is_iterable_type(argument.hint):
+        # Variadic positional (*args) or collection type (list[X], set[X], etc.)
         return f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
 
     # Regular positional - zsh uses 1-based indexing
@@ -576,15 +580,17 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
 
 
-def _generate_keyword_specs_for_command(names: tuple[str, ...], cmd_app: "App", help_format: str) -> list[str]:
+def _generate_keyword_specs_for_command(
+    names: tuple[str, ...], cmd_app: "App | CommandSpec", help_format: str
+) -> list[str]:
     """Generate zsh _arguments specs for a command that looks like a flag.
 
     Parameters
     ----------
     names : tuple[str, ...]
         Registered names for the command.
-    cmd_app : App
-        Command app with flag-like names.
+    cmd_app : App | CommandSpec
+        Command app or spec.
     help_format : str
         Help text format.
 
@@ -649,13 +655,13 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
     return _escape_zsh_description(text)
 
 
-def _safe_get_description_from_app(cmd_app: "App", help_format: str) -> str:
+def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:
     """Extract plain text description from App, escaping zsh special chars.
 
     Parameters
     ----------
-    cmd_app : App
-        Command app with help text.
+    cmd_app : App | CommandSpec
+        Command app or spec with help text.
     help_format : str
         Help text format.
 
@@ -664,14 +670,11 @@ def _safe_get_description_from_app(cmd_app: "App", help_format: str) -> str:
     str
         Escaped plain text description (truncated to 80 chars).
     """
-    if not cmd_app.help:
-        return ""
-
     try:
         parsed = docstring_parse(cmd_app.help, "plaintext")
         text = parsed.short_description or ""
     except Exception:
-        text = str(cmd_app.help)
+        text = str(cmd_app.help or "")
 
     text = strip_markup(text, format=help_format)
     return _escape_zsh_description(text)

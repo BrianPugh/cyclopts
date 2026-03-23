@@ -150,6 +150,43 @@ API
 
       See :ref:`Help Customization` for detailed examples and advanced usage.
 
+   .. attribute:: help_prologue
+      :type: Optional[str]
+      :value: None
+
+      Text to display at the beginning of the help screen, before the usage section.
+      If :obj:`None`, no prologue is displayed.
+      If not set, attempts to inherit from parenting :class:`.App`.
+
+      The prologue supports the same formatting as :attr:`help` based on :attr:`help_format` (markdown, plaintext, restructuredtext, or rich).
+
+      Example:
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(
+             name="myapp",
+             help="My application help.",
+             help_prologue=f"myapp, v1.0.0 (http://example.myapp.com)"
+         )
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         myapp, v1.0.0 (http://example.myapp.com)
+
+         Usage: myapp COMMAND
+
+         My application help.
+
+         ╭─ Commands ────────────────────────────────────────────────────────────╮
+         │ --help -h  Display this message and exit.                             │
+         │ --version  Display application version.                               │
+         ╰───────────────────────────────────────────────────────────────────────╯
+
    .. attribute:: help_epilogue
       :type: Optional[str]
       :value: None
@@ -217,6 +254,16 @@ API
 
       Populate exception strings with more information intended for developers.
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`False`.
+
+   .. attribute:: error_formatter
+      :type: Optional[Callable[[CycloptsError], Any]]
+      :value: None
+
+      A callable that formats :exc:`.CycloptsError` exceptions for display.
+      The callable receives the exception and should return any Rich-printable object (string, :class:`~rich.text.Text`, :class:`~rich.panel.Panel`, etc.).
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :func:`.CycloptsPanel`.
+
+      See :ref:`Custom Error Formatting` for examples.
 
    .. attribute:: version_format
       :type: Optional[Literal["plaintext", "markdown", "md", "restructuredtext", "rst"]]
@@ -1091,6 +1138,46 @@ API
       Allow parsing non-numeric values that begin with a hyphen ``-``.
       This is disabled (:obj:`False`) by default, allowing for more helpful error messages for unknown CLI options.
 
+   .. attribute:: requires_equals
+      :type: bool
+      :value: False
+
+      Require long options to use ``=`` to separate the option name from its value (e.g., ``--option=value``).
+      When enabled, the space-separated form ``--option value`` is rejected with a :class:`RequiresEqualsError`.
+
+      * Only applies to long-form options (those starting with ``--``).
+      * Short options (e.g., ``-o value``) are **not** affected.
+      * Boolean flags (e.g., ``--verbose``) work regardless of this setting.
+      * Can be set app-wide via :attr:`.App.default_parameter`.
+      * Cannot be combined with :attr:`consume_multiple` (raises :class:`ValueError`).
+        To provide multiple values for a list parameter, repeat the option
+        (e.g., ``--urls=a --urls=b``). To pass an empty iterable, use the
+        negative flag (e.g., ``--empty-urls``).
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(*, name: Annotated[str, Parameter(requires_equals=True)]):
+             print(f"Hello {name}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --name=alice
+         Hello alice
+
+         $ my-script --name alice
+         ╭─ Error ───────────────────────────────────────────────────────╮
+         │ Parameter "--name" requires a value assigned with "=".        │
+         │ Use "--name=VALUE".                                           │
+         ╰───────────────────────────────────────────────────────────────╯
+
    .. attribute:: parse
       :type: Union[None, bool, str, re.Pattern]
       :value: None
@@ -1299,12 +1386,20 @@ API
       :attr:`~.Parameter.n_tokens`.
 
    .. attribute:: consume_multiple
-      :type: Optional[bool]
+      :type: None | bool | int | Sequence[int]
       :value: None
 
-      Lists use `different parsing rules <rules.html#list>`__ depending on whether the values are provided positionally or by keyword. If the parameter is specified **positionally**, :attr:`.Parameter.consume_multiple` is ignored.
+      Controls how many CLI tokens a list/iterable parameter consumes when specified **by keyword**.
+      If the parameter is specified **positionally**, :attr:`.Parameter.consume_multiple` is ignored.
 
-      If the parameter is specified **by keyword** and ``consume_multiple=True``, all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token (typically a keyword) is reached (unless :attr:`.Parameter.allow_leading_hyphen` is :obj:`True`, in which case it will also be consumed).
+      The following value types are supported:
+
+      * :obj:`False` (default) — only a single *element* worth of CLI tokens will be consumed per keyword occurrence.
+      * :obj:`True` — all remaining CLI tokens will be consumed until the stream is exhausted or an option-like token is reached. Providing the keyword with no values creates an empty container.
+      * :class:`int` — like :obj:`True`, but the integer specifies the **minimum** number of *elements* required. For example, ``consume_multiple=1`` requires at least one value (preventing empty lists), and ``consume_multiple=0`` is equivalent to :obj:`True`.
+      * :class:`~collections.abc.Sequence`\[:class:`int`\] — a ``(min, max)`` pair (e.g. a tuple or list of two ints). All remaining CLI tokens are consumed greedily, and a :class:`ConsumeMultipleError` is raised if the number of elements is outside the ``(min, max)`` bounds.
+
+      **Example: consume_multiple=True**
 
       .. code-block:: python
 
@@ -1343,7 +1438,64 @@ API
          $ my-program --name "my_file" --empty-ext
          # No output - ext is an empty list []
 
-      If the parameter is specified **by keyword** and ``consume_multiple=False`` (the default), only a single element worth of CLI tokens will be consumed.
+      **Example: consume_multiple=1 (require at least one value)**
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(
+             urls: Annotated[list[str] | None, Parameter(consume_multiple=1)] = None,
+         ):
+             print(urls)
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --urls http://a.com http://b.com
+         ['http://a.com', 'http://b.com']
+
+         $ my-program --urls
+         ╭─ Error ────────────────────────────────────────────╮
+         │ Parameter "--urls" requires an argument.            │
+         ╰────────────────────────────────────────────────────╯
+
+      **Example: consume_multiple=(1, 3) (min/max bounds)**
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(
+             files: Annotated[list[str], Parameter(consume_multiple=(1, 3))],
+         ):
+             print(f"Files: {files}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-program --files a.txt b.txt
+         Files: ['a.txt', 'b.txt']
+
+         $ my-program --files a.txt b.txt c.txt d.txt
+         ╭─ Error ─────────────────────────────────────────╮
+         │ Parameter "--files" accepts at most 3 elements. │
+         │ Got 4.                                          │
+         ╰─────────────────────────────────────────────────╯
+
+      In this example, ``--files`` raises a :class:`ConsumeMultipleError` if fewer than 1 or more than 3 values are provided.
+
+      **Example: consume_multiple=False (default)**
 
       .. code-block:: python
 
@@ -1427,6 +1579,43 @@ API
          Verbosity level: 3
 
       See :ref:`Coercion Rules` for more details.
+
+   .. attribute:: allow_repeating
+      :type: Optional[bool]
+      :value: None
+
+      Controls whether a keyword option can be specified multiple times on the CLI (e.g., ``--foo a --foo b``).
+
+      * :obj:`None` (default): iterable types accumulate values, scalar types raise :exc:`RepeatArgumentError`.
+      * :obj:`False`: always raise :exc:`RepeatArgumentError` on repeated options. Useful with :attr:`consume_multiple` to allow
+        ``--foo a b c`` but disallow ``--foo a --foo b``.
+      * :obj:`True`: always allow repeated options. Iterable types accumulate as usual. Scalar types
+        use "last wins" semantics (the last value specified is used).
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(
+             values: Annotated[list[str], Parameter(consume_multiple=True, allow_repeating=False)],
+         ):
+             print(values)
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --values a b c
+         ['a', 'b', 'c']
+
+         $ my-script --values a --values b
+         ╭─ Error ──────────────────────────────────────────────────╮
+         │ Parameter "--values" was specified multiple times.       │
+         ╰─────────────────────────────────────────────────────────╯
 
    .. attribute:: n_tokens
       :type: Optional[int]
@@ -2434,6 +2623,14 @@ Exceptions
    :members:
 
 .. autoexception:: cyclopts.MissingArgumentError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.ConsumeMultipleError
+   :show-inheritance:
+   :members:
+
+.. autoexception:: cyclopts.RequiresEqualsError
    :show-inheritance:
    :members:
 

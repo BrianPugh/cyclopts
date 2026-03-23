@@ -21,6 +21,7 @@ from typing import (
 
 from cyclopts._cache import cache
 from cyclopts.annotations import (
+    ITERABLE_TYPES,
     NoneType,
     is_annotated,
     is_enum_flag,
@@ -68,17 +69,6 @@ _abstract_to_concrete_type_mapping: dict[type, type] = {
     collections.abc.Mapping: dict,
     collections.abc.MutableMapping: dict,
 }
-
-ITERABLE_TYPES = {
-    Iterable,
-    typing.Sequence,
-    Sequence,
-    frozenset,
-    list,
-    set,
-    tuple,
-}
-
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 

@@ -48,8 +48,11 @@ The import path format is ``"module.path:function_name"``, similar to setuptools
 Lazy commands are resolved/imported in these situations:
 
 - **Command Execution** - When the user runs that specific command
-- **Help Generation** - When displaying help that includes the command
+- **Subcommand Help** - When displaying ``--help`` for the specific lazy command (e.g., ``myapp lazy-cmd --help``)
 - **Direct Access** - When accessing via ``app["command_name"]``
+
+Parent ``--help`` (e.g., ``myapp --help``) displays lazy commands using metadata provided at registration time
+(``help=``, ``group=``, ``show=``, ``sort_key=``) **without** resolving them.
 
 In order to benefit from lazy loading, you have to make sure that the files are not imported by other means when your CLI starts up.
 
@@ -156,10 +159,11 @@ To catch import errors early, you can access the command during testing:
 Groups and Lazy Loading
 -----------------------
 
-.. tip:: **TL;DR:** Define :class:`~cyclopts.Group` objects used by commands in your main CLI module, NOT in lazy-loaded modules.
+.. tip:: **TL;DR:** Pass ``group=`` at registration time, and define :class:`~cyclopts.Group` objects in your main CLI module, NOT in lazy-loaded modules.
 
-:class:`~cyclopts.Group` objects defined in **unresolved lazy modules** won't be available
-until those modules are **explicitly imported**. To avoid this, define :class:`~cyclopts.Group` objects in non-lazy modules.
+Lazy commands support ``group=`` at registration time, so they appear in the correct group in ``--help`` output without being resolved.
+However, :class:`~cyclopts.Group` objects defined **only inside** unresolved lazy modules won't be available until those modules are imported.
+To avoid this, define :class:`~cyclopts.Group` objects in non-lazy modules.
 
 .. code-block:: python
 

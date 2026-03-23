@@ -14,8 +14,10 @@ from cyclopts.exceptions import (
     ArgumentOrderError,
     CoercionError,
     CombinedShortOptionError,
+    ConsumeMultipleError,
     CycloptsError,
     MissingArgumentError,
+    RequiresEqualsError,
     UnknownOptionError,
     ValidationError,
 )
@@ -85,8 +87,26 @@ def _parse_kw_and_flags(
     *,
     end_of_options_delimiter: str = "--",
     stop_at_first_unknown: bool = False,
-):
+) -> tuple[list[str], int | None]:
+    """Extract keyword arguments and flags from the token stream.
+
+    Returns
+    -------
+    unused_tokens: list[str]
+        Tokens not consumed by any keyword or flag.
+    contiguous_positional_count: int | None
+        Number of leading contiguous non-option tokens before the first gap
+        caused by keyword extraction. ``None`` if all non-option tokens are
+        contiguous (i.e. no keywords were interleaved among positional tokens).
+
+        For example, given ``a b c --bar 8 --baz 10 d``, the unused tokens are
+        ``['a', 'b', 'c', 'd']`` with original indices ``[0, 1, 2, 6]``.
+        The gap between indices 2 and 6 yields ``contiguous_positional_count=3``.
+        This is used by ``_parse_pos`` to prevent positional-only list parameters
+        from consuming tokens that appeared after keyword arguments.
+    """
     unused_tokens, positional_only_tokens = [], []
+    unused_token_original_indices: list[int] = []
     skip_next_iterations = 0
     if end_of_options_delimiter:
         try:
@@ -106,8 +126,10 @@ def _parse_kw_and_flags(
             if stop_at_first_unknown:
                 # Stop parsing and return all remaining tokens as unused
                 unused_tokens.extend(tokens[i:])
+                unused_token_original_indices.extend(range(i, len(tokens)))
                 break
             unused_tokens.append(token)
+            unused_token_original_indices.append(i)
             continue
 
         cli_values: list[str] = []
@@ -173,8 +195,9 @@ def _parse_kw_and_flags(
                         # Unknown flag
                         if stop_at_first_unknown:
                             unused_tokens.extend(tokens[i:])
-                            return unused_tokens
+                            return unused_tokens, None
                         unused_tokens.append(test_flag)
+                        unused_token_original_indices.append(i)
                         position += 1
 
                 if not matches:
@@ -184,8 +207,9 @@ def _parse_kw_and_flags(
                 if stop_at_first_unknown:
                     # Unknown option, stop parsing and return all remaining tokens
                     unused_tokens.extend(tokens[i:])
-                    return unused_tokens
+                    return unused_tokens, None
                 unused_tokens.append(token)
+                unused_token_original_indices.append(i)
                 continue
         for match_index, match in enumerate(matches):
             # For GNU-style combined options, add the attached value only when processing
@@ -255,12 +279,23 @@ def _parse_kw_and_flags(
                     match.keys, upcoming_tokens=upcoming_tokens
                 )
 
+                if match.argument.parameter.requires_equals and match.matched_token.startswith("--") and not cli_values:
+                    raise RequiresEqualsError(
+                        argument=match.argument,
+                        keyword=match.matched_token,
+                    )
+
                 # Consume the appropriate number of tokens
                 consumed_tokens: list[Token] = []
                 pre_extracted_count = len(pre_extracted_values)
 
+                # cm_bounds is either None or (min, max) — guaranteed by _consume_multiple_converter
+                cm_bounds = match.argument.parameter.consume_multiple
+                assert cm_bounds is None or isinstance(cm_bounds, tuple)
+                cm_min, cm_max = cm_bounds if cm_bounds is not None else (0, None)
+
                 with suppress(IndexError):
-                    if consume_all and match.argument.parameter.consume_multiple:
+                    if consume_all and cm_bounds is not None:
                         # First, include the pre-extracted tokens
                         for j in range(pre_extracted_count):
                             consumed_tokens.append(upcoming_tokens[j])
@@ -305,7 +340,17 @@ def _parse_kw_and_flags(
 
                 if not consumed_tokens:
                     # No values were consumed after the keyword
-                    if consume_all and match.argument.parameter.consume_multiple:
+                    if consume_all and cm_bounds is not None:
+                        if cm_min > 0:
+                            # Minimum count not met — treat as missing argument
+                            raise ConsumeMultipleError(
+                                argument=match.argument,
+                                tokens_so_far=cli_values,
+                                keyword=match.matched_token,
+                                min_required=cm_min,
+                                max_allowed=cm_max,
+                                actual_count=0,
+                            )
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
                         empty_container = (get_origin(match.argument.resolved_hint) or match.argument.resolved_hint)()
                         match.argument.append(
@@ -322,12 +367,43 @@ def _parse_kw_and_flags(
                         argument=match.argument, tokens_so_far=cli_values, keyword=match.matched_token
                     )
                 else:
+                    # Check min/max count for consume_multiple
+                    if cm_bounds is not None:
+                        n_elements = len(cli_values) // max(1, tokens_per_element)
+                        if n_elements < cm_min:
+                            raise ConsumeMultipleError(
+                                argument=match.argument,
+                                tokens_so_far=cli_values,
+                                keyword=match.matched_token,
+                                min_required=cm_min,
+                                max_allowed=cm_max,
+                                actual_count=n_elements,
+                            )
+                        if cm_max is not None and n_elements > cm_max:
+                            raise ConsumeMultipleError(
+                                argument=match.argument,
+                                tokens_so_far=cli_values,
+                                keyword=match.matched_token,
+                                min_required=cm_min,
+                                max_allowed=cm_max,
+                                actual_count=n_elements,
+                            )
                     # Normal case: append the pre-created Token objects directly
                     for consumed_token in consumed_tokens:
                         match.argument.append(consumed_token)
 
+    # Compute the number of contiguous positional (non-option-like) unused tokens
+    # before the first gap caused by keyword extraction. This prevents positional-only
+    # list parameters from consuming tokens that appeared after keyword arguments.
+    # Only set when a gap is detected; None means no gap (all tokens are contiguous).
+    contiguous_positional_count: int | None = None
+    for j in range(1, len(unused_token_original_indices)):
+        if unused_token_original_indices[j] != unused_token_original_indices[j - 1] + 1:
+            contiguous_positional_count = j
+            break
+
     unused_tokens.extend(positional_only_tokens)
-    return unused_tokens
+    return unused_tokens, contiguous_positional_count
 
 
 def _future_positional_only_token_count(argument_collection: ArgumentCollection, starting_index: int) -> int:
@@ -359,7 +435,26 @@ def _parse_pos(
     tokens: list[str],
     *,
     end_of_options_delimiter: str = "--",
+    contiguous_positional_count: int | None = None,
 ) -> list[str]:
+    """Assign positional tokens to positional parameters.
+
+    Parameters
+    ----------
+    argument_collection: ArgumentCollection
+        Arguments whose keyword/flag tokens have already been consumed.
+    tokens: list[str]
+        Unused tokens from ``_parse_kw_and_flags``.
+    end_of_options_delimiter: str
+        Delimiter after which all tokens are forced positional.
+    contiguous_positional_count: int | None
+        If not ``None``, the number of leading contiguous positional tokens
+        that were adjacent in the original CLI input (before keyword extraction
+        created a gap). Used to cap how many tokens a ``POSITIONAL_ONLY``
+        list/iterable parameter may consume, preventing it from greedily
+        swallowing tokens that originally appeared after keyword arguments.
+        See ``_parse_kw_and_flags`` for how this value is computed.
+    """
     prior_positional_or_keyword_supplied_as_keyword_arguments = []
 
     if not tokens:
@@ -404,6 +499,13 @@ def _parse_pos(
 
             # Need to see how many tokens we need to leave for subsequent POSITIONAL_ONLY parameters.
             n_tokens_to_leave = _future_positional_only_token_count(argument_collection, i + 1)
+
+            # Cap at the contiguous positional count to prevent consuming tokens
+            # that appeared after keyword arguments (issue #763).
+            if contiguous_positional_count is not None:
+                n_tokens_to_leave = max(
+                    n_tokens_to_leave, len(tokens_and_force_positional) - contiguous_positional_count
+                )
         else:
             n_tokens_to_leave = 0
 
@@ -510,11 +612,14 @@ def create_bound_arguments(
     unused_tokens = tokens
 
     try:
-        unused_tokens = _parse_kw_and_flags(
+        unused_tokens, contiguous_positional_count = _parse_kw_and_flags(
             argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
         )
         unused_tokens = _parse_pos(
-            argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
+            argument_collection,
+            unused_tokens,
+            end_of_options_delimiter=end_of_options_delimiter,
+            contiguous_positional_count=contiguous_positional_count,
         )
 
         _parse_env(argument_collection)

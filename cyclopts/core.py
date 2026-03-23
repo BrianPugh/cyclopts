@@ -293,6 +293,7 @@ class App:
         default=None, kw_only=True
     )
     help_on_error: bool | None = field(default=None, kw_only=True)
+    help_prologue: str | None = field(default=None, kw_only=True)
     help_epilogue: str | None = field(default=None, kw_only=True)
 
     version_format: Literal["markdown", "md", "plaintext", "restructuredtext", "rst", "rich"] | None = field(
@@ -355,6 +356,8 @@ class App:
     help_formatter: Union[None, Literal["default", "plain"], "HelpFormatter"] = field(
         default=None, converter=help_formatter_converter, kw_only=True
     )
+
+    error_formatter: Callable[["CycloptsError"], Any] | None = field(default=None, kw_only=True)
 
     # This can ONLY ever be None or Tuple[ResultActionSingle, ...] due to converter.
     # The other types is to make type checkers happy for Cyclopts users.
@@ -1115,7 +1118,7 @@ class App:
 
                 # Try to consume tokens with this meta app's parameters
                 # stop_at_first_unknown=True ensures we only consume contiguous leading options
-                unused_tokens = _parse_kw_and_flags(
+                unused_tokens, _ = _parse_kw_and_flags(
                     argument_collection,
                     unused_tokens,
                     end_of_options_delimiter=end_of_options_delimiter,
@@ -1263,7 +1266,16 @@ class App:
 
             # Create CommandSpec with the resolved name (first name if multiple)
             # The name will be used when wrapping functions in an App
-            spec = CommandSpec(import_path=obj, name=name[0] if name else None, app_kwargs=kwargs)
+            # Pop CommandSpec-specific fields from kwargs before storing the rest as app_kwargs
+            spec = CommandSpec(
+                import_path=obj,
+                name=name[0] if name else None,
+                help=kwargs.pop("help", None),  # type: ignore[arg-type]
+                sort_key=kwargs.pop("sort_key", None),
+                group=kwargs.pop("group", None),  # type: ignore[arg-type]
+                show=kwargs.pop("show", None),  # type: ignore[arg-type]
+                app_kwargs=kwargs,
+            )
 
             # Register the CommandSpec
             for n in name + alias:
@@ -1625,6 +1637,7 @@ class App:
         help_on_error: bool | None = None,
         verbose: bool | None = None,
         end_of_options_delimiter: str | None = None,
+        error_formatter: Callable[["CycloptsError"], Any] | None = None,
     ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
@@ -1691,6 +1704,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "end_of_options_delimiter": end_of_options_delimiter,
+                "error_formatter": error_formatter,
             }.items()
             if v is not None
         }
@@ -1714,7 +1728,11 @@ class App:
                 if help_on_error if help_on_error is not None else False:
                     self.help_print(tokens, console=e.console)
                 if print_error if print_error is not None else True:
-                    e.console.print(CycloptsPanel(e))
+                    resolved_error_formatter = self.app_stack.resolve("error_formatter")
+                    if resolved_error_formatter is not None:
+                        e.console.print(resolved_error_formatter(e))
+                    else:
+                        e.console.print(CycloptsPanel(e))
                 if exit_on_error if exit_on_error is not None else True:
                     sys.exit(1)
                 raise
@@ -1740,6 +1758,7 @@ class App:
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
         result_action: ResultAction | None = None,
+        error_formatter: Callable[["CycloptsError"], Any] | None = None,
     ) -> Any:
         """Interprets and executes a command.
 
@@ -1802,6 +1821,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": result_action,
+                "error_formatter": error_formatter,
             }.items()
             if v is not None
         }
@@ -1839,6 +1859,7 @@ class App:
         end_of_options_delimiter: str | None = None,
         backend: Literal["asyncio", "trio"] | None = None,
         result_action: ResultAction | None = None,
+        error_formatter: Callable[["CycloptsError"], Any] | None = None,
     ) -> Any:
         """Async equivalent of :meth:`__call__` for use within existing event loops.
 
@@ -1929,6 +1950,7 @@ class App:
                 "verbose": verbose,
                 "backend": backend,
                 "result_action": result_action,
+                "error_formatter": error_formatter,
             }.items()
             if v is not None
         }
@@ -1998,6 +2020,14 @@ class App:
 
             # Prepare panels with their associated groups
             help_panels_with_groups = self._assemble_help_panels(tokens, help_format)
+
+            # Render prologue
+            if help_prologue := executing_app.app_stack.resolve("help_prologue"):
+                from cyclopts.help import InlineText
+
+                prologue = InlineText.from_format(help_prologue, format=help_format)
+                console.print(prologue)
+                console.print()  # Add blank line after prologue
 
             # Render usage
             default_formatter = executing_app.app_stack.resolve("help_formatter", fallback=DefaultFormatter())
@@ -2308,7 +2338,7 @@ class App:
             Shell type for completion. If not specified, attempts to auto-detect current shell.
         output : Path | None
             Output path for the completion script. If not specified, uses shell-specific default:
-            - zsh: ~/.zsh/completions/_<prog_name>
+            - zsh: ~/.zsh/completions/_<prog_name> (or $ZSH_CUSTOM/completions/_<prog_name> with oh-my-zsh)
             - bash: ~/.local/share/bash-completion/completions/<prog_name>
             - fish: ~/.config/fish/completions/<prog_name>.fish
         add_to_startup : bool

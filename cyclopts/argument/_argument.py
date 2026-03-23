@@ -13,13 +13,13 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from attrs import define, field
 
 from cyclopts._convert import (
-    ITERABLE_TYPES,
     _validate_json_extra_keys,
     convert,
     instantiate_from_dict,
     token_count,
 )
 from cyclopts.annotations import (
+    ITERABLE_TYPES,
     contains_hint,
     is_attrs,
     is_dataclass,
@@ -51,7 +51,7 @@ from cyclopts.field_info import (
 )
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, grouper, is_builtin
+from cyclopts.utils import UNSET, grouper, is_builtin, parse_version
 
 from .utils import (
     enum_flag_from_dict,
@@ -182,6 +182,13 @@ class Argument:
                     f"Parameter(count=True) requires an int type hint, got {self.hint}. "
                     f"Use 'Annotated[int, Parameter(count=True)]' for counting flags."
                 )
+
+        if self.parameter.requires_equals and self.parameter.consume_multiple:
+            raise ValueError(
+                "Parameter(requires_equals=True) and Parameter(consume_multiple=...) cannot be used together. "
+                "requires_equals enforces '--option=value' syntax, which is incompatible with "
+                "consume_multiple's space-separated value consumption."
+            )
 
         if not self.parse:
             # Validate that non-parsed parameters are keyword-only or have defaults
@@ -530,8 +537,14 @@ class Argument:
             raise ValueError
 
         if any(x.address == token.address for x in self.tokens):
+            if self.parameter.allow_repeating is False:
+                raise RepeatArgumentError(token=token)
             _, consume_all = self.token_count(token.keys)
-            if not consume_all and not self.parameter.count:
+            if self.parameter.allow_repeating is True:
+                if not consume_all:
+                    # "last wins" for scalar types — remove old tokens with same address
+                    self.tokens = [x for x in self.tokens if x.address != token.address]
+            elif not consume_all and not self.parameter.count:
                 raise RepeatArgumentError(token=token)
 
         if self.tokens:
@@ -793,10 +806,12 @@ class Argument:
         """
         assert isinstance(self.parameter.validator, tuple)
 
+        # Only use pydantic validation if pydantic v2+ is available.
+        # Pydantic v1 has an incompatible API (e.g. no TypeAdapter).
         if "pydantic" in sys.modules:
             import pydantic
 
-            pydantic_version = tuple(int(x) for x in pydantic.__version__.split("."))
+            pydantic_version = parse_version(pydantic.__version__)
             if pydantic_version < (2,):
                 pydantic = None
         else:
