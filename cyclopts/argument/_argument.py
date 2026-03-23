@@ -52,7 +52,7 @@ from cyclopts.field_info import (
 )
 from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, Parameter
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, grouper, is_builtin
+from cyclopts.utils import UNSET, grouper, is_builtin, parse_version
 
 from .utils import (
     enum_flag_from_dict,
@@ -786,10 +786,12 @@ class Argument:
         """
         assert isinstance(self.parameter.validator, tuple)
 
+        # Only use pydantic validation if pydantic v2+ is available.
+        # Pydantic v1 has an incompatible API (e.g. no TypeAdapter).
         if "pydantic" in sys.modules:
             import pydantic
 
-            pydantic_version = tuple(int(x) for x in pydantic.__version__.split("."))
+            pydantic_version = parse_version(pydantic.__version__)
             if pydantic_version < (2,):
                 pydantic = None
         else:
