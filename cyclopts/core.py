@@ -29,7 +29,13 @@ from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
-from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens, segment_tokens_by_command
+from cyclopts.bind import (
+    create_bound_arguments,
+    is_option_like,
+    normalize_tokens,
+    partition_tokens,
+    segment_tokens_by_command,
+)
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
 from cyclopts.exceptions import (
@@ -1625,21 +1631,17 @@ class App:
                         #    the meta app itself, not a resolved subcommand)
                         # 3. The full parse (with parent meta) finds subcommands
                         #    that the meta app will forward tokens to
-                        # TODO: Once bubble-up is implemented (Phase 3c), change to:
-                        #   flag_scope = self.app_stack.resolve("flag_scope", fallback="bubble-up")
-                        # At that point flag_scope is always a string and the
-                        # ``is not None`` checks below become unnecessary.
-                        flag_scope = self.app_stack.resolve("flag_scope")
+                        flag_scope = self.app_stack.resolve("flag_scope", fallback="bubble-up")
                         full_command_indices: list[int] = []
-                        if flag_scope is not None and not command_chain:
-                            _, _, _, full_command_indices = self._parse_commands(tokens, include_parent_meta=True)
+                        full_apps: tuple[App, ...] | None = None
+                        if not command_chain:
+                            _, full_apps, _, full_command_indices = self._parse_commands(
+                                tokens, include_parent_meta=True
+                            )
 
-                        if flag_scope is not None and full_command_indices:
+                        if full_command_indices and full_apps is not None:
                             # Split tokens into per-command-level segments.
                             segments = segment_tokens_by_command(tokens, full_command_indices)
-                            # segments[0] = tokens before the first command (meta-level flags)
-                            # Remaining segments = command name + tokens for child commands
-                            meta_kw_tokens = segments[0]
 
                             # Reconstruct the positional tokens for the meta app's *tokens:
                             # command name(s) + all post-command tokens.
@@ -1647,6 +1649,39 @@ class App:
                             for i, cmd_idx in enumerate(full_command_indices):
                                 positional_tokens.append(tokens[cmd_idx])  # command name
                                 positional_tokens.extend(segments[i + 1])  # tokens after this command
+
+                            # Partition pre-command tokens: tokens matching the current
+                            # level's argument collection go to meta_kw_tokens; the rest
+                            # are prepended to positional_tokens (for nested meta scenarios
+                            # where pre-command tokens belong to an intermediate meta level).
+                            meta_kw_tokens, pre_command_passthrough = partition_tokens(argument_collection, segments[0])
+                            positional_tokens = pre_command_passthrough + positional_tokens
+
+                            # Bubble-up: scan post-command tokens for flags that match the
+                            # meta's argument collection but NOT the child's. Move them from
+                            # positional_tokens to meta_kw_tokens so the meta binds them.
+                            if flag_scope == "bubble-up":
+                                child_app = full_apps[-1]
+                                try:
+                                    child_argument_collection = (
+                                        child_app.assemble_argument_collection()
+                                        if child_app.default_command
+                                        else ArgumentCollection()
+                                    )
+                                except Exception:
+                                    # If we can't resolve the child's argument collection
+                                    # (e.g., internal help/version handlers), treat it as
+                                    # having no arguments — all flags bubble up.
+                                    child_argument_collection = ArgumentCollection()
+
+                                bubbled, positional_tokens = partition_tokens(
+                                    argument_collection, positional_tokens, exclude=child_argument_collection
+                                )
+                                meta_kw_tokens.extend(bubbled)
+                            elif flag_scope == "strict":
+                                pass  # No bubble-up; post-command flags stay with the child.
+                            else:
+                                raise NotImplementedError(f"Unknown flag_scope: {flag_scope!r}")
 
                             bound, unused_tokens = create_bound_arguments(
                                 command_app.default_command,

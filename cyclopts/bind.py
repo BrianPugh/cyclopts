@@ -97,6 +97,73 @@ def segment_tokens_by_command(
     return segments
 
 
+def partition_tokens(
+    argument_collection: ArgumentCollection,
+    tokens: list[str],
+    *,
+    exclude: "ArgumentCollection | None" = None,
+) -> tuple[list[str], list[str]]:
+    """Partition tokens into those matching an argument collection and those that don't.
+
+    Delegates to :func:`_parse_kw_and_flags` on a throwaway copy of the
+    argument collection, so all matching edge cases (combined short flags,
+    GNU-style attached values, ``=`` splitting, etc.) are handled correctly
+    without duplicating logic.
+
+    Parameters
+    ----------
+    argument_collection: ArgumentCollection
+        The argument collection to match against.
+    tokens: list[str]
+        Token list to partition.
+    exclude: ArgumentCollection | None
+        If provided, tokens matching this collection take priority and
+        are placed into ``unmatched`` even if they also match
+        ``argument_collection``. Used for child-wins semantics.
+
+    Returns
+    -------
+    matched: list[str]
+        Tokens (and their values) that match ``argument_collection``.
+    unmatched: list[str]
+        Everything else, in original order.
+    """
+    if exclude is not None:
+        # First pass: remove tokens the exclude collection would claim
+        # (child-wins semantics). Only the remainder is eligible for matching.
+        exclude_copy = exclude.copy(reset_tokens=True)
+        tokens_for_parent, _ = _parse_kw_and_flags(exclude_copy, tokens)
+    else:
+        tokens_for_parent = list(tokens)
+
+    # Second pass: match remaining tokens against the target collection.
+    parent_copy = argument_collection.copy(reset_tokens=True)
+    parent_unmatched, _ = _parse_kw_and_flags(parent_copy, tokens_for_parent)
+
+    # Build matched from the difference: tokens_for_parent minus parent_unmatched.
+    # Use sequential scanning to handle duplicate token values correctly.
+    parent_unmatched_indices: set[int] = set()
+    for tok in parent_unmatched:
+        for k in range(len(tokens_for_parent)):
+            if k not in parent_unmatched_indices and tokens_for_parent[k] == tok:
+                parent_unmatched_indices.add(k)
+                break
+
+    matched = [t for k, t in enumerate(tokens_for_parent) if k not in parent_unmatched_indices]
+
+    # Unmatched = original tokens minus matched, preserving original order.
+    matched_indices: set[int] = set()
+    for tok in matched:
+        for k in range(len(tokens)):
+            if k not in matched_indices and tokens[k] == tok:
+                matched_indices.add(k)
+                break
+
+    unmatched = [t for k, t in enumerate(tokens) if k not in matched_indices]
+
+    return matched, unmatched
+
+
 def _common_root_keys(argument_collection) -> tuple[str, ...]:
     if not argument_collection:
         return ()
