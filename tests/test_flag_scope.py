@@ -254,6 +254,66 @@ class TestTokensReassembly:
         assert captured_tokens == ["foo", "-v"]
 
 
+class TestErrorMessages:
+    """Tests for scope-aware error messages."""
+
+    def test_strict_parent_match_suggests_placement(self):
+        """In strict mode, if a parent defines the unknown flag, suggest placing it before the command."""
+        app = App(flag_scope="strict")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.command
+        def foo():
+            pass
+
+        with pytest.raises(UnknownOptionError, match='belongs to a parent command; place it before "foo"'):
+            app.meta(["foo", "--verbose"], exit_on_error=False)
+
+    def test_strict_no_parent_match_normal_error(self):
+        """In strict mode, if no parent defines the flag, show normal error."""
+        app = App(flag_scope="strict")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.command
+        def foo():
+            pass
+
+        with pytest.raises(UnknownOptionError, match='Unknown option: "--unknown"'):
+            app.meta(["foo", "--unknown"], exit_on_error=False)
+
+    def test_bubble_up_no_scope_error(self):
+        """In bubble-up mode, parent flags after command don't error."""
+        app = App(flag_scope="bubble-up", result_action="return_value")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            result = app(tokens)
+            return {"verbose": verbose, **result}
+
+        @app.command
+        def foo():
+            return {}
+
+        # Should NOT raise — --verbose bubbles up
+        result = app.meta(["foo", "--verbose"])
+        assert result == {"verbose": True}
+
+
 class TestBubbleUpScope:
     """Tests for flag_scope='bubble-up'."""
 

@@ -1726,12 +1726,28 @@ class App:
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
                 if raise_on_unused_tokens and unused_tokens:
+                    # Build parent argument collection for scope-aware error hints.
+                    # Walk the full meta chain for each app in the stack.
+                    parent_ac: ArgumentCollection | None = None
+                    if self.app_stack.resolve("flag_scope") == "strict":
+                        parent_ac = ArgumentCollection()
+                        for stack_apps in self.app_stack.stack:
+                            for stack_app in stack_apps:
+                                meta = stack_app._meta
+                                while meta and meta.default_command:
+                                    try:
+                                        parent_ac.extend(meta.assemble_argument_collection())
+                                    except Exception:
+                                        pass
+                                    meta = meta._meta
+
                     for token in unused_tokens:
                         if is_option_like(token):
                             token = token.split("=")[0]
                             raise UnknownOptionError(
                                 token=Token(keyword=token, source="cli"),
                                 argument_collection=argument_collection,
+                                parent_argument_collection=parent_ac,
                             )
                     raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
             except CycloptsError as e:

@@ -188,6 +188,9 @@ class UnknownOptionError(CycloptsError):
     argument_collection: "ArgumentCollection"
     """Argument collection of plausible options."""
 
+    parent_argument_collection: Optional["ArgumentCollection"] = None
+    """Argument collection from a parent/meta app, used for scope-aware suggestions."""
+
     def __str__(self):
         value = self.token.keyword or self.token.value
         if self.token.source == "cli":
@@ -196,6 +199,19 @@ class UnknownOptionError(CycloptsError):
             response = f'Unknown option: "{value}" from "{self.token.source}".'
 
         if keyword := self.token.keyword or self.token.value:
+            # Check if a parent scope defines this option (for strict mode hints).
+            if self.parent_argument_collection is not None:
+                try:
+                    self.parent_argument_collection.match(keyword)
+                    if self.command_chain:
+                        subcommand = " ".join(self.command_chain)
+                        response += f' This option belongs to a parent command; place it before "{subcommand}".'
+                    else:
+                        response += " This option belongs to a parent command; place it before the subcommand."
+                    return super().__str__() + response
+                except ValueError:
+                    pass
+
             import difflib
 
             candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x.parse))
