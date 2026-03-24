@@ -272,7 +272,7 @@ class TestErrorMessages:
         def foo():
             pass
 
-        with pytest.raises(UnknownOptionError, match='belongs to a parent command; place it before "foo"'):
+        with pytest.raises(UnknownOptionError, match="Did you mean to place it directly after"):
             app.meta(["foo", "--verbose"], exit_on_error=False)
 
     def test_strict_no_parent_match_normal_error(self):

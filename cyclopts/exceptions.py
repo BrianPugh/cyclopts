@@ -188,8 +188,8 @@ class UnknownOptionError(CycloptsError):
     argument_collection: "ArgumentCollection"
     """Argument collection of plausible options."""
 
-    parent_argument_collection: Optional["ArgumentCollection"] = None
-    """Argument collection from a parent/meta app, used for scope-aware suggestions."""
+    parent_apps_with_collections: list[tuple[str, "ArgumentCollection"]] | None = None
+    """List of ``(app_name, argument_collection)`` from parent/meta apps, for scope-aware suggestions."""
 
     def __str__(self):
         value = self.token.keyword or self.token.value
@@ -200,17 +200,17 @@ class UnknownOptionError(CycloptsError):
 
         if keyword := self.token.keyword or self.token.value:
             # Check if a parent scope defines this option (for strict mode hints).
-            if self.parent_argument_collection is not None:
-                try:
-                    self.parent_argument_collection.match(keyword)
-                    if self.command_chain:
-                        subcommand = " ".join(self.command_chain)
-                        response += f' This option belongs to a parent command; place it before "{subcommand}".'
-                    else:
-                        response += " This option belongs to a parent command; place it before the subcommand."
-                    return super().__str__() + response
-                except ValueError:
-                    pass
+            if self.parent_apps_with_collections is not None:
+                for parent_name, parent_ac in self.parent_apps_with_collections:
+                    try:
+                        parent_ac.match(keyword)
+                        if not self.command_chain:
+                            response += " Did you mean to place it before the subcommand?"
+                        else:
+                            response += f' Did you mean to place it directly after "{parent_name}"?'
+                        return super().__str__() + response
+                    except ValueError:
+                        continue
 
             import difflib
 

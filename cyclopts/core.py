@@ -229,6 +229,29 @@ def _walk_metas(app: "App"):
     yield from reversed(meta_list)
 
 
+def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, ArgumentCollection]] | None:
+    """Build parent (app_name, argument_collection) pairs for scope-aware error hints.
+
+    Returns ``None`` if ``flag_scope`` is not ``"strict"``.
+    Walks the full meta chain for each app in the stack.
+    """
+    if app_stack.resolve("flag_scope") != "strict":
+        return None
+    parent_info: list[tuple[str, ArgumentCollection]] = []
+    for stack_apps in app_stack.stack:
+        for stack_app in stack_apps:
+            meta = stack_app._meta
+            while meta and meta.default_command:
+                parent = meta._meta_parent
+                parent_name = parent.name[0] if parent else ""
+                try:
+                    parent_info.append((parent_name, meta.assemble_argument_collection()))
+                except Exception:
+                    pass
+                meta = meta._meta
+    return parent_info or None
+
+
 def _group_converter(input_value: None | str | Group) -> Group | None:
     if input_value is None:
         return None
@@ -1726,20 +1749,7 @@ class App:
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
                 if raise_on_unused_tokens and unused_tokens:
-                    # Build parent argument collection for scope-aware error hints.
-                    # Walk the full meta chain for each app in the stack.
-                    parent_ac: ArgumentCollection | None = None
-                    if self.app_stack.resolve("flag_scope") == "strict":
-                        parent_ac = ArgumentCollection()
-                        for stack_apps in self.app_stack.stack:
-                            for stack_app in stack_apps:
-                                meta = stack_app._meta
-                                while meta and meta.default_command:
-                                    try:
-                                        parent_ac.extend(meta.assemble_argument_collection())
-                                    except Exception:
-                                        pass
-                                    meta = meta._meta
+                    strict_parent_info = _build_strict_parent_info(self.app_stack)
 
                     for token in unused_tokens:
                         if is_option_like(token):
@@ -1747,7 +1757,7 @@ class App:
                             raise UnknownOptionError(
                                 token=Token(keyword=token, source="cli"),
                                 argument_collection=argument_collection,
-                                parent_argument_collection=parent_ac,
+                                parent_apps_with_collections=strict_parent_info,
                             )
                     raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
             except CycloptsError as e:
@@ -1757,6 +1767,10 @@ class App:
                     e.command_chain = command_chain
                 if e.console is None:
                     e.console = command_app.error_console
+                # Add parent scope info to UnknownOptionError for
+                # helpful "did you mean to place it after ..." hints.
+                if isinstance(e, UnknownOptionError) and e.parent_apps_with_collections is None:
+                    e.parent_apps_with_collections = _build_strict_parent_info(self.app_stack)
                 raise
             finally:
                 _convert.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
