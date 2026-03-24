@@ -2260,6 +2260,11 @@ class App:
         # Use get_resolution_context to get all apps that contribute parameters
         apps_for_params = self._get_resolution_context(execution_path)
 
+        # In strict mode, exclude parent meta apps from the parameter list
+        # since their flags are not valid at the child command level.
+        if command_app.app_stack.resolve("flag_scope") == "strict":
+            apps_for_params = [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
+
         for subapp in apps_for_params:
             if not subapp.default_command:
                 continue

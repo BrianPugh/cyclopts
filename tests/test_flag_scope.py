@@ -480,3 +480,76 @@ class TestBubbleUpScope:
 
         result = app.meta(["foo", "--user=alice", "--debug"])
         assert result == {"user": "alice", "debug": True}
+
+
+class TestHelpDisplay:
+    """Tests that help pages respect flag scoping."""
+
+    def _get_help_text(self, app, tokens):
+        from io import StringIO
+
+        from rich.console import Console
+
+        buf = StringIO()
+        console = Console(file=buf, width=80, force_terminal=False)
+        try:
+            app.meta(tokens, console=console, exit_on_error=False)
+        except SystemExit:
+            pass
+        return buf.getvalue()
+
+    def test_bubble_up_shows_parent_flags(self):
+        """In bubble-up mode, subcommand help shows parent meta flags."""
+        app = App(flag_scope="bubble-up")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.command
+        def foo(*, debug: bool = False):
+            pass
+
+        help_text = self._get_help_text(app, ["foo", "--help"])
+        assert "--verbose" in help_text
+        assert "--debug" in help_text
+
+    def test_strict_hides_parent_flags(self):
+        """In strict mode, subcommand help does NOT show parent meta flags."""
+        app = App(flag_scope="strict")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.command
+        def foo(*, debug: bool = False):
+            pass
+
+        help_text = self._get_help_text(app, ["foo", "--help"])
+        assert "--verbose" not in help_text
+        assert "--debug" in help_text
+
+    def test_strict_root_still_shows_own_flags(self):
+        """In strict mode, root help still shows its own flags."""
+        app = App(flag_scope="strict")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.command
+        def foo(*, debug: bool = False):
+            pass
+
+        help_text = self._get_help_text(app, ["--help"])
+        assert "--verbose" in help_text
