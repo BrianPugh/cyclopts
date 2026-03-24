@@ -186,6 +186,74 @@ class TestStrictScope:
         assert result == {"verbose": False, "version": True}
 
 
+class TestTokensReassembly:
+    """Tests that the meta app's *tokens receives the correct subset."""
+
+    def test_tokens_exclude_meta_flags_strict(self):
+        """In strict mode, *tokens should not contain meta-level flags."""
+        app = App(flag_scope="strict", result_action="return_value")
+        captured_tokens = []
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+            user: str = "default",
+        ):
+            captured_tokens.extend(tokens)
+            return app(tokens)
+
+        @app.command
+        def foo(name: str, *, debug: bool = False):
+            return {"name": name, "debug": debug}
+
+        app.meta(["--verbose", "--user", "alice", "foo", "--debug", "myname"])
+        assert captured_tokens == ["foo", "--debug", "myname"]
+
+    def test_tokens_exclude_bubbled_flags(self):
+        """In bubble-up mode, *tokens should not contain bubbled-up flags."""
+        app = App(flag_scope="bubble-up", result_action="return_value")
+        captured_tokens = []
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+            user: str = "default",
+        ):
+            captured_tokens.extend(tokens)
+            return app(tokens)
+
+        @app.command
+        def foo(name: str, *, debug: bool = False):
+            return {"name": name, "debug": debug}
+
+        # --verbose before foo → meta flag, --user after foo → bubbles up
+        app.meta(["--verbose", "foo", "--debug", "--user", "alice", "myname"])
+        assert captured_tokens == ["foo", "--debug", "myname"]
+
+    def test_tokens_preserve_child_flags(self):
+        """Child flags remain in *tokens even when meta defines the same flag."""
+        app = App(flag_scope="bubble-up", result_action="return_value")
+        captured_tokens = []
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(alias="-v")] = False,
+        ):
+            captured_tokens.extend(tokens)
+            return app(tokens)
+
+        @app.command
+        def foo(*, version: Annotated[bool, Parameter(alias="-v")] = False):
+            return {"version": version}
+
+        app.meta(["-v", "foo", "-v"])
+        # First -v → meta (pre-command), second -v → child (child wins)
+        assert captured_tokens == ["foo", "-v"]
+
+
 class TestBubbleUpScope:
     """Tests for flag_scope='bubble-up'."""
 
