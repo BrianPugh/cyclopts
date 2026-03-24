@@ -155,8 +155,8 @@ def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
         app._group_arguments = copy(parent_app._group_arguments)
     if app.version is None and parent_app.version is not None:
         app.version = parent_app.version
-    if app.flag_scope is None and parent_app.flag_scope is not None:
-        app.flag_scope = parent_app.flag_scope
+    if app.parse_mode is None and parent_app.parse_mode is not None:
+        app.parse_mode = parent_app.parse_mode
 
 
 def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") -> None:
@@ -232,10 +232,10 @@ def _walk_metas(app: "App"):
 def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, ArgumentCollection]] | None:
     """Build parent (app_name, argument_collection) pairs for scope-aware error hints.
 
-    Returns ``None`` if ``flag_scope`` is not ``"strict"``.
+    Returns ``None`` if ``parse_mode`` is not ``"strict"``.
     Walks the full meta chain for each app in the stack.
     """
-    if app_stack.resolve("flag_scope") != "strict":
+    if app_stack.resolve("parse_mode") != "strict":
         return None
     parent_info: list[tuple[str, ArgumentCollection]] = []
     for stack_apps in app_stack.stack:
@@ -374,7 +374,7 @@ class App:
 
     end_of_options_delimiter: str | None = field(default=None, kw_only=True)
 
-    flag_scope: Literal["bubble-up", "strict"] | None = field(default=None, kw_only=True)
+    parse_mode: Literal["fallthrough", "strict"] | None = field(default=None, kw_only=True)
 
     print_error: bool | None = field(default=None, kw_only=True)
 
@@ -1649,12 +1649,12 @@ class App:
 
                         # Determine if flag scoping should be applied.
                         # Scoping is active when:
-                        # 1. flag_scope is set
+                        # 1. parse_mode is set
                         # 2. The flat parse found no commands (command_app is
                         #    the meta app itself, not a resolved subcommand)
                         # 3. The full parse (with parent meta) finds subcommands
                         #    that the meta app will forward tokens to
-                        flag_scope = self.app_stack.resolve("flag_scope", fallback="bubble-up")
+                        parse_mode = self.app_stack.resolve("parse_mode", fallback="fallthrough")
                         full_command_indices: list[int] = []
                         full_apps: tuple[App, ...] | None = None
                         if not command_chain:
@@ -1683,7 +1683,7 @@ class App:
                             # Bubble-up: scan post-command tokens for flags that match the
                             # meta's argument collection but NOT the child's. Move them from
                             # positional_tokens to meta_kw_tokens so the meta binds them.
-                            if flag_scope == "bubble-up":
+                            if parse_mode == "fallthrough":
                                 child_app = full_apps[-1]
                                 try:
                                     child_argument_collection = (
@@ -1694,17 +1694,17 @@ class App:
                                 except Exception:
                                     # If we can't resolve the child's argument collection
                                     # (e.g., internal help/version handlers), treat it as
-                                    # having no arguments — all flags bubble up.
+                                    # having no arguments — all flags fall through.
                                     child_argument_collection = ArgumentCollection()
 
                                 bubbled, positional_tokens = partition_tokens(
                                     argument_collection, positional_tokens, exclude=child_argument_collection
                                 )
                                 meta_kw_tokens.extend(bubbled)
-                            elif flag_scope == "strict":
-                                pass  # No bubble-up; post-command flags stay with the child.
+                            elif parse_mode == "strict":
+                                pass  # No fallthrough; post-command flags stay with the child.
                             else:
-                                raise NotImplementedError(f"Unknown flag_scope: {flag_scope!r}")
+                                raise NotImplementedError(f"Unknown parse_mode: {parse_mode!r}")
 
                             bound, unused_tokens = create_bound_arguments(
                                 command_app.default_command,
@@ -2262,7 +2262,7 @@ class App:
 
         # In strict mode, exclude parent meta apps from the parameter list
         # since their flags are not valid at the child command level.
-        if command_app.app_stack.resolve("flag_scope") == "strict":
+        if command_app.app_stack.resolve("parse_mode") == "strict":
             apps_for_params = [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
 
         for subapp in apps_for_params:

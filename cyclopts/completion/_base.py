@@ -72,7 +72,7 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
         # In strict mode, exclude parent meta apps since their flags
         # are not valid at the child command level.
         with app.app_stack(execution_path):
-            if command_app.app_stack.resolve("flag_scope") == "strict":
+            if command_app.app_stack.resolve("parse_mode") == "strict":
                 apps_for_params = [
                     a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app
                 ]
