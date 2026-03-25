@@ -557,6 +557,24 @@ API
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to POSIX-standard ``"--"``.
       Set to an empty string to disable.
 
+   .. attribute:: parse_mode
+      :type: Optional[Literal["fallthrough", "strict"]]
+      :value: None
+
+      Controls how parameters are scoped across command levels in :ref:`Meta App` patterns.
+      If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to ``"fallthrough"``.
+
+      - ``"fallthrough"``: Unmatched parameters fall through to parent levels. When both a parent and child define the same flag, the child wins.
+      - ``"strict"``: Parameters only bind to the command level where they appear. A parent-level parameter placed after a subcommand is rejected with a helpful error message.
+
+      See :ref:`Parse Mode` for detailed documentation and examples.
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App(parse_mode="strict")
+
    .. attribute:: suppress_keyboard_interrupt
       :type: bool
       :value: True
