@@ -246,7 +246,7 @@ def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, Argument
                 parent_name = parent.name[0] if parent else ""
                 try:
                     parent_info.append((parent_name, meta.assemble_argument_collection()))
-                except Exception:
+                except (NameError, TypeError, ValueError):
                     pass
                 meta = meta._meta
     return parent_info or None
@@ -1691,10 +1691,11 @@ class App:
                                         if child_app.default_command
                                         else ArgumentCollection()
                                     )
-                                except Exception:
+                                except (NameError, TypeError, ValueError):
                                     # If we can't resolve the child's argument collection
-                                    # (e.g., internal help/version handlers), treat it as
-                                    # having no arguments — all flags fall through.
+                                    # (e.g., internal help/version handlers with unresolvable
+                                    # type hints), treat it as having no arguments — all
+                                    # flags fall through.
                                     child_argument_collection = ArgumentCollection()
 
                                 bubbled, positional_tokens = partition_tokens(
