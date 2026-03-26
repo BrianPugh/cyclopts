@@ -63,6 +63,107 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     return tokens
 
 
+def segment_tokens_by_command(
+    tokens: list[str],
+    command_indices: list[int],
+) -> list[list[str]]:
+    """Split tokens into segments, one per command level.
+
+    Segments are delimited by command tokens. Command tokens themselves
+    are excluded from the segments.
+
+    Parameters
+    ----------
+    tokens: list[str]
+        The full normalized token list.
+    command_indices: list[int]
+        Indices in ``tokens`` where command names were found.
+        Returned by :meth:`App._parse_commands`.
+
+    Returns
+    -------
+    list[list[str]]
+        ``segments[0]`` contains tokens before the first command,
+        ``segments[i]`` contains tokens after the i-th command but
+        before the (i+1)-th command. There are always
+        ``len(command_indices) + 1`` segments.
+    """
+    segments: list[list[str]] = []
+    prev = 0
+    for idx in command_indices:
+        segments.append(tokens[prev:idx])
+        prev = idx + 1  # skip the command token itself
+    segments.append(tokens[prev:])
+    return segments
+
+
+def partition_tokens(
+    argument_collection: ArgumentCollection,
+    tokens: list[str],
+    *,
+    exclude: "ArgumentCollection | None" = None,
+) -> tuple[list[str], list[str]]:
+    """Partition tokens into those matching an argument collection and those that don't.
+
+    Delegates to :func:`_parse_kw_and_flags` on a throwaway copy of the
+    argument collection, so all matching edge cases (combined short flags,
+    GNU-style attached values, ``=`` splitting, etc.) are handled correctly
+    without duplicating logic.
+
+    Parameters
+    ----------
+    argument_collection: ArgumentCollection
+        The argument collection to match against.
+    tokens: list[str]
+        Token list to partition.
+    exclude: ArgumentCollection | None
+        If provided, tokens matching this collection take priority and
+        are placed into ``unmatched`` even if they also match
+        ``argument_collection``. Used for child-wins semantics.
+
+    Returns
+    -------
+    matched: list[str]
+        Tokens (and their values) that match ``argument_collection``.
+    unmatched: list[str]
+        Everything else, in original order.
+    """
+    if exclude is not None:
+        # First pass: remove tokens the exclude collection would claim
+        # (child-wins semantics). Only the remainder is eligible for matching.
+        exclude_copy = exclude.copy(reset_tokens=True)
+        tokens_for_parent, _ = _parse_kw_and_flags(exclude_copy, tokens)
+    else:
+        tokens_for_parent = list(tokens)
+
+    # Second pass: match remaining tokens against the target collection.
+    parent_copy = argument_collection.copy(reset_tokens=True)
+    parent_unmatched, _ = _parse_kw_and_flags(parent_copy, tokens_for_parent)
+
+    # Build matched from the difference: tokens_for_parent minus parent_unmatched.
+    # Use sequential scanning to handle duplicate token values correctly.
+    parent_unmatched_indices: set[int] = set()
+    for tok in parent_unmatched:
+        for k in range(len(tokens_for_parent)):
+            if k not in parent_unmatched_indices and tokens_for_parent[k] == tok:
+                parent_unmatched_indices.add(k)
+                break
+
+    matched = [t for k, t in enumerate(tokens_for_parent) if k not in parent_unmatched_indices]
+
+    # Unmatched = original tokens minus matched, preserving original order.
+    matched_indices: set[int] = set()
+    for tok in matched:
+        for k in range(len(tokens)):
+            if k not in matched_indices and tokens[k] == tok:
+                matched_indices.add(k)
+                break
+
+    unmatched = [t for k, t in enumerate(tokens) if k not in matched_indices]
+
+    return matched, unmatched
+
+
 def _common_root_keys(argument_collection) -> tuple[str, ...]:
     if not argument_collection:
         return ()
@@ -587,6 +688,7 @@ def create_bound_arguments(
     configs: Iterable[Callable],
     *,
     end_of_options_delimiter: str = "--",
+    positional_tokens: list[str] | None = None,
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -597,9 +699,15 @@ def create_bound_arguments(
     argument_collection: ArgumentCollection
     tokens: list[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
+        If ``positional_tokens`` is provided, only used for keyword/flag parsing.
     configs: Iterable[Callable]
     end_of_options_delimiter: str
         Everything after this special token is forced to be supplied as a positional argument.
+    positional_tokens: list[str] | None
+        If provided, these tokens are used for positional argument parsing
+        instead of the leftover tokens from keyword/flag parsing. This is
+        used by flag scoping to separate which tokens are eligible for
+        keyword/flag matching vs positional assignment.
 
     Returns
     -------
@@ -615,6 +723,9 @@ def create_bound_arguments(
         unused_tokens, contiguous_positional_count = _parse_kw_and_flags(
             argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
         )
+        if positional_tokens is not None:
+            unused_tokens = positional_tokens
+            contiguous_positional_count = None
         unused_tokens = _parse_pos(
             argument_collection,
             unused_tokens,

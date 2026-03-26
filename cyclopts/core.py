@@ -29,7 +29,13 @@ from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
-from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
+from cyclopts.bind import (
+    create_bound_arguments,
+    is_option_like,
+    normalize_tokens,
+    partition_tokens,
+    segment_tokens_by_command,
+)
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
 from cyclopts.exceptions import (
@@ -149,6 +155,8 @@ def _apply_parent_defaults_to_app(app: "App", parent_app: "App") -> None:
         app._group_arguments = copy(parent_app._group_arguments)
     if app.version is None and parent_app.version is not None:
         app.version = parent_app.version
+    if app.parse_mode is None and parent_app.parse_mode is not None:
+        app.parse_mode = parent_app.parse_mode
 
 
 def _apply_parent_groups_to_kwargs(kwargs: dict[str, Any], parent_app: "App") -> None:
@@ -219,6 +227,29 @@ def _walk_metas(app: "App"):
     while (meta := meta._meta) and meta.default_command:
         meta_list.append(meta)
     yield from reversed(meta_list)
+
+
+def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, ArgumentCollection]] | None:
+    """Build parent (app_name, argument_collection) pairs for scope-aware error hints.
+
+    Returns ``None`` if ``parse_mode`` is not ``"strict"``.
+    Walks the full meta chain for each app in the stack.
+    """
+    if app_stack.resolve("parse_mode") != "strict":
+        return None
+    parent_info: list[tuple[str, ArgumentCollection]] = []
+    for stack_apps in app_stack.stack:
+        for stack_app in stack_apps:
+            meta = stack_app._meta
+            while meta and meta.default_command:
+                parent = meta._meta_parent
+                parent_name = parent.name[0] if parent else ""
+                try:
+                    parent_info.append((parent_name, meta.assemble_argument_collection()))
+                except (NameError, TypeError, ValueError):
+                    pass
+                meta = meta._meta
+    return parent_info or None
 
 
 def _group_converter(input_value: None | str | Group) -> Group | None:
@@ -342,6 +373,8 @@ class App:
     )
 
     end_of_options_delimiter: str | None = field(default=None, kw_only=True)
+
+    parse_mode: Literal["fallthrough", "strict"] | None = field(default=None, kw_only=True)
 
     print_error: bool | None = field(default=None, kw_only=True)
 
@@ -934,6 +967,104 @@ class App:
             self._meta._meta_parent = self
         return self._meta
 
+    def _parse_commands(
+        self,
+        tokens: list[str],
+        *,
+        include_parent_meta: bool = True,
+    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str], list[int]]:
+        """Internal command parsing with richer return data.
+
+        Unlike the public :meth:`parse_commands`, this method:
+        - Accepts already-normalized tokens (list[str]).
+        - Returns command indices into the original token list.
+
+        Parameters
+        ----------
+        tokens: list[str]
+            Already-normalized token list.
+        include_parent_meta: bool
+            Controls whether parent meta apps are included in the execution path.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Strings that are interpreted as a valid command chain.
+        tuple[App, ...]
+            The execution path - apps that will be invoked in order.
+        list[str]
+            The remaining non-command tokens.
+        list[int]
+            Index (into the original token list) of each command token found.
+        """
+        command_chain = []
+        app = self
+        apps: list[App] = []
+        unused_tokens = tokens
+        command_indices: list[int] = []
+        # Track the current offset into the original token list.
+        # This is needed because _consume_leading_meta_options can
+        # remove tokens, shifting the relationship between unused_tokens
+        # and the original token indices.
+        token_offset = 0
+
+        def add_parent_metas(app):
+            """If ``app`` is a meta-app, also add it's "normal" app.
+
+            We assume that ``app._meta`` will always invoke the ``app``.
+            """
+            if not include_parent_meta:
+                return
+            meta_parents = []
+            meta_parent = app
+            while (meta_parent := meta_parent._meta_parent) is not None:
+                meta_parents.append(meta_parent)
+            # The "root" non-meta app gets highest priority (first)
+            apps.extend(meta_parents[::-1])
+
+        add_parent_metas(app)
+        apps.append(app)
+        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+
+        unused_tokens = tokens
+        while unused_tokens:
+            token = unused_tokens[0]
+            app_or_spec = command_mapping.get(token)
+
+            if app_or_spec is None:
+                # Token is not a command. Try to consume it as a meta app parameter.
+                # This is only relevant when ``include_parent_meta==True``, because
+                # otherwise it will be handled by the natural parsing process.
+                if include_parent_meta:
+                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
+                    if len(remaining) < len(unused_tokens):
+                        # Some meta parameters were consumed, continue looking for commands
+                        token_offset += len(unused_tokens) - len(remaining)
+                        unused_tokens = remaining
+                        continue
+                # Not a command or meta parameter, stop parsing commands
+                break
+
+            # Resolve CommandSpec if needed (lazy loading)
+            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
+            # Pass the current app as parent to inherit its defaults
+            if isinstance(app_or_spec, CommandSpec):
+                parent_app = app  # Save parent before overwriting
+                app = app_or_spec.resolve(parent_app)
+            else:
+                app = app_or_spec
+
+            # Found a command - add it to the chain
+            add_parent_metas(app)
+            apps.append(app)
+            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
+            command_chain.append(token)
+            command_indices.append(token_offset)
+            token_offset += 1
+            unused_tokens = unused_tokens[1:]
+
+        return tuple(command_chain), tuple(apps), unused_tokens, command_indices
+
     def parse_commands(
         self,
         tokens: None | str | Iterable[str] = None,
@@ -972,66 +1103,11 @@ class App:
         list[str]
             The remaining non-command tokens.
         """
-        tokens = normalize_tokens(tokens)
-
-        command_chain = []
-        app = self
-        apps: list[App] = []
-        unused_tokens = tokens
-
-        def add_parent_metas(app):
-            """If ``app`` is a meta-app, also add it's "normal" app.
-
-            We assume that ``app._meta`` will always invoke the ``app``.
-            """
-            if not include_parent_meta:
-                return
-            meta_parents = []
-            meta_parent = app
-            while (meta_parent := meta_parent._meta_parent) is not None:
-                meta_parents.append(meta_parent)
-            # The "root" non-meta app gets highest priority (first)
-            apps.extend(meta_parents[::-1])
-
-        add_parent_metas(app)
-        apps.append(app)
-        command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-
-        unused_tokens = tokens
-        while unused_tokens:
-            token = unused_tokens[0]
-            app_or_spec = command_mapping.get(token)
-
-            if app_or_spec is None:
-                # Token is not a command. Try to consume it as a meta app parameter.
-                # This is only relevant when ``include_parent_meta==True``, because
-                # otherwise it will be handled by the natural parsing process.
-                if include_parent_meta:
-                    remaining = self._consume_leading_meta_options(apps, unused_tokens)
-                    if len(remaining) < len(unused_tokens):
-                        # Some meta parameters were consumed, continue looking for commands
-                        unused_tokens = remaining
-                        continue
-                # Not a command or meta parameter, stop parsing commands
-                break
-
-            # Resolve CommandSpec if needed (lazy loading)
-            # Note: CommandSpec.resolve() has built-in caching via its _resolved field
-            # Pass the current app as parent to inherit its defaults
-            if isinstance(app_or_spec, CommandSpec):
-                parent_app = app  # Save parent before overwriting
-                app = app_or_spec.resolve(parent_app)
-            else:
-                app = app_or_spec
-
-            # Found a command - add it to the chain
-            add_parent_metas(app)
-            apps.append(app)
-            command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
-            command_chain.append(token)
-            unused_tokens = unused_tokens[1:]
-
-        return tuple(command_chain), tuple(apps), unused_tokens
+        command_chain, apps, unused_tokens, _ = self._parse_commands(
+            normalize_tokens(tokens),
+            include_parent_meta=include_parent_meta,
+        )
+        return command_chain, apps, unused_tokens
 
     def _get_resolution_context(self, execution_path: Sequence["App"]) -> list["App"]:
         """Get all apps that contribute to parameter resolution for the given execution path.
@@ -1571,13 +1647,82 @@ class App:
                             for argument in argument_collection.filter_by(parse=False)
                         }
 
-                        bound, unused_tokens = create_bound_arguments(
-                            command_app.default_command,
-                            argument_collection,
-                            unused_tokens,
-                            config,
-                            end_of_options_delimiter=end_of_options_delimiter,
-                        )
+                        # Determine if flag scoping should be applied.
+                        # Scoping is active when:
+                        # 1. parse_mode is set
+                        # 2. The flat parse found no commands (command_app is
+                        #    the meta app itself, not a resolved subcommand)
+                        # 3. The full parse (with parent meta) finds subcommands
+                        #    that the meta app will forward tokens to
+                        parse_mode = self.app_stack.resolve("parse_mode", fallback="fallthrough")
+                        full_command_indices: list[int] = []
+                        full_apps: tuple[App, ...] | None = None
+                        if not command_chain:
+                            _, full_apps, _, full_command_indices = self._parse_commands(
+                                tokens, include_parent_meta=True
+                            )
+
+                        if full_command_indices and full_apps is not None:
+                            # Split tokens into per-command-level segments.
+                            segments = segment_tokens_by_command(tokens, full_command_indices)
+
+                            # Reconstruct the positional tokens for the meta app's *tokens:
+                            # command name(s) + all post-command tokens.
+                            positional_tokens: list[str] = []
+                            for i, cmd_idx in enumerate(full_command_indices):
+                                positional_tokens.append(tokens[cmd_idx])  # command name
+                                positional_tokens.extend(segments[i + 1])  # tokens after this command
+
+                            # Partition pre-command tokens: tokens matching the current
+                            # level's argument collection go to meta_kw_tokens; the rest
+                            # are prepended to positional_tokens (for nested meta scenarios
+                            # where pre-command tokens belong to an intermediate meta level).
+                            meta_kw_tokens, pre_command_passthrough = partition_tokens(argument_collection, segments[0])
+                            positional_tokens = pre_command_passthrough + positional_tokens
+
+                            # Bubble-up: scan post-command tokens for flags that match the
+                            # meta's argument collection but NOT the child's. Move them from
+                            # positional_tokens to meta_kw_tokens so the meta binds them.
+                            if parse_mode == "fallthrough":
+                                child_app = full_apps[-1]
+                                try:
+                                    child_argument_collection = (
+                                        child_app.assemble_argument_collection()
+                                        if child_app.default_command
+                                        else ArgumentCollection()
+                                    )
+                                except (NameError, TypeError, ValueError):
+                                    # If we can't resolve the child's argument collection
+                                    # (e.g., internal help/version handlers with unresolvable
+                                    # type hints), treat it as having no arguments — all
+                                    # flags fall through.
+                                    child_argument_collection = ArgumentCollection()
+
+                                bubbled, positional_tokens = partition_tokens(
+                                    argument_collection, positional_tokens, exclude=child_argument_collection
+                                )
+                                meta_kw_tokens.extend(bubbled)
+                            elif parse_mode == "strict":
+                                pass  # No fallthrough; post-command flags stay with the child.
+                            else:
+                                raise NotImplementedError(f"Unknown parse_mode: {parse_mode!r}")
+
+                            bound, unused_tokens = create_bound_arguments(
+                                command_app.default_command,
+                                argument_collection,
+                                meta_kw_tokens,
+                                config,
+                                end_of_options_delimiter=end_of_options_delimiter,
+                                positional_tokens=positional_tokens,
+                            )
+                        else:
+                            bound, unused_tokens = create_bound_arguments(
+                                command_app.default_command,
+                                argument_collection,
+                                unused_tokens,
+                                config,
+                                end_of_options_delimiter=end_of_options_delimiter,
+                            )
                         try:
                             for validator in command_app.validator:
                                 validator(**bound.arguments)
@@ -1605,12 +1750,15 @@ class App:
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
                 if raise_on_unused_tokens and unused_tokens:
+                    strict_parent_info = _build_strict_parent_info(self.app_stack)
+
                     for token in unused_tokens:
                         if is_option_like(token):
                             token = token.split("=")[0]
                             raise UnknownOptionError(
                                 token=Token(keyword=token, source="cli"),
                                 argument_collection=argument_collection,
+                                parent_apps_with_collections=strict_parent_info,
                             )
                     raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
             except CycloptsError as e:
@@ -1620,6 +1768,10 @@ class App:
                     e.command_chain = command_chain
                 if e.console is None:
                     e.console = command_app.error_console
+                # Add parent scope info to UnknownOptionError for
+                # helpful "did you mean to place it after ..." hints.
+                if isinstance(e, UnknownOptionError) and e.parent_apps_with_collections is None:
+                    e.parent_apps_with_collections = _build_strict_parent_info(self.app_stack)
                 raise
             finally:
                 _convert.cache_clear()  # pyright: ignore[reportFunctionMemberAccess]
@@ -2108,6 +2260,11 @@ class App:
         # We have to combine all the help-pages of the command-app and it's meta apps.
         # Use get_resolution_context to get all apps that contribute parameters
         apps_for_params = self._get_resolution_context(execution_path)
+
+        # In strict mode, exclude parent meta apps from the parameter list
+        # since their flags are not valid at the child command level.
+        if command_app.app_stack.resolve("parse_mode") == "strict":
+            apps_for_params = [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
 
         for subapp in apps_for_params:
             if not subapp.default_command:

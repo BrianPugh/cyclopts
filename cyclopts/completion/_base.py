@@ -69,7 +69,13 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
 
         arguments = ArgumentCollection()
         apps_for_params = app._get_resolution_context(execution_path)
+        # In strict mode, exclude parent meta apps since their flags
+        # are not valid at the child command level.
         with app.app_stack(execution_path):
+            if command_app.app_stack.resolve("parse_mode") == "strict":
+                apps_for_params = [
+                    a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app
+                ]
             for subapp in apps_for_params:
                 if subapp.default_command:
                     app_arguments = subapp.assemble_argument_collection(parse_docstring=True)
