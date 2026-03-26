@@ -722,3 +722,21 @@ class TestEdgeCases:
 
         result = app.meta(["--user=alice", "foo", "--count=5"])
         assert result == {"user": "alice", "count": 5}
+
+    def test_strict_error_hint_with_equals_syntax(self):
+        """Error hint works when the unknown option uses --flag=value syntax."""
+        app = App(parse_mode="strict")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.command
+        def foo():
+            pass
+
+        with pytest.raises(UnknownOptionError, match="Did you mean to place it directly after"):
+            app.meta(["foo", "--verbose=true"], exit_on_error=False)

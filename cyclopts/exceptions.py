@@ -203,7 +203,8 @@ class UnknownOptionError(CycloptsError):
             if self.parent_apps_with_collections is not None:
                 for parent_name, parent_ac in self.parent_apps_with_collections:
                     try:
-                        parent_ac.match(keyword)
+                        # Strip "=value" suffix so "--verbose=true" matches "--verbose".
+                        parent_ac.match(keyword.split("=", 1)[0])
                         if not self.command_chain:
                             response += " Did you mean to place it before the subcommand?"
                         else:
