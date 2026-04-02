@@ -3,7 +3,17 @@ from textwrap import dedent
 import pytest
 
 from cyclopts.exceptions import ValidationError
-from cyclopts.types import HexUInt, HexUInt8, HexUInt16, HexUInt32, HexUInt64, UInt8
+from cyclopts.types import (
+    HexUInt,
+    HexUInt8,
+    HexUInt16,
+    HexUInt32,
+    HexUInt64,
+    NormFloat,
+    PercentageInt,
+    SignedNormFloat,
+    UInt8,
+)
 
 
 def test_nested_annotated_validator(app, assert_parse_args):
@@ -92,3 +102,48 @@ def test_hexuint_help_no_default(app, console):
     )
 
     assert expected == actual
+
+
+def test_norm_float(app, assert_parse_args):
+    @app.default
+    def default(val: NormFloat):
+        pass
+
+    assert_parse_args(default, "0.0", 0.0)
+    assert_parse_args(default, "0.5", 0.5)
+    assert_parse_args(default, "1.0", 1.0)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("-0.1", exit_on_error=False)
+    with pytest.raises(ValidationError):
+        app.parse_args("1.1", exit_on_error=False)
+
+
+def test_signed_norm_float(app, assert_parse_args):
+    @app.default
+    def default(val: SignedNormFloat):
+        pass
+
+    assert_parse_args(default, "-- -1.0", -1.0)
+    assert_parse_args(default, "0.0", 0.0)
+    assert_parse_args(default, "1.0", 1.0)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("-- -1.1", exit_on_error=False)
+    with pytest.raises(ValidationError):
+        app.parse_args("1.1", exit_on_error=False)
+
+
+def test_percentage_int(app, assert_parse_args):
+    @app.default
+    def default(val: PercentageInt):
+        pass
+
+    assert_parse_args(default, "0", 0)
+    assert_parse_args(default, "50", 50)
+    assert_parse_args(default, "100", 100)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("-- -1", exit_on_error=False)
+    with pytest.raises(ValidationError):
+        app.parse_args("101", exit_on_error=False)

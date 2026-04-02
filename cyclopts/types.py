@@ -76,6 +76,9 @@ __all__ = [
     "HexUInt16",
     "HexUInt32",
     "HexUInt64",
+    "NormFloat",
+    "SignedNormFloat",
+    "PercentageInt",
     # Json,
     "Json",
     # Web
@@ -259,6 +262,15 @@ HexUInt32 = Annotated[UInt32, Parameter(show_default=partial(_hex_formatter, dig
 
 HexUInt64 = Annotated[UInt64, Parameter(show_default=partial(_hex_formatter, digits=16))]
 "An unsigned 64-bit integer who's default value will be displayed as hexadecimal in the help-page."
+
+NormFloat = Annotated[float, Parameter(validator=validators.Number(gte=0, lte=1))]
+"A float in the range ``[0, 1]``."
+
+SignedNormFloat = Annotated[float, Parameter(validator=validators.Number(gte=-1, lte=1))]
+"A float in the range ``[-1, 1]``."
+
+PercentageInt = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=100))]
+"An int in the range ``[0, 100]``."
 
 
 ########
