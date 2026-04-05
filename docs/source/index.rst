@@ -59,6 +59,7 @@ For extensive documentation on all the features Cyclopts has to offer, checkout 
    cookbook/sharing_parameters.rst
    cookbook/unit_testing.rst
    cookbook/file_or_stdin_stdout.rst
+   cookbook/random_tips.rst
 
 .. toctree::
    :maxdepth: 2
