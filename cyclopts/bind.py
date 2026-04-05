@@ -102,6 +102,7 @@ def partition_tokens(
     tokens: list[str],
     *,
     exclude: "ArgumentCollection | None" = None,
+    end_of_options_delimiter: str = "--",
 ) -> tuple[list[str], list[str]]:
     """Partition tokens into those matching an argument collection and those that don't.
 
@@ -120,6 +121,9 @@ def partition_tokens(
         If provided, tokens matching this collection take priority and
         are placed into ``unmatched`` even if they also match
         ``argument_collection``. Used for child-wins semantics.
+    end_of_options_delimiter: str
+        Token that marks the end of options. Tokens at or after this
+        delimiter are treated as positional-only. Defaults to ``"--"``.
 
     Returns
     -------
@@ -133,7 +137,9 @@ def partition_tokens(
     # parent argument collection would also match them (child-wins semantics).
     if exclude is not None:
         exclude_copy = exclude.copy(reset_tokens=True)
-        _, exclude_unused_indices, _ = _parse_kw_and_flags(exclude_copy, tokens)
+        _, exclude_unused_indices, _ = _parse_kw_and_flags(
+            exclude_copy, tokens, end_of_options_delimiter=end_of_options_delimiter
+        )
         # Indices NOT in exclude_unused_indices are claimed by the exclude collection.
         exclude_unused_index_set = set(exclude_unused_indices)
         excluded_claimed_indices = {k for k in range(len(tokens)) if k not in exclude_unused_index_set}
@@ -148,7 +154,9 @@ def partition_tokens(
 
     # Second pass: match remaining tokens against the target collection.
     parent_copy = argument_collection.copy(reset_tokens=True)
-    _, parent_unused_indices, _ = _parse_kw_and_flags(parent_copy, tokens_for_parent)
+    _, parent_unused_indices, _ = _parse_kw_and_flags(
+        parent_copy, tokens_for_parent, end_of_options_delimiter=end_of_options_delimiter
+    )
 
     # Translate parent-local unused indices back into original-token indices.
     parent_unused_original = {parent_to_original[k] for k in parent_unused_indices}

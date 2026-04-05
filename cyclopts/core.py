@@ -1715,7 +1715,11 @@ class App:
                             # level's argument collection go to meta_kw_tokens; the rest
                             # are prepended to positional_tokens (for nested meta scenarios
                             # where pre-command tokens belong to an intermediate meta level).
-                            meta_kw_tokens, pre_command_passthrough = partition_tokens(argument_collection, segments[0])
+                            meta_kw_tokens, pre_command_passthrough = partition_tokens(
+                                argument_collection,
+                                segments[0],
+                                end_of_options_delimiter=end_of_options_delimiter,
+                            )
                             positional_tokens = pre_command_passthrough + positional_tokens
 
                             # Bubble-up: scan post-command tokens for flags that match the
@@ -1731,7 +1735,10 @@ class App:
                                     child_argument_collection = ArgumentCollection()
 
                                 bubbled, positional_tokens = partition_tokens(
-                                    argument_collection, positional_tokens, exclude=child_argument_collection
+                                    argument_collection,
+                                    positional_tokens,
+                                    exclude=child_argument_collection,
+                                    end_of_options_delimiter=end_of_options_delimiter,
                                 )
                                 meta_kw_tokens.extend(bubbled)
                             elif parse_mode == "strict":
