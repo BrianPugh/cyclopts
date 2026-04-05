@@ -2187,7 +2187,7 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.NonPositiveInt
 
-.. autodata:: cyclopts.types.PercentageInt
+.. autodata:: cyclopts.types.PercentInt
 
 .. autodata:: cyclopts.types.UInt8
 

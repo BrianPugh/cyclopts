@@ -10,7 +10,7 @@ from cyclopts.types import (
     HexUInt32,
     HexUInt64,
     NormFloat,
-    PercentageInt,
+    PercentInt,
     SignedNormFloat,
     UInt8,
 )
@@ -134,9 +134,9 @@ def test_signed_norm_float(app, assert_parse_args):
         app.parse_args("1.1", exit_on_error=False)
 
 
-def test_percentage_int(app, assert_parse_args):
+def test_percent_int(app, assert_parse_args):
     @app.default
-    def default(val: PercentageInt):
+    def default(val: PercentInt):
         pass
 
     assert_parse_args(default, "0", 0)

@@ -78,7 +78,7 @@ __all__ = [
     "HexUInt64",
     "NormFloat",
     "SignedNormFloat",
-    "PercentageInt",
+    "PercentInt",
     # Json,
     "Json",
     # Web
@@ -269,7 +269,7 @@ NormFloat = Annotated[float, Parameter(validator=validators.Number(gte=0, lte=1)
 SignedNormFloat = Annotated[float, Parameter(validator=validators.Number(gte=-1, lte=1))]
 "A float in the range ``[-1, 1]``."
 
-PercentageInt = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=100))]
+PercentInt = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=100))]
 "An int in the range ``[0, 100]``."
 
 
