@@ -242,6 +242,19 @@ def test_parse_mode_can_be_set(scope):
     assert app.parse_mode == scope
 
 
+@pytest.mark.parametrize("value", ["fallthrough", "strict", None])
+def test_parse_mode_valid_values_construct(value):
+    """All documented parse_mode values (including None) construct successfully."""
+    app = App(parse_mode=value)
+    assert app.parse_mode == value
+
+
+def test_parse_mode_invalid_value_raises():
+    """Invalid parse_mode values are rejected at construction time."""
+    with pytest.raises(ValueError):
+        App(parse_mode="nonsense")  # pyright: ignore[reportArgumentType]
+
+
 def test_parse_mode_inherits_from_parent():
     """Test that child apps inherit parse_mode from parent."""
     parent_app = App(parse_mode="strict")

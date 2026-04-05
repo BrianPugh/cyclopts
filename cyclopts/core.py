@@ -24,6 +24,7 @@ from typing import (
 )
 
 from attrs import Factory, define, field
+from attrs import validators as attrs_validators
 
 from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
@@ -229,6 +230,40 @@ def _walk_metas(app: "App"):
     yield from reversed(meta_list)
 
 
+def _filter_apps_for_parse_mode(apps_for_params: list["App"], command_app: "App") -> list["App"]:
+    """Filter ``apps_for_params`` based on ``command_app``'s resolved ``parse_mode``.
+
+    In ``"strict"`` mode, parent meta apps are excluded from the parameter list
+    since their flags are not valid at the child command level. Meta apps whose
+    ``_meta_parent`` is ``command_app`` itself are retained.
+
+    In other parse modes, the input list is returned unchanged.
+    """
+    if command_app.app_stack.resolve("parse_mode") == "strict":
+        return [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
+    return apps_for_params
+
+
+def _safe_assemble_argument_collection(app: "App") -> ArgumentCollection | None:
+    """Assemble an :class:`ArgumentCollection` from ``app``'s default command, tolerating unresolvable signatures.
+
+    Returns ``None`` if the signature cannot be resolved because of a forward
+    reference that doesn't exist at runtime (``NameError``). This is the case
+    for Cyclopts' own internal ``help_print``/``version_print`` handlers, whose
+    signatures reference ``rich.console.Console`` — a ``TYPE_CHECKING``-only
+    import. Callers in ``parse_mode``-handling paths need to inspect these
+    collections without being able to fix the forward reference, so they
+    gracefully fall back when ``None`` is returned.
+
+    Any other exception (``TypeError``, ``ValueError``, etc.) indicates a
+    genuine problem with the command's type hints and is allowed to propagate.
+    """
+    try:
+        return app.assemble_argument_collection()
+    except NameError:
+        return None
+
+
 def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, ArgumentCollection]] | None:
     """Build parent (app_name, argument_collection) pairs for scope-aware error hints.
 
@@ -244,10 +279,9 @@ def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, Argument
             while meta and meta.default_command:
                 parent = meta._meta_parent
                 parent_name = parent.name[0] if parent else ""
-                try:
-                    parent_info.append((parent_name, meta.assemble_argument_collection()))
-                except (NameError, TypeError, ValueError):
-                    pass
+                meta_argument_collection = _safe_assemble_argument_collection(meta)
+                if meta_argument_collection is not None:
+                    parent_info.append((parent_name, meta_argument_collection))
                 meta = meta._meta
     return parent_info or None
 
@@ -374,7 +408,11 @@ class App:
 
     end_of_options_delimiter: str | None = field(default=None, kw_only=True)
 
-    parse_mode: Literal["fallthrough", "strict"] | None = field(default=None, kw_only=True)
+    parse_mode: Literal["fallthrough", "strict"] | None = field(
+        default=None,
+        kw_only=True,
+        validator=attrs_validators.optional(attrs_validators.in_(("fallthrough", "strict"))),
+    )
 
     print_error: bool | None = field(default=None, kw_only=True)
 
@@ -1194,7 +1232,7 @@ class App:
 
                 # Try to consume tokens with this meta app's parameters
                 # stop_at_first_unknown=True ensures we only consume contiguous leading options
-                unused_tokens, _ = _parse_kw_and_flags(
+                unused_tokens, _, _ = _parse_kw_and_flags(
                     argument_collection,
                     unused_tokens,
                     end_of_options_delimiter=end_of_options_delimiter,
@@ -1685,17 +1723,11 @@ class App:
                             # positional_tokens to meta_kw_tokens so the meta binds them.
                             if parse_mode == "fallthrough":
                                 child_app = full_apps[-1]
-                                try:
+                                if child_app.default_command:
                                     child_argument_collection = (
-                                        child_app.assemble_argument_collection()
-                                        if child_app.default_command
-                                        else ArgumentCollection()
+                                        _safe_assemble_argument_collection(child_app) or ArgumentCollection()
                                     )
-                                except (NameError, TypeError, ValueError):
-                                    # If we can't resolve the child's argument collection
-                                    # (e.g., internal help/version handlers with unresolvable
-                                    # type hints), treat it as having no arguments — all
-                                    # flags fall through.
+                                else:
                                     child_argument_collection = ArgumentCollection()
 
                                 bubbled, positional_tokens = partition_tokens(
@@ -1705,7 +1737,7 @@ class App:
                             elif parse_mode == "strict":
                                 pass  # No fallthrough; post-command flags stay with the child.
                             else:
-                                raise NotImplementedError(f"Unknown parse_mode: {parse_mode!r}")
+                                raise ValueError(f"Unknown parse_mode: {parse_mode!r}")
 
                             bound, unused_tokens = create_bound_arguments(
                                 command_app.default_command,
@@ -2263,8 +2295,7 @@ class App:
 
         # In strict mode, exclude parent meta apps from the parameter list
         # since their flags are not valid at the child command level.
-        if command_app.app_stack.resolve("parse_mode") == "strict":
-            apps_for_params = [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
+        apps_for_params = _filter_apps_for_parse_mode(apps_for_params, command_app)
 
         for subapp in apps_for_params:
             if not subapp.default_command:

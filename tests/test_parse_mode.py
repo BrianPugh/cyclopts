@@ -275,6 +275,31 @@ class TestErrorMessages:
         with pytest.raises(UnknownOptionError, match="Did you mean to place it directly after"):
             app.meta(["foo", "--verbose"], exit_on_error=False)
 
+    def test_strict_parent_match_no_subcommand_hint(self):
+        """When the inner app is invoked directly (no command_chain) and a parent meta
+        defines the unknown flag, the hint should indicate a parent-scope origin rather
+        than suggest placement relative to a nonexistent subcommand.
+        """
+        app = App(parse_mode="strict", name="myapp")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            app(tokens)
+
+        @app.default
+        def main():
+            pass
+
+        with pytest.raises(UnknownOptionError) as exc_info:
+            app(["--verbose"], exit_on_error=False)
+        message = str(exc_info.value)
+        assert 'Unknown option: "--verbose"' in message
+        assert "This option is defined in a parent scope." in message
+        assert "subcommand" not in message
+
     def test_strict_no_parent_match_normal_error(self):
         """In strict mode, if no parent defines the flag, show normal error."""
         app = App(parse_mode="strict")
@@ -740,3 +765,169 @@ class TestEdgeCases:
 
         with pytest.raises(UnknownOptionError, match="Did you mean to place it directly after"):
             app.meta(["foo", "--verbose=true"], exit_on_error=False)
+
+
+class TestNestedMeta:
+    """Tests for nested meta-of-meta apps with ``parse_mode='strict'``.
+
+    These exercise the ``while meta and meta.default_command: meta = meta._meta``
+    loop in :func:`cyclopts.core._build_strict_parent_info`, which walks the
+    full meta chain to collect parent scopes for scope-aware error hints.
+    """
+
+    @staticmethod
+    def _build_app():
+        """Build a 3-level app: outer-meta -> inner-meta -> app -> sub.
+
+        ``app`` is given an explicit name so assertions about the hint's
+        suggested-parent name are deterministic (they don't depend on
+        ``sys.argv[0]``).
+        """
+        app = App(name="myapp", parse_mode="strict", result_action="return_value")
+
+        @app.meta.default
+        def inner_meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            inner_flag: bool = False,
+        ):
+            result = app(tokens)
+            out = {"inner": inner_flag}
+            if isinstance(result, dict):
+                out.update(result)
+            return out
+
+        @app.meta.meta.default
+        def outer_meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            outer_flag: bool = False,
+        ):
+            result = app.meta(tokens)
+            out = {"outer": outer_flag}
+            if isinstance(result, dict):
+                out.update(result)
+            return out
+
+        @app.command
+        def sub(*, sub_flag: bool = False):
+            return {"sub": sub_flag}
+
+        return app
+
+    def test_nested_meta_chain_is_linked(self):
+        """Sanity check that ``app.meta.meta`` really is a meta-of-meta.
+
+        Confirms ``_meta_parent`` links walk all the way back to ``app`` so
+        :func:`_build_strict_parent_info` has a full chain to iterate.
+        """
+        app = self._build_app()
+        assert app.meta._meta_parent is app
+        assert app.meta.meta._meta_parent is app.meta
+        # Names are derived from each default_command's function name.
+        assert app.name[0] == "myapp"
+        assert app.meta.name[0] == "inner-meta"
+        assert app.meta.meta.name[0] == "outer-meta"
+
+    def test_all_levels_bind_when_placed_correctly(self):
+        """Each level's flag binds to its own level when placed there."""
+        app = self._build_app()
+        result = app.meta.meta(["--outer-flag", "--inner-flag", "sub", "--sub-flag"])
+        assert result == {"outer": True, "inner": True, "sub": True}
+
+    def test_outer_only(self):
+        """Only the outermost meta's flag is set."""
+        app = self._build_app()
+        result = app.meta.meta(["--outer-flag", "sub"])
+        assert result == {"outer": True, "inner": False, "sub": False}
+
+    def test_inner_only(self):
+        """Only the inner meta's flag is set."""
+        app = self._build_app()
+        result = app.meta.meta(["--inner-flag", "sub"])
+        assert result == {"outer": False, "inner": True, "sub": False}
+
+    def test_sub_only(self):
+        """Only the subcommand's flag is set."""
+        app = self._build_app()
+        result = app.meta.meta(["sub", "--sub-flag"])
+        assert result == {"outer": False, "inner": False, "sub": True}
+
+    def test_outer_flag_after_sub_errors_with_hint(self):
+        """An outer-meta-only flag after the subcommand errors in strict mode.
+
+        The scope-aware hint points at the parent *of* the meta that owns the
+        flag -- that is, ``outer-meta``'s ``_meta_parent`` is ``inner-meta``,
+        so the hint suggests placing it after ``"inner-meta"`` (the position
+        just before the subcommand, which is also where ``inner-meta`` forwards
+        to ``app``).
+        """
+        app = self._build_app()
+        with pytest.raises(
+            UnknownOptionError,
+            match=r'Unknown option: "--outer-flag"\. Did you mean to place it directly after "inner-meta"\?',
+        ):
+            app.meta.meta(["sub", "--outer-flag"], exit_on_error=False)
+
+    def test_inner_flag_after_sub_errors_with_hint(self):
+        """An inner-meta-only flag after the subcommand errors in strict mode.
+
+        ``inner-meta``'s ``_meta_parent`` is ``app`` (name ``"myapp"``), so the
+        hint points at ``"myapp"``.
+        """
+        app = self._build_app()
+        with pytest.raises(
+            UnknownOptionError,
+            match=r'Unknown option: "--inner-flag"\. Did you mean to place it directly after "myapp"\?',
+        ):
+            app.meta.meta(["sub", "--inner-flag"], exit_on_error=False)
+
+    def test_build_strict_parent_info_walks_full_chain(self):
+        """Directly exercise :func:`_build_strict_parent_info`.
+
+        When invoked from the outermost meta, the strict parent-info list
+        should contain one entry per meta level in the chain (inner + outer).
+        Each entry's ``argument_collection`` should contain the flag defined
+        on that level.
+        """
+        app = self._build_app()
+        # Trigger a parse so the app_stack is populated; capture mid-flight
+        # via the error-hint path. An easier approach: construct the info
+        # directly by driving the outer app and asking it during parse.
+        # We instead simulate by invoking with a token that triggers the hint
+        # and inspect the exception's attached parent info.
+        try:
+            app.meta.meta(["sub", "--outer-flag"], exit_on_error=False)
+        except UnknownOptionError as e:
+            assert e.parent_apps_with_collections is not None
+            # Chain should include both meta levels.
+            parent_names = [name for name, _ in e.parent_apps_with_collections]
+            # inner-meta is the _meta_parent of outer-meta; myapp is the
+            # _meta_parent of inner-meta. Both must appear.
+            assert "inner-meta" in parent_names
+            assert "myapp" in parent_names
+            # The outer-meta's collection should contain --outer-flag.
+            outer_ac = next(ac for name, ac in e.parent_apps_with_collections if name == "inner-meta")
+            # match() raises ValueError if not found.
+            outer_ac.match("--outer-flag")
+            # The inner-meta's collection should contain --inner-flag.
+            inner_ac = next(ac for name, ac in e.parent_apps_with_collections if name == "myapp")
+            inner_ac.match("--inner-flag")
+        else:
+            raise AssertionError("expected UnknownOptionError")
+
+    def test_strict_help_hides_both_meta_levels(self):
+        """In strict mode, subcommand help hides flags from *both* meta levels."""
+        from io import StringIO
+
+        from rich.console import Console
+
+        app = self._build_app()
+        buf = StringIO()
+        console = Console(file=buf, width=80, force_terminal=False)
+        try:
+            app.meta.meta(["sub", "--help"], console=console, exit_on_error=False)
+        except SystemExit:
+            pass
+        help_text = buf.getvalue()
+        assert "--outer-flag" not in help_text
+        assert "--inner-flag" not in help_text
+        assert "--sub-flag" in help_text

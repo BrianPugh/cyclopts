@@ -205,10 +205,10 @@ class UnknownOptionError(CycloptsError):
                     try:
                         # Strip "=value" suffix so "--verbose=true" matches "--verbose".
                         parent_ac.match(keyword.split("=", 1)[0])
-                        if not self.command_chain:
-                            response += " Did you mean to place it before the subcommand?"
-                        else:
+                        if self.command_chain:
                             response += f' Did you mean to place it directly after "{parent_name}"?'
+                        else:
+                            response += " This option is defined in a parent scope."
                         return super().__str__() + response
                     except ValueError:
                         continue
