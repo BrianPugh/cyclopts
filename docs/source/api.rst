@@ -2186,6 +2186,10 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.NonPositiveFloat
 
+.. autodata:: cyclopts.types.NormFloat
+
+.. autodata:: cyclopts.types.SignedNormFloat
+
 .. autodata:: cyclopts.types.PositiveInt
 
 .. autodata:: cyclopts.types.NonNegativeInt
@@ -2193,6 +2197,8 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 .. autodata:: cyclopts.types.NegativeInt
 
 .. autodata:: cyclopts.types.NonPositiveInt
+
+.. autodata:: cyclopts.types.PercentInt
 
 .. autodata:: cyclopts.types.UInt8
 
