@@ -1109,3 +1109,41 @@ def test_positional_only_list_and_scalar_interleaved_error(app):
     # Interleaved: should error
     with pytest.raises(UnusedCliTokensError):
         app.parse_args("a b --verbose c out.csv", print_error=False, exit_on_error=False)
+
+
+def test_parse_kw_and_flags_stop_at_first_unknown_preserves_end_of_options(app):
+    """When ``stop_at_first_unknown=True`` encounters an unknown option appearing
+    before the ``end_of_options_delimiter``, the delimiter and everything after
+    it must still be returned in ``unused_tokens``. Tokens after ``--`` belong
+    to the downstream parser and must not be dropped just because an unknown
+    option preceded them.
+    """
+    from cyclopts.bind import _parse_kw_and_flags
+
+    @app.default
+    def main(*, known: bool = False):
+        pass
+
+    argument_collection = app.assemble_argument_collection()
+
+    # Long unknown option followed by positional-only segment.
+    tokens = ["--unknown", "--", "raw1", "raw2"]
+    unused_tokens, unused_indices, _ = _parse_kw_and_flags(
+        argument_collection,
+        tokens,
+        stop_at_first_unknown=True,
+    )
+    assert unused_tokens == ["--unknown", "--", "raw1", "raw2"]
+    assert unused_indices == [0, 1, 2, 3]
+
+    # Combined short unknown option followed by positional-only segment.
+    argument_collection = app.assemble_argument_collection()
+    tokens = ["-xyz", "--", "raw1", "raw2"]
+    unused_tokens, unused_indices, _ = _parse_kw_and_flags(
+        argument_collection,
+        tokens,
+        stop_at_first_unknown=True,
+    )
+    assert "--" in unused_tokens
+    assert "raw1" in unused_tokens
+    assert "raw2" in unused_tokens

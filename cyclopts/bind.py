@@ -224,6 +224,7 @@ def _parse_kw_and_flags(
     positional_only_start: int | None = None
     unused_token_original_indices: list[int] = []
     skip_next_iterations = 0
+    stop_parsing = False
     if end_of_options_delimiter:
         try:
             delimiter_index = tokens.index(end_of_options_delimiter)
@@ -313,11 +314,14 @@ def _parse_kw_and_flags(
                         if stop_at_first_unknown:
                             unused_tokens.extend(tokens[i:])
                             unused_token_original_indices.extend(range(i, len(tokens)))
-                            return unused_tokens, unused_token_original_indices, None
+                            stop_parsing = True
+                            break
                         unused_tokens.append(test_flag)
                         unused_token_original_indices.append(i)
                         position += 1
 
+                if stop_parsing:
+                    break
                 if not matches:
                     # No valid matches found at all
                     continue
@@ -326,7 +330,7 @@ def _parse_kw_and_flags(
                     # Unknown option, stop parsing and return all remaining tokens
                     unused_tokens.extend(tokens[i:])
                     unused_token_original_indices.extend(range(i, len(tokens)))
-                    return unused_tokens, unused_token_original_indices, None
+                    break
                 unused_tokens.append(token)
                 unused_token_original_indices.append(i)
                 continue
