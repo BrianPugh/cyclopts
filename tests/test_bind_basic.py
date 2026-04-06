@@ -1147,3 +1147,46 @@ def test_parse_kw_and_flags_stop_at_first_unknown_preserves_end_of_options(app):
     assert "--" in unused_tokens
     assert "raw1" in unused_tokens
     assert "raw2" in unused_tokens
+
+
+def test_partition_tokens_combined_short_option_no_duplicate(console):
+    """When the exclude collection doesn't recognize any flags in a combined
+    short option (e.g. ``-vd``), ``partition_tokens`` must pass the original
+    token to the parent collection exactly once, not once per exploded flag.
+    """
+    from cyclopts import App, Parameter
+    from cyclopts.bind import partition_tokens
+
+    # Parent recognizes -v/--verbose and -d/--debug
+    parent_app = App(console=console)
+
+    @parent_app.default
+    def parent_cmd(
+        *,
+        verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False,
+        debug: Annotated[bool, Parameter(name=["-d", "--debug"])] = False,
+    ):
+        pass
+
+    parent_ac = parent_app.assemble_argument_collection()
+
+    # Child recognizes -f/--force — neither -v nor -d
+    child_app = App(console=console)
+
+    @child_app.default
+    def child_cmd(*, force: Annotated[bool, Parameter(name=["-f", "--force"])] = False):
+        pass
+
+    child_ac = child_app.assemble_argument_collection()
+
+    # -vd: child recognizes neither flag, so both get unused with the same
+    # original index. partition_tokens must not duplicate the token.
+    matched, unmatched = partition_tokens(
+        parent_ac,
+        ["-vd", "pos1"],
+        exclude=child_ac,
+    )
+    # Parent should match -vd (it knows both -v and -d).
+    assert "-vd" in matched
+    # pos1 is unmatched.
+    assert unmatched == ["pos1"]

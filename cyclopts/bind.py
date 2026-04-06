@@ -141,12 +141,22 @@ def partition_tokens(
             exclude_copy, tokens, end_of_options_delimiter=end_of_options_delimiter
         )
         # Indices NOT in exclude_unused_indices are claimed by the exclude collection.
-        exclude_unused_index_set = set(exclude_unused_indices)
+        # Deduplicate indices (preserving order) because combined short options
+        # (e.g. -vd) can produce multiple unused entries sharing the same
+        # original index.  Without dedup the same original token would be
+        # forwarded to the parent collection more than once.
+        seen: set[int] = set()
+        deduped_indices: list[int] = []
+        for idx in exclude_unused_indices:
+            if idx not in seen:
+                seen.add(idx)
+                deduped_indices.append(idx)
+        exclude_unused_index_set = set(deduped_indices)
         excluded_claimed_indices = {k for k in range(len(tokens)) if k not in exclude_unused_index_set}
         # Tokens eligible for matching against the parent collection.
-        tokens_for_parent = [tokens[k] for k in exclude_unused_indices]
+        tokens_for_parent = [tokens[k] for k in deduped_indices]
         # Map from parent-local index -> original index in ``tokens``.
-        parent_to_original = list(exclude_unused_indices)
+        parent_to_original = list(deduped_indices)
     else:
         excluded_claimed_indices = set()
         tokens_for_parent = list(tokens)
