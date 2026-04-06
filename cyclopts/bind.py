@@ -63,6 +63,127 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     return tokens
 
 
+def segment_tokens_by_command(
+    tokens: list[str],
+    command_indices: list[int],
+) -> list[list[str]]:
+    """Split tokens into segments, one per command level.
+
+    Segments are delimited by command tokens. Command tokens themselves
+    are excluded from the segments.
+
+    Parameters
+    ----------
+    tokens: list[str]
+        The full normalized token list.
+    command_indices: list[int]
+        Indices in ``tokens`` where command names were found.
+        Returned by :meth:`App._parse_commands`.
+
+    Returns
+    -------
+    list[list[str]]
+        ``segments[0]`` contains tokens before the first command,
+        ``segments[i]`` contains tokens after the i-th command but
+        before the (i+1)-th command. There are always
+        ``len(command_indices) + 1`` segments.
+    """
+    segments: list[list[str]] = []
+    prev = 0
+    for idx in command_indices:
+        segments.append(tokens[prev:idx])
+        prev = idx + 1  # skip the command token itself
+    segments.append(tokens[prev:])
+    return segments
+
+
+def partition_tokens(
+    argument_collection: ArgumentCollection,
+    tokens: list[str],
+    *,
+    exclude: "ArgumentCollection | None" = None,
+    end_of_options_delimiter: str = "--",
+) -> tuple[list[str], list[str]]:
+    """Partition tokens into those matching an argument collection and those that don't.
+
+    Delegates to :func:`_parse_kw_and_flags` on a throwaway copy of the
+    argument collection, so all matching edge cases (combined short flags,
+    GNU-style attached values, ``=`` splitting, etc.) are handled correctly
+    without duplicating logic.
+
+    Parameters
+    ----------
+    argument_collection: ArgumentCollection
+        The argument collection to match against.
+    tokens: list[str]
+        Token list to partition.
+    exclude: ArgumentCollection | None
+        If provided, tokens matching this collection take priority and
+        are placed into ``unmatched`` even if they also match
+        ``argument_collection``. Used for child-wins semantics.
+    end_of_options_delimiter: str
+        Token that marks the end of options. Tokens at or after this
+        delimiter are treated as positional-only. Defaults to ``"--"``.
+
+    Returns
+    -------
+    matched: list[str]
+        Tokens (and their values) that match ``argument_collection``.
+    unmatched: list[str]
+        Everything else, in original order.
+    """
+    # First, determine which tokens the exclude collection (if any) would claim.
+    # Those indices are forced into ``unmatched`` regardless of whether the
+    # parent argument collection would also match them (child-wins semantics).
+    if exclude is not None:
+        exclude_copy = exclude.copy(reset_tokens=True)
+        _, exclude_unused_indices, _ = _parse_kw_and_flags(
+            exclude_copy, tokens, end_of_options_delimiter=end_of_options_delimiter
+        )
+        # Indices NOT in exclude_unused_indices are claimed by the exclude collection.
+        # Deduplicate indices (preserving order) because combined short options
+        # (e.g. -vd) can produce multiple unused entries sharing the same
+        # original index.  Without dedup the same original token would be
+        # forwarded to the parent collection more than once.
+        seen: set[int] = set()
+        deduped_indices: list[int] = []
+        for idx in exclude_unused_indices:
+            if idx not in seen:
+                seen.add(idx)
+                deduped_indices.append(idx)
+        exclude_unused_index_set = set(deduped_indices)
+        excluded_claimed_indices = {k for k in range(len(tokens)) if k not in exclude_unused_index_set}
+        # Tokens eligible for matching against the parent collection.
+        tokens_for_parent = [tokens[k] for k in deduped_indices]
+        # Map from parent-local index -> original index in ``tokens``.
+        parent_to_original = list(deduped_indices)
+    else:
+        excluded_claimed_indices = set()
+        tokens_for_parent = list(tokens)
+        parent_to_original = list(range(len(tokens)))
+
+    # Second pass: match remaining tokens against the target collection.
+    parent_copy = argument_collection.copy(reset_tokens=True)
+    _, parent_unused_indices, _ = _parse_kw_and_flags(
+        parent_copy, tokens_for_parent, end_of_options_delimiter=end_of_options_delimiter
+    )
+
+    # Translate parent-local unused indices back into original-token indices.
+    parent_unused_original = {parent_to_original[k] for k in parent_unused_indices}
+
+    # A token is matched iff the parent consumed it AND the exclude collection
+    # did not already claim it.
+    matched: list[str] = []
+    unmatched: list[str] = []
+    for k, tok in enumerate(tokens):
+        if k in excluded_claimed_indices or k in parent_unused_original:
+            unmatched.append(tok)
+        else:
+            matched.append(tok)
+
+    return matched, unmatched
+
+
 def _common_root_keys(argument_collection) -> tuple[str, ...]:
     if not argument_collection:
         return ()
@@ -87,13 +208,17 @@ def _parse_kw_and_flags(
     *,
     end_of_options_delimiter: str = "--",
     stop_at_first_unknown: bool = False,
-) -> tuple[list[str], int | None]:
+) -> tuple[list[str], list[int], int | None]:
     """Extract keyword arguments and flags from the token stream.
 
     Returns
     -------
     unused_tokens: list[str]
         Tokens not consumed by any keyword or flag.
+    unused_token_original_indices: list[int]
+        Parallel list to ``unused_tokens`` giving each token's original
+        index in the input ``tokens`` sequence. ``len(unused_tokens) ==
+        len(unused_token_original_indices)``.
     contiguous_positional_count: int | None
         Number of leading contiguous non-option tokens before the first gap
         caused by keyword extraction. ``None`` if all non-option tokens are
@@ -106,8 +231,10 @@ def _parse_kw_and_flags(
         from consuming tokens that appeared after keyword arguments.
     """
     unused_tokens, positional_only_tokens = [], []
+    positional_only_start: int | None = None
     unused_token_original_indices: list[int] = []
     skip_next_iterations = 0
+    stop_parsing = False
     if end_of_options_delimiter:
         try:
             delimiter_index = tokens.index(end_of_options_delimiter)
@@ -115,6 +242,7 @@ def _parse_kw_and_flags(
             pass  # end_of_options_delimiter not in token stream
         else:
             positional_only_tokens = tokens[delimiter_index:]
+            positional_only_start = delimiter_index
             tokens = tokens[:delimiter_index]
     for i, token in enumerate(tokens):
         # If the previous argument was a keyword, then this is its value
@@ -195,11 +323,15 @@ def _parse_kw_and_flags(
                         # Unknown flag
                         if stop_at_first_unknown:
                             unused_tokens.extend(tokens[i:])
-                            return unused_tokens, None
+                            unused_token_original_indices.extend(range(i, len(tokens)))
+                            stop_parsing = True
+                            break
                         unused_tokens.append(test_flag)
                         unused_token_original_indices.append(i)
                         position += 1
 
+                if stop_parsing:
+                    break
                 if not matches:
                     # No valid matches found at all
                     continue
@@ -207,7 +339,8 @@ def _parse_kw_and_flags(
                 if stop_at_first_unknown:
                     # Unknown option, stop parsing and return all remaining tokens
                     unused_tokens.extend(tokens[i:])
-                    return unused_tokens, None
+                    unused_token_original_indices.extend(range(i, len(tokens)))
+                    break
                 unused_tokens.append(token)
                 unused_token_original_indices.append(i)
                 continue
@@ -403,7 +536,11 @@ def _parse_kw_and_flags(
             break
 
     unused_tokens.extend(positional_only_tokens)
-    return unused_tokens, contiguous_positional_count
+    if positional_only_start is not None:
+        unused_token_original_indices.extend(
+            range(positional_only_start, positional_only_start + len(positional_only_tokens))
+        )
+    return unused_tokens, unused_token_original_indices, contiguous_positional_count
 
 
 def _future_positional_only_token_count(argument_collection: ArgumentCollection, starting_index: int) -> int:
@@ -587,6 +724,7 @@ def create_bound_arguments(
     configs: Iterable[Callable],
     *,
     end_of_options_delimiter: str = "--",
+    positional_tokens: list[str] | None = None,
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -597,9 +735,15 @@ def create_bound_arguments(
     argument_collection: ArgumentCollection
     tokens: list[str]
         CLI tokens to parse and coerce to match ``f``'s signature.
+        If ``positional_tokens`` is provided, only used for keyword/flag parsing.
     configs: Iterable[Callable]
     end_of_options_delimiter: str
         Everything after this special token is forced to be supplied as a positional argument.
+    positional_tokens: list[str] | None
+        If provided, these tokens are used for positional argument parsing
+        instead of the leftover tokens from keyword/flag parsing. This is
+        used by flag scoping to separate which tokens are eligible for
+        keyword/flag matching vs positional assignment.
 
     Returns
     -------
@@ -612,9 +756,12 @@ def create_bound_arguments(
     unused_tokens = tokens
 
     try:
-        unused_tokens, contiguous_positional_count = _parse_kw_and_flags(
+        unused_tokens, _, contiguous_positional_count = _parse_kw_and_flags(
             argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
         )
+        if positional_tokens is not None:
+            unused_tokens = positional_tokens
+            contiguous_positional_count = None
         unused_tokens = _parse_pos(
             argument_collection,
             unused_tokens,
