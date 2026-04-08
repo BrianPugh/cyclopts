@@ -1,3 +1,4 @@
+from pathlib import Path
 from textwrap import dedent
 from typing import Annotated
 
@@ -58,3 +59,37 @@ def test_union_coercion_cannot_coerce_error(app, console):
     )
 
     assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("bar", ["bar"]),
+        ("bar baz", ["bar", "baz"]),
+    ],
+)
+def test_union_of_list_types(app, cmd_str, expected, assert_parse_args):
+    """list[str] | list[Path] should work as a union of list types (issue #780)."""
+
+    @app.default
+    def foo(paths: list[str] | list[Path]):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("bar", ["bar"]),
+        ("bar baz", ["bar", "baz"]),
+    ],
+)
+def test_union_of_list_types_optional(app, cmd_str, expected, assert_parse_args):
+    """list[str] | list[Path] | None should work as a union of list types."""
+
+    @app.default
+    def foo(paths: list[str] | list[Path] | None = None):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
