@@ -932,7 +932,10 @@ def convert(
         # enum.Flag object.
         return convert_enum_flag(dispatch_origin, tokens, name_transform)
     else:
-        if len(tokens) == 1:
+        tokens_per_element, consume_all = token_count(type_)
+        if consume_all:
+            return convert_priv(type_, tokens)  # pyright: ignore
+        elif len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
         # Pass Token objects to token_count for consistent union type resolution
         # tokens is Sequence[Token] at this point (strings were converted to Tokens earlier in this function)
