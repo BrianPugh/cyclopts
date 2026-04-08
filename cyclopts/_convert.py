@@ -847,10 +847,12 @@ def convert(
         # enum.Flag object.
         return convert_enum_flag(maybe_origin_type, tokens, name_transform)
     else:
-        if len(tokens) == 1:
+        tokens_per_element, consume_all = token_count(type_)
+        if consume_all:
+            return convert_priv(type_, tokens)  # pyright: ignore
+        elif len(tokens) == 1:
             return convert_priv(type_, tokens[0])  # pyright: ignore
-        tokens_per_element, _ = token_count(type_)
-        if tokens_per_element == 1:
+        elif tokens_per_element == 1:
             return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
         elif len(tokens) == tokens_per_element:
             return convert_priv(type_, tokens)  # pyright: ignore
