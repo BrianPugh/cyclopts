@@ -262,17 +262,17 @@ _ConfigCallable = Callable[["list[App]", "tuple[str, ...]", "ArgumentCollection"
 
 
 def _app_optional_name_converter(value: str | Iterable[str] | None) -> tuple[str, ...] | None:
-    return optional_to_tuple_converter(value)
+    return optional_to_tuple_converter(value)  # type: ignore[return-value]
 
 
 def _app_str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
-    return cast(tuple[str, ...], to_tuple_converter(value))
+    return to_tuple_converter(value)  # type: ignore[return-value]
 
 
 def _app_config_converter(
     value: "_ConfigCallable | Iterable[_ConfigCallable] | None",
 ) -> "tuple[_ConfigCallable, ...] | None":
-    return optional_to_tuple_converter(value)
+    return optional_to_tuple_converter(value)  # type: ignore[return-value]
 
 
 def _app_group_tuple_converter(value: Group | str | Iterable[Group | str] | None) -> tuple[Group | str, ...]:
@@ -282,7 +282,7 @@ def _app_group_tuple_converter(value: Group | str | Iterable[Group | str] | None
 def _app_validator_converter(
     value: Callable[..., Any] | Iterable[Callable[..., Any]] | None,
 ) -> list[Callable[..., Any]]:
-    return to_list_converter(value)
+    return to_list_converter(value)  # type: ignore[return-value]
 
 
 @define
