@@ -258,7 +258,7 @@ def _group_converter(input_value: None | str | Group) -> Group | None:
         raise TypeError
 
 
-_ConfigCallable = Callable[["list[App]", "tuple[str, ...]", "ArgumentCollection"], Any]
+_ConfigCallable = Callable[["App", "tuple[str, ...]", "ArgumentCollection"], Any]
 
 
 def _app_optional_name_converter(value: str | Iterable[str] | None) -> tuple[str, ...] | None:
@@ -309,8 +309,8 @@ class App:
     # This can ONLY ever be None or Tuple[Callable, ...]
     _config: (
         None
-        | Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any]
-        | Iterable[Callable[[list["App"], tuple[str, ...], ArgumentCollection], Any]]
+        | Callable[["App", tuple[str, ...], ArgumentCollection], Any]
+        | Iterable[Callable[["App", tuple[str, ...], ArgumentCollection], Any]]
     ) = field(
         default=None,
         alias="config",
