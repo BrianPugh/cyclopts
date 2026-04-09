@@ -2056,7 +2056,7 @@ class App:
 
             # Prepare usage
             if executing_app.usage is None:
-                usage = format_usage(self, command_chain)
+                usage = format_usage(self, command_chain, execution_path=apps)
             elif executing_app.usage:  # i.e. skip empty-string.
                 usage = executing_app.usage + "\n"
             else:

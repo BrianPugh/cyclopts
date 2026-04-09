@@ -1724,7 +1724,7 @@ def test_help_print_commands_plus_meta(console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND
+        Usage: app COMMAND --hostname STR
 
         App Help String Line 1.
 
@@ -1865,7 +1865,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND
+        Usage: app COMMAND --hostname STR [ARGS...]
 
         App Help String Line 1 from meta.
 
@@ -1904,7 +1904,7 @@ def test_help_print_commands_plus_meta_short(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app COMMAND RDP
+        Usage: app COMMAND --hostname STR RDP [ARGS...]
 
         Root Default Command Short Description.
 
@@ -2242,7 +2242,7 @@ def test_issue_373_help_space_with_meta_app(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app VALUE
+        Usage: app [OPTIONS] VALUE
 
         App Help String Line 1.
 

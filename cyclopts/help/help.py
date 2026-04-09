@@ -251,6 +251,7 @@ def _categorize_positional_arguments(argument_collection: "ArgumentCollection") 
 def format_usage(
     app: "App",
     command_chain: Iterable[str],
+    execution_path: tuple["App", ...] = (),
 ):
     from rich.text import Text
 
@@ -280,36 +281,50 @@ def format_usage(
     if any(x not in help_version_flags and app._get_item(x, recurse_meta=True).show for x in app):
         usage.append("COMMAND")
 
-    if app.default_command:
-        argument_collection = app.assemble_argument_collection(parse_docstring=False)
+    # Include meta app parameters (e.g., options defined on meta.default) in the usage line,
+    # matching how _assemble_help_panels collects parameters for help panels.
+    apps_for_usage = app._get_resolution_context(execution_path) if execution_path else [app]
 
-        required_keyword_params, optional_keyword_params = _categorize_keyword_arguments(argument_collection)
-        required_positional_args, optional_positional_args = _categorize_positional_arguments(argument_collection)
+    required_keyword_params = []
+    optional_keyword_params = []
+    required_positional_args = []
+    optional_positional_args = []
 
-        for argument in required_keyword_params:
-            param_name = argument.name
-            type_name = get_hint_name(argument.hint).upper()
-            usage.append(f"{param_name} {type_name}")
+    for usage_app in apps_for_usage:
+        if not usage_app.default_command:
+            continue
+        argument_collection = usage_app.assemble_argument_collection(parse_docstring=False)
+        rk, ok = _categorize_keyword_arguments(argument_collection)
+        rp, op = _categorize_positional_arguments(argument_collection)
+        required_keyword_params.extend(rk)
+        optional_keyword_params.extend(ok)
+        required_positional_args.extend(rp)
+        optional_positional_args.extend(op)
 
-        if optional_keyword_params:
-            usage.append("[OPTIONS]")
+    for argument in required_keyword_params:
+        param_name = argument.name
+        type_name = get_hint_name(argument.hint).upper()
+        usage.append(f"{param_name} {type_name}")
 
-        for argument in required_positional_args:
-            if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
-                arg_name = argument.name.lstrip("-").upper()
-                usage.append(f"{arg_name}...")
-            else:
-                arg_name = argument.name.lstrip("-").upper()
-                usage.append(arg_name)
+    if optional_keyword_params:
+        usage.append("[OPTIONS]")
 
-        if optional_positional_args:
-            has_var_positional = any(
-                arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
-            )
-            if has_var_positional:
-                usage.append("[ARGS...]")
-            else:
-                usage.append("[ARGS]")
+    for argument in required_positional_args:
+        if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
+            arg_name = argument.name.lstrip("-").upper()
+            usage.append(f"{arg_name}...")
+        else:
+            arg_name = argument.name.lstrip("-").upper()
+            usage.append(arg_name)
+
+    if optional_positional_args:
+        has_var_positional = any(
+            arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
+        )
+        if has_var_positional:
+            usage.append("[ARGS...]")
+        else:
+            usage.append("[ARGS]")
 
     return Text(" ".join(usage) + "\n", style="bold")
 

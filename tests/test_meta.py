@@ -181,7 +181,7 @@ def test_meta_app_inheriting_root_default_parameter(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_meta COMMAND
+        Usage: test_meta COMMAND [OPTIONS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ foo                                                                │
@@ -272,7 +272,7 @@ def test_meta_app_help_inconsistency_with_argument_order(app, console):
 
     expected = dedent(
         """\
-        Usage: test_meta foo LOOPS
+        Usage: test_meta foo --user STR LOOPS
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  LOOPS --loops  [required]                                       │
