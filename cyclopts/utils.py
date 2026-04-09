@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
     from attrs import frozen
     from rich.console import Console
+
+    from cyclopts.help.protocols import HelpFormatter
 else:
     from attrs import define
 
@@ -156,8 +158,8 @@ def sort_key_converter(value: Any) -> Any:
 
 
 def help_formatter_converter(
-    input_value: None | Literal["default", "plain"] | Any,
-) -> Any | None:
+    input_value: "None | Literal['default', 'plain'] | HelpFormatter",
+) -> "HelpFormatter | None":
     """Convert string literals to help formatter instances.
 
     Parameters

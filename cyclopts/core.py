@@ -82,7 +82,9 @@ V = TypeVar("V")
 DEFAULT_FORMAT = "markdown"
 
 
-def _result_action_converter(value: None | Any | Iterable[Any]) -> tuple[Any, ...] | None:
+def _result_action_converter(
+    value: "ResultAction | ResultActionSingle | None",
+) -> tuple["ResultActionSingle", ...] | None:
     """Convert result_action value, ensuring non-empty sequences.
 
     Intended to be used in an ``attrs.Field`` for result_action.
@@ -117,7 +119,7 @@ def _get_root_module_name():
     raise _CannotDeriveCallingModuleNameError  # pragma: no cover
 
 
-def _validate_default_command(x):
+def _validate_default_command(x: Callable[..., Any] | None) -> Callable[..., Any] | None:
     if isinstance(x, App):
         raise TypeError("Cannot register a sub-App to default.")
     return x
@@ -256,11 +258,38 @@ def _group_converter(input_value: None | str | Group) -> Group | None:
         raise TypeError
 
 
+_ConfigCallable = Callable[["list[App]", "tuple[str, ...]", "ArgumentCollection"], Any]
+
+
+def _app_optional_name_converter(value: str | Iterable[str] | None) -> tuple[str, ...] | None:
+    return optional_to_tuple_converter(value)
+
+
+def _app_str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
+    return cast(tuple[str, ...], to_tuple_converter(value))
+
+
+def _app_config_converter(
+    value: "_ConfigCallable | Iterable[_ConfigCallable] | None",
+) -> "tuple[_ConfigCallable, ...] | None":
+    return optional_to_tuple_converter(value)
+
+
+def _app_group_tuple_converter(value: Group | str | Iterable[Group | str] | None) -> tuple[Group | str, ...]:
+    return cast(tuple[Group | str, ...], to_tuple_converter(value))
+
+
+def _app_validator_converter(
+    value: Callable[..., Any] | Iterable[Callable[..., Any]] | None,
+) -> list[Callable[..., Any]]:
+    return to_list_converter(value)
+
+
 @define
 class App:
     # This can ONLY ever be Tuple[str, ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    _name: None | str | tuple[str, ...] = field(default=None, alias="name", converter=optional_to_tuple_converter)
+    _name: None | str | tuple[str, ...] = field(default=None, alias="name", converter=_app_optional_name_converter)
 
     _help: str | None = field(default=None, alias="help")
 
@@ -270,7 +299,7 @@ class App:
 
     alias: None | str | tuple[str, ...] = field(
         default=None,
-        converter=to_tuple_converter,
+        converter=_app_str_tuple_converter,
         kw_only=True,
     )
 
@@ -285,7 +314,7 @@ class App:
     ) = field(
         default=None,
         alias="config",
-        converter=optional_to_tuple_converter,
+        converter=_app_config_converter,
         kw_only=True,
     )
 
@@ -295,7 +324,7 @@ class App:
     # This can ONLY ever be a Tuple[str, ...]
     _version_flags: str | Iterable[str] = field(
         default=["--version"],
-        converter=to_tuple_converter,
+        converter=_app_str_tuple_converter,
         alias="version_flags",
         kw_only=True,
     )
@@ -309,7 +338,7 @@ class App:
     # This can ONLY ever be a Tuple[str, ...]
     _help_flags: str | Iterable[str] = field(
         default=["--help", "-h"],
-        converter=to_tuple_converter,
+        converter=_app_str_tuple_converter,
         alias="help_flags",
         kw_only=True,
     )
@@ -326,7 +355,9 @@ class App:
 
     # This can ONLY ever be Tuple[Union[Group, str], ...] due to converter.
     # The other types is to make mypy happy for Cyclopts users.
-    group: Group | str | tuple[Group | str, ...] = field(default=None, converter=to_tuple_converter, kw_only=True)
+    group: Group | str | tuple[Group | str, ...] = field(
+        default=None, converter=_app_group_tuple_converter, kw_only=True
+    )
 
     # This can ONLY ever be a Group or None
     _group_arguments: Group | str | None = field(
@@ -350,7 +381,7 @@ class App:
         kw_only=True,
     )
 
-    validator: list[Callable[..., Any]] = field(default=None, converter=to_list_converter, kw_only=True)
+    validator: list[Callable[..., Any]] = field(default=None, converter=_app_validator_converter, kw_only=True)
 
     _name_transform: Callable[[str], str] | None = field(
         default=None,
