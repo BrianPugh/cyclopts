@@ -14,7 +14,6 @@ from typing import (  # noqa: UP035
     get_origin,
 )
 
-import attrs
 from attrs import define, field
 
 if sys.version_info >= (3, 11):
@@ -67,8 +66,34 @@ def _not_hyphen_validator(instance, attribute, values):
             raise ValueError(f'{attribute.alias} value must NOT start with "-".')
 
 
+def _str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
+    return cast(tuple[str, ...], to_tuple_converter(value))
+
+
+def _validator_tuple_converter(
+    value: Callable[[Any, Any], Any] | Iterable[Callable[[Any, Any], Any]] | None,
+) -> tuple[Callable[[Any, Any], Any], ...]:
+    return cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(value))
+
+
+def _group_tuple_converter(value: "None | Group | str | Iterable[Group | str]") -> tuple["Group | str", ...]:
+    return cast(tuple["Group | str", ...], to_tuple_converter(value))
+
+
+def _optional_str_tuple_converter(value: bool | str | Iterable[str] | None) -> tuple[str, ...] | None:
+    return optional_to_tuple_converter(value)  # type: ignore[return-value]
+
+
+def _default_if_none_true(value: bool | None) -> bool:
+    return value if value is not None else True
+
+
+def _default_if_none_false(value: bool | None) -> bool:
+    return value if value is not None else False
+
+
 def _negative_converter(default: tuple[str, ...]):
-    def converter(value) -> tuple[str, ...]:
+    def converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
         if value is None:
             return default
         else:
@@ -77,7 +102,9 @@ def _negative_converter(default: tuple[str, ...]):
     return converter
 
 
-def _consume_multiple_converter(value) -> tuple[int, int | None] | None:
+def _consume_multiple_converter(
+    value: bool | int | Sequence[int] | tuple[int, int | None] | None,
+) -> tuple[int, int | None] | None:
     """Normalize consume_multiple into (min, max) or None.
 
     Returns
@@ -113,7 +140,7 @@ def _consume_multiple_converter(value) -> tuple[int, int | None] | None:
     raise TypeError(f"consume_multiple must be None, bool, int, or a (min, max) sequence, got {type(value).__name__}.")
 
 
-def _parse_converter(value):
+def _parse_converter(value: bool | re.Pattern[str] | str | None) -> bool | re.Pattern[str] | None:
     """Convert string patterns to compiled regex, pass through other types.
 
     Note: re.compile() internally caches compiled patterns, so no additional
@@ -161,7 +188,7 @@ class Parameter:
     # Usually starts with "--" or "-"
     name: None | str | Iterable[str] = field(
         default=None,
-        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
+        converter=_str_tuple_converter,
     )
 
     # Accepts regular converters (type, tokens) -> Any, bound methods (tokens) -> Any, or string references
@@ -173,28 +200,28 @@ class Parameter:
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: None | Callable[[Any, Any], Any] | Iterable[Callable[[Any, Any], Any]] = field(
         default=(),
-        converter=lambda x: cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(x)),
+        converter=_validator_tuple_converter,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
     alias: None | str | Iterable[str] = field(
         default=None,
-        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
+        converter=_str_tuple_converter,
         kw_only=True,
     )
 
     # This can ONLY ever be ``None`` or ``Tuple[str, ...]``
     negative: None | str | Iterable[str] = field(
         default=None,
-        converter=optional_to_tuple_converter,
+        converter=_optional_str_tuple_converter,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
     group: None | Group | str | Iterable[Group | str] = field(
         default=None,
-        converter=to_tuple_converter,
+        converter=_group_tuple_converter,
         kw_only=True,
         hash=False,
     )
@@ -218,7 +245,7 @@ class Parameter:
 
     show_choices: bool = field(
         default=None,
-        converter=attrs.converters.default_if_none(True),
+        converter=_default_if_none_true,
         kw_only=True,
     )
 
@@ -226,18 +253,18 @@ class Parameter:
 
     show_env_var: bool = field(
         default=None,
-        converter=attrs.converters.default_if_none(True),
+        converter=_default_if_none_true,
         kw_only=True,
     )
 
     # This can ONLY ever be a Tuple[str, ...]
     env_var: None | str | Iterable[str] = field(
         default=None,
-        converter=lambda x: cast(tuple[str, ...], to_tuple_converter(x)),
+        converter=_str_tuple_converter,
         kw_only=True,
     )
 
-    env_var_split: Callable = field(
+    env_var_split: Callable[..., Any] = field(
         default=cyclopts._env_var.env_var_split,
         kw_only=True,
     )
@@ -304,7 +331,7 @@ class Parameter:
 
     count: bool = field(
         default=None,
-        converter=attrs.converters.default_if_none(False),
+        converter=_default_if_none_false,
         kw_only=True,
     )
 

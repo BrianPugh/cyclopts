@@ -13,6 +13,11 @@ from cyclopts.argument import ArgumentCollection, update_argument_collection
 from cyclopts.exceptions import CycloptsError
 from cyclopts.utils import to_tuple_converter
 
+
+def _root_keys_converter(value: Iterable[str]) -> tuple[str, ...]:
+    return to_tuple_converter(value)  # type: ignore[return-value]
+
+
 if TYPE_CHECKING:
     from cyclopts.core import App
 
@@ -25,7 +30,7 @@ class ConfigBase(ABC):
     and updating ArgumentCollections.
     """
 
-    root_keys: Iterable[str] = field(default=(), converter=to_tuple_converter)
+    root_keys: Iterable[str] = field(default=(), converter=_root_keys_converter)
     allow_unknown: bool = field(default=False)
     use_commands_as_keys: bool = field(default=True)
     _source: str | None = field(default=None, alias="source")

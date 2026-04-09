@@ -8,7 +8,6 @@ from typing import (
     Literal,
     Optional,
     Union,
-    cast,
 )
 
 from attrs import field
@@ -61,6 +60,12 @@ class DEFAULT_PARAMETERS_GROUP_SORT_MARKER(Sentinel):  # noqa: N801
     pass
 
 
+def _group_validator_converter(
+    value: "None | Callable[[ArgumentCollection], Any] | Iterable[Callable[[ArgumentCollection], Any]]",
+) -> "tuple[Callable[[ArgumentCollection], Any], ...]":
+    return to_tuple_converter(value)  # type: ignore[return-value]
+
+
 def _group_name_converter(val: str):
     return val if val else object()
 
@@ -93,7 +98,7 @@ class Group:
     # This can ONLY ever be a Tuple[Callable, ...]
     validator: None | Callable[["ArgumentCollection"], Any] | Iterable[Callable[["ArgumentCollection"], Any]] = field(
         default=None,
-        converter=lambda x: cast(tuple[Callable, ...], to_tuple_converter(x)),
+        converter=_group_validator_converter,
         kw_only=True,
     )
 

@@ -936,23 +936,23 @@ def test_custom_formatter_receives_correct_arguments(console: Console):
     captured_args = {}
 
     class ValidatingFormatter:
-        def __call__(self, console_arg, options_arg, panel_arg):
+        def __call__(self, console, options, panel):
             # Capture arguments for validation
-            captured_args["console"] = console_arg
-            captured_args["options"] = options_arg
-            captured_args["panel"] = panel_arg
+            captured_args["console"] = console
+            captured_args["options"] = options
+            captured_args["panel"] = panel
 
             # Verify panel structure
-            assert hasattr(panel_arg, "title")
-            assert hasattr(panel_arg, "entries")
-            assert hasattr(panel_arg, "description")
+            assert hasattr(panel, "title")
+            assert hasattr(panel, "entries")
+            assert hasattr(panel, "description")
 
             # Render something to verify it works
-            console_arg.print(f"Panel: {panel_arg.title}")
-            assert len(panel_arg.entries) == 1
-            entry = panel_arg.entries[0]
+            console.print(f"Panel: {panel.title}")
+            assert len(panel.entries) == 1
+            entry = panel.entries[0]
             assert "test" in " ".join(entry.names).lower() and "param" in " ".join(entry.names).lower()
-            console_arg.print(f"  Entry: {' '.join(entry.names)}")
+            console.print(f"  Entry: {' '.join(entry.names)}")
 
     custom_group = Group(
         "Validated Group",

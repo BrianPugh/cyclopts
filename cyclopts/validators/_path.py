@@ -7,7 +7,7 @@ from attrs import field
 from cyclopts.utils import frozen, to_tuple_converter
 
 
-def ext_converter(value: None | Any | Iterable[Any]) -> tuple[str, ...]:
+def ext_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
     return tuple(e.lower().lstrip(".") for e in to_tuple_converter(value))
 
 
