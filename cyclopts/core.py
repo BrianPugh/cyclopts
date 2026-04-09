@@ -1686,7 +1686,7 @@ class App:
         verbose: bool | None = None,
         end_of_options_delimiter: str | None = None,
         error_formatter: Callable[["CycloptsError"], Any] | None = None,
-    ) -> tuple[Callable, inspect.BoundArguments, dict[str, Any]]:
+    ) -> tuple[Callable[..., Any], inspect.BoundArguments, dict[str, Any]]:
         """Interpret arguments into a function and :class:`~inspect.BoundArguments`.
 
         Raises
