@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from textwrap import dedent
 from typing import Annotated
 
@@ -389,3 +390,39 @@ def test_nested_meta_app_command_help(console):
     # Should show help for foo command
     assert "foo" in actual.lower()
     assert "value" in actual.lower()
+
+
+def test_issue_783_meta_default_options_in_usage(console):
+    """Usage string should include [OPTIONS] when meta.default has visible parameters.
+
+    https://github.com/BrianPugh/cyclopts/issues/783
+    """
+
+    @dataclass
+    class Options:
+        input: Annotated[str | None, Parameter(name=["--input", "-i"])] = None
+        output: Annotated[str | None, Parameter(name=["--output", "-o"])] = None
+
+    app = App(console=console, result_action="return_value")
+
+    @app.meta.default
+    def main(
+        *tokens: Annotated[str, Parameter(show=False)], opts: Annotated[Options, Parameter()] | None = None
+    ) -> None:
+        command, bound, _ = app.parse_args(tokens)
+        if opts is None:
+            opts = Options()
+        command(*bound.args, **bound.kwargs, opts=opts)
+
+    @app.command
+    def add(*args: str, opts: Annotated[Options, Parameter(parse=False)]) -> None:
+        pass
+
+    with console.capture() as capture:
+        app.meta(["--help"])
+
+    actual = capture.get()
+
+    # The usage line should include [OPTIONS] since the meta.default has visible
+    # keyword parameters (opts: Options).
+    assert "[OPTIONS]" in actual
