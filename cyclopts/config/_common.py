@@ -15,7 +15,7 @@ from cyclopts.utils import to_tuple_converter
 
 
 def _root_keys_converter(value: Iterable[str]) -> tuple[str, ...]:
-    return to_tuple_converter(value)
+    return to_tuple_converter(value)  # type: ignore[return-value]
 
 
 if TYPE_CHECKING:

@@ -81,7 +81,7 @@ def _group_tuple_converter(value: "None | Group | str | Iterable[Group | str]") 
 
 
 def _optional_str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...] | None:
-    return optional_to_tuple_converter(value)
+    return optional_to_tuple_converter(value)  # type: ignore[return-value]
 
 
 def _default_if_none_true(value: bool | None) -> bool:
