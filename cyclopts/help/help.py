@@ -10,7 +10,7 @@ from typing import (
     Literal,
 )
 
-from attrs import converters, define, evolve, field
+from attrs import define, evolve, field
 
 from cyclopts.annotations import resolve_annotated
 from cyclopts.core import _get_root_module_name
@@ -58,6 +58,12 @@ def _text_factory():
     from rich.text import Text
 
     return Text()
+
+
+def _description_converter(value: Any | None) -> Any:
+    if value is None:
+        return _text_factory()
+    return value
 
 
 @frozen(kw_only=True)
@@ -131,7 +137,7 @@ class HelpPanel:
 
     description: Any = field(
         default=None,
-        converter=converters.default_if_none(factory=_text_factory),
+        converter=_description_converter,
     )
     """Optional description text displayed below the title.
 
