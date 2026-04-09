@@ -12,7 +12,7 @@ from typing import (
 
 from attrs import converters, define, evolve, field
 
-from cyclopts.annotations import resolve_annotated
+from cyclopts.annotations import is_pydantic, resolve_annotated
 from cyclopts.core import _get_root_module_name
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
@@ -375,6 +375,22 @@ def create_parameter_help_panel(
 
     entries_positional, entries_kw = [], []
     for argument in argument_collection.filter_by(show=True):
+        # For dict[str, BaseModel] arguments, synthesize one help entry per sub-field
+        # using {NAME} as a placeholder for the dynamic dict key.
+        if argument._accepts_keywords and not argument._lookup and is_pydantic(argument._default):
+            negatives = set(argument.negatives)
+            base_names = [o for o in argument.names if o not in negatives and not _is_short(o)]
+            for field_name, pydantic_field in argument._default.model_fields.items():
+                synthetic_names = tuple(f"{name}.{{NAME}}.{field_name}" for name in base_names)
+                entry = HelpEntry(
+                    positive_names=synthetic_names,
+                    description=InlineText.from_format(pydantic_field.description or "", format=format),
+                    required=argument.required,
+                    type=resolve_annotated(pydantic_field.annotation),
+                )
+                entries_kw.append(entry)
+            continue
+
         assert argument.parameter.name_transform
 
         help_components = []

@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Annotated, Literal
 
 import pytest
+from pydantic import BaseModel, Field
 
 from cyclopts import App, Group, Parameter
 from cyclopts.argument import ArgumentCollection
@@ -2886,6 +2887,78 @@ def test_help_uppercase_short_negative_flag(app, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ DRY-RUN --dry-run -n  [default: True]                              │
         │   --no-dry-run -N                                                  │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_of_basemodels(app, console):
+    """Help for a command whose config has a dict[str, BaseModel] field annotated with a custom help string."""
+
+    class SubConfig(BaseModel):
+        path: str = Field(description="path to model data")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        print(cfg.model_dump_json(indent=2))
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path  path to model data                           │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_req_dict_of_basemodels(app, console):
+    """Help for a command whose config has a dict[str, BaseModel] field annotated with a custom help string."""
+
+    class SubConfig(BaseModel):
+        path: str = Field(description="path to model data")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig]
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")]):
+        print(cfg.model_dump_json(indent=2))
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app MODELS
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --models.{NAME}.path  path to model data [required]             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
