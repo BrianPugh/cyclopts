@@ -483,6 +483,54 @@ def test_pydantic_annotated_field_discriminator_basemodel_container(app, assert_
     )
 
 
+def test_pydantic_annotated_field_discriminator_list(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/785
+
+    list[DiscriminatedUnion] fields in a BaseModel should not crash with
+    ``ValueError: Cannot Union types that consume different numbers of tokens``.
+    """
+
+    class Cat(pydantic.BaseModel):
+        dead_birds: int
+        dead_rats: int
+        type: Literal["cat"] = "cat"
+
+    class Dog(pydantic.BaseModel):
+        type: Literal["dog"] = "dog"
+
+    Animal = Annotated[Cat | Dog, pydantic.Field(discriminator="type")]
+
+    class Home(pydantic.BaseModel):
+        animals: list[Animal]  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.default
+    def main(
+        home: Annotated[Home | None, Parameter(name="*")] = None,
+    ):
+        pass
+
+    # Single dog
+    assert_parse_args(
+        main,
+        """--animals '{"type": "dog"}'""",
+        Home(animals=[Dog()]),
+    )
+
+    # Single cat
+    assert_parse_args(
+        main,
+        """--animals '{"type": "cat", "dead_birds": 1, "dead_rats": 2}'""",
+        Home(animals=[Cat(dead_birds=1, dead_rats=2)]),
+    )
+
+    # Multiple animals
+    assert_parse_args(
+        main,
+        """--animals '{"type": "dog"}' --animals '{"type": "cat", "dead_birds": 3, "dead_rats": 4}'""",
+        Home(animals=[Dog(), Cat(dead_birds=3, dead_rats=4)]),
+    )
+
+
 def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatch):
     """
     Test that Pydantic's own JSON serialization (which uses aliases by default)
