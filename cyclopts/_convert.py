@@ -1089,6 +1089,14 @@ def token_count(
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
+    # Discriminated unions (e.g. Annotated[Cat | Dog, pydantic.Field(discriminator="type")])
+    # consume a single JSON string token regardless of member field counts.
+    # Check before get_parameters strips the Annotated metadata.
+    from cyclopts.argument.utils import get_annotated_discriminator
+
+    if get_annotated_discriminator(resolve_optional(type_)) is not None:
+        return 1, False
+
     from cyclopts.parameter import get_parameters
 
     # Token-aware union handling MUST happen before get_parameters() because
