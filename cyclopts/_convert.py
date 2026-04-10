@@ -24,7 +24,15 @@ if sys.version_info >= (3, 12):
 else:
     TypeAliasType = None
 
-from cyclopts.annotations import ITERABLE_TYPES, is_annotated, is_enum_flag, is_nonetype, is_union, resolve
+from cyclopts.annotations import (
+    ITERABLE_TYPES,
+    is_annotated,
+    is_enum_flag,
+    is_nonetype,
+    is_union,
+    resolve,
+    resolve_optional,
+)
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import FieldInfo, get_field_infos
 from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
@@ -879,6 +887,14 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
+    # Discriminated unions (e.g. Annotated[Cat | Dog, pydantic.Field(discriminator="type")])
+    # consume a single JSON string token regardless of member field counts.
+    # Check before get_parameters strips the Annotated metadata.
+    from cyclopts.argument.utils import get_annotated_discriminator
+
+    if get_annotated_discriminator(resolve_optional(type_)) is not None:
+        return 1, False
+
     # Check for explicit n_tokens in Parameter annotation before resolving
     # This handles nested cases like tuple[Annotated[str, Parameter(n_tokens=2)], int]
     from cyclopts.parameter import get_parameters
