@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 import pytest
 from pydantic import BaseModel, Field
@@ -2959,6 +2959,213 @@ def test_help_pydantic_req_dict_of_basemodels(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --models.{NAME}.path  path to model data [required]             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_nested_basemodel(app, console):
+    """Nested BaseModel fields inside a dict value are recursively expanded."""
+
+    class Inner(BaseModel):
+        value: int = Field(description="some value")
+
+    class SubConfig(BaseModel):
+        path: str = Field(description="path to data")
+        inner: Inner = Field(description="inner config")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path       path to data                            │
+        │ --models.{NAME}.inner.val  some value                              │
+        │   ue                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_nested_dict_of_basemodels(app, console):
+    """dict[str, BaseModel] inside a dict value's BaseModel adds another {NAME} level."""
+
+    class Inner(BaseModel):
+        score: float = Field(description="model score")
+
+    class SubConfig(BaseModel):
+        path: str = Field(description="path to data")
+        children: dict[str, Inner] = Field(default_factory=dict, description="child models")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path       path to data                            │
+        │ --models.{NAME}.children.  model score                             │
+        │   {NAME}.score                                                     │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_optional_basemodel_field(app, console):
+    """Optional[BaseModel] fields are unwrapped and recursively expanded."""
+
+    class Inner(BaseModel):
+        value: int = Field(description="inner value")
+
+    class SubConfig(BaseModel):
+        path: str = Field(description="path to data")
+        extra: Optional[Inner] = Field(default=None, description="optional inner")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path       path to data                            │
+        │ --models.{NAME}.extra.val  inner value                             │
+        │   ue                                                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_list_basemodel_is_leaf(app, console):
+    """list[BaseModel] fields are shown as leaves, not recursively expanded."""
+
+    class Inner(BaseModel):
+        value: int = Field(description="item value")
+
+    class SubConfig(BaseModel):
+        path: str = Field(description="path to data")
+        items: list[Inner] = Field(default_factory=list, description="list of items")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path   path to data                                │
+        │ --models.{NAME}.items  list of items                               │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_circular_reference(app, console):
+    """Circular model references terminate without infinite recursion.
+
+    The self-referencing ``children`` field should still appear as a leaf
+    entry (with its description) rather than being silently dropped.
+    """
+
+    class Node(BaseModel):
+        label: str = Field(description="node label")
+        children: dict[str, "Node"] = Field(default_factory=dict, description="child nodes")
+
+    Node.model_rebuild()
+
+    class TopConfig(BaseModel):
+        root: dict[str, Node] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --root.{NAME}.label        node label                              │
+        │ --root.{NAME}.children.{N  child nodes                             │
+        │   AME}                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
