@@ -12,7 +12,7 @@ from typing import (
 
 from attrs import define, evolve, field
 
-from cyclopts.annotations import resolve_annotated
+from cyclopts.annotations import is_pydantic, is_union, resolve_annotated, resolve_optional
 from cyclopts.core import _get_root_module_name
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
@@ -354,6 +354,51 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
+def _yield_pydantic_help_entries(
+    model_class,
+    base_names: list[str],
+    format: str,
+    required: bool,
+    _seen: set | None = None,
+):
+    """Recursively yield ``HelpEntry`` objects for every leaf field of a pydantic model.
+
+    Handles nested BaseModels, ``dict[str, BaseModel]`` fields, and
+    ``Optional[BaseModel]`` by unwrapping and recursing.  A *_seen* set
+    guards against circular model references.
+    """
+    from typing import get_args, get_origin
+
+    if _seen is None:
+        _seen = set()
+    _seen = _seen | {id(model_class)}
+
+    for field_name, pydantic_field in model_class.model_fields.items():
+        annotation = resolve_annotated(pydantic_field.annotation)
+        resolved = resolve_optional(annotation) if is_union(annotation) else annotation
+        field_names = [f"{name}.{field_name}" for name in base_names]
+        leaf_type = resolved
+
+        if is_pydantic(resolved) and id(resolved) not in _seen:
+            yield from _yield_pydantic_help_entries(resolved, field_names, format, required, _seen)
+            continue
+
+        if get_origin(resolved) is dict:
+            args = get_args(resolved)
+            leaf_type = args[1] if len(args) > 1 else str
+            field_names = [f"{name}.{{NAME}}" for name in field_names]
+            if is_pydantic(leaf_type) and id(leaf_type) not in _seen:
+                yield from _yield_pydantic_help_entries(leaf_type, field_names, format, required, _seen)
+                continue
+
+        yield HelpEntry(
+            positive_names=tuple(field_names),
+            description=InlineText.from_format(pydantic_field.description or "", format=format),
+            required=required,
+            type=leaf_type,
+        )
+
+
 def create_parameter_help_panel(
     group: "Group",
     argument_collection: "ArgumentCollection",
@@ -381,6 +426,17 @@ def create_parameter_help_panel(
 
     entries_positional, entries_kw = [], []
     for argument in argument_collection.filter_by(show=True):
+        # For dict[str, BaseModel] arguments, synthesize one help entry per sub-field
+        # using {NAME} as a placeholder for the dynamic dict key.
+        if argument._accepts_keywords and not argument._lookup and is_pydantic(argument._default):
+            negatives = set(argument.negatives)
+            base_names = [o for o in argument.names if o not in negatives and not _is_short(o)]
+            placeholder_names = [f"{name}.{{NAME}}" for name in base_names]
+            entries_kw.extend(
+                _yield_pydantic_help_entries(argument._default, placeholder_names, format, argument.required)
+            )
+            continue
+
         assert argument.parameter.name_transform
 
         help_components = []
