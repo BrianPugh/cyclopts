@@ -288,6 +288,34 @@ def build_command_chain(command_chain: list[str] | None, command_name: str, app_
         return [app_name, command_name]
 
 
+def apply_usage_name(command_chain: list[str], usage_name: str | None) -> list[str]:
+    """Return a display command chain with the root replaced by ``usage_name``.
+
+    When ``usage_name`` is None, returns ``command_chain`` unchanged so callers
+    can use this helper unconditionally. When the chain is empty, returns a
+    single-element list containing ``usage_name`` so downstream formatters can
+    treat the root specially.
+
+    Parameters
+    ----------
+    command_chain : list[str]
+        The logical command chain (root app name first).
+    usage_name : str | None
+        Replacement for the chain's root element used in Usage: lines only.
+
+    Returns
+    -------
+    list[str]
+        A new list with the root replaced, or the original chain when
+        ``usage_name`` is None.
+    """
+    if usage_name is None:
+        return command_chain
+    if not command_chain:
+        return [usage_name]
+    return [usage_name, *command_chain[1:]]
+
+
 def generate_anchor(command_path: str) -> str:
     """Generate a URL-friendly anchor from a command path.
 
