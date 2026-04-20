@@ -70,6 +70,7 @@ def generate_docs(
     ] = None,
     include_hidden: bool = False,
     heading_level: int = 1,
+    usage_name: str | None = None,
 ):
     """Generate documentation for a Cyclopts application.
 
@@ -88,6 +89,10 @@ def generate_docs(
         Include hidden commands in documentation.
     heading_level : int
         Starting heading level for markdown format.
+    usage_name : Optional[str]
+        Replace the app name shown in ``Usage:`` lines with this string. For
+        example, ``"uv run cli"`` for an app whose runtime name is ``"cli"``.
+        Headings and anchors are unaffected. Default is None.
     """
     if format is None:  # Handled by _format_group_validator
         raise ValueError("Must specify format.")
@@ -97,6 +102,7 @@ def generate_docs(
         output_format=format,
         include_hidden=include_hidden,
         heading_level=heading_level,
+        usage_name=usage_name,
     )
 
     if output:

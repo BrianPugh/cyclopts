@@ -396,3 +396,57 @@ def test_generate_rst_docs_usage_with_varargs():
     assert "SCRIPT" in docs
     # Variable args are typically shown as [ARGS...] or ARGS...
     assert "[ARGS" in docs or "ARGS" in docs
+
+
+def test_generate_rst_docs_usage_name_overrides_root_usage():
+    """usage_name replaces the app name in the root Usage: line (RST)."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main(name: str = "world"):
+        """Greet.
+
+        Parameters
+        ----------
+        name : str
+            Name.
+        """
+        pass
+
+    actual = app.generate_docs(output_format="rst", usage_name="uv run cli")
+    assert "uv run cli" in actual
+
+
+def test_generate_rst_docs_usage_name_overrides_subcommand_usage():
+    """usage_name prefixes every subcommand's Usage: line in RST output."""
+    app = App(name="cli", help="A CLI")
+
+    @app.command
+    def serve(port: int = 8000):
+        """Start server.
+
+        Parameters
+        ----------
+        port : int
+            Port.
+        """
+        pass
+
+    actual = app.generate_docs(output_format="rst", usage_name="uv run cli")
+
+    # Subcommand heading still references the plain app name
+    assert "cli serve" in actual
+    # Usage line for the subcommand shows the override, not the plain app name
+    assert "uv run cli serve" in actual
+
+
+def test_generate_rst_docs_usage_name_none_is_default_behavior():
+    """Default (None) preserves existing RST output."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main():
+        """Entry."""
+        pass
+
+    assert app.generate_docs(output_format="rst") == app.generate_docs(output_format="rst", usage_name=None)
