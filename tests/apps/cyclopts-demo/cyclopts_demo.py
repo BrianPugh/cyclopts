@@ -58,6 +58,16 @@ def cp(
         Preserve file attributes (timestamps, permissions).
     verbose : bool
         Show verbose output.
+
+    Examples
+    --------
+    Copy a single file:
+
+        $ cyclopts-demo files cp source.txt dest.txt
+
+    Copy a directory recursively:
+
+        $ cyclopts-demo files cp --recursive src/ backup/
     """
     print(f"Copy: {source} -> {destination} (recursive={recursive}, preserve={preserve}, verbose={verbose})")
 
