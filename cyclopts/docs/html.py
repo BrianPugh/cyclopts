@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from cyclopts._markup import escape_html, extract_text
 from cyclopts.docs.base import (
+    apply_usage_name,
     build_command_chain,
     extract_description,
     extract_usage,
@@ -335,6 +336,7 @@ def generate_html_docs(
     command_chain: list[str] | None = None,
     generate_toc: bool = True,
     flatten_commands: bool = False,
+    usage_name: str | None = None,
 ) -> str:
     """Generate HTML documentation for a CLI application.
 
@@ -369,6 +371,10 @@ def generate_html_docs(
     flatten_commands : bool
         If True, generate all commands at the same heading level instead of nested.
         Default is False.
+    usage_name : str | None
+        Optional replacement for the root app name in every ``Usage:`` line
+        (root and subcommands). Section headings and anchors continue to use
+        ``app.name[0]``. Default is None.
 
     Returns
     -------
@@ -436,7 +442,8 @@ def generate_html_docs(
             usage_text = usage
         else:
             usage_text = extract_text(usage, None)
-        usage_text = format_usage_line(usage_text, command_chain, prefix="$")
+        display_chain = apply_usage_name(command_chain, usage_name)
+        usage_text = format_usage_line(usage_text, display_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
 
@@ -516,7 +523,8 @@ def generate_html_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_usage_text = format_usage_line(sub_usage_text, sub_command_chain, prefix="$")
+                    sub_display_chain = apply_usage_name(sub_command_chain, usage_name)
+                    sub_usage_text = format_usage_line(sub_usage_text, sub_display_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")
 
@@ -573,6 +581,7 @@ def generate_html_docs(
                                 command_chain=nested_chain,  # Pass the command chain
                                 generate_toc=False,  # No TOC for nested commands
                                 flatten_commands=flatten_commands,
+                                usage_name=usage_name,
                             )
                         lines.append(nested_docs)
 

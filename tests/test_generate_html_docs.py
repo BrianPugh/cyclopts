@@ -326,3 +326,61 @@ def test_generate_html_docs_flatten_commands():
     # Should NOT have h2 or h3 command headings
     assert '<h2 id="myapp-sub' not in docs_flat
     assert '<h3 id="myapp-sub' not in docs_flat
+
+
+def test_generate_html_docs_usage_name_overrides_root_usage():
+    """usage_name replaces the app name in the root Usage: line (HTML)."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main(name: str = "world"):
+        """Greet.
+
+        Parameters
+        ----------
+        name : str
+            Name.
+        """
+        pass
+
+    actual = app.generate_docs(output_format="html", usage_name="uv run cli")
+    assert "uv run cli" in actual
+
+
+def test_generate_html_docs_usage_name_overrides_subcommand_usage():
+    """usage_name prefixes every subcommand's Usage: line in HTML output."""
+    app = App(name="cli", help="A CLI")
+
+    @app.command
+    def serve(port: int = 8000):
+        """Start server.
+
+        Parameters
+        ----------
+        port : int
+            Port.
+        """
+        pass
+
+    actual = app.generate_docs(output_format="html", usage_name="uv run cli")
+    import re
+
+    usage_blocks = re.findall(r'<pre class="usage">([^<]+)</pre>', actual)
+    assert usage_blocks, "expected at least one <pre class='usage'> block"
+    for block in usage_blocks:
+        assert block.strip().startswith("$ uv run cli"), f"usage block: {block!r}"
+
+    # Section anchors still use the plain app name
+    assert 'id="cli-serve"' in actual
+
+
+def test_generate_html_docs_usage_name_none_is_default_behavior():
+    """Default (None) preserves existing HTML output."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main():
+        """Entry."""
+        pass
+
+    assert app.generate_docs(output_format="html") == app.generate_docs(output_format="html", usage_name=None)
