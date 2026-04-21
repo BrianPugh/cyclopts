@@ -227,7 +227,10 @@ markers = [
 addopts = "-m 'not slow'"
 
 [tool.codespell]
-skip = 'uv.lock,'
+skip = 'uv.lock,tests/test_help.py'
+
+[tool.typos.files]
+extend-exclude = ["tests/test_help.py"]
 
 [tool.creosote]
 venvs = [".venv"]
