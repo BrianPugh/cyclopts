@@ -23,6 +23,7 @@ from cyclopts._cache import cache
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     NoneType,
+    get_annotated_discriminator,
     is_annotated,
     is_enum_flag,
     is_nonetype,
@@ -1092,8 +1093,6 @@ def token_count(
     # Discriminated unions (e.g. Annotated[Cat | Dog, pydantic.Field(discriminator="type")])
     # consume a single JSON string token regardless of member field counts.
     # Check before get_parameters strips the Annotated metadata.
-    from cyclopts.argument.utils import get_annotated_discriminator
-
     if get_annotated_discriminator(resolve_optional(type_)) is not None:
         return 1, False
 

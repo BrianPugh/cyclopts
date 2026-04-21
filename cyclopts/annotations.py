@@ -214,6 +214,23 @@ def resolve_annotated(type_: Any) -> type:
     return type_
 
 
+def get_annotated_discriminator(annotation) -> Any:
+    """Return the ``discriminator`` metadata from an ``Annotated[...]`` hint, else ``None``.
+
+    Only inspects ``Annotated`` hints — for other parameterized types (``list[X]``,
+    ``dict[K, V]``, etc.) this returns ``None`` so that an incidental
+    ``.discriminator`` attribute on a type parameter cannot spuriously match.
+    """
+    if get_origin(annotation) is not Annotated:
+        return None
+    for meta in get_args(annotation)[1:]:
+        try:
+            return meta.discriminator
+        except AttributeError:
+            pass
+    return None
+
+
 def resolve_required(type_: Any) -> type:
     if get_origin(type_) in (Required, NotRequired):
         type_ = get_args(type_)[0]
