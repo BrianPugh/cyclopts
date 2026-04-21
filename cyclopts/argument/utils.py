@@ -131,15 +131,6 @@ def missing_keys_factory(
     return inner
 
 
-def get_annotated_discriminator(annotation):
-    for meta in get_args(annotation)[1:]:
-        try:
-            return meta.discriminator
-        except AttributeError:
-            pass
-    return None
-
-
 def enum_flag_from_dict(
     enum_type: type[F],
     data: dict[str, bool],

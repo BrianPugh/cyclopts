@@ -21,6 +21,7 @@ from cyclopts._convert import (
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     contains_hint,
+    get_annotated_discriminator,
     is_attrs,
     is_dataclass,
     is_enum_flag,
@@ -56,7 +57,6 @@ from cyclopts.utils import UNSET, grouper, is_builtin, parse_version
 
 from .utils import (
     enum_flag_from_dict,
-    get_annotated_discriminator,
     get_choices_from_hint,
     missing_keys_factory,
     startswith,
