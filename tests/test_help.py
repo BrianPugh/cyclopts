@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, TypedDict
 
+import attrs
 import pytest
 from pydantic import BaseModel, Field
 
@@ -3207,8 +3208,10 @@ def test_help_pydantic_dict_list_basemodel_is_leaf(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path   path to data                                │
-        │ --models.{NAME}.items  list of items                               │
+        │ --models.{NAME}.path       path to data                            │
+        │ --models.{NAME}.items --m  list of items                           │
+        │   odels.{NAME}.empty-item                                          │
+        │   s                                                                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3257,3 +3260,469 @@ def test_help_pydantic_dict_circular_reference(app, console):
         """
     )
     assert actual == expected
+
+
+def test_help_dict_of_dataclass(app, console):
+    """dict[str, dataclass] fields are expanded with defaults rendered."""
+
+    @dataclass
+    class SubConfig:
+        path: str = "/tmp"
+        count: int = 3
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path   [default: /tmp]                             │
+        │ --models.{NAME}.count  [default: 3]                                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_dict_of_attrs(app, console):
+    """dict[str, attrs-class] fields are expanded with defaults rendered."""
+
+    @attrs.define
+    class SubConfig:
+        path: str = "/tmp"
+
+    @app.default
+    def main(models: dict[str, SubConfig] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path  [default: /tmp]                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_dict_of_typeddict(app, console):
+    """dict[str, TypedDict] fields are expanded."""
+
+    class SubConfig(TypedDict):
+        path: str
+        count: int
+
+    @app.default
+    def main(models: dict[str, SubConfig] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path                                               │
+        │ --models.{NAME}.count                                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_literal_choices(app, console):
+    """Literal fields inside a dict-valued BaseModel render [choices: ...]."""
+
+    class SubConfig(BaseModel):
+        level: Literal["low", "med", "high"] = Field("low", description="verbosity level")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.level  verbosity level [choices: low, med, high]   │
+        │                        [default: low]                              │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_required_propagation(app, console):
+    """An outer required dict + inner defaulted field → inner is NOT marked required."""
+
+    class SubConfig(BaseModel):
+        req_path: str = Field(description="required")
+        opt_path: str = Field("/tmp", description="defaulted")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig]  # required outer
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")]):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app MODELS
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ *  --models.{NAME}.req-path  required [required]                   │
+        │    --models.{NAME}.opt-path  defaulted [default: /tmp]             │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_parameter_help_precedence(app, console):
+    """Parameter(help=...) on a nested field overrides pydantic Field(description=...)."""
+
+    class SubConfig(BaseModel):
+        path: Annotated[str, Parameter(help="cyclopts help")] = Field(description="pydantic description")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.path  cyclopts help                                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_pydantic_dict_name_transform_kebab(app, console):
+    """snake_case pydantic field names are rendered as kebab-case in help."""
+
+    class SubConfig(BaseModel):
+        my_field: str = Field(description="a snake field")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        pass
+
+    with console.capture() as capture:
+        app(["--help"], console=console)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        Usage: app [ARGS]
+
+        App Help String Line 1.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ --models.{NAME}.my-field  a snake field                            │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_parse_pydantic_dict_nested_kebab_name(app):
+    """The CLI accepts the kebab-case form that help advertises for dict-nested fields."""
+
+    class SubConfig(BaseModel):
+        my_field: str = Field(description="snake_case field")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    result = app(["--models.foo.my-field", "hello"], exit_on_error=False)
+    assert result == {"models": {"foo": {"my_field": "hello"}}}
+
+
+def test_parse_pydantic_dict_nested_snake_still_accepted(app):
+    """Backward-compat: raw snake_case names still parse for dict-nested fields."""
+
+    class SubConfig(BaseModel):
+        my_field: str = Field(description="snake_case field")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    result = app(["--models.foo.my_field", "hello"], exit_on_error=False)
+    assert result == {"models": {"foo": {"my_field": "hello"}}}
+
+
+def test_parse_dict_of_dict_of_basemodel_kebab(app):
+    """Double-dynamic: dict[str, dict[str, SubConfig]] — first two segments are dict keys."""
+
+    class SubConfig(BaseModel):
+        my_field: str
+
+    class TopConfig(BaseModel):
+        groups: dict[str, dict[str, SubConfig]] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    result = app(["--groups.a.b.my-field", "hello"], exit_on_error=False)
+    assert result == {"groups": {"a": {"b": {"my_field": "hello"}}}}
+
+
+def test_parse_pydantic_dict_nested_struct_in_struct_kebab(app):
+    """Nested struct inside a dict value: dict[str, SubConfig] where SubConfig has inner: Inner."""
+
+    class Inner(BaseModel):
+        nested_field: str
+
+    class SubConfig(BaseModel):
+        inner: Inner
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    result = app(["--models.foo.inner.nested-field", "hello"], exit_on_error=False)
+    assert result == {"models": {"foo": {"inner": {"nested_field": "hello"}}}}
+
+
+def test_parse_pydantic_dict_nested_alias(app):
+    """Pydantic aliases: both the alias and the Python name are accepted."""
+
+    class SubConfig(BaseModel):
+        model_config = {"populate_by_name": True}
+        my_field: str = Field(alias="my_alias")
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump(by_alias=True)
+
+    # Alias form (kebab)
+    result = app(["--models.foo.my-alias", "via-alias"], exit_on_error=False)
+    assert result == {"models": {"foo": {"my_alias": "via-alias"}}}
+
+
+def test_parse_pydantic_dict_nested_forward_ref_passthrough(app):
+    """Unresolved forward-ref in dict value: segments pass through unchanged."""
+
+    class Node(BaseModel):
+        label: str
+        children: dict[str, "Node"] = Field(default_factory=dict)
+
+    Node.model_rebuild()
+
+    class TopConfig(BaseModel):
+        root: dict[str, Node] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    # Straight through the forward-ref boundary; label is still reachable.
+    result = app(["--root.a.label", "top", "--root.a.children.b.label", "child"], exit_on_error=False)
+    assert result == {
+        "root": {
+            "a": {
+                "label": "top",
+                "children": {"b": {"label": "child", "children": {}}},
+            }
+        }
+    }
+
+
+def test_parse_dict_key_preserved_when_matching_kebab_field_name(app):
+    """A dict key that literally matches a kebab field name must pass through
+    unchanged (not get canonicalized to the field's python name).
+    """
+
+    class SubConfig(BaseModel):
+        my_field: str
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    # Dict key is literally "my-field"; structural field after it is "my-field".
+    # The first segment must stay "my-field" (dict key); the second must canonicalize to "my_field".
+    result = app(["--models.my-field.my-field", "hello"], exit_on_error=False)
+    assert result == {"models": {"my-field": {"my_field": "hello"}}}
+
+
+def test_parse_dict_key_preserved_with_hyphens_and_underscores(app):
+    """Arbitrary characters in dict keys (hyphens, underscores) pass through unchanged."""
+
+    class SubConfig(BaseModel):
+        my_field: str
+
+    class TopConfig(BaseModel):
+        models: dict[str, SubConfig] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    r1 = app(["--models.some-key.my-field", "a"], exit_on_error=False)
+    assert r1 == {"models": {"some-key": {"my_field": "a"}}}
+
+    r2 = app(["--models.some_key.my-field", "b"], exit_on_error=False)
+    assert r2 == {"models": {"some_key": {"my_field": "b"}}}
+
+
+def test_parse_double_dynamic_dict_keys_preserved(app):
+    """``dict[str, dict[str, SubConfig]]`` — both outer and inner dict keys pass
+    through unchanged, even if they look like kebab'd field names.
+    """
+
+    class SubConfig(BaseModel):
+        my_field: str
+
+    class TopConfig(BaseModel):
+        groups: dict[str, dict[str, SubConfig]] = Field(default_factory=dict)
+
+    @app.default
+    def main(cfg: Annotated[TopConfig, Parameter(name="*")] | None = None):
+        if cfg is None:
+            cfg = TopConfig()
+        return cfg.model_dump()
+
+    # Both keys look like kebab form of a field; only the *structural* segment transforms.
+    result = app(["--groups.my-field.my-field.my-field", "hello"], exit_on_error=False)
+    assert result == {"groups": {"my-field": {"my-field": {"my_field": "hello"}}}}
+
+
+def test_normalize_trailing_keys_var_keyword_seed():
+    """``_normalize_trailing_keys`` seeds from ``self.hint`` so VAR_KEYWORD args
+    (whose ``field_info.annotation`` is the value type but whose ``hint`` is the
+    wrapping ``dict[str, ValueType]``) route the first segment as a dict key.
+    """
+
+    class SubConfig(BaseModel):
+        my_field: str
+
+    def main(**opts: SubConfig):
+        pass
+
+    coll = ArgumentCollection._from_callable(main)
+    kw_arg = next(a for a in coll if a.field_info.kind == a.field_info.VAR_KEYWORD)
+
+    assert kw_arg._normalize_trailing_keys(("foo", "my-field")) == ("foo", "my_field")
+    assert kw_arg._normalize_trailing_keys(("foo", "my_field")) == ("foo", "my_field")
+    # A single segment is the dynamic kwarg key — pass through.
+    assert kw_arg._normalize_trailing_keys(("my-field",)) == ("my-field",)
