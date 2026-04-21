@@ -1106,21 +1106,29 @@ class Argument:
 
         error = exc.errors()[0]
         if error["type"] == "missing":
-            # Try normal lookup first
             loc = error["loc"]
-            missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + loc)
 
-            # For discriminated/tagged unions, Pydantic includes the discriminator value
-            # in the error location. e.g., for a Cat|Dog union discriminated by "type",
-            # a missing "rainbow" field on Cat will have loc=('cat', 'rainbow') instead
-            # of just ('rainbow'). Strip discriminator values to find the actual child.
-            while not missing_arguments and len(loc) > 1:
-                loc = loc[1:]
-                missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + loc)
-
-            if missing_arguments:
-                raise MissingArgumentError(argument=missing_arguments[0]) from exc
-            # Fall through to ValidationError if we can't find the missing argument
+            # Pydantic includes list indices in loc for list-element errors
+            # (e.g. ("animals", 0, "dog", "name")). Cyclopts doesn't model list
+            # items as individual Arguments, so no prefix-match can correctly
+            # map — fall through to the native pydantic error, which shows the
+            # full nested path.
+            if not any(isinstance(part, int) for part in loc):
+                candidate = tuple(loc)
+                while candidate:
+                    missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + candidate)
+                    # An Argument that already has tokens cannot be "missing";
+                    # the stripping heuristic has wandered into a populated sibling.
+                    missing_arguments = [a for a in missing_arguments if not a.tokens]
+                    if missing_arguments:
+                        raise MissingArgumentError(argument=missing_arguments[0]) from exc
+                    if len(candidate) == 1:
+                        break
+                    # For discriminated unions pydantic prepends the discriminator
+                    # value (e.g. loc=("cat", "rainbow")). Strip leading elements
+                    # until we find a real child Argument.
+                    candidate = candidate[1:]
+            # Fall through to ValidationError.
 
         if isinstance(exc, pydantic.ValidationError):
             raise ValidationError(exception_message=str(exc), argument=self) from exc
