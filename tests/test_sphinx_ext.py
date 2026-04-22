@@ -1044,6 +1044,8 @@ def serve(port: int = 8000):
             assert "uv run cli" in rst_content
         finally:
             sys.path.remove(str(tmp_path))
+            if "test_usage_name_module" in sys.modules:
+                del sys.modules["test_usage_name_module"]
 
 
 class TestRstContentParsing:

@@ -434,10 +434,58 @@ def test_generate_rst_docs_usage_name_overrides_subcommand_usage():
 
     actual = app.generate_docs(output_format="rst", usage_name="uv run cli")
 
-    # Subcommand heading still references the plain app name
-    assert "cli serve" in actual
+    # Subcommand anchor/ref still uses the plain app name, not the override —
+    # asserted via the explicit RST label rather than a substring match, which
+    # would also be satisfied by the override "uv run cli serve" in the Usage
+    # block.
+    assert ".. _cyclopts-cli-serve:" in actual
+
     # Usage line for the subcommand shows the override, not the plain app name
     assert "uv run cli serve" in actual
+
+
+def test_generate_rst_docs_usage_name_empty_drops_root_in_subcommand_usage():
+    """usage_name='' drops the root token in subcommand Usage lines, with no stray whitespace."""
+    app = App(name="cli", help="A CLI")
+
+    @app.command
+    def serve(port: int = 8000):
+        """Start server.
+
+        Parameters
+        ----------
+        port : int
+            Port.
+        """
+        pass
+
+    actual = app.generate_docs(output_format="rst", usage_name="")
+
+    # Find the Usage literal block for the subcommand. RST emits "::" followed
+    # by a blank line and 4-space-indented content. Check every indented line
+    # inside such blocks.
+    lines = actual.splitlines()
+    literal_contents: list[str] = []
+    i = 0
+    while i < len(lines):
+        if lines[i].rstrip() == "::":
+            i += 1
+            while i < len(lines) and not lines[i].strip():
+                i += 1
+            while i < len(lines) and (lines[i].startswith("    ") or not lines[i].strip()):
+                if lines[i].startswith("    "):
+                    literal_contents.append(lines[i][4:])
+                i += 1
+        else:
+            i += 1
+
+    subcommand_lines = [line for line in literal_contents if "serve" in line]
+    assert subcommand_lines, "expected a subcommand Usage literal line"
+    for line in subcommand_lines:
+        assert "  " not in line, f"double space in usage line: {line!r}"
+        assert not line.startswith(" "), f"leading space in usage line: {line!r}"
+        assert "cli serve" not in line, f"root name leaked into usage line: {line!r}"
+        assert "serve" in line
 
 
 def test_generate_rst_docs_usage_name_none_is_default_behavior():

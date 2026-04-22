@@ -291,10 +291,12 @@ def build_command_chain(command_chain: list[str] | None, command_name: str, app_
 def apply_usage_name(command_chain: list[str], usage_name: str | None) -> list[str]:
     """Return a display command chain with the root replaced by ``usage_name``.
 
-    When ``usage_name`` is None, returns ``command_chain`` unchanged so callers
-    can use this helper unconditionally. When the chain is empty, returns a
-    single-element list containing ``usage_name`` so downstream formatters can
-    treat the root specially.
+    When ``usage_name`` is ``None``, returns ``command_chain`` unchanged so callers
+    can use this helper unconditionally. When ``usage_name`` is ``""``, the root
+    token is dropped rather than substituted, so downstream formatters never see
+    an empty element (which would render as stray leading/internal whitespace).
+    When the chain is empty and ``usage_name`` is a non-empty string, returns a
+    single-element list containing ``usage_name``.
 
     Parameters
     ----------
@@ -302,15 +304,18 @@ def apply_usage_name(command_chain: list[str], usage_name: str | None) -> list[s
         The logical command chain (root app name first).
     usage_name : str | None
         Replacement for the chain's root element used in Usage: lines only.
+        An empty string drops the root token entirely.
 
     Returns
     -------
     list[str]
-        A new list with the root replaced, or the original chain when
-        ``usage_name`` is None.
+        A new list with the root replaced/dropped, or the original chain when
+        ``usage_name`` is ``None``.
     """
     if usage_name is None:
         return command_chain
+    if usage_name == "":
+        return command_chain[1:]
     if not command_chain:
         return [usage_name]
     return [usage_name, *command_chain[1:]]

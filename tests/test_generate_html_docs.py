@@ -374,6 +374,35 @@ def test_generate_html_docs_usage_name_overrides_subcommand_usage():
     assert 'id="cli-serve"' in actual
 
 
+def test_generate_html_docs_usage_name_empty_drops_root_in_subcommand_usage():
+    """usage_name='' drops the root token in subcommand Usage lines, with no stray whitespace."""
+    app = App(name="cli", help="A CLI")
+
+    @app.command
+    def serve(port: int = 8000):
+        """Start server.
+
+        Parameters
+        ----------
+        port : int
+            Port.
+        """
+        pass
+
+    actual = app.generate_docs(output_format="html", usage_name="")
+    import re
+
+    usage_blocks = re.findall(r'<pre class="usage">([^<]+)</pre>', actual)
+    assert usage_blocks, "expected at least one <pre class='usage'> block"
+    subcommand_blocks = [b for b in usage_blocks if "serve" in b]
+    assert subcommand_blocks, "expected a subcommand Usage block"
+    for block in subcommand_blocks:
+        assert "  " not in block, f"double space in usage block: {block!r}"
+        assert not block.startswith(" "), f"leading space in usage block: {block!r}"
+        assert "cli serve" not in block, f"root name leaked into usage block: {block!r}"
+        assert "serve" in block
+
+
 def test_generate_html_docs_usage_name_none_is_default_behavior():
     """Default (None) preserves existing HTML output."""
     app = App(name="cli", help="A CLI")
