@@ -5,6 +5,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Annotated
 
+import pytest
+
 from cyclopts import App, Parameter
 
 
@@ -438,8 +440,6 @@ def test_generate_docs_output_format_markdown():
 
 def test_generate_docs_invalid_format():
     """Test that invalid output format raises ValueError."""
-    import pytest
-
     app = App(name="myapp", help="Test app")
 
     with pytest.raises(ValueError, match='Unsupported format "pdf"'):
@@ -938,3 +938,103 @@ def test_generate_docs_nested_command_list_hyperlinks():
 
     # Also verify the root-level command list (darts listing training)
     assert "* [`training`](#darts-training):" in docs
+
+
+def test_generate_docs_usage_name_overrides_root_usage():
+    """usage_name replaces the app name in the root Usage: line."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main(name: str = "world"):
+        """Greet.
+
+        Parameters
+        ----------
+        name : str
+            Name.
+        """
+        pass
+
+    actual = app.generate_docs(usage_name="uv run cli")
+    assert "# cli" in actual  # heading unchanged
+    usage_block = actual.split("```console")[1].split("```")[0].strip()
+    first_line = next(line for line in usage_block.splitlines() if line.strip())
+    assert first_line.startswith("uv run cli"), f"usage line: {first_line!r}"
+
+
+def test_generate_docs_usage_name_overrides_subcommand_usage():
+    """usage_name prefixes every subcommand's Usage: line too."""
+    app = App(name="cli", help="A CLI")
+
+    @app.command
+    def serve(port: int = 8000):
+        """Start the server.
+
+        Parameters
+        ----------
+        port : int
+            Port.
+        """
+        pass
+
+    actual = app.generate_docs(usage_name="uv run cli")
+    # Subcommand heading still uses plain app name
+    assert "## cli serve" in actual
+    # TOC anchor unchanged
+    assert "](#cli-serve)" in actual
+    # Every console block begins with "uv run cli"
+    for block in actual.split("```console")[1:]:
+        body = block.split("```")[0].strip()
+        first_line = next(line for line in body.splitlines() if line.strip())
+        assert first_line.startswith("uv run cli"), f"usage line should start with 'uv run cli': {first_line!r}"
+
+
+def test_generate_docs_usage_name_none_is_default_behavior():
+    """Passing usage_name=None (default) produces identical output to omitting it."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main():
+        """Entry."""
+        pass
+
+    assert app.generate_docs() == app.generate_docs(usage_name=None)
+
+
+@pytest.mark.parametrize("fmt", ["markdown", "rst", "html"])
+def test_generate_docs_usage_name_applies_across_formats(fmt):
+    """usage_name is accepted by every output format and affects its Usage: output."""
+    app = App(name="cli", help="A CLI")
+
+    @app.default
+    def main():
+        """Entry."""
+        pass
+
+    output = app.generate_docs(output_format=fmt, usage_name="uv run cli")
+    assert "uv run cli" in output
+
+
+def test_generate_docs_usage_name_empty_string_is_inserted_verbatim():
+    """Empty usage_name is inserted verbatim; the bare "cli" prefix is dropped."""
+    app = App(name="cli", help="A CLI")
+
+    @app.command
+    def serve(port: int = 8000):
+        """Start the server.
+
+        Parameters
+        ----------
+        port : int
+            Port.
+        """
+        pass
+
+    actual = app.generate_docs(usage_name="")
+    # Heading untouched
+    assert "## cli serve" in actual
+    # Subcommand usage line no longer starts with "cli " — the root token has been replaced by "".
+    subcommand_usage = actual.split("## cli serve")[1].split("```console")[1].split("```")[0].strip()
+    first_line = next(line for line in subcommand_usage.splitlines() if line.strip())
+    assert not first_line.startswith("cli ")
+    assert first_line.startswith("serve")

@@ -2251,6 +2251,7 @@ class App:
         heading_level: int = 1,
         max_heading_level: int = 6,
         flatten_commands: bool = False,
+        usage_name: str | None = None,
     ) -> str:
         """Generate documentation for this CLI application.
 
@@ -2275,6 +2276,14 @@ class App:
         flatten_commands : bool
             If True, generate all commands at the same heading level instead of nested.
             Default is False.
+        usage_name : str | None
+            Optional replacement for the root app name shown in ``Usage:`` lines
+            of the generated documentation. Useful when the runtime invocation
+            differs from the app's configured name — for example, an app named
+            ``"cli"`` that is typically invoked as ``uv run cli``. Only the
+            ``Usage:`` lines change; document titles, section headings, and
+            table-of-contents anchors continue to use ``app.name[0]``.
+            Default is None (use ``app.name[0]``).
 
         Returns
         -------
@@ -2294,6 +2303,8 @@ class App:
         >>> rst_docs = app.generate_docs(output_format="rst")  # Generate RST
         >>> # To write to file, caller can do:
         >>> # Path("docs/cli.md").write_text(docs)
+        >>> # Override the invocation shown in Usage: lines (e.g., uv run cli)
+        >>> docs = app.generate_docs(usage_name="uv run cli")
         """
         from cyclopts.docs import (
             generate_markdown_docs,
@@ -2312,6 +2323,7 @@ class App:
                 heading_level=heading_level,
                 max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
+                usage_name=usage_name,
             )
         elif output_format == "html":
             doc = generate_html_docs(
@@ -2321,6 +2333,7 @@ class App:
                 heading_level=heading_level,
                 max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
+                usage_name=usage_name,
             )
         elif output_format == "rst":
             doc = generate_rst_docs(
@@ -2331,6 +2344,7 @@ class App:
                 max_heading_level=max_heading_level,
                 flatten_commands=flatten_commands,
                 no_root_title=False,  # Default to False for direct API usage
+                usage_name=usage_name,
             )
 
         return doc

@@ -217,3 +217,46 @@ def test_generate_docs_script_not_found(tmp_path, capsys):
     assert exc_info.value.code == 1
     captured = capsys.readouterr()
     assert "not found" in captured.err.lower()
+
+
+def test_generate_docs_cli_usage_name_override(tmp_path, capsys):
+    """--usage-name replaces the app name in Usage: lines of stdout output."""
+    script = tmp_path / "app.py"
+    script.write_text(
+        dedent(
+            """\
+            from cyclopts import App
+
+            app = App(name="cli", help="Test application")
+
+            @app.default
+            def main(name: str = "World"):
+                '''Greet.
+
+                Parameters
+                ----------
+                name : str
+                    Name to greet.
+                '''
+                pass
+            """
+        )
+    )
+
+    with patch("sys.exit"):
+        cyclopts_cli(
+            [
+                "generate-docs",
+                str(script),
+                "--format",
+                "markdown",
+                "--usage-name",
+                "uv run cli",
+            ]
+        )
+
+    captured = capsys.readouterr()
+    # Heading still uses plain app name
+    assert "# cli" in captured.out
+    # Usage block shows the override
+    assert "uv run cli" in captured.out

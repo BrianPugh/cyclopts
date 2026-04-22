@@ -201,6 +201,18 @@ This is useful when you want to write your own introduction for a command sectio
 
 Without ``:skip-preamble:``, the output would include both your introduction and the command's docstring description, which can be redundant.
 
+``:usage-name:`` - Override the Command Shown in Usage Lines
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Replace the app name shown in ``Usage:`` lines of the generated documentation with a custom invocation string:
+
+.. code-block:: rst
+
+   .. cyclopts:: mypackage.cli:app
+      :usage-name: uv run cli
+
+This is useful when the documented invocation differs from the app's configured name. For example, an ``App(name="cli", ...)`` installed as a project entry point might typically be invoked as ``uv run cli``; setting ``:usage-name: uv run cli`` renders that in every ``Usage:`` block while section headings, anchors, and the table of contents continue to reference the plain ``cli`` name.
+
 Automatic Reference Labels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
