@@ -120,3 +120,21 @@ def test_contains_hint(hint, target_type, expected):
 )
 def test_is_iterable_type(hint, expected):
     assert is_iterable_type(hint) == expected
+
+
+def test_get_annotated_discriminator_rejects_non_annotated():
+    from cyclopts.annotations import get_annotated_discriminator
+
+    class Decoy:
+        discriminator = "type"
+
+    assert get_annotated_discriminator(list[Decoy]) is None
+    assert get_annotated_discriminator(int) is None
+
+
+def test_get_annotated_discriminator_positive():
+    from types import SimpleNamespace
+
+    from cyclopts.annotations import get_annotated_discriminator
+
+    assert get_annotated_discriminator(Annotated[int, SimpleNamespace(discriminator="type")]) == "type"

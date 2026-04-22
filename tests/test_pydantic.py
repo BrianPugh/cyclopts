@@ -483,6 +483,54 @@ def test_pydantic_annotated_field_discriminator_basemodel_container(app, assert_
     )
 
 
+def test_pydantic_annotated_field_discriminator_list(app, assert_parse_args):
+    """Regression test for https://github.com/BrianPugh/cyclopts/issues/785
+
+    list[DiscriminatedUnion] fields in a BaseModel should not crash with
+    ``ValueError: Cannot Union types that consume different numbers of tokens``.
+    """
+
+    class Cat(pydantic.BaseModel):
+        dead_birds: int
+        dead_rats: int
+        type: Literal["cat"] = "cat"
+
+    class Dog(pydantic.BaseModel):
+        type: Literal["dog"] = "dog"
+
+    Animal = Annotated[Cat | Dog, pydantic.Field(discriminator="type")]
+
+    class Home(pydantic.BaseModel):
+        animals: list[Animal]  # pyright: ignore[reportInvalidTypeForm]
+
+    @app.default
+    def main(
+        home: Annotated[Home | None, Parameter(name="*")] = None,
+    ):
+        pass
+
+    # Single dog
+    assert_parse_args(
+        main,
+        """--animals '{"type": "dog"}'""",
+        Home(animals=[Dog()]),
+    )
+
+    # Single cat
+    assert_parse_args(
+        main,
+        """--animals '{"type": "cat", "dead_birds": 1, "dead_rats": 2}'""",
+        Home(animals=[Cat(dead_birds=1, dead_rats=2)]),
+    )
+
+    # Multiple animals
+    assert_parse_args(
+        main,
+        """--animals '{"type": "dog"}' --animals '{"type": "cat", "dead_birds": 3, "dead_rats": 4}'""",
+        Home(animals=[Dog(), Cat(dead_birds=3, dead_rats=4)]),
+    )
+
+
 def test_pydantic_roundtrip_json_with_aliases(app, assert_parse_args, monkeypatch):
     """
     Test that Pydantic's own JSON serialization (which uses aliases by default)
@@ -621,6 +669,84 @@ def test_pydantic_annotated_field_discriminator_missing_argument(app):
 
     assert exc_info.value.argument is not None
     assert exc_info.value.argument.parameter.name == ("--animal.rainbow",)
+
+
+def test_pydantic_discriminated_union_in_list_sibling_field(app):
+    """Regression test for follow-up to issue #785 surfaced during PR #789 review.
+
+    When a pydantic BaseModel contains both a ``list[DiscriminatedUnion]`` field
+    and a sibling field that's provided on the CLI, a missing nested field inside
+    the list element's JSON must raise a ValidationError naming the nested path,
+    not a bogus MissingArgumentError on the populated sibling.
+    """
+
+    class AnimalBase(pydantic.BaseModel):
+        name: str
+
+    class Cat(AnimalBase):
+        dead_birds: int
+        dead_rats: int
+        type: Literal["cat"] = "cat"
+
+    class Dog(AnimalBase):
+        type: Literal["dog"] = "dog"
+
+    Animal = Annotated[Cat | Dog, pydantic.Field(discriminator="type")]
+
+    class Home(pydantic.BaseModel):
+        animals: list[Animal]  # pyright: ignore[reportInvalidTypeForm]
+        name: str
+
+    @app.default
+    def main(*, home: Home):
+        pass
+
+    with pytest.raises(ValidationError) as exc_info:
+        app(
+            ["--home.animals", '{"type": "dog"}', "--home.name", "ISS"],
+            exit_on_error=False,
+        )
+
+    message = str(exc_info.value)
+    assert "animals" in message
+    assert "name" in message
+    assert not isinstance(exc_info.value, MissingArgumentError)
+
+
+def test_pydantic_discriminated_union_in_list_sibling_field_success(app, assert_parse_args):
+    """Happy-path counterpart to ``test_pydantic_discriminated_union_in_list_sibling_field``.
+
+    When a list-element's JSON provides all required fields (including those
+    inherited from a common base), it must parse successfully alongside a
+    sibling field on the parent model.
+    """
+
+    class AnimalBase(pydantic.BaseModel):
+        name: str
+
+    class Cat(AnimalBase):
+        dead_birds: int
+        dead_rats: int
+        type: Literal["cat"] = "cat"
+
+    class Dog(AnimalBase):
+        type: Literal["dog"] = "dog"
+
+    Animal = Annotated[Cat | Dog, pydantic.Field(discriminator="type")]
+
+    class Home(pydantic.BaseModel):
+        animals: list[Animal]  # pyright: ignore[reportInvalidTypeForm]
+        name: str
+
+    @app.default
+    def main(*, home: Home):
+        pass
+
+    assert_parse_args(
+        main,
+        """--home.animals '{"type": "dog", "name": "Rex"}' --home.name "ISS" """,
+        home=Home(animals=[Dog(name="Rex")], name="ISS"),
+    )
 
 
 def test_pydantic_list_empty_flag(app, assert_parse_args):
