@@ -23,5 +23,7 @@ def test_apply_usage_name_does_not_mutate_input():
     assert chain == ["cli", "files"]
 
 
-def test_apply_usage_name_accepts_empty_string_verbatim():
-    assert apply_usage_name(["cli", "files"], "") == ["", "files"]
+def test_apply_usage_name_empty_string_drops_root():
+    assert apply_usage_name(["cli", "files"], "") == ["files"]
+    assert apply_usage_name(["cli"], "") == []
+    assert apply_usage_name([], "") == []
