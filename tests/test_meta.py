@@ -341,6 +341,43 @@ def test_issue_680_nested_meta_command_resolution(app, queue):
     assert queue == ["meta_meta_default", "meta_default(value)", "command"]
 
 
+def test_issue_783_meta_default_usage_shows_options(console):
+    """Test for issue #783: Usage string missing ``[OPTIONS]`` for custom meta.default commands.
+
+    When ``meta.default`` defines parameters (besides the ``*tokens`` passthrough),
+    the usage line should include ``[OPTIONS]`` to reflect them.
+    """
+    from dataclasses import dataclass
+    from typing import Optional
+
+    app = App(name="test_app", console=console, result_action="return_value")
+
+    @dataclass
+    class Options:
+        input: Annotated[Optional[str], Parameter(name=["--input", "-i"])] = None
+        output: Annotated[Optional[str], Parameter(name=["--output", "-o"])] = None
+
+    @app.meta.default
+    def main(
+        *tokens: Annotated[str, Parameter(show=False)],
+        opts: Annotated[Optional[Options], Parameter()] = None,
+    ) -> None:
+        command, bound, _ = app.parse_args(tokens)
+        if opts is None:
+            opts = Options()
+        command(*bound.args, **bound.kwargs, opts=opts)
+
+    @app.command
+    def add(*args: str, opts: Annotated[Options, Parameter(parse=False)]) -> None:
+        pass
+
+    with console.capture() as capture:
+        app.meta(["--help"])
+
+    actual = capture.get()
+    assert actual.splitlines()[0] == "Usage: test_app COMMAND [OPTIONS]"
+
+
 def test_nested_meta_app_command_help(console):
     """Test that --help works for commands in nested meta-apps (issue-680)."""
     app = App(console=console, result_action="return_value")
