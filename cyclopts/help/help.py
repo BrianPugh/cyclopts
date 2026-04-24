@@ -14,7 +14,7 @@ from typing import (
 from attrs import define, evolve, field
 
 from cyclopts.annotations import resolve_annotated
-from cyclopts.core import _get_root_module_name
+from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
 from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
@@ -259,6 +259,7 @@ def _categorize_positional_arguments(argument_collection: "ArgumentCollection") 
 def format_usage(
     app: "App",
     command_chain: Iterable[str],
+    execution_path: Sequence["App"] | None = None,
 ):
     from rich.text import Text
 
@@ -288,36 +289,47 @@ def format_usage(
     if any(x not in help_version_flags and app._get_item(x, recurse_meta=True).show for x in app):
         usage.append("COMMAND")
 
-    if app.default_command:
-        argument_collection = app.assemble_argument_collection(parse_docstring=False)
+    # Aggregate arguments across all apps that contribute parameters to this help page.
+    # Shares the resolution logic with ``App._assemble_help_panels`` so the usage line and
+    # the parameter panels always agree on which apps contribute.
+    required_keyword_params: list = []
+    optional_keyword_params: list = []
+    required_positional_args: list = []
+    optional_positional_args: list = []
+    for _, argument_collection in _iter_resolution_argument_collections(
+        execution_path, fallback_app=app, parse_docstring=False
+    ):
+        rkw, okw = _categorize_keyword_arguments(argument_collection)
+        rpos, opos = _categorize_positional_arguments(argument_collection)
+        required_keyword_params.extend(rkw)
+        optional_keyword_params.extend(okw)
+        required_positional_args.extend(rpos)
+        optional_positional_args.extend(opos)
 
-        required_keyword_params, optional_keyword_params = _categorize_keyword_arguments(argument_collection)
-        required_positional_args, optional_positional_args = _categorize_positional_arguments(argument_collection)
+    for argument in required_keyword_params:
+        param_name = argument.name
+        type_name = get_hint_name(argument.hint).upper()
+        usage.append(f"{param_name} {type_name}")
 
-        for argument in required_keyword_params:
-            param_name = argument.name
-            type_name = get_hint_name(argument.hint).upper()
-            usage.append(f"{param_name} {type_name}")
+    if optional_keyword_params:
+        usage.append("[OPTIONS]")
 
-        if optional_keyword_params:
-            usage.append("[OPTIONS]")
+    for argument in required_positional_args:
+        if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
+            arg_name = argument.name.lstrip("-").upper()
+            usage.append(f"{arg_name}...")
+        else:
+            arg_name = argument.name.lstrip("-").upper()
+            usage.append(arg_name)
 
-        for argument in required_positional_args:
-            if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
-                arg_name = argument.name.lstrip("-").upper()
-                usage.append(f"{arg_name}...")
-            else:
-                arg_name = argument.name.lstrip("-").upper()
-                usage.append(arg_name)
-
-        if optional_positional_args:
-            has_var_positional = any(
-                arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
-            )
-            if has_var_positional:
-                usage.append("[ARGS...]")
-            else:
-                usage.append("[ARGS]")
+    if optional_positional_args:
+        has_var_positional = any(
+            arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
+        )
+        if has_var_positional:
+            usage.append("[ARGS...]")
+        else:
+            usage.append("[ARGS]")
 
     return Text(" ".join(usage) + "\n", style="bold")
 

@@ -247,6 +247,33 @@ def _walk_metas(app: "App"):
     yield from reversed(meta_list)
 
 
+def _iter_resolution_argument_collections(
+    execution_path: Sequence["App"] | None,
+    fallback_app: "App | None" = None,
+    *,
+    parse_docstring: bool,
+) -> Iterator[tuple["App", ArgumentCollection]]:
+    """Yield ``(subapp, argument_collection)`` for each app contributing parameters to a help page.
+
+    Pairs ``App._get_resolution_context`` with ``App.assemble_argument_collection`` so that the
+    usage-line, help-panel, and completion generators all see the same set of contributing apps.
+    Callers must already be inside the relevant ``app_stack`` context if the assembled
+    collection depends on resolved stack values.
+
+    ``execution_path`` is used when available (help/completion paths). ``fallback_app`` is used
+    for standalone calls (e.g. docs generation) that walk only the app's own meta chain.
+    """
+    if execution_path:
+        resolution_apps = execution_path[-1]._get_resolution_context(execution_path)
+    elif fallback_app is not None:
+        resolution_apps = list(_walk_metas(fallback_app))
+    else:
+        return
+    for subapp in resolution_apps:
+        if subapp.default_command:
+            yield subapp, subapp.assemble_argument_collection(parse_docstring=parse_docstring)
+
+
 def _group_converter(input_value: None | str | Group) -> Group | None:
     if input_value is None:
         return None
@@ -2087,7 +2114,7 @@ class App:
 
             # Prepare usage
             if executing_app.usage is None:
-                usage = format_usage(self, command_chain)
+                usage = format_usage(self, command_chain, execution_path=apps)
             elif executing_app.usage:  # i.e. skip empty-string.
                 usage = executing_app.usage + "\n"
             else:
@@ -2185,15 +2212,7 @@ class App:
 
         # Handle Arguments/Parameters
         # We have to combine all the help-pages of the command-app and it's meta apps.
-        # Use get_resolution_context to get all apps that contribute parameters
-        apps_for_params = self._get_resolution_context(execution_path)
-
-        for subapp in apps_for_params:
-            if not subapp.default_command:
-                continue
-
-            argument_collection = subapp.assemble_argument_collection(parse_docstring=True)
-
+        for subapp, argument_collection in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
             # Special-case: add config.Env values to Parameter(env_var=)
             configs: tuple[Callable, ...] = subapp.app_stack.resolve("_config") or ()
             env_configs = tuple(x for x in configs if isinstance(x, Env) and x.show)

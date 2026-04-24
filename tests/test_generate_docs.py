@@ -583,7 +583,7 @@ def test_generate_docs_with_meta_app():
         # myapp
 
         ```console
-        myapp INPUT-FILE
+        myapp INPUT-FILE [ARGS]
         ```
 
         Main application
