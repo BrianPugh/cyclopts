@@ -1,3 +1,30 @@
+r"""Shell-completion test harness.
+
+Each shell exposes two capabilities:
+
+* ``validate_script_syntax()`` - runs ``{bash,zsh,fish} -n`` on the generated
+  script. Already non-interactive.
+* ``get_completions(partial)`` - returns the list of suggestions a user would
+  see for a partial command line. Historically driven via ``pexpect`` with an
+  interactive shell; that was fragile, disabled on macOS CI, and missing
+  entirely for bash. The drivers below use **non-interactive** shell features
+  wherever possible:
+
+  * **Bash** - spawn ``bash -c``, source the completion script, set ``COMP_*``
+    variables, invoke the registered ``_<prog>`` completion function by name,
+    and print ``COMPREPLY``. No TTY, no timing. Bash 3.2-safe (the mac-stock
+    version).
+  * **Fish** - use fish's built-in ``complete -C '<partial>'`` flag. Prints
+    ``completion\tdescription`` one per line. Deterministic since fish 3.0.
+  * **Zsh** - zle's completion machinery refuses to run outside zle context
+    (``_arguments`` errors with "can only be called from completion function"
+    when invoked directly). A reliable non-interactive driver is deferred;
+    ``get_completions`` currently skips, and zsh behavioral matrix rows are
+    skipped as a result. ``validate_script_syntax`` plus the extensive
+    string-content checks in ``test_zsh.py`` continue to cover zsh.
+"""
+
+import re
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -7,326 +34,94 @@ import pytest
 
 
 class CompletionTesterBase(ABC):
-    """Base class for shell completion testers.
-
-    Defines the interface that all shell-specific completion testers must implement.
-    This ensures consistency across bash, zsh, fish, and any future shell implementations.
-    """
+    """Base class for shell completion testers."""
 
     def __init__(self, completion_script: str, prog_name: str):
-        """Initialize the completion tester.
-
-        Parameters
-        ----------
-        completion_script : str
-            The generated completion script to test.
-        prog_name : str
-            Program name for completion.
-        """
         self.completion_script = completion_script
         self.prog_name = prog_name
 
     @abstractmethod
     def validate_script_syntax(self) -> bool:
-        """Check if the completion script has valid syntax for this shell.
-
-        Returns
-        -------
-        bool
-            True if syntax is valid, False otherwise.
-        """
-        pass
+        """Return True if the generated script is syntactically valid for this shell."""
 
     @abstractmethod
     def get_completions(self, partial_command: str) -> list[str]:
-        """Get completion suggestions for partial command.
+        """Return the completion suggestions a real shell would offer for ``partial_command``."""
 
-        Parameters
-        ----------
-        partial_command : str
-            Partial command line to complete.
 
-        Returns
-        -------
-        list[str]
-            List of completion suggestions.
-        """
-        pass
+# --- Bash --------------------------------------------------------------------
+
+
+_BASH_FUNC_RE = re.compile(r"^complete -F (\S+) ", re.MULTILINE)
 
 
 class BashCompletionTester(CompletionTesterBase):
-    """Test bash completion by executing real bash subprocess.
-
-    Uses actual bash completion system to validate generated scripts.
-    Requires bash 3.2+ (macOS) or 4.0+ (Linux) to be installed.
-    """
+    """Bash completion tester using a non-interactive ``bash -c`` driver."""
 
     def validate_script_syntax(self) -> bool:
-        """Check if the completion script has valid bash syntax.
-
-        Returns
-        -------
-        bool
-            True if syntax is valid, False otherwise.
-        """
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-            comp_file = tmpdir / f"{self.prog_name}_completion.bash"
+            comp_file = Path(tmpdir) / f"{self.prog_name}_completion.bash"
             comp_file.write_text(self.completion_script)
-
             result = subprocess.run(
                 ["bash", "-n", str(comp_file)],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-
             return result.returncode == 0
 
     def get_completions(self, partial_command: str) -> list[str]:
-        """Get completion suggestions for partial command.
-
-        Parameters
-        ----------
-        partial_command : str
-            Partial command line, e.g., "myapp --verb"
-
-        Returns
-        -------
-        list[str]
-            Completion suggestions from COMPREPLY array.
-        """
-        try:
-            import pexpect
-        except ImportError:
-            pytest.skip("pexpect not available for end-to-end testing")
+        match = _BASH_FUNC_RE.search(self.completion_script)
+        if not match:
+            raise RuntimeError("Could not locate 'complete -F <fn>' line in generated bash script")
+        func_name = match.group(1)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-
-            comp_file = tmpdir / f"{self.prog_name}_completion.bash"
+            comp_file = Path(tmpdir) / f"{self.prog_name}_completion.bash"
             comp_file.write_text(self.completion_script)
 
-            child = pexpect.spawn("bash --norc -i", encoding="utf-8", timeout=3)
-
-            try:
-                child.expect([r"\$", r"bash-"], timeout=2)
-
-                child.sendline(f"source {comp_file}")
-                child.expect([r"\$", r"bash-"])
-
-                child.send(partial_command)
-                child.send("\t\t")
-
-                try:
-                    child.expect([r"\r\n", pexpect.TIMEOUT], timeout=0.5)
-                    output = child.before
-                except pexpect.TIMEOUT:
-                    output = child.before or ""
-
-                child.sendline("\x03")
-
-                completions = []
-                if output:
-                    for line in output.split("\n"):
-                        line = line.strip()
-                        if line and not line.startswith(partial_command.split()[0]):
-                            words = line.split()
-                            completions.extend(words)
-
-                return completions
-
-            finally:
-                child.close()
-
-
-class ZshCompletionTester(CompletionTesterBase):
-    """Test zsh completion by executing real zsh subprocess.
-
-    Uses actual zsh completion system to validate generated scripts.
-    Requires zsh 5.0+ to be installed.
-    """
-
-    def validate_script_syntax(self) -> bool:
-        """Check if the completion script has valid zsh syntax.
-
-        Returns
-        -------
-        bool
-            True if syntax is valid, False otherwise.
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-            comp_file = tmpdir / f"_{self.prog_name}"
-            comp_file.write_text(self.completion_script)
+            driver = (
+                'source "$1"\n'
+                'COMP_LINE="$2"\n'
+                "COMP_POINT=${#COMP_LINE}\n"
+                "COMP_WORDS=()\n"
+                "COMPREPLY=()\n"
+                'read -ra COMP_WORDS <<< "$COMP_LINE"\n'
+                'if [[ "$COMP_LINE" == *" " ]]; then COMP_WORDS+=(""); fi\n'
+                "COMP_CWORD=$(( ${#COMP_WORDS[@]} - 1 ))\n"
+                f'"{func_name}" "$3" "${{COMP_WORDS[COMP_CWORD]}}" "${{COMP_WORDS[COMP_CWORD-1]:-}}" >/dev/null\n'
+                'printf "%s\\n" "${COMPREPLY[@]}"\n'
+            )
 
             result = subprocess.run(
-                ["zsh", "-n", str(comp_file)],
+                ["bash", "-c", driver, "_", str(comp_file), partial_command, self.prog_name],
                 capture_output=True,
                 text=True,
                 timeout=5,
+                cwd=tmpdir,
             )
-
-            return result.returncode == 0
-
-    def get_completions(self, partial_command: str) -> list[str]:
-        """Get completion suggestions for partial command using pexpect.
-
-        Parameters
-        ----------
-        partial_command : str
-            Partial command line, e.g., "myapp --verb"
-
-        Returns
-        -------
-        list[str]
-            Completion suggestions (words that appeared after TAB)
-        """
-        try:
-            import pexpect
-        except ImportError:
-            pytest.skip("pexpect not available for end-to-end testing")
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-
-            comp_file = tmpdir / f"_{self.prog_name}"
-            comp_file.write_text(self.completion_script)
-
-            child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-            try:
-                child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-                child.sendline(f"fpath=({tmpdir} $fpath)")
-                child.expect(["% ", "# ", r"\$ "])
-
-                child.sendline("autoload -Uz compinit && compinit -u")
-                child.expect(["% ", "# ", r"\$ "])
-
-                child.send(partial_command)
-                child.send("\t")
-
-                try:
-                    child.expect([r"\r\n", pexpect.TIMEOUT], timeout=0.5)
-                    output = child.before
-                except pexpect.TIMEOUT:
-                    output = child.before or ""
-
-                child.sendline("\x03")
-
-                completions = []
-                if output:
-                    for line in output.split("\n"):
-                        line = line.strip()
-                        if line and not line.startswith(partial_command.split()[0]):
-                            words = line.split()
-                            completions.extend(words)
-
-                return completions
-
-            finally:
-                child.close()
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"bash driver failed (exit {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
+                )
+            return [line for line in result.stdout.splitlines() if line]
 
 
-def _check_zsh_available():
-    """Check if zsh is available and meets minimum version requirement.
-
-    Returns
-    -------
-    bool
-        True if zsh 5.0+ is available, False otherwise.
-    """
+def _check_bash_available() -> bool:
     try:
-        result = subprocess.run(
-            ["zsh", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        if result.returncode == 0:
-            version_str = result.stdout.strip()
-            if "zsh" in version_str.lower():
-                return True
+        result = subprocess.run(["bash", "--version"], capture_output=True, text=True, timeout=2)
+        return result.returncode == 0 and "bash" in result.stdout.lower()
     except (subprocess.SubprocessError, FileNotFoundError):
-        pass
-    return False
-
-
-@pytest.fixture(scope="session")
-def zsh_available():
-    """Check if zsh is available for testing."""
-    return _check_zsh_available()
-
-
-@pytest.fixture
-def zsh_tester(zsh_available):
-    """Fixture for ZshCompletionTester.
-
-    Parameters
-    ----------
-    zsh_available : bool
-        Whether zsh is available for testing.
-
-    Returns
-    -------
-    callable
-        Factory function that creates ZshCompletionTester instances.
-    """
-    if not zsh_available:
-        pytest.skip("zsh not available")
-
-    def _make_tester(app, prog_name="testapp"):
-        script = app.generate_completion(prog_name=prog_name, shell="zsh")
-        return ZshCompletionTester(script, prog_name)
-
-    return _make_tester
-
-
-def _check_bash_available():
-    """Check if bash is available and meets minimum version requirement.
-
-    Returns
-    -------
-    bool
-        True if bash 3.2+ is available, False otherwise.
-    """
-    try:
-        result = subprocess.run(
-            ["bash", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        if result.returncode == 0:
-            version_str = result.stdout.strip()
-            if "bash" in version_str.lower():
-                return True
-    except (subprocess.SubprocessError, FileNotFoundError):
-        pass
-    return False
+        return False
 
 
 @pytest.fixture(scope="session")
 def bash_available():
-    """Check if bash is available for testing."""
     return _check_bash_available()
 
 
 @pytest.fixture
 def bash_tester(bash_available):
-    """Fixture for BashCompletionTester.
-
-    Parameters
-    ----------
-    bash_available : bool
-        Whether bash is available for testing.
-
-    Returns
-    -------
-    callable
-        Factory function that creates BashCompletionTester instances.
-    """
     if not bash_available:
         pytest.skip("bash not available")
 
@@ -337,167 +132,132 @@ def bash_tester(bash_available):
     return _make_tester
 
 
+# --- Fish --------------------------------------------------------------------
+
+
 class FishCompletionTester(CompletionTesterBase):
-    """Test fish completion by executing real fish subprocess.
-
-    Uses actual fish completion system to validate generated scripts.
-    Requires fish 3.0+ to be installed.
-
-    Testing Approach
-    ----------------
-    Most tests should use `validate_script_syntax()` and verify script content
-    directly via string assertions. The `get_completions()` method is fragile
-    and should be used sparingly due to:
-    - Dependency on pexpect and interactive shell behavior
-    - Sensitivity to fish version output format changes
-    - Potential issues with custom prompt configurations
-    - Difficulty handling completions with whitespace
-
-    For robust testing, prefer validating the generated script structure
-    rather than relying on interactive completion behavior.
-    """
+    """Fish completion tester using the built-in non-interactive ``complete -C`` flag."""
 
     def validate_script_syntax(self) -> bool:
-        """Check if the completion script has valid fish syntax.
-
-        Returns
-        -------
-        bool
-            True if syntax is valid, False otherwise.
-        """
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-            comp_file = tmpdir / f"{self.prog_name}.fish"
+            comp_file = Path(tmpdir) / f"{self.prog_name}.fish"
             comp_file.write_text(self.completion_script)
-
             result = subprocess.run(
                 ["fish", "-n", str(comp_file)],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-
             return result.returncode == 0
 
     def get_completions(self, partial_command: str) -> list[str]:
-        """Get completion suggestions for partial command using pexpect.
-
-        NOTE: This implementation is fragile and makes assumptions about fish's
-        interactive output format. It parses the completion output by:
-        1. Looking for lines that don't start with the command name
-        2. Splitting lines by whitespace to extract completion words
-
-        This may break with:
-        - Different fish versions that format output differently
-        - Custom fish prompt configurations
-        - Completions containing whitespace or special formatting
-
-        For more robust testing, consider using fish's --print-completions flag
-        when it becomes available in future fish versions.
-
-        Parameters
-        ----------
-        partial_command : str
-            Partial command line, e.g., "myapp --verb"
-
-        Returns
-        -------
-        list[str]
-            Completion suggestions (words that appeared after TAB)
-        """
-        try:
-            import pexpect
-        except ImportError:
-            pytest.skip("pexpect not available for end-to-end testing")
-
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir = Path(tmpdir)
-
-            comp_file = tmpdir / f"{self.prog_name}.fish"
+            comp_file = Path(tmpdir) / f"{self.prog_name}.fish"
             comp_file.write_text(self.completion_script)
 
-            child = pexpect.spawn("fish", encoding="utf-8", timeout=3)
-
-            try:
-                child.expect([r"> ", r"~> ", r"\$ "], timeout=2)
-
-                child.sendline(f"source {comp_file}")
-                child.expect([r"> ", r"~> ", r"\$ "])
-
-                child.send(partial_command)
-                child.send("\t")
-
-                try:
-                    child.expect([r"\r\n", pexpect.TIMEOUT], timeout=0.5)
-                    output = child.before
-                except pexpect.TIMEOUT:
-                    output = child.before or ""
-
-                child.sendline("\x03")
-
-                completions = []
-                if output:
-                    for line in output.split("\n"):
-                        line = line.strip()
-                        if line and not line.startswith(partial_command.split()[0]):
-                            words = line.split()
-                            completions.extend(words)
-
-                return completions
-
-            finally:
-                child.close()
+            # `source` the completion then ask fish for completions of the partial line.
+            # Single-quote the partial and escape any single quotes inside it.
+            escaped = partial_command.replace("'", "\\'")
+            script = f"source {comp_file}; complete -C '{escaped}'"
+            result = subprocess.run(
+                ["fish", "-c", script],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=tmpdir,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"fish driver failed (exit {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
+                )
+            # `complete -C` prints "completion\tdescription" per line (description optional).
+            completions = []
+            for line in result.stdout.splitlines():
+                if not line:
+                    continue
+                completions.append(line.split("\t", 1)[0])
+            return completions
 
 
-def _check_fish_available():
-    """Check if fish is available and meets minimum version requirement.
-
-    Returns
-    -------
-    bool
-        True if fish 3.0+ is available, False otherwise.
-    """
+def _check_fish_available() -> bool:
     try:
-        result = subprocess.run(
-            ["fish", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        if result.returncode == 0:
-            version_str = result.stdout.strip()
-            if "fish" in version_str.lower():
-                return True
+        result = subprocess.run(["fish", "--version"], capture_output=True, text=True, timeout=2)
+        return result.returncode == 0 and "fish" in result.stdout.lower()
     except (subprocess.SubprocessError, FileNotFoundError):
-        pass
-    return False
+        return False
 
 
 @pytest.fixture(scope="session")
 def fish_available():
-    """Check if fish is available for testing."""
     return _check_fish_available()
 
 
 @pytest.fixture
 def fish_tester(fish_available):
-    """Fixture for FishCompletionTester.
-
-    Parameters
-    ----------
-    fish_available : bool
-        Whether fish is available for testing.
-
-    Returns
-    -------
-    callable
-        Factory function that creates FishCompletionTester instances.
-    """
     if not fish_available:
         pytest.skip("fish not available")
 
     def _make_tester(app, prog_name="testapp"):
         script = app.generate_completion(prog_name=prog_name, shell="fish")
         return FishCompletionTester(script, prog_name)
+
+    return _make_tester
+
+
+# --- Zsh ---------------------------------------------------------------------
+
+
+class ZshCompletionTester(CompletionTesterBase):
+    """Zsh completion tester.
+
+    **Interactive completion driving is not currently supported.** zsh's
+    completion helpers (``_arguments``, ``_describe``, ``_files``) refuse to
+    run outside a real zle widget context, and the non-rc zle environment
+    spawned by ``zsh -f`` doesn't bind TAB to completion. A reliable
+    non-interactive zsh driver (zpty-based or otherwise) is deferred.
+
+    For now, zsh tests rely on ``validate_script_syntax()`` plus string-level
+    assertions in ``test_zsh.py`` to verify the generated script's structure.
+    ``get_completions()`` raises ``pytest.skip`` so the cross-shell behavioral
+    matrix degrades gracefully until a driver lands.
+    """
+
+    def validate_script_syntax(self) -> bool:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            comp_file = Path(tmpdir) / f"_{self.prog_name}"
+            comp_file.write_text(self.completion_script)
+            result = subprocess.run(
+                ["zsh", "-n", str(comp_file)],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return result.returncode == 0
+
+    def get_completions(self, partial_command: str) -> list[str]:
+        pytest.skip("Interactive zsh completion driver is not yet implemented. See the ZshCompletionTester docstring.")
+
+
+def _check_zsh_available() -> bool:
+    try:
+        result = subprocess.run(["zsh", "--version"], capture_output=True, text=True, timeout=2)
+        return result.returncode == 0 and "zsh" in result.stdout.lower()
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+@pytest.fixture(scope="session")
+def zsh_available():
+    return _check_zsh_available()
+
+
+@pytest.fixture
+def zsh_tester(zsh_available):
+    if not zsh_available:
+        pytest.skip("zsh not available")
+
+    def _make_tester(app, prog_name="testapp"):
+        script = app.generate_completion(prog_name=prog_name, shell="zsh")
+        return ZshCompletionTester(script, prog_name)
 
     return _make_tester

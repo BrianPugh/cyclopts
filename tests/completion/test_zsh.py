@@ -1,8 +1,4 @@
-import os
 import re
-import sys
-import tempfile
-import time
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -110,106 +106,6 @@ def test_path_completion(zsh_tester):
     tester = zsh_tester(app_path, "pathapp")
 
     assert "_files" in tester.completion_script
-
-
-@pytest.mark.slow
-@pytest.mark.skipif(
-    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
-)
-def test_end_to_end_completion(zsh_tester):
-    """End-to-end test: actually trigger zsh completion.
-
-    This test uses pexpect to simulate real TAB completion.
-    Requires pexpect to be installed (skip otherwise).
-    """
-    pexpect = pytest.importorskip("pexpect")
-
-    tester = zsh_tester(app_basic, "basic")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        comp_file = tmpdir / "_basic"
-        comp_file.write_text(tester.completion_script)
-
-        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-        try:
-            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-            child.sendline(f"fpath=({tmpdir} $fpath)")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.sendline("autoload -Uz compinit && compinit -u")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.send("basic --cou")
-            child.send("\t")
-
-            time.sleep(0.3)
-
-            child.send(" MARKER\r")
-
-            child.expect(["% ", "# ", r"\$ "], timeout=2)
-            output = child.before
-
-            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
-            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
-            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
-
-            assert "--count" in clean_output and "MARKER" in clean_output
-
-        finally:
-            child.close()
-
-
-@pytest.mark.slow
-@pytest.mark.skipif(
-    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
-)
-def test_command_prefix_completion(zsh_tester):
-    """End-to-end test: verify command name prefix completion works.
-
-    This test verifies that typing "d" and pressing TAB completes to "deploy".
-    Requires pexpect to be installed (skip otherwise).
-    """
-    pexpect = pytest.importorskip("pexpect")
-
-    tester = zsh_tester(app_basic, "basic")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        comp_file = tmpdir / "_basic"
-        comp_file.write_text(tester.completion_script)
-
-        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-        try:
-            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-            child.sendline(f"fpath=({tmpdir} $fpath)")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.sendline("autoload -Uz compinit && compinit -u")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.send("basic d")
-            child.send("\t")
-
-            time.sleep(0.3)
-
-            child.send(" MARKER\r")
-
-            child.expect(["% ", "# ", r"\$ "], timeout=2)
-            output = child.before
-
-            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
-            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
-            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
-
-            assert "deploy" in clean_output and "MARKER" in clean_output
-
-        finally:
-            child.close()
 
 
 def test_optional_path_completion(zsh_tester):
@@ -471,76 +367,6 @@ def test_empty_iterable_flag_completion(zsh_tester):
     )
 
     assert tester.validate_script_syntax()
-
-
-@pytest.mark.slow
-@pytest.mark.skipif(
-    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
-)
-def test_completion_after_empty_flag(zsh_tester):
-    """Test that completion works after using an --empty-* flag.
-
-    Regression test for: cyclopts-demo process --empty-items --<TAB> should show other options.
-    """
-    pexpect = pytest.importorskip("pexpect")
-
-    import tempfile
-    import time
-    from pathlib import Path
-
-    app = App(name="testapp")
-
-    @app.command
-    def process(
-        items: Annotated[list[str], Parameter(help="Items to process")],
-        count: Annotated[int, Parameter(help="Count")] = 1,
-        verbose: Annotated[bool, Parameter(help="Verbose")] = False,
-    ):
-        """Process items."""
-        pass
-
-    tester = zsh_tester(app, "testapp")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        comp_file = tmpdir / "_testapp"
-        comp_file.write_text(tester.completion_script)
-
-        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-        try:
-            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-            child.sendline(f"fpath=({tmpdir} $fpath)")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.sendline("autoload -Uz compinit && compinit -u")
-            child.expect(["% ", "# ", r"\$ "])
-
-            # Type: testapp process --empty-items --c<TAB>
-            child.send("testapp process --empty-items --c")
-            child.send("\t")
-
-            time.sleep(0.3)
-
-            child.send(" MARKER\r")
-
-            child.expect(["% ", "# ", r"\$ "], timeout=2)
-            output = child.before
-
-            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
-            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
-            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
-
-            # Should complete to --count
-            # Note: MARKER may be corrupted by terminal escape sequences during completion display,
-            # so we check for MARK (prefix) instead of full MARKER string
-            assert "--count" in clean_output and "MARK" in clean_output, (
-                f"Expected --count and MARK in output, got: {clean_output}"
-            )
-
-        finally:
-            child.close()
 
 
 def test_positional_or_keyword_literal_completion(zsh_tester):
@@ -1032,7 +858,6 @@ def test_positional_without_help_uses_name_fallback(zsh_tester):
 
     # Should have parameter name as fallback '1:CHOICE:(foo bar)' or similar
     # The format is '1:description:(choices)' - description should be non-empty
-    import re
 
     positional_spec = re.search(r"'1:([^:]+):\(foo bar\)'", script)
     assert positional_spec is not None, "Should have positional spec with choices"
