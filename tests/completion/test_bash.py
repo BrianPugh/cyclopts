@@ -794,3 +794,89 @@ def test_glob_chars_in_command_name(bash_tester):
     assert r"test\[1\]" in script, "Brackets in command name should be escaped in case patterns"
 
     assert tester.validate_script_syntax()
+
+
+# --- Choice values containing whitespace / shell metacharacters --------------
+#
+# Regression tests for the bug where ``compgen -W '<choices>'`` whitespace-
+# tokenized the choice list (so ``"hello world"`` became two completions)
+# and the surrounding ``$(...)`` re-parsed backticks even inside single
+# quotes. Choices now go through an array + prefix-match loop, which keeps
+# every value intact.
+
+
+def test_choice_with_whitespace(bash_tester):
+    """A choice value containing a space stays a single completion."""
+    app = App(name="ws")
+
+    @app.default
+    def m(x: Literal["hello world", "normal"] = "normal", /):
+        """Whitespace in choice."""
+
+    tester = bash_tester(app, "ws")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("ws ")
+    assert "hello world" in completions
+    assert "hello" not in completions
+    assert "world" not in completions
+
+
+def test_choice_with_single_quote(bash_tester):
+    """A choice value containing a single quote round-trips intact."""
+    app = App(name="sq")
+
+    @app.default
+    def m(x: Literal["a'b", "normal"] = "normal", /):
+        """Single quote in choice."""
+
+    tester = bash_tester(app, "sq")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("sq ")
+    assert "a'b" in completions
+
+
+def test_choice_with_backtick(bash_tester):
+    """A choice value containing a backtick does not break the script.
+
+    Previously ``compgen -W 'a`b ...'`` inside ``$(...)`` raised
+    ``bad substitution: no closing "\\`"`` because ``$(...)`` re-scans for
+    backticks even inside single quotes.
+    """
+    app = App(name="btk")
+
+    @app.default
+    def m(x: Literal["a`b", "normal"] = "normal", /):
+        """Backtick in choice."""
+
+    tester = bash_tester(app, "btk")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("btk ")
+    assert "a`b" in completions
+
+
+def test_choice_with_dollar(bash_tester):
+    """A choice value containing $ is not parameter-expanded."""
+    app = App(name="dol")
+
+    @app.default
+    def m(x: Literal["$home", "normal"] = "normal", /):
+        """Dollar in choice."""
+
+    tester = bash_tester(app, "dol")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("dol ")
+    assert "$home" in completions
+
+
+def test_choice_value_after_option(bash_tester):
+    """Tricky choices also survive the ``--opt <choice>`` value-completion path."""
+    app = App(name="optchoice")
+
+    @app.default
+    def m(env: Annotated[Literal["a b", "c'd", "e`f"], Parameter(help="env")] = "a b"):
+        """Tricky choices behind a keyword option."""
+
+    tester = bash_tester(app, "optchoice")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("optchoice --env ")
+    assert {"a b", "c'd", "e`f"} <= set(completions)
