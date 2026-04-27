@@ -172,40 +172,31 @@ def _generate_nested_positional_specs(
         arg for arg in positional_args if not arg.is_var_positional() and not is_iterable_type(arg.hint)
     ]
 
+    def _build(arg, position: str) -> str:
+        choices = arg.get_choices(force=True)
+        if choices:
+            escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
+            choices_str = " ".join(escaped_choices)
+            action = f"({choices_str})"
+            desc = _escape_zsh_description_dq(_description_text(arg, help_format))
+            quote = '"'
+        else:
+            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
+            desc = _get_description_from_argument(arg, help_format)
+            quote = "'"
+        return f"{quote}{position}:{desc}:{action}{quote}" if action else f"{quote}{position}:{desc}{quote}"
+
     # Generate specs for non-variadic positionals
     for arg in non_variadic_args:
         # Position in nested context: After *::arg:->args, $words[1] is the subcommand
         # So positionals start at position 1 (not 2)
         # Use 1-based indexing: first positional is '1:', second is '2:', etc.
         pos = 1 + (arg.index or 0)
-        desc = _get_description_from_argument(arg, help_format)
-
-        # Check for choices first (Literal/Enum types)
-        choices = arg.get_choices(force=True)
-        if choices:
-            escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            action = f"({choices_str})"
-        else:
-            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
-
-        spec = f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
-        specs.append(spec)
+        specs.append(_build(arg, str(pos)))
 
     # Generate specs for variadic positionals
     for arg in variadic_args:
-        desc = _get_description_from_argument(arg, help_format)
-
-        choices = arg.get_choices(force=True)
-        if choices:
-            escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            action = f"({choices_str})"
-        else:
-            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
-
-        spec = f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
-        specs.append(spec)
+        specs.append(_build(arg, "*"))
 
     return specs
 
@@ -411,10 +402,12 @@ def _generate_completion_for_path(
 
 
 def _escape_completion_choice(choice: str) -> str:
-    """Escape special characters in a completion choice value for zsh.
+    """Escape a choice value for embedding in a single-quoted shell context.
 
-    Choice should already be cleaned via clean_choice_text() before calling this function.
-    This function only applies zsh-specific escaping.
+    Used for ``_describe`` array elements (``'value:desc'``) where the only
+    parser the value passes through is the array-element parser, not the
+    ``_arguments`` choice-list eval. Choice should already be cleaned via
+    ``clean_choice_text()``.
 
     Parameters
     ----------
@@ -441,6 +434,55 @@ def _escape_completion_choice(choice: str) -> str:
     choice = choice.replace("&", "\\&")
     choice = choice.replace(":", "\\:")
     return choice
+
+
+def _escape_choice_for_dq_spec(value: str) -> str:
+    r"""Escape a choice value for ``_arguments``' parenthesized choice list.
+
+    The value passes through *two* parsers:
+
+    1. zsh's outer double-quoted-string parser, which interprets ``\``,
+       ``"``, ``$`` and backtick.
+    2. ``_arguments``' choice-list parser, which whitespace-tokenizes and
+       reads ``\X`` as a literal X.
+
+    A literal ``'`` cannot be embedded in a single-quoted spec string
+    (``'\''`` ends/restarts the quoting and the parser then sees an
+    unbalanced ``'``), so choice-bearing specs are emitted with a *double*-
+    quoted outer string and routed through this helper.
+    """
+    # Layer 1: choice-list parser escapes. The parser eval-style processes
+    # each token, so ``$`` and backtick must be escaped here even though
+    # they're DQ-specials too — DQ stripping happens *first* and would
+    # otherwise leave them bare for the parser. Backslash first to avoid
+    # double-escaping the slashes the loop introduces.
+    s = value.replace("\\", "\\\\")
+    for ch in " '\"()[]:;|&$`":
+        s = s.replace(ch, "\\" + ch)
+    # Layer 2: outer double-quote escapes. Re-escape backslashes (preserves
+    # all the layer-1 ones) and re-escape DQ-specials so each one survives
+    # to the choice-list parser as ``\X``.
+    s = s.replace("\\", "\\\\")
+    s = s.replace('"', '\\"')
+    s = s.replace("$", "\\$")
+    s = s.replace("`", "\\`")
+    return s
+
+
+def _escape_zsh_description_dq(text: str) -> str:
+    """Escape a description for embedding in a double-quoted spec string.
+
+    Same as ``_escape_zsh_description`` but skips the ``'`` -> ``'\\''``
+    substitution: ``'`` is literal in a double-quoted context.
+    """
+    text = text.replace("\\", "\\\\")
+    text = text.replace("`", "\\`")
+    text = text.replace("$", "\\$")
+    text = text.replace('"', '\\"')
+    text = text.replace(":", r"\:")
+    text = text.replace("[", r"\[")
+    text = text.replace("]", r"\]")
+    return text
 
 
 def _escape_command_name_for_case(name: str) -> str:
@@ -505,39 +547,52 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
         List of zsh argument specs.
     """
     specs = []
-    desc = _get_description_from_argument(argument, help_format)
-
     flag = argument.is_flag()
 
-    # Determine completion action
+    # Determine completion action. When choices are present we emit the spec
+    # in a *double-quoted* outer string so a literal ``'`` inside a choice
+    # can be backslash-escaped (single-quoted specs can't carry a literal
+    # ``'`` past the inner ``_arguments`` choice-list eval).
     action = ""
+    has_choices = False
     choices = argument.get_choices(force=True)
     if choices:
-        escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+        has_choices = True
+        escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
         flag = False
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
+    desc = (
+        _escape_zsh_description_dq(_description_text(argument, help_format))
+        if has_choices
+        else _get_description_from_argument(argument, help_format)
+    )
+
+    quote = '"' if has_choices else "'"
+
     # Generate specs for positive names (from parameter.name)
     for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
         if flag and not action:
-            spec = f"'{name}[{desc}]'"
+            spec = f"{quote}{name}[{desc}]{quote}"
         elif action:
-            spec = f"'{name}[{desc}]:{name.lstrip('-')}:{action}'"
+            spec = f"{quote}{name}[{desc}]:{name.lstrip('-')}:{action}{quote}"
         else:
-            spec = f"'{name}[{desc}]:{name.lstrip('-')}'"
+            spec = f"{quote}{name}[{desc}]:{name.lstrip('-')}{quote}"
         specs.append(spec)
 
-    # Generate specs for negative names (always flags, consume no tokens)
+    # Generate specs for negative names (always flags, consume no tokens).
+    # No choice action, so single-quoted is fine and keeps the description
+    # escaping consistent with the other flag specs.
+    desc_sq = _get_description_from_argument(argument, help_format)
     for name in argument.negatives:
         if not name.startswith("-"):
             continue
-        # Negative flags always consume zero tokens (e.g., --empty-items, --no-verbose)
-        spec = f"'{name}[{desc}]'"
+        spec = f"'{name}[{desc_sq}]'"
         specs.append(spec)
 
     return specs
@@ -558,26 +613,29 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     str
         Zsh positional argument spec.
     """
-    desc = _get_description_from_argument(argument, help_format)
-
-    # Check for choices first (Literal/Enum types)
+    # Check for choices first (Literal/Enum types). Choice-bearing specs use
+    # double-quoted outer to allow embedding a literal ``'`` in a choice.
     choices = argument.get_choices(force=True)
     if choices:
-        escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+        escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
+        desc = _escape_zsh_description_dq(_description_text(argument, help_format))
+        quote = '"'
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
+        desc = _get_description_from_argument(argument, help_format)
+        quote = "'"
 
     if argument.is_var_positional() or is_iterable_type(argument.hint):
         # Variadic positional (*args) or collection type (list[X], set[X], etc.)
-        return f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
+        return f"{quote}*:{desc}:{action}{quote}" if action else f"{quote}*:{desc}{quote}"
 
     # Regular positional - zsh uses 1-based indexing
     if argument.index is None:
         raise ValueError(f"Positional-only argument {argument.names} missing index")
     pos = argument.index + 1
-    return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
+    return f"{quote}{pos}:{desc}:{action}{quote}" if action else f"{quote}{pos}:{desc}{quote}"
 
 
 def _generate_keyword_specs_for_command(
@@ -647,12 +705,17 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
         Falls back to argument name if help text is empty, since zsh _arguments
         requires a non-empty description for positional specs to work correctly.
     """
+    return _escape_zsh_description(_description_text(argument, help_format))
+
+
+def _description_text(argument: "Argument", help_format: str) -> str:
+    """Plain-text description for an argument with the empty-help fallback."""
     text = strip_markup(argument.parameter.help or "", format=help_format)
     if not text:
         # Use primary argument name as fallback - zsh _arguments requires non-empty
         # description for positional specs to provide completions
         text = argument.names[0] if argument.names else "argument"
-    return _escape_zsh_description(text)
+    return text
 
 
 def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:

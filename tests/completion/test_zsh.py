@@ -166,7 +166,13 @@ def test_description_escaping(zsh_tester):
 
 
 def test_special_chars_in_literal_choices(zsh_tester):
-    """Test that Literal choices with special characters are properly escaped."""
+    """Test that Literal choices with special characters are properly escaped.
+
+    Choice-bearing specs are emitted with double-quoted outer strings (so a
+    literal ``'`` can be embedded) which means each backslash from the inner
+    choice-list-parser layer is doubled by the outer DQ layer. The runtime
+    behavior is verified separately in ``test_choice_with_*`` below.
+    """
     app = App(name="special_choices")
 
     @app.default
@@ -177,10 +183,13 @@ def test_special_chars_in_literal_choices(zsh_tester):
 
     tester = zsh_tester(app, "special_choices")
 
-    assert r"foo\ bar" in tester.completion_script
-    assert r"baz\(\)" in tester.completion_script
-    assert r"test\[1\]" in tester.completion_script
-    assert r"back\\slash" in tester.completion_script
+    # After the two-layer escape ("" outer + choice-list parser): every
+    # backslash from layer 1 is doubled.
+    assert r"foo\\ bar" in tester.completion_script
+    assert r"baz\\(\\)" in tester.completion_script
+    assert r"test\\[1\\]" in tester.completion_script
+    # User-supplied backslash gets layer-1 ``\\\\`` then DQ-doubled to ``\\\\\\\\``
+    assert r"back\\\\slash" in tester.completion_script
 
 
 def test_unicode_in_descriptions(zsh_tester):
@@ -400,9 +409,10 @@ def test_positional_or_keyword_literal_completion(zsh_tester):
 
     # In nested context, positionals are now included as specs in _arguments
     # Positions are '1:' and '2:' (not '2:' and '3:') because after *::arg:->args,
-    # $words[1] is the subcommand and positionals start at position 1
-    assert "'1:Target environment.:(dev staging production)'" in tester.completion_script
-    assert "'2:AWS region.:(us-east-1 us-west-2)'" in tester.completion_script
+    # $words[1] is the subcommand and positionals start at position 1.
+    # Choice-bearing specs use double-quoted outer to allow embedding ``'``.
+    assert '"1:Target environment.:(dev staging production)"' in tester.completion_script
+    assert '"2:AWS region.:(us-east-1 us-west-2)"' in tester.completion_script
 
     # Should have choices for both positionals
     assert "dev" in tester.completion_script
@@ -853,16 +863,105 @@ def test_positional_without_help_uses_name_fallback(zsh_tester):
     tester = zsh_tester(app, "testapp")
     script = tester.completion_script
 
-    # Should NOT have empty description '1::(foo bar)'
+    # Should NOT have empty description '1::(foo bar)' or "1::(foo bar)"
     assert "'1::(foo bar)'" not in script, "Should not have empty description in positional spec"
+    assert '"1::(foo bar)"' not in script, "Should not have empty description in positional spec"
 
-    # Should have parameter name as fallback '1:CHOICE:(foo bar)' or similar
-    # The format is '1:description:(choices)' - description should be non-empty
-
-    positional_spec = re.search(r"'1:([^:]+):\(foo bar\)'", script)
+    # Should have parameter name as fallback. Choice-bearing specs use
+    # double-quoted outer; the format is `"1:description:(choices)"`.
+    positional_spec = re.search(r'"1:([^:]+):\(foo bar\)"', script)
     assert positional_spec is not None, "Should have positional spec with choices"
     description = positional_spec.group(1)
     assert description, "Description should not be empty"
     assert len(description) > 0, "Description should have content"
 
     assert tester.validate_script_syntax()
+
+
+# --- Choice values containing whitespace / shell metacharacters --------------
+#
+# End-to-end regression tests for tricky choice values surviving zsh's
+# completion machinery. zsh's ``_arguments`` puts choices through *two*
+# parsers: the outer shell quoting and the inner choice-list parser. The
+# generator now uses double-quoted outer specs so a literal ``'`` can be
+# embedded as ``\'``. Without that, ``Literal["a'b"]`` produced ``(eval):1:
+# unmatched '`` at completion time.
+
+
+def test_choice_with_whitespace(zsh_tester):
+    """A choice value containing a space stays a single completion."""
+    app = App(name="ws")
+
+    @app.default
+    def m(x: Literal["hello world", "normal"] = "normal", /):
+        """Whitespace in choice."""
+
+    tester = zsh_tester(app, "ws")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("ws ")
+    assert "hello world" in completions
+    assert "hello" not in completions
+    assert "world" not in completions
+
+
+def test_choice_with_single_quote(zsh_tester):
+    """A choice value containing a single quote does not break the script.
+
+    Regression test: previously ``Literal["a'b"]`` produced
+    ``'1:X:(... a'\\\\''b)'``. After the outer single-quote-end-restart
+    trick, ``_arguments``' choice-list parser saw an unbalanced ``'`` and
+    failed with ``(eval):1: unmatched '``.
+    """
+    app = App(name="sq")
+
+    @app.default
+    def m(x: Literal["a'b", "normal"] = "normal", /):
+        """Single quote in choice."""
+
+    tester = zsh_tester(app, "sq")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("sq ")
+    assert "a'b" in completions
+    assert not any("unmatched" in c for c in completions)
+
+
+def test_choice_with_backtick(zsh_tester):
+    """A choice value containing a backtick does not break the script."""
+    app = App(name="btk")
+
+    @app.default
+    def m(x: Literal["a`b", "normal"] = "normal", /):
+        """Backtick in choice."""
+
+    tester = zsh_tester(app, "btk")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("btk ")
+    assert "a`b" in completions
+
+
+def test_choice_with_dollar(zsh_tester):
+    """A choice value containing $ is not parameter-expanded."""
+    app = App(name="dol")
+
+    @app.default
+    def m(x: Literal["$home", "normal"] = "normal", /):
+        """Dollar in choice."""
+
+    tester = zsh_tester(app, "dol")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("dol ")
+    assert "$home" in completions
+
+
+def test_choice_value_after_keyword_option(zsh_tester):
+    """Tricky choices also survive the ``--opt <choice>`` value-completion path."""
+    app = App(name="optchoice")
+
+    @app.default
+    def m(env: Annotated[Literal["a b", "c'd", "e`f"], Parameter(help="env")] = "a b"):
+        """Tricky choices behind a keyword option."""
+
+    tester = zsh_tester(app, "optchoice")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("optchoice --env ")
+    assert {"a b", "c'd", "e`f"} <= set(completions)

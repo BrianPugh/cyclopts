@@ -233,6 +233,25 @@ def fish_tester(fish_available):
 
 
 _ZSH_ANSI_RE = re.compile(r"\x1b\[[\d;?]*[a-zA-Z]|\x1b[=>()][a-zA-Z0-9]?|\x1b[=>]|\r|\x07|\x0e|\x0f")
+# zsh's listing widget separates *columns* with two-or-more spaces and uses a
+# single backslash to escape characters within a match value (so
+# ``hello world`` is rendered ``hello\ world``, not split). Splitting on
+# single spaces would merge those into the column gap.
+_ZSH_COLUMN_GAP = re.compile(r" {2,}")
+
+
+def _zsh_unescape_match(token: str) -> str:
+    """Reverse the ``\\X``-style display escape zsh applies to listed matches."""
+    out: list[str] = []
+    i = 0
+    while i < len(token):
+        if token[i] == "\\" and i + 1 < len(token):
+            out.append(token[i + 1])
+            i += 2
+        else:
+            out.append(token[i])
+            i += 1
+    return "".join(out)
 
 
 class ZshCompletionTester(CompletionTesterBase):
@@ -321,12 +340,19 @@ class ZshCompletionTester(CompletionTesterBase):
 
         cleaned = _ZSH_ANSI_RE.sub("", output)
         # First line is the user's typed partial echoed back; subsequent
-        # lines are the listed matches.
+        # lines are the listed matches. Columns are separated by 2+ spaces;
+        # matches themselves may contain single-space-with-escape sequences
+        # like ``hello\ world`` for a value that contains a literal space.
         lines = cleaned.split("\n")
         matches: list[str] = []
         for line in lines[1:]:
-            for token in line.split():
-                matches.append(token)
+            line = line.rstrip()
+            if not line:
+                continue
+            for token in _ZSH_COLUMN_GAP.split(line):
+                token = token.strip()
+                if token:
+                    matches.append(_zsh_unescape_match(token))
         return matches
 
 
