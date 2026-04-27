@@ -5,23 +5,20 @@ Each shell exposes two capabilities:
 * ``validate_script_syntax()`` - runs ``{bash,zsh,fish} -n`` on the generated
   script. Already non-interactive.
 * ``get_completions(partial)`` - returns the list of suggestions a user would
-  see for a partial command line. Historically driven via ``pexpect`` with an
-  interactive shell; that was fragile, disabled on macOS CI, and missing
-  entirely for bash. The drivers below use **non-interactive** shell features
-  wherever possible:
+  see for a partial command line.
 
-  * **Bash** - spawn ``bash -c``, source the completion script, set ``COMP_*``
-    variables, invoke the registered ``_<prog>`` completion function by name,
-    and print ``COMPREPLY``. No TTY, no timing. Bash 3.2-safe (the mac-stock
+  * **Bash** - spawn ``bash -c``, source the completion script, populate
+    ``COMP_WORDS`` using a ``COMP_WORDBREAKS``-aware tokenizer (default
+    ``WORDBREAKS`` includes ``=`` and ``:``, which matters for ``--opt=value``
+    and ``host:port`` forms), invoke the registered ``_<prog>`` function, and
+    print ``COMPREPLY``. No TTY, no timing. Bash 3.2-safe (the mac-stock
     version).
   * **Fish** - use fish's built-in ``complete -C '<partial>'`` flag. Prints
     ``completion\tdescription`` one per line. Deterministic since fish 3.0.
-  * **Zsh** - zle's completion machinery refuses to run outside zle context
-    (``_arguments`` errors with "can only be called from completion function"
-    when invoked directly). A reliable non-interactive driver is deferred;
-    ``get_completions`` currently skips, and zsh behavioral matrix rows are
-    skipped as a result. ``validate_script_syntax`` plus the extensive
-    string-content checks in ``test_zsh.py`` continue to cover zsh.
+  * **Zsh** - drive an interactive ``zsh -i`` via ``pexpect`` and ask it to
+    *list* matches without modifying the line by sending the
+    ``list-choices`` widget (``\e\C-d``). Matches are screen-scraped between
+    two prompt sentinels. Skipped if ``pexpect`` is unavailable.
 """
 
 import re
@@ -80,14 +77,42 @@ class BashCompletionTester(CompletionTesterBase):
             comp_file = Path(tmpdir) / f"{self.prog_name}_completion.bash"
             comp_file.write_text(self.completion_script)
 
+            # Tokenize the line the way real interactive bash does: split on
+            # whitespace AND on every char in ``COMP_WORDBREAKS`` (default:
+            # space tab newline " ' < > = ; | & ( :). Each break char becomes
+            # its own word. Without this the driver can't probe ``--opt=value``
+            # or ``host:port`` style completions.
             driver = (
                 'source "$1"\n'
                 'COMP_LINE="$2"\n'
                 "COMP_POINT=${#COMP_LINE}\n"
                 "COMP_WORDS=()\n"
                 "COMPREPLY=()\n"
-                'read -ra COMP_WORDS <<< "$COMP_LINE"\n'
-                'if [[ "$COMP_LINE" == *" " ]]; then COMP_WORDS+=(""); fi\n'
+                "_word=''\n"
+                "for ((_k=0; _k<${#COMP_LINE}; _k++)); do\n"
+                '  _ch="${COMP_LINE:$_k:1}"\n'
+                '  case "$_ch" in\n'
+                "    ' '|$'\\t'|$'\\n')\n"
+                '      [[ -n "$_word" ]] && { COMP_WORDS+=("$_word"); _word=""; }\n'
+                "      ;;\n"
+                "    '\"'|\"'\"|'<'|'>'|'='|';'|'|'|'&'|'('|':')\n"
+                '      [[ -n "$_word" ]] && { COMP_WORDS+=("$_word"); _word=""; }\n'
+                '      COMP_WORDS+=("$_ch")\n'
+                "      ;;\n"
+                "    *)\n"
+                '      _word+="$_ch"\n'
+                "      ;;\n"
+                "  esac\n"
+                "done\n"
+                # Final word: trailing whitespace means there's an empty
+                # "current word" the user is about to type; otherwise the
+                # accumulated word is the current word.
+                'if [[ "${COMP_LINE: -1}" == " " || "${COMP_LINE: -1}" == $\'\\t\' ]]; then\n'
+                '  [[ -n "$_word" ]] && COMP_WORDS+=("$_word")\n'
+                '  COMP_WORDS+=("")\n'
+                "else\n"
+                '  COMP_WORDS+=("$_word")\n'
+                "fi\n"
                 "COMP_CWORD=$(( ${#COMP_WORDS[@]} - 1 ))\n"
                 f'"{func_name}" "$3" "${{COMP_WORDS[COMP_CWORD]}}" "${{COMP_WORDS[COMP_CWORD-1]:-}}" >/dev/null\n'
                 'printf "%s\\n" "${COMPREPLY[@]}"\n'
@@ -207,19 +232,26 @@ def fish_tester(fish_available):
 # --- Zsh ---------------------------------------------------------------------
 
 
+_ZSH_ANSI_RE = re.compile(r"\x1b\[[\d;?]*[a-zA-Z]|\x1b[=>()][a-zA-Z0-9]?|\x1b[=>]|\r|\x07|\x0e|\x0f")
+
+
 class ZshCompletionTester(CompletionTesterBase):
-    """Zsh completion tester.
+    """Zsh completion tester driven via ``pexpect``.
 
-    **Interactive completion driving is not currently supported.** zsh's
-    completion helpers (``_arguments``, ``_describe``, ``_files``) refuse to
-    run outside a real zle widget context, and the non-rc zle environment
-    spawned by ``zsh -f`` doesn't bind TAB to completion. A reliable
-    non-interactive zsh driver (zpty-based or otherwise) is deferred.
+    zsh's completion helpers (``_arguments``, ``_describe``, ``_files``) only
+    run inside a real zle widget context, so the driver spawns an interactive
+    ``zsh -i`` in a pty. To get matches without zsh inserting / cycling
+    through them, the partial line is followed by the ``list-choices`` widget
+    (``\\e\\C-d``), which lists matches in place and leaves the buffer
+    untouched. Output is screen-scraped between two prompt sentinels and
+    stripped of ANSI.
 
-    For now, zsh tests rely on ``validate_script_syntax()`` plus string-level
-    assertions in ``test_zsh.py`` to verify the generated script's structure.
-    ``get_completions()`` raises ``pytest.skip`` so the cross-shell behavioral
-    matrix degrades gracefully until a driver lands.
+    Notes
+    -----
+    * Skipped if ``pexpect`` is not importable (e.g. Windows).
+    * The TERM is forced to ``dumb`` to minimize control-byte noise.
+    * ``ZDOTDIR`` is pointed at a temp dir so the host's ``.zshrc`` cannot
+      perturb completion (custom widgets, ``zstyle`` settings, oh-my-zsh).
     """
 
     def validate_script_syntax(self) -> bool:
@@ -235,7 +267,67 @@ class ZshCompletionTester(CompletionTesterBase):
             return result.returncode == 0
 
     def get_completions(self, partial_command: str) -> list[str]:
-        pytest.skip("Interactive zsh completion driver is not yet implemented. See the ZshCompletionTester docstring.")
+        try:
+            import pexpect
+        except ImportError:
+            pytest.skip("pexpect not available")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            td = Path(tmpdir)
+            (td / f"_{self.prog_name}").write_text(self.completion_script)
+
+            (td / ".zshrc").write_text(
+                "PROMPT='ZTEST> '\n"
+                f"fpath=({td} $fpath)\n"
+                "autoload -Uz compinit && compinit -u\n"
+                # Force "list, don't insert" semantics so we always see the
+                # full set of matches even when there's only one.
+                "unsetopt MENU_COMPLETE AUTO_MENU AUTO_LIST\n"
+                "setopt NO_BEEP NO_LIST_BEEP\n"
+                # Suppress descriptions/headers so each line is just matches.
+                "zstyle ':completion:*' format ''\n"
+                "zstyle ':completion:*:descriptions' format ''\n"
+                "zstyle ':completion:*:messages' format ''\n"
+                "zstyle ':completion:*:warnings' format ''\n"
+                "zstyle ':completion:*' verbose no\n"
+                "zstyle ':completion:*' group-name ''\n"
+                "zstyle ':completion:*' list-prompt ''\n"
+            )
+
+            env_vars = {
+                "HOME": str(td),
+                "ZDOTDIR": str(td),
+                "PATH": "/usr/bin:/bin:/usr/local/bin",
+                "TERM": "dumb",
+            }
+            child = pexpect.spawn(
+                "zsh -i",
+                encoding="utf-8",
+                env=env_vars,
+                timeout=5,
+                dimensions=(40, 400),
+            )
+            try:
+                child.expect("ZTEST> ", timeout=4)
+                child.send(partial_command)
+                child.send("\x1b\x04")  # list-choices widget (Esc Ctrl-D)
+                try:
+                    child.expect("ZTEST> ", timeout=1.5)
+                except pexpect.TIMEOUT:
+                    pass
+                output = child.before or ""
+            finally:
+                child.close(force=True)
+
+        cleaned = _ZSH_ANSI_RE.sub("", output)
+        # First line is the user's typed partial echoed back; subsequent
+        # lines are the listed matches.
+        lines = cleaned.split("\n")
+        matches: list[str] = []
+        for line in lines[1:]:
+            for token in line.split():
+                matches.append(token)
+        return matches
 
 
 def _check_zsh_available() -> bool:
