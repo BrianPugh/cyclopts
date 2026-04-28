@@ -938,3 +938,23 @@ def test_eq_form_space_form_still_works(bash_tester):
     tester = bash_tester(app_basic, "basic")
     completions = tester.get_completions("basic deploy --env ")
     assert {"dev", "staging", "prod"} <= set(completions)
+
+
+# --- Repeatable value-options ----------------------------------------------
+#
+# Bash already re-offers used flags / values by design, but lock the
+# behavior in via tests so it stays consistent with zsh after Group D.
+
+
+def test_value_option_repeatable_space_form(bash_tester):
+    """``--env dev --env<TAB>`` should still offer choices."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env dev --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_value_option_repeatable_eq_form(bash_tester):
+    """``--env=dev --env=<TAB>`` should still offer choices."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=dev --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)

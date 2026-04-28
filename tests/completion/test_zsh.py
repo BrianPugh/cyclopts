@@ -111,12 +111,13 @@ def test_path_completion(zsh_tester):
 def test_optional_path_completion(zsh_tester):
     """Test that Optional[Path] and Path | None generate file completion.
 
-    Long options that take a value carry an ``=`` suffix in the spec so
-    zsh accepts both ``--output FILE`` and ``--output=FILE`` forms.
+    Long options that take a value carry an ``=`` suffix (so zsh accepts
+    both ``--output FILE`` and ``--output=FILE`` forms) and a ``*`` prefix
+    (so the option can repeat — required for collection-typed options).
     """
     tester = zsh_tester(app_path, "pathapp")
 
-    assert "'--output=[Output file]:output:_files'" in tester.completion_script
+    assert "'*--output=[Output file]:output:_files'" in tester.completion_script
 
 
 def test_nested_command_uses_correct_word_index(zsh_tester):
@@ -1022,3 +1023,64 @@ def test_eq_form_space_form_still_works(zsh_tester):
     tester = zsh_tester(app_basic, "basic")
     completions = tester.get_completions("basic deploy --env ")
     assert {"dev", "staging", "prod"} <= set(completions)
+
+
+# --- Repeatable value-options ----------------------------------------------
+#
+# zsh's ``_arguments`` defaults each spec to single-use, so once an option
+# has been consumed it disappears from suggestions and its value can't be
+# completed again. Cyclopts now prefixes value-bearing specs with ``*`` so
+# the option may repeat — required for collection-typed options
+# (``list[X]``) and matches bash's behavior. Bool flags stay non-repeating.
+
+
+def test_value_option_repeatable_space_form(zsh_tester):
+    """``--env dev --env<TAB>`` should still offer choices."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env dev --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_value_option_repeatable_eq_form(zsh_tester):
+    """``--env=dev --env=<TAB>`` should still offer choices."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=dev --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_collection_option_repeats(zsh_tester):
+    """A ``list[Path]`` keyword option must accept repeated ``--file``.
+
+    Without ``*`` prefix on the spec, zsh would refuse to complete a second
+    ``--file`` value, breaking the natural ``--file a --file b --file c``
+    usage of collection-typed parameters.
+    """
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="files")
+
+    @app.default
+    def m(file: Annotated[list[_Path], Parameter(help="files")] = []):
+        """Files."""
+
+    tester = zsh_tester(app, "files")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "first.txt").write_text("x")
+        cwd = os.getcwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("files --file first.txt --file ")
+        finally:
+            os.chdir(cwd)
+    assert completions, f"expected file completion on second --file, got {completions!r}"
+
+
+def test_bool_flag_not_repeated(zsh_tester):
+    """Bool flags stay single-use in zsh (matches zsh convention)."""
+    tester = zsh_tester(app_basic, "basic")
+    script = tester.completion_script
+    # No ``*`` prefix on the verbose spec.
+    assert "'--verbose[" in script
+    assert "'*--verbose[" not in script

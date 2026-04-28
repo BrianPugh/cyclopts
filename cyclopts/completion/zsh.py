@@ -575,21 +575,29 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
 
     # Generate specs for positive names (from parameter.name).
     #
-    # For long options that take a value, append ``=`` to the option name in
-    # the spec so ``_arguments`` accepts BOTH ``--opt val`` and
-    # ``--opt=val`` forms. Short options keep the plain form (``-v=val`` is
-    # uncommon enough that we don't volunteer it; ``-v val`` still works).
+    # For options that take a value, prefix the spec with ``*`` so
+    # ``_arguments`` allows the option to repeat (matches bash's behavior
+    # and is required for collection-typed options like ``list[Path]`` where
+    # ``--file a --file b`` is the natural usage). Bool flags stay
+    # non-repeating per zsh convention.
+    #
+    # For long options that take a value, also append ``=`` to the option
+    # name so ``_arguments`` accepts BOTH ``--opt val`` and ``--opt=val``
+    # forms. Short options keep the plain form (``-v=val`` is uncommon
+    # enough that we don't volunteer it; ``-v val`` still works).
+    takes_value = bool(action) and not (flag and not action)
     for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
         accepts_eq = name.startswith("--") and not flag and bool(action)
         spec_name = f"{name}=" if accepts_eq else name
+        repeat_prefix = "*" if takes_value else ""
         if flag and not action:
-            spec = f"{quote}{spec_name}[{desc}]{quote}"
+            spec = f"{quote}{repeat_prefix}{spec_name}[{desc}]{quote}"
         elif action:
-            spec = f"{quote}{spec_name}[{desc}]:{name.lstrip('-')}:{action}{quote}"
+            spec = f"{quote}{repeat_prefix}{spec_name}[{desc}]:{name.lstrip('-')}:{action}{quote}"
         else:
-            spec = f"{quote}{spec_name}[{desc}]:{name.lstrip('-')}{quote}"
+            spec = f"{quote}{repeat_prefix}{spec_name}[{desc}]:{name.lstrip('-')}{quote}"
         specs.append(spec)
 
     # Generate specs for negative names (always flags, consume no tokens).
