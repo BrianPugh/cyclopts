@@ -13,8 +13,19 @@ Assertions use subset / exclusion (not exact equality) because shells
 legitimately differ in ordering and in whether helper entries like ``--help``
 surface at every depth.
 
-Scenarios that depend on shell-specific tokenization (e.g. ``foo=bar``) are
-intentionally excluded.
+Known divergences (intentional, not bugs):
+
+* **Naked-TAB at a no-arg subcommand**: bash returns nothing; zsh's
+  ``_arguments`` always lists ``--help`` / ``--version``. Bash's
+  ``cur == -*`` gate is the right convention — typing space-TAB usually
+  means "show me commands or positional values," not "show me flags," and
+  mixing flags into that suggestion list clutters the UI. The current
+  per-shell behavior is locked in by ``test_naked_tab_*`` in
+  ``test_bash.py`` / ``test_zsh.py``.
+* **``--opt=value`` form** is now supported in both shells (Group C), but
+  the cross-shell scenario list below excludes it because each shell
+  reaches it through a different code path and the *space* form alone
+  exercises the binding logic well enough.
 """
 
 from __future__ import annotations

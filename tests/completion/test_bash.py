@@ -958,3 +958,38 @@ def test_value_option_repeatable_eq_form(bash_tester):
     tester = bash_tester(app_basic, "basic")
     completions = tester.get_completions("basic deploy --env=dev --env=")
     assert {"dev", "staging", "prod"} <= set(completions)
+
+
+# --- Naked-TAB at no-arg subcommand: known per-shell divergence -------------
+#
+# See the doc note at the top of test_behavior.py. Bash gates ``--*``
+# suggestions behind ``cur == -*`` so naked-TAB at a no-arg subcommand
+# returns nothing rather than mixing flags into the suggestion list. zsh's
+# ``_arguments`` always offers help / version. We treat the bash behavior
+# as the right default and lock it in here.
+
+
+def test_naked_tab_at_no_arg_subcommand_returns_nothing(bash_tester):
+    """Pressing TAB after a no-arg subcommand + space should be empty."""
+    app = App(name="probe")
+
+    @app.command
+    def noarg():
+        """No-arg subcommand."""
+
+    tester = bash_tester(app, "probe")
+    completions = tester.get_completions("probe noarg ")
+    assert completions == []
+
+
+def test_dash_tab_at_no_arg_subcommand_offers_help(bash_tester):
+    """Typing ``-<TAB>`` at the same point still surfaces ``--help``."""
+    app = App(name="probe")
+
+    @app.command
+    def noarg():
+        """No-arg subcommand."""
+
+    tester = bash_tester(app, "probe")
+    completions = tester.get_completions("probe noarg -")
+    assert "--help" in completions

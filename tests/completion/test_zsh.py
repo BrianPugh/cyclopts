@@ -1084,3 +1084,25 @@ def test_bool_flag_not_repeated(zsh_tester):
     # No ``*`` prefix on the verbose spec.
     assert "'--verbose[" in script
     assert "'*--verbose[" not in script
+
+
+# --- Naked-TAB at no-arg subcommand: known per-shell divergence -------------
+#
+# See the doc note at the top of test_behavior.py. zsh's ``_arguments``
+# always lists ``--help`` / ``--version`` whether or not the user has
+# typed a leading ``-``; bash gates them behind ``cur == -*``. The current
+# behavior is intentional and locked in here.
+
+
+def test_naked_tab_at_no_arg_subcommand_offers_help(zsh_tester):
+    """Zsh always surfaces ``--help`` / ``--version`` via ``_arguments``."""
+    app = App(name="probe")
+
+    @app.command
+    def noarg():
+        """No-arg subcommand."""
+
+    tester = zsh_tester(app, "probe")
+    completions = tester.get_completions("probe noarg ")
+    assert "--help" in completions
+    assert "--version" in completions
