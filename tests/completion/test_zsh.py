@@ -109,10 +109,14 @@ def test_path_completion(zsh_tester):
 
 
 def test_optional_path_completion(zsh_tester):
-    """Test that Optional[Path] and Path | None generate file completion."""
+    """Test that Optional[Path] and Path | None generate file completion.
+
+    Long options that take a value carry an ``=`` suffix in the spec so
+    zsh accepts both ``--output FILE`` and ``--output=FILE`` forms.
+    """
     tester = zsh_tester(app_path, "pathapp")
 
-    assert "'--output[Output file]:output:_files'" in tester.completion_script
+    assert "'--output=[Output file]:output:_files'" in tester.completion_script
 
 
 def test_nested_command_uses_correct_word_index(zsh_tester):
@@ -965,3 +969,56 @@ def test_choice_value_after_keyword_option(zsh_tester):
     assert tester.validate_script_syntax()
     completions = tester.get_completions("optchoice --env ")
     assert {"a b", "c'd", "e`f"} <= set(completions)
+
+
+# --- --opt=value form -------------------------------------------------------
+#
+# Long-option specs now carry an ``=`` suffix so ``_arguments`` accepts both
+# ``--opt val`` and ``--opt=val``. The space form must keep working.
+
+
+def test_eq_form_literal_choices(zsh_tester):
+    """``--env=`` should offer the same Literal choices as ``--env ``."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_eq_form_literal_choices_partial(zsh_tester):
+    """``--env=d`` should narrow the choices to those starting with ``d``."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=d")
+    assert "dev" in completions
+    assert "staging" not in completions
+    assert "prod" not in completions
+
+
+def test_eq_form_path_completion(zsh_tester):
+    """``--input-file=`` should still offer file completion."""
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="ekw")
+
+    @app.default
+    def m(input_file: Annotated[_Path, Parameter(help="In")] = _Path()):
+        """Path keyword."""
+
+    tester = zsh_tester(app, "ekw")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "sample.txt").write_text("x")
+        cwd = os.getcwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("ekw --input-file=")
+        finally:
+            os.chdir(cwd)
+    assert completions, f"expected file completion, got {completions!r}"
+
+
+def test_eq_form_space_form_still_works(zsh_tester):
+    """The ``--env <value>`` form must remain functional after the eq fix."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)

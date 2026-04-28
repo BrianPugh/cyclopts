@@ -573,16 +573,23 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
 
     quote = '"' if has_choices else "'"
 
-    # Generate specs for positive names (from parameter.name)
+    # Generate specs for positive names (from parameter.name).
+    #
+    # For long options that take a value, append ``=`` to the option name in
+    # the spec so ``_arguments`` accepts BOTH ``--opt val`` and
+    # ``--opt=val`` forms. Short options keep the plain form (``-v=val`` is
+    # uncommon enough that we don't volunteer it; ``-v val`` still works).
     for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
+        accepts_eq = name.startswith("--") and not flag and bool(action)
+        spec_name = f"{name}=" if accepts_eq else name
         if flag and not action:
-            spec = f"{quote}{name}[{desc}]{quote}"
+            spec = f"{quote}{spec_name}[{desc}]{quote}"
         elif action:
-            spec = f"{quote}{name}[{desc}]:{name.lstrip('-')}:{action}{quote}"
+            spec = f"{quote}{spec_name}[{desc}]:{name.lstrip('-')}:{action}{quote}"
         else:
-            spec = f"{quote}{name}[{desc}]:{name.lstrip('-')}{quote}"
+            spec = f"{quote}{spec_name}[{desc}]:{name.lstrip('-')}{quote}"
         specs.append(spec)
 
     # Generate specs for negative names (always flags, consume no tokens).

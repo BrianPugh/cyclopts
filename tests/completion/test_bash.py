@@ -518,8 +518,11 @@ def test_positional_with_keyword_options(bash_tester):
     tester = bash_tester(app_deploy, "deploy")
     script = tester.completion_script
 
-    # Should have a case statement for $prev (because --environment takes a value)
-    assert 'case "$prev"' in script or 'case "${prev}"' in script
+    # Should have a case statement that switches on the previous word.
+    # The dispatch key is now ``$_value_prev`` (resolved through ``=`` for
+    # ``--opt=value`` form), but it still represents the same prev-word
+    # logic.
+    assert 'case "$_value_prev"' in script or 'case "${prev}"' in script
 
     # Should suggest positional choices in the script
     assert "web" in script
@@ -880,3 +883,58 @@ def test_choice_value_after_option(bash_tester):
     assert tester.validate_script_syntax()
     completions = tester.get_completions("optchoice --env ")
     assert {"a b", "c'd", "e`f"} <= set(completions)
+
+
+# --- --opt=value form -------------------------------------------------------
+#
+# In real interactive bash, ``--env=dev`` tokenizes through COMP_WORDBREAKS
+# to ``--env`` ``=`` ``dev`` with ``$prev == "="``. Cyclopts now resolves
+# through the equals sign to the actual option name two slots back, so the
+# same case-statement dispatch covers both ``--opt val`` and ``--opt=val``.
+
+
+def test_eq_form_literal_choices(bash_tester):
+    """``--env=`` should offer the same Literal choices as ``--env ``."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_eq_form_literal_choices_partial(bash_tester):
+    """``--env=d`` should narrow the choices to those starting with ``d``."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=d")
+    assert "dev" in completions
+    assert "staging" not in completions
+    assert "prod" not in completions
+
+
+def test_eq_form_path_completion(bash_tester):
+    """``--input-file=`` should still offer file completion."""
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="ekw")
+
+    @app.default
+    def m(input_file: Annotated[_Path, Parameter(help="In")] = _Path()):
+        """Path keyword."""
+
+    tester = bash_tester(app, "ekw")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "sample.txt").write_text("x")
+        cwd = os.getcwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("ekw --input-file=")
+        finally:
+            os.chdir(cwd)
+    assert completions, f"expected file completion, got {completions!r}"
+
+
+def test_eq_form_space_form_still_works(bash_tester):
+    """The ``--env <value>`` form must remain functional after the eq fix."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)

@@ -535,7 +535,15 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
         Lines of bash code for value completion.
     """
     lines = []
-    lines.append(f'{indent}case "${{prev}}" in')
+    # Real interactive bash treats ``=`` as a COMP_WORDBREAK, so
+    # ``--opt=value`` tokenizes to ``--opt`` ``=`` ``value`` and ``$prev``
+    # ends up as ``=``. Resolve through the equals sign to the actual option
+    # name two slots back so the dispatch case below works for both forms.
+    lines.append(f'{indent}local _value_prev="${{prev}}"')
+    lines.append(f'{indent}if [[ "$_value_prev" == "=" && $COMP_CWORD -ge 2 ]]; then')
+    lines.append(f'{indent}  _value_prev="${{COMP_WORDS[COMP_CWORD-2]}}"')
+    lines.append(f"{indent}fi")
+    lines.append(f'{indent}case "$_value_prev" in')
 
     has_cases = False
     for argument in arguments:
