@@ -241,7 +241,7 @@ _ZSH_COLUMN_GAP = re.compile(r" {2,}")
 
 
 def _zsh_unescape_match(token: str) -> str:
-    """Reverse the ``\\X``-style display escape zsh applies to listed matches."""
+    r"""Reverse the ``\X``-style display escape zsh applies to listed matches."""
     out: list[str] = []
     i = 0
     while i < len(token):
@@ -255,13 +255,13 @@ def _zsh_unescape_match(token: str) -> str:
 
 
 class ZshCompletionTester(CompletionTesterBase):
-    """Zsh completion tester driven via ``pexpect``.
+    r"""Zsh completion tester driven via ``pexpect``.
 
     zsh's completion helpers (``_arguments``, ``_describe``, ``_files``) only
     run inside a real zle widget context, so the driver spawns an interactive
     ``zsh -i`` in a pty. To get matches without zsh inserting / cycling
     through them, the partial line is followed by the ``list-choices`` widget
-    (``\\e\\C-d``), which lists matches in place and leaves the buffer
+    (``\e\C-d``), which lists matches in place and leaves the buffer
     untouched. Output is screen-scraped between two prompt sentinels and
     stripped of ANSI.
 
@@ -322,7 +322,7 @@ class ZshCompletionTester(CompletionTesterBase):
             child = pexpect.spawn(
                 "zsh -i",
                 encoding="utf-8",
-                env=env_vars,
+                env=env_vars,  # pyright: ignore[reportArgumentType]
                 timeout=5,
                 dimensions=(40, 400),
             )

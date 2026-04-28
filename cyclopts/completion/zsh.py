@@ -470,7 +470,7 @@ def _escape_choice_for_dq_spec(value: str) -> str:
 
 
 def _escape_zsh_description_dq(text: str) -> str:
-    """Escape a description for embedding in a double-quoted spec string.
+    r"""Escape a description for embedding in a double-quoted spec string.
 
     Same as ``_escape_zsh_description`` but skips the ``'`` -> ``'\\''``
     substitution: ``'`` is literal in a double-quoted context.

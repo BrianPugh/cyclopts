@@ -839,10 +839,10 @@ def test_choice_with_single_quote(bash_tester):
 
 
 def test_choice_with_backtick(bash_tester):
-    """A choice value containing a backtick does not break the script.
+    r"""A choice value containing a backtick does not break the script.
 
     Previously ``compgen -W 'a`b ...'`` inside ``$(...)`` raised
-    ``bad substitution: no closing "\\`"`` because ``$(...)`` re-scans for
+    ``bad substitution: no closing "\`"`` because ``$(...)`` re-scans for
     backticks even inside single quotes.
     """
     app = App(name="btk")
@@ -924,7 +924,7 @@ def test_eq_form_path_completion(bash_tester):
     tester = bash_tester(app, "ekw")
     with tempfile.TemporaryDirectory() as td:
         (_Path(td) / "sample.txt").write_text("x")
-        cwd = os.getcwd()
+        cwd = _Path.cwd()
         try:
             os.chdir(td)
             completions = tester.get_completions("ekw --input-file=")

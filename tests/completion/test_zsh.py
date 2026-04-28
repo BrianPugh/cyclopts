@@ -910,10 +910,10 @@ def test_choice_with_whitespace(zsh_tester):
 
 
 def test_choice_with_single_quote(zsh_tester):
-    """A choice value containing a single quote does not break the script.
+    r"""A choice value containing a single quote does not break the script.
 
     Regression test: previously ``Literal["a'b"]`` produced
-    ``'1:X:(... a'\\\\''b)'``. After the outer single-quote-end-restart
+    ``'1:X:(... a'\\''b)'``. After the outer single-quote-end-restart
     trick, ``_arguments``' choice-list parser saw an unbalanced ``'`` and
     failed with ``(eval):1: unmatched '``.
     """
@@ -1009,7 +1009,7 @@ def test_eq_form_path_completion(zsh_tester):
     tester = zsh_tester(app, "ekw")
     with tempfile.TemporaryDirectory() as td:
         (_Path(td) / "sample.txt").write_text("x")
-        cwd = os.getcwd()
+        cwd = _Path.cwd()
         try:
             os.chdir(td)
             completions = tester.get_completions("ekw --input-file=")
@@ -1062,13 +1062,13 @@ def test_collection_option_repeats(zsh_tester):
     app = App(name="files")
 
     @app.default
-    def m(file: Annotated[list[_Path], Parameter(help="files")] = []):
+    def m(file: Annotated[list[_Path], Parameter(help="files")] = []):  # noqa: B006
         """Files."""
 
     tester = zsh_tester(app, "files")
     with tempfile.TemporaryDirectory() as td:
         (_Path(td) / "first.txt").write_text("x")
-        cwd = os.getcwd()
+        cwd = _Path.cwd()
         try:
             os.chdir(td)
             completions = tester.get_completions("files --file first.txt --file ")
