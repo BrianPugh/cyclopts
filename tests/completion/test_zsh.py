@@ -1141,6 +1141,56 @@ def test_collection_option_repeats(zsh_tester):
     assert completions, f"expected file completion on second --file, got {completions!r}"
 
 
+def test_multiple_iterable_positionals_emit_one_rest_spec(zsh_tester):
+    """Functions with multiple ``list[X]`` positional-or-keyword params.
+
+    Regression test for ``_arguments:comparguments:327: doubled rest argument
+    definition``: zsh allows at most one ``*:`` rest spec per command, but
+    each iterable-typed positional was emitting one. Cyclopts now collapses
+    them to a single rest spec (the first iterable, or the ``*args``
+    var-positional if present); the others remain available via their
+    ``--name`` keyword forms.
+    """
+    app = App(name="multi_iter")
+
+    @app.command
+    def process(
+        items: list[str],
+        tags: list[str] | None = None,
+        exclude: list[str] | None = None,
+    ):
+        """Process items.
+
+        Parameters
+        ----------
+        items
+            Items to process.
+        tags
+            Tags to apply.
+        exclude
+            Items to exclude.
+        """
+
+    tester = zsh_tester(app, "multi_iter")
+    script = tester.completion_script
+
+    assert tester.validate_script_syntax()
+
+    # Exactly one rest-arg spec inside the process block.
+    process_block = re.search(r"process\)(.*?);;", script, re.DOTALL)
+    assert process_block is not None
+    rest_specs = re.findall(r"'\*:[^']*'|\"\*:[^\"]*\"", process_block.group(1))
+    assert len(rest_specs) == 1, f"expected one rest spec, found {rest_specs!r}"
+
+    # The collapsed-out positionals are still available as keyword options.
+    assert "--tags[" in script
+    assert "--exclude[" in script
+
+    # Real zsh accepts the script and offers ``--tags`` after ``--ta``.
+    completions = tester.get_completions("multi_iter process --ta")
+    assert "--tags" in completions
+
+
 def test_bool_flag_not_repeated(zsh_tester):
     """Bool flags stay single-use in zsh (matches zsh convention)."""
     tester = zsh_tester(app_basic, "basic")

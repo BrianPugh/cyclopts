@@ -194,9 +194,17 @@ def _generate_nested_positional_specs(
         pos = 1 + (arg.index or 0)
         specs.append(_build(arg, str(pos)))
 
-    # Generate specs for variadic positionals
-    for arg in variadic_args:
-        specs.append(_build(arg, "*"))
+    # Emit at most one rest-arg (``*:``) spec. zsh's ``_arguments`` errors
+    # with "doubled rest argument definition" if more than one is present.
+    # When a function has multiple iterable positional-or-keyword params
+    # (e.g. several ``list[X]`` defaults), only the first can realistically
+    # be filled positionally — the others remain available via their
+    # ``--name`` keyword forms emitted elsewhere.
+    chosen = next((a for a in variadic_args if a.is_var_positional()), None)
+    if chosen is None and variadic_args:
+        chosen = variadic_args[0]
+    if chosen is not None:
+        specs.append(_build(chosen, "*"))
 
     return specs
 
@@ -336,8 +344,22 @@ def _generate_completion_for_path(
             # Nested context: use shifted positional indexing (words[1] is subcommand)
             positional_specs = _generate_nested_positional_specs(positional_args, data.help_format)
         else:
-            # Root context: standard _arguments works fine
+            # Root context: standard _arguments works fine. As in the
+            # nested helper, only one rest-arg (``*:``) spec is allowed —
+            # collapse multiple iterable positionals to the first one
+            # (var-positional preferred). The other iterables remain
+            # available via their ``--name`` keyword specs.
+            seen_rest = False
+            iterable_args = [a for a in positional_args if a.is_var_positional() or is_iterable_type(a.hint)]
+            chosen_rest = next((a for a in iterable_args if a.is_var_positional()), None)
+            if chosen_rest is None and iterable_args:
+                chosen_rest = iterable_args[0]
             for argument in positional_args:
+                is_rest = argument.is_var_positional() or is_iterable_type(argument.hint)
+                if is_rest:
+                    if argument is not chosen_rest or seen_rest:
+                        continue
+                    seen_rest = True
                 spec = _generate_positional_spec(argument, data.help_format)
                 positional_specs.append(spec)
 
