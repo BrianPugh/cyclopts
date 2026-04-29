@@ -469,23 +469,43 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
             return [f'{body_indent}COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )']
         return [f"{body_indent}COMPREPLY=()"]
 
-    if len(positional_args) == 1:
-        lines.extend(_emit_one(positional_args[0], indent))
-    else:
-        # Multiple positionals - use case statement for position-aware completion
-        lines.append(f"{indent}case ${{positional_count}} in")
+    # An iterable positional (``list[X]``, ``set[X]``, or ``*args``) greedily
+    # consumes all remaining positions starting at its index. The args that
+    # follow it in ``positional_args`` are positional-or-keyword-with-default
+    # entries that can still be filled via their ``--name`` keyword forms but
+    # never end up at a later positional slot. Picking the rest-owner here:
+    # prefer the actual var-positional, otherwise the first iterable.
+    rest_idx = None
+    for i, arg in enumerate(positional_args):
+        if arg.is_var_positional():
+            rest_idx = i
+            break
+    if rest_idx is None:
+        for i, arg in enumerate(positional_args):
+            if is_iterable_type(arg.hint):
+                rest_idx = i
+                break
 
-        for idx, argument in enumerate(positional_args):
+    # Numbered cases only for positions strictly before the rest-owner.
+    head = positional_args if rest_idx is None else positional_args[:rest_idx]
+    rest_owner = None if rest_idx is None else positional_args[rest_idx]
+
+    if not head and rest_owner is not None:
+        # Rest-owner at index 0 — no case statement needed; the iterable
+        # answers every position.
+        lines.extend(_emit_one(rest_owner, indent))
+    elif len(head) == 1 and rest_owner is None:
+        # Single non-iterable positional — simple case.
+        lines.extend(_emit_one(head[0], indent))
+    else:
+        lines.append(f"{indent}case ${{positional_count}} in")
+        for idx, argument in enumerate(head):
             lines.append(f"{indent}  {idx})")
             lines.extend(_emit_one(argument, f"{indent}    "))
             lines.append(f"{indent}    ;;")
-
-        # Default case for positions beyond defined positionals
-        # If any positional is a collection type, use it as the default
-        iterable_arg = next((arg for arg in positional_args if is_iterable_type(arg.hint)), None)
         lines.append(f"{indent}  *)")
-        if iterable_arg:
-            lines.extend(_emit_one(iterable_arg, f"{indent}    "))
+        if rest_owner is not None:
+            lines.extend(_emit_one(rest_owner, f"{indent}    "))
         else:
             lines.append(f"{indent}    COMPREPLY=()")
         lines.append(f"{indent}    ;;")

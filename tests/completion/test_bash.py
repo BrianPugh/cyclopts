@@ -720,28 +720,41 @@ def test_list_annotated_path_completion(bash_tester):
 
 
 def test_list_path_multi_positional_default_case(bash_tester):
-    """Test that list[Path] positional uses file completion in the default case.
+    """Test that list[Path] positional uses file completion at every later position.
 
-    When a list parameter can consume multiple positional values, the bash
-    default case (*) should use the list's completion instead of empty COMPREPLY.
+    When a ``list[Path]`` follows a scalar positional, position 0 takes the
+    scalar's completion and *every* later position is owned by the iterable
+    (collapsed onto the ``*)`` default — there's no separate numbered case
+    for the iterable). End-to-end: position 1, 2, … all offer files.
     """
-    from pathlib import Path
+    import os
+    import tempfile
+    from pathlib import Path as _Path
     from typing import Literal
 
     app = App(name="testapp")
 
     @app.command
-    def cmd(first: Literal["a", "b"], files: list[Path], /):
+    def cmd(first: Literal["a", "b"], files: list[_Path], /):
         pass
 
     tester = bash_tester(app, "testapp")
-    script = tester.completion_script
-
-    # The default case should provide file completion for the list[Path] arg
-    assert script.count("compgen -f") >= 2, (
-        "list[Path] should have file completion in both its position and the default case"
-    )
     assert tester.validate_script_syntax()
+
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "x.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            pos0 = tester.get_completions("testapp cmd ")
+            pos1 = tester.get_completions("testapp cmd a ")
+            pos2 = tester.get_completions("testapp cmd a x.txt ")
+        finally:
+            os.chdir(cwd)
+
+    assert {"a", "b"} <= set(pos0)
+    assert pos1, f"expected file completion at position 1, got {pos1!r}"
+    assert pos2, f"expected file completion at position 2, got {pos2!r}"
 
 
 def test_colon_in_command_name(bash_tester):
@@ -993,3 +1006,85 @@ def test_dash_tab_at_no_arg_subcommand_offers_help(bash_tester):
     tester = bash_tester(app, "probe")
     completions = tester.get_completions("probe noarg -")
     assert "--help" in completions
+
+
+# --- Multi-iterable positionals: rest-owner collapse ------------------------
+#
+# An iterable positional (``list[X]`` / ``set[X]`` / ``*args``) greedily
+# consumes all positions starting at its index. Sibling positional-or-keyword
+# args declared after it still need their ``--name`` keyword forms but should
+# never get their own positional case branch. Bash isn't fatal here (unlike
+# zsh's "doubled rest argument" error), but emitting per-position branches
+# for those siblings would surface wrong completions when the iterables have
+# a completable type (Path / Literal / Enum).
+
+
+def test_multi_iterable_positionals_rest_owner_collapse(bash_tester):
+    """Multiple iterable positionals collapse to a single rest-owner.
+
+    The first iterable (``envs``) owns position 0 and the ``*)`` default;
+    the second iterable (``regions``) is keyword-only-via-default and must
+    not get its own ``1)`` case, otherwise position 1 would offer
+    ``us / eu`` when ``envs`` has actually consumed it as ``dev / prod``.
+    """
+    app = App(name="multi_iter")
+
+    @app.command
+    def deploy(
+        envs: list[Literal["dev", "prod"]],
+        regions: list[Literal["us", "eu"]] | None = None,
+    ):
+        """Deploy.
+
+        Parameters
+        ----------
+        envs
+            Environments.
+        regions
+            Regions.
+        """
+
+    tester = bash_tester(app, "multi_iter")
+    assert tester.validate_script_syntax()
+
+    # Position 0 offers envs; position 1 must continue offering envs (not
+    # regions), because envs greedily owns positions ≥ 0.
+    pos0 = tester.get_completions("multi_iter deploy ")
+    assert {"dev", "prod"} <= set(pos0)
+    pos1 = tester.get_completions("multi_iter deploy dev ")
+    assert {"dev", "prod"} <= set(pos1)
+    assert "us" not in pos1 and "eu" not in pos1
+
+    # ``--regions`` keyword form still works.
+    via_kw = tester.get_completions("multi_iter deploy dev --regions ")
+    assert {"us", "eu"} <= set(via_kw)
+
+
+def test_multi_iterable_after_scalar_positional(bash_tester):
+    """Scalar positionals before the first iterable keep their own cases."""
+    app = App(name="mixed_iter")
+
+    @app.command
+    def cmd(
+        kind: Literal["a", "b"],
+        items: list[Literal["x", "y"]],
+    ):
+        """Mixed scalar + iterable.
+
+        Parameters
+        ----------
+        kind
+            Kind.
+        items
+            Items.
+        """
+
+    tester = bash_tester(app, "mixed_iter")
+    assert tester.validate_script_syntax()
+
+    pos0 = tester.get_completions("mixed_iter cmd ")
+    assert {"a", "b"} <= set(pos0)
+    pos1 = tester.get_completions("mixed_iter cmd a ")
+    assert {"x", "y"} <= set(pos1)
+    pos2 = tester.get_completions("mixed_iter cmd a x ")
+    assert {"x", "y"} <= set(pos2)
