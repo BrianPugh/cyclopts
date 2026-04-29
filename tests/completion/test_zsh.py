@@ -111,13 +111,15 @@ def test_path_completion(zsh_tester):
 def test_optional_path_completion(zsh_tester):
     """Test that Optional[Path] and Path | None generate file completion.
 
-    Long options that take a value carry an ``=`` suffix (so zsh accepts
-    both ``--output FILE`` and ``--output=FILE`` forms) and a ``*`` prefix
-    (so the option can repeat — required for collection-typed options).
+    Value-bearing options carry a ``*`` prefix so the option can repeat
+    (required for collection-typed options like ``list[Path]``). The
+    option name has no ``=`` suffix by default — TAB-completion inserts
+    ``--opt`` plus a space rather than ``--opt=``. ``Parameter(requires_equals=True)``
+    flips this on and is exercised separately.
     """
     tester = zsh_tester(app_path, "pathapp")
 
-    assert "'*--output=[Output file]:output:_files'" in tester.completion_script
+    assert "'*--output[Output file]:output:_files'" in tester.completion_script
 
 
 def test_nested_command_uses_correct_word_index(zsh_tester):
@@ -442,14 +444,22 @@ def test_help_version_flags_in_subcommands(zsh_tester):
 
     script_lines = tester.completion_script.split("\n")
 
+    # Walk from the deploy case label to its closing ``;;``. Track
+    # nested ``case ... in / esac`` so the eq-form pre-pass's inner
+    # ``;;`` markers don't terminate the scan early.
     in_deploy = False
+    case_depth = 0
     deploy_section = []
-    for i, line in enumerate(script_lines):
+    for line in script_lines:
         if "deploy)" in line and not in_deploy:
             in_deploy = True
         if in_deploy:
             deploy_section.append(line)
-            if ";;" in line and i > 0:
+            if re.search(r"\bcase\b.*\bin\b", line):
+                case_depth += 1
+            elif re.search(r"\besac\b", line):
+                case_depth -= 1
+            elif ";;" in line and case_depth == 0:
                 break
 
     deploy_text = "\n".join(deploy_section)
@@ -972,21 +982,60 @@ def test_choice_value_after_keyword_option(zsh_tester):
     assert {"a b", "c'd", "e`f"} <= set(completions)
 
 
-# --- --opt=value form -------------------------------------------------------
+# --- --opt=value form: gated on Parameter.requires_equals ------------------
 #
-# Long-option specs now carry an ``=`` suffix so ``_arguments`` accepts both
-# ``--opt val`` and ``--opt=val``. The space form must keep working.
+# The ``=`` suffix on a zsh ``_arguments`` option spec is load-bearing in
+# two ways at once: it enables ``--opt=value`` value-completion AND it
+# changes the *name* TAB-insert from ``--opt `` (trailing space) to
+# ``--opt=`` (no space). zsh has no native syntax that decouples these.
+#
+# Because forced ``=`` insertion surprises most users and the space form
+# is the more common across CLIs, the default (``requires_equals=False``)
+# emits the plain spec — at the cost of ``--opt=value<TAB>``
+# value-completion silently doing nothing. ``requires_equals=True`` opts
+# back into the eq spec so completion mirrors what the parser accepts.
+#
+# Bash is unaffected by this trade-off — its eq-form completion goes
+# through ``_value_prev`` hopping over ``=`` and works regardless.
 
 
-def test_eq_form_literal_choices(zsh_tester):
-    """``--env=`` should offer the same Literal choices as ``--env ``."""
+def test_default_no_eq_in_spec_name(zsh_tester):
+    """Default: no ``=`` suffix on the option name in the spec.
+
+    The ``--env`` option has Literal choices, so its spec uses a
+    double-quoted outer string. The assertion checks for the ``=``-less
+    form regardless of which quote style wraps the spec.
+    """
+    tester = zsh_tester(app_basic, "basic")
+    script = tester.completion_script
+    # Plain spec — TAB on the name will insert ``--env`` plus a space.
+    assert '"*--env[' in script or "'*--env[" in script
+    assert '"*--env=[' not in script
+    assert "'*--env=[" not in script
+
+
+def test_default_space_form_value_completion(zsh_tester):
+    """The space form must offer value completion regardless of ``requires_equals``."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_default_eq_form_value_completion_via_prepass(zsh_tester):
+    """``--opt=value<TAB>`` works in the default case via the compset pre-pass.
+
+    Even with the plain (no-``=``) ``_arguments`` spec, a user who
+    explicitly types ``--env=`` should still see value completions: the
+    pre-pass intercepts the pattern, strips the ``--env=`` prefix, and
+    dispatches to the choice list.
+    """
     tester = zsh_tester(app_basic, "basic")
     completions = tester.get_completions("basic deploy --env=")
     assert {"dev", "staging", "prod"} <= set(completions)
 
 
-def test_eq_form_literal_choices_partial(zsh_tester):
-    """``--env=d`` should narrow the choices to those starting with ``d``."""
+def test_default_eq_form_value_completion_partial(zsh_tester):
+    """``--opt=d<TAB>`` narrows via the pre-pass."""
     tester = zsh_tester(app_basic, "basic")
     completions = tester.get_completions("basic deploy --env=d")
     assert "dev" in completions
@@ -994,8 +1043,8 @@ def test_eq_form_literal_choices_partial(zsh_tester):
     assert "prod" not in completions
 
 
-def test_eq_form_path_completion(zsh_tester):
-    """``--input-file=`` should still offer file completion."""
+def test_default_eq_form_path_completion_via_prepass(zsh_tester):
+    """Path-typed options also dispatch to ``_files`` from the pre-pass."""
     import os
     import tempfile
     from pathlib import Path as _Path
@@ -1015,14 +1064,36 @@ def test_eq_form_path_completion(zsh_tester):
             completions = tester.get_completions("ekw --input-file=")
         finally:
             os.chdir(cwd)
-    assert completions, f"expected file completion, got {completions!r}"
+    assert completions, f"expected file completion via pre-pass, got {completions!r}"
 
 
-def test_eq_form_space_form_still_works(zsh_tester):
-    """The ``--env <value>`` form must remain functional after the eq fix."""
-    tester = zsh_tester(app_basic, "basic")
-    completions = tester.get_completions("basic deploy --env ")
-    assert {"dev", "staging", "prod"} <= set(completions)
+def test_requires_equals_emits_eq_spec(zsh_tester):
+    """``Parameter(requires_equals=True)`` opts back into the eq spec."""
+    app = App(name="rqeq")
+
+    @app.default
+    def m(env: Annotated[Literal["dev", "prod"], Parameter(requires_equals=True)] = "dev"):
+        """Eq-required."""
+
+    tester = zsh_tester(app, "rqeq")
+    script = tester.completion_script
+    assert "*--env=[" in script
+    # The pre-pass should NOT include this option — its eq-form is already
+    # handled by the spec.
+    assert "--env=*)" not in script
+
+
+def test_requires_equals_eq_form_value_completion(zsh_tester):
+    """``--opt=<TAB>`` value completion works when ``requires_equals=True``."""
+    app = App(name="rqeq")
+
+    @app.default
+    def m(env: Annotated[Literal["dev", "prod"], Parameter(requires_equals=True)] = "dev"):
+        """Eq-required."""
+
+    tester = zsh_tester(app, "rqeq")
+    completions = tester.get_completions("rqeq --env=")
+    assert {"dev", "prod"} <= set(completions)
 
 
 # --- Repeatable value-options ----------------------------------------------
@@ -1038,13 +1109,6 @@ def test_value_option_repeatable_space_form(zsh_tester):
     """``--env dev --env<TAB>`` should still offer choices."""
     tester = zsh_tester(app_basic, "basic")
     completions = tester.get_completions("basic deploy --env dev --env ")
-    assert {"dev", "staging", "prod"} <= set(completions)
-
-
-def test_value_option_repeatable_eq_form(zsh_tester):
-    """``--env=dev --env=<TAB>`` should still offer choices."""
-    tester = zsh_tester(app_basic, "basic")
-    completions = tester.get_completions("basic deploy --env=dev --env=")
     assert {"dev", "staging", "prod"} <= set(completions)
 
 

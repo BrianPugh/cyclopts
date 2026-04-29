@@ -348,6 +348,18 @@ def _generate_completion_for_path(
         args_specs.append("'1: :->cmds'")
         args_specs.append("'*::arg:->args'")
 
+    # Eq-form pre-pass: zsh's ``_arguments`` only handles ``--opt=value``
+    # value-completion when the spec name carries an ``=`` suffix, which
+    # also forces ``=`` insertion on name TAB. We want the natural
+    # ``--opt `` (trailing space) name TAB *and* ``--opt=value<TAB>``
+    # value completion. Achieved with a pre-pass that intercepts
+    # ``--opt=...`` patterns before ``_arguments`` runs and dispatches to
+    # the same value action with the ``--opt=`` prefix consumed via
+    # ``compset -P``. ``Parameter(requires_equals=True)`` already emits the
+    # eq spec directly, so those options are skipped here.
+    eq_prepass = _generate_eq_form_prepass(keyword_args, indent_str)
+    lines.extend(eq_prepass)
+
     if args_specs:
         c_flag = "-C " if has_non_flag_commands else ""
         lines.append(f"{indent_str}_arguments {c_flag}\\")
@@ -531,6 +543,75 @@ def _escape_zsh_description(text: str) -> str:
     return text
 
 
+def _generate_eq_form_prepass(keyword_args: list, indent_str: str) -> list[str]:
+    """Emit a ``--opt=value`` pattern dispatcher to run before ``_arguments``.
+
+    For each keyword argument with a long name and a value action, emits a
+    ``--opt=*)`` case branch that strips the ``--opt=`` prefix via
+    ``compset -P`` and then dispatches to the value action (choice list,
+    ``_files``, or ``_directories``). The natural-TAB experience on the
+    option *name* is preserved by leaving the underlying ``_arguments``
+    spec without an ``=`` suffix; this pre-pass only catches the user
+    explicitly typing the eq form.
+
+    Skipped for arguments whose ``Parameter.requires_equals`` is True —
+    those already emit the ``=`` spec, which handles eq-form completion
+    via ``_arguments``.
+
+    Parameters
+    ----------
+    keyword_args : list
+        Keyword argument objects from ArgumentCollection (already filtered
+        to ``arg.show``).
+    indent_str : str
+        Leading indentation.
+
+    Returns
+    -------
+    list[str]
+        Zsh code lines (empty if no eligible options).
+    """
+    cases: list[tuple[str, str]] = []  # (option_name, completion_action_lines)
+    for argument in keyword_args:
+        if argument.is_flag() or argument.parameter.requires_equals:
+            continue
+        long_names = [name for name in (argument.parameter.name or []) if name.startswith("--")]
+        if not long_names:
+            continue
+
+        choices = argument.get_choices(force=True)
+        if choices:
+            escaped = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+            action_line = "compadd -- " + " ".join(f"'{c}'" for c in escaped)
+        else:
+            action = get_completion_action(argument.hint)
+            zsh_action = _map_completion_action_to_zsh(action)
+            if zsh_action == "_files":
+                action_line = "_files"
+            elif zsh_action == "_directories":
+                action_line = "_directories"
+            else:
+                continue  # Nothing to dispatch to.
+
+        for name in long_names:
+            cases.append((name, action_line))
+
+    if not cases:
+        return []
+
+    lines = [
+        f"{indent_str}case ${{words[CURRENT]}} in",
+    ]
+    for opt_name, action_line in cases:
+        lines.append(f"{indent_str}  {opt_name}=*)")
+        lines.append(f"{indent_str}    compset -P '{opt_name}='")
+        lines.append(f"{indent_str}    {action_line}")
+        lines.append(f"{indent_str}    return")
+        lines.append(f"{indent_str}    ;;")
+    lines.append(f"{indent_str}esac")
+    return lines
+
+
 def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]:
     """Generate zsh _arguments specs for a keyword argument.
 
@@ -581,15 +662,28 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
     # ``--file a --file b`` is the natural usage). Bool flags stay
     # non-repeating per zsh convention.
     #
-    # For long options that take a value, also append ``=`` to the option
-    # name so ``_arguments`` accepts BOTH ``--opt val`` and ``--opt=val``
-    # forms. Short options keep the plain form (``-v=val`` is uncommon
-    # enough that we don't volunteer it; ``-v val`` still works).
+    # The ``=`` suffix on the option name is the *only* knob zsh exposes for
+    # eq-form support, and it's load-bearing in two ways at once:
+    #
+    #   1. With ``=``, ``--opt=value`` value-completion works.
+    #   2. With ``=``, TAB-completing the option *name* inserts ``--opt=``
+    #      (no trailing space). Without ``=``, TAB inserts ``--opt`` plus a
+    #      space — which most users prefer.
+    #
+    # Since most CLIs in the wild lean on the space form and users find a
+    # forced ``=`` insertion surprising, the default (``requires_equals=False``)
+    # emits the plain spec — accepting the cost that ``--opt=value<TAB>``
+    # value-completion silently does nothing in zsh. When the parser is
+    # configured to *require* the eq form (``requires_equals=True``), we
+    # emit the ``=`` spec so completion mirrors what the parser will
+    # accept. Bash is unaffected: its eq-form completion is driven by
+    # ``_value_prev`` hopping over the ``=`` token, not by the spec.
+    requires_eq = bool(argument.parameter.requires_equals)
     takes_value = bool(action) and not (flag and not action)
     for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
-        accepts_eq = name.startswith("--") and not flag and bool(action)
+        accepts_eq = requires_eq and name.startswith("--") and not flag and bool(action)
         spec_name = f"{name}=" if accepts_eq else name
         repeat_prefix = "*" if takes_value else ""
         if flag and not action:
