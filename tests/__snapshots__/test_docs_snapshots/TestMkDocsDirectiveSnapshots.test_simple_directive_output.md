@@ -1,7 +1,7 @@
 # CLI Reference
 
 ```console
-complex-cli COMMAND
+complex-cli COMMAND [OPTIONS]
 ```
 
 Complex CLI application for comprehensive documentation testing.
