@@ -21,6 +21,7 @@ Each shell exposes two capabilities:
     two prompt sentinels. Skipped if ``pexpect`` is unavailable.
 """
 
+import os
 import re
 import subprocess
 import tempfile
@@ -180,12 +181,12 @@ class FishCompletionTester(CompletionTesterBase):
             comp_file = Path(tmpdir) / f"{self.prog_name}.fish"
             comp_file.write_text(self.completion_script)
 
-            # `source` the completion then ask fish for completions of the partial line.
-            # Single-quote the partial and escape any single quotes inside it.
-            escaped = partial_command.replace("'", "\\'")
-            script = f"source {comp_file}; complete -C '{escaped}'"
+            # Pass the completion file and partial line as argv items so fish
+            # treats them as data — manual single-quote escaping breaks for
+            # partials containing backslashes or other shell metacharacters.
+            script = "source $argv[1]; complete -C $argv[2]"
             result = subprocess.run(
-                ["fish", "-c", script],
+                ["fish", "-c", script, str(comp_file), partial_command],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -313,10 +314,16 @@ class ZshCompletionTester(CompletionTesterBase):
                 "zstyle ':completion:*' list-prompt ''\n"
             )
 
+            # Inherit the parent PATH so zsh (and any tools it shells out to)
+            # can be located when installed outside ``/usr/bin:/bin:/usr/local/bin``
+            # — Homebrew on Apple Silicon, nix, asdf, pyenv shims, etc. We
+            # deliberately *don't* inherit the rest of ``os.environ``: stray
+            # ``ZSH_*``/``LC_*``/locale vars from the host can leak into the
+            # listing widget output and break screen-scraping.
             env_vars = {
                 "HOME": str(td),
                 "ZDOTDIR": str(td),
-                "PATH": "/usr/bin:/bin:/usr/local/bin",
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin:/usr/local/bin"),
                 "TERM": "dumb",
             }
             child = pexpect.spawn(

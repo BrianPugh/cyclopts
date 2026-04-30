@@ -376,8 +376,11 @@ def test_empty_iterable_flag_completion(zsh_tester):
     assert "'--empty-items[Items to process]'" in tester.completion_script
     assert "'--empty-tags[Optional tags]'" in tester.completion_script
 
-    # Positive names should expect values (have :action or :name suffix)
-    lines_with_items = [line for line in tester.completion_script.split("\n") if "'--items[" in line]
+    # Positive names should expect values (have :action or :name suffix).
+    # Match both the plain and ``*``-prefixed (repeatable) spec forms.
+    lines_with_items = [
+        line for line in tester.completion_script.split("\n") if "--items[" in line and "empty" not in line
+    ]
     assert any(":items:" in line or ":items'" in line for line in lines_with_items), (
         "Positive --items flag should expect a value"
     )

@@ -701,11 +701,15 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
     # accept. Bash is unaffected: its eq-form completion is driven by
     # ``_value_prev`` hopping over the ``=`` token, not by the spec.
     requires_eq = bool(argument.parameter.requires_equals)
-    takes_value = bool(action) and not (flag and not action)
+    # An option "takes a value" iff it isn't a bool flag — independent of whether
+    # zsh has a completion *action* for the value. Collection-typed options like
+    # ``list[int]`` have no action (``get_completion_action`` only knows FILES /
+    # DIRECTORIES) but still need ``*`` so ``_arguments`` allows repetition.
+    takes_value = not flag
     for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
-        accepts_eq = requires_eq and name.startswith("--") and not flag and bool(action)
+        accepts_eq = requires_eq and name.startswith("--") and takes_value
         spec_name = f"{name}=" if accepts_eq else name
         repeat_prefix = "*" if takes_value else ""
         if flag and not action:
