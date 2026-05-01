@@ -546,7 +546,7 @@ class Argument:
                 else:
                     return (), implicit_value
         else:
-            hint = resolve_annotated(self.field_info.annotation)
+            hint = self._negatives_hint
             if is_union(hint):
                 hints = get_args(hint)
             else:
@@ -968,9 +968,22 @@ class Argument:
         return tokens_per_element, consume_all
 
     @property
+    def _negatives_hint(self):
+        # Mirrors ``field_info.annotation`` but substitutes ``type(default)`` when
+        # there is no annotation, so an unannotated ``foo=False`` is treated as
+        # ``bool`` for negative-flag purposes. Unlike ``self.hint``, this preserves
+        # ``Optional`` / unions, which ``negative_none`` depends on.
+        hint = self.field_info.annotation
+        if hint is inspect.Parameter.empty:
+            default = self.field_info.default
+            if default is not inspect.Parameter.empty and default is not None:
+                hint = type(default)
+        return resolve_annotated(hint)
+
+    @property
     def negatives(self):
         """Negative flags from :meth:`.Parameter.get_negatives`."""
-        return self.parameter.get_negatives(resolve_annotated(self.field_info.annotation))
+        return self.parameter.get_negatives(self._negatives_hint)
 
     @property
     def name(self) -> str:
