@@ -34,6 +34,29 @@ def test_boolean_flag_default(app, cmd_str, expected, assert_parse_args):
         ("--my-flag=true", True),
         ("--my-flag=false", False),
         ("--no-my-flag", False),
+    ],
+)
+def test_boolean_flag_unannotated_default(app, cmd_str, expected, assert_parse_args):
+    """https://github.com/BrianPugh/cyclopts/issues/797
+
+    A parameter whose type is inferred from a boolean default (no annotation)
+    should still get a generated negative ``--no-`` flag.
+    """
+
+    @app.default
+    def foo(my_flag=False):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("--my-flag", True),
+        ("--my-flag=true", True),
+        ("--my-flag=false", False),
+        ("--no-my-flag", False),
         ("--your-flag", True),
         ("--no-your-flag", False),
         ("-m", True),
