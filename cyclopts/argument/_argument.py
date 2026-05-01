@@ -974,7 +974,7 @@ class Argument:
         # ``bool`` for negative-flag purposes. Unlike ``self.hint``, this preserves
         # ``Optional`` / unions, which ``negative_none`` depends on.
         hint = self.field_info.annotation
-        if hint is inspect.Parameter.empty:
+        if hint is inspect.Parameter.empty or resolve(hint) is Any:
             default = self.field_info.default
             if default is not inspect.Parameter.empty and default is not None:
                 hint = type(default)
