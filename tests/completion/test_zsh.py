@@ -1070,6 +1070,52 @@ def test_default_eq_form_path_completion_via_prepass(zsh_tester):
     assert completions, f"expected file completion via pre-pass, got {completions!r}"
 
 
+def test_eq_form_prepass_compadd_no_stray_backslashes(zsh_tester):
+    r"""Eq-form prepass ``compadd`` args must be POSIX-safe single-quoted.
+
+    Reproduces the Copilot review finding: choices are passed through
+    ``_escape_completion_choice`` (which inserts ``\\`` escapes designed for
+    ``_describe``'s inner parser) and then wrapped in *single quotes* for
+    ``compadd``. Inside single quotes, backslashes are literal — so a choice
+    like ``"foo bar"`` ends up as ``'foo\\ bar'`` and the user sees a
+    completion containing a stray backslash. The fix is proper single-quote
+    escaping (only ``'`` needs handling, via the ``'\\''`` end/restart trick).
+    """
+    app = App(name="eqp")
+
+    @app.default
+    def m(env: Annotated[Literal["foo bar", "baz qux"], Parameter(help="E")] = "foo bar"):
+        """Eq-form choices with spaces."""
+
+    tester = zsh_tester(app, "eqp")
+    script = tester.completion_script
+
+    # Locate the prepass case branch for ``--env`` and the inner ``compadd`` line.
+    lines = script.splitlines()
+    in_env_case = False
+    compadd_line = None
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "--env=*)":
+            in_env_case = True
+            continue
+        if in_env_case:
+            if stripped.startswith("compadd "):
+                compadd_line = stripped
+                break
+            if stripped == ";;":
+                break
+
+    assert compadd_line is not None, "no ``compadd`` line found in --env=*) prepass branch"
+
+    # Single-quoted compadd args must not contain literal backslash-escape
+    # sequences — those would render as visible backslashes in the user's
+    # completion menu.
+    assert "\\ " not in compadd_line, (
+        f"single-quoted compadd args contain literal '\\ ' (backslash-space): {compadd_line!r}"
+    )
+
+
 def test_requires_equals_emits_eq_spec(zsh_tester):
     """``Parameter(requires_equals=True)`` opts back into the eq spec."""
     app = App(name="rqeq")

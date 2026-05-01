@@ -119,12 +119,16 @@ class BashCompletionTester(CompletionTesterBase):
                 'printf "%s\\n" "${COMPREPLY[@]}"\n'
             )
 
+            # Inherit the caller's cwd (don't pin to ``tmpdir``): tests that
+            # ``os.chdir()`` into a target directory before calling
+            # ``get_completions()`` rely on path completion seeing that
+            # directory. The comp-script itself is sourced via an absolute
+            # path, so cwd is otherwise irrelevant.
             result = subprocess.run(
                 ["bash", "-c", driver, "_", str(comp_file), partial_command, self.prog_name],
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd=tmpdir,
             )
             if result.returncode != 0:
                 raise RuntimeError(
@@ -185,12 +189,14 @@ class FishCompletionTester(CompletionTesterBase):
             # treats them as data — manual single-quote escaping breaks for
             # partials containing backslashes or other shell metacharacters.
             script = "source $argv[1]; complete -C $argv[2]"
+            # Inherit the caller's cwd so path completion reflects whatever
+            # directory the test ``os.chdir()``-ed into. The comp-script is
+            # sourced via an absolute path.
             result = subprocess.run(
                 ["fish", "-c", script, str(comp_file), partial_command],
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd=tmpdir,
             )
             if result.returncode != 0:
                 raise RuntimeError(

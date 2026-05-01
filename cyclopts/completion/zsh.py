@@ -435,6 +435,18 @@ def _generate_completion_for_path(
     return lines
 
 
+def _shell_single_quote(s: str) -> str:
+    r"""Wrap ``s`` in POSIX-safe single quotes for embedding as a shell argument.
+
+    The only character that can't appear inside a single-quoted shell string
+    is ``'`` itself, which is handled with the ``'\''`` end-and-restart
+    trick. Everything else (spaces, parens, ``$``, backticks, etc.) is
+    literal — no backslash-escaping is needed, and adding any would just
+    surface as visible backslashes in the resulting argument.
+    """
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
 def _escape_completion_choice(choice: str) -> str:
     """Escape a choice value for embedding in a single-quoted shell context.
 
@@ -603,8 +615,12 @@ def _generate_eq_form_prepass(keyword_args: list, indent_str: str) -> list[str]:
 
         choices = argument.get_choices(force=True)
         if choices:
-            escaped = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
-            action_line = "compadd -- " + " ".join(f"'{c}'" for c in escaped)
+            # ``compadd`` adds its arguments verbatim — no inner parser to
+            # interpret backslash escapes — so we use POSIX single-quoting
+            # rather than ``_escape_completion_choice`` (which is built for
+            # ``_describe``'s inner parser).
+            quoted = [_shell_single_quote(clean_choice_text(c)) for c in choices]
+            action_line = "compadd -- " + " ".join(quoted)
         else:
             action = get_completion_action(argument.hint)
             zsh_action = _map_completion_action_to_zsh(action)

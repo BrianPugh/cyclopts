@@ -1088,3 +1088,38 @@ def test_multi_iterable_after_scalar_positional(bash_tester):
     assert {"x", "y"} <= set(pos1)
     pos2 = tester.get_completions("mixed_iter cmd a x ")
     assert {"x", "y"} <= set(pos2)
+
+
+def test_bash_path_completion_reflects_caller_cwd(bash_tester):
+    """Path completion must inspect the caller's cwd, not the harness tmpdir.
+
+    Reproduces the Copilot finding: ``BashCompletionTester.get_completions()``
+    forces ``cwd=`` to the temporary directory holding the comp-script, so a
+    test that ``os.chdir()``-es into a target directory before calling
+    ``get_completions()`` has the chdir overridden by the driver. Path
+    completion then lists files from the comp-script's tmpdir instead of the
+    intended directory. The driver should inherit the caller's cwd.
+    """
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="pcwd")
+
+    @app.default
+    def m(output: Annotated[_Path, Parameter(help="Out")] = _Path()):
+        """Path keyword."""
+
+    tester = bash_tester(app, "pcwd")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "myfile.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("pcwd --output ")
+        finally:
+            os.chdir(cwd)
+
+    assert "myfile.txt" in completions, (
+        f"expected 'myfile.txt' from caller cwd, got {completions!r} (driver likely overrode cwd to its own tmpdir)"
+    )
