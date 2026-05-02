@@ -36,11 +36,14 @@ from .apps import (
     app_basic,
     app_disabled_negative,
     app_enum,
+    app_list_path,
     app_multiple_positionals,
     app_negative,
     app_nested,
     app_positional_literal,
     app_positional_path,
+    app_three_positionals,
+    app_two_iterables,
 )
 
 # Each scenario:
@@ -170,6 +173,64 @@ SCENARIOS = [
         {"--help"},
         set(),
     ),
+    # 14. --opt=value form. Each shell reaches value-completion through a
+    # different code path (bash: COMP_WORDBREAK splits on '=' so the script
+    # walks back through ``$prev``; zsh: ``_arguments`` parses ``--env=`` as
+    # a single token; fish: ``complete -C`` does the right thing natively).
+    # Excluded historically out of caution — this is exactly where per-shell
+    # divergence regressions hide.
+    (
+        "equals-form-option-value",
+        app_basic,
+        "basic",
+        "basic deploy --env=p",
+        {"prod"},
+        set(),
+    ),
+    # 15. --help works at a nested command depth, not just the root.
+    (
+        "help-at-nested-depth",
+        app_nested,
+        "nested",
+        "nested config --h",
+        {"--help"},
+        set(),
+    ),
+    # 16. Position-aware multi-positional: third slot has its own choices.
+    # Scenario #8 only verifies the second slot — this catches off-by-one
+    # regressions deeper in the cycle.
+    (
+        "multi-positional-third",
+        app_three_positionals,
+        "multipos3",
+        "multipos3 command-multi3 red cat ",
+        {"small", "large"},
+        {"red", "blue", "cat", "dog"},
+    ),
+    # 17. Iterable positional (``list[Path]``) keeps offering completions
+    # past the first slot — a regression net for the rest-owner logic.
+    # Path completion is shell-specific, so we only assert non-empty (same
+    # convention as scenario #10).
+    (
+        "iterable-positional-rest",
+        app_list_path,
+        "listpath",
+        "listpath a.txt ",
+        None,
+        set(),
+    ),
+    # 18. Two iterable positionals back-to-back. The "first iterable wins
+    # the rest spec" rule (commits 1bc65e8 / 3302dc7) prevents a doubled
+    # rest spec from being emitted. With the bug present, scripts either
+    # fail to parse or silently produce wrong completions at the rest slot.
+    (
+        "two-iterables-rest-owner",
+        app_two_iterables,
+        "twoiter",
+        "twoiter collect a.txt b.txt ",
+        None,
+        set(),
+    ),
 ]
 
 
@@ -200,11 +261,12 @@ def test_behavior(
 ):
     tester = shell_tester_factory(app, prog_name)
 
-    # Scenario #10: path completion. Ensure cwd has a file, then just assert
-    # the driver returns a non-empty result. Different shells format file
-    # completions differently (fish: full path, bash: basename, zsh: a mix),
-    # so exact content checks would be brittle.
-    if scenario_id == "path-positional":
+    # Path-completion scenarios opt in with ``contains=None``. Different
+    # shells format file completions differently (fish: full path, bash:
+    # basename, zsh: a mix), so exact content checks would be brittle —
+    # we only assert the driver returns a non-empty result with a real
+    # file in cwd.
+    if contains is None:
         import os
         import tempfile
         from pathlib import Path as _Path
@@ -217,7 +279,7 @@ def test_behavior(
                 results = tester.get_completions(partial)
             finally:
                 os.chdir(cwd)
-        assert results, f"expected some file-completion result for {partial!r}, got nothing"
+        assert results, f"[{scenario_id}] expected some file-completion result for {partial!r}, got nothing"
         return
 
     results = tester.get_completions(partial)
