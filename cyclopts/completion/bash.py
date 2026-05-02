@@ -214,8 +214,9 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
     lines = []
     lines.append("  # Build list of options that take values (to skip their arguments)")
     if options_with_values:
-        escaped_opts = [_escape_bash_choice(opt) for opt in sorted(options_with_values)]
-        opts_str = " ".join(escaped_opts)
+        # Option/command names are constrained to ``-``, ``_``, and alphanumerics,
+        # so they cannot contain characters that need shell escaping.
+        opts_str = " ".join(sorted(options_with_values))
         lines.append(f"  local options_with_values='{opts_str}'")
     else:
         lines.append("  local options_with_values=''")
@@ -223,8 +224,7 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
     lines.append("")
     lines.append("  # Build list of all valid command names (to distinguish from positionals)")
     if all_commands:
-        escaped_cmds = [_escape_bash_choice(cmd) for cmd in sorted(all_commands)]
-        cmds_str = " ".join(escaped_cmds)
+        cmds_str = " ".join(sorted(all_commands))
         lines.append(f"  local all_commands='{cmds_str}'")
     else:
         lines.append("  local all_commands=''")
