@@ -518,8 +518,11 @@ def test_positional_with_keyword_options(bash_tester):
     tester = bash_tester(app_deploy, "deploy")
     script = tester.completion_script
 
-    # Should have a case statement for $prev (because --environment takes a value)
-    assert 'case "$prev"' in script or 'case "${prev}"' in script
+    # Should have a case statement that switches on the previous word.
+    # The dispatch key is now ``$_value_prev`` (resolved through ``=`` for
+    # ``--opt=value`` form), but it still represents the same prev-word
+    # logic.
+    assert 'case "$_value_prev"' in script or 'case "${prev}"' in script
 
     # Should suggest positional choices in the script
     assert "web" in script
@@ -717,28 +720,41 @@ def test_list_annotated_path_completion(bash_tester):
 
 
 def test_list_path_multi_positional_default_case(bash_tester):
-    """Test that list[Path] positional uses file completion in the default case.
+    """Test that list[Path] positional uses file completion at every later position.
 
-    When a list parameter can consume multiple positional values, the bash
-    default case (*) should use the list's completion instead of empty COMPREPLY.
+    When a ``list[Path]`` follows a scalar positional, position 0 takes the
+    scalar's completion and *every* later position is owned by the iterable
+    (collapsed onto the ``*)`` default — there's no separate numbered case
+    for the iterable). End-to-end: position 1, 2, … all offer files.
     """
-    from pathlib import Path
+    import os
+    import tempfile
+    from pathlib import Path as _Path
     from typing import Literal
 
     app = App(name="testapp")
 
     @app.command
-    def cmd(first: Literal["a", "b"], files: list[Path], /):
+    def cmd(first: Literal["a", "b"], files: list[_Path], /):
         pass
 
     tester = bash_tester(app, "testapp")
-    script = tester.completion_script
-
-    # The default case should provide file completion for the list[Path] arg
-    assert script.count("compgen -f") >= 2, (
-        "list[Path] should have file completion in both its position and the default case"
-    )
     assert tester.validate_script_syntax()
+
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "x.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            pos0 = tester.get_completions("testapp cmd ")
+            pos1 = tester.get_completions("testapp cmd a ")
+            pos2 = tester.get_completions("testapp cmd a x.txt ")
+        finally:
+            os.chdir(cwd)
+
+    assert {"a", "b"} <= set(pos0)
+    assert pos1, f"expected file completion at position 1, got {pos1!r}"
+    assert pos2, f"expected file completion at position 2, got {pos2!r}"
 
 
 def test_colon_in_command_name(bash_tester):
@@ -794,3 +810,316 @@ def test_glob_chars_in_command_name(bash_tester):
     assert r"test\[1\]" in script, "Brackets in command name should be escaped in case patterns"
 
     assert tester.validate_script_syntax()
+
+
+# --- Choice values containing whitespace / shell metacharacters --------------
+#
+# Regression tests for the bug where ``compgen -W '<choices>'`` whitespace-
+# tokenized the choice list (so ``"hello world"`` became two completions)
+# and the surrounding ``$(...)`` re-parsed backticks even inside single
+# quotes. Choices now go through an array + prefix-match loop, which keeps
+# every value intact.
+
+
+def test_choice_with_whitespace(bash_tester):
+    """A choice value containing a space stays a single completion."""
+    app = App(name="ws")
+
+    @app.default
+    def m(x: Literal["hello world", "normal"] = "normal", /):
+        """Whitespace in choice."""
+
+    tester = bash_tester(app, "ws")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("ws ")
+    assert "hello world" in completions
+    assert "hello" not in completions
+    assert "world" not in completions
+
+
+def test_choice_with_single_quote(bash_tester):
+    """A choice value containing a single quote round-trips intact."""
+    app = App(name="sq")
+
+    @app.default
+    def m(x: Literal["a'b", "normal"] = "normal", /):
+        """Single quote in choice."""
+
+    tester = bash_tester(app, "sq")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("sq ")
+    assert "a'b" in completions
+
+
+def test_choice_with_backtick(bash_tester):
+    r"""A choice value containing a backtick does not break the script.
+
+    Previously ``compgen -W 'a`b ...'`` inside ``$(...)`` raised
+    ``bad substitution: no closing "\`"`` because ``$(...)`` re-scans for
+    backticks even inside single quotes.
+    """
+    app = App(name="btk")
+
+    @app.default
+    def m(x: Literal["a`b", "normal"] = "normal", /):
+        """Backtick in choice."""
+
+    tester = bash_tester(app, "btk")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("btk ")
+    assert "a`b" in completions
+
+
+def test_choice_with_dollar(bash_tester):
+    """A choice value containing $ is not parameter-expanded."""
+    app = App(name="dol")
+
+    @app.default
+    def m(x: Literal["$home", "normal"] = "normal", /):
+        """Dollar in choice."""
+
+    tester = bash_tester(app, "dol")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("dol ")
+    assert "$home" in completions
+
+
+def test_choice_value_after_option(bash_tester):
+    """Tricky choices also survive the ``--opt <choice>`` value-completion path."""
+    app = App(name="optchoice")
+
+    @app.default
+    def m(env: Annotated[Literal["a b", "c'd", "e`f"], Parameter(help="env")] = "a b"):
+        """Tricky choices behind a keyword option."""
+
+    tester = bash_tester(app, "optchoice")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("optchoice --env ")
+    assert {"a b", "c'd", "e`f"} <= set(completions)
+
+
+# --- --opt=value form -------------------------------------------------------
+#
+# In real interactive bash, ``--env=dev`` tokenizes through COMP_WORDBREAKS
+# to ``--env`` ``=`` ``dev`` with ``$prev == "="``. Cyclopts now resolves
+# through the equals sign to the actual option name two slots back, so the
+# same case-statement dispatch covers both ``--opt val`` and ``--opt=val``.
+
+
+def test_eq_form_literal_choices(bash_tester):
+    """``--env=`` should offer the same Literal choices as ``--env ``."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_eq_form_literal_choices_partial(bash_tester):
+    """``--env=d`` should narrow the choices to those starting with ``d``."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=d")
+    assert "dev" in completions
+    assert "staging" not in completions
+    assert "prod" not in completions
+
+
+def test_eq_form_path_completion(bash_tester):
+    """``--input-file=`` should still offer file completion."""
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="ekw")
+
+    @app.default
+    def m(input_file: Annotated[_Path, Parameter(help="In")] = _Path()):
+        """Path keyword."""
+
+    tester = bash_tester(app, "ekw")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "sample.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("ekw --input-file=")
+        finally:
+            os.chdir(cwd)
+    assert completions, f"expected file completion, got {completions!r}"
+
+
+def test_eq_form_space_form_still_works(bash_tester):
+    """The ``--env <value>`` form must remain functional after the eq fix."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+# --- Repeatable value-options ----------------------------------------------
+#
+# Bash already re-offers used flags / values by design, but lock the
+# behavior in via tests so it stays consistent with zsh after Group D.
+
+
+def test_value_option_repeatable_space_form(bash_tester):
+    """``--env dev --env<TAB>`` should still offer choices."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env dev --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_value_option_repeatable_eq_form(bash_tester):
+    """``--env=dev --env=<TAB>`` should still offer choices."""
+    tester = bash_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=dev --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+# --- Naked-TAB at no-arg subcommand: known per-shell divergence -------------
+#
+# See the doc note at the top of test_behavior.py. Bash gates ``--*``
+# suggestions behind ``cur == -*`` so naked-TAB at a no-arg subcommand
+# returns nothing rather than mixing flags into the suggestion list. zsh's
+# ``_arguments`` always offers help / version. We treat the bash behavior
+# as the right default and lock it in here.
+
+
+def test_naked_tab_at_no_arg_subcommand_returns_nothing(bash_tester):
+    """Pressing TAB after a no-arg subcommand + space should be empty."""
+    app = App(name="probe")
+
+    @app.command
+    def noarg():
+        """No-arg subcommand."""
+
+    tester = bash_tester(app, "probe")
+    completions = tester.get_completions("probe noarg ")
+    assert completions == []
+
+
+def test_dash_tab_at_no_arg_subcommand_offers_help(bash_tester):
+    """Typing ``-<TAB>`` at the same point still surfaces ``--help``."""
+    app = App(name="probe")
+
+    @app.command
+    def noarg():
+        """No-arg subcommand."""
+
+    tester = bash_tester(app, "probe")
+    completions = tester.get_completions("probe noarg -")
+    assert "--help" in completions
+
+
+# --- Multi-iterable positionals: rest-owner collapse ------------------------
+#
+# An iterable positional (``list[X]`` / ``set[X]`` / ``*args``) greedily
+# consumes all positions starting at its index. Sibling positional-or-keyword
+# args declared after it still need their ``--name`` keyword forms but should
+# never get their own positional case branch. Bash isn't fatal here (unlike
+# zsh's "doubled rest argument" error), but emitting per-position branches
+# for those siblings would surface wrong completions when the iterables have
+# a completable type (Path / Literal / Enum).
+
+
+def test_multi_iterable_positionals_rest_owner_collapse(bash_tester):
+    """Multiple iterable positionals collapse to a single rest-owner.
+
+    The first iterable (``envs``) owns position 0 and the ``*)`` default;
+    the second iterable (``regions``) is keyword-only-via-default and must
+    not get its own ``1)`` case, otherwise position 1 would offer
+    ``us / eu`` when ``envs`` has actually consumed it as ``dev / prod``.
+    """
+    app = App(name="multi_iter")
+
+    @app.command
+    def deploy(
+        envs: list[Literal["dev", "prod"]],
+        regions: list[Literal["us", "eu"]] | None = None,
+    ):
+        """Deploy.
+
+        Parameters
+        ----------
+        envs
+            Environments.
+        regions
+            Regions.
+        """
+
+    tester = bash_tester(app, "multi_iter")
+    assert tester.validate_script_syntax()
+
+    # Position 0 offers envs; position 1 must continue offering envs (not
+    # regions), because envs greedily owns positions ≥ 0.
+    pos0 = tester.get_completions("multi_iter deploy ")
+    assert {"dev", "prod"} <= set(pos0)
+    pos1 = tester.get_completions("multi_iter deploy dev ")
+    assert {"dev", "prod"} <= set(pos1)
+    assert "us" not in pos1 and "eu" not in pos1
+
+    # ``--regions`` keyword form still works.
+    via_kw = tester.get_completions("multi_iter deploy dev --regions ")
+    assert {"us", "eu"} <= set(via_kw)
+
+
+def test_multi_iterable_after_scalar_positional(bash_tester):
+    """Scalar positionals before the first iterable keep their own cases."""
+    app = App(name="mixed_iter")
+
+    @app.command
+    def cmd(
+        kind: Literal["a", "b"],
+        items: list[Literal["x", "y"]],
+    ):
+        """Mixed scalar + iterable.
+
+        Parameters
+        ----------
+        kind
+            Kind.
+        items
+            Items.
+        """
+
+    tester = bash_tester(app, "mixed_iter")
+    assert tester.validate_script_syntax()
+
+    pos0 = tester.get_completions("mixed_iter cmd ")
+    assert {"a", "b"} <= set(pos0)
+    pos1 = tester.get_completions("mixed_iter cmd a ")
+    assert {"x", "y"} <= set(pos1)
+    pos2 = tester.get_completions("mixed_iter cmd a x ")
+    assert {"x", "y"} <= set(pos2)
+
+
+def test_bash_path_completion_reflects_caller_cwd(bash_tester):
+    """Path completion must inspect the caller's cwd, not the harness tmpdir.
+
+    Reproduces the Copilot finding: ``BashCompletionTester.get_completions()``
+    forces ``cwd=`` to the temporary directory holding the comp-script, so a
+    test that ``os.chdir()``-es into a target directory before calling
+    ``get_completions()`` has the chdir overridden by the driver. Path
+    completion then lists files from the comp-script's tmpdir instead of the
+    intended directory. The driver should inherit the caller's cwd.
+    """
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="pcwd")
+
+    @app.default
+    def m(output: Annotated[_Path, Parameter(help="Out")] = _Path()):
+        """Path keyword."""
+
+    tester = bash_tester(app, "pcwd")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "myfile.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("pcwd --output ")
+        finally:
+            os.chdir(cwd)
+
+    assert "myfile.txt" in completions, (
+        f"expected 'myfile.txt' from caller cwd, got {completions!r} (driver likely overrode cwd to its own tmpdir)"
+    )

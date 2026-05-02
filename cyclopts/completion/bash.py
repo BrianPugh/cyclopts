@@ -67,8 +67,48 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
 
 def _escape_bash_choice(choice: str) -> str:
-    r"""Escape single quotes for bash strings."""
-    return choice.replace("'", "'\\''")
+    r"""Escape a choice for embedding inside a bash double-quoted string.
+
+    Choices live inside ``local -a _c=("..." "...")`` arrays in the generated
+    script (not as ``compgen -W`` whitespace-split tokens), so the only
+    characters the shell still interprets are ``\``, ``"``, ``$`` and
+    backtick.
+    """
+    choice = choice.replace("\\", "\\\\")
+    choice = choice.replace('"', '\\"')
+    choice = choice.replace("$", "\\$")
+    choice = choice.replace("`", "\\`")
+    return choice
+
+
+def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
+    """Emit bash that prefix-matches ``$cur`` against an array of choices.
+
+    Avoids ``compgen -W`` whitespace tokenization, which mangles choices
+    containing spaces, single quotes, or characters re-parsed by the
+    surrounding ``$(...)`` (e.g. backticks).
+
+    Parameters
+    ----------
+    choices : list[str]
+        Raw choice strings (already cleaned via ``clean_choice_text``).
+    indent : str
+        Indentation prefix.
+
+    Returns
+    -------
+    list[str]
+        Bash code lines.
+    """
+    escaped = [_escape_bash_choice(c) for c in choices]
+    array_body = " ".join(f'"{c}"' for c in escaped)
+    return [
+        f"{indent}local -a _c=({array_body})",
+        f"{indent}COMPREPLY=()",
+        f'{indent}for _x in "${{_c[@]}}"; do',
+        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && COMPREPLY+=("$_x")',
+        f"{indent}done",
+    ]
 
 
 def _escape_bash_description(text: str) -> str:
@@ -174,8 +214,9 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
     lines = []
     lines.append("  # Build list of options that take values (to skip their arguments)")
     if options_with_values:
-        escaped_opts = [_escape_bash_choice(opt) for opt in sorted(options_with_values)]
-        opts_str = " ".join(escaped_opts)
+        # Option/command names are constrained to ``-``, ``_``, and alphanumerics,
+        # so they cannot contain characters that need shell escaping.
+        opts_str = " ".join(sorted(options_with_values))
         lines.append(f"  local options_with_values='{opts_str}'")
     else:
         lines.append("  local options_with_values=''")
@@ -183,8 +224,7 @@ def _generate_command_path_detection(completion_data: dict[tuple[str, ...], Comp
     lines.append("")
     lines.append("  # Build list of all valid command names (to distinguish from positionals)")
     if all_commands:
-        escaped_cmds = [_escape_bash_choice(cmd) for cmd in sorted(all_commands)]
-        cmds_str = " ".join(escaped_cmds)
+        cmds_str = " ".join(sorted(all_commands))
         lines.append(f"  local all_commands='{cmds_str}'")
     else:
         lines.append("  local all_commands=''")
@@ -377,9 +417,7 @@ def _generate_completions_for_path(
     lines.append(f"{indent}if [[ ${{cur}} == -* ]]; then")
 
     if options:
-        escaped_options = [_escape_bash_choice(opt) for opt in options]
-        options_str = " ".join(escaped_options)
-        lines.append(f"{indent}  COMPREPLY=( $(compgen -W '{options_str}' -- \"${{cur}}\") )")
+        lines.extend(_emit_choice_completion(options, f"{indent}  "))
     else:
         lines.append(f"{indent}  COMPREPLY=()")
 
@@ -393,9 +431,7 @@ def _generate_completions_for_path(
         )
         lines.extend(value_completion_lines)
     elif commands:
-        escaped_commands = [_escape_bash_choice(cmd) for cmd in commands]
-        commands_str = " ".join(escaped_commands)
-        lines.append(f"{indent}  COMPREPLY=( $(compgen -W '{commands_str}' -- \"${{cur}}\") )")
+        lines.extend(_emit_choice_completion(commands, f"{indent}  "))
     elif positional_args:
         lines.extend(_generate_positional_completion(positional_args, f"{indent}  "))
     else:
@@ -423,57 +459,53 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
     """
     lines = []
 
-    if len(positional_args) == 1:
-        # Single positional - simple case
-        choices = positional_args[0].get_choices(force=True)
-        action = get_completion_action(positional_args[0].hint)
+    def _emit_one(argument, body_indent: str) -> list[str]:
+        choices = argument.get_choices(force=True)
         if choices:
-            escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            lines.append(f"{indent}COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
-        else:
-            compgen_flag = _map_completion_action_to_bash(action)
-            if compgen_flag:
-                lines.append(f'{indent}COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )')
-            else:
-                lines.append(f"{indent}COMPREPLY=()")
+            cleaned = [clean_choice_text(c) for c in choices]
+            return _emit_choice_completion(cleaned, body_indent)
+        compgen_flag = _map_completion_action_to_bash(get_completion_action(argument.hint))
+        if compgen_flag:
+            return [f'{body_indent}COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )']
+        return [f"{body_indent}COMPREPLY=()"]
+
+    # An iterable positional (``list[X]``, ``set[X]``, or ``*args``) greedily
+    # consumes all remaining positions starting at its index. The args that
+    # follow it in ``positional_args`` are positional-or-keyword-with-default
+    # entries that can still be filled via their ``--name`` keyword forms but
+    # never end up at a later positional slot. Picking the rest-owner here:
+    # prefer the actual var-positional, otherwise the first iterable.
+    rest_idx = None
+    for i, arg in enumerate(positional_args):
+        if arg.is_var_positional():
+            rest_idx = i
+            break
+    if rest_idx is None:
+        for i, arg in enumerate(positional_args):
+            if is_iterable_type(arg.hint):
+                rest_idx = i
+                break
+
+    # Numbered cases only for positions strictly before the rest-owner.
+    head = positional_args if rest_idx is None else positional_args[:rest_idx]
+    rest_owner = None if rest_idx is None else positional_args[rest_idx]
+
+    if not head and rest_owner is not None:
+        # Rest-owner at index 0 — no case statement needed; the iterable
+        # answers every position.
+        lines.extend(_emit_one(rest_owner, indent))
+    elif len(head) == 1 and rest_owner is None:
+        # Single non-iterable positional — simple case.
+        lines.extend(_emit_one(head[0], indent))
     else:
-        # Multiple positionals - use case statement for position-aware completion
         lines.append(f"{indent}case ${{positional_count}} in")
-
-        for idx, argument in enumerate(positional_args):
-            choices = argument.get_choices(force=True)
-            action = get_completion_action(argument.hint)
+        for idx, argument in enumerate(head):
             lines.append(f"{indent}  {idx})")
-            if choices:
-                escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
-                choices_str = " ".join(escaped_choices)
-                lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
-            else:
-                compgen_flag = _map_completion_action_to_bash(action)
-                if compgen_flag:
-                    lines.append(f'{indent}    COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )')
-                else:
-                    lines.append(f"{indent}    COMPREPLY=()")
+            lines.extend(_emit_one(argument, f"{indent}    "))
             lines.append(f"{indent}    ;;")
-
-        # Default case for positions beyond defined positionals
-        # If any positional is a collection type, use it as the default
-        iterable_arg = next((arg for arg in positional_args if is_iterable_type(arg.hint)), None)
         lines.append(f"{indent}  *)")
-        if iterable_arg:
-            choices = iterable_arg.get_choices(force=True)
-            action = get_completion_action(iterable_arg.hint)
-            if choices:
-                escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
-                choices_str = " ".join(escaped_choices)
-                lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
-            else:
-                compgen_flag = _map_completion_action_to_bash(action)
-                if compgen_flag:
-                    lines.append(f'{indent}    COMPREPLY=( $(compgen {compgen_flag} -- "${{cur}}") )')
-                else:
-                    lines.append(f"{indent}    COMPREPLY=()")
+        if rest_owner is not None:
+            lines.extend(_emit_one(rest_owner, f"{indent}    "))
         else:
             lines.append(f"{indent}    COMPREPLY=()")
         lines.append(f"{indent}    ;;")
@@ -523,7 +555,15 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
         Lines of bash code for value completion.
     """
     lines = []
-    lines.append(f'{indent}case "${{prev}}" in')
+    # Real interactive bash treats ``=`` as a COMP_WORDBREAK, so
+    # ``--opt=value`` tokenizes to ``--opt`` ``=`` ``value`` and ``$prev``
+    # ends up as ``=``. Resolve through the equals sign to the actual option
+    # name two slots back so the dispatch case below works for both forms.
+    lines.append(f'{indent}local _value_prev="${{prev}}"')
+    lines.append(f'{indent}if [[ "$_value_prev" == "=" && $COMP_CWORD -ge 2 ]]; then')
+    lines.append(f'{indent}  _value_prev="${{COMP_WORDS[COMP_CWORD-2]}}"')
+    lines.append(f"{indent}fi")
+    lines.append(f'{indent}case "$_value_prev" in')
 
     has_cases = False
     for argument in arguments:
@@ -542,9 +582,8 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
             lines.append(f"{indent}  {name})")
 
             if choices:
-                escaped_choices = [_escape_bash_choice(clean_choice_text(c)) for c in choices]
-                choices_str = " ".join(escaped_choices)
-                lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{choices_str}' -- \"${{cur}}\") )")
+                cleaned = [clean_choice_text(c) for c in choices]
+                lines.extend(_emit_choice_completion(cleaned, f"{indent}    "))
             else:
                 compgen_flag = _map_completion_action_to_bash(action)
                 if compgen_flag:
@@ -557,9 +596,7 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
     if has_cases:
         lines.append(f"{indent}  *)")
         if commands:
-            escaped_commands = [_escape_bash_choice(cmd) for cmd in commands]
-            commands_str = " ".join(escaped_commands)
-            lines.append(f"{indent}    COMPREPLY=( $(compgen -W '{commands_str}' -- \"${{cur}}\") )")
+            lines.extend(_emit_choice_completion(commands, f"{indent}    "))
         elif positional_args:
             lines.extend(_generate_positional_completion(positional_args, f"{indent}    "))
         else:
@@ -569,9 +606,7 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
     else:
         lines = []
         if commands:
-            escaped_commands = [_escape_bash_choice(cmd) for cmd in commands]
-            commands_str = " ".join(escaped_commands)
-            lines.append(f"{indent}COMPREPLY=( $(compgen -W '{commands_str}' -- \"${{cur}}\") )")
+            lines.extend(_emit_choice_completion(commands, indent))
         elif positional_args:
             lines.extend(_generate_positional_completion(positional_args, indent))
         else:

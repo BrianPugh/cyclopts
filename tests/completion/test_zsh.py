@@ -1,8 +1,4 @@
-import os
 import re
-import sys
-import tempfile
-import time
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -112,111 +108,18 @@ def test_path_completion(zsh_tester):
     assert "_files" in tester.completion_script
 
 
-@pytest.mark.slow
-@pytest.mark.skipif(
-    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
-)
-def test_end_to_end_completion(zsh_tester):
-    """End-to-end test: actually trigger zsh completion.
-
-    This test uses pexpect to simulate real TAB completion.
-    Requires pexpect to be installed (skip otherwise).
-    """
-    pexpect = pytest.importorskip("pexpect")
-
-    tester = zsh_tester(app_basic, "basic")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        comp_file = tmpdir / "_basic"
-        comp_file.write_text(tester.completion_script)
-
-        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-        try:
-            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-            child.sendline(f"fpath=({tmpdir} $fpath)")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.sendline("autoload -Uz compinit && compinit -u")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.send("basic --cou")
-            child.send("\t")
-
-            time.sleep(0.3)
-
-            child.send(" MARKER\r")
-
-            child.expect(["% ", "# ", r"\$ "], timeout=2)
-            output = child.before
-
-            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
-            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
-            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
-
-            assert "--count" in clean_output and "MARKER" in clean_output
-
-        finally:
-            child.close()
-
-
-@pytest.mark.slow
-@pytest.mark.skipif(
-    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
-)
-def test_command_prefix_completion(zsh_tester):
-    """End-to-end test: verify command name prefix completion works.
-
-    This test verifies that typing "d" and pressing TAB completes to "deploy".
-    Requires pexpect to be installed (skip otherwise).
-    """
-    pexpect = pytest.importorskip("pexpect")
-
-    tester = zsh_tester(app_basic, "basic")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        comp_file = tmpdir / "_basic"
-        comp_file.write_text(tester.completion_script)
-
-        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-        try:
-            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-            child.sendline(f"fpath=({tmpdir} $fpath)")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.sendline("autoload -Uz compinit && compinit -u")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.send("basic d")
-            child.send("\t")
-
-            time.sleep(0.3)
-
-            child.send(" MARKER\r")
-
-            child.expect(["% ", "# ", r"\$ "], timeout=2)
-            output = child.before
-
-            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
-            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
-            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
-
-            assert "deploy" in clean_output and "MARKER" in clean_output
-
-        finally:
-            child.close()
-
-
 def test_optional_path_completion(zsh_tester):
-    """Test that Optional[Path] and Path | None generate file completion."""
+    """Test that Optional[Path] and Path | None generate file completion.
+
+    Value-bearing options carry a ``*`` prefix so the option can repeat
+    (required for collection-typed options like ``list[Path]``). The
+    option name has no ``=`` suffix by default — TAB-completion inserts
+    ``--opt`` plus a space rather than ``--opt=``. ``Parameter(requires_equals=True)``
+    flips this on and is exercised separately.
+    """
     tester = zsh_tester(app_path, "pathapp")
 
-    assert "'--output[Output file]:output:_files'" in tester.completion_script
+    assert "'*--output[Output file]:output:_files'" in tester.completion_script
 
 
 def test_nested_command_uses_correct_word_index(zsh_tester):
@@ -270,7 +173,13 @@ def test_description_escaping(zsh_tester):
 
 
 def test_special_chars_in_literal_choices(zsh_tester):
-    """Test that Literal choices with special characters are properly escaped."""
+    """Test that Literal choices with special characters are properly escaped.
+
+    Choice-bearing specs are emitted with double-quoted outer strings (so a
+    literal ``'`` can be embedded) which means each backslash from the inner
+    choice-list-parser layer is doubled by the outer DQ layer. The runtime
+    behavior is verified separately in ``test_choice_with_*`` below.
+    """
     app = App(name="special_choices")
 
     @app.default
@@ -281,10 +190,13 @@ def test_special_chars_in_literal_choices(zsh_tester):
 
     tester = zsh_tester(app, "special_choices")
 
-    assert r"foo\ bar" in tester.completion_script
-    assert r"baz\(\)" in tester.completion_script
-    assert r"test\[1\]" in tester.completion_script
-    assert r"back\\slash" in tester.completion_script
+    # After the two-layer escape ("" outer + choice-list parser): every
+    # backslash from layer 1 is doubled.
+    assert r"foo\\ bar" in tester.completion_script
+    assert r"baz\\(\\)" in tester.completion_script
+    assert r"test\\[1\\]" in tester.completion_script
+    # User-supplied backslash gets layer-1 ``\\\\`` then DQ-doubled to ``\\\\\\\\``
+    assert r"back\\\\slash" in tester.completion_script
 
 
 def test_unicode_in_descriptions(zsh_tester):
@@ -464,83 +376,16 @@ def test_empty_iterable_flag_completion(zsh_tester):
     assert "'--empty-items[Items to process]'" in tester.completion_script
     assert "'--empty-tags[Optional tags]'" in tester.completion_script
 
-    # Positive names should expect values (have :action or :name suffix)
-    lines_with_items = [line for line in tester.completion_script.split("\n") if "'--items[" in line]
+    # Positive names should expect values (have :action or :name suffix).
+    # Match both the plain and ``*``-prefixed (repeatable) spec forms.
+    lines_with_items = [
+        line for line in tester.completion_script.split("\n") if "--items[" in line and "empty" not in line
+    ]
     assert any(":items:" in line or ":items'" in line for line in lines_with_items), (
         "Positive --items flag should expect a value"
     )
 
     assert tester.validate_script_syntax()
-
-
-@pytest.mark.slow
-@pytest.mark.skipif(
-    sys.platform == "darwin" and os.getenv("CI") == "true", reason="Interactive zsh tests are flaky on macOS CI runners"
-)
-def test_completion_after_empty_flag(zsh_tester):
-    """Test that completion works after using an --empty-* flag.
-
-    Regression test for: cyclopts-demo process --empty-items --<TAB> should show other options.
-    """
-    pexpect = pytest.importorskip("pexpect")
-
-    import tempfile
-    import time
-    from pathlib import Path
-
-    app = App(name="testapp")
-
-    @app.command
-    def process(
-        items: Annotated[list[str], Parameter(help="Items to process")],
-        count: Annotated[int, Parameter(help="Count")] = 1,
-        verbose: Annotated[bool, Parameter(help="Verbose")] = False,
-    ):
-        """Process items."""
-        pass
-
-    tester = zsh_tester(app, "testapp")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        comp_file = tmpdir / "_testapp"
-        comp_file.write_text(tester.completion_script)
-
-        child = pexpect.spawn("zsh -i", encoding="utf-8", timeout=3)
-
-        try:
-            child.expect(["% ", "# ", r"\$ ", "zsh-"], timeout=2)
-
-            child.sendline(f"fpath=({tmpdir} $fpath)")
-            child.expect(["% ", "# ", r"\$ "])
-
-            child.sendline("autoload -Uz compinit && compinit -u")
-            child.expect(["% ", "# ", r"\$ "])
-
-            # Type: testapp process --empty-items --c<TAB>
-            child.send("testapp process --empty-items --c")
-            child.send("\t")
-
-            time.sleep(0.3)
-
-            child.send(" MARKER\r")
-
-            child.expect(["% ", "# ", r"\$ "], timeout=2)
-            output = child.before
-
-            clean_output = re.sub(r"\x1b\[[^a-zA-Z]*[a-zA-Z]", "", output)
-            clean_output = re.sub(r"\x1b\].*?\x07", "", clean_output)
-            clean_output = re.sub(r"[\x00-\x1f\x7f]", "", clean_output)
-
-            # Should complete to --count
-            # Note: MARKER may be corrupted by terminal escape sequences during completion display,
-            # so we check for MARK (prefix) instead of full MARKER string
-            assert "--count" in clean_output and "MARK" in clean_output, (
-                f"Expected --count and MARK in output, got: {clean_output}"
-            )
-
-        finally:
-            child.close()
 
 
 def test_positional_or_keyword_literal_completion(zsh_tester):
@@ -574,9 +419,10 @@ def test_positional_or_keyword_literal_completion(zsh_tester):
 
     # In nested context, positionals are now included as specs in _arguments
     # Positions are '1:' and '2:' (not '2:' and '3:') because after *::arg:->args,
-    # $words[1] is the subcommand and positionals start at position 1
-    assert "'1:Target environment.:(dev staging production)'" in tester.completion_script
-    assert "'2:AWS region.:(us-east-1 us-west-2)'" in tester.completion_script
+    # $words[1] is the subcommand and positionals start at position 1.
+    # Choice-bearing specs use double-quoted outer to allow embedding ``'``.
+    assert '"1:Target environment.:(dev staging production)"' in tester.completion_script
+    assert '"2:AWS region.:(us-east-1 us-west-2)"' in tester.completion_script
 
     # Should have choices for both positionals
     assert "dev" in tester.completion_script
@@ -601,14 +447,22 @@ def test_help_version_flags_in_subcommands(zsh_tester):
 
     script_lines = tester.completion_script.split("\n")
 
+    # Walk from the deploy case label to its closing ``;;``. Track
+    # nested ``case ... in / esac`` so the eq-form pre-pass's inner
+    # ``;;`` markers don't terminate the scan early.
     in_deploy = False
+    case_depth = 0
     deploy_section = []
-    for i, line in enumerate(script_lines):
+    for line in script_lines:
         if "deploy)" in line and not in_deploy:
             in_deploy = True
         if in_deploy:
             deploy_section.append(line)
-            if ";;" in line and i > 0:
+            if re.search(r"\bcase\b.*\bin\b", line):
+                case_depth += 1
+            elif re.search(r"\besac\b", line):
+                case_depth -= 1
+            elif ";;" in line and case_depth == 0:
                 break
 
     deploy_text = "\n".join(deploy_section)
@@ -1027,17 +881,391 @@ def test_positional_without_help_uses_name_fallback(zsh_tester):
     tester = zsh_tester(app, "testapp")
     script = tester.completion_script
 
-    # Should NOT have empty description '1::(foo bar)'
+    # Should NOT have empty description '1::(foo bar)' or "1::(foo bar)"
     assert "'1::(foo bar)'" not in script, "Should not have empty description in positional spec"
+    assert '"1::(foo bar)"' not in script, "Should not have empty description in positional spec"
 
-    # Should have parameter name as fallback '1:CHOICE:(foo bar)' or similar
-    # The format is '1:description:(choices)' - description should be non-empty
-    import re
-
-    positional_spec = re.search(r"'1:([^:]+):\(foo bar\)'", script)
+    # Should have parameter name as fallback. Choice-bearing specs use
+    # double-quoted outer; the format is `"1:description:(choices)"`.
+    positional_spec = re.search(r'"1:([^:]+):\(foo bar\)"', script)
     assert positional_spec is not None, "Should have positional spec with choices"
     description = positional_spec.group(1)
     assert description, "Description should not be empty"
     assert len(description) > 0, "Description should have content"
 
     assert tester.validate_script_syntax()
+
+
+# --- Choice values containing whitespace / shell metacharacters --------------
+#
+# End-to-end regression tests for tricky choice values surviving zsh's
+# completion machinery. zsh's ``_arguments`` puts choices through *two*
+# parsers: the outer shell quoting and the inner choice-list parser. The
+# generator now uses double-quoted outer specs so a literal ``'`` can be
+# embedded as ``\'``. Without that, ``Literal["a'b"]`` produced ``(eval):1:
+# unmatched '`` at completion time.
+
+
+def test_choice_with_whitespace(zsh_tester):
+    """A choice value containing a space stays a single completion."""
+    app = App(name="ws")
+
+    @app.default
+    def m(x: Literal["hello world", "normal"] = "normal", /):
+        """Whitespace in choice."""
+
+    tester = zsh_tester(app, "ws")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("ws ")
+    assert "hello world" in completions
+    assert "hello" not in completions
+    assert "world" not in completions
+
+
+def test_choice_with_single_quote(zsh_tester):
+    r"""A choice value containing a single quote does not break the script.
+
+    Regression test: previously ``Literal["a'b"]`` produced
+    ``'1:X:(... a'\\''b)'``. After the outer single-quote-end-restart
+    trick, ``_arguments``' choice-list parser saw an unbalanced ``'`` and
+    failed with ``(eval):1: unmatched '``.
+    """
+    app = App(name="sq")
+
+    @app.default
+    def m(x: Literal["a'b", "normal"] = "normal", /):
+        """Single quote in choice."""
+
+    tester = zsh_tester(app, "sq")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("sq ")
+    assert "a'b" in completions
+    assert not any("unmatched" in c for c in completions)
+
+
+def test_choice_with_backtick(zsh_tester):
+    """A choice value containing a backtick does not break the script."""
+    app = App(name="btk")
+
+    @app.default
+    def m(x: Literal["a`b", "normal"] = "normal", /):
+        """Backtick in choice."""
+
+    tester = zsh_tester(app, "btk")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("btk ")
+    assert "a`b" in completions
+
+
+def test_choice_with_dollar(zsh_tester):
+    """A choice value containing $ is not parameter-expanded."""
+    app = App(name="dol")
+
+    @app.default
+    def m(x: Literal["$home", "normal"] = "normal", /):
+        """Dollar in choice."""
+
+    tester = zsh_tester(app, "dol")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("dol ")
+    assert "$home" in completions
+
+
+def test_choice_value_after_keyword_option(zsh_tester):
+    """Tricky choices also survive the ``--opt <choice>`` value-completion path."""
+    app = App(name="optchoice")
+
+    @app.default
+    def m(env: Annotated[Literal["a b", "c'd", "e`f"], Parameter(help="env")] = "a b"):
+        """Tricky choices behind a keyword option."""
+
+    tester = zsh_tester(app, "optchoice")
+    assert tester.validate_script_syntax()
+    completions = tester.get_completions("optchoice --env ")
+    assert {"a b", "c'd", "e`f"} <= set(completions)
+
+
+# --- --opt=value form: gated on Parameter.requires_equals ------------------
+#
+# The ``=`` suffix on a zsh ``_arguments`` option spec is load-bearing in
+# two ways at once: it enables ``--opt=value`` value-completion AND it
+# changes the *name* TAB-insert from ``--opt `` (trailing space) to
+# ``--opt=`` (no space). zsh has no native syntax that decouples these.
+#
+# Because forced ``=`` insertion surprises most users and the space form
+# is the more common across CLIs, the default (``requires_equals=False``)
+# emits the plain spec — at the cost of ``--opt=value<TAB>``
+# value-completion silently doing nothing. ``requires_equals=True`` opts
+# back into the eq spec so completion mirrors what the parser accepts.
+#
+# Bash is unaffected by this trade-off — its eq-form completion goes
+# through ``_value_prev`` hopping over ``=`` and works regardless.
+
+
+def test_default_no_eq_in_spec_name(zsh_tester):
+    """Default: no ``=`` suffix on the option name in the spec.
+
+    The ``--env`` option has Literal choices, so its spec uses a
+    double-quoted outer string. The assertion checks for the ``=``-less
+    form regardless of which quote style wraps the spec.
+    """
+    tester = zsh_tester(app_basic, "basic")
+    script = tester.completion_script
+    # Plain spec — TAB on the name will insert ``--env`` plus a space.
+    assert '"*--env[' in script or "'*--env[" in script
+    assert '"*--env=[' not in script
+    assert "'*--env=[" not in script
+
+
+def test_default_space_form_value_completion(zsh_tester):
+    """The space form must offer value completion regardless of ``requires_equals``."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_default_eq_form_value_completion_via_prepass(zsh_tester):
+    """``--opt=value<TAB>`` works in the default case via the compset pre-pass.
+
+    Even with the plain (no-``=``) ``_arguments`` spec, a user who
+    explicitly types ``--env=`` should still see value completions: the
+    pre-pass intercepts the pattern, strips the ``--env=`` prefix, and
+    dispatches to the choice list.
+    """
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_default_eq_form_value_completion_partial(zsh_tester):
+    """``--opt=d<TAB>`` narrows via the pre-pass."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env=d")
+    assert "dev" in completions
+    assert "staging" not in completions
+    assert "prod" not in completions
+
+
+def test_default_eq_form_path_completion_via_prepass(zsh_tester):
+    """Path-typed options also dispatch to ``_files`` from the pre-pass."""
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="ekw")
+
+    @app.default
+    def m(input_file: Annotated[_Path, Parameter(help="In")] = _Path()):
+        """Path keyword."""
+
+    tester = zsh_tester(app, "ekw")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "sample.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("ekw --input-file=")
+        finally:
+            os.chdir(cwd)
+    assert completions, f"expected file completion via pre-pass, got {completions!r}"
+
+
+def test_eq_form_prepass_compadd_no_stray_backslashes(zsh_tester):
+    r"""Eq-form prepass ``compadd`` args must be POSIX-safe single-quoted.
+
+    Reproduces the Copilot review finding: choices are passed through
+    ``_escape_completion_choice`` (which inserts ``\\`` escapes designed for
+    ``_describe``'s inner parser) and then wrapped in *single quotes* for
+    ``compadd``. Inside single quotes, backslashes are literal — so a choice
+    like ``"foo bar"`` ends up as ``'foo\\ bar'`` and the user sees a
+    completion containing a stray backslash. The fix is proper single-quote
+    escaping (only ``'`` needs handling, via the ``'\\''`` end/restart trick).
+    """
+    app = App(name="eqp")
+
+    @app.default
+    def m(env: Annotated[Literal["foo bar", "baz qux"], Parameter(help="E")] = "foo bar"):
+        """Eq-form choices with spaces."""
+
+    tester = zsh_tester(app, "eqp")
+    script = tester.completion_script
+
+    # Locate the prepass case branch for ``--env`` and the inner ``compadd`` line.
+    lines = script.splitlines()
+    in_env_case = False
+    compadd_line = None
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "--env=*)":
+            in_env_case = True
+            continue
+        if in_env_case:
+            if stripped.startswith("compadd "):
+                compadd_line = stripped
+                break
+            if stripped == ";;":
+                break
+
+    assert compadd_line is not None, "no ``compadd`` line found in --env=*) prepass branch"
+
+    # Single-quoted compadd args must not contain literal backslash-escape
+    # sequences — those would render as visible backslashes in the user's
+    # completion menu.
+    assert "\\ " not in compadd_line, (
+        f"single-quoted compadd args contain literal '\\ ' (backslash-space): {compadd_line!r}"
+    )
+
+
+def test_requires_equals_emits_eq_spec(zsh_tester):
+    """``Parameter(requires_equals=True)`` opts back into the eq spec."""
+    app = App(name="rqeq")
+
+    @app.default
+    def m(env: Annotated[Literal["dev", "prod"], Parameter(requires_equals=True)] = "dev"):
+        """Eq-required."""
+
+    tester = zsh_tester(app, "rqeq")
+    script = tester.completion_script
+    assert "*--env=[" in script
+    # The pre-pass should NOT include this option — its eq-form is already
+    # handled by the spec.
+    assert "--env=*)" not in script
+
+
+def test_requires_equals_eq_form_value_completion(zsh_tester):
+    """``--opt=<TAB>`` value completion works when ``requires_equals=True``."""
+    app = App(name="rqeq")
+
+    @app.default
+    def m(env: Annotated[Literal["dev", "prod"], Parameter(requires_equals=True)] = "dev"):
+        """Eq-required."""
+
+    tester = zsh_tester(app, "rqeq")
+    completions = tester.get_completions("rqeq --env=")
+    assert {"dev", "prod"} <= set(completions)
+
+
+# --- Repeatable value-options ----------------------------------------------
+#
+# zsh's ``_arguments`` defaults each spec to single-use, so once an option
+# has been consumed it disappears from suggestions and its value can't be
+# completed again. Cyclopts now prefixes value-bearing specs with ``*`` so
+# the option may repeat — required for collection-typed options
+# (``list[X]``) and matches bash's behavior. Bool flags stay non-repeating.
+
+
+def test_value_option_repeatable_space_form(zsh_tester):
+    """``--env dev --env<TAB>`` should still offer choices."""
+    tester = zsh_tester(app_basic, "basic")
+    completions = tester.get_completions("basic deploy --env dev --env ")
+    assert {"dev", "staging", "prod"} <= set(completions)
+
+
+def test_collection_option_repeats(zsh_tester):
+    """A ``list[Path]`` keyword option must accept repeated ``--file``.
+
+    Without ``*`` prefix on the spec, zsh would refuse to complete a second
+    ``--file`` value, breaking the natural ``--file a --file b --file c``
+    usage of collection-typed parameters.
+    """
+    import os
+    import tempfile
+    from pathlib import Path as _Path
+
+    app = App(name="files")
+
+    @app.default
+    def m(file: Annotated[list[_Path], Parameter(help="files")] = []):  # noqa: B006
+        """Files."""
+
+    tester = zsh_tester(app, "files")
+    with tempfile.TemporaryDirectory() as td:
+        (_Path(td) / "first.txt").write_text("x")
+        cwd = _Path.cwd()
+        try:
+            os.chdir(td)
+            completions = tester.get_completions("files --file first.txt --file ")
+        finally:
+            os.chdir(cwd)
+    assert completions, f"expected file completion on second --file, got {completions!r}"
+
+
+def test_multiple_iterable_positionals_emit_one_rest_spec(zsh_tester):
+    """Functions with multiple ``list[X]`` positional-or-keyword params.
+
+    Regression test for ``_arguments:comparguments:327: doubled rest argument
+    definition``: zsh allows at most one ``*:`` rest spec per command, but
+    each iterable-typed positional was emitting one. Cyclopts now collapses
+    them to a single rest spec (the first iterable, or the ``*args``
+    var-positional if present); the others remain available via their
+    ``--name`` keyword forms.
+    """
+    app = App(name="multi_iter")
+
+    @app.command
+    def process(
+        items: list[str],
+        tags: list[str] | None = None,
+        exclude: list[str] | None = None,
+    ):
+        """Process items.
+
+        Parameters
+        ----------
+        items
+            Items to process.
+        tags
+            Tags to apply.
+        exclude
+            Items to exclude.
+        """
+
+    tester = zsh_tester(app, "multi_iter")
+    script = tester.completion_script
+
+    assert tester.validate_script_syntax()
+
+    # Exactly one rest-arg spec inside the process block.
+    process_block = re.search(r"process\)(.*?);;", script, re.DOTALL)
+    assert process_block is not None
+    rest_specs = re.findall(r"'\*:[^']*'|\"\*:[^\"]*\"", process_block.group(1))
+    assert len(rest_specs) == 1, f"expected one rest spec, found {rest_specs!r}"
+
+    # The collapsed-out positionals are still available as keyword options.
+    assert "--tags[" in script
+    assert "--exclude[" in script
+
+    # Real zsh accepts the script and offers ``--tags`` after ``--ta``.
+    completions = tester.get_completions("multi_iter process --ta")
+    assert "--tags" in completions
+
+
+def test_bool_flag_not_repeated(zsh_tester):
+    """Bool flags stay single-use in zsh (matches zsh convention)."""
+    tester = zsh_tester(app_basic, "basic")
+    script = tester.completion_script
+    # No ``*`` prefix on the verbose spec.
+    assert "'--verbose[" in script
+    assert "'*--verbose[" not in script
+
+
+# --- Naked-TAB at no-arg subcommand: known per-shell divergence -------------
+#
+# See the doc note at the top of test_behavior.py. zsh's ``_arguments``
+# always lists ``--help`` / ``--version`` whether or not the user has
+# typed a leading ``-``; bash gates them behind ``cur == -*``. The current
+# behavior is intentional and locked in here.
+
+
+def test_naked_tab_at_no_arg_subcommand_offers_help(zsh_tester):
+    """Zsh always surfaces ``--help`` / ``--version`` via ``_arguments``."""
+    app = App(name="probe")
+
+    @app.command
+    def noarg():
+        """No-arg subcommand."""
+
+    tester = zsh_tester(app, "probe")
+    completions = tester.get_completions("probe noarg ")
+    assert "--help" in completions
+    assert "--version" in completions
