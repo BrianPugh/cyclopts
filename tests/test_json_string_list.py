@@ -6,7 +6,17 @@ import pytest
 
 from cyclopts import CycloptsError, Parameter
 
-LIST_STR_LIKE_TYPES = [list, list[str], Sequence, Sequence[str], Iterable, Iterable[str]]
+LIST_STR_LIKE_TYPES = [
+    pytest.param(list, id="list"),
+    pytest.param(list[str], id="list[str]"),
+    pytest.param(list[str] | None, id="list[str]|None"),
+    pytest.param(Sequence, id="Sequence"),
+    pytest.param(Sequence[str], id="Sequence[str]"),
+    pytest.param(Sequence[str] | None, id="Sequence[str]|None"),
+    pytest.param(Iterable, id="Iterable"),
+    pytest.param(Iterable[str], id="Iterable[str]"),
+    pytest.param(Iterable[str] | None, id="Iterable[str]|None"),
+]
 
 
 @dataclass
