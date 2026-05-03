@@ -395,7 +395,7 @@ class Argument:
             return False
         if self.parameter.json_list is not None:
             return self.parameter.json_list
-        for arg in get_args(self.field_info.annotation) or (str,):
+        for arg in get_args(self.hint) or (str,):
             if contains_hint(arg, str):
                 return False
         return True
