@@ -1004,7 +1004,7 @@ API
 
 
    .. attribute:: validator
-      :type: Union[None, Callable, Iterable[Callable]]
+      :type: Union[None, Callable, str, Iterable[Union[Callable, str]]]
       :value: None
 
       A function (or list of functions) that validates data returned by the :attr:`converter`.
@@ -1013,6 +1013,23 @@ API
 
           def validator(type_, value: Any) -> None:
               pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
+
+      **Classmethod Support:** Validators can be classmethods. Use string references for class decoration
+      or direct references in annotations.
+
+      .. code-block:: python
+
+         @Parameter(name="*", validator="validate")
+         @dataclass
+         class TextStyle:
+             color: str
+             bold: bool = False
+             italic: bool = False
+
+             @classmethod
+             def validate(cls, value):
+                 if value.bold and value.italic:
+                     raise ValueError("Cannot use both --bold and --italic together.")
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]

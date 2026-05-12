@@ -875,22 +875,41 @@ class Argument:
             except pydantic.PydanticUserError:
                 pass
 
+        def _resolve(validator, hint):
+            if isinstance(validator, str):
+                validator = getattr(hint, validator)
+            return validator
+
         try:
             if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.parameter.validator:
+                    validator = _resolve(validator, hint)
+                    is_method = inspect.ismethod(validator)
                     for val in value.values():
-                        validator(hint, val)
+                        if is_method:
+                            validator(val)  # pyright: ignore[reportCallIssue]
+                        else:
+                            validator(hint, val)
                 validate_pydantic(dict[str, self.field_info.annotation], value)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.parameter.validator:
+                    validator = _resolve(validator, hint)
+                    is_method = inspect.ismethod(validator)
                     for val in value:
-                        validator(hint, val)
+                        if is_method:
+                            validator(val)  # pyright: ignore[reportCallIssue]
+                        else:
+                            validator(hint, val)
                 validate_pydantic(tuple[self.field_info.annotation, ...], value)
             else:
                 for validator in self.parameter.validator:
-                    validator(self.hint, value)
+                    validator = _resolve(validator, self.hint)
+                    if inspect.ismethod(validator):
+                        validator(value)
+                    else:
+                        validator(self.hint, value)
                 validate_pydantic(self.field_info.annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e

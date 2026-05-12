@@ -202,3 +202,136 @@ def test_custom_converter_inside_class(app, mocker):
     app("bar")
 
     converter.assert_called_once_with(int, (Token(value="bar", source="cli"),))
+
+
+def test_classmethod_validator_string_reference(app, assert_parse_args):
+    """String reference to a classmethod validator on a Parameter-decorated class."""
+
+    @Parameter(name="*", validator="validate")
+    @dataclass
+    class TextStyle:
+        color: str
+        bold: bool = False
+        italic: bool = False
+
+        @classmethod
+        def validate(cls, value):
+            if value.bold and value.italic:
+                raise ValueError("Cannot use both --bold and --italic together.")
+
+    @app.default
+    def main(style: TextStyle):
+        pass
+
+    assert_parse_args(main, "--color red --bold", style=TextStyle(color="red", bold=True))
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--color red --bold --italic", print_error=False, exit_on_error=False)
+
+
+def test_classmethod_validator_direct_reference(app, assert_parse_args):
+    """Direct classmethod reference exercises the inspect.ismethod branch."""
+
+    @dataclass
+    class TextStyle:
+        color: str
+        bold: bool = False
+        italic: bool = False
+
+        @classmethod
+        def validate(cls, value):
+            if value.bold and value.italic:
+                raise ValueError("Cannot use both --bold and --italic together.")
+
+    @app.default
+    def main(style: Annotated[TextStyle, Parameter(name="*", validator=TextStyle.validate)]):
+        pass
+
+    assert_parse_args(main, "--color red --bold", style=TextStyle(color="red", bold=True))
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--color red --bold --italic", print_error=False, exit_on_error=False)
+
+
+def test_staticmethod_validator_string_reference(app, assert_parse_args):
+    """Staticmethods follow the (type_, value) calling convention."""
+    seen = {}
+
+    @Parameter(name="*", validator="validate")
+    @dataclass
+    class TextStyle:
+        color: str
+        bold: bool = False
+
+        @staticmethod
+        def validate(type_, value):
+            seen["type_"] = type_
+            seen["value"] = value
+            if value.color == "invalid":
+                raise ValueError("bad color")
+
+    @app.default
+    def main(style: TextStyle):
+        pass
+
+    assert_parse_args(main, "--color red --bold", style=TextStyle(color="red", bold=True))
+    assert seen["type_"] is TextStyle
+    assert seen["value"] == TextStyle(color="red", bold=True)
+
+
+def test_staticmethod_validator_direct_reference(app, assert_parse_args):
+    """Direct staticmethod reference."""
+
+    @dataclass
+    class TextStyle:
+        color: str
+
+        @staticmethod
+        def validate(type_, value):
+            if value.color == "invalid":
+                raise ValueError("bad color")
+
+    @app.default
+    def main(style: Annotated[TextStyle, Parameter(name="*", validator=TextStyle.validate)]):
+        pass
+
+    assert_parse_args(main, "--color red", style=TextStyle(color="red"))
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--color invalid", print_error=False, exit_on_error=False)
+
+
+def test_validator_string_reference_in_list(app, assert_parse_args):
+    """Strings can be intermixed with callables in a validator list."""
+    external_calls = []
+
+    def external(type_, value):
+        external_calls.append(value)
+
+    @Parameter(name="*", validator=["validate_a", external, "validate_b"])
+    @dataclass
+    class Config:
+        n: int
+
+        @classmethod
+        def validate_a(cls, value):
+            if value.n < 0:
+                raise ValueError("n must be >= 0")
+
+        @classmethod
+        def validate_b(cls, value):
+            if value.n > 100:
+                raise ValueError("n must be <= 100")
+
+    @app.default
+    def main(config: Config):
+        pass
+
+    assert_parse_args(main, "--n 5", config=Config(n=5))
+    assert external_calls == [Config(n=5)]
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--n -1", print_error=False, exit_on_error=False)
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--n 200", print_error=False, exit_on_error=False)
