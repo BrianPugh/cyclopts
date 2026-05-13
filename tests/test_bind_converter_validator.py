@@ -335,3 +335,126 @@ def test_validator_string_reference_in_list(app, assert_parse_args):
 
     with pytest.raises(ValidationError):
         app.parse_args("--n 200", print_error=False, exit_on_error=False)
+
+
+def test_classmethod_validator_string_reference_nested_annotated(app, assert_parse_args):
+    """String validator on a nested Annotated type triggers the ``_convert`` validator path."""
+    seen = []
+
+    class Score(int):
+        @classmethod
+        def validate(cls, value):
+            seen.append(value)
+            if value > 100:
+                raise ValueError("score too high")
+
+    Validated = Annotated[Score, Parameter(validator="validate")]
+
+    @app.default
+    def main(scores: tuple[Validated, Validated]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(main, "10 20", scores=(Score(10), Score(20)))
+    assert seen == [10, 20]
+
+    with pytest.raises(ValidationError):
+        app.parse_args("10 200", print_error=False, exit_on_error=False)
+
+
+def test_staticmethod_validator_string_reference_nested_annotated(app, assert_parse_args):
+    """Staticmethod string validator on a nested Annotated follows the ``(type_, value)`` calling convention in ``_convert``."""
+    seen = []
+
+    class Score(int):
+        @staticmethod
+        def validate(type_, value):
+            seen.append((type_, value))
+            if value > 100:
+                raise ValueError("score too high")
+
+    Validated = Annotated[Score, Parameter(validator="validate")]
+
+    @app.default
+    def main(scores: tuple[Validated, Validated]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(main, "10 20", scores=(Score(10), Score(20)))
+    assert seen == [(Score, 10), (Score, 20)]
+
+
+def test_classmethod_validator_string_reference_var_keyword(app, assert_parse_args):
+    """String validator with ``**kwargs`` exercises the ``VAR_KEYWORD`` branch in ``Argument.validate``."""
+    seen = []
+
+    class Bounded(int):
+        @classmethod
+        def validate(cls, value):
+            seen.append(value)
+            if value < 0:
+                raise ValueError("must be non-negative")
+
+    @app.default
+    def main(**vals: Annotated[Bounded, Parameter(validator="validate")]):
+        pass
+
+    assert_parse_args(main, "--a=1 --b=2", a=Bounded(1), b=Bounded(2))
+    assert sorted(seen) == [1, 2]
+
+    with pytest.raises(ValidationError):
+        app.parse_args("--a=-1", print_error=False, exit_on_error=False)
+
+
+def test_staticmethod_validator_string_reference_var_keyword(app, assert_parse_args):
+    """Staticmethod string validator with ``**kwargs`` uses ``(type_, value)`` calling convention."""
+    seen = []
+
+    class Bounded(int):
+        @staticmethod
+        def validate(type_, value):
+            seen.append((type_, value))
+
+    @app.default
+    def main(**vals: Annotated[Bounded, Parameter(validator="validate")]):
+        pass
+
+    assert_parse_args(main, "--a=1 --b=2", a=Bounded(1), b=Bounded(2))
+    assert sorted(seen) == [(Bounded, 1), (Bounded, 2)]
+
+
+def test_classmethod_validator_string_reference_var_positional(app, assert_parse_args):
+    """String validator with ``*args`` exercises the ``VAR_POSITIONAL`` branch in ``Argument.validate``."""
+    seen = []
+
+    class Bounded(int):
+        @classmethod
+        def validate(cls, value):
+            seen.append(value)
+            if value < 0:
+                raise ValueError("must be non-negative")
+
+    @app.default
+    def main(*vals: Annotated[Bounded, Parameter(validator="validate")]):
+        pass
+
+    assert_parse_args(main, "1 2 3", Bounded(1), Bounded(2), Bounded(3))
+    assert seen == [1, 2, 3]
+
+    with pytest.raises(ValidationError):
+        app.parse_args("1 -1", print_error=False, exit_on_error=False)
+
+
+def test_staticmethod_validator_string_reference_var_positional(app, assert_parse_args):
+    """Staticmethod string validator with ``*args`` uses ``(type_, value)`` calling convention."""
+    seen = []
+
+    class Bounded(int):
+        @staticmethod
+        def validate(type_, value):
+            seen.append((type_, value))
+
+    @app.default
+    def main(*vals: Annotated[Bounded, Parameter(validator="validate")]):
+        pass
+
+    assert_parse_args(main, "1 2", Bounded(1), Bounded(2))
+    assert seen == [(Bounded, 1), (Bounded, 2)]
