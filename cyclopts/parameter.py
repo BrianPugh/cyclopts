@@ -71,9 +71,9 @@ def _str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
 
 
 def _validator_tuple_converter(
-    value: Callable[[Any, Any], Any] | Iterable[Callable[[Any, Any], Any]] | None,
-) -> tuple[Callable[[Any, Any], Any], ...]:
-    return cast(tuple[Callable[[Any, Any], Any], ...], to_tuple_converter(value))
+    value: Callable[..., Any] | str | Iterable[Callable[..., Any] | str] | None,
+) -> tuple[Callable[..., Any] | str, ...]:
+    return cast(tuple[Callable[..., Any] | str, ...], to_tuple_converter(value))
 
 
 def _group_tuple_converter(value: "None | Group | str | Iterable[Group | str]") -> tuple["Group | str", ...]:
@@ -197,8 +197,9 @@ class Parameter:
         kw_only=True,
     )
 
-    # This can ONLY ever be a Tuple[Callable, ...]
-    validator: None | Callable[[Any, Any], Any] | Iterable[Callable[[Any, Any], Any]] = field(
+    # Accepts regular validators (type, value) -> None, bound methods (value) -> None,
+    # string references, or an iterable mixing the three. Normalized to a tuple.
+    validator: None | Callable[..., Any] | str | Iterable[Callable[..., Any] | str] = field(
         default=(),
         converter=_validator_tuple_converter,
         kw_only=True,

@@ -737,7 +737,12 @@ def _convert(
         #    rgb: tuple[Uint8, Uint8, Uint8]
         try:
             for validator in cparam.validator:  # pyright: ignore
-                validator(type_, out)
+                if isinstance(validator, str):
+                    validator = getattr(type_, validator)
+                if inspect.ismethod(validator):
+                    validator(out)
+                else:
+                    validator(type_, out)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", value=out) from e
 
