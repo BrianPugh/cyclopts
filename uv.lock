@@ -318,6 +318,7 @@ dependencies = [
     { name = "attrs" },
     { name = "docstring-parser" },
     { name = "rich" },
+    { name = "rich-rst" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
@@ -337,7 +338,6 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pyyaml" },
-    { name = "rich-rst" },
     { name = "syrupy" },
     { name = "toml" },
     { name = "trio" },
@@ -345,7 +345,6 @@ dev = [
 docs = [
     { name = "gitpython" },
     { name = "myst-parser", extra = ["linkify"] },
-    { name = "rich-rst" },
     { name = "sphinx" },
     { name = "sphinx-autodoc-typehints" },
     { name = "sphinx-copybutton" },
@@ -356,9 +355,6 @@ mkdocs = [
     { name = "markdown" },
     { name = "mkdocs" },
     { name = "pymdown-extensions" },
-]
-rst = [
-    { name = "rich-rst" },
 ]
 toml = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
@@ -392,9 +388,7 @@ requires-dist = [
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.1" },
     { name = "pyyaml", marker = "extra == 'yaml'", specifier = ">=6.0.1" },
     { name = "rich", specifier = ">=13.6.0" },
-    { name = "rich-rst", marker = "extra == 'dev'", specifier = ">=1.3.1" },
-    { name = "rich-rst", marker = "extra == 'docs'", specifier = ">=1.3.1" },
-    { name = "rich-rst", marker = "extra == 'rst'", specifier = ">=1.3.1" },
+    { name = "rich-rst", specifier = ">=2.0.0a9,<3" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.4.7,<8.2.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=1.25.2,<4.0.0" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.5,<1.0" },
@@ -408,7 +402,7 @@ requires-dist = [
     { name = "trio", marker = "extra == 'trio'", specifier = ">=0.10.0" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.8.0" },
 ]
-provides-extras = ["debug", "dev", "docs", "mkdocs", "rst", "toml", "trio", "yaml"]
+provides-extras = ["debug", "dev", "docs", "mkdocs", "toml", "trio", "yaml"]
 
 [[package]]
 name = "decorator"
@@ -1361,15 +1355,15 @@ wheels = [
 
 [[package]]
 name = "rich-rst"
-version = "1.3.2"
+version = "2.0.0a9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "docutils" },
+    { name = "pygments" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bc/6d/a506aaa4a9eaa945ed8ab2b7347859f53593864289853c5d6d62b77246e0/rich_rst-1.3.2.tar.gz", hash = "sha256:a1196fdddf1e364b02ec68a05e8ff8f6914fee10fbca2e6b6735f166bb0da8d4", size = 14936, upload-time = "2025-10-14T16:49:45.332Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/30/7360bdd7bf3ca4d68520d43ca685336c6df45cfc66126b5311b6d24dc76b/rich_rst-2.0.0a9.tar.gz", hash = "sha256:576771be53d8121c7b88ea83abb21b45460be8586b3d50b3c4ff4b1b0385ae31", size = 282861, upload-time = "2026-05-11T04:06:04.571Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/2f/b4530fbf948867702d0a3f27de4a6aab1d156f406d72852ab902c4d04de9/rich_rst-1.3.2-py3-none-any.whl", hash = "sha256:a99b4907cbe118cf9d18b0b44de272efa61f15117c61e39ebdc431baf5df722a", size = 12567, upload-time = "2025-10-14T16:49:42.953Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/7e/0f51e400f1605d97c51f80a31dfb667c1f7f299e1b97dd54d88f8dbd0e02/rich_rst-2.0.0a9-py3-none-any.whl", hash = "sha256:1dc2ec6612986b7b4e891f7f66427ce9705fbd23ac23bd690157d14227e9b13c", size = 264545, upload-time = "2026-05-11T04:06:02.502Z" },
 ]
 
 [[package]]
