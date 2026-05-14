@@ -5,7 +5,7 @@ complex-cli
 
 ::
 
-    complex-cli COMMAND
+    complex-cli COMMAND [OPTIONS]
 
 Complex CLI application for comprehensive documentation testing.
 

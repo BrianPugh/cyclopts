@@ -235,3 +235,51 @@ app_disabled_negative = App(name="disabledneg", default_parameter=Parameter(nega
 def build(param: list[Literal["apple", "banana", "cherry"]]):
     """Build command with list parameter."""
     pass
+
+
+app_three_positionals = App(name="multipos3")
+
+
+@app_three_positionals.command
+def command_multi3(
+    first: Literal["red", "blue"],
+    second: Literal["cat", "dog"],
+    third: Literal["small", "large"],
+    /,
+):
+    """Command with three positional literals.
+
+    Parameters
+    ----------
+    first : Literal["red", "blue"]
+        Color choice.
+    second : Literal["cat", "dog"]
+        Animal choice.
+    third : Literal["small", "large"]
+        Size choice.
+    """
+    pass
+
+
+# Two iterable positionals back-to-back. Exercises the "first iterable wins
+# the rest position" rule that prevents two rest specs from being emitted
+# (regressions here would surface as either invalid scripts or wrong
+# completions at the rest position).
+app_two_iterables = App(name="twoiter")
+
+
+@app_two_iterables.command
+def collect(
+    paths: list[Path],
+    tags: list[str],
+):
+    """Collect paths and tags.
+
+    Parameters
+    ----------
+    paths : list[Path]
+        Paths to collect.
+    tags : list[str]
+        Optional tags.
+    """
+    pass

@@ -330,6 +330,7 @@ debug = [
 dev = [
     { name = "coverage", extra = ["toml"] },
     { name = "mkdocs" },
+    { name = "pexpect", marker = "sys_platform != 'win32'" },
     { name = "pre-commit" },
     { name = "pydantic" },
     { name = "pytest" },
@@ -381,6 +382,7 @@ requires-dist = [
     { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.4.0" },
     { name = "mkdocs", marker = "extra == 'mkdocs'", specifier = ">=1.4.0" },
     { name = "myst-parser", extras = ["linkify"], marker = "extra == 'docs'", specifier = ">=3.0.1,<5.0.0" },
+    { name = "pexpect", marker = "sys_platform != 'win32' and extra == 'dev'", specifier = ">=4.9.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=2.16.0" },
     { name = "pydantic", marker = "extra == 'dev'", specifier = ">=2.11.2,<3.0.0" },
     { name = "pymdown-extensions", marker = "extra == 'mkdocs'", specifier = ">=10.0" },

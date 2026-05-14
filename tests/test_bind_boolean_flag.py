@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 import pytest
 
@@ -22,6 +22,52 @@ from cyclopts.exceptions import CoercionError
 def test_boolean_flag_default(app, cmd_str, expected, assert_parse_args):
     @app.default
     def foo(my_flag: bool = True):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("--my-flag", True),
+        ("--my-flag=true", True),
+        ("--my-flag=false", False),
+        ("--no-my-flag", False),
+    ],
+)
+def test_boolean_flag_unannotated_default(app, cmd_str, expected, assert_parse_args):
+    """https://github.com/BrianPugh/cyclopts/issues/797
+
+    A parameter whose type is inferred from a boolean default (no annotation)
+    should still get a generated negative ``--no-`` flag.
+    """
+
+    @app.default
+    def foo(my_flag=False):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
+
+
+@pytest.mark.parametrize(
+    "cmd_str,expected",
+    [
+        ("--my-flag", True),
+        ("--my-flag=true", True),
+        ("--my-flag=false", False),
+        ("--no-my-flag", False),
+    ],
+)
+def test_boolean_flag_any_annotation_default(app, cmd_str, expected, assert_parse_args):
+    """``Any`` annotation with a bool default should behave like an unannotated bool default.
+
+    ``FieldInfo.hint`` already infers ``type(default)`` when the annotation resolves to ``Any``,
+    so the parsing path treats this as ``bool``; the negative-flag path should match.
+    """
+
+    @app.default
+    def foo(my_flag: Any = False):
         pass
 
     assert_parse_args(foo, cmd_str, expected)

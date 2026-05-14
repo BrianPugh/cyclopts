@@ -397,7 +397,7 @@ class Argument:
             return False
         if self.parameter.json_list is not None:
             return self.parameter.json_list
-        for arg in get_args(self.field_info.annotation) or (str,):
+        for arg in get_args(resolve_optional(self.hint)) or (str,):
             if contains_hint(arg, str):
                 return False
         return True
@@ -550,7 +550,7 @@ class Argument:
                 else:
                     return (), implicit_value
         else:
-            hint = resolve_annotated(self.field_info.annotation)
+            hint = self._negatives_hint
             if is_union(hint):
                 hints = get_args(hint)
             else:
@@ -896,22 +896,41 @@ class Argument:
             except pydantic.PydanticUserError:
                 pass
 
+        def _resolve(validator, hint):
+            if isinstance(validator, str):
+                validator = getattr(hint, validator)
+            return validator
+
         try:
             if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.parameter.validator:
+                    validator = _resolve(validator, hint)
+                    is_method = inspect.ismethod(validator)
                     for val in value.values():
-                        validator(hint, val)
+                        if is_method:
+                            validator(val)  # pyright: ignore[reportCallIssue]
+                        else:
+                            validator(hint, val)
                 validate_pydantic(dict[str, self.field_info.annotation], value)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.parameter.validator:
+                    validator = _resolve(validator, hint)
+                    is_method = inspect.ismethod(validator)
                     for val in value:
-                        validator(hint, val)
+                        if is_method:
+                            validator(val)  # pyright: ignore[reportCallIssue]
+                        else:
+                            validator(hint, val)
                 validate_pydantic(tuple[self.field_info.annotation, ...], value)
             else:
                 for validator in self.parameter.validator:
-                    validator(self.hint, value)
+                    validator = _resolve(validator, self.hint)
+                    if inspect.ismethod(validator):
+                        validator(value)
+                    else:
+                        validator(self.hint, value)
                 validate_pydantic(self.field_info.annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
@@ -991,9 +1010,22 @@ class Argument:
         return tokens_per_element, consume_all
 
     @property
+    def _negatives_hint(self):
+        # Mirrors ``field_info.annotation`` but substitutes ``type(default)`` when
+        # there is no annotation, so an unannotated ``foo=False`` is treated as
+        # ``bool`` for negative-flag purposes. Unlike ``self.hint``, this preserves
+        # ``Optional`` / unions, which ``negative_none`` depends on.
+        hint = self.field_info.annotation
+        if hint is inspect.Parameter.empty or resolve(hint) is Any:
+            default = self.field_info.default
+            if default is not inspect.Parameter.empty and default is not None:
+                hint = type(default)
+        return resolve_annotated(hint)
+
+    @property
     def negatives(self):
         """Negative flags from :meth:`.Parameter.get_negatives`."""
-        return self.parameter.get_negatives(resolve_annotated(self.field_info.annotation))
+        return self.parameter.get_negatives(self._negatives_hint)
 
     @property
     def name(self) -> str:
