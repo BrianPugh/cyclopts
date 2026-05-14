@@ -41,12 +41,7 @@ class InlineText:
 
             primary_renderable = Markdown(content)
         elif format in ("restructuredtext", "rst"):
-            try:
-                from rich_rst import RestructuredText
-            except ImportError as e:
-                raise ImportError(
-                    'reStructuredText format requires the "rst" extra. Install with: pip install "cyclopts[rst]"'
-                ) from e
+            from rich_rst import RestructuredText
 
             from cyclopts.help.rst_preprocessor import process_sphinx_directives
 
