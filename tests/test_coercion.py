@@ -178,7 +178,7 @@ def test_coerce_enum_invalid_choice():
     assert_convert_coercion_error(
         GroupedConstants,
         ["invalid-choice"],
-        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid-choice" into one of {'foo', 'bar'}.""",
+        msg='Invalid value "invalid-choice" for "MOCKED_ARGUMENT_NAME". Choose from: "foo", "bar".',
     )
 
 
@@ -191,7 +191,7 @@ def test_coerce_enum_invalid_choice_name_transform():
     assert_convert_coercion_error(
         SoftwareEnvironment,
         ["invalid"],
-        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid" into one of {'dev-local', 'staging-us', 'prod-west'}.""",
+        msg='Invalid value "invalid" for "MOCKED_ARGUMENT_NAME". Choose from: "dev-local", "staging-us", "prod-west".',
     )
 
 
@@ -204,7 +204,7 @@ def test_coerce_enum_invalid_choice_custom_name_transform():
         SoftwareEnvironment,
         ["invalid"],
         name_transform=str.upper,
-        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid" into one of {'DEV_LOCAL', 'STAGING_US'}.""",
+        msg='Invalid value "invalid" for "MOCKED_ARGUMENT_NAME". Choose from: "DEV_LOCAL", "STAGING_US".',
     )
 
 
@@ -346,7 +346,7 @@ def test_coerce_literal_invalid_choice():
     assert_convert_coercion_error(
         Literal["foo", "bar", 3],
         ["invalid-choice"],
-        msg="""Invalid value for "MOCKED_ARGUMENT_NAME": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+        msg='Invalid value "invalid-choice" for "MOCKED_ARGUMENT_NAME". Choose from: "foo", "bar", 3.',
     )
 
 
@@ -354,7 +354,7 @@ def test_coerce_literal_invalid_choice_keyword():
     assert_convert_coercion_error(
         Literal["foo", "bar", 3],
         [Token(keyword="--MY_KEYWORD", value="invalid-choice")],
-        msg="""Invalid value for "--MY_KEYWORD": unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+        msg='Invalid value "invalid-choice" for "--MY_KEYWORD". Choose from: "foo", "bar", 3.',
     )
 
 
@@ -362,7 +362,7 @@ def test_coerce_literal_invalid_choice_non_cli_token():
     assert_convert_coercion_error(
         Literal["foo", "bar", 3],
         [Token(value="invalid-choice", source="TEST")],
-        msg="""Invalid value for "MOCKED_ARGUMENT_NAME" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+        msg='Invalid value "invalid-choice" for "MOCKED_ARGUMENT_NAME" from TEST. Choose from: "foo", "bar", 3.',
     )
 
 
@@ -370,7 +370,36 @@ def test_coerce_literal_invalid_choice_keyword_non_cli_token():
     assert_convert_coercion_error(
         Literal["foo", "bar", 3],
         [Token(keyword="--MY-KEYWORD", value="invalid-choice", source="TEST")],
-        msg="""Invalid value for "--MY-KEYWORD" from TEST: unable to convert "invalid-choice" into one of {'foo', 'bar', 3}.""",
+        msg='Invalid value "invalid-choice" for "--MY-KEYWORD" from TEST. Choose from: "foo", "bar", 3.',
+    )
+
+
+def test_coerce_literal_invalid_choice_did_you_mean():
+    assert_convert_coercion_error(
+        Literal["pishock", "openshock"],
+        ["pisock"],
+        msg='Invalid value "pisock" for "MOCKED_ARGUMENT_NAME". Choose from: "pishock", "openshock". Did you mean "pishock"?',
+    )
+
+
+def test_coerce_literal_invalid_choice_no_did_you_mean():
+    assert_convert_coercion_error(
+        Literal["pishock", "openshock"],
+        ["auth"],
+        msg='Invalid value "auth" for "MOCKED_ARGUMENT_NAME". Choose from: "pishock", "openshock".',
+    )
+
+
+def test_coerce_enum_invalid_choice_did_you_mean_uses_name_transform():
+    class SoftwareEnvironment(Enum):
+        DEV_LOCAL = 1
+        STAGING_US = 2
+        PROD_WEST = 3
+
+    assert_convert_coercion_error(
+        SoftwareEnvironment,
+        ["staging-uss"],
+        msg='Invalid value "staging-uss" for "MOCKED_ARGUMENT_NAME". Choose from: "dev-local", "staging-us", "prod-west". Did you mean "staging-us"?',
     )
 
 

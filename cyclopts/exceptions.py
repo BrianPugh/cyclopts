@@ -241,15 +241,35 @@ class CoercionError(CycloptsError):
 
         msg = super().__str__()
 
+        choice_strs: list[str] | None = None
+        plain_choices: list[str] | None = None
         if get_origin(self.target_type) is Literal:
-            choices = "{" + ", ".join(repr(x) for x in get_args(self.target_type)) + "}"
-            target_type_name = f"one of {choices}"
+            args = get_args(self.target_type)
+            choice_strs = [f'"{x}"' if isinstance(x, str) else repr(x) for x in args]
+            plain_choices = [x for x in args if isinstance(x, str)]
         elif isinstance(self.target_type, type) and issubclass(self.target_type, Enum):
             nt = self.argument.parameter.name_transform
-            choices = "{" + ", ".join(repr(nt(x)) for x in self.target_type.__members__) + "}"
-            target_type_name = f"one of {choices}"
-        else:
-            target_type_name = get_hint_name(self.target_type)
+            members = [nt(x) for x in self.target_type.__members__]
+            choice_strs = [f'"{x}"' for x in members]
+            plain_choices = members
+
+        if choice_strs is not None and self.token is not None:
+            name = self.token.keyword if self.token.keyword else self.argument.name.lstrip("-").upper()
+            src_suffix = "" if self.token.source in ("", "cli") else f" from {self.token.source}"
+            msg += (
+                f'Invalid value "{self.token.value}" for "{name}"{src_suffix}. Choose from: {", ".join(choice_strs)}.'
+            )
+
+            import difflib
+
+            close = difflib.get_close_matches(self.token.value, plain_choices or [], n=1, cutoff=0.6)
+            if close:
+                msg += f' Did you mean "{close[0]}"?'
+            return msg
+
+        target_type_name = (
+            get_hint_name(self.target_type) if choice_strs is None else f"one of {{{', '.join(choice_strs)}}}"
+        )
 
         if not self.token:
             msg += f'Invalid value for "{self.argument.name}": unable to convert value to {target_type_name}.'
