@@ -547,8 +547,8 @@ def test_help_format_group_parameters_sphinx_directives(capture_format_group_par
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Foo parameter [required]                             │
         │    BAR --bar  Bar parameter [Added in v0.47] [default: 1.0]        │
-        │    BAZ --baz  Baz parameter [⚠ Deprecated in v2.0] Use something   │
-        │               else instead [default: 5]                            │
+        │    BAZ --baz  Baz parameter ⚠ [Deprecated in v2.0: Use something   │
+        │               else instead] [default: 5]                           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -612,7 +612,7 @@ def test_help_format_group_parameters_sphinx_note_warning_seealso(capture_format
         │               ⚠ Warning: Be careful here [required]                │
         │ *  BAZ --baz  Baz parameter                                        │
         │                                                                    │
-        │               See also: Related function [required]                │
+        │               See Also: Related function [required]                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -666,7 +666,7 @@ def test_help_format_group_parameters_sphinx_deprecated_no_content(capture_forma
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO --foo  Foo parameter [⚠ Deprecated in v3.0] [required]      │
+        │ *  FOO --foo  Foo parameter ⚠ [Deprecated in v3.0] [required]      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1989,7 +1989,6 @@ def test_help_restructuredtext(app, console, normalize_trailing_whitespace):
         The following are bulletpoints:
 
          • bulletpoint 1
-
          • bulletpoint 2
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
