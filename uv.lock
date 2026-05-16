@@ -388,7 +388,7 @@ requires-dist = [
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.1" },
     { name = "pyyaml", marker = "extra == 'yaml'", specifier = ">=6.0.1" },
     { name = "rich", specifier = ">=13.6.0" },
-    { name = "rich-rst", specifier = ">=2.0.0a9,<3" },
+    { name = "rich-rst", specifier = ">=2.0.1,<3" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.4.7,<8.2.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=1.25.2,<4.0.0" },
     { name = "sphinx-copybutton", marker = "extra == 'docs'", specifier = ">=0.5,<1.0" },
@@ -1355,15 +1355,15 @@ wheels = [
 
 [[package]]
 name = "rich-rst"
-version = "2.0.0a9"
+version = "2.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pygments" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f5/30/7360bdd7bf3ca4d68520d43ca685336c6df45cfc66126b5311b6d24dc76b/rich_rst-2.0.0a9.tar.gz", hash = "sha256:576771be53d8121c7b88ea83abb21b45460be8586b3d50b3c4ff4b1b0385ae31", size = 282861, upload-time = "2026-05-11T04:06:04.571Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/56/3191bae66b08ccc637ea8120426068bcb361cc323c96404c310886937067/rich_rst-2.0.1.tar.gz", hash = "sha256:cbe236ed0901d1ec8427cc6a50bf0a34353ba28ad014dc24def68bfe7f3b9e68", size = 300570, upload-time = "2026-05-16T00:47:57.362Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/7e/0f51e400f1605d97c51f80a31dfb667c1f7f299e1b97dd54d88f8dbd0e02/rich_rst-2.0.0a9-py3-none-any.whl", hash = "sha256:1dc2ec6612986b7b4e891f7f66427ce9705fbd23ac23bd690157d14227e9b13c", size = 264545, upload-time = "2026-05-11T04:06:02.502Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/3d/55c17d3ebdf3cd81356002afe5bef9bb8af631db2819785b6eac845b925b/rich_rst-2.0.1-py3-none-any.whl", hash = "sha256:7ee15f345ce25fa02b582c272a6cdbaf0c21243e38061cea273cff659bf3ef61", size = 272922, upload-time = "2026-05-16T00:47:55.508Z" },
 ]
 
 [[package]]
