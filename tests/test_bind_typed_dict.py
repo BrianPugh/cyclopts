@@ -54,7 +54,7 @@ def test_bind_typed_dict_missing_arg_basic(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--d.my-list" requires an argument.        │
+        │ Command "foo" parameter --d.my-list requires an argument.          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -79,7 +79,7 @@ def test_bind_typed_dict_missing_arg_flatten(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--my-int" requires an argument.           │
+        │ Command "foo" parameter --my-int requires an argument.             │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -110,7 +110,7 @@ def test_bind_typed_dict_missing_arg_renamed_no_hyphen(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--d.your-list" requires an argument.      │
+        │ Command "foo" parameter --d.your-list requires an argument.        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -141,7 +141,7 @@ def test_bind_typed_dict_missing_arg_renamed_hyphen(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--your-list" requires an argument.        │
+        │ Command "foo" parameter --your-list requires an argument.          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -175,7 +175,7 @@ def test_bind_typed_dict_missing_arg_nested(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--d.my-user.name" requires an argument.   │
+        │ Command "foo" parameter --d.my-user.name requires an argument.     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -236,7 +236,7 @@ def test_bind_typed_dict_extra_field(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Unknown option: "--d.extra-key".                                   │
+        │ Unknown option: --d.extra-key.                                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

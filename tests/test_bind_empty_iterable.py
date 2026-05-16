@@ -222,7 +222,7 @@ def test_consume_multiple_error_panel_min(app):
     expected = textwrap.dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Parameter "--urls" requires at least 2 elements. Got 1.            │
+        │ Parameter --urls requires at least 2 elements. Got 1.              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -248,7 +248,7 @@ def test_consume_multiple_error_panel_empty(app):
     expected = textwrap.dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Parameter "--urls" requires at least 3 elements. Got 0.            │
+        │ Parameter --urls requires at least 3 elements. Got 0.              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

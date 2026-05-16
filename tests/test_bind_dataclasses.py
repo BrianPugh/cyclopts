@@ -58,7 +58,7 @@ def test_bind_dataclass_missing_all_arguments(app, assert_parse_args, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Parameter "--user.id" requires an argument.                        │
+        │ Parameter --user.id requires an argument.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -207,7 +207,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "build" parameter "--car.cylinders" requires an argument.  │
+        │ Command "build" parameter --car.cylinders requires an argument.    │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
