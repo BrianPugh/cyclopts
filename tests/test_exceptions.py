@@ -43,7 +43,7 @@ def test_exceptions_missing_argument_single(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command foo parameter --bar requires an argument.                  │
+        │ Command "foo" parameter --bar requires an argument.                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -64,7 +64,7 @@ def test_exceptions_missing_argument_flag(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command foo parameter --bar flag required.                         │
+        │ Command "foo" parameter --bar flag required.                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -88,7 +88,7 @@ def test_exceptions_missing_argument_with_short_flag(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command foo parameter -o requires an argument.                     │
+        │ Command "foo" parameter -o requires an argument.                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

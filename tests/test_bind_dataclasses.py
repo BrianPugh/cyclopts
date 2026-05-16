@@ -207,7 +207,7 @@ def test_bind_dataclass_recursive_missing_arg(app, assert_parse_args, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command build parameter --car.cylinders requires an argument.      │
+        │ Command "build" parameter --car.cylinders requires an argument.    │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

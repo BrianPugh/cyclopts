@@ -161,7 +161,7 @@ class ValidationError(CycloptsError):
             if self.group.name:
                 message = f"Invalid values for group {self.group.name}."
         elif self.command_chain:
-            message = f"Invalid values for command {self.command_chain[-1]}."
+            message = f'Invalid values for command "{self.command_chain[-1]}".'
         else:
             raise NotImplementedError
 
@@ -319,7 +319,7 @@ class UnknownCommandError(CycloptsError):
                 cutoff=0.6,
             )
             if close_matches:
-                response += f" Did you mean {close_matches[0]}?"
+                response += f' Did you mean "{close_matches[0]}"?'
 
             # The following is a heuristic to be "maximally helpful" to someone who may have
             # forgotten a command in their CLI call.
@@ -389,7 +389,7 @@ class MissingArgumentError(CycloptsError):
 
         if self.command_chain:
             strings.append(
-                f"Command {' '.join(self.command_chain)} parameter {param_name} {required_string}.{only_got_string}"
+                f'Command "{" ".join(self.command_chain)}" parameter {param_name} {required_string}.{only_got_string}'
             )
         else:
             strings.append(f"Parameter {param_name} {required_string}.{only_got_string}")
@@ -421,7 +421,7 @@ class ConsumeMultipleError(MissingArgumentError):
             constraint = f"accepts at most {self.max_allowed}"
 
         if self.command_chain:
-            base = f"Command {' '.join(self.command_chain)} parameter {param_name} {constraint} elements. Got {self.actual_count}."
+            base = f'Command "{" ".join(self.command_chain)}" parameter {param_name} {constraint} elements. Got {self.actual_count}.'
         else:
             base = f"Parameter {param_name} {constraint} elements. Got {self.actual_count}."
 

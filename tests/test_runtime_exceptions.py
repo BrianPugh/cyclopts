@@ -84,8 +84,8 @@ def test_runtime_exception_bad_command_recommend(app, console):
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Unknown command "bad-command". Did you mean mad-command? Available │
-        │ commands: mad-command.                                             │
+        │ Unknown command "bad-command". Did you mean "mad-command"?         │
+        │ Available commands: mad-command.                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -109,7 +109,7 @@ def test_runtime_exception_bad_command_recommend_no_show(app, console):
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Unknown command "bad-command". Did you mean other-command?         │
+        │ Unknown command "bad-command". Did you mean "other-command"?       │
         │ Available commands: other-command.                                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -137,7 +137,7 @@ def test_runtime_exception_bad_command_list_ellipsis(app, console):
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Unknown command "cmd". Did you mean cmd9? Available commands:      │
+        │ Unknown command "cmd". Did you mean "cmd9"? Available commands:    │
         │ cmd1, cmd2, cmd3, cmd4, cmd5, cmd6, cmd7, cmd8, ...                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -156,8 +156,8 @@ def test_runtime_exception_bad_parameter_recommend(app, console):
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command some-command parameter --foo requires an argument. Did you │
-        │ mean --foo instead of --boo?                                       │
+        │ Command "some-command" parameter --foo requires an argument. Did   │
+        │ you mean --foo instead of --boo?                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

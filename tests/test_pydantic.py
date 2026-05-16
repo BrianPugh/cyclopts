@@ -195,7 +195,7 @@ def test_bind_pydantic_basemodel_missing_arg(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command foo parameter --user.outfit.head requires an argument.     │
+        │ Command "foo" parameter --user.outfit.head requires an argument.   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
