@@ -262,7 +262,7 @@ class CoercionError(CycloptsError):
 
             close = difflib.get_close_matches(self.token.value, plain_choices or [], n=1, cutoff=0.6)
             if close:
-                msg += f" Did you mean {close[0]}?"
+                msg += f' Did you mean "{close[0]}"?'
             return msg
 
         target_type_name = (

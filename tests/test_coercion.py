@@ -378,7 +378,7 @@ def test_coerce_literal_invalid_choice_did_you_mean():
     assert_convert_coercion_error(
         Literal["pishock", "openshock"],
         ["pisock"],
-        msg='Invalid value "pisock" for MOCKED_ARGUMENT_NAME. Choose from: "pishock", "openshock". Did you mean pishock?',
+        msg='Invalid value "pisock" for MOCKED_ARGUMENT_NAME. Choose from: "pishock", "openshock". Did you mean "pishock"?',
     )
 
 
@@ -399,7 +399,7 @@ def test_coerce_enum_invalid_choice_did_you_mean_uses_name_transform():
     assert_convert_coercion_error(
         SoftwareEnvironment,
         ["staging-uss"],
-        msg='Invalid value "staging-uss" for MOCKED_ARGUMENT_NAME. Choose from: "dev-local", "staging-us", "prod-west". Did you mean staging-us?',
+        msg='Invalid value "staging-uss" for MOCKED_ARGUMENT_NAME. Choose from: "dev-local", "staging-us", "prod-west". Did you mean "staging-us"?',
     )
 
 
