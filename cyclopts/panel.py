@@ -35,8 +35,13 @@ def CycloptsPanel(message: Any, title: str = "Error", style: str = "red") -> "Pa
     from rich.panel import Panel
     from rich.text import Text
 
+    if hasattr(message, "__rich__") or hasattr(message, "__rich_console__"):
+        renderable = message
+    else:
+        renderable = Text(str(message), "default")
+
     panel = Panel(
-        Text(str(message), "default"),
+        renderable,
         title=title,
         style=style,
         box=box.ROUNDED,
