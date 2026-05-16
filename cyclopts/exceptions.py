@@ -609,11 +609,14 @@ class RepeatArgumentError(CycloptsError):
     """The repeated token."""
 
     def _segments(self) -> Iterator[tuple[str, str]]:
+        # Invariant: positional duplication is routed to UnusedCliTokensError by the binder,
+        # so any token reaching this error path was matched by keyword.
+        assert self.token.keyword is not None
         prefix = super().__str__()
         if prefix:
             yield prefix, ""
         yield "Parameter ", ""
-        yield self.token.keyword or "", _STYLE_NAME
+        yield self.token.keyword, _STYLE_NAME
         yield " specified multiple times.", ""
 
     def __str__(self):
