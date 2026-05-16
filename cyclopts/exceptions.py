@@ -155,8 +155,9 @@ class ValidationError(CycloptsError):
     value: Any = cyclopts.utils.UNSET
     """Converted value that failed validation."""
 
-    def __str__(self):
-        message = ""
+    def _segments(self) -> Iterator[tuple[str, str]]:
+        body: list[tuple[str, str]] = []
+
         if self.argument:
             value = self.argument.value if self.value is cyclopts.utils.UNSET else self.value
             try:
@@ -166,23 +167,46 @@ class ValidationError(CycloptsError):
             else:
                 provided_by = "" if not token.source or token.source == "cli" else f" provided by {token.source}"
                 name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
-                message = f'Invalid value "{value}" for {name}{provided_by}.'
+                body.append(('Invalid value "', ""))
+                body.append((f"{value}", _STYLE_VALUE))
+                body.append(('" for ', ""))
+                body.append((name, _STYLE_NAME))
+                if provided_by:
+                    body.append((provided_by, _STYLE_DIM))
+                body.append((".", ""))
         elif self.group:
             if self.group.name:
-                message = f"Invalid values for group {self.group.name}."
+                body.append(("Invalid values for group ", ""))
+                body.append((self.group.name, _STYLE_NAME))
+                body.append((".", ""))
         elif self.command_chain:
-            message = f'Invalid values for command "{self.command_chain[-1]}".'
+            body.append(('Invalid values for command "', ""))
+            body.append((self.command_chain[-1], _STYLE_NAME))
+            body.append(('".', ""))
         else:
             raise NotImplementedError
 
-        cyclopts_message = f"{super().__str__()}{message}"
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
+        yield from body
+
+        cyclopts_message_nonempty = bool(prefix) or bool(body)
         if self.exception_message:
-            if cyclopts_message:
-                return f"{cyclopts_message} {self.exception_message}"
-            else:
-                return self.exception_message
-        else:
-            return cyclopts_message
+            if cyclopts_message_nonempty:
+                yield " ", ""
+            yield self.exception_message, ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -198,12 +222,21 @@ class UnknownOptionError(CycloptsError):
     argument_collection: "ArgumentCollection"
     """Argument collection of plausible options."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         value = self.token.keyword or self.token.value
+
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
+
+        yield 'Unknown option: "', ""
+        yield value, _STYLE_VALUE
         if self.token.source == "cli":
-            response = f'Unknown option: "{value}".'
+            yield '".', ""
         else:
-            response = f'Unknown option: "{value}" from {self.token.source}.'
+            yield '"', ""
+            yield f" from {self.token.source}", _STYLE_DIM
+            yield ".", ""
 
         if keyword := self.token.keyword or self.token.value:
             import difflib
@@ -212,9 +245,20 @@ class UnknownOptionError(CycloptsError):
 
             close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.6)
             if close_matches:
-                response += f" Did you mean {close_matches[0]}?"
+                yield " Did you mean ", ""
+                yield close_matches[0], _STYLE_SUGGESTION
+                yield "?", ""
 
-        return super().__str__() + response
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -339,49 +383,73 @@ class CoercionError(CycloptsError):
 class UnknownCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.unused_tokens
         token = self.unused_tokens[0]
-        response = f'Unknown command "{token}".'
 
-        if self.app and self.app._commands:
-            import difflib
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
 
-            # Resolve CommandSpec and filter visible commands
-            visible_commands = []
-            for name, app_or_spec in self.app._commands.items():
-                if name in self.app._help_flags or name in self.app._version_flags:
-                    continue
+        yield 'Unknown command "', ""
+        yield token, _STYLE_VALUE
+        yield '".', ""
 
-                # Resolve CommandSpec to App
-                subapp = app_or_spec.resolve(self.app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
+        if not (self.app and self.app._commands):
+            return
 
-                if not isinstance(subapp, type(self.app)):
-                    continue
+        import difflib
 
-                if subapp.show:
-                    visible_commands.append(name)
+        visible_commands: list[str] = []
+        for name, app_or_spec in self.app._commands.items():
+            if name in self.app._help_flags or name in self.app._version_flags:
+                continue
 
-            close_matches = difflib.get_close_matches(
-                token,
-                visible_commands,
-                n=1,
-                cutoff=0.6,
-            )
-            if close_matches:
-                response += f' Did you mean "{close_matches[0]}"?'
+            subapp = app_or_spec.resolve(self.app) if isinstance(app_or_spec, CommandSpec) else app_or_spec
 
-            # The following is a heuristic to be "maximally helpful" to someone who may have
-            # forgotten a command in their CLI call.
-            max_commands = 8
-            available_commands = [name for name in visible_commands if not name.startswith("-")]
-            if available_commands:
-                if len(available_commands) > max_commands:
-                    response += f" Available commands: {', '.join(available_commands[:max_commands])}, ..."
-                else:
-                    response += f" Available commands: {', '.join(available_commands)}."
+            if not isinstance(subapp, type(self.app)):
+                continue
 
-        return super().__str__() + response
+            if subapp.show:
+                visible_commands.append(name)
+
+        close_matches = difflib.get_close_matches(token, visible_commands, n=1, cutoff=0.6)
+        if close_matches:
+            yield ' Did you mean "', ""
+            yield close_matches[0], _STYLE_SUGGESTION
+            yield '"?', ""
+
+        # Heuristic: list the visible commands to help users who forgot the command name.
+        max_commands = 8
+        available_commands = [name for name in visible_commands if not name.startswith("-")]
+        if not available_commands:
+            return
+
+        yield " Available commands: ", ""
+        if len(available_commands) > max_commands:
+            shown = available_commands[:max_commands]
+            for i, name in enumerate(shown):
+                if i:
+                    yield ", ", ""
+                yield name, _STYLE_CHOICE
+            yield ", ...", ""
+        else:
+            for i, name in enumerate(available_commands):
+                if i:
+                    yield ", ", ""
+                yield name, _STYLE_CHOICE
+            yield ".", ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -403,9 +471,8 @@ class MissingArgumentError(CycloptsError):
     keyword: str | None = None
     """The keyword that was used when the error was raised (e.g., '-o' instead of '--option')."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
-        strings = []
         count, _ = self.argument.token_count()
         if count == 0:
             required_string = "flag required"
@@ -418,15 +485,14 @@ class MissingArgumentError(CycloptsError):
             received_count = len(self.tokens_so_far) % count
             only_got_string = f" Only got {received_count}." if received_count else ""
 
-        close_match_string = ""
+        close_match: str | None = None
         if self.unused_tokens and self.argument.field_info.is_keyword:
             import difflib
 
             candidates = [x for x in self.unused_tokens if is_option_like(x)]
-
-            close_matches = difflib.get_close_matches(self.argument.name, candidates, n=1, cutoff=0.6)
-            if close_matches and close_matches[0] not in self.argument.names:
-                close_match_string = f"Did you mean {self.argument.name} instead of {close_matches[0]}?"
+            matches = difflib.get_close_matches(self.argument.name, candidates, n=1, cutoff=0.6)
+            if matches and matches[0] not in self.argument.names:
+                close_match = matches[0]
 
         param_name = self.argument.name
         if self.keyword is not None:
@@ -437,20 +503,39 @@ class MissingArgumentError(CycloptsError):
                     param_name = token.keyword
                     break
 
-        if self.command_chain:
-            strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter {param_name} {required_string}.{only_got_string}'
-            )
-        else:
-            strings.append(f"Parameter {param_name} {required_string}.{only_got_string}")
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
 
-        if close_match_string:
-            strings.append(close_match_string)
+        if self.command_chain:
+            yield 'Command "', ""
+            yield " ".join(self.command_chain), _STYLE_NAME
+            yield '" parameter ', ""
+        else:
+            yield "Parameter ", ""
+        yield param_name, _STYLE_NAME
+        yield f" {required_string}.{only_got_string}", ""
+
+        if close_match is not None:
+            yield " Did you mean ", ""
+            yield self.argument.name, _STYLE_SUGGESTION
+            yield " instead of ", ""
+            yield close_match, _STYLE_VALUE
+            yield "?", ""
 
         if self.verbose:
-            strings.append(f" Parsed: {self.tokens_so_far}.")
+            yield f"  Parsed: {self.tokens_so_far}.", ""
 
-        return super().__str__() + " ".join(strings)
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -461,7 +546,7 @@ class ConsumeMultipleError(MissingArgumentError):
     max_allowed: int | None = None
     actual_count: int = 0
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
         param_name = self.keyword or self.argument.name
 
@@ -470,12 +555,19 @@ class ConsumeMultipleError(MissingArgumentError):
         else:
             constraint = f"accepts at most {self.max_allowed}"
 
-        if self.command_chain:
-            base = f'Command "{" ".join(self.command_chain)}" parameter {param_name} {constraint} elements. Got {self.actual_count}.'
-        else:
-            base = f"Parameter {param_name} {constraint} elements. Got {self.actual_count}."
+        # Skip MissingArgumentError.__str__ chain; we want just the base verbose prefix.
+        prefix = CycloptsError.__str__(self)
+        if prefix:
+            yield prefix, ""
 
-        return CycloptsError.__str__(self) + base
+        if self.command_chain:
+            yield 'Command "', ""
+            yield " ".join(self.command_chain), _STYLE_NAME
+            yield '" parameter ', ""
+        else:
+            yield "Parameter ", ""
+        yield param_name, _STYLE_NAME
+        yield f" {constraint} elements. Got {self.actual_count}.", ""
 
 
 @define(kw_only=True)
@@ -485,10 +577,28 @@ class RequiresEqualsError(CycloptsError):
     keyword: str | None = None
     """The keyword that was used (e.g., '--name')."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
         param_name = self.keyword or self.argument.name
-        return super().__str__() + f"Parameter {param_name} requires a value assigned with `=`. Use {param_name}=VALUE."
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
+        yield "Parameter ", ""
+        yield param_name, _STYLE_NAME
+        yield " requires a value assigned with `=`. Use ", ""
+        yield param_name, _STYLE_NAME
+        yield "=VALUE.", ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -498,8 +608,24 @@ class RepeatArgumentError(CycloptsError):
     token: "Token"
     """The repeated token."""
 
+    def _segments(self) -> Iterator[tuple[str, str]]:
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
+        yield "Parameter ", ""
+        yield self.token.keyword or "", _STYLE_NAME
+        yield " specified multiple times.", ""
+
     def __str__(self):
-        return super().__str__() + f"Parameter {self.token.keyword} specified multiple times."
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -509,27 +635,63 @@ class ArgumentOrderError(CycloptsError):
     token: str
     prior_positional_or_keyword_supplied_as_keyword_arguments: list["Argument"]
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
         plural = len(self.prior_positional_or_keyword_supplied_as_keyword_arguments) > 1
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name).lstrip("-")
-        prior_display_names = [
-            x.tokens[0].keyword for x in self.prior_positional_or_keyword_supplied_as_keyword_arguments
-        ]
-        if len(prior_display_names) == 1:
-            prior_display_names = prior_display_names[0]
+        prior_list = [x.tokens[0].keyword for x in self.prior_positional_or_keyword_supplied_as_keyword_arguments]
+        prior_display = prior_list[0] if len(prior_list) == 1 else prior_list
 
-        return (
-            super().__str__()
-            + f'Cannot specify token "{self.token}" positionally for parameter {display_name} due to previously specified keyword{"s" if plural else ""} {prior_display_names}. {prior_display_names} must either be passed positionally, or "{self.token}" must be passed as a keyword to {self.argument.name}.'
-        )
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
+        yield 'Cannot specify token "', ""
+        yield self.token, _STYLE_VALUE
+        yield '" positionally for parameter ', ""
+        yield display_name, _STYLE_NAME
+        yield f" due to previously specified keyword{'s' if plural else ''} ", ""
+        yield f"{prior_display}", _STYLE_NAME
+        yield ". ", ""
+        yield f"{prior_display}", _STYLE_NAME
+        yield ' must either be passed positionally, or "', ""
+        yield self.token, _STYLE_VALUE
+        yield '" must be passed as a keyword to ', ""
+        yield self.argument.name, _STYLE_NAME
+        yield ".", ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
 class MixedArgumentError(CycloptsError):
     """Cannot supply keywords and non-keywords to the same argument."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
-        return super().__str__() + f"Cannot supply keyword & non-keyword arguments to {display_name}."
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
+        yield "Cannot supply keyword & non-keyword arguments to ", ""
+        yield display_name, _STYLE_NAME
+        yield ".", ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
