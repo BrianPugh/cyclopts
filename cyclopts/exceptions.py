@@ -145,7 +145,9 @@ class CycloptsError(Exception):
     def __rich__(self) -> "Text":
         from rich.text import Text
 
-        out = Text()
+        # style="default" prevents the enclosing panel's border style (e.g. "red")
+        # from bleeding through into unstyled body segments.
+        out = Text(style="default")
         for text, style in self._segments():
             out.append(text, style=style or None)
         return out
