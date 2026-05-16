@@ -115,26 +115,40 @@ class CycloptsError(Exception):
     console: Optional["Console"] = field(default=None, kw_only=True)
     """:class:`~rich.console.Console` to display runtime errors."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
+        """Yield (text, style) pairs that compose the error message.
+
+        Drives both ``__str__`` (joins text) and ``__rich__`` (applies styles).
+        Empty string in the style position means "no styling". Subclasses
+        override to add their body, typically prefixing with
+        ``yield from super()._segments()`` to include the verbose preamble.
+        """
         if self.msg is not None:
-            return self.msg
+            yield self.msg, ""
+            return
 
-        strings = []
-        if self.verbose:
-            strings.append(type(self).__name__)
-            if self.target:
-                file, lineno = _get_function_info(self.target)
-                strings.append(f'Function defined in file "{file}", line {lineno}:')
-                strings.append(f"    {self.target.__name__}{inspect.signature(self.target)}")
-            if self.root_input_tokens is not None:
-                strings.append(f"Root Input Tokens: {self.root_input_tokens}")
-        else:
-            pass
+        if not self.verbose:
+            return
 
-        if strings:
-            return "\n".join(strings) + "\n"
-        else:
-            return ""
+        strings = [type(self).__name__]
+        if self.target:
+            file, lineno = _get_function_info(self.target)
+            strings.append(f'Function defined in file "{file}", line {lineno}:')
+            strings.append(f"    {self.target.__name__}{inspect.signature(self.target)}")
+        if self.root_input_tokens is not None:
+            strings.append(f"Root Input Tokens: {self.root_input_tokens}")
+        yield "\n".join(strings) + "\n", ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 @define(kw_only=True)
@@ -186,27 +200,14 @@ class ValidationError(CycloptsError):
         else:
             raise NotImplementedError
 
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        preamble = list(super()._segments())
+        yield from preamble
         yield from body
 
-        cyclopts_message_nonempty = bool(prefix) or bool(body)
         if self.exception_message:
-            if cyclopts_message_nonempty:
+            if preamble or body:
                 yield " ", ""
             yield self.exception_message, ""
-
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
 
 
 @define(kw_only=True)
@@ -227,9 +228,7 @@ class UnknownOptionError(CycloptsError):
         # Option-like values (start with '-') are self-delimiting; quoting them is noise.
         quoted = not is_option_like(value)
 
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
 
         yield ('Unknown option: "' if quoted else "Unknown option: "), ""
         yield value, _STYLE_VALUE
@@ -252,17 +251,6 @@ class UnknownOptionError(CycloptsError):
                 yield " Did you mean ", ""
                 yield close_matches[0], _STYLE_SUGGESTION
                 yield "?", ""
-
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
 
 
 @define(kw_only=True)
@@ -307,9 +295,7 @@ class CoercionError(CycloptsError):
         assert self.argument is not None
         assert self.target_type is not None
 
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
 
         choice_strs: list[str] | None = None
         plain_choices: list[str] | None = None
@@ -372,17 +358,6 @@ class CoercionError(CycloptsError):
         yield self.token.value, _STYLE_VALUE
         yield f'" into {target_type_name}.', ""
 
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
-
 
 class UnknownCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
@@ -391,9 +366,7 @@ class UnknownCommandError(CycloptsError):
         assert self.unused_tokens
         token = self.unused_tokens[0]
 
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
 
         yield 'Unknown command "', ""
         yield token, _STYLE_VALUE
@@ -444,25 +417,15 @@ class UnknownCommandError(CycloptsError):
                 yield name, _STYLE_CHOICE
             yield ".", ""
 
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
-
 
 @define(kw_only=True)
 class UnusedCliTokensError(CycloptsError):
     """Not all CLI tokens were used as expected."""
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.unused_tokens is not None
-        return super().__str__() + f"Unused Tokens: {self.unused_tokens}."
+        yield from super()._segments()
+        yield f"Unused Tokens: {self.unused_tokens}.", ""
 
 
 @define(kw_only=True)
@@ -507,9 +470,7 @@ class MissingArgumentError(CycloptsError):
                     param_name = token.keyword
                     break
 
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
 
         if self.command_chain:
             yield 'Command "', ""
@@ -530,17 +491,6 @@ class MissingArgumentError(CycloptsError):
         if self.verbose:
             yield f"  Parsed: {self.tokens_so_far}.", ""
 
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
-
 
 @define(kw_only=True)
 class ConsumeMultipleError(MissingArgumentError):
@@ -559,10 +509,8 @@ class ConsumeMultipleError(MissingArgumentError):
         else:
             constraint = f"accepts at most {self.max_allowed}"
 
-        # Skip MissingArgumentError.__str__ chain; we want just the base verbose prefix.
-        prefix = CycloptsError.__str__(self)
-        if prefix:
-            yield prefix, ""
+        # Skip MissingArgumentError._segments; we want just the base verbose preamble.
+        yield from CycloptsError._segments(self)
 
         if self.command_chain:
             yield 'Command "', ""
@@ -584,25 +532,12 @@ class RequiresEqualsError(CycloptsError):
     def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
         param_name = self.keyword or self.argument.name
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
         yield "Parameter ", ""
         yield param_name, _STYLE_NAME
         yield " requires a value assigned with `=`. Use ", ""
         yield param_name, _STYLE_NAME
         yield "=VALUE.", ""
-
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
 
 
 @define(kw_only=True)
@@ -616,23 +551,10 @@ class RepeatArgumentError(CycloptsError):
         # Invariant: positional duplication is routed to UnusedCliTokensError by the binder,
         # so any token reaching this error path was matched by keyword.
         assert self.token.keyword is not None
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
         yield "Parameter ", ""
         yield self.token.keyword, _STYLE_NAME
         yield " specified multiple times.", ""
-
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
 
 
 @define(kw_only=True)
@@ -649,9 +571,7 @@ class ArgumentOrderError(CycloptsError):
         prior_list = [x.tokens[0].keyword for x in self.prior_positional_or_keyword_supplied_as_keyword_arguments]
         prior_display = prior_list[0] if len(prior_list) == 1 else prior_list
 
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
         yield 'Cannot specify token "', ""
         yield self.token, _STYLE_VALUE
         yield '" positionally for parameter ', ""
@@ -666,17 +586,6 @@ class ArgumentOrderError(CycloptsError):
         yield self.argument.name, _STYLE_NAME
         yield ".", ""
 
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
-
 
 @define(kw_only=True)
 class MixedArgumentError(CycloptsError):
@@ -685,20 +594,7 @@ class MixedArgumentError(CycloptsError):
     def _segments(self) -> Iterator[tuple[str, str]]:
         assert self.argument is not None
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
-        prefix = super().__str__()
-        if prefix:
-            yield prefix, ""
+        yield from super()._segments()
         yield "Cannot supply keyword & non-keyword arguments to ", ""
         yield display_name, _STYLE_NAME
         yield ".", ""
-
-    def __str__(self):
-        return "".join(text for text, _ in self._segments())
-
-    def __rich__(self) -> "Text":
-        from rich.text import Text
-
-        out = Text()
-        for text, style in self._segments():
-            out.append(text, style=style or None)
-        return out
