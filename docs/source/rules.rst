@@ -187,13 +187,13 @@ Bool
 
       $ my-program foo 2
       ╭─ Error ───────────────────────────────────────╮
-      │ Invalid value for "--my-flag": unable to      │
+      │ Invalid value for --my-flag: unable to        │
       │ convert "2" into bool.                        │
       ╰───────────────────────────────────────────────╯
 
       $ my-program foo not-a-true-or-false-value
       ╭─ Error ─────────────────────────────────────────────────╮
-      │ Invalid value for "--my-flag": unable to convert        │
+      │ Invalid value for --my-flag: unable to convert          │
       │ "not-a-true-or-false-value" into bool.                  │
       ╰─────────────────────────────────────────────────────────╯
 
@@ -394,7 +394,7 @@ When arguments are provided by keyword:
 
      $ my-program --values 1 --values 2
      ╭─ Error ──────────────────────────────────────────────────╮
-     │ Parameter "--values" was specified multiple times.       │
+     │ Parameter --values specified multiple times.             │
      ╰─────────────────────────────────────────────────────────╯
 
 ^^^^^^^^^^
@@ -627,8 +627,8 @@ Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typ
 
    $ my-program fizz
    ╭─ Error ─────────────────────────────────────────────────╮
-   │ Invalid value for "VALUE": unable to convert "fizz"     │
-   │ into one of {'foo', 'bar', 3}.                          │
+   │ Invalid value "fizz" for VALUE. Choose from: "foo",     │
+   │ "bar", 3.                                               │
    ╰─────────────────────────────────────────────────────────╯
 
 
@@ -1001,7 +1001,7 @@ The class parameter will consume enough tokens to populate the **required positi
 
    $ my-program 'Bob Smith'
    ╭─ Error ────────────────────────────────────────────────────────────────────────╮
-   │ Parameter "--user" requires 2 arguments. Only got 1.                           │
+   │ Parameter --user requires 2 arguments. Only got 1.                             │
    ╰────────────────────────────────────────────────────────────────────────────────╯
 
 In this example, we are unable to change the ``region`` parameter of ``User`` from the CLI.

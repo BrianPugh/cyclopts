@@ -43,7 +43,7 @@ def test_exceptions_missing_argument_single(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--bar" requires an argument.              │
+        │ Command foo parameter --bar requires an argument.                  │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -64,7 +64,7 @@ def test_exceptions_missing_argument_flag(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--bar" flag required.                     │
+        │ Command foo parameter --bar flag required.                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -88,7 +88,7 @@ def test_exceptions_missing_argument_with_short_flag(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "-o" requires an argument.                 │
+        │ Command foo parameter -o requires an argument.                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -110,7 +110,7 @@ def test_exceptions_validation_error_cli_single_positional(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "-2" for "BAR". Value must be positive.
+        Invalid value "-2" for BAR. Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -130,7 +130,7 @@ def test_exceptions_validation_error_cli_single_keyword(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "-2" for "--bar". Value must be positive.
+        Invalid value "-2" for --bar. Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -176,7 +176,7 @@ def test_exceptions_validation_error_non_cli_single_keyword(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "-2" for "BAR" provided by "test". Value must be positive.
+        Invalid value "-2" for BAR provided by test. Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -197,7 +197,7 @@ def test_exceptions_validation_error_cli_multi_positional(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "(100, -2)" for "BAR". Value must be positive.
+        Invalid value "(100, -2)" for BAR. Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -218,7 +218,7 @@ def test_exceptions_validation_error_cli_multi_keyword(app, console):
     expected = dedent(
         """
         ValidationError
-        Invalid value "(100, -2)" for "--bar". Value must be positive.
+        Invalid value "(100, -2)" for --bar. Value must be positive.
         """
     ).strip()
     assert str(e.value) == expected
@@ -237,7 +237,7 @@ def test_exceptions_coercion_error_from_positional_cli(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for "BAR": unable to convert "fizz" into int.        │
+        │ Invalid value for BAR: unable to convert "fizz" into int.          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -258,7 +258,7 @@ def test_exceptions_coercion_error_from_keyword_cli(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for "-b": unable to convert "fizz" into int.         │
+        │ Invalid value for -b: unable to convert "fizz" into int.           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -288,7 +288,7 @@ def test_exceptions_coercion_error_verbose(app, console):
         """\
         │     foo(bar: int)                                                  │
         │ Root Input Tokens: ['foo', 'fizz']                                 │
-        │ Invalid value for "BAR": unable to convert "fizz" into int.        │
+        │ Invalid value for BAR: unable to convert "fizz" into int.          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -308,7 +308,7 @@ def test_exceptions_mixed_argument_error(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Cannot supply keyword & non-keyword arguments to "--bar".          │
+        │ Cannot supply keyword & non-keyword arguments to --bar.            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -349,9 +349,9 @@ def test_exceptions_argument_order_error_singular(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Cannot specify token '2' positionally for parameter 'c' due to     │
-        │ previously specified keyword '--b'. '--b' must either be passed    │
-        │ positionally, or '2' must be passed as a keyword to '--c'.         │
+        │ Cannot specify token "2" positionally for parameter c due to       │
+        │ previously specified keyword --b. --b must either be passed        │
+        │ positionally, or "2" must be passed as a keyword to --c.           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -372,10 +372,10 @@ def test_exceptions_argument_order_error_plural(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Cannot specify token '3' positionally for parameter 'c' due to     │
+        │ Cannot specify token "3" positionally for parameter c due to       │
         │ previously specified keywords ['--a', '--b']. ['--a', '--b'] must  │
-        │ either be passed positionally, or '3' must be passed as a keyword  │
-        │ to '--c'.                                                          │
+        │ either be passed positionally, or "3" must be passed as a keyword  │
+        │ to --c.                                                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

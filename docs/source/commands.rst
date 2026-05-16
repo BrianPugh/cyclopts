@@ -50,7 +50,7 @@ We can now control which command runs from the CLI:
 
    $ my-script fuzz
    ╭─ Error ────────────────────────────────────────────────────────────────────╮
-   │ Unknown command "fuzz". Did you mean "fizz"?                               │
+   │ Unknown command "fuzz". Did you mean fizz?                                 │
    ╰────────────────────────────────────────────────────────────────────────────╯
 
 ------------------------

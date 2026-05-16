@@ -48,7 +48,7 @@ def test_pydantic_error_msg(app, console):
     expected_prefix = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value "-1" for "VALUE". 1 validation error for             │
+        │ Invalid value "-1" for VALUE. 1 validation error for               │
         │ constrained-int                                                    │
         │   Input should be greater than 0 [type=greater_than,               │
         │ input_value=-1, input_type=int]                                    │
@@ -195,7 +195,7 @@ def test_bind_pydantic_basemodel_missing_arg(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "foo" parameter "--user.outfit.head" requires an argument. │
+        │ Command foo parameter --user.outfit.head requires an argument.     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

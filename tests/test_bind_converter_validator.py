@@ -46,7 +46,7 @@ def test_custom_converter_user_value_error_single_token(app):
 
     with pytest.raises(CoercionError) as e:
         app("5", exit_on_error=False)
-    assert str(e.value) == 'Invalid value for "AGE": unable to convert "5" into int.'
+    assert str(e.value) == 'Invalid value for AGE: unable to convert "5" into int.'
 
 
 def test_custom_converter_user_value_error_multi_token(app):
@@ -59,7 +59,7 @@ def test_custom_converter_user_value_error_multi_token(app):
 
     with pytest.raises(CoercionError) as e:
         app("5 6", exit_on_error=False)
-    assert str(e.value) == 'Invalid value for "--age": unable to convert value to tuple[int, int].'
+    assert str(e.value) == "Invalid value for --age: unable to convert value to tuple[int, int]."
 
 
 def test_custom_converter_user_value_error_with_message(app):
@@ -85,7 +85,7 @@ def test_custom_converter_user_kwargs_error(app):
 
     with pytest.raises(CoercionError) as e:
         app("--foo 5", exit_on_error=False)
-    assert str(e.value) == 'Invalid value for "--foo": unable to convert "5" into int.'
+    assert str(e.value) == 'Invalid value for --foo: unable to convert "5" into int.'
 
 
 def test_custom_converter_user_kwargs_error_with_message(app):

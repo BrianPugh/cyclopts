@@ -2790,6 +2790,6 @@ def _log_framework_warning(framework: TestFramework) -> None:
         else:
             var_name = matched_app_variables[0]
 
-        message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean "{var_name}([])"?'
+        message = f'Cyclopts application invoked without tokens under unit-test framework "{framework.value}". Did you mean {var_name}([])?'
         warnings.warn(UserWarning(message), stacklevel=3)
         break

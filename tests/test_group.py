@@ -46,7 +46,7 @@ def test_command_validator(app, assert_parse_args):
     with pytest.raises(ValidationError) as e:
         app("foo 2", exit_on_error=False)
 
-    assert str(e.value) == "Invalid values for command 'foo'."
+    assert str(e.value) == "Invalid values for command foo."
 
 
 def test_command_validator_with_message(app, assert_parse_args):
@@ -64,7 +64,7 @@ def test_command_validator_with_message(app, assert_parse_args):
     with pytest.raises(ValidationError) as e:
         app("foo 2", exit_on_error=False)
 
-    assert str(e.value) == "Invalid values for command 'foo'. The value 'bar' must be 1."
+    assert str(e.value) == "Invalid values for command foo. The value 'bar' must be 1."
 
 
 def test_group_command_default_parameter_resolution(app):

@@ -2219,7 +2219,7 @@ def test_help_help_on_error(app, console):
         │ *  COUNT --count  [required]                                       │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for "COUNT": unable to convert "bar" into int.       │
+        │ Invalid value for COUNT: unable to convert "bar" into int.         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

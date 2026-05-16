@@ -91,7 +91,7 @@ def test_log_framework_warning_pytest(app):
     warning_msg = str(warning_records[0].message)
     assert (
         warning_msg
-        == 'Cyclopts application invoked without tokens under unit-test framework "pytest". Did you mean "app([])"?'
+        == 'Cyclopts application invoked without tokens under unit-test framework "pytest". Did you mean app([])?'
     )
 
 
