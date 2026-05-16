@@ -22,7 +22,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
     actual = capture.get()
     assert actual == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Parameter "--a" requires 3 positional arguments. Only got 2.       │\n'
+        "│ Parameter --a requires 3 positional arguments. Only got 2.         │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
@@ -37,7 +37,7 @@ def test_runtime_exception_not_enough_tokens(app, console, mock_get_function_inf
         │ Function defined in file "FILENAME", line 100:                     │
         │     foo(a: tuple[int, int, int])                                   │
         │ Root Input Tokens: ['1', '2']                                      │
-        │ Parameter "--a" requires 3 positional arguments. Only got 2.       │
+        │ Parameter --a requires 3 positional arguments. Only got 2.         │
         │ Parsed: ['1', '2'].                                                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
@@ -55,7 +55,7 @@ def test_runtime_exception_missing_parameter(app, console):
     actual = capture.get()
     assert actual == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        '│ Parameter "--c" requires an argument.                              │\n'
+        "│ Parameter --c requires an argument.                                │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
@@ -156,8 +156,8 @@ def test_runtime_exception_bad_parameter_recommend(app, console):
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Command "some-command" parameter "--foo" requires an argument. Did │
-        │ you mean "--foo" instead of "--boo"?                               │
+        │ Command "some-command" parameter --foo requires an argument. Did   │
+        │ you mean --foo instead of --boo?                                   │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -201,7 +201,7 @@ def test_runtime_exception_missing_tuple(app, console):
     assert actual == dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Parameter "--network-delay" requires 2 positional arguments. Only  │
+        │ Parameter --network-delay requires 2 positional arguments. Only    │
         │ got 1.                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         """

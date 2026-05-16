@@ -154,14 +154,14 @@ class ValidationError(CycloptsError):
             except IndexError:
                 pass
             else:
-                provided_by = "" if not token.source or token.source == "cli" else f' provided by "{token.source}"'
+                provided_by = "" if not token.source or token.source == "cli" else f" provided by {token.source}"
                 name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
-                message = f'Invalid value "{value}" for "{name}"{provided_by}.'
+                message = f'Invalid value "{value}" for {name}{provided_by}.'
         elif self.group:
             if self.group.name:
-                message = f'Invalid values for group "{self.group.name}".'
+                message = f"Invalid values for group {self.group.name}."
         elif self.command_chain:
-            message = f"Invalid values for command {self.command_chain[-1]!r}."
+            message = f'Invalid values for command "{self.command_chain[-1]}".'
         else:
             raise NotImplementedError
 
@@ -193,7 +193,7 @@ class UnknownOptionError(CycloptsError):
         if self.token.source == "cli":
             response = f'Unknown option: "{value}".'
         else:
-            response = f'Unknown option: "{value}" from "{self.token.source}".'
+            response = f'Unknown option: "{value}" from {self.token.source}.'
 
         if keyword := self.token.keyword or self.token.value:
             import difflib
@@ -202,7 +202,7 @@ class UnknownOptionError(CycloptsError):
 
             close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.6)
             if close_matches:
-                response += f' Did you mean "{close_matches[0]}"?'
+                response += f" Did you mean {close_matches[0]}?"
 
         return super().__str__() + response
 
@@ -241,29 +241,47 @@ class CoercionError(CycloptsError):
 
         msg = super().__str__()
 
+        choice_strs: list[str] | None = None
+        plain_choices: list[str] | None = None
         if get_origin(self.target_type) is Literal:
-            choices = "{" + ", ".join(repr(x) for x in get_args(self.target_type)) + "}"
-            target_type_name = f"one of {choices}"
+            args = get_args(self.target_type)
+            choice_strs = [f'"{x}"' if isinstance(x, str) else repr(x) for x in args]
+            plain_choices = [x for x in args if isinstance(x, str)]
         elif isinstance(self.target_type, type) and issubclass(self.target_type, Enum):
             nt = self.argument.parameter.name_transform
-            choices = "{" + ", ".join(repr(nt(x)) for x in self.target_type.__members__) + "}"
-            target_type_name = f"one of {choices}"
-        else:
-            target_type_name = get_hint_name(self.target_type)
+            members = [nt(x) for x in self.target_type.__members__]
+            choice_strs = [f'"{x}"' for x in members]
+            plain_choices = members
+
+        if choice_strs is not None and self.token is not None:
+            name = self.token.keyword if self.token.keyword else self.argument.name.lstrip("-").upper()
+            src_suffix = "" if self.token.source in ("", "cli") else f" from {self.token.source}"
+            msg += f'Invalid value "{self.token.value}" for {name}{src_suffix}. Choose from: {", ".join(choice_strs)}.'
+
+            import difflib
+
+            close = difflib.get_close_matches(self.token.value, plain_choices or [], n=1, cutoff=0.6)
+            if close:
+                msg += f' Did you mean "{close[0]}"?'
+            return msg
+
+        target_type_name = (
+            get_hint_name(self.target_type) if choice_strs is None else f"one of {{{', '.join(choice_strs)}}}"
+        )
 
         if not self.token:
-            msg += f'Invalid value for "{self.argument.name}": unable to convert value to {target_type_name}.'
+            msg += f"Invalid value for {self.argument.name}: unable to convert value to {target_type_name}."
         elif self.token.keyword is None:
             positional_name = self.argument.name.lstrip("-").upper()
             if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for "{positional_name}": unable to convert "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for {positional_name}: unable to convert "{self.token.value}" into {target_type_name}.'
             else:
-                msg += f'Invalid value for "{positional_name}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for {positional_name} from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
         else:
             if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for "{self.token.keyword}": unable to convert "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for {self.token.keyword}: unable to convert "{self.token.value}" into {target_type_name}.'
             else:
-                msg += f'Invalid value for "{self.token.keyword}" from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
+                msg += f'Invalid value for {self.token.keyword} from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
 
         return msg
 
@@ -358,7 +376,7 @@ class MissingArgumentError(CycloptsError):
 
             close_matches = difflib.get_close_matches(self.argument.name, candidates, n=1, cutoff=0.6)
             if close_matches and close_matches[0] not in self.argument.names:
-                close_match_string = f'Did you mean "{self.argument.name}" instead of "{close_matches[0]}"?'
+                close_match_string = f"Did you mean {self.argument.name} instead of {close_matches[0]}?"
 
         param_name = self.argument.name
         if self.keyword is not None:
@@ -371,10 +389,10 @@ class MissingArgumentError(CycloptsError):
 
         if self.command_chain:
             strings.append(
-                f'Command "{" ".join(self.command_chain)}" parameter "{param_name}" {required_string}.{only_got_string}'
+                f'Command "{" ".join(self.command_chain)}" parameter {param_name} {required_string}.{only_got_string}'
             )
         else:
-            strings.append(f'Parameter "{param_name}" {required_string}.{only_got_string}')
+            strings.append(f"Parameter {param_name} {required_string}.{only_got_string}")
 
         if close_match_string:
             strings.append(close_match_string)
@@ -403,9 +421,9 @@ class ConsumeMultipleError(MissingArgumentError):
             constraint = f"accepts at most {self.max_allowed}"
 
         if self.command_chain:
-            base = f'Command "{" ".join(self.command_chain)}" parameter "{param_name}" {constraint} elements. Got {self.actual_count}.'
+            base = f'Command "{" ".join(self.command_chain)}" parameter {param_name} {constraint} elements. Got {self.actual_count}.'
         else:
-            base = f'Parameter "{param_name}" {constraint} elements. Got {self.actual_count}.'
+            base = f"Parameter {param_name} {constraint} elements. Got {self.actual_count}."
 
         return CycloptsError.__str__(self) + base
 
@@ -420,10 +438,7 @@ class RequiresEqualsError(CycloptsError):
     def __str__(self):
         assert self.argument is not None
         param_name = self.keyword or self.argument.name
-        return (
-            super().__str__()
-            + f'Parameter "{param_name}" requires a value assigned with "=". Use "{param_name}=VALUE".'
-        )
+        return super().__str__() + f"Parameter {param_name} requires a value assigned with `=`. Use {param_name}=VALUE."
 
 
 @define(kw_only=True)
@@ -456,7 +471,7 @@ class ArgumentOrderError(CycloptsError):
 
         return (
             super().__str__()
-            + f"Cannot specify token {self.token!r} positionally for parameter {display_name!r} due to previously specified keyword{'s' if plural else ''} {prior_display_names!r}. {prior_display_names!r} must either be passed positionally, or {self.token!r} must be passed as a keyword to {self.argument.name!r}."
+            + f'Cannot specify token "{self.token}" positionally for parameter {display_name} due to previously specified keyword{"s" if plural else ""} {prior_display_names}. {prior_display_names} must either be passed positionally, or "{self.token}" must be passed as a keyword to {self.argument.name}.'
         )
 
 
@@ -467,4 +482,4 @@ class MixedArgumentError(CycloptsError):
     def __str__(self):
         assert self.argument is not None
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
-        return super().__str__() + f'Cannot supply keyword & non-keyword arguments to "{display_name}".'
+        return super().__str__() + f"Cannot supply keyword & non-keyword arguments to {display_name}."

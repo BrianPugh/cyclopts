@@ -205,7 +205,7 @@ We will use :meth:`.App.parse_args`, which performs all the parsing, but doesn't
       =============================== warnings summary ================================
       test.py::test_no_args
         /my_project/test.py:64: UserWarning: Cyclopts application invoked without tokens
-        under unit-test framework "pytest". Did you mean "app([])"?
+        under unit-test framework "pytest". Did you mean app([])?
           app()
 
    The proper way to specify no CLI arguments is to provide an empty string or list:
