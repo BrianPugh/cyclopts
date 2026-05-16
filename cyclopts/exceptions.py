@@ -224,17 +224,21 @@ class UnknownOptionError(CycloptsError):
 
     def _segments(self) -> Iterator[tuple[str, str]]:
         value = self.token.keyword or self.token.value
+        # Option-like values (start with '-') are self-delimiting; quoting them is noise.
+        quoted = not is_option_like(value)
 
         prefix = super().__str__()
         if prefix:
             yield prefix, ""
 
-        yield 'Unknown option: "', ""
+        yield ('Unknown option: "' if quoted else "Unknown option: "), ""
         yield value, _STYLE_VALUE
+        close = '"' if quoted else ""
         if self.token.source == "cli":
-            yield '".', ""
+            yield f"{close}.", ""
         else:
-            yield '"', ""
+            if close:
+                yield close, ""
             yield f" from {self.token.source}", _STYLE_DIM
             yield ".", ""
 

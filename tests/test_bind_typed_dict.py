@@ -236,7 +236,7 @@ def test_bind_typed_dict_extra_field(app, console):
     expected = dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Unknown option: "--d.extra-key".                                   │
+        │ Unknown option: --d.extra-key.                                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

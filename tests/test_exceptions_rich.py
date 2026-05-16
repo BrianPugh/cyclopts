@@ -300,7 +300,7 @@ def _make_unknown_option_app() -> cyclopts.App:
 
 def test_unknown_option_str_parity_cli_with_suggestion():
     e = _provoke_app_exception(UnknownOptionError, _make_unknown_option_app(), "--no-my-flag")
-    assert str(e) == 'Unknown option: "--no-my-flag". Did you mean --my-flag?'
+    assert str(e) == "Unknown option: --no-my-flag. Did you mean --my-flag?"
 
 
 def test_unknown_option_rich_styles_token_and_suggestion():
