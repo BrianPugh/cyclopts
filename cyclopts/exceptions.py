@@ -1,6 +1,6 @@
 import inspect
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from enum import Enum
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, Optional, get_args, get_origin
@@ -16,9 +16,19 @@ from cyclopts.utils import is_option_like, json_decode_error_verbosifier
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from rich.text import Text
 
     from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
+
+
+# Rich style palette for error messages. Kept conservative; this is error
+# output, not a TUI. Empty string in a segment means "no styling".
+_STYLE_VALUE = "bold red"  # offending user-supplied value
+_STYLE_NAME = "bold"  # parameter / command name
+_STYLE_CHOICE = "cyan"  # valid choices in "Choose from:" lists
+_STYLE_SUGGESTION = "bold green"  # "Did you mean ..." suggestion
+_STYLE_DIM = "dim"  # source suffixes like " from <CONFIG>"
 
 
 __all__ = [
@@ -221,25 +231,37 @@ class CoercionError(CycloptsError):
     Intended type to coerce into.
     """
 
-    def __str__(self):
+    def _segments(self) -> Iterator[tuple[str, str]]:
+        """Yield (text, style) pairs that compose the error message.
+
+        Empty string in the style position means "no styling". Drives both
+        ``__str__`` (which joins the text) and ``__rich__`` (which applies
+        the styles).
+        """
+        # Branch 1: explicit msg override. Yield exactly what str() would
+        # produce as a single unstyled segment -- user content stays plain.
         if self.msg is not None:
             if not self.token or self.token.keyword is None:
-                return self.msg
+                yield self.msg, ""
             else:
-                return f"Invalid value for {self.token.keyword}: {self.msg}"
-        else:
-            # If a JsonDecodeError, try and verbosify it.
-            if isinstance(self.__cause__, json.JSONDecodeError):
-                msg = json_decode_error_verbosifier(self.__cause__)  # pyright: ignore[reportArgumentType]
-                if not self.token or self.token.keyword is None:
-                    return msg
-                else:
-                    return f"Invalid value for {self.token.keyword}: {msg}"
+                yield f"Invalid value for {self.token.keyword}: {self.msg}", ""
+            return
+
+        # Branch 2: JSONDecodeError verbosifier path. Plain, like branch 1.
+        if isinstance(self.__cause__, json.JSONDecodeError):
+            verbosified = json_decode_error_verbosifier(self.__cause__)  # pyright: ignore[reportArgumentType]
+            if not self.token or self.token.keyword is None:
+                yield verbosified, ""
+            else:
+                yield f"Invalid value for {self.token.keyword}: {verbosified}", ""
+            return
 
         assert self.argument is not None
         assert self.target_type is not None
 
-        msg = super().__str__()
+        prefix = super().__str__()
+        if prefix:
+            yield prefix, ""
 
         choice_strs: list[str] | None = None
         plain_choices: list[str] | None = None
@@ -253,37 +275,65 @@ class CoercionError(CycloptsError):
             choice_strs = [f'"{x}"' for x in members]
             plain_choices = members
 
+        # Branch 3: Literal/Enum with a token -- "Choose from" + suggestion.
         if choice_strs is not None and self.token is not None:
             name = self.token.keyword if self.token.keyword else self.argument.name.lstrip("-").upper()
-            src_suffix = "" if self.token.source in ("", "cli") else f" from {self.token.source}"
-            msg += f'Invalid value "{self.token.value}" for {name}{src_suffix}. Choose from: {", ".join(choice_strs)}.'
+            yield 'Invalid value "', ""
+            yield self.token.value, _STYLE_VALUE
+            yield '" for ', ""
+            yield name, _STYLE_NAME
+            if self.token.source not in ("", "cli"):
+                yield f" from {self.token.source}", _STYLE_DIM
+            yield ". Choose from: ", ""
+            for i, choice in enumerate(choice_strs):
+                if i:
+                    yield ", ", ""
+                yield choice, _STYLE_CHOICE
+            yield ".", ""
 
             import difflib
 
             close = difflib.get_close_matches(self.token.value, plain_choices or [], n=1, cutoff=0.6)
             if close:
-                msg += f' Did you mean "{close[0]}"?'
-            return msg
+                yield ' Did you mean "', ""
+                yield close[0], _STYLE_SUGGESTION
+                yield '"?', ""
+            return
 
+        # Branch 4: fallback -- "unable to convert ... into <type>".
         target_type_name = (
             get_hint_name(self.target_type) if choice_strs is None else f"one of {{{', '.join(choice_strs)}}}"
         )
 
         if not self.token:
-            msg += f"Invalid value for {self.argument.name}: unable to convert value to {target_type_name}."
-        elif self.token.keyword is None:
-            positional_name = self.argument.name.lstrip("-").upper()
-            if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for {positional_name}: unable to convert "{self.token.value}" into {target_type_name}.'
-            else:
-                msg += f'Invalid value for {positional_name} from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
-        else:
-            if self.token.source == "" or self.token.source == "cli":
-                msg += f'Invalid value for {self.token.keyword}: unable to convert "{self.token.value}" into {target_type_name}.'
-            else:
-                msg += f'Invalid value for {self.token.keyword} from {self.token.source}: unable to convert "{self.token.value}" into {target_type_name}.'
+            yield "Invalid value for ", ""
+            yield self.argument.name, _STYLE_NAME
+            yield f": unable to convert value to {target_type_name}.", ""
+            return
 
-        return msg
+        if self.token.keyword is None:
+            display_name = self.argument.name.lstrip("-").upper()
+        else:
+            display_name = self.token.keyword
+
+        yield "Invalid value for ", ""
+        yield display_name, _STYLE_NAME
+        if self.token.source not in ("", "cli"):
+            yield f" from {self.token.source}", _STYLE_DIM
+        yield ': unable to convert "', ""
+        yield self.token.value, _STYLE_VALUE
+        yield f'" into {target_type_name}.', ""
+
+    def __str__(self):
+        return "".join(text for text, _ in self._segments())
+
+    def __rich__(self) -> "Text":
+        from rich.text import Text
+
+        out = Text()
+        for text, style in self._segments():
+            out.append(text, style=style or None)
+        return out
 
 
 class UnknownCommandError(CycloptsError):
