@@ -22,6 +22,7 @@ from cyclopts.exceptions import DocstringError as DocstringError
 from cyclopts.exceptions import MissingArgumentError as MissingArgumentError
 from cyclopts.exceptions import MixedArgumentError as MixedArgumentError
 from cyclopts.exceptions import RepeatArgumentError as RepeatArgumentError
+from cyclopts.exceptions import RequiresEqualsError as RequiresEqualsError
 from cyclopts.exceptions import UnknownCommandError as UnknownCommandError
 from cyclopts.exceptions import UnknownOptionError as UnknownOptionError
 from cyclopts.exceptions import UnusedCliTokensError as UnusedCliTokensError

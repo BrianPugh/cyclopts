@@ -159,6 +159,6 @@ def test_no_parse_did_you_mean_excludes_non_parsed(app):
 
     # The error message should NOT suggest "--verbose" since it has parse=False
     error_message = str(e.value)
-    assert 'Unknown option: "--verbose"' in error_message
+    assert "Unknown option: --verbose" in error_message
     # Should NOT have "Did you mean" since there's no valid similar option
     assert "Did you mean" not in error_message

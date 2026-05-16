@@ -1191,8 +1191,8 @@ API
 
          $ my-script --name alice
          ╭─ Error ───────────────────────────────────────────────────────╮
-         │ Parameter "--name" requires a value assigned with "=".        │
-         │ Use "--name=VALUE".                                           │
+         │ Parameter --name requires a value assigned with `=`. Use      │
+         │ --name=VALUE.                                                 │
          ╰───────────────────────────────────────────────────────────────╯
 
    .. attribute:: parse
@@ -1479,7 +1479,7 @@ API
 
          $ my-program --urls
          ╭─ Error ────────────────────────────────────────────╮
-         │ Parameter "--urls" requires an argument.            │
+         │ Parameter --urls requires an argument.              │
          ╰────────────────────────────────────────────────────╯
 
       **Example: consume_multiple=(1, 3) (min/max bounds)**
@@ -1506,7 +1506,7 @@ API
 
          $ my-program --files a.txt b.txt c.txt d.txt
          ╭─ Error ─────────────────────────────────────────╮
-         │ Parameter "--files" accepts at most 3 elements. │
+         │ Parameter --files accepts at most 3 elements.   │
          │ Got 4.                                          │
          ╰─────────────────────────────────────────────────╯
 
@@ -1631,7 +1631,7 @@ API
 
          $ my-script --values a --values b
          ╭─ Error ──────────────────────────────────────────────────╮
-         │ Parameter "--values" was specified multiple times.       │
+         │ Parameter --values specified multiple times.             │
          ╰─────────────────────────────────────────────────────────╯
 
    .. attribute:: n_tokens

@@ -99,6 +99,12 @@ def console():
 
 
 @pytest.fixture
+def rich_console():
+    """Console that emits ANSI escapes -- for asserting styled output."""
+    return Console(width=70, force_terminal=True, highlight=False, color_system="truecolor", legacy_windows=False)
+
+
+@pytest.fixture
 def normalize_trailing_whitespace():
     """Remove trailing whitespace from each line while preserving line breaks.
 

@@ -32,7 +32,7 @@ def test_error_formatter_custom():
     with pytest.raises(CoercionError):
         app.parse_args("abc", exit_on_error=False, error_console=error_console)
 
-    assert buf.getvalue() == 'error: Invalid value for "VALUE": unable to convert "abc" into int.\n'
+    assert buf.getvalue() == 'error: Invalid value for VALUE: unable to convert "abc" into int.\n'
 
 
 def test_error_formatter_none_uses_cyclopts_panel():
@@ -54,7 +54,7 @@ def test_error_formatter_none_uses_cyclopts_panel():
     expected = textwrap.dedent(
         """\
         ╭─ Error ────────────────────────────────────────────────────────────╮
-        │ Invalid value for "VALUE": unable to convert "abc" into int.       │
+        │ Invalid value for VALUE: unable to convert "abc" into int.         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -80,7 +80,7 @@ def test_error_formatter_runtime_override():
     with pytest.raises(CoercionError):
         app.parse_args("abc", exit_on_error=False, error_console=error_console, error_formatter=my_formatter)
 
-    assert buf.getvalue() == 'custom: Invalid value for "VALUE": unable to convert "abc" into int.\n'
+    assert buf.getvalue() == 'custom: Invalid value for VALUE: unable to convert "abc" into int.\n'
 
 
 def test_error_formatter_inherited_by_subcommand():
@@ -102,7 +102,7 @@ def test_error_formatter_inherited_by_subcommand():
     with pytest.raises(CoercionError):
         app.parse_args("sub abc", exit_on_error=False, error_console=error_console)
 
-    assert buf.getvalue() == 'inherited: Invalid value for "VALUE": unable to convert "abc" into int.\n'
+    assert buf.getvalue() == 'inherited: Invalid value for VALUE: unable to convert "abc" into int.\n'
 
 
 def test_error_formatter_call():
@@ -124,4 +124,4 @@ def test_error_formatter_call():
     with pytest.raises(SystemExit):
         app("abc", error_console=error_console)
 
-    assert buf.getvalue() == 'call: Invalid value for "VALUE": unable to convert "abc" into int.\n'
+    assert buf.getvalue() == 'call: Invalid value for VALUE: unable to convert "abc" into int.\n'
