@@ -1,6 +1,8 @@
 import asyncio
 from pathlib import Path
 
+import pytest
+
 
 def test_version_print_console_from_init(app, console):
     app.console = console
@@ -329,3 +331,89 @@ def test_function_command_inherits_parent_version(console):
         root_app(["my-command", "--version"], console=console)
 
     assert "4.0.0\n" == capture.get()
+
+
+def test_subcommand_version_parameter_overrides_auto_version():
+    """A user-defined ``version`` parameter on a subcommand takes precedence
+    over the auto-registered ``--version`` flag (reported by octo-yart on PR #776).
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    result = app(["sub", "--version"])
+    assert result is True
+
+    result = app(["sub"])
+    assert result is False
+
+
+def test_parent_version_still_works_when_subcommand_overrides(console):
+    """The override only affects the subcommand; the parent ``--version`` still
+    triggers the auto-registered handler.
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    with console.capture() as capture:
+        app(["--version"], console=console)
+
+    assert "1.0.0\n" == capture.get()
+
+
+def test_subcommand_help_parameter_overrides_auto_help():
+    """A user-defined ``help`` parameter on a subcommand takes precedence over
+    the auto-registered ``--help`` flag.
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", result_action="return_value")
+
+    @app.command
+    def sub(help: bool = False):
+        return help
+
+    result = app(["sub", "--help"])
+    assert result is True
+
+
+def test_subcommand_version_parameter_non_bool():
+    """Override works for non-bool parameter types as well."""
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: str = "default"):
+        return version
+
+    result = app(["sub", "--version", "custom"])
+    assert result == "custom"
+
+
+def test_subcommand_repeated_version_flag_restores_all():
+    """When the user provides ``--version`` more than once and the command
+    shadows it, every occurrence is restored. The second occurrence triggers
+    cyclopts' normal repeat-argument detection rather than silently routing
+    to auto-version.
+    """
+    from cyclopts import App
+    from cyclopts.exceptions import RepeatArgumentError
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    with pytest.raises(RepeatArgumentError):
+        app(["sub", "--version", "--version"], exit_on_error=False)

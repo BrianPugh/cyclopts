@@ -931,3 +931,107 @@ class TestNestedMeta:
         assert "--outer-flag" not in help_text
         assert "--inner-flag" not in help_text
         assert "--sub-flag" in help_text
+
+
+class TestVarPositionalShadowing:
+    """Regression coverage for VAR_POSITIONAL (``*args``) interactions reported
+    by octo-yart on PR #776. The cases below currently bind correctly; they
+    exist to lock in that behavior.
+    """
+
+    def test_default_var_positional_and_subcommand_var_positional(self):
+        """``app.default(*argument)`` and ``app.command sub(*argument)`` each
+        bind their own tokens; the names don't collide.
+        """
+        app = App(result_action="return_value")
+
+        @app.default
+        def main(*argument: str):
+            return ("main", argument)
+
+        @app.command
+        def sub(*argument: str):
+            return ("sub", argument)
+
+        assert app(["foo", "bar"]) == ("main", ("foo", "bar"))
+        assert app(["sub", "foo", "bar"]) == ("sub", ("foo", "bar"))
+
+    def test_meta_var_positional_and_subcommand_var_positional(self):
+        """Meta's ``*argument`` (forwarding wrapper) and a sub-command's
+        ``*argument`` capture different slices of the token stream.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, tuple[str, ...]] = {}
+
+        @app.meta.default
+        def meta(*argument: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+            captured["meta"] = argument
+            return app(argument)
+
+        @app.command
+        def sub(*argument: str):
+            captured["sub"] = argument
+            return argument
+
+        result = app.meta(["sub", "foo", "bar"])
+        assert captured["meta"] == ("sub", "foo", "bar")
+        assert captured["sub"] == ("foo", "bar")
+        assert result == ("foo", "bar")
+
+    def test_child_var_positional_with_allow_leading_hyphen_inhibits_bubble_up(self):
+        """A sub-command whose *only* positional is ``*args`` with
+        ``allow_leading_hyphen=True`` claims every post-command token,
+        including ones the meta would otherwise match by name.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            argument: str = "default-meta",
+        ):
+            captured["meta_argument"] = argument
+            return app(tokens)
+
+        @app.command
+        def sub(*argument: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+            captured["sub_argument"] = argument
+            return argument
+
+        result = app.meta(["sub", "--argument=foo", "bar"])
+        assert captured["meta_argument"] == "default-meta"
+        assert captured["sub_argument"] == ("--argument=foo", "bar")
+        assert result == ("--argument=foo", "bar")
+
+    def test_meta_flag_bubbles_past_mixed_positionals(self):
+        """Mixed shape: child has a non-ALH positional followed by ``*args[ALH]``.
+        A meta flag like ``--verbose`` must bubble to the meta because the
+        child's first positional would reject an option-like value, instead
+        of being swallowed (or erroring) at the child layer.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            captured["meta_verbose"] = verbose
+            return app(tokens)
+
+        @app.command
+        def sub(
+            positional: str,
+            *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
+        ):
+            captured["sub_positional"] = positional
+            captured["sub_args"] = args
+            return positional, args
+
+        result = app.meta(["sub", "--verbose", "hello"])
+        assert captured["meta_verbose"] is True
+        assert captured["sub_positional"] == "hello"
+        assert captured["sub_args"] == ()
+        assert result == ("hello", ())

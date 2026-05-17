@@ -1688,6 +1688,7 @@ class App:
 
         # We don't want the command_app to be the version/help handler; we handle those specially
         command_app = execution_apps[-1]
+        removed_help_version_tokens: list[str] = []
         with suppress(IndexError):
             # Remove trailing help/version commands from the execution chain.
             # When users provide multiple flags (e.g., "myapp cmd --help --help"), the parser
@@ -1696,11 +1697,46 @@ class App:
             while command_chain and command_chain[-1] in set(
                 execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
             ):
+                removed_help_version_tokens.append(command_chain[-1])
                 execution_apps = execution_apps[:-1]
                 command_chain = command_chain[:-1]
 
         command_app = execution_apps[-1]
         del execution_apps  # Always use AppStack from here-on.
+
+        # Assemble the resolved command's argument collection once; it powers
+        # both the trailing-flag restoration below and the shadowing check used
+        # by the help/version interception block further down.
+        command_argument_collection = (
+            _safe_assemble_argument_collection(command_app) if command_app.default_command else None
+        )
+
+        def _flag_shadowed_by_user_param(flag: str) -> bool:
+            if command_argument_collection is None:
+                return False
+            try:
+                command_argument_collection.match(flag)
+            except ValueError:
+                return False
+            return True
+
+        # If a removed trailing help/version "command" is actually shadowed by a
+        # parameter on the resolved command (e.g. ``def sub(version: bool = False)``),
+        # restore it to ``unused_tokens`` so normal binding can claim it.
+        #
+        # Order invariant: ``_parse_commands`` consumes command tokens
+        # left-to-right and stops at the first non-command, so any token that
+        # ended up in the chain originally appeared *before* every token still
+        # in ``unused_tokens``. Prepending the restored flags (in original
+        # order; ``removed_help_version_tokens`` was filled LIFO so we reverse)
+        # therefore reproduces the input order for the suffix.
+        if removed_help_version_tokens:
+            restored: list[str] = []
+            for flag in reversed(removed_help_version_tokens):
+                if _flag_shadowed_by_user_param(flag):
+                    restored.append(flag)
+            if restored:
+                unused_tokens = restored + unused_tokens
 
         ignored: dict[str, Any] = {}
 
@@ -1712,15 +1748,22 @@ class App:
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
 
-            help_flag_index = _get_help_flag_index(tokens, command_app.help_flags, end_of_options_delimiter)
+            # If the resolved command defines its own parameter that shadows one of the
+            # auto-registered help/version flags (e.g. ``def sub(version: bool = False)``),
+            # let normal binding handle that flag instead of triggering the auto-handler.
+            active_help_flags = tuple(f for f in command_app.help_flags if not _flag_shadowed_by_user_param(f))
+            active_version_flags = tuple(f for f in command_app.version_flags if not _flag_shadowed_by_user_param(f))
+
+            help_flag_index = _get_help_flag_index(tokens, active_help_flags, end_of_options_delimiter)
 
             try:
                 if help_flag_index is not None:
-                    # Remove ALL help and version flags from both token lists.
+                    # Remove the auto-handled help and version flags from both token lists.
                     # Users can provide multiple flags (e.g., "myapp --help --help --version").
                     # When help is requested, it takes priority over version, so we remove all
                     # occurrences of both flag types to prevent downstream parsing errors.
-                    flags_to_remove = set(command_app.help_flags + command_app.version_flags)  # pyright: ignore[reportOperatorIssue]
+                    # User-shadowed flags are preserved so normal binding can claim them.
+                    flags_to_remove = set(active_help_flags + active_version_flags)
                     tokens[:] = [t for t in tokens if t not in flags_to_remove]
                     unused_tokens[:] = [t for t in unused_tokens if t not in flags_to_remove]
 
@@ -1730,7 +1773,7 @@ class App:
                     bound = inspect.signature(command).bind(tokens, console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
-                elif any(flag in tokens for flag in command_app.version_flags):
+                elif any(flag in tokens for flag in active_version_flags):
                     command = _get_version_command(command_app)
                     while meta_parent := meta_parent._meta_parent:
                         command = _get_version_command(meta_parent)
@@ -1797,12 +1840,85 @@ class App:
                                 else:
                                     child_argument_collection = ArgumentCollection()
 
-                                bubbled, positional_tokens = partition_tokens(
-                                    argument_collection,
-                                    positional_tokens,
-                                    exclude=child_argument_collection,
-                                    end_of_options_delimiter=end_of_options_delimiter,
+                                # Per-token bubble-up: simulate the child's positional
+                                # binding over the post-deepest-command segment and reserve
+                                # tokens the child will absorb as positional values. The
+                                # ``_parse_kw_and_flags`` pass that powers ``partition_tokens``
+                                # only sees kw/flag arguments, so without this reservation a
+                                # VAR_POSITIONAL with ``allow_leading_hyphen=True`` would lose
+                                # option-like tokens to the meta. This also correctly lets
+                                # meta flags pass through when an upstream non-ALH positional
+                                # would have rejected them.
+                                from cyclopts.bind import _parse_kw_and_flags  # local import: tight scope
+
+                                positional_slots: list[bool] = []
+                                var_positional_alh: bool | None = None
+                                positional_args = sorted(
+                                    (
+                                        a
+                                        for a in child_argument_collection
+                                        if a.field_info.is_positional and a.index is not None
+                                    ),
+                                    key=lambda a: a.index if a.index is not None else 0,
                                 )
+                                for arg in positional_args:
+                                    if arg.is_var_positional():
+                                        var_positional_alh = arg.parameter.allow_leading_hyphen
+                                        break
+                                    positional_slots.append(arg.parameter.allow_leading_hyphen)
+
+                                # Special case: the child's only positional is ``*args``
+                                # with ``allow_leading_hyphen=True``. The user explicitly
+                                # asked for every post-command token to land in the child,
+                                # so suppress bubble-up entirely — including tokens the
+                                # meta would otherwise have claimed by name.
+                                if not positional_slots and var_positional_alh is True:
+                                    bubbled = []
+                                else:
+                                    from cyclopts.bind import (
+                                        _parse_kw_and_flags,  # local import: tight scope
+                                    )
+
+                                    # Tokens the meta's kw/flag pass would claim (including
+                                    # values for keyword args) must NOT be treated as
+                                    # candidate positionals for the child.
+                                    meta_collection_probe = argument_collection.copy(reset_tokens=True)
+                                    _, meta_unused_indices, _ = _parse_kw_and_flags(
+                                        meta_collection_probe,
+                                        positional_tokens,
+                                        end_of_options_delimiter=end_of_options_delimiter,
+                                    )
+                                    meta_unused_set = set(meta_unused_indices)
+
+                                    extra_claimed: set[int] = set()
+                                    post_start = len(positional_tokens) - len(segments[-1])
+                                    slot_idx = 0
+                                    for k in range(post_start, len(positional_tokens)):
+                                        if k not in meta_unused_set:
+                                            # Token (or its value-pair partner) is claimed
+                                            # by meta; don't model it as child positional.
+                                            continue
+                                        tok = positional_tokens[k]
+                                        opt_like = is_option_like(tok)
+                                        if slot_idx < len(positional_slots):
+                                            slot_alh = positional_slots[slot_idx]
+                                            if opt_like and not slot_alh:
+                                                # Slot rejects option-like; meta may claim.
+                                                continue
+                                            extra_claimed.add(k)
+                                            slot_idx += 1
+                                        elif var_positional_alh is True:
+                                            extra_claimed.add(k)
+                                        elif var_positional_alh is False and not opt_like:
+                                            extra_claimed.add(k)
+
+                                    bubbled, positional_tokens = partition_tokens(
+                                        argument_collection,
+                                        positional_tokens,
+                                        exclude=child_argument_collection,
+                                        extra_claimed_indices=extra_claimed,
+                                        end_of_options_delimiter=end_of_options_delimiter,
+                                    )
                                 meta_kw_tokens.extend(bubbled)
                             elif parse_mode == "strict":
                                 pass  # No fallthrough; post-command flags stay with the child.

@@ -102,6 +102,7 @@ def partition_tokens(
     tokens: list[str],
     *,
     exclude: "ArgumentCollection | None" = None,
+    extra_claimed_indices: set[int] | None = None,
     end_of_options_delimiter: str = "--",
 ) -> tuple[list[str], list[str]]:
     """Partition tokens into those matching an argument collection and those that don't.
@@ -121,6 +122,11 @@ def partition_tokens(
         If provided, tokens matching this collection take priority and
         are placed into ``unmatched`` even if they also match
         ``argument_collection``. Used for child-wins semantics.
+    extra_claimed_indices: set[int] | None
+        Token indices that should be forced into ``unmatched`` in addition
+        to those claimed by ``exclude``. Used by hierarchical parsing to
+        reserve tokens that a child's positional arguments will consume
+        (which ``_parse_kw_and_flags`` cannot detect on its own).
     end_of_options_delimiter: str
         Token that marks the end of options. Tokens at or after this
         delimiter are treated as positional-only. Defaults to ``"--"``.
@@ -171,12 +177,13 @@ def partition_tokens(
     # Translate parent-local unused indices back into original-token indices.
     parent_unused_original = {parent_to_original[k] for k in parent_unused_indices}
 
-    # A token is matched iff the parent consumed it AND the exclude collection
-    # did not already claim it.
+    # A token is matched iff the parent consumed it AND neither the exclude
+    # collection nor ``extra_claimed_indices`` already claimed it.
+    extra_claimed = extra_claimed_indices or set()
     matched: list[str] = []
     unmatched: list[str] = []
     for k, tok in enumerate(tokens):
-        if k in excluded_claimed_indices or k in parent_unused_original:
+        if k in excluded_claimed_indices or k in parent_unused_original or k in extra_claimed:
             unmatched.append(tok)
         else:
             matched.append(tok)
