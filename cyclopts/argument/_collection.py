@@ -1,5 +1,6 @@
 """ArgumentCollection class and related functionality."""
 
+import copy as copy_module
 import inspect
 import itertools
 import json
@@ -40,9 +41,30 @@ class ArgumentCollection(list[Argument]):
     def __init__(self, *args):
         super().__init__(*args)
 
-    def copy(self) -> "ArgumentCollection":
-        """Returns a shallow copy of the :class:`ArgumentCollection`."""
-        return type(self)(self)
+    def copy(self, *, reset_tokens: bool = False) -> "ArgumentCollection":
+        """Returns a copy of the :class:`ArgumentCollection`.
+
+        Parameters
+        ----------
+        reset_tokens: bool
+            If ``True``, each :class:`Argument` is shallow-copied and given
+            a fresh empty ``tokens`` list. All other fields (``field_info``,
+            ``parameter``, lookup tables, etc.) are shared with the original.
+            This is useful for running a parse pass without mutating the
+            original collection.
+
+            If ``False`` (default), returns a shallow copy where the same
+            :class:`Argument` objects are shared.
+        """
+        if reset_tokens:
+            ac = type(self)()
+            for arg in self:
+                arg_copy = copy_module.copy(arg)
+                arg_copy.tokens = []
+                ac.append(arg_copy)
+        else:
+            ac = type(self)(self)
+        return ac
 
     @overload
     def __getitem__(self, term: SupportsIndex, /) -> Argument: ...

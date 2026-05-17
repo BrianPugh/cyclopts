@@ -225,6 +225,9 @@ class UnknownOptionError(CycloptsError):
     argument_collection: "ArgumentCollection"
     """Argument collection of plausible options."""
 
+    parent_apps_with_collections: list[tuple[str, "ArgumentCollection"]] | None = None
+    """List of ``(app_name, argument_collection)`` from parent/meta apps, for scope-aware suggestions."""
+
     def _segments(self) -> Iterator[tuple[str, str]]:
         value = self.token.keyword or self.token.value
         # Option-like values (start with '-') are self-delimiting; quoting them is noise.
@@ -244,6 +247,22 @@ class UnknownOptionError(CycloptsError):
             yield ".", ""
 
         if keyword := self.token.keyword or self.token.value:
+            # Check if a parent scope defines this option (for strict mode hints).
+            if self.parent_apps_with_collections is not None:
+                for parent_name, parent_ac in self.parent_apps_with_collections:
+                    try:
+                        # Strip "=value" suffix so "--verbose=true" matches "--verbose".
+                        parent_ac.match(keyword.split("=", 1)[0])
+                    except ValueError:
+                        continue
+                    if self.command_chain:
+                        yield ' Did you mean to place it directly after "', ""
+                        yield parent_name, _STYLE_NAME
+                        yield '"?', ""
+                    else:
+                        yield " This option is defined in a parent scope.", ""
+                    return
+
             import difflib
 
             candidates = list(chain.from_iterable(x.names for x in self.argument_collection if x.parse))

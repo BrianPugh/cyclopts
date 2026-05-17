@@ -397,7 +397,8 @@ class Argument:
             return False
         if self.parameter.json_list is not None:
             return self.parameter.json_list
-        for arg in get_args(resolve_optional(self.hint)) or (str,):
+        hint = resolve_optional(self.hint)
+        for arg in get_args(hint) or (str,):
             if contains_hint(arg, str):
                 return False
         return True
