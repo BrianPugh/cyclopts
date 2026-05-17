@@ -203,7 +203,7 @@ def resolve_optional(type_: Any) -> Any:
 
 def resolve_annotated(type_: Any) -> type:
     type_ = resolve_type_alias(type_)
-    if type(type_) is AnnotatedType:
+    if is_annotated(type_):
         type_ = get_args(type_)[0]
     elif is_union(type_):
         # Resolve Annotated inside union members
@@ -212,6 +212,23 @@ def resolve_annotated(type_: Any) -> type:
         if resolved_args != args:
             type_ = Union[resolved_args]  # noqa: UP007
     return type_
+
+
+def get_annotated_discriminator(annotation) -> Any:
+    """Return the ``discriminator`` metadata from an ``Annotated[...]`` hint, else ``None``.
+
+    Only inspects ``Annotated`` hints — for other parameterized types (``list[X]``,
+    ``dict[K, V]``, etc.) this returns ``None`` so that an incidental
+    ``.discriminator`` attribute on a type parameter cannot spuriously match.
+    """
+    if not is_annotated(annotation):
+        return None
+    for meta in get_args(annotation)[1:]:
+        try:
+            return meta.discriminator
+        except AttributeError:
+            pass
+    return None
 
 
 def resolve_required(type_: Any) -> type:

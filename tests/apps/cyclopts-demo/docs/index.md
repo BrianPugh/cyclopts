@@ -10,3 +10,4 @@ The following documentation is automatically generated from the Cyclopts demo ap
     module: cyclopts_demo:app
     heading_level: 3
     recursive: true
+    usage_name: foo bar baz

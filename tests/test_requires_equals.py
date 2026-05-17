@@ -118,7 +118,7 @@ def test_requires_equals_error_message(app):
     def main(*, name: Annotated[str, Parameter(requires_equals=True)]):
         pass
 
-    with pytest.raises(RequiresEqualsError, match=r'Use "--name=VALUE"'):
+    with pytest.raises(RequiresEqualsError, match=r"Use --name=VALUE"):
         app.parse_args("--name alice", print_error=False, exit_on_error=False)
 
 

@@ -296,7 +296,7 @@ class TestErrorMessages:
         with pytest.raises(UnknownOptionError) as exc_info:
             app(["--verbose"], exit_on_error=False)
         message = str(exc_info.value)
-        assert 'Unknown option: "--verbose"' in message
+        assert "Unknown option: --verbose" in message
         assert "This option is defined in a parent scope." in message
         assert "subcommand" not in message
 
@@ -315,7 +315,7 @@ class TestErrorMessages:
         def foo():
             pass
 
-        with pytest.raises(UnknownOptionError, match='Unknown option: "--unknown"'):
+        with pytest.raises(UnknownOptionError, match="Unknown option: --unknown"):
             app.meta(["foo", "--unknown"], exit_on_error=False)
 
     def test_fallthrough_no_scope_error(self):
@@ -863,7 +863,7 @@ class TestNestedMeta:
         app = self._build_app()
         with pytest.raises(
             UnknownOptionError,
-            match=r'Unknown option: "--outer-flag"\. Did you mean to place it directly after "inner-meta"\?',
+            match=r'Unknown option: --outer-flag\. Did you mean to place it directly after "inner-meta"\?',
         ):
             app.meta.meta(["sub", "--outer-flag"], exit_on_error=False)
 
@@ -876,7 +876,7 @@ class TestNestedMeta:
         app = self._build_app()
         with pytest.raises(
             UnknownOptionError,
-            match=r'Unknown option: "--inner-flag"\. Did you mean to place it directly after "myapp"\?',
+            match=r'Unknown option: --inner-flag\. Did you mean to place it directly after "myapp"\?',
         ):
             app.meta.meta(["sub", "--inner-flag"], exit_on_error=False)
 

@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 
 from cyclopts.annotations import ITERABLE_TYPES, is_annotated, is_union
 from cyclopts.argument import ArgumentCollection
-from cyclopts.core import _filter_apps_for_parse_mode
 from cyclopts.exceptions import CycloptsError
 from cyclopts.group_extractors import RegisteredCommand, groups_from_app
 from cyclopts.utils import frozen, is_class_and_subclass
@@ -68,16 +67,12 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
             )
             return
 
+        from cyclopts.core import _iter_resolution_argument_collections
+
         arguments = ArgumentCollection()
-        apps_for_params = app._get_resolution_context(execution_path)
-        # In strict mode, exclude parent meta apps since their flags
-        # are not valid at the child command level.
         with app.app_stack(execution_path):
-            apps_for_params = _filter_apps_for_parse_mode(apps_for_params, command_app)
-            for subapp in apps_for_params:
-                if subapp.default_command:
-                    app_arguments = subapp.assemble_argument_collection(parse_docstring=True)
-                    arguments.extend(app_arguments)
+            for _, app_arguments in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
+                arguments.extend(app_arguments)
 
         commands = []
         for group, registered_commands in groups_from_app(command_app, resolve_lazy=True):

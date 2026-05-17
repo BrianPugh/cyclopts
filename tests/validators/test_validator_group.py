@@ -143,7 +143,7 @@ def test_bind_group_validator_limited_choice(app):
     with pytest.raises(ValidationError) as e:
         app("foo --car --motorcycle", exit_on_error=False)
 
-    assert str(e.value) == 'Invalid values for group "Vehicle". Mutually exclusive arguments: {--car, --motorcycle}'
+    assert str(e.value) == "Invalid values for group Vehicle. Mutually exclusive arguments: {--car, --motorcycle}"
 
     app("foo")
     app("foo --car")
@@ -162,7 +162,7 @@ def test_bind_group_validator_limited_choice_name_override(app):
     with pytest.raises(ValidationError) as e:
         app("foo --car --bike", exit_on_error=False)
 
-    assert str(e.value) == 'Invalid values for group "Vehicle". Mutually exclusive arguments: {--car, --bike}'
+    assert str(e.value) == "Invalid values for group Vehicle. Mutually exclusive arguments: {--car, --bike}"
 
 
 def test_group_validator_complete_argument_collection(app, mocker):

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import extract_text
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
+    apply_usage_name,
     extract_description,
     extract_usage,
     generate_anchor,
@@ -169,6 +170,7 @@ def generate_rst_docs(
     no_root_title: bool = False,
     code_block_title: bool = False,
     skip_preamble: bool = False,
+    usage_name: str | None = None,
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -215,6 +217,10 @@ def generate_rst_docs(
         when filtering to a single command via ``commands_filter``.
         Useful when the user provides their own section introduction.
         Default is False.
+    usage_name : str | None
+        Optional replacement for the root app name used in ``Usage:`` lines
+        only. Section headings, anchors, and TOC continue to use ``app.name[0]``.
+        Default is None.
 
     Returns
     -------
@@ -281,7 +287,10 @@ def generate_rst_docs(
 
     # Add usage section first if appropriate (skip if skip_preamble is True)
     if not skip_preamble and should_show_usage(app):
-        # Generate usage line - only if we're documenting a specific command
+        # Generate usage line - only if we're documenting a specific command.
+        # When no_root_title is set at the root (e.g., in Sphinx contexts), the
+        # root Usage: line is intentionally suppressed; usage_name still applies
+        # to every subcommand usage block below.
         if not (no_root_title and not command_chain):
             # Extract usage from app
             usage = extract_usage(app)
@@ -292,14 +301,16 @@ def generate_rst_docs(
                 else:
                     usage_text = extract_text(usage, None, preserve_markup=False)
 
-                # Format usage with command chain if this is a subcommand
-                if command_chain:
-                    # Add command chain to usage
+                # Apply usage_name override to the display chain (only for the Usage: line)
+                display_chain = apply_usage_name(command_chain, usage_name)
+
+                # Format usage with the display chain when one is present
+                if display_chain:
                     parts = usage_text.split(None, 1)
                     if len(parts) > 1:
-                        usage_text = f"{' '.join(command_chain)} {parts[1]}"
+                        usage_text = f"{' '.join(display_chain)} {parts[1]}"
                     else:
-                        usage_text = " ".join(command_chain)
+                        usage_text = " ".join(display_chain)
 
             if usage_text:
                 # Use literal block with double colon
@@ -459,6 +470,7 @@ def generate_rst_docs(
                     no_root_title=is_intermediate_path,  # Skip title for intermediate path commands
                     code_block_title=code_block_title,
                     skip_preamble=is_single_target or is_intermediate_path,  # Skip preamble for target or intermediate
+                    usage_name=usage_name,
                 )
             lines.append(subdocs)
 

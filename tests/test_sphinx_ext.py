@@ -999,6 +999,54 @@ app.command(sub_cmd)
         finally:
             sys.path.remove(str(tmp_path))
 
+    def test_usage_name_option(self, tmp_path):
+        """:usage-name: overrides the app name in Usage: lines."""
+        module_file = tmp_path / "test_usage_name_module.py"
+        module_file.write_text("""from cyclopts import App
+
+app = App(name="cli", help="Test CLI")
+
+@app.command
+def serve(port: int = 8000):
+    '''Start the server.'''
+    pass
+""")
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            from cyclopts.ext.sphinx import CycloptsDirective
+
+            mock_state = MagicMock()
+            mock_state.nested_parse = MagicMock()
+
+            directive = CycloptsDirective(
+                name="cyclopts",
+                arguments=["test_usage_name_module:app"],
+                options={"usage-name": "uv run cli"},
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state,
+                state_machine=MagicMock(),
+            )
+
+            directive.run()
+
+            all_calls = mock_state.nested_parse.call_args_list
+            all_content = []
+            for call_args in all_calls:
+                if call_args:
+                    rst_lines = call_args[0][0]
+                    all_content.extend(rst_lines)
+
+            rst_content = "\n".join(all_content)
+            assert "uv run cli" in rst_content
+        finally:
+            sys.path.remove(str(tmp_path))
+            if "test_usage_name_module" in sys.modules:
+                del sys.modules["test_usage_name_module"]
+
 
 class TestRstContentParsing:
     """Test RST content parsing and formatting."""

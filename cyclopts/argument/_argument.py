@@ -21,6 +21,7 @@ from cyclopts._convert import (
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     contains_hint,
+    get_annotated_discriminator,
     is_attrs,
     is_dataclass,
     is_enum_flag,
@@ -29,6 +30,7 @@ from cyclopts.annotations import (
     is_pydantic,
     is_typeddict,
     is_union,
+    resolve,
     resolve_annotated,
     resolve_optional,
 )
@@ -55,7 +57,6 @@ from cyclopts.utils import UNSET, grouper, is_builtin, parse_version
 
 from .utils import (
     enum_flag_from_dict,
-    get_annotated_discriminator,
     get_choices_from_hint,
     missing_keys_factory,
     startswith,
@@ -396,7 +397,8 @@ class Argument:
             return False
         if self.parameter.json_list is not None:
             return self.parameter.json_list
-        for arg in get_args(self.field_info.annotation) or (str,):
+        hint = resolve_optional(self.hint)
+        for arg in get_args(hint) or (str,):
             if contains_hint(arg, str):
                 return False
         return True
@@ -432,6 +434,71 @@ class Argument:
             else self._match_name(term, transform=transform, delimiter=delimiter)
         )
 
+    def _normalize_trailing_keys(self, trailing: tuple[str, ...]) -> tuple[str, ...]:
+        """Map kebab-case segments back to their canonical Python field names.
+
+        Walks the type hint segment-by-segment:
+
+        * Dynamic ``dict`` keys pass through unchanged (advance to the value type).
+        * Segments addressing a structured type (pydantic / dataclass / attrs /
+          TypedDict / NamedTuple) are looked up in a ``{name_transform(name): name}``
+          map built from the type's field_infos; on hit, the segment is replaced
+          with the canonical name and the walk advances to that field's annotation.
+        * On miss or when the hint is unwalkable (plain scalar, unresolved forward
+          ref, etc.) remaining segments pass through unchanged — this preserves the
+          existing raw-snake_case behavior as a backward-compat fallback.
+        """
+        name_transform = self.parameter.name_transform
+        if name_transform is None or not trailing:
+            return trailing
+
+        # Seed from ``self.hint`` (not ``field_info.annotation``): for
+        # ``**kwargs: SubConfig``, the annotation is ``SubConfig`` but the hint
+        # is ``dict[str, SubConfig]`` — we need the wrapped form so the first
+        # trailing segment is routed as a dict key rather than a field name.
+        hint = resolve(self.hint)
+        out: list[str] = []
+        i = 0
+        while i < len(trailing):
+            segment = trailing[i]
+            hint = resolve_optional(hint)
+
+            if get_origin(hint) is dict:
+                out.append(segment)
+                args = get_args(hint)
+                hint = args[1] if len(args) > 1 else str
+                i += 1
+                continue
+
+            field_infos = {}
+            try:
+                field_infos = get_field_infos(hint)
+            except Exception:
+                pass
+            if not field_infos:
+                out.extend(trailing[i:])
+                break
+
+            # Build a kebab→canonical map from ``fi.names`` only.  Cyclopts's
+            # field_info extractors populate ``names`` with exactly the names
+            # the underlying library accepts (e.g. pydantic omits the python
+            # name when ``populate_by_name=False``); trust that.
+            name_map: dict[str, tuple[str, Any]] = {}
+            for canonical_name, fi in field_infos.items():
+                for alias in fi.names:
+                    name_map.setdefault(name_transform(alias), (canonical_name, fi.annotation))
+
+            match = name_map.get(segment)
+            if match is None:
+                out.extend(trailing[i:])
+                break
+            canonical_name, next_hint = match
+            out.append(canonical_name)
+            hint = resolve(next_hint)
+            i += 1
+
+        return tuple(out)
+
     def _match_name(
         self,
         term: str,
@@ -463,7 +530,7 @@ class Argument:
             Implicit value.
         """
         if self.field_info.kind is self.field_info.VAR_KEYWORD:
-            return tuple(term.lstrip("-").split(delimiter)), UNSET
+            return self._normalize_trailing_keys(tuple(term.lstrip("-").split(delimiter))), UNSET
 
         trailing = term
         implicit_value = UNSET
@@ -484,7 +551,7 @@ class Argument:
                 else:
                     return (), implicit_value
         else:
-            hint = resolve_annotated(self.field_info.annotation)
+            hint = self._negatives_hint
             if is_union(hint):
                 hints = get_args(hint)
             else:
@@ -519,7 +586,7 @@ class Argument:
         if not self._accepts_arbitrary_keywords:
             raise ValueError
 
-        return tuple(trailing.split(delimiter)), implicit_value
+        return self._normalize_trailing_keys(tuple(trailing.split(delimiter))), implicit_value
 
     def _match_index(self, index: int) -> tuple[tuple[str, ...], Any]:
         if self.index is None:
@@ -830,22 +897,41 @@ class Argument:
             except pydantic.PydanticUserError:
                 pass
 
+        def _resolve(validator, hint):
+            if isinstance(validator, str):
+                validator = getattr(hint, validator)
+            return validator
+
         try:
             if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
                 hint = get_args(self.hint)[1]
                 for validator in self.parameter.validator:
+                    validator = _resolve(validator, hint)
+                    is_method = inspect.ismethod(validator)
                     for val in value.values():
-                        validator(hint, val)
+                        if is_method:
+                            validator(val)  # pyright: ignore[reportCallIssue]
+                        else:
+                            validator(hint, val)
                 validate_pydantic(dict[str, self.field_info.annotation], value)
             elif self.field_info and self.field_info.kind is self.field_info.VAR_POSITIONAL:
                 hint = get_args(self.hint)[0]
                 for validator in self.parameter.validator:
+                    validator = _resolve(validator, hint)
+                    is_method = inspect.ismethod(validator)
                     for val in value:
-                        validator(hint, val)
+                        if is_method:
+                            validator(val)  # pyright: ignore[reportCallIssue]
+                        else:
+                            validator(hint, val)
                 validate_pydantic(tuple[self.field_info.annotation, ...], value)
             else:
                 for validator in self.parameter.validator:
-                    validator(self.hint, value)
+                    validator = _resolve(validator, self.hint)
+                    if inspect.ismethod(validator):
+                        validator(value)
+                    else:
+                        validator(self.hint, value)
                 validate_pydantic(self.field_info.annotation, value)
         except (AssertionError, ValueError, TypeError) as e:
             raise ValidationError(exception_message=e.args[0] if e.args else "", argument=self) from e
@@ -925,9 +1011,22 @@ class Argument:
         return tokens_per_element, consume_all
 
     @property
+    def _negatives_hint(self):
+        # Mirrors ``field_info.annotation`` but substitutes ``type(default)`` when
+        # there is no annotation, so an unannotated ``foo=False`` is treated as
+        # ``bool`` for negative-flag purposes. Unlike ``self.hint``, this preserves
+        # ``Optional`` / unions, which ``negative_none`` depends on.
+        hint = self.field_info.annotation
+        if hint is inspect.Parameter.empty or resolve(hint) is Any:
+            default = self.field_info.default
+            if default is not inspect.Parameter.empty and default is not None:
+                hint = type(default)
+        return resolve_annotated(hint)
+
+    @property
     def negatives(self):
         """Negative flags from :meth:`.Parameter.get_negatives`."""
-        return self.parameter.get_negatives(resolve_annotated(self.field_info.annotation))
+        return self.parameter.get_negatives(self._negatives_hint)
 
     @property
     def name(self) -> str:
@@ -1106,21 +1205,29 @@ class Argument:
 
         error = exc.errors()[0]
         if error["type"] == "missing":
-            # Try normal lookup first
             loc = error["loc"]
-            missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + loc)
 
-            # For discriminated/tagged unions, Pydantic includes the discriminator value
-            # in the error location. e.g., for a Cat|Dog union discriminated by "type",
-            # a missing "rainbow" field on Cat will have loc=('cat', 'rainbow') instead
-            # of just ('rainbow'). Strip discriminator values to find the actual child.
-            while not missing_arguments and len(loc) > 1:
-                loc = loc[1:]
-                missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + loc)
-
-            if missing_arguments:
-                raise MissingArgumentError(argument=missing_arguments[0]) from exc
-            # Fall through to ValidationError if we can't find the missing argument
+            # Pydantic includes list indices in loc for list-element errors
+            # (e.g. ("animals", 0, "dog", "name")). Cyclopts doesn't model list
+            # items as individual Arguments, so no prefix-match can correctly
+            # map — fall through to the native pydantic error, which shows the
+            # full nested path.
+            if not any(isinstance(part, int) for part in loc):
+                candidate = tuple(loc)
+                while candidate:
+                    missing_arguments = self.children_recursive.filter_by(keys_prefix=self.keys + candidate)
+                    # An Argument that already has tokens cannot be "missing";
+                    # the stripping heuristic has wandered into a populated sibling.
+                    missing_arguments = [a for a in missing_arguments if not a.tokens]
+                    if missing_arguments:
+                        raise MissingArgumentError(argument=missing_arguments[0]) from exc
+                    if len(candidate) == 1:
+                        break
+                    # For discriminated unions pydantic prepends the discriminator
+                    # value (e.g. loc=("cat", "rainbow")). Strip leading elements
+                    # until we find a real child Argument.
+                    candidate = candidate[1:]
+            # Fall through to ValidationError.
 
         if isinstance(exc, pydantic.ValidationError):
             raise ValidationError(exception_message=str(exc), argument=self) from exc

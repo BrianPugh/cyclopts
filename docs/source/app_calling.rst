@@ -159,8 +159,8 @@ By default, Cyclopts displays errors using :func:`.CycloptsPanel`, which renders
 .. code-block:: text
 
    ╭─ Error ───────────────────────────────────────────────╮
-   │ Invalid value "foo" for "VALUE": unable to convert    │
-   │ "foo" into int.                                       │
+   │ Invalid value for VALUE: unable to convert "foo"      │
+   │ into int.                                             │
    ╰───────────────────────────────────────────────────────╯
 
 To customize this, set :attr:`.App.error_formatter` to a callable that receives a :exc:`.CycloptsError` and returns any Rich-printable object.
@@ -181,7 +181,7 @@ To customize this, set :attr:`.App.error_formatter` to a callable that receives 
 .. code-block:: text
 
    $ my-app foo
-   error: Invalid value "foo" for "VALUE": unable to convert "foo" into int.
+   error: Invalid value for VALUE: unable to convert "foo" into int.
 
 The formatter receives the full :exc:`.CycloptsError` exception, which contains context like the :attr:`~.CycloptsError.command_chain`, :attr:`~.CycloptsError.argument`, and :attr:`~.CycloptsError.target`.
 Use ``str(e)`` for just the message text.

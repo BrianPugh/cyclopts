@@ -172,40 +172,39 @@ def _generate_nested_positional_specs(
         arg for arg in positional_args if not arg.is_var_positional() and not is_iterable_type(arg.hint)
     ]
 
+    def _build(arg, position: str) -> str:
+        choices = arg.get_choices(force=True)
+        if choices:
+            escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
+            choices_str = " ".join(escaped_choices)
+            action = f"({choices_str})"
+            desc = _escape_zsh_description_dq(_description_text(arg, help_format))
+            quote = '"'
+        else:
+            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
+            desc = _get_description_from_argument(arg, help_format)
+            quote = "'"
+        return f"{quote}{position}:{desc}:{action}{quote}" if action else f"{quote}{position}:{desc}{quote}"
+
     # Generate specs for non-variadic positionals
     for arg in non_variadic_args:
         # Position in nested context: After *::arg:->args, $words[1] is the subcommand
         # So positionals start at position 1 (not 2)
         # Use 1-based indexing: first positional is '1:', second is '2:', etc.
         pos = 1 + (arg.index or 0)
-        desc = _get_description_from_argument(arg, help_format)
+        specs.append(_build(arg, str(pos)))
 
-        # Check for choices first (Literal/Enum types)
-        choices = arg.get_choices(force=True)
-        if choices:
-            escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            action = f"({choices_str})"
-        else:
-            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
-
-        spec = f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
-        specs.append(spec)
-
-    # Generate specs for variadic positionals
-    for arg in variadic_args:
-        desc = _get_description_from_argument(arg, help_format)
-
-        choices = arg.get_choices(force=True)
-        if choices:
-            escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            action = f"({choices_str})"
-        else:
-            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
-
-        spec = f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
-        specs.append(spec)
+    # Emit at most one rest-arg (``*:``) spec. zsh's ``_arguments`` errors
+    # with "doubled rest argument definition" if more than one is present.
+    # When a function has multiple iterable positional-or-keyword params
+    # (e.g. several ``list[X]`` defaults), only the first can realistically
+    # be filled positionally — the others remain available via their
+    # ``--name`` keyword forms emitted elsewhere.
+    chosen = next((a for a in variadic_args if a.is_var_positional()), None)
+    if chosen is None and variadic_args:
+        chosen = variadic_args[0]
+    if chosen is not None:
+        specs.append(_build(chosen, "*"))
 
     return specs
 
@@ -345,8 +344,22 @@ def _generate_completion_for_path(
             # Nested context: use shifted positional indexing (words[1] is subcommand)
             positional_specs = _generate_nested_positional_specs(positional_args, data.help_format)
         else:
-            # Root context: standard _arguments works fine
+            # Root context: standard _arguments works fine. As in the
+            # nested helper, only one rest-arg (``*:``) spec is allowed —
+            # collapse multiple iterable positionals to the first one
+            # (var-positional preferred). The other iterables remain
+            # available via their ``--name`` keyword specs.
+            seen_rest = False
+            iterable_args = [a for a in positional_args if a.is_var_positional() or is_iterable_type(a.hint)]
+            chosen_rest = next((a for a in iterable_args if a.is_var_positional()), None)
+            if chosen_rest is None and iterable_args:
+                chosen_rest = iterable_args[0]
             for argument in positional_args:
+                is_rest = argument.is_var_positional() or is_iterable_type(argument.hint)
+                if is_rest:
+                    if argument is not chosen_rest or seen_rest:
+                        continue
+                    seen_rest = True
                 spec = _generate_positional_spec(argument, data.help_format)
                 positional_specs.append(spec)
 
@@ -356,6 +369,18 @@ def _generate_completion_for_path(
     if has_non_flag_commands:
         args_specs.append("'1: :->cmds'")
         args_specs.append("'*::arg:->args'")
+
+    # Eq-form pre-pass: zsh's ``_arguments`` only handles ``--opt=value``
+    # value-completion when the spec name carries an ``=`` suffix, which
+    # also forces ``=`` insertion on name TAB. We want the natural
+    # ``--opt `` (trailing space) name TAB *and* ``--opt=value<TAB>``
+    # value completion. Achieved with a pre-pass that intercepts
+    # ``--opt=...`` patterns before ``_arguments`` runs and dispatches to
+    # the same value action with the ``--opt=`` prefix consumed via
+    # ``compset -P``. ``Parameter(requires_equals=True)`` already emits the
+    # eq spec directly, so those options are skipped here.
+    eq_prepass = _generate_eq_form_prepass(keyword_args, indent_str)
+    lines.extend(eq_prepass)
 
     if args_specs:
         c_flag = "-C " if has_non_flag_commands else ""
@@ -410,11 +435,25 @@ def _generate_completion_for_path(
     return lines
 
 
-def _escape_completion_choice(choice: str) -> str:
-    """Escape special characters in a completion choice value for zsh.
+def _shell_single_quote(s: str) -> str:
+    r"""Wrap ``s`` in POSIX-safe single quotes for embedding as a shell argument.
 
-    Choice should already be cleaned via clean_choice_text() before calling this function.
-    This function only applies zsh-specific escaping.
+    The only character that can't appear inside a single-quoted shell string
+    is ``'`` itself, which is handled with the ``'\''`` end-and-restart
+    trick. Everything else (spaces, parens, ``$``, backticks, etc.) is
+    literal — no backslash-escaping is needed, and adding any would just
+    surface as visible backslashes in the resulting argument.
+    """
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
+def _escape_completion_choice(choice: str) -> str:
+    """Escape a choice value for embedding in a single-quoted shell context.
+
+    Used for ``_describe`` array elements (``'value:desc'``) where the only
+    parser the value passes through is the array-element parser, not the
+    ``_arguments`` choice-list eval. Choice should already be cleaned via
+    ``clean_choice_text()``.
 
     Parameters
     ----------
@@ -441,6 +480,55 @@ def _escape_completion_choice(choice: str) -> str:
     choice = choice.replace("&", "\\&")
     choice = choice.replace(":", "\\:")
     return choice
+
+
+def _escape_choice_for_dq_spec(value: str) -> str:
+    r"""Escape a choice value for ``_arguments``' parenthesized choice list.
+
+    The value passes through *two* parsers:
+
+    1. zsh's outer double-quoted-string parser, which interprets ``\``,
+       ``"``, ``$`` and backtick.
+    2. ``_arguments``' choice-list parser, which whitespace-tokenizes and
+       reads ``\X`` as a literal X.
+
+    A literal ``'`` cannot be embedded in a single-quoted spec string
+    (``'\''`` ends/restarts the quoting and the parser then sees an
+    unbalanced ``'``), so choice-bearing specs are emitted with a *double*-
+    quoted outer string and routed through this helper.
+    """
+    # Layer 1: choice-list parser escapes. The parser eval-style processes
+    # each token, so ``$`` and backtick must be escaped here even though
+    # they're DQ-specials too — DQ stripping happens *first* and would
+    # otherwise leave them bare for the parser. Backslash first to avoid
+    # double-escaping the slashes the loop introduces.
+    s = value.replace("\\", "\\\\")
+    for ch in " '\"()[]:;|&$`":
+        s = s.replace(ch, "\\" + ch)
+    # Layer 2: outer double-quote escapes. Re-escape backslashes (preserves
+    # all the layer-1 ones) and re-escape DQ-specials so each one survives
+    # to the choice-list parser as ``\X``.
+    s = s.replace("\\", "\\\\")
+    s = s.replace('"', '\\"')
+    s = s.replace("$", "\\$")
+    s = s.replace("`", "\\`")
+    return s
+
+
+def _escape_zsh_description_dq(text: str) -> str:
+    r"""Escape a description for embedding in a double-quoted spec string.
+
+    Same as ``_escape_zsh_description`` but skips the ``'`` -> ``'\\''``
+    substitution: ``'`` is literal in a double-quoted context.
+    """
+    text = text.replace("\\", "\\\\")
+    text = text.replace("`", "\\`")
+    text = text.replace("$", "\\$")
+    text = text.replace('"', '\\"')
+    text = text.replace(":", r"\:")
+    text = text.replace("[", r"\[")
+    text = text.replace("]", r"\]")
+    return text
 
 
 def _escape_command_name_for_case(name: str) -> str:
@@ -489,6 +577,79 @@ def _escape_zsh_description(text: str) -> str:
     return text
 
 
+def _generate_eq_form_prepass(keyword_args: list, indent_str: str) -> list[str]:
+    """Emit a ``--opt=value`` pattern dispatcher to run before ``_arguments``.
+
+    For each keyword argument with a long name and a value action, emits a
+    ``--opt=*)`` case branch that strips the ``--opt=`` prefix via
+    ``compset -P`` and then dispatches to the value action (choice list,
+    ``_files``, or ``_directories``). The natural-TAB experience on the
+    option *name* is preserved by leaving the underlying ``_arguments``
+    spec without an ``=`` suffix; this pre-pass only catches the user
+    explicitly typing the eq form.
+
+    Skipped for arguments whose ``Parameter.requires_equals`` is True —
+    those already emit the ``=`` spec, which handles eq-form completion
+    via ``_arguments``.
+
+    Parameters
+    ----------
+    keyword_args : list
+        Keyword argument objects from ArgumentCollection (already filtered
+        to ``arg.show``).
+    indent_str : str
+        Leading indentation.
+
+    Returns
+    -------
+    list[str]
+        Zsh code lines (empty if no eligible options).
+    """
+    cases: list[tuple[str, str]] = []  # (option_name, completion_action_lines)
+    for argument in keyword_args:
+        if argument.is_flag() or argument.parameter.requires_equals:
+            continue
+        long_names = [name for name in (argument.parameter.name or []) if name.startswith("--")]
+        if not long_names:
+            continue
+
+        choices = argument.get_choices(force=True)
+        if choices:
+            # ``compadd`` adds its arguments verbatim — no inner parser to
+            # interpret backslash escapes — so we use POSIX single-quoting
+            # rather than ``_escape_completion_choice`` (which is built for
+            # ``_describe``'s inner parser).
+            quoted = [_shell_single_quote(clean_choice_text(c)) for c in choices]
+            action_line = "compadd -- " + " ".join(quoted)
+        else:
+            action = get_completion_action(argument.hint)
+            zsh_action = _map_completion_action_to_zsh(action)
+            if zsh_action == "_files":
+                action_line = "_files"
+            elif zsh_action == "_directories":
+                action_line = "_directories"
+            else:
+                continue  # Nothing to dispatch to.
+
+        for name in long_names:
+            cases.append((name, action_line))
+
+    if not cases:
+        return []
+
+    lines = [
+        f"{indent_str}case ${{words[CURRENT]}} in",
+    ]
+    for opt_name, action_line in cases:
+        lines.append(f"{indent_str}  {opt_name}=*)")
+        lines.append(f"{indent_str}    compset -P '{opt_name}='")
+        lines.append(f"{indent_str}    {action_line}")
+        lines.append(f"{indent_str}    return")
+        lines.append(f"{indent_str}    ;;")
+    lines.append(f"{indent_str}esac")
+    return lines
+
+
 def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]:
     """Generate zsh _arguments specs for a keyword argument.
 
@@ -505,39 +666,84 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
         List of zsh argument specs.
     """
     specs = []
-    desc = _get_description_from_argument(argument, help_format)
-
     flag = argument.is_flag()
 
-    # Determine completion action
+    # Determine completion action. When choices are present we emit the spec
+    # in a *double-quoted* outer string so a literal ``'`` inside a choice
+    # can be backslash-escaped (single-quoted specs can't carry a literal
+    # ``'`` past the inner ``_arguments`` choice-list eval).
     action = ""
+    has_choices = False
     choices = argument.get_choices(force=True)
     if choices:
-        escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+        has_choices = True
+        escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
         flag = False
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
 
-    # Generate specs for positive names (from parameter.name)
+    desc = (
+        _escape_zsh_description_dq(_description_text(argument, help_format))
+        if has_choices
+        else _get_description_from_argument(argument, help_format)
+    )
+
+    quote = '"' if has_choices else "'"
+
+    # Generate specs for positive names (from parameter.name).
+    #
+    # For options that take a value, prefix the spec with ``*`` so
+    # ``_arguments`` allows the option to repeat (matches bash's behavior
+    # and is required for collection-typed options like ``list[Path]`` where
+    # ``--file a --file b`` is the natural usage). Bool flags stay
+    # non-repeating per zsh convention.
+    #
+    # The ``=`` suffix on the option name is the *only* knob zsh exposes for
+    # eq-form support, and it's load-bearing in two ways at once:
+    #
+    #   1. With ``=``, ``--opt=value`` value-completion works.
+    #   2. With ``=``, TAB-completing the option *name* inserts ``--opt=``
+    #      (no trailing space). Without ``=``, TAB inserts ``--opt`` plus a
+    #      space — which most users prefer.
+    #
+    # Since most CLIs in the wild lean on the space form and users find a
+    # forced ``=`` insertion surprising, the default (``requires_equals=False``)
+    # emits the plain spec — accepting the cost that ``--opt=value<TAB>``
+    # value-completion silently does nothing in zsh. When the parser is
+    # configured to *require* the eq form (``requires_equals=True``), we
+    # emit the ``=`` spec so completion mirrors what the parser will
+    # accept. Bash is unaffected: its eq-form completion is driven by
+    # ``_value_prev`` hopping over the ``=`` token, not by the spec.
+    requires_eq = bool(argument.parameter.requires_equals)
+    # An option "takes a value" iff it isn't a bool flag — independent of whether
+    # zsh has a completion *action* for the value. Collection-typed options like
+    # ``list[int]`` have no action (``get_completion_action`` only knows FILES /
+    # DIRECTORIES) but still need ``*`` so ``_arguments`` allows repetition.
+    takes_value = not flag
     for name in argument.parameter.name:  # pyright: ignore[reportOptionalIterable]
         if not name.startswith("-"):
             continue
+        accepts_eq = requires_eq and name.startswith("--") and takes_value
+        spec_name = f"{name}=" if accepts_eq else name
+        repeat_prefix = "*" if takes_value else ""
         if flag and not action:
-            spec = f"'{name}[{desc}]'"
+            spec = f"{quote}{repeat_prefix}{spec_name}[{desc}]{quote}"
         elif action:
-            spec = f"'{name}[{desc}]:{name.lstrip('-')}:{action}'"
+            spec = f"{quote}{repeat_prefix}{spec_name}[{desc}]:{name.lstrip('-')}:{action}{quote}"
         else:
-            spec = f"'{name}[{desc}]:{name.lstrip('-')}'"
+            spec = f"{quote}{repeat_prefix}{spec_name}[{desc}]:{name.lstrip('-')}{quote}"
         specs.append(spec)
 
-    # Generate specs for negative names (always flags, consume no tokens)
+    # Generate specs for negative names (always flags, consume no tokens).
+    # No choice action, so single-quoted is fine and keeps the description
+    # escaping consistent with the other flag specs.
+    desc_sq = _get_description_from_argument(argument, help_format)
     for name in argument.negatives:
         if not name.startswith("-"):
             continue
-        # Negative flags always consume zero tokens (e.g., --empty-items, --no-verbose)
-        spec = f"'{name}[{desc}]'"
+        spec = f"'{name}[{desc_sq}]'"
         specs.append(spec)
 
     return specs
@@ -558,26 +764,29 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
     str
         Zsh positional argument spec.
     """
-    desc = _get_description_from_argument(argument, help_format)
-
-    # Check for choices first (Literal/Enum types)
+    # Check for choices first (Literal/Enum types). Choice-bearing specs use
+    # double-quoted outer to allow embedding a literal ``'`` in a choice.
     choices = argument.get_choices(force=True)
     if choices:
-        escaped_choices = [_escape_completion_choice(clean_choice_text(c)) for c in choices]
+        escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"
+        desc = _escape_zsh_description_dq(_description_text(argument, help_format))
+        quote = '"'
     else:
         action = _map_completion_action_to_zsh(get_completion_action(argument.hint))
+        desc = _get_description_from_argument(argument, help_format)
+        quote = "'"
 
     if argument.is_var_positional() or is_iterable_type(argument.hint):
         # Variadic positional (*args) or collection type (list[X], set[X], etc.)
-        return f"'*:{desc}:{action}'" if action else f"'*:{desc}'"
+        return f"{quote}*:{desc}:{action}{quote}" if action else f"{quote}*:{desc}{quote}"
 
     # Regular positional - zsh uses 1-based indexing
     if argument.index is None:
         raise ValueError(f"Positional-only argument {argument.names} missing index")
     pos = argument.index + 1
-    return f"'{pos}:{desc}:{action}'" if action else f"'{pos}:{desc}'"
+    return f"{quote}{pos}:{desc}:{action}{quote}" if action else f"{quote}{pos}:{desc}{quote}"
 
 
 def _generate_keyword_specs_for_command(
@@ -647,12 +856,17 @@ def _get_description_from_argument(argument: "Argument", help_format: str) -> st
         Falls back to argument name if help text is empty, since zsh _arguments
         requires a non-empty description for positional specs to work correctly.
     """
+    return _escape_zsh_description(_description_text(argument, help_format))
+
+
+def _description_text(argument: "Argument", help_format: str) -> str:
+    """Plain-text description for an argument with the empty-help fallback."""
     text = strip_markup(argument.parameter.help or "", format=help_format)
     if not text:
         # Use primary argument name as fallback - zsh _arguments requires non-empty
         # description for positional specs to provide completions
         text = argument.names[0] if argument.names else "argument"
-    return _escape_zsh_description(text)
+    return text
 
 
 def _safe_get_description_from_app(cmd_app: "App | CommandSpec", help_format: str) -> str:

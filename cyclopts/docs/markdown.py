@@ -6,6 +6,7 @@ from cyclopts._markup import extract_text
 from cyclopts.core import DEFAULT_FORMAT
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
+    apply_usage_name,
     build_command_chain,
     extract_description,
     extract_usage,
@@ -168,7 +169,12 @@ def _render_description_section(app: "App", help_format: str, lines: list[str]) 
             lines.append("")
 
 
-def _render_usage_section(app: "App", command_chain: list[str], lines: list[str]) -> None:
+def _render_usage_section(
+    app: "App",
+    command_chain: list[str],
+    lines: list[str],
+    usage_name: str | None = None,
+) -> None:
     """Render usage console block.
 
     Parameters
@@ -179,6 +185,8 @@ def _render_usage_section(app: "App", command_chain: list[str], lines: list[str]
         Command chain for usage line.
     lines : list[str]
         List to append usage to.
+    usage_name : str | None
+        Optional replacement for the chain's root in Usage: lines only.
     """
     if should_show_usage(app):
         usage = extract_usage(app)
@@ -188,7 +196,8 @@ def _render_usage_section(app: "App", command_chain: list[str], lines: list[str]
                 usage_text = usage
             else:
                 usage_text = extract_text(usage, None, preserve_markup=False)
-            usage_line = format_usage_line(usage_text, command_chain)
+            display_chain = apply_usage_name(command_chain, usage_name)
+            usage_line = format_usage_line(usage_text, display_chain)
             lines.append(usage_line)
             lines.append("```")
             lines.append("")
@@ -321,6 +330,7 @@ def generate_markdown_docs(
     no_root_title: bool = False,
     code_block_title: bool = False,
     skip_preamble: bool = False,
+    usage_name: str | None = None,
 ) -> str:
     """Generate markdown documentation for a CLI application.
 
@@ -366,6 +376,10 @@ def generate_markdown_docs(
         when filtering to a single command via ``commands_filter``.
         Useful when the user provides their own section introduction.
         Default is False.
+    usage_name : str | None
+        Optional replacement for the root app name used in ``Usage:`` lines
+        only. Headings and TOC anchors still use ``app.name[0]``.
+        Default is None (use ``app.name[0]`` as before).
 
     Returns
     -------
@@ -409,7 +423,7 @@ def generate_markdown_docs(
 
     # Add usage section first (skip if skipping current level or skip_preamble is True)
     if not skip_current_level and not skip_preamble:
-        _render_usage_section(app, command_chain, lines)
+        _render_usage_section(app, command_chain, lines, usage_name=usage_name)
 
     # Add application description (skip if skipping current level or skip_preamble is True)
     if not skip_current_level and not skip_preamble:
@@ -553,7 +567,7 @@ def generate_markdown_docs(
 
                 if not skip_this_preamble:
                     # Generate usage first for subcommand
-                    _render_usage_section(subapp, sub_command_chain, lines)
+                    _render_usage_section(subapp, sub_command_chain, lines, usage_name=usage_name)
                     _render_description_section(subapp, sub_help_format, lines)
 
                 # Only show subcommand panels if we're in recursive mode
@@ -748,6 +762,7 @@ def generate_markdown_docs(
                                 no_root_title=nested_is_intermediate,  # Skip title for intermediate paths
                                 code_block_title=code_block_title,
                                 skip_preamble=nested_is_target or nested_is_intermediate,
+                                usage_name=usage_name,
                             )
                         # Just append the generated docs - no title replacement
                         lines.append(nested_docs)

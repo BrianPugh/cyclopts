@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    ForwardRef,
     Literal,
 )
 
-from attrs import converters, define, evolve, field
+from attrs import define, evolve, field
 
 from cyclopts.annotations import resolve_annotated
-from cyclopts.core import _get_root_module_name
+from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
+from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
@@ -22,7 +24,7 @@ from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_ca
 if TYPE_CHECKING:
     from rich.console import RenderableType
 
-    from cyclopts.argument import ArgumentCollection
+    from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
 
 
@@ -58,6 +60,12 @@ def _text_factory():
     from rich.text import Text
 
     return Text()
+
+
+def _description_converter(value: Any | None) -> Any:
+    if value is None:
+        return _text_factory()
+    return value
 
 
 @frozen(kw_only=True)
@@ -131,7 +139,7 @@ class HelpPanel:
 
     description: Any = field(
         default=None,
-        converter=converters.default_if_none(factory=_text_factory),
+        converter=_description_converter,
     )
     """Optional description text displayed below the title.
 
@@ -251,6 +259,7 @@ def _categorize_positional_arguments(argument_collection: "ArgumentCollection") 
 def format_usage(
     app: "App",
     command_chain: Iterable[str],
+    execution_path: Sequence["App"] | None = None,
 ):
     from rich.text import Text
 
@@ -280,36 +289,47 @@ def format_usage(
     if any(x not in help_version_flags and app._get_item(x, recurse_meta=True).show for x in app):
         usage.append("COMMAND")
 
-    if app.default_command:
-        argument_collection = app.assemble_argument_collection(parse_docstring=False)
+    # Aggregate arguments across all apps that contribute parameters to this help page.
+    # Shares the resolution logic with ``App._assemble_help_panels`` so the usage line and
+    # the parameter panels always agree on which apps contribute.
+    required_keyword_params: list = []
+    optional_keyword_params: list = []
+    required_positional_args: list = []
+    optional_positional_args: list = []
+    for _, argument_collection in _iter_resolution_argument_collections(
+        execution_path, fallback_app=app, parse_docstring=False
+    ):
+        rkw, okw = _categorize_keyword_arguments(argument_collection)
+        rpos, opos = _categorize_positional_arguments(argument_collection)
+        required_keyword_params.extend(rkw)
+        optional_keyword_params.extend(okw)
+        required_positional_args.extend(rpos)
+        optional_positional_args.extend(opos)
 
-        required_keyword_params, optional_keyword_params = _categorize_keyword_arguments(argument_collection)
-        required_positional_args, optional_positional_args = _categorize_positional_arguments(argument_collection)
+    for argument in required_keyword_params:
+        param_name = argument.name
+        type_name = get_hint_name(argument.hint).upper()
+        usage.append(f"{param_name} {type_name}")
 
-        for argument in required_keyword_params:
-            param_name = argument.name
-            type_name = get_hint_name(argument.hint).upper()
-            usage.append(f"{param_name} {type_name}")
+    if optional_keyword_params:
+        usage.append("[OPTIONS]")
 
-        if optional_keyword_params:
-            usage.append("[OPTIONS]")
+    for argument in required_positional_args:
+        if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
+            arg_name = argument.name.lstrip("-").upper()
+            usage.append(f"{arg_name}...")
+        else:
+            arg_name = argument.name.lstrip("-").upper()
+            usage.append(arg_name)
 
-        for argument in required_positional_args:
-            if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
-                arg_name = argument.name.lstrip("-").upper()
-                usage.append(f"{arg_name}...")
-            else:
-                arg_name = argument.name.lstrip("-").upper()
-                usage.append(arg_name)
-
-        if optional_positional_args:
-            has_var_positional = any(
-                arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
-            )
-            if has_var_positional:
-                usage.append("[ARGS...]")
-            else:
-                usage.append("[ARGS]")
+    if optional_positional_args:
+        has_var_positional = any(
+            arg.field_info.kind == arg.field_info.VAR_POSITIONAL for arg in optional_positional_args
+        )
+        if has_var_positional:
+            usage.append("[ARGS...]")
+        else:
+            usage.append("[ARGS]")
 
     return Text(" ".join(usage) + "\n", style="bold")
 
@@ -348,6 +368,174 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
+def _is_dynamic_structured_dict(argument: "Argument") -> bool:
+    """True if ``argument`` is ``dict[str, StructuredType]`` eligible for help expansion.
+
+    Covers pydantic, dataclass, attrs, TypedDict, NamedTuple via the shared
+    ``get_field_infos`` dispatcher.  Uses the same indicators as the parser's
+    dict branch in ``Argument.__attrs_post_init__``: ``_accepts_keywords`` is
+    set, ``_lookup`` is empty (no pre-built children — keys are dynamic), and
+    ``_default`` is the value type with structured fields.
+
+    Also matches when ``_default`` is a string/``ForwardRef`` — an unresolved
+    self-reference from something like ``dict[str, "Node"]``.  We can't walk
+    into it, but we treat it as assumed-structured so the expansion still
+    renders a ``.{NAME}`` layer before terminating.
+    """
+    default = argument._default
+    if not (argument._accepts_keywords and not argument._lookup and default is not None):
+        return False
+    if isinstance(default, (str, ForwardRef)):
+        return True
+    try:
+        return bool(get_field_infos(default))
+    except Exception:
+        return False
+
+
+def _expand_structured_dict_for_help(
+    argument: "Argument",
+    format: str,
+    *,
+    seen: frozenset[int] = frozenset(),
+) -> Iterable[HelpEntry]:
+    """Yield help entries for every leaf field of a ``dict[str, StructuredType]``.
+
+    Reuses :meth:`ArgumentCollection._from_type_preview` so synthesized entries
+    carry the full metadata (choices, defaults, env_var, required propagation,
+    ``Parameter.help`` precedence, ``name_transform``) that the normal
+    per-argument path produces.
+    """
+    # NOTE: help output uses cyclopts' name_transform (e.g. ``my_field`` →
+    # ``--models.{NAME}.my-field``).  The parser currently only accepts the raw
+    # snake_case form for dict-nested paths; harmonizing the two is a separate
+    # follow-up (touches ``_argument.py`` token routing).
+    from cyclopts.argument import ArgumentCollection
+    from cyclopts.field_info import FieldInfo
+    from cyclopts.parameter import Parameter
+
+    value_type = argument._default
+
+    negatives = set(argument.negatives)
+    outer_long_names = tuple(o for o in argument.names if o not in negatives and not _is_short(o))
+
+    is_unresolvable = isinstance(value_type, (str, ForwardRef))
+    is_cycle = id(value_type) in seen
+
+    if is_cycle or is_unresolvable or not outer_long_names:
+        # Cycle or unresolved forward-ref — stop expanding, but still indicate
+        # the next level is another ``{NAME}`` layer by appending ``.{{NAME}}``
+        # to the names.
+        base = _make_help_entry(argument, format)
+        if outer_long_names:
+            suffixed_names = tuple(f"{n}.{{NAME}}" for n in base.positive_names)
+            yield evolve(base, positive_names=suffixed_names)
+        else:
+            yield base
+        return
+
+    new_seen = seen | {id(value_type)}
+    synthetic = FieldInfo(
+        names=("_preview",),
+        kind=FieldInfo.KEYWORD_ONLY,
+        annotation=value_type,
+        default=FieldInfo.empty,
+        required=argument.required,
+    )
+    for outer in outer_long_names:
+        preview = ArgumentCollection._from_type(
+            synthetic,
+            (),
+            Parameter(name=(f"{outer}.{{NAME}}",)),
+            group_lookup={},
+            group_arguments=Group.create_default_arguments(),
+            group_parameters=Group.create_default_parameters(),
+            _resolve_groups=False,
+        )
+        for leaf in preview.filter_by(show=True):
+            if _is_dynamic_structured_dict(leaf):
+                yield from _expand_structured_dict_for_help(leaf, format, seen=new_seen)
+            else:
+                yield _make_help_entry(leaf, format)
+
+
+def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
+    """Build a single ``HelpEntry`` for one ``Argument``.
+
+    Extracted from ``create_parameter_help_panel`` so it can also be applied
+    to synthetic preview arguments (see ``_expand_structured_dict_for_help``).
+    """
+    assert argument.parameter.name_transform
+
+    options = list(argument.names)
+
+    seen: set[str] = set()
+    options = [x for x in options if x not in seen and not seen.add(x)]
+
+    if argument.index is not None:
+        label_source = next((o for o in options if o.startswith("--")), options[0])
+        arg_name = label_source.lstrip("-").upper()
+        if arg_name != options[0]:
+            options = [arg_name, *options]
+
+    negatives = set(argument.negatives)
+    positive_names = [o for o in options if o not in negatives and not _is_short(o)]
+    positive_shorts = [o for o in options if o not in negatives and _is_short(o)]
+    negative_names = [o for o in options if o in negatives and not _is_short(o)]
+    negative_shorts = [o for o in options if o in negatives and _is_short(o)]
+
+    help_description = InlineText.from_format(argument.parameter.help, format=format)
+
+    choices = argument.get_choices()
+
+    env_var = None
+    if argument.parameter.show_env_var and argument.parameter.env_var:
+        env_var = tuple(argument.parameter.env_var)
+
+    default = None
+    if argument.show_default:
+        default_val = argument.field_info.default
+        if is_class_and_subclass(argument.hint, Enum):
+            default = argument.parameter.name_transform(default_val.name)
+        elif isinstance(default_val, (list, tuple, set, frozenset)):
+            formatted_items = []
+            for item in default_val:
+                if isinstance(item, Enum):
+                    formatted_items.append(argument.parameter.name_transform(item.name))
+                elif isinstance(item, str):
+                    formatted_items.append(f"'{item}'")
+                else:
+                    formatted_items.append(str(item))
+            if isinstance(default_val, tuple):
+                if len(formatted_items) == 1:
+                    default = "(" + formatted_items[0] + ",)"
+                else:
+                    default = "(" + ", ".join(formatted_items) + ")"
+            elif isinstance(default_val, list):
+                default = "[" + ", ".join(formatted_items) + "]"
+            else:
+                default = "{" + ", ".join(formatted_items) + "}"
+        elif default_val == "":
+            default = '""'
+        else:
+            default = str(default_val)
+        if callable(argument.show_default):
+            default = argument.show_default(default_val)
+
+    return HelpEntry(
+        positive_names=tuple(positive_names),
+        positive_shorts=tuple(positive_shorts),
+        negative_names=tuple(negative_names),
+        negative_shorts=tuple(negative_shorts),
+        description=help_description,
+        required=argument.required,
+        type=resolve_annotated(argument.field_info.annotation),
+        choices=choices,
+        env_var=env_var,
+        default=default,
+    )
+
+
 def create_parameter_help_panel(
     group: "Group",
     argument_collection: "ArgumentCollection",
@@ -365,102 +553,12 @@ def create_parameter_help_panel(
 
     help_panel = HelpPanel(**kwargs)
 
-    def help_append(text, style):
-        if help_components:
-            text = " " + text
-        if style:
-            help_components.append((text, style))
-        else:
-            help_components.append(text)
-
     entries_positional, entries_kw = [], []
     for argument in argument_collection.filter_by(show=True):
-        assert argument.parameter.name_transform
-
-        help_components = []
-        options = list(argument.names)
-
-        # Deduplicate options while preserving order.
-        # argument.names may contain duplicates when multiple field_info names
-        # (e.g., Pydantic field name + alias) resolve to the same CLI option.
-        seen: set[str] = set()
-        options = [x for x in options if x not in seen and not seen.add(x)]
-
-        # Add an all-uppercase name if it's an argument
-        if argument.index is not None:
-            # Prefer the first long-form name for the label; fall back to options[0].
-            label_source = next((o for o in options if o.startswith("--")), options[0])
-            arg_name = label_source.lstrip("-").upper()
-            if arg_name != options[0]:
-                options = [arg_name, *options]
-
-        # Split options into positive/negative and long/short categories.
-        negatives = set(argument.negatives)
-        positive_names = [o for o in options if o not in negatives and not _is_short(o)]
-        positive_shorts = [o for o in options if o not in negatives and _is_short(o)]
-        negative_names = [o for o in options if o in negatives and not _is_short(o)]
-        negative_shorts = [o for o in options if o in negatives and _is_short(o)]
-
-        help_description = InlineText.from_format(argument.parameter.help, format=format)
-
-        # Prepare choices if needed
-        choices = argument.get_choices()
-
-        # Prepare env_var if needed
-        env_var = None
-        if argument.parameter.show_env_var and argument.parameter.env_var:
-            env_var = tuple(argument.parameter.env_var)
-
-        # Prepare default if needed
-        default = None
-        if argument.show_default:
-            default_val = argument.field_info.default
-            if is_class_and_subclass(argument.hint, Enum):
-                default = argument.parameter.name_transform(default_val.name)
-            elif isinstance(default_val, (list, tuple, set, frozenset)):
-                # Handle collections - format each element, especially enums
-                formatted_items = []
-                for item in default_val:
-                    if isinstance(item, Enum):
-                        # For enums, use the transformed name without quotes
-                        formatted_items.append(argument.parameter.name_transform(item.name))
-                    elif isinstance(item, str):
-                        # Keep strings quoted
-                        formatted_items.append(f"'{item}'")
-                    else:
-                        formatted_items.append(str(item))
-                # Use appropriate collection notation
-                if isinstance(default_val, tuple):
-                    if len(formatted_items) == 1:
-                        default = "(" + formatted_items[0] + ",)"
-                    else:
-                        default = "(" + ", ".join(formatted_items) + ")"
-                elif isinstance(default_val, list):
-                    default = "[" + ", ".join(formatted_items) + "]"
-                else:  # set or frozenset
-                    default = "{" + ", ".join(formatted_items) + "}"
-            elif default_val == "":
-                # Empty string - show explicitly as empty
-                default = '""'
-            else:
-                default = str(default_val)
-            if callable(argument.show_default):
-                default = argument.show_default(default_val)
-
-        # populate row
-        entry = HelpEntry(
-            positive_names=tuple(positive_names),
-            positive_shorts=tuple(positive_shorts),
-            negative_names=tuple(negative_names),
-            negative_shorts=tuple(negative_shorts),
-            description=help_description,
-            required=argument.required,
-            type=resolve_annotated(argument.field_info.annotation),
-            choices=choices,
-            env_var=env_var,
-            default=default,
-        )
-
+        if _is_dynamic_structured_dict(argument):
+            entries_kw.extend(_expand_structured_dict_for_help(argument, format))
+            continue
+        entry = _make_help_entry(argument, format)
         if argument.field_info.is_positional:
             entries_positional.append(entry)
         else:

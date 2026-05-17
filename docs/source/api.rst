@@ -1033,7 +1033,7 @@ API
 
 
    .. attribute:: validator
-      :type: Union[None, Callable, Iterable[Callable]]
+      :type: Union[None, Callable, str, Iterable[Union[Callable, str]]]
       :value: None
 
       A function (or list of functions) that validates data returned by the :attr:`converter`.
@@ -1042,6 +1042,23 @@ API
 
           def validator(type_, value: Any) -> None:
               pass  # Raise a TypeError, ValueError, or AssertionError here if data is invalid.
+
+      **Classmethod Support:** Validators can be classmethods. Use string references for class decoration
+      or direct references in annotations.
+
+      .. code-block:: python
+
+         @Parameter(name="*", validator="validate")
+         @dataclass
+         class TextStyle:
+             color: str
+             bold: bool = False
+             italic: bool = False
+
+             @classmethod
+             def validate(cls, value):
+                 if value.bold and value.italic:
+                     raise ValueError("Cannot use both --bold and --italic together.")
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
@@ -1192,8 +1209,8 @@ API
 
          $ my-script --name alice
          ╭─ Error ───────────────────────────────────────────────────────╮
-         │ Parameter "--name" requires a value assigned with "=".        │
-         │ Use "--name=VALUE".                                           │
+         │ Parameter --name requires a value assigned with `=`. Use      │
+         │ --name=VALUE.                                                 │
          ╰───────────────────────────────────────────────────────────────╯
 
    .. attribute:: parse
@@ -1480,7 +1497,7 @@ API
 
          $ my-program --urls
          ╭─ Error ────────────────────────────────────────────╮
-         │ Parameter "--urls" requires an argument.            │
+         │ Parameter --urls requires an argument.              │
          ╰────────────────────────────────────────────────────╯
 
       **Example: consume_multiple=(1, 3) (min/max bounds)**
@@ -1507,7 +1524,7 @@ API
 
          $ my-program --files a.txt b.txt c.txt d.txt
          ╭─ Error ─────────────────────────────────────────╮
-         │ Parameter "--files" accepts at most 3 elements. │
+         │ Parameter --files accepts at most 3 elements.   │
          │ Got 4.                                          │
          ╰─────────────────────────────────────────────────╯
 
@@ -1632,7 +1649,7 @@ API
 
          $ my-script --values a --values b
          ╭─ Error ──────────────────────────────────────────────────╮
-         │ Parameter "--values" was specified multiple times.       │
+         │ Parameter --values specified multiple times.             │
          ╰─────────────────────────────────────────────────────────╯
 
    .. attribute:: n_tokens

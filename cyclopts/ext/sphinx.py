@@ -26,6 +26,7 @@ class DirectiveOptions:
     max_heading_level: int = 6
     commands: list[str] | None = None
     exclude_commands: list[str] | None = None
+    usage_name: str | None = None
 
     # All booleans must have ``False`` default.
     no_recursive: bool = False
@@ -358,6 +359,7 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             no_root_title=True,  # Always skip root title in Sphinx context
             code_block_title=opts.code_block_title,
             skip_preamble=opts.skip_preamble,
+            usage_name=opts.usage_name,
         )
 
     def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> list["nodes.Node"]:

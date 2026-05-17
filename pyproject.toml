@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
@@ -60,6 +61,7 @@ dev = [
     "pyyaml>=6.0.1",
     "rich-rst>=1.3.1",
     "mkdocs>=1.4.0",
+    "pexpect>=4.9.0; sys_platform != 'win32'",
 ]
 debug = ["ipdb>=0.13.9", "line_profiler>=3.5.1"]
 
@@ -227,7 +229,10 @@ markers = [
 addopts = "-m 'not slow'"
 
 [tool.codespell]
-skip = 'uv.lock,'
+skip = 'uv.lock,tests/test_help.py'
+
+[tool.typos.files]
+extend-exclude = ["tests/test_help.py"]
 
 [tool.creosote]
 venvs = [".venv"]

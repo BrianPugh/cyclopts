@@ -135,6 +135,7 @@ class TestDirectiveOptions:
                 include_hidden: true
                 flatten_commands: true
                 generate_toc: false
+                usage_name: uv run cli
                 commands:
                   - init
                   - build
@@ -152,6 +153,7 @@ class TestDirectiveOptions:
         assert options.include_hidden is True
         assert options.flatten_commands is True
         assert options.generate_toc is False
+        assert options.usage_name == "uv run cli"
         assert options.commands == ["init", "build", "deploy"]
         assert options.exclude_commands == ["debug", "internal"]
 
@@ -374,6 +376,37 @@ class TestProcessDirectives:
         assert result.count("::: cyclopts") == 0
         assert "# First Section" in result
         assert "# Second Section" in result
+
+    def test_process_directive_with_usage_name(self, importable_tmp_path):
+        """usage_name in the directive overrides the app name in Usage: lines."""
+        module_file = importable_tmp_path / "usage_name_app.py"
+        module_file.write_text(
+            textwrap.dedent(
+                """\
+                from cyclopts import App
+
+                app = App(name="cli", help="Test CLI")
+
+                @app.command
+                def serve(port: int = 8000):
+                    '''Start the server.'''
+                    pass
+                """
+            )
+        )
+
+        from cyclopts.ext.mkdocs import process_cyclopts_directives
+
+        markdown = textwrap.dedent(
+            """\
+            ::: cyclopts
+                module: usage_name_app:app
+                usage_name: uv run cli
+            """
+        )
+
+        result = process_cyclopts_directives(markdown, None)
+        assert "uv run cli" in result
 
     def test_process_directive_with_error(self):
         """Test that errors in directive processing raise PluginError."""
