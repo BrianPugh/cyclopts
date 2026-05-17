@@ -547,8 +547,8 @@ def test_help_format_group_parameters_sphinx_directives(capture_format_group_par
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Foo parameter [required]                             │
         │    BAR --bar  Bar parameter [Added in v0.47] [default: 1.0]        │
-        │    BAZ --baz  Baz parameter [⚠ Deprecated in v2.0] Use something   │
-        │               else instead [default: 5]                            │
+        │    BAZ --baz  Baz parameter ⚠ [Deprecated in v2.0: Use something   │
+        │               else instead] [default: 5]                           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -612,7 +612,7 @@ def test_help_format_group_parameters_sphinx_note_warning_seealso(capture_format
         │               ⚠ Warning: Be careful here [required]                │
         │ *  BAZ --baz  Baz parameter                                        │
         │                                                                    │
-        │               See also: Related function [required]                │
+        │               See Also: Related function [required]                │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -666,7 +666,7 @@ def test_help_format_group_parameters_sphinx_deprecated_no_content(capture_forma
     expected = dedent(
         """\
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  FOO --foo  Foo parameter [⚠ Deprecated in v3.0] [required]      │
+        │ *  FOO --foo  Foo parameter ⚠ [Deprecated in v3.0] [required]      │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -2167,9 +2167,8 @@ def test_help_plaintext(app, console):
 def test_rich_rst_not_imported_without_rst_format():
     """Ensure rich_rst is not imported unless RST format is explicitly used.
 
-    This test verifies that rich_rst remains an optional dependency and is
-    only imported when the user explicitly sets help_format to "rst" or
-    "restructuredtext".
+    rich_rst is a required dependency, but kept behind a deferred import so
+    that apps using markdown/plaintext/rich formats don't pay its import cost.
     """
     import sys
 
@@ -2223,32 +2222,6 @@ def test_rich_rst_not_imported_without_rst_format():
 
     # rich_rst should still not be imported
     assert "rich_rst" not in sys.modules, "rich_rst was imported when using rich format"
-
-
-def test_rich_rst_helpful_error_when_missing(mocker):
-    """Ensure helpful error message when RST format is used without rich_rst installed."""
-    import sys
-
-    # Remove any cached imports
-    for key in list(sys.modules.keys()):
-        if key == "rich_rst" or key.startswith("rich_rst."):
-            del sys.modules[key]
-
-    sys.modules.pop("cyclopts.help.inline_text", None)
-
-    # Mock the rich_rst module to simulate it not being installed
-    mocker.patch.dict("sys.modules", {"rich_rst": None})
-
-    # Now try to use RST format - should get helpful error
-    from cyclopts.help.inline_text import InlineText
-
-    with pytest.raises(ImportError) as exc_info:
-        InlineText.from_format("**test**", "rst")
-
-    # Check that the error message is helpful
-    error_msg = str(exc_info.value)
-    assert "rst" in error_msg.lower()
-    assert "cyclopts[rst]" in error_msg
 
 
 def test_help_consistent_formatting(app, console):
