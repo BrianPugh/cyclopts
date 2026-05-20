@@ -83,16 +83,17 @@ class CycloptsError(Exception):
     """
     If set, override automatic message generation.
 
-    A :class:`str` is parsed as `Rich console markup
-    <https://rich.readthedocs.io/en/stable/markup.html>`_, so custom errors
-    can match the built-in styling::
+    A :class:`str` is rendered as literal text. To apply styling, pass a
+    :class:`rich.text.Text` instance — either constructed from `Rich
+    console markup <https://rich.readthedocs.io/en/stable/markup.html>`_::
 
-        raise CycloptsError(msg="Invalid value [bold red]foo[/] for [bold]--name[/].")
+        from rich.text import Text
+        raise CycloptsError(msg=Text.from_markup("Invalid value [bold red]foo[/]."))
 
-    For full control, pass a :class:`rich.text.Text` instance. Reuse the
-    built-in palette — :data:`STYLE_OFFENDING_VALUE`, :data:`STYLE_NAME`,
+    or assembled directly using the built-in palette
+    (:data:`STYLE_OFFENDING_VALUE`, :data:`STYLE_NAME`,
     :data:`STYLE_VALID_CHOICE`, :data:`STYLE_SUGGESTION`,
-    :data:`STYLE_SOURCE` — to keep custom errors visually consistent with
+    :data:`STYLE_SOURCE`) to keep custom errors visually consistent with
     the framework's output::
 
         from rich.text import Text
@@ -145,17 +146,17 @@ class CycloptsError(Exception):
     """:class:`~rich.console.Console` to display runtime errors."""
 
     def _resolved_msg(self) -> "Text":
-        """Resolve ``self.msg`` (str | Text) into a Rich ``Text`` instance."""
-        from rich.errors import MarkupError
+        """Resolve ``self.msg`` (str | Text) into a Rich ``Text`` instance.
+
+        Strings are wrapped as literal text -- only ``Text`` instances carry
+        styling, so the caller opts in by constructing one explicitly.
+        """
         from rich.text import Text
 
         assert self.msg is not None
         if isinstance(self.msg, Text):
             return self.msg
-        try:
-            return Text.from_markup(self.msg)
-        except MarkupError:
-            return Text(self.msg)
+        return Text(self.msg)
 
     def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         """Yield segments that compose the error message.
