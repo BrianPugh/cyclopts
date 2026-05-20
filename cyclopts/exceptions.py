@@ -83,16 +83,26 @@ class CycloptsError(Exception):
     """
     If set, override automatic message generation.
 
-    A plain :class:`str` is interpreted as Rich console markup so custom
-    errors can match the built-in styling::
+    A :class:`str` is parsed as `Rich console markup
+    <https://rich.readthedocs.io/en/stable/markup.html>`_, so custom errors
+    can match the built-in styling::
 
         raise CycloptsError(msg="Invalid value [bold red]foo[/] for [bold]--name[/].")
 
-    Malformed markup falls back to literal rendering. Pass a
-    :class:`rich.text.Text` instance for full control — see
-    :data:`STYLE_OFFENDING_VALUE`, :data:`STYLE_NAME`, :data:`STYLE_VALID_CHOICE`,
-    :data:`STYLE_SUGGESTION`, and :data:`STYLE_SOURCE` for the palette used
-    by the built-in messages.
+    For full control, pass a :class:`rich.text.Text` instance. Reuse the
+    built-in palette — :data:`STYLE_OFFENDING_VALUE`, :data:`STYLE_NAME`,
+    :data:`STYLE_VALID_CHOICE`, :data:`STYLE_SUGGESTION`,
+    :data:`STYLE_SOURCE` — to keep custom errors visually consistent with
+    the framework's output::
+
+        from rich.text import Text
+        from cyclopts.exceptions import STYLE_NAME, STYLE_OFFENDING_VALUE
+
+        t = Text("Invalid value ")
+        t.append("foo", style=STYLE_OFFENDING_VALUE)
+        t.append(" for ")
+        t.append("--name", style=STYLE_NAME)
+        raise CycloptsError(msg=t)
     """
 
     verbose: bool = True
