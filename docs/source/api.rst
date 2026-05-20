@@ -2677,3 +2677,41 @@ Exceptions
 .. autoexception:: cyclopts.EditorDidNotChangeError
    :show-inheritance:
    :members:
+
+^^^^^^^^^^^^^^^^^^^^^
+Styling Custom Errors
+^^^^^^^^^^^^^^^^^^^^^
+
+The :attr:`~cyclopts.CycloptsError.msg` attribute accepts either a string
+(parsed as `Rich console markup <https://rich.readthedocs.io/en/stable/markup.html>`_)
+or a :class:`rich.text.Text` instance. Malformed markup falls back to literal
+rendering, so existing plain-string messages continue to work unchanged.
+
+.. code-block:: python
+
+   from cyclopts import CycloptsError
+
+   # Rich markup in a plain string.
+   raise CycloptsError(msg="Invalid value [bold red]foo[/] for [bold]--name[/].")
+
+For full control (overlapping spans, dynamic content, etc.), construct a
+:class:`rich.text.Text` directly and reuse Cyclopts' built-in style palette
+so custom errors visually match the framework's output:
+
+.. code-block:: python
+
+   from rich.text import Text
+   from cyclopts import CycloptsError
+   from cyclopts.exceptions import STYLE_NAME, STYLE_OFFENDING_VALUE
+
+   t = Text("Invalid value ")
+   t.append("foo", style=STYLE_OFFENDING_VALUE)
+   t.append(" for ")
+   t.append("--name", style=STYLE_NAME)
+   raise CycloptsError(msg=t)
+
+.. autodata:: cyclopts.exceptions.STYLE_OFFENDING_VALUE
+.. autodata:: cyclopts.exceptions.STYLE_NAME
+.. autodata:: cyclopts.exceptions.STYLE_VALID_CHOICE
+.. autodata:: cyclopts.exceptions.STYLE_SUGGESTION
+.. autodata:: cyclopts.exceptions.STYLE_SOURCE

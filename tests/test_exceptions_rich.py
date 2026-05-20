@@ -174,6 +174,93 @@ def test_rich_msg_override_yields_unstyled():
 
 
 # ---------------------------------------------------------------------------
+# msg styling: markup strings and Text instances (issue #813).
+# ---------------------------------------------------------------------------
+
+
+def test_msg_markup_string_styles_applied_in_rich():
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="Invalid value [bold red]foo[/] for [bold]--name[/].")
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value foo for --name."
+    spans = _spans(rich_text)
+    assert ("foo", "bold red") in spans
+    assert ("--name", "bold") in spans
+
+
+def test_msg_markup_string_str_returns_plain_text():
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="[bold]hello[/] [red]world[/]")
+    assert str(e) == "hello world"
+
+
+def test_msg_text_instance_preserved_in_rich():
+    from rich.text import Text
+
+    from cyclopts import CycloptsError
+    from cyclopts.exceptions import STYLE_NAME, STYLE_OFFENDING_VALUE
+
+    t = Text("Invalid value ")
+    t.append("foo", style=STYLE_OFFENDING_VALUE)
+    t.append(" for ")
+    t.append("--name", style=STYLE_NAME)
+    e = CycloptsError(msg=t)
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value foo for --name"
+    spans = _spans(rich_text)
+    assert ("foo", "bold red") in spans
+    assert ("--name", "bold") in spans
+
+
+def test_msg_markup_in_coercion_error_with_keyword():
+    e = CoercionError(msg="[bold red]bad[/]", token=Token(keyword="--flag", value="x"))
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value for --flag: bad"
+    spans = _spans(rich_text)
+    assert ("bad", "bold red") in spans
+
+
+def test_msg_malformed_markup_falls_back_to_literal():
+    from cyclopts import CycloptsError
+
+    # Unbalanced bracket would raise MarkupError; should render literally.
+    e = CycloptsError(msg="error at [foo")
+    assert str(e) == "error at [foo"
+    rich_text = e.__rich__()
+    assert rich_text.plain == "error at [foo"
+
+
+def test_msg_plain_string_with_no_markup_unchanged():
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="just a plain message")
+    assert str(e) == "just a plain message"
+    rich_text = e.__rich__()
+    assert rich_text.plain == "just a plain message"
+    # No styled spans -- nothing to highlight.
+    assert all(s.style is None or str(s.style) == "" for s in rich_text.spans)
+
+
+def test_style_constants_match_builtin_palette():
+    """Public style constants should match what the built-in messages emit."""
+    from cyclopts.exceptions import (
+        STYLE_NAME,
+        STYLE_OFFENDING_VALUE,
+        STYLE_SOURCE,
+        STYLE_SUGGESTION,
+        STYLE_VALID_CHOICE,
+    )
+
+    assert STYLE_OFFENDING_VALUE == "bold red"
+    assert STYLE_NAME == "bold"
+    assert STYLE_VALID_CHOICE == "cyan"
+    assert STYLE_SUGGESTION == "bold green"
+    assert STYLE_SOURCE == "dim"
+
+
+# ---------------------------------------------------------------------------
 # ANSI smoke test: end-to-end render through CycloptsPanel.
 # ---------------------------------------------------------------------------
 
