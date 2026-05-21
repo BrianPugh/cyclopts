@@ -49,11 +49,25 @@ def docstring_parse(doc: str | None, format: str):
         cleaned_doc = short + "\n\n" + short_description_and_maybe_remainder[1]
 
     res = docstring_parser.parse(cleaned_doc)
+    example_sections = [
+        _format_docstring_example(meta.description or meta.snippet, format)
+        for meta in res.meta
+        if meta.args == ["examples"] and (meta.description or meta.snippet)
+    ]
+    if example_sections:
+        sections = [res.long_description or "", *example_sections]
+        res.long_description = "\n\n".join(section for section in sections if section)
 
     # Ensure a short description exists if there's a long description
     assert not res.long_description or res.short_description
 
     return res
+
+
+def _format_docstring_example(example: str, format: str) -> str:
+    heading = "Examples::" if format in ("restructuredtext", "rst") else "Examples:"
+    indented_example = "\n".join(f"    {line}" if line else "" for line in example.splitlines())
+    return f"{heading}\n\n{indented_example}"
 
 
 def _text_factory():

@@ -220,6 +220,26 @@ def test_format_commands_docstring_multi_line_pep0257(app, console):
     )
 
 
+def test_help_docstring_examples_section(app, console):
+    @app.command
+    def foo():
+        """Run foo.
+
+        This command demonstrates an example in a Google-style docstring.
+
+        Example:
+            app foo --name Alice
+        """
+
+    with console.capture() as capture:
+        app.help_print("foo", console=console)
+
+    actual = capture.get()
+    assert "This command demonstrates an example in a Google-style docstring." in actual
+    assert "Examples:" in actual
+    assert "app foo --name Alice" in actual
+
+
 def test_format_commands_no_show(app, console, assert_parse_args):
     @app.command
     def foo():
