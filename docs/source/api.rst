@@ -72,6 +72,40 @@ API
          $ my-script bar
          Running bar.
 
+   .. attribute:: synonym
+      :type: Optional[Union[str, Iterable[str]]]
+      :value: None
+
+      Alternate names that trigger a "Did you mean..." suggestion when typed, but do **not**
+      register the command under those names.
+
+      Unlike :attr:`.alias`, synonyms are not runnable and are hidden from ``--help``.
+      They exist to guide users who type a semantically equivalent but orthographically
+      dissimilar token that Cyclopts' fuzzy matcher would otherwise miss (e.g., ``remove``
+      when the command is ``uninstall``).
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App()
+
+         @app.command(synonym=["remove", "rm"])
+         def uninstall(name: str):
+             print(f"uninstalling {name}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script uninstall mypackage
+         uninstalling mypackage
+
+         $ my-script remove mypackage
+         Unknown command "remove". Did you mean "uninstall"? Available commands: uninstall.
+
+      See :ref:`Synonyms` for details.
+
    .. attribute:: help
       :type: Optional[str]
       :value: None

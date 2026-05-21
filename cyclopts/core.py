@@ -330,6 +330,18 @@ class App:
         kw_only=True,
     )
 
+    synonym: None | str | tuple[str, ...] = field(
+        default=None,
+        converter=_app_str_tuple_converter,
+        kw_only=True,
+    )
+    """Alternate command names that are NOT runnable but trigger a "Did you mean..." suggestion.
+
+    Unlike :attr:`alias`, synonyms do not register the command under additional names. They exist
+    purely to guide users who type a semantically-equivalent but orthographically-dissimilar token
+    (e.g., ``remove`` when the command is ``uninstall``).
+    """
+
     default_command: Callable[..., Any] | None = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Parameter | None = field(default=None, kw_only=True)
 
