@@ -434,9 +434,10 @@ class UnknownCommandError(CycloptsError):
         if not (self.app and self.app._commands):
             return
 
-        import difflib
-
         visible_commands: list[str] = []
+        synonym_matches: list[str] = []
+        seen_subapps: set[int] = set()
+
         for name, app_or_spec in self.app._commands.items():
             if name in self.app._help_flags or name in self.app._version_flags:
                 continue
@@ -446,14 +447,40 @@ class UnknownCommandError(CycloptsError):
             if not isinstance(subapp, type(self.app)):
                 continue
 
-            if subapp.show:
-                visible_commands.append(name)
+            if not subapp.show:
+                continue
 
-        close_matches = difflib.get_close_matches(token, visible_commands, n=1, cutoff=0.6)
-        if close_matches:
-            yield ' Did you mean "', ""
-            yield close_matches[0], STYLE_SUGGESTION
-            yield '"?', ""
+            visible_commands.append(name)
+
+            # First registration of this subapp is its primary name; only check synonyms once per subapp.
+            subapp_id = id(subapp)
+            if subapp_id not in seen_subapps:
+                seen_subapps.add(subapp_id)
+                if token in subapp.synonym:  # pyright: ignore[reportOperatorIssue]
+                    synonym_matches.append(name)
+
+        if synonym_matches:
+            yield " Did you mean ", ""
+            for i, match in enumerate(synonym_matches):
+                if i > 0:
+                    if len(synonym_matches) == 2:
+                        yield " or ", ""
+                    elif i == len(synonym_matches) - 1:
+                        yield ", or ", ""
+                    else:
+                        yield ", ", ""
+                yield '"', ""
+                yield match, STYLE_SUGGESTION
+                yield '"', ""
+            yield "?", ""
+        else:
+            import difflib
+
+            close_matches = difflib.get_close_matches(token, visible_commands, n=1, cutoff=0.6)
+            if close_matches:
+                yield ' Did you mean "', ""
+                yield close_matches[0], STYLE_SUGGESTION
+                yield '"?', ""
 
         # Heuristic: list the visible commands to help users who forgot the command name.
         max_commands = 8
