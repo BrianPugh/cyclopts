@@ -467,7 +467,7 @@ def test_synonym_not_in_help_output():
     output = _strip_ansi(buf.getvalue())
     assert "uninstall" in output
     assert "remove" not in output
-    assert " rm " not in output
+    assert re.search(r"\brm\b", output) is None
 
 
 # ---------------------------------------------------------------------------
