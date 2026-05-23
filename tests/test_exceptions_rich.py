@@ -6,6 +6,7 @@ from typing import Literal
 from unittest.mock import Mock
 
 import pytest
+from rich.console import Console
 
 import cyclopts
 from cyclopts import (
@@ -458,8 +459,6 @@ def test_unknown_command_synonym_dedupes_across_aliases():
 
 def test_synonym_not_in_help_output():
     """Synonyms should not appear in --help output."""
-    from rich.console import Console
-
     buf = StringIO()
     console = Console(file=buf, force_terminal=False, width=200)
     app = cyclopts.App(name="myapp", result_action="return_value", console=console)
