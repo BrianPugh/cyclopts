@@ -6,6 +6,7 @@ from typing import Literal
 from unittest.mock import Mock
 
 import pytest
+from rich.console import Console
 
 import cyclopts
 from cyclopts import (
@@ -171,6 +172,77 @@ def test_rich_msg_override_yields_unstyled():
     assert rich_text.plain == "Invalid value for --flag: custom error"
     # No styled spans -- override stays plain.
     assert all(s.style is None or str(s.style) == "" for s in rich_text.spans)
+
+
+# ---------------------------------------------------------------------------
+# msg styling: Text instances opt into styling; plain str stays literal (#813).
+# ---------------------------------------------------------------------------
+
+
+def test_msg_text_instance_preserved_in_rich():
+    from rich.text import Text
+
+    from cyclopts import CycloptsError
+    from cyclopts.exceptions import STYLE_NAME, STYLE_OFFENDING_VALUE
+
+    t = Text("Invalid value ")
+    t.append("foo", style=STYLE_OFFENDING_VALUE)
+    t.append(" for ")
+    t.append("--name", style=STYLE_NAME)
+    e = CycloptsError(msg=t)
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value foo for --name"
+    spans = _spans(rich_text)
+    assert ("foo", "bold red") in spans
+    assert ("--name", "bold") in spans
+
+
+def test_msg_text_from_markup_in_coercion_error_with_keyword():
+    from rich.text import Text
+
+    e = CoercionError(msg=Text.from_markup("[bold red]bad[/]"), token=Token(keyword="--flag", value="x"))
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value for --flag: bad"
+    spans = _spans(rich_text)
+    assert ("bad", "bold red") in spans
+
+
+def test_msg_plain_string_with_brackets_renders_literally():
+    """Backwards-compat: strings are never parsed as Rich markup."""
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="error in [section] config")
+    assert str(e) == "error in [section] config"
+    rich_text = e.__rich__()
+    assert rich_text.plain == "error in [section] config"
+
+
+def test_msg_plain_string_with_no_markup_unchanged():
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="just a plain message")
+    assert str(e) == "just a plain message"
+    rich_text = e.__rich__()
+    assert rich_text.plain == "just a plain message"
+    # No styled spans -- nothing to highlight.
+    assert all(s.style is None or str(s.style) == "" for s in rich_text.spans)
+
+
+def test_style_constants_match_builtin_palette():
+    """Public style constants should match what the built-in messages emit."""
+    from cyclopts.exceptions import (
+        STYLE_NAME,
+        STYLE_OFFENDING_VALUE,
+        STYLE_SOURCE,
+        STYLE_SUGGESTION,
+        STYLE_VALID_CHOICE,
+    )
+
+    assert STYLE_OFFENDING_VALUE == "bold red"
+    assert STYLE_NAME == "bold"
+    assert STYLE_VALID_CHOICE == "cyan"
+    assert STYLE_SUGGESTION == "bold green"
+    assert STYLE_SOURCE == "dim"
 
 
 # ---------------------------------------------------------------------------
@@ -387,8 +459,6 @@ def test_unknown_command_synonym_dedupes_across_aliases():
 
 def test_synonym_not_in_help_output():
     """Synonyms should not appear in --help output."""
-    from rich.console import Console
-
     buf = StringIO()
     console = Console(file=buf, force_terminal=False, width=200)
     app = cyclopts.App(name="myapp", result_action="return_value", console=console)
@@ -397,7 +467,7 @@ def test_synonym_not_in_help_output():
     output = _strip_ansi(buf.getvalue())
     assert "uninstall" in output
     assert "remove" not in output
-    assert " rm " not in output
+    assert re.search(r"\brm\b", output) is None
 
 
 # ---------------------------------------------------------------------------

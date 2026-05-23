@@ -2715,3 +2715,16 @@ Exceptions
 .. autoexception:: cyclopts.EditorDidNotChangeError
    :show-inheritance:
    :members:
+
+^^^^^^^^^^^^^^^
+Style Constants
+^^^^^^^^^^^^^^^
+
+Palette used by the built-in error messages. See
+:attr:`CycloptsError.msg <cyclopts.CycloptsError.msg>` for example usage.
+
+.. autodata:: cyclopts.exceptions.STYLE_OFFENDING_VALUE
+.. autodata:: cyclopts.exceptions.STYLE_NAME
+.. autodata:: cyclopts.exceptions.STYLE_VALID_CHOICE
+.. autodata:: cyclopts.exceptions.STYLE_SUGGESTION
+.. autodata:: cyclopts.exceptions.STYLE_SOURCE

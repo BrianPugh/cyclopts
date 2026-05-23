@@ -247,7 +247,7 @@ Finally, if you would like to register an **additional** name to the Cyclopts-de
 --------
 Synonyms
 --------
-A common CLI problem is remembering subcommand synonyms. Did this CLI's developer decide to call it  ``remove``, ``uninstall``, or ``delete``?
+A common CLI problem is remembering subcommand synonyms. Did this CLI's developer decide to call it ``remove``, ``uninstall``, or ``delete``?
 
 The :attr:`~.App.synonym` field declares **alternate names** that trigger a "Did you mean..."
 suggestion **without** registering the command under those names.
