@@ -456,7 +456,11 @@ class UnknownCommandError(CycloptsError):
             subapp_id = id(subapp)
             if subapp_id not in seen_subapps:
                 seen_subapps.add(subapp_id)
-                if token in subapp.synonym:  # pyright: ignore[reportOperatorIssue]
+                synonym = subapp.synonym
+                if isinstance(synonym, str):
+                    if token == synonym:
+                        synonym_matches.append(name)
+                elif synonym and token in synonym:
                     synonym_matches.append(name)
 
         if synonym_matches:
