@@ -6,6 +6,7 @@ from typing import Literal
 from unittest.mock import Mock
 
 import pytest
+from rich.console import Console
 
 import cyclopts
 from cyclopts import (
@@ -174,6 +175,77 @@ def test_rich_msg_override_yields_unstyled():
 
 
 # ---------------------------------------------------------------------------
+# msg styling: Text instances opt into styling; plain str stays literal (#813).
+# ---------------------------------------------------------------------------
+
+
+def test_msg_text_instance_preserved_in_rich():
+    from rich.text import Text
+
+    from cyclopts import CycloptsError
+    from cyclopts.exceptions import STYLE_NAME, STYLE_OFFENDING_VALUE
+
+    t = Text("Invalid value ")
+    t.append("foo", style=STYLE_OFFENDING_VALUE)
+    t.append(" for ")
+    t.append("--name", style=STYLE_NAME)
+    e = CycloptsError(msg=t)
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value foo for --name"
+    spans = _spans(rich_text)
+    assert ("foo", "bold red") in spans
+    assert ("--name", "bold") in spans
+
+
+def test_msg_text_from_markup_in_coercion_error_with_keyword():
+    from rich.text import Text
+
+    e = CoercionError(msg=Text.from_markup("[bold red]bad[/]"), token=Token(keyword="--flag", value="x"))
+    rich_text = e.__rich__()
+    assert rich_text.plain == "Invalid value for --flag: bad"
+    spans = _spans(rich_text)
+    assert ("bad", "bold red") in spans
+
+
+def test_msg_plain_string_with_brackets_renders_literally():
+    """Backwards-compat: strings are never parsed as Rich markup."""
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="error in [section] config")
+    assert str(e) == "error in [section] config"
+    rich_text = e.__rich__()
+    assert rich_text.plain == "error in [section] config"
+
+
+def test_msg_plain_string_with_no_markup_unchanged():
+    from cyclopts import CycloptsError
+
+    e = CycloptsError(msg="just a plain message")
+    assert str(e) == "just a plain message"
+    rich_text = e.__rich__()
+    assert rich_text.plain == "just a plain message"
+    # No styled spans -- nothing to highlight.
+    assert all(s.style is None or str(s.style) == "" for s in rich_text.spans)
+
+
+def test_style_constants_match_builtin_palette():
+    """Public style constants should match what the built-in messages emit."""
+    from cyclopts.exceptions import (
+        STYLE_NAME,
+        STYLE_OFFENDING_VALUE,
+        STYLE_SOURCE,
+        STYLE_SUGGESTION,
+        STYLE_VALID_CHOICE,
+    )
+
+    assert STYLE_OFFENDING_VALUE == "bold red"
+    assert STYLE_NAME == "bold"
+    assert STYLE_VALID_CHOICE == "cyan"
+    assert STYLE_SUGGESTION == "bold green"
+    assert STYLE_SOURCE == "dim"
+
+
+# ---------------------------------------------------------------------------
 # ANSI smoke test: end-to-end render through CycloptsPanel.
 # ---------------------------------------------------------------------------
 
@@ -271,6 +343,131 @@ def test_unknown_command_rich_ellipsis_truncates_styled_list():
     # Ellipsis tail is plain.
     plain = e.__rich__().plain
     assert plain.endswith(", ...")
+
+
+# ---------------------------------------------------------------------------
+# UnknownCommandError synonym suggestions
+# ---------------------------------------------------------------------------
+
+
+def _provoke_unknown_with_synonyms(commands: list[tuple[str, list[str]]], typed: str) -> UnknownCommandError:
+    """Build an app where each command optionally declares synonyms, then provoke an unknown-command error.
+
+    `commands` is a list of (name, synonyms) pairs.
+    """
+    app = cyclopts.App(result_action="return_value")
+    for name, synonyms in commands:
+        app.command(name=name, synonym=synonyms)(lambda: None)
+    with pytest.raises(UnknownCommandError) as ei:
+        app.parse_args(typed, exit_on_error=False)
+    e = ei.value
+    e.verbose = False
+    return e
+
+
+def test_unknown_command_synonym_single_match():
+    """A single declared synonym yields a 'Did you mean...' suggestion for that command."""
+    e = _provoke_unknown_with_synonyms([("uninstall", ["remove", "rm"])], "remove")
+    assert str(e) == 'Unknown command "remove". Did you mean "uninstall"? Available commands: uninstall.'
+
+
+def test_unknown_command_synonym_rich_styles_suggestion():
+    """The suggested command name is styled as a suggestion (bold green)."""
+    e = _provoke_unknown_with_synonyms([("uninstall", ["remove"])], "remove")
+    spans = _spans(e.__rich__())
+    assert ("remove", "bold red") in spans
+    assert ("uninstall", "bold green") in spans
+
+
+def test_unknown_command_synonym_two_targets():
+    """When two commands declare the same synonym, both are suggested with 'or'."""
+    e = _provoke_unknown_with_synonyms(
+        [("uninstall", ["remove"]), ("delete", ["remove"])],
+        "remove",
+    )
+    assert str(e) == (
+        'Unknown command "remove". Did you mean "uninstall" or "delete"? Available commands: uninstall, delete.'
+    )
+
+
+def test_unknown_command_synonym_three_targets_uses_oxford_or():
+    """Three or more matches use comma separation and a final ', or'."""
+    e = _provoke_unknown_with_synonyms(
+        [("uninstall", ["remove"]), ("delete", ["remove"]), ("purge", ["remove"])],
+        "remove",
+    )
+    plain = e.__rich__().plain
+    assert 'Did you mean "uninstall", "delete", or "purge"?' in plain
+
+
+def test_unknown_command_synonym_falls_back_to_difflib_when_no_match():
+    """When the token does not match any synonym, the existing difflib path still runs."""
+    e = _provoke_unknown_with_synonyms([("mad-command", ["nope"])], "bad-command")
+    # difflib fuzzy match still kicks in because no synonym matched.
+    assert 'Did you mean "mad-command"?' in str(e)
+
+
+def test_unknown_command_synonym_does_not_register_as_runnable():
+    """A synonym must not make the command runnable under that name."""
+    app = cyclopts.App(result_action="return_value")
+    app.command(name="uninstall", synonym=["remove"])(lambda: None)
+    # The synonym is NOT in the registered commands dict.
+    assert "remove" not in app
+    assert "uninstall" in app
+
+
+def test_unknown_command_synonym_shadowed_by_real_command():
+    """If a real command shares a name with another command's synonym, the real command wins."""
+    real_called = []
+    synonym_called = []
+
+    app = cyclopts.App(result_action="return_value")
+
+    @app.command(name="remove")
+    def remove_cmd():
+        real_called.append(True)
+
+    @app.command(name="uninstall", synonym=["remove"])
+    def uninstall_cmd():
+        synonym_called.append(True)
+
+    app("remove", exit_on_error=False)
+    assert real_called == [True]
+    assert synonym_called == []
+
+
+def test_unknown_command_synonym_no_match_no_suggestion():
+    """If neither synonym nor difflib finds anything, no 'Did you mean' is emitted."""
+    e = _provoke_unknown_with_synonyms([("uninstall", ["remove"])], "totally-different-zzz")
+    assert "Did you mean" not in str(e)
+
+
+def test_unknown_command_synonym_dedupes_across_aliases():
+    """A subapp registered under multiple names (via alias) should only be suggested once."""
+    app = cyclopts.App(result_action="return_value")
+    app.command(name="uninstall", alias=["delete-it", "rm-it"], synonym=["remove"])(lambda: None)
+    with pytest.raises(UnknownCommandError) as ei:
+        app.parse_args("remove", exit_on_error=False)
+    e = ei.value
+    e.verbose = False
+    plain = e.__rich__().plain
+    # Suggestion mentions the primary name once, not all three aliases.
+    assert 'Did you mean "uninstall"?' in plain
+    assert "delete-it" not in plain.split("Available commands:")[0]
+    assert "rm-it" not in plain.split("Available commands:")[0]
+
+
+def test_synonym_not_in_help_output():
+    """Synonyms should not appear in --help output."""
+    buf = StringIO()
+    console = Console(file=buf, force_terminal=False, width=200)
+    app = cyclopts.App(name="myapp", result_action="return_value", console=console)
+    app.command(name="uninstall", synonym=["remove", "rm"])(lambda: None)
+    app.help_print(console=console)
+    output = _strip_ansi(buf.getvalue())
+    assert "uninstall" in output
+    assert "remove" not in output
+    assert re.search(r"\brm\b", output) is None
 
 
 # ---------------------------------------------------------------------------

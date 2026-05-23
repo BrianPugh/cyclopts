@@ -72,6 +72,40 @@ API
          $ my-script bar
          Running bar.
 
+   .. attribute:: synonym
+      :type: Optional[Union[str, Iterable[str]]]
+      :value: None
+
+      Alternate names that trigger a "Did you mean..." suggestion when typed, but do **not**
+      register the command under those names.
+
+      Unlike :attr:`.alias`, synonyms are not runnable and are hidden from ``--help``.
+      They exist to guide users who type a semantically equivalent but orthographically
+      dissimilar token that Cyclopts' fuzzy matcher would otherwise miss (e.g., ``remove``
+      when the command is ``uninstall``).
+
+      .. code-block:: python
+
+         from cyclopts import App
+
+         app = App()
+
+         @app.command(synonym=["remove", "rm"])
+         def uninstall(name: str):
+             print(f"uninstalling {name}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script uninstall mypackage
+         uninstalling mypackage
+
+         $ my-script remove mypackage
+         Unknown command "remove". Did you mean "uninstall"? Available commands: uninstall.
+
+      See :ref:`Synonyms` for details.
+
    .. attribute:: help
       :type: Optional[str]
       :value: None
@@ -602,9 +636,11 @@ API
                 sys.exit(result)
             elif result is not None:
                 print(result)
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
             else:
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
+
+         See :ref:`Custom Return Code Protocol <custom-return-code-protocol>` for :func:`~cyclopts.resolve_returncode`.
 
       **"return_value"**
 
@@ -635,7 +671,7 @@ API
             elif isinstance(result, int):
                 sys.exit(result)
             else:
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
 
       **"print_non_int_return_int_as_exit_code"**
 
@@ -649,9 +685,9 @@ API
                 return result
             elif result is not None:
                 print(result)
-                return 0
+                return resolve_returncode(result)
             else:
-                return 0
+                return resolve_returncode(result)
 
       **"print_str_return_int_as_exit_code"**
 
@@ -661,13 +697,13 @@ API
 
             if isinstance(result, str):
                 print(result)
-                return 0
+                return resolve_returncode(result)
             elif isinstance(result, bool):
                 return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
             else:
-                return 0
+                return resolve_returncode(result)
 
       **"print_str_return_zero"**
 
@@ -677,7 +713,7 @@ API
 
             if isinstance(result, str):
                 print(result)
-            return 0
+            return resolve_returncode(result)
 
       **"print_non_none_return_int_as_exit_code"**
 
@@ -691,7 +727,7 @@ API
                 return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
-            return 0
+            return resolve_returncode(result)
 
       **"print_non_none_return_zero"**
 
@@ -701,7 +737,7 @@ API
 
             if result is not None:
                 print(result)
-            return 0
+            return resolve_returncode(result)
 
       **"return_int_as_exit_code_else_zero"**
 
@@ -714,7 +750,7 @@ API
             elif isinstance(result, int):
                 return result
             else:
-                return 0
+                return resolve_returncode(result)
 
       **"return_none"**
 
@@ -730,7 +766,7 @@ API
 
          .. code-block:: python
 
-            return 0
+            return resolve_returncode(result)
 
       **"print_return_zero"**
 
@@ -739,7 +775,7 @@ API
          .. code-block:: python
 
             print(result)
-            return 0
+            return resolve_returncode(result)
 
       **"sys_exit_zero"**
 
@@ -747,7 +783,7 @@ API
 
          .. code-block:: python
 
-            sys.exit(0)
+            sys.exit(resolve_returncode(result))
 
       **"print_sys_exit_zero"**
 
@@ -756,7 +792,7 @@ API
          .. code-block:: python
 
             print(result)
-            sys.exit(0)
+            sys.exit(resolve_returncode(result))
 
       **Custom Callable**
 
@@ -1953,6 +1989,8 @@ API
 
 .. autofunction:: cyclopts.run
 
+.. autofunction:: cyclopts.resolve_returncode
+
 .. autoclass:: cyclopts.CycloptsPanel
 
 .. _API Validators:
@@ -2677,3 +2715,16 @@ Exceptions
 .. autoexception:: cyclopts.EditorDidNotChangeError
    :show-inheritance:
    :members:
+
+^^^^^^^^^^^^^^^
+Style Constants
+^^^^^^^^^^^^^^^
+
+Palette used by the built-in error messages. See
+:attr:`CycloptsError.msg <cyclopts.CycloptsError.msg>` for example usage.
+
+.. autodata:: cyclopts.exceptions.STYLE_OFFENDING_VALUE
+.. autodata:: cyclopts.exceptions.STYLE_NAME
+.. autodata:: cyclopts.exceptions.STYLE_VALID_CHOICE
+.. autodata:: cyclopts.exceptions.STYLE_SUGGESTION
+.. autodata:: cyclopts.exceptions.STYLE_SOURCE
