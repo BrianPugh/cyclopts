@@ -1327,3 +1327,294 @@ def test_result_action_call_if_callable_composition(monkeypatch):
 
     assert buf.getvalue() == "Hey Jude.\n"
     assert exit_code == 0
+
+
+# ==============================================================================
+# __cyclopts_returncode__ tests
+# ==============================================================================
+
+
+class _CustomResult:
+    """Result object that advertises a custom return code via __cyclopts_returncode__."""
+
+    def __init__(self, message: str = "custom", returncode: int = 7):
+        self.message = message
+        self._returncode = returncode
+
+    def __cyclopts_returncode__(self) -> int:
+        return self._returncode
+
+    def __str__(self) -> str:
+        return self.message
+
+
+def test_cyclopts_returncode_print_non_int_sys_exit(monkeypatch):
+    """print_non_int_sys_exit honors __cyclopts_returncode__ for non-int results."""
+    app = App(result_action="print_non_int_sys_exit")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult("hi", returncode=7)
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["run"])
+
+    assert exit_code == 7
+    assert buf.getvalue() == "hi\n"
+
+
+def test_cyclopts_returncode_sys_exit(monkeypatch):
+    """sys_exit honors __cyclopts_returncode__ for non-int results."""
+    app = App(result_action="sys_exit")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=3)
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["run"])
+
+    assert exit_code == 3
+    assert buf.getvalue() == ""
+
+
+def test_cyclopts_returncode_print_non_int_return_int_as_exit_code():
+    """print_non_int_return_int_as_exit_code honors __cyclopts_returncode__."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult("hello", returncode=4)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 4
+    assert buf.getvalue() == "hello\n"
+
+
+def test_cyclopts_returncode_print_str_return_int_as_exit_code_for_str_subclass():
+    """print_str_return_int_as_exit_code honors __cyclopts_returncode__ on str subclasses."""
+
+    class CustomStr(str):
+        def __cyclopts_returncode__(self) -> int:
+            return 9
+
+    app = App(result_action="print_str_return_int_as_exit_code")
+
+    @app.command
+    def run() -> CustomStr:
+        return CustomStr("hello")
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 9
+    assert buf.getvalue() == "hello\n"
+
+
+def test_cyclopts_returncode_print_str_return_int_as_exit_code_for_other():
+    """print_str_return_int_as_exit_code honors __cyclopts_returncode__ for non-str/int results."""
+    app = App(result_action="print_str_return_int_as_exit_code")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=5)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 5
+    assert buf.getvalue() == ""  # non-str silently ignored for printing
+
+
+def test_cyclopts_returncode_print_str_return_zero():
+    """print_str_return_zero honors __cyclopts_returncode__."""
+    app = App(result_action="print_str_return_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=6)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 6
+
+
+def test_cyclopts_returncode_print_non_none_return_int_as_exit_code():
+    """print_non_none_return_int_as_exit_code honors __cyclopts_returncode__."""
+    app = App(result_action="print_non_none_return_int_as_exit_code")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult("hi", returncode=8)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 8
+    assert buf.getvalue() == "hi\n"
+
+
+def test_cyclopts_returncode_print_non_none_return_zero():
+    """print_non_none_return_zero honors __cyclopts_returncode__."""
+    app = App(result_action="print_non_none_return_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult("hi", returncode=2)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 2
+    assert buf.getvalue() == "hi\n"
+
+
+def test_cyclopts_returncode_return_int_as_exit_code_else_zero():
+    """return_int_as_exit_code_else_zero honors __cyclopts_returncode__."""
+    app = App(result_action="return_int_as_exit_code_else_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=11)
+
+    result = app(["run"])
+    assert result == 11
+
+
+def test_cyclopts_returncode_return_zero():
+    """return_zero honors __cyclopts_returncode__."""
+    app = App(result_action="return_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=12)
+
+    result = app(["run"])
+    assert result == 12
+
+
+def test_cyclopts_returncode_print_return_zero():
+    """print_return_zero honors __cyclopts_returncode__."""
+    app = App(result_action="print_return_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult("hello", returncode=13)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 13
+    assert buf.getvalue() == "hello\n"
+
+
+def test_cyclopts_returncode_sys_exit_zero(monkeypatch):
+    """sys_exit_zero honors __cyclopts_returncode__."""
+    app = App(result_action="sys_exit_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=14)
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    app(["run"])
+
+    assert exit_code == 14
+
+
+def test_cyclopts_returncode_print_sys_exit_zero(monkeypatch):
+    """print_sys_exit_zero honors __cyclopts_returncode__."""
+    app = App(result_action="print_sys_exit_zero")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult("hi", returncode=15)
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["run"])
+
+    assert exit_code == 15
+    assert buf.getvalue() == "hi\n"
+
+
+def test_cyclopts_returncode_falls_back_to_zero_when_not_callable():
+    """__cyclopts_returncode__ is ignored when not callable (fall back to 0)."""
+
+    class BadResult:
+        __cyclopts_returncode__ = 42  # not callable
+
+        def __str__(self) -> str:
+            return "bad"
+
+    app = App(result_action="print_non_int_return_int_as_exit_code")
+
+    @app.command
+    def run() -> BadResult:
+        return BadResult()
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["run"])
+
+    assert result == 0
+    assert buf.getvalue() == "bad\n"
+
+
+def test_cyclopts_returncode_default_zero_when_not_defined():
+    """Results without __cyclopts_returncode__ continue to use 0 as default."""
+    app = App(result_action="print_non_int_return_int_as_exit_code")
+
+    @app.command
+    def greet(name: str) -> str:
+        return f"Hello {name}!"
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["greet", "Alice"])
+
+    assert result == 0
+    assert buf.getvalue() == "Hello Alice!\n"

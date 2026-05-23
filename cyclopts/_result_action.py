@@ -28,6 +28,34 @@ ResultActionSingle = (
 ResultAction = ResultActionSingle | Iterable[ResultActionSingle]
 
 
+def resolve_returncode(result: Any, default: int = 0) -> int:
+    """Resolve the return code for ``result``.
+
+    If ``result`` defines ``__cyclopts_returncode__`` (a zero-argument callable),
+    its value is used. Otherwise ``default`` is returned.
+
+    Custom ``result_action`` callables can use this helper to honor the
+    ``__cyclopts_returncode__`` protocol consistently with the built-in actions.
+
+    Parameters
+    ----------
+    result : Any
+        The command's return value.
+    default : int
+        Fallback exit code when ``result`` doesn't define a callable
+        ``__cyclopts_returncode__``. Defaults to ``0``.
+
+    Returns
+    -------
+    int
+        The resolved return code.
+    """
+    returncode_fn = getattr(result, "__cyclopts_returncode__", None)
+    if callable(returncode_fn):
+        return cast(int, returncode_fn())
+    return default
+
+
 def handle_result_action(
     result: Any,
     action: ResultAction,
@@ -72,9 +100,9 @@ def handle_result_action(
                 sys.exit(result)
             elif result is not None:
                 print_fn(result)
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
             else:
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
         case "return_value":
             return result
         case "call_if_callable":
@@ -87,7 +115,7 @@ def handle_result_action(
             elif isinstance(result, int):
                 sys.exit(result)
             else:
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
         case "print_non_int_return_int_as_exit_code":
             if isinstance(result, bool):
                 return 0 if result else 1
@@ -95,23 +123,23 @@ def handle_result_action(
                 return result
             elif result is not None:
                 print_fn(result)
-                return 0
+                return resolve_returncode(result)
             else:
-                return 0
+                return resolve_returncode(result)
         case "print_str_return_int_as_exit_code":
             if isinstance(result, str):
                 print_fn(result)
-                return 0
+                return resolve_returncode(result)
             elif isinstance(result, bool):
                 return 0 if result else 1
             elif isinstance(result, int):
                 return result
             else:
-                return 0
+                return resolve_returncode(result)
         case "print_str_return_zero":
             if isinstance(result, str):
                 print_fn(result)
-            return 0
+            return resolve_returncode(result)
         case "print_non_none_return_int_as_exit_code":
             if result is not None:
                 print_fn(result)
@@ -119,29 +147,29 @@ def handle_result_action(
                 return 0 if result else 1
             elif isinstance(result, int):
                 return result
-            return 0
+            return resolve_returncode(result)
         case "print_non_none_return_zero":
             if result is not None:
                 print_fn(result)
-            return 0
+            return resolve_returncode(result)
         case "return_int_as_exit_code_else_zero":
             if isinstance(result, bool):
                 return 0 if result else 1
             elif isinstance(result, int):
                 return result
             else:
-                return 0
+                return resolve_returncode(result)
         case "return_none":
             return None
         case "return_zero":
-            return 0
+            return resolve_returncode(result)
         case "print_return_zero":
             print_fn(result)
-            return 0
+            return resolve_returncode(result)
         case "sys_exit_zero":
-            sys.exit(0)
+            sys.exit(resolve_returncode(result))
         case "print_sys_exit_zero":
             print_fn(result)
-            sys.exit(0)
+            sys.exit(resolve_returncode(result))
         case _:
             raise ValueError
