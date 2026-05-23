@@ -115,5 +115,79 @@ When using Cyclopts as a CLI application, command return values are automaticall
 This default behavior makes Cyclopts applications work consistently whether run directly as scripts or installed via `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_. The :attr:`~cyclopts.App.result_action` can be customized if different behavior is needed:
 
 
+.. _custom-return-code-protocol:
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Custom Return Code Protocol
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Whenever a built-in :attr:`~cyclopts.App.result_action` would otherwise use ``0`` as the exit code, Cyclopts checks the return value for a ``__cyclopts_returncode__`` method. If present, its return value is used as the exit code instead. This lets returned objects describe their own success/failure without forcing the CLI layer to translate them.
+
+A common use case is a CLI that wraps a library and returns rich result objects directly, deferring presentation to the object's ``__rich__`` method:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+
+   class HealthCheck:
+       def __init__(self, service: str, healthy: bool):
+           self.service = service
+           self.healthy = healthy
+
+       def __rich__(self) -> str:
+           status = "[green]OK[/green]" if self.healthy else "[red]FAIL[/red]"
+           return f"{self.service}: {status}"
+
+       def __cyclopts_returncode__(self) -> int:
+           return 0 if self.healthy else 1
+
+
+   app = App()
+
+
+   @app.command
+   def check(service: str) -> HealthCheck:
+       """Check the health of a service."""
+       return HealthCheck(service, healthy=ping(service))
+
+
+   app()
+
+.. code-block:: console
+
+   $ my-script check database; echo "exit=$?"
+   database: OK
+   exit=0
+
+   $ my-script check cache; echo "exit=$?"
+   cache: FAIL
+   exit=1
+
+The protocol is opt-in: objects that don't define ``__cyclopts_returncode__`` continue to use the previous ``0`` default. The method must be a zero-argument callable that returns an :class:`int`; non-callable attributes are ignored. Branches that derive their exit code from an :class:`int` or :class:`bool` return value (e.g. ``sys.exit(result)``) ignore the protocol — return an integer/bool directly to set those exit codes.
+
+Custom ``result_action`` callables can opt into the same protocol via :func:`cyclopts.resolve_returncode`:
+
+.. code-block:: python
+
+   import sys
+   from typing import Any
+
+   from cyclopts import App, resolve_returncode
+
+
+   def result_action(result: Any) -> None:
+       if isinstance(result, bool):
+           sys.exit(0 if result else 1)
+       if isinstance(result, int):
+           sys.exit(result)
+       if result is not None:
+           print(result)
+       sys.exit(resolve_returncode(result))
+
+
+   app = App(result_action=result_action)
+
+
 .. _Poetry: https://python-poetry.org
 .. _entrypoint: https://setuptools.pypa.io/en/latest/userguide/entry_point.html#entry-points

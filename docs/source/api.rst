@@ -636,9 +636,11 @@ API
                 sys.exit(result)
             elif result is not None:
                 print(result)
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
             else:
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
+
+         See :ref:`Custom Return Code Protocol <custom-return-code-protocol>` for :func:`~cyclopts.resolve_returncode`.
 
       **"return_value"**
 
@@ -669,7 +671,7 @@ API
             elif isinstance(result, int):
                 sys.exit(result)
             else:
-                sys.exit(0)
+                sys.exit(resolve_returncode(result))
 
       **"print_non_int_return_int_as_exit_code"**
 
@@ -683,9 +685,9 @@ API
                 return result
             elif result is not None:
                 print(result)
-                return 0
+                return resolve_returncode(result)
             else:
-                return 0
+                return resolve_returncode(result)
 
       **"print_str_return_int_as_exit_code"**
 
@@ -695,13 +697,13 @@ API
 
             if isinstance(result, str):
                 print(result)
-                return 0
+                return resolve_returncode(result)
             elif isinstance(result, bool):
                 return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
             else:
-                return 0
+                return resolve_returncode(result)
 
       **"print_str_return_zero"**
 
@@ -711,7 +713,7 @@ API
 
             if isinstance(result, str):
                 print(result)
-            return 0
+            return resolve_returncode(result)
 
       **"print_non_none_return_int_as_exit_code"**
 
@@ -725,7 +727,7 @@ API
                 return 0 if result else 1  # i.e. True is success
             elif isinstance(result, int):
                 return result
-            return 0
+            return resolve_returncode(result)
 
       **"print_non_none_return_zero"**
 
@@ -735,7 +737,7 @@ API
 
             if result is not None:
                 print(result)
-            return 0
+            return resolve_returncode(result)
 
       **"return_int_as_exit_code_else_zero"**
 
@@ -748,7 +750,7 @@ API
             elif isinstance(result, int):
                 return result
             else:
-                return 0
+                return resolve_returncode(result)
 
       **"return_none"**
 
@@ -764,7 +766,7 @@ API
 
          .. code-block:: python
 
-            return 0
+            return resolve_returncode(result)
 
       **"print_return_zero"**
 
@@ -773,7 +775,7 @@ API
          .. code-block:: python
 
             print(result)
-            return 0
+            return resolve_returncode(result)
 
       **"sys_exit_zero"**
 
@@ -781,7 +783,7 @@ API
 
          .. code-block:: python
 
-            sys.exit(0)
+            sys.exit(resolve_returncode(result))
 
       **"print_sys_exit_zero"**
 
@@ -790,7 +792,7 @@ API
          .. code-block:: python
 
             print(result)
-            sys.exit(0)
+            sys.exit(resolve_returncode(result))
 
       **Custom Callable**
 
@@ -1986,6 +1988,8 @@ API
 .. autofunction:: cyclopts.edit
 
 .. autofunction:: cyclopts.run
+
+.. autofunction:: cyclopts.resolve_returncode
 
 .. autoclass:: cyclopts.CycloptsPanel
 
