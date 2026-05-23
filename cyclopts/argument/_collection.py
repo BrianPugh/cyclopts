@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts.annotations import resolve
+from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve, resolve_unpack
 from cyclopts.exceptions import (
     UnknownOptionError,
 )
@@ -258,7 +258,18 @@ class ArgumentCollection(list[Argument]):
 
         if not keys:
             if field_info.kind is field_info.VAR_KEYWORD:
-                hint = dict[str, hint]
+                if is_unpack(hint):
+                    # PEP 692: ``**kwargs: Unpack[SomeTypedDict]`` — the TypedDict
+                    # defines the schema, so unwrap and let the TypedDict-expansion
+                    # machinery promote its fields to top-level CLI options.
+                    hint = resolve_unpack(hint)
+                    if not is_typeddict(hint):
+                        raise TypeError(
+                            f"`**{field_info.name}: Unpack[{get_hint_name(hint)}]` — PEP 692 "
+                            f"requires the Unpack target to be a TypedDict."
+                        )
+                else:
+                    hint = dict[str, hint]
             elif field_info.kind is field_info.VAR_POSITIONAL:
                 hint = tuple[hint, ...]
 
@@ -334,7 +345,12 @@ class ArgumentCollection(list[Argument]):
                 if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
                     cparam = Parameter.combine(cparam, Parameter(name=(name.upper() for name in field_info.names)))
                 elif field_info.kind is field_info.VAR_KEYWORD:
-                    cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
+                    if is_unpack(field_info.hint):
+                        # PEP 692: TypedDict fields are promoted to top-level options,
+                        # so the kwargs argument itself must not contribute a name prefix.
+                        cparam = Parameter.combine(cparam, Parameter(name=()))
+                    else:
+                        cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:
                     assert cparam.name_transform is not None
                     cparam = Parameter.combine(
@@ -375,6 +391,13 @@ class ArgumentCollection(list[Argument]):
                     k[1:]: v for k, v in hint_docstring_lookup.items() if k[0] == sub_field_name and len(k) > 1
                 }
 
+                # PEP 692: VAR_KEYWORD's `required=False` should not suppress an Unpack[TypedDict]
+                # field's own Required marker — each field's required-ness comes from the TypedDict.
+                if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+                    child_required = sub_field_info.required
+                else:
+                    child_required = argument.required & sub_field_info.required
+
                 subkey_argument_collection = cls._from_type(
                     sub_field_info,
                     keys + (sub_field_name,),
@@ -384,7 +407,7 @@ class ArgumentCollection(list[Argument]):
                         if sub_field_info.help
                         else hint_docstring_lookup.get((sub_field_name,))
                     ),
-                    Parameter(required=argument.required & sub_field_info.required),
+                    Parameter(required=child_required),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,

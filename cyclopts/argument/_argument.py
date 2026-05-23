@@ -528,13 +528,14 @@ class Argument:
         Any
             Implicit value.
         """
-        if self.field_info.kind is self.field_info.VAR_KEYWORD:
+        if self.field_info.kind is self.field_info.VAR_KEYWORD and self._accepts_arbitrary_keywords:
             return self._normalize_trailing_keys(tuple(term.lstrip("-").split(delimiter))), UNSET
 
         trailing = term
         implicit_value = UNSET
 
-        assert self.parameter.name
+        if not self.parameter.name:
+            raise ValueError(f"No name to match {term!r}")
         for name in self.parameter.name:
             if transform:
                 name = transform(name)
@@ -902,7 +903,12 @@ class Argument:
             return validator
 
         try:
-            if not self.keys and self.field_info and self.field_info.kind is self.field_info.VAR_KEYWORD:
+            if (
+                not self.keys
+                and self.field_info
+                and self.field_info.kind is self.field_info.VAR_KEYWORD
+                and self._accepts_arbitrary_keywords
+            ):
                 hint = get_args(self.hint)[1]
                 for validator in self.parameter.validator:
                     validator = _resolve(validator, hint)
@@ -1056,6 +1062,9 @@ class Argument:
         if self.parameter.show is not None:
             # User explicitly set show
             return self.parameter.show
+        if not self.parameter.name and not self.field_info.is_positional_only:
+            # Nothing to render (e.g. PEP-692 Unpack[EmptyTypedDict] kwargs parent).
+            return False
         # Default to whether this argument is parsed
         return self.parse
 
