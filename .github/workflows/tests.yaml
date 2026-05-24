@@ -41,6 +41,10 @@ jobs:
         run: |
           echo 'ACTIVATE_PYTHON_VENV=.venv/bin/activate' >> $GITHUB_ENV
 
+      - name: Install zsh (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
