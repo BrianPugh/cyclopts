@@ -333,7 +333,11 @@ class ZshCompletionTester(CompletionTesterBase):
                 "TERM": "dumb",
             }
             child = pexpect.spawn(
-                "zsh -i",
+                # --no-globalrcs skips /etc/zsh/{zshenv,zprofile,zshrc,...}; Ubuntu's
+                # /etc/zsh/zshrc calls bare `compinit`, which blocks on the
+                # "insecure directories" prompt on GitHub-hosted runners before our
+                # own `compinit -u` below has a chance to run.
+                "zsh --no-globalrcs -i",
                 encoding="utf-8",
                 env=env_vars,  # pyright: ignore[reportArgumentType]
                 timeout=5,
