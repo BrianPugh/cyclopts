@@ -202,12 +202,24 @@ class FishCompletionTester(CompletionTesterBase):
                 raise RuntimeError(
                     f"fish driver failed (exit {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
                 )
-            # `complete -C` prints "completion\tdescription" per line (description optional).
+            # ``complete -C`` prints the *full* token that would replace the
+            # current word ("completion\tdescription" per line). For
+            # ``--opt=p`` the returned token is ``--opt=prod``, but bash's
+            # driver splits on ``=`` (COMP_WORDBREAKS) and zsh's compsys
+            # consumes the ``--opt=`` prefix via ``compset -P`` — both yield
+            # ``prod`` directly. Strip the matching prefix here so the
+            # cross-shell behavioral assertions can compare values uniformly.
+            current_word = "" if partial_command.endswith(" ") else partial_command.rsplit(maxsplit=1)[-1]
+            eq_prefix = current_word[: current_word.rindex("=") + 1] if "=" in current_word else ""
+
             completions = []
             for line in result.stdout.splitlines():
                 if not line:
                     continue
-                completions.append(line.split("\t", 1)[0])
+                token = line.split("\t", 1)[0]
+                if eq_prefix and token.startswith(eq_prefix):
+                    token = token[len(eq_prefix) :]
+                completions.append(token)
             return completions
 
 
