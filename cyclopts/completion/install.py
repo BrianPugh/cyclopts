@@ -62,14 +62,17 @@ def get_default_completion_path(shell: Literal["zsh", "bash", "fish"], prog_name
     """
     home = Path.home()
     if shell == "zsh":
+        # Namespace the file as ``_cyclopts_<prog>`` so the autoload entry
+        # doesn't shadow zsh helpers (``_files``, ``_directories``, etc.) when
+        # ``<prog>`` happens to match one.
         omz_completions = _detect_omz_completions_dir()
         if omz_completions is not None:
             omz_completions.mkdir(parents=True, exist_ok=True)
-            return omz_completions / f"_{prog_name}"
+            return omz_completions / f"_cyclopts_{prog_name}"
         # Vanilla zsh fallback
         zsh_completions = home / ".zsh" / "completions"
         zsh_completions.mkdir(parents=True, exist_ok=True)
-        return zsh_completions / f"_{prog_name}"
+        return zsh_completions / f"_cyclopts_{prog_name}"
     elif shell == "bash":
         bash_completions = home / ".local" / "share" / "bash-completion" / "completions"
         bash_completions.mkdir(parents=True, exist_ok=True)
