@@ -41,9 +41,13 @@ jobs:
         run: |
           echo 'ACTIVATE_PYTHON_VENV=.venv/bin/activate' >> $GITHUB_ENV
 
-      - name: Install zsh (Linux)
+      - name: Install zsh and fish (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh fish
+
+      - name: Install fish (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish
 
       - name: Check out repository
         uses: actions/checkout@v4
