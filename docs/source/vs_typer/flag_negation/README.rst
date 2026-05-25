@@ -26,6 +26,7 @@ Overriding the option's name will disable Typer's negative-flag generation logic
 
    import typer
    from typing import Annotated
+   from typer import Option
 
    typer_app = typer.Typer()
 
@@ -44,6 +45,8 @@ To use a different negative flag, you can supply the name after a slash in your 
 .. code-block:: python
 
    import typer
+   from typing import Annotated
+   from typer import Option
 
    typer_app = typer.Typer()
 
