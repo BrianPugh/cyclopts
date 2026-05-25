@@ -294,7 +294,7 @@ class ZshCompletionTester(CompletionTesterBase):
 
     def validate_script_syntax(self) -> bool:
         with tempfile.TemporaryDirectory() as tmpdir:
-            comp_file = Path(tmpdir) / f"_{self.prog_name}"
+            comp_file = Path(tmpdir) / f"_cyclopts_{self.prog_name}"
             comp_file.write_text(self.completion_script)
             result = subprocess.run(
                 ["zsh", "-n", str(comp_file)],
@@ -312,7 +312,7 @@ class ZshCompletionTester(CompletionTesterBase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            (td / f"_{self.prog_name}").write_text(self.completion_script)
+            (td / f"_cyclopts_{self.prog_name}").write_text(self.completion_script)
 
             (td / ".zshrc").write_text(
                 "PROMPT='ZTEST> '\n"
