@@ -33,3 +33,38 @@ def test_handler(app):
         return "Sync handler works"
 
     assert app("command") == "Sync handler works"
+
+
+def test_interactive_shell_async_command(mocker, console):
+    """Async commands should be run with the trio backend in the interactive shell.
+
+    See https://github.com/BrianPugh/cyclopts/issues/826
+    """
+    app = App(backend="trio")
+
+    mocker.patch(
+        "cyclopts.core.input",
+        side_effect=[
+            "start",
+            "quit",
+        ],
+    )
+
+    start_called = 0
+
+    @app.command
+    async def start():
+        nonlocal start_called
+        assert sniffio.current_async_library() == "trio"
+        await trio.lowlevel.checkpoint()  # Ensure trio is functioning
+        start_called += 1
+        return "Started!"
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console)
+
+    actual = capture.get()
+
+    assert start_called == 1
+    assert "Started!" in actual
+    assert "coroutine object" not in actual

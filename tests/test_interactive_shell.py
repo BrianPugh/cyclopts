@@ -239,6 +239,39 @@ def test_interactive_shell_result_action_callable(app, mocker, console):
     assert results == ["CUSTOM: Hello Alice!"]
 
 
+def test_interactive_shell_async_command(mocker, console):
+    """Async commands should be run, not returned as un-awaited coroutines.
+
+    See https://github.com/BrianPugh/cyclopts/issues/826
+    """
+    app = App(backend="asyncio")
+
+    mocker.patch(
+        "cyclopts.core.input",
+        side_effect=[
+            "start",
+            "quit",
+        ],
+    )
+
+    start_called = 0
+
+    @app.command
+    async def start():
+        nonlocal start_called
+        start_called += 1
+        return "Started!"
+
+    with console.capture() as capture:
+        app.interactive_shell(console=console)
+
+    actual = capture.get()
+
+    assert start_called == 1
+    assert "Started!" in actual
+    assert "coroutine object" not in actual
+
+
 def test_interactive_shell_no_sys_exit_on_command(app, mocker, console):
     """Test that commands continue to execute (no sys.exit called) in interactive shell."""
     mocker.patch(
