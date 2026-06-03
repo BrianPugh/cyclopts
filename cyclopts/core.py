@@ -2608,7 +2608,10 @@ class App:
                 def dispatcher(command: Callable, bound: inspect.BoundArguments, ignored: dict[str, Any]) -> Any:
                     return command(*bound.args, **bound.kwargs)
 
-            The above is the default dispatcher implementation.
+            The default dispatcher additionally runs ``async`` commands using the
+            resolved :attr:`App.backend` (defaulting to ``"asyncio"``), mirroring
+            :meth:`App.__call__`. A custom ``dispatcher`` is responsible for handling
+            async commands itself (e.g. via :func:`asyncio.run`).
         console: Console | None
             Rich Console to use for output. If :obj:`None`, uses :attr:`App.console`.
         exit_on_error: bool
@@ -2634,7 +2637,8 @@ class App:
             quit = [quit]
 
         def default_dispatcher(command, bound, _):
-            return command(*bound.args, **bound.kwargs)
+            resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
+            return _run_maybe_async_command(command, bound, resolved_backend)
 
         if dispatcher is None:
             dispatcher = default_dispatcher
