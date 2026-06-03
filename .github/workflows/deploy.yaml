@@ -26,6 +26,7 @@ jobs:
 
   publish:
     needs: build
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -38,4 +39,3 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@v1.14.0
-        if: github.event_name != 'workflow_dispatch'
