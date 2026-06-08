@@ -160,11 +160,15 @@ def maybe_apply_auto_alias(
     used_short_aliases: set[str] | None,
 ) -> Parameter:
     """Add a one-letter CLI alias when enabled by upstream ``Parameter.auto_alias``."""
+    if "alias" in immediate_parameter._provided_args:
+        if used_short_aliases is not None and immediate_parameter.alias:
+            used_short_aliases.update(immediate_parameter.alias)
+        return cparam
     if not cparam.auto_alias:
         return cparam
-    if "alias" in immediate_parameter._provided_args:
-        return cparam
     if cparam.alias:
+        if used_short_aliases is not None:
+            used_short_aliases.update(cparam.alias)
         return cparam
     if used_short_aliases is None:
         return cparam
@@ -175,12 +179,13 @@ def maybe_apply_auto_alias(
     if not name:
         return cparam
 
-    short = f"-{name[0].lower()}"
-    if short in used_short_aliases:
-        return cparam
+    letter = name[0].lower()
+    for short in (f"-{letter}", f"-{letter.upper()}"):
+        if short not in used_short_aliases:
+            used_short_aliases.add(short)
+            return Parameter.combine(cparam, Parameter(alias=short))
 
-    used_short_aliases.add(short)
-    return Parameter.combine(cparam, Parameter(alias=short))
+    return cparam
 
 
 def extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:

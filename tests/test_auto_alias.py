@@ -52,19 +52,36 @@ def test_auto_alias_explicit_alias_overrides():
     assert app("deploy -E prod -r 5") == ("prod", 5)
 
 
-def test_auto_alias_skips_collision():
+def test_auto_alias_same_letter_lowercase_then_uppercase():
     app = App(result_action="return_value")
 
     @app.command(default_parameter=Parameter(auto_alias=True))
     def deploy(*, env: str, endpoint: str):
         return env, endpoint
 
-    collection = app["deploy"].assemble_argument_collection()
-    env_arg = _arg_named(collection, "env")
-    endpoint_arg = _arg_named(collection, "endpoint")
+    assert app("deploy -e dev -E api") == ("dev", "api")
 
-    assert "-e" in env_arg.parameter.name
-    assert "-e" not in endpoint_arg.parameter.name
+    collection = app["deploy"].assemble_argument_collection()
+
+    assert "-e" in _arg_named(collection, "env").parameter.name
+    assert "-E" in _arg_named(collection, "endpoint").parameter.name
+
+
+def test_auto_alias_same_letter_third_gets_none():
+    app = App(result_action="return_value")
+
+    @app.command(default_parameter=Parameter(auto_alias=True))
+    def deploy(*, env: str, endpoint: str, extra: str):
+        return env, endpoint, extra
+
+    collection = app["deploy"].assemble_argument_collection()
+
+    assert "-e" in _arg_named(collection, "env").parameter.name
+    assert "-E" in _arg_named(collection, "endpoint").parameter.name
+
+    extra_arg = _arg_named(collection, "extra")
+    assert "-e" not in extra_arg.parameter.name
+    assert "-E" not in extra_arg.parameter.name
 
 
 def test_auto_alias_skips_positional():
@@ -75,11 +92,9 @@ def test_auto_alias_skips_positional():
         return env, replicas
 
     collection = app["deploy"].assemble_argument_collection()
-    env_arg = _arg_named(collection, "env")
-    replicas_arg = _arg_named(collection, "replicas")
 
-    assert "-e" not in env_arg.parameter.name
-    assert "-r" in replicas_arg.parameter.name
+    assert "-e" not in _arg_named(collection, "env").parameter.name
+    assert "-r" in _arg_named(collection, "replicas").parameter.name
 
 
 def test_auto_alias_from_argument_collection():
@@ -109,10 +124,10 @@ def test_auto_alias_command_kwarg_combines_with_default_parameter():
         return env, flag
 
     collection = app["deploy"].assemble_argument_collection()
-    env_arg = _arg_named(collection, "env")
-    flag_arg = _arg_named(collection, "flag")
 
-    assert "-e" in env_arg.parameter.name
+    assert "-e" in _arg_named(collection, "env").parameter.name
+
+    flag_arg = _arg_named(collection, "flag")
     assert "-f" in flag_arg.parameter.name
     assert not flag_arg.negatives
 
