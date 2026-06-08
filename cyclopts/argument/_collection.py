@@ -440,6 +440,7 @@ class ArgumentCollection(list[Argument]):
         group_parameters: Group | None = None,
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
+        reserved: Iterable[str] | None = None,
     ):
         out = cls()
 
@@ -463,7 +464,7 @@ class ArgumentCollection(list[Argument]):
 
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
-        used_short_aliases: set[str] = set()
+        used_short_aliases: set[str] = set(reserved or ())
         for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {

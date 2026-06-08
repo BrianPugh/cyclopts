@@ -89,6 +89,35 @@ def test_auto_alias_combines_with_default_parameter(app):
     assert not collection["--flag"].negatives
 
 
+def test_auto_alias_skips_help_flag(app, assert_parse_args):
+    @app.command(auto_alias=True)
+    def connect(*, host: str, port: int):
+        pass
+
+    collection = app["connect"].assemble_argument_collection()
+    assert "-h" not in collection["--host"].parameter.name
+    assert "-H" in collection["--host"].parameter.name
+    assert_parse_args(connect, "connect -H localhost -p 8080", host="localhost", port=8080)
+
+
+def test_auto_alias_uses_help_flag_when_unreserved(app):
+    @app.command(auto_alias=True, help_flags=["--help"])
+    def connect(*, host: str):
+        pass
+
+    collection = app["connect"].assemble_argument_collection()
+    assert "-h" in collection["--host"].parameter.name
+
+
+def test_auto_alias_skips_version_flag(app):
+    @app.command(auto_alias=True, version_flags=["-v", "--version"])
+    def main(*, verbose: bool = False):
+        pass
+
+    collection = app["main"].assemble_argument_collection()
+    assert "-v" not in collection["--verbose"].parameter.name
+
+
 def test_auto_alias_help(app, console):
     @app.command(auto_alias=True)
     def deploy(*, env: str, replicas: int = 10):
