@@ -26,6 +26,7 @@ from .utils import (
     KIND_PARENT_CHILD_REASSIGNMENT,
     PARAMETER_SUBKEY_BLOCKER,
     extract_docstring_help,
+    maybe_apply_auto_alias,
     resolve_parameter_name,
     to_cli_option_name,
     walk_leaves,
@@ -240,6 +241,7 @@ class ArgumentCollection(list[Argument]):
         parse_docstring: bool = True,
         docstring_lookup: dict[tuple[str, ...], Parameter] | None = None,
         positional_index: int | None = None,
+        used_short_aliases: set[str] | None = None,
         _resolve_groups: bool = True,
     ):
         from cyclopts.parameter import get_parameters
@@ -318,6 +320,7 @@ class ArgumentCollection(list[Argument]):
                 PARAMETER_SUBKEY_BLOCKER,
                 immediate_parameter,
             )
+            cparam = maybe_apply_auto_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
@@ -333,6 +336,7 @@ class ArgumentCollection(list[Argument]):
                 upstream_parameter,
                 immediate_parameter,
             )
+            cparam = maybe_apply_auto_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             assert isinstance(cparam.alias, tuple)
             if cparam.name:
                 if field_info.is_keyword:
@@ -412,6 +416,7 @@ class ArgumentCollection(list[Argument]):
                     parse_docstring=parse_docstring,
                     docstring_lookup=subkey_docstring_lookup,
                     positional_index=positional_index,
+                    used_short_aliases=used_short_aliases,
                     _resolve_groups=_resolve_groups,
                 )
                 if subkey_argument_collection:
@@ -458,6 +463,7 @@ class ArgumentCollection(list[Argument]):
 
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
+        used_short_aliases: set[str] = set()
         for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
@@ -474,6 +480,7 @@ class ArgumentCollection(list[Argument]):
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
                 positional_index=positional_index,
+                used_short_aliases=used_short_aliases,
                 parse_docstring=parse_docstring,
                 docstring_lookup=subkey_docstring_lookup,
                 _resolve_groups=_resolve_groups,

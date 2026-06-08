@@ -153,6 +153,36 @@ def enum_flag_from_dict(
     return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)
 
 
+def maybe_apply_auto_alias(
+    cparam: Parameter,
+    field_info: FieldInfo,
+    immediate_parameter: Parameter,
+    used_short_aliases: set[str] | None,
+) -> Parameter:
+    """Add a one-letter CLI alias when enabled by upstream ``Parameter.auto_alias``."""
+    if not cparam.auto_alias:
+        return cparam
+    if "alias" in immediate_parameter._provided_args:
+        return cparam
+    if cparam.alias:
+        return cparam
+    if used_short_aliases is None:
+        return cparam
+    if field_info.kind is not field_info.KEYWORD_ONLY:
+        return cparam
+
+    name = field_info.names[0]
+    if not name:
+        return cparam
+
+    short = f"-{name[0].lower()}"
+    if short in used_short_aliases:
+        return cparam
+
+    used_short_aliases.add(short)
+    return Parameter.combine(cparam, Parameter(alias=short))
+
+
 def extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:
     from docstring_parser import parse_from_object
 

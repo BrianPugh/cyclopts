@@ -336,6 +336,12 @@ class Parameter:
         kw_only=True,
     )
 
+    auto_alias: bool = field(
+        default=None,
+        converter=_default_if_none_false,
+        kw_only=True,
+    )
+
     allow_repeating: bool | None = field(
         default=None,
         kw_only=True,
