@@ -464,19 +464,28 @@ class ArgumentCollection(list[Argument]):
 
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
+        params = signature_parameters(func).values()
         used_short_aliases: set[str] = set(reserved or ())
-        for field_info in signature_parameters(func).values():
+        has_star = any(p.kind is p.KEYWORD_ONLY for p in params)
+        for field_info in params:
             if parse_docstring:
                 subkey_docstring_lookup = {
                     k[1:]: v for k, v in docstring_lookup.items() if k[0] == field_info.name and len(k) > 1
                 }
             else:
                 subkey_docstring_lookup = None
+            auto_alias = field_info.kind is field_info.KEYWORD_ONLY or (
+                field_info.kind is field_info.POSITIONAL_OR_KEYWORD and not has_star and not field_info.required
+            )
+            field_parameters: list[Parameter | None] = [
+                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
+                None if auto_alias else Parameter(auto_alias=False),
+            ]
             iparam_argument_collection = cls._from_type(
                 field_info,
                 (),
                 *default_parameters,
-                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
+                *field_parameters,
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,

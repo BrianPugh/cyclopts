@@ -172,7 +172,7 @@ def maybe_apply_auto_alias(
         return cparam
     if used_short_aliases is None:
         return cparam
-    if field_info.kind is not field_info.KEYWORD_ONLY:
+    if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
         return cparam
 
     name = field_info.names[0]

@@ -15,7 +15,7 @@ from cyclopts.argument import ArgumentCollection
 )
 def test_auto_alias_parses(app, assert_parse_args, cmd, kwargs):
     @app.command(auto_alias=True)
-    def deploy(*, env: str, replicas: int = 10):
+    def deploy(env: str = "staging", replicas: int = 10):
         pass
 
     assert_parse_args(deploy, cmd, **kwargs)
@@ -23,11 +23,11 @@ def test_auto_alias_parses(app, assert_parse_args, cmd, kwargs):
 
 def test_auto_alias_opt_out(app, assert_parse_args):
     @app.command(auto_alias=True)
-    def aliased(*, env: str):
+    def aliased(env: str = "prod"):
         pass
 
     @app.command
-    def plain(*, env: str):
+    def plain(env: str = "prod"):
         pass
 
     assert_parse_args(aliased, "aliased -e prod", env="prod")
@@ -37,7 +37,7 @@ def test_auto_alias_opt_out(app, assert_parse_args):
 
 def test_auto_alias_explicit_alias(app, assert_parse_args):
     @app.command(auto_alias=True)
-    def deploy(*, env: Annotated[str, Parameter(alias="-E")], replicas: int = 10):
+    def deploy(env: Annotated[str, Parameter(alias="-E")] = "prod", replicas: int = 10):
         pass
 
     assert_parse_args(deploy, "deploy -E prod -r 5", env="prod", replicas=5)
@@ -45,14 +45,14 @@ def test_auto_alias_explicit_alias(app, assert_parse_args):
 
 def test_auto_alias_same_letter(app, assert_parse_args):
     @app.command(auto_alias=True)
-    def deploy(*, env: str, endpoint: str):
+    def deploy(env: str = "dev", endpoint: str = "api"):
         pass
 
     assert_parse_args(deploy, "deploy -e dev -E api", env="dev", endpoint="api")
 
 
 def test_auto_alias_assignment():
-    def keyword(*, env: str, endpoint: str, extra: str, replicas: int = 10):
+    def keyword(env: str = "a", endpoint: str = "b", extra: str = "c", replicas: int = 10):
         pass
 
     def positional(env, /, *, replicas: int = 10):
@@ -73,7 +73,7 @@ def test_auto_alias_on_app_default():
     app = App(auto_alias=True, result_action="return_value")
 
     @app.default
-    def main(*, env: str):
+    def main(env: str = "prod"):
         return env
 
     assert app("-e prod") == "prod"
@@ -81,7 +81,7 @@ def test_auto_alias_on_app_default():
 
 def test_auto_alias_combines_with_default_parameter(app):
     @app.command(auto_alias=True, default_parameter=Parameter(negative=""))
-    def deploy(*, env: str, flag: bool = False):
+    def deploy(env: str = "prod", flag: bool = False):
         pass
 
     collection = app["deploy"].assemble_argument_collection()
@@ -91,18 +91,18 @@ def test_auto_alias_combines_with_default_parameter(app):
 
 def test_auto_alias_skips_help_flag(app, assert_parse_args):
     @app.command(auto_alias=True)
-    def connect(*, host: str, port: int):
+    def connect(host: str = "localhost", port: int = 8080):
         pass
 
     collection = app["connect"].assemble_argument_collection()
     assert "-h" not in collection["--host"].parameter.name
     assert "-H" in collection["--host"].parameter.name
-    assert_parse_args(connect, "connect -H localhost -p 8080", host="localhost", port=8080)
+    assert_parse_args(connect, "connect -H localhost -p 9000", host="localhost", port=9000)
 
 
 def test_auto_alias_uses_help_flag_when_unreserved(app):
     @app.command(auto_alias=True, help_flags=["--help"])
-    def connect(*, host: str):
+    def connect(host: str = "localhost"):
         pass
 
     collection = app["connect"].assemble_argument_collection()
@@ -111,7 +111,7 @@ def test_auto_alias_uses_help_flag_when_unreserved(app):
 
 def test_auto_alias_skips_version_flag(app):
     @app.command(auto_alias=True, version_flags=["-v", "--version"])
-    def main(*, verbose: bool = False):
+    def main(verbose: bool = False):
         pass
 
     collection = app["main"].assemble_argument_collection()
@@ -120,7 +120,7 @@ def test_auto_alias_skips_version_flag(app):
 
 def test_auto_alias_help(app, console):
     @app.command(auto_alias=True)
-    def deploy(*, env: str, replicas: int = 10):
+    def deploy(env: str = "staging", replicas: int = 10):
         """Deploy."""
 
     with console.capture() as capture:
