@@ -1277,7 +1277,7 @@ API
 
       .. code-block:: python
 
-         input_file: Annotated[Path, Parameter(show_default="automatic")] = None
+         input_file: Annotated[Path | None, Parameter(show_default="automatic")] = None
 
       Results in ``[default: automatic]`` on the help page.
 
