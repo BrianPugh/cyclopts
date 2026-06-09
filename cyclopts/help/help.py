@@ -493,7 +493,9 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         env_var = tuple(argument.parameter.env_var)
 
     default = None
-    if argument.show_default:
+    if isinstance(argument.show_default, str):
+        default = argument.show_default
+    elif argument.show_default:
         default_val = argument.field_info.default
         if is_class_and_subclass(argument.hint, Enum):
             default = argument.parameter.name_transform(default_val.name)

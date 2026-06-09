@@ -783,6 +783,25 @@ def test_help_format_group_parameters_defaults_no_show(capture_format_group_para
     assert actual == expected
 
 
+def test_help_format_group_parameters_show_default_string(capture_format_group_parameters):
+    def cmd(
+        foo: Annotated[str, Parameter(show_default="automatic", help="Docstring for foo.")] = "fizz",
+        bar: Annotated[str | None, Parameter(show_default="automatic", help="Docstring for bar.")] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  Docstring for foo. [default: automatic]                 │
+        │ BAR --bar  Docstring for bar. [default: automatic]                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_dataclass_default_parameter_negative_propagation(app, console):
     app.default_parameter = Parameter(negative=())
 
