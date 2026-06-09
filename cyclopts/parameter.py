@@ -239,7 +239,7 @@ class Parameter:
         kw_only=True,
     )
 
-    show_default: None | bool | Callable[[Any], Any] = field(
+    show_default: None | bool | str | Callable[[Any], Any] = field(
         default=None,
         kw_only=True,
     )

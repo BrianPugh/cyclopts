@@ -316,12 +316,14 @@ class Argument:
         return any(dict in (arg, get_origin(arg)) for arg in args)
 
     @property
-    def show_default(self) -> bool | Callable[[Any], str]:
+    def show_default(self) -> bool | str | Callable[[Any], str]:
         """Show the default value on the help page."""
         if self.required:
             return False
         elif self.parameter.show_default is None:
             return self.field_info.default not in (None, self.field_info.empty)
+        elif isinstance(self.parameter.show_default, str):
+            return self.parameter.show_default
         elif (self.field_info.default is self.field_info.empty) or not self.parameter.show_default:
             return False
         else:

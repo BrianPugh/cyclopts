@@ -1266,11 +1266,20 @@ API
       Defaults to whether the parameter is :attr:`parsed <.Parameter.parse>` (usually :obj:`True`).
 
    .. attribute:: show_default
-      :type: Union[None, bool, Callable[[Any], Any]]
+      :type: Union[None, bool, str, Callable[[Any], Any]]
       :value: None
 
       If a variable has a default, display the default on the help page.
       Defaults to :obj:`None`, similar to :obj:`True`, but will **not** display the default if it is :obj:`None`.
+
+      If set to a string, that string is displayed verbatim as the default value, regardless of the actual default.
+      This is useful when the real default cannot be known at help-time (e.g. a value resolved at runtime):
+
+      .. code-block:: python
+
+         input_file: Annotated[Path, Parameter(show_default="automatic")] = None
+
+      Results in ``[default: automatic]`` on the help page.
 
       If set to a function with signature:
 
