@@ -153,18 +153,15 @@ def enum_flag_from_dict(
     return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)
 
 
-def maybe_apply_auto_alias(
+def resolve_short_alias(
     cparam: Parameter,
     field_info: FieldInfo,
     immediate_parameter: Parameter,
     used_short_aliases: set[str] | None,
 ) -> Parameter:
-    """Add a one-letter CLI alias when enabled by upstream ``Parameter.auto_alias``."""
     if "alias" in immediate_parameter._provided_args:
         if used_short_aliases is not None and immediate_parameter.alias:
             used_short_aliases.update(immediate_parameter.alias)
-        return cparam
-    if not cparam.auto_alias:
         return cparam
     if cparam.alias:
         if used_short_aliases is not None:
@@ -172,20 +169,25 @@ def maybe_apply_auto_alias(
         return cparam
     if used_short_aliases is None:
         return cparam
-    if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
+
+    short = None
+    auto_alias = cparam.auto_alias
+    if callable(auto_alias):
+        short = auto_alias(field_info, used_short_aliases)
+    elif auto_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
+        name = field_info.names[0]
+        if name:
+            letter = name[0].lower()
+            for candidate in (f"-{letter}", f"-{letter.upper()}"):
+                if candidate not in used_short_aliases:
+                    short = candidate
+                    break
+
+    if not short:
         return cparam
-
-    name = field_info.names[0]
-    if not name:
-        return cparam
-
-    letter = name[0].lower()
-    for short in (f"-{letter}", f"-{letter.upper()}"):
-        if short not in used_short_aliases:
-            used_short_aliases.add(short)
-            return Parameter.combine(cparam, Parameter(alias=short))
-
-    return cparam
+    shorts = (short,) if isinstance(short, str) else tuple(short)
+    used_short_aliases.update(shorts)
+    return Parameter.combine(cparam, Parameter(alias=shorts if len(shorts) != 1 else shorts[0]))
 
 
 def extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:

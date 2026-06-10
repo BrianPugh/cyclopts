@@ -52,6 +52,18 @@ def test_auto_alias_same_letter(app, assert_parse_args):
     assert_parse_args(deploy, "deploy -e dev -E api", env="dev", endpoint="api")
 
 
+def test_auto_alias_callable():
+    def fn(host: str = "localhost", port: int = 8080):
+        pass
+
+    collection = ArgumentCollection._from_callable(
+        fn,
+        Parameter(auto_alias=lambda field_info, _: f"-{field_info.names[0][0].upper()}"),
+    )
+    assert collection[0].parameter.name == ("--host", "-H")
+    assert collection[1].parameter.name == ("--port", "-P")
+
+
 def test_auto_alias_assignment():
     def keyword(env: str = "a", endpoint: str = "b", extra: str = "c", replicas: int = 10):
         pass

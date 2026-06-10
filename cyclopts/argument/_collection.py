@@ -26,8 +26,8 @@ from .utils import (
     KIND_PARENT_CHILD_REASSIGNMENT,
     PARAMETER_SUBKEY_BLOCKER,
     extract_docstring_help,
-    maybe_apply_auto_alias,
     resolve_parameter_name,
+    resolve_short_alias,
     to_cli_option_name,
     walk_leaves,
 )
@@ -320,7 +320,7 @@ class ArgumentCollection(list[Argument]):
                 PARAMETER_SUBKEY_BLOCKER,
                 immediate_parameter,
             )
-            cparam = maybe_apply_auto_alias(cparam, field_info, immediate_parameter, used_short_aliases)
+            cparam = resolve_short_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
@@ -336,7 +336,7 @@ class ArgumentCollection(list[Argument]):
                 upstream_parameter,
                 immediate_parameter,
             )
-            cparam = maybe_apply_auto_alias(cparam, field_info, immediate_parameter, used_short_aliases)
+            cparam = resolve_short_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             assert isinstance(cparam.alias, tuple)
             if cparam.name:
                 if field_info.is_keyword:
