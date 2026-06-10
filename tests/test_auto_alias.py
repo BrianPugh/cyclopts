@@ -32,7 +32,8 @@ def test_auto_alias_opt_out(app, assert_parse_args):
 
     assert_parse_args(aliased, "aliased -e prod", env="prod")
     assert_parse_args(plain, "plain --env prod", env="prod")
-    assert "-e" not in app["plain"].assemble_argument_collection()["--env"].parameter.name
+    collection = app["plain"].assemble_argument_collection()
+    assert collection[0].parameter.name == ("--env",)
 
 
 def test_auto_alias_explicit_alias(app, assert_parse_args):
@@ -59,14 +60,14 @@ def test_auto_alias_assignment():
         pass
 
     collection = ArgumentCollection._from_callable(keyword, Parameter(auto_alias=True))
-    assert "-e" in collection["--env"].parameter.name
-    assert "-E" in collection["--endpoint"].parameter.name
-    assert "-e" not in collection["--extra"].parameter.name
-    assert "-r" in collection["--replicas"].parameter.name
+    assert collection[0].parameter.name == ("--env", "-e")
+    assert collection[1].parameter.name == ("--endpoint", "-E")
+    assert collection[2].parameter.name == ("--extra",)
+    assert collection[3].parameter.name == ("--replicas", "-r")
 
     positional_collection = ArgumentCollection._from_callable(positional, Parameter(auto_alias=True))
-    assert "-e" not in positional_collection["ENV"].parameter.name
-    assert "-r" in positional_collection["--replicas"].parameter.name
+    assert positional_collection[0].parameter.name == ("ENV",)
+    assert positional_collection[1].parameter.name == ("--replicas", "-r")
 
 
 def test_auto_alias_on_app_default():
@@ -85,8 +86,8 @@ def test_auto_alias_combines_with_default_parameter(app):
         pass
 
     collection = app["deploy"].assemble_argument_collection()
-    assert "-f" in collection["--flag"].parameter.name
-    assert not collection["--flag"].negatives
+    assert collection[1].parameter.name == ("--flag", "-f")
+    assert not collection[1].negatives
 
 
 def test_auto_alias_skips_help_flag(app, assert_parse_args):
@@ -95,8 +96,7 @@ def test_auto_alias_skips_help_flag(app, assert_parse_args):
         pass
 
     collection = app["connect"].assemble_argument_collection()
-    assert "-h" not in collection["--host"].parameter.name
-    assert "-H" in collection["--host"].parameter.name
+    assert collection[0].parameter.name == ("--host", "-H")
     assert_parse_args(connect, "connect -H localhost -p 9000", host="localhost", port=9000)
 
 
@@ -106,7 +106,7 @@ def test_auto_alias_uses_help_flag_when_unreserved(app):
         pass
 
     collection = app["connect"].assemble_argument_collection()
-    assert "-h" in collection["--host"].parameter.name
+    assert collection[0].parameter.name == ("--host", "-h")
 
 
 def test_auto_alias_skips_version_flag(app):
@@ -115,7 +115,7 @@ def test_auto_alias_skips_version_flag(app):
         pass
 
     collection = app["main"].assemble_argument_collection()
-    assert "-v" not in collection["--verbose"].parameter.name
+    assert collection[0].parameter.name == ("--verbose", "-V")
 
 
 def test_auto_alias_help(app, console):

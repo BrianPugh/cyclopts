@@ -1562,7 +1562,9 @@ class App:
             group_arguments=self._group_arguments,  # pyright: ignore
             group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
-            reserved=(f for f in (*self.help_flags, *self.version_flags) if len(f) == 2 and f[0] == "-" and f[1] != "-"),
+            reserved=(
+                f for f in (*self.help_flags, *self.version_flags) if len(f) == 2 and f[0] == "-" and f[1] != "-"
+            ),
         )
 
     def parse_known_args(
