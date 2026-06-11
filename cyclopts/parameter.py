@@ -580,7 +580,7 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     Returns
     -------
     hint
-        Annotation hint with :obj:`Annotated` and :obj:`Optional` resolved.
+        Annotation hint with :obj:`Annotated`, :obj:`Optional`, and :obj:`NewType` resolved.
     list[Parameter]
         List of parameters discovered, ordered by priority (lowest to highest):
         converter-decoration < type-decoration < annotation.
