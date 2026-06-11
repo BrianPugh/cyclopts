@@ -177,7 +177,7 @@ def _timedelta(s: str) -> timedelta:
 
 
 def _slice(s: str) -> slice:
-    """Parse a numpy-style slice string.
+    """Parse a string in slice notation.
 
     Examples: ``0:3``, ``:10``, ``0:100:5``, ``-10:``. Empty fields map to :obj:`None`.
 

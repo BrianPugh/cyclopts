@@ -770,7 +770,7 @@ Combining durations is also supported:
 *****
 slice
 *****
-Cyclopts supports parsing numpy-style slice strings into a :class:`slice` object.
+Cyclopts supports parsing slice-notation strings into a :class:`slice` object.
 The supplied value must contain 1 or 2 colons (``start:stop`` or ``start:stop:step``); empty fields map to :obj:`None`.
 
 - ``0:3`` - ``slice(0, 3)``
