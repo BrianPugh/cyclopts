@@ -30,6 +30,7 @@ from cyclopts.annotations import (
     is_union,
     resolve,
     resolve_annotated,
+    resolve_new_type,
     resolve_optional,
 )
 from cyclopts.field_info import get_field_infos, signature_parameters
@@ -584,21 +585,25 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
         List of parameters discovered, ordered by priority (lowest to highest):
         converter-decoration < type-decoration < annotation.
     """
-    hint = resolve_optional(hint)
-
     # Extract parameters from Annotated metadata.
-    # Loop to handle nested Annotated/Optional combinations, e.g.
-    # ``Annotated[cyclopts.types.ResolvedPath | None, Parameter()]`` where the inner
-    # ``ResolvedPath`` is itself an ``Annotated`` carrying a converter. After resolving
-    # the Optional, the hint can become Annotated again, so we keep unwrapping.
+    # Loop to handle nested Annotated/Optional/NewType combinations, e.g.
+    # ``Annotated[cyclopts.types.ResolvedPath | None, Parameter()]`` or a ``NewType``
+    # wrapping ``ResolvedPath`` -- the inner wrapper is itself an ``Annotated`` carrying a
+    # converter/validator that must not be lost. After unwrapping one layer the hint can
+    # become Annotated again, so we keep unwrapping until it stabilizes.
     annotated_params = []
-    while is_annotated(hint):
-        inner = get_args(hint)
-        hint = inner[0]
-        # Prepend so that more deeply nested annotations have lower priority than outer ones.
-        annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
-        # Resolve Optional again after unwrapping Annotated, since hint could be Type | None
+    while True:
+        hint_prev = hint
+        hint = cast(T, resolve_new_type(hint))
         hint = resolve_optional(hint)
+        if is_annotated(hint):
+            inner = get_args(hint)
+            hint = inner[0]
+            # Prepend so that more deeply nested annotations have lower priority than outer ones.
+            annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
+            continue
+        if hint == hint_prev:
+            break
 
     # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
     type_cyclopts_config_params = []
