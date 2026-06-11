@@ -171,6 +171,24 @@ def test_types_resolved_file_validation_error(convert, tmp_path):
         convert(ct.ResolvedFile, tmp_path)
 
 
+def test_types_resolved_path_optional_annotated_app(app, assert_parse_args):
+    """A ``cyclopts.types`` annotation wrapped in ``Annotated[... | None, Parameter()]``
+    should still apply its converter.
+
+    https://github.com/BrianPugh/cyclopts/issues/836
+    """
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    @app.default
+    def main(foo: Annotated[ct.ResolvedPath | None, Parameter()]):
+        pass
+
+    expected = Path("bar").resolve()
+    assert_parse_args(main, "bar", expected)
+
+
 def test_types_path_resolve_converter(convert, tmp_path):
     """Tests that ``_path_resolve_converter`` handles things like tuples correctly."""
     dir1 = tmp_path / "foo"
