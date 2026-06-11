@@ -586,12 +586,17 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     """
     hint = resolve_optional(hint)
 
-    # Extract parameters from Annotated metadata
+    # Extract parameters from Annotated metadata.
+    # Loop to handle nested Annotated/Optional combinations, e.g.
+    # ``Annotated[cyclopts.types.ResolvedPath | None, Parameter()]`` where the inner
+    # ``ResolvedPath`` is itself an ``Annotated`` carrying a converter. After resolving
+    # the Optional, the hint can become Annotated again, so we keep unwrapping.
     annotated_params = []
-    if is_annotated(hint):
+    while is_annotated(hint):
         inner = get_args(hint)
         hint = inner[0]
-        annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
+        # Prepend so that more deeply nested annotations have lower priority than outer ones.
+        annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
         # Resolve Optional again after unwrapping Annotated, since hint could be Type | None
         hint = resolve_optional(hint)
 
