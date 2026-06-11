@@ -2037,6 +2037,9 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.Path
    :members:
 
+.. autoclass:: cyclopts.validators.Slice
+   :members:
+
 
 .. _Annotated Types:
 

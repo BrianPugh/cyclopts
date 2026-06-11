@@ -814,9 +814,9 @@ def test_help_format_group_parameters_show_default_string(capture_format_group_p
     ],
 )
 def test_slice_to_str(value, expected):
-    from cyclopts.help.help import _slice_to_str
+    from cyclopts.utils import slice_to_str
 
-    assert _slice_to_str(value) == expected
+    assert slice_to_str(value) == expected
 
 
 def test_help_format_group_parameters_slice_default(capture_format_group_parameters):

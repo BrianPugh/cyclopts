@@ -19,7 +19,7 @@ from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
+from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables, slice_to_str
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -187,14 +187,6 @@ class HelpPanel:
 
 def _is_short(s):
     return not s.startswith("--") and s.startswith("-")
-
-
-def _slice_to_str(value: slice, /) -> str:
-    """Format a slice in cli/numpy-style syntax (e.g. ``0:100:5``)."""
-    parts = ["" if value.start is None else str(value.start), "" if value.stop is None else str(value.stop)]
-    if value.step is not None:
-        parts.append(str(value.step))
-    return ":".join(parts)
 
 
 def _categorize_keyword_arguments(argument_collection: "ArgumentCollection") -> tuple[list, list]:
@@ -526,7 +518,7 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
             else:
                 default = "{" + ", ".join(formatted_items) + "}"
         elif isinstance(default_val, slice):
-            default = _slice_to_str(default_val)
+            default = slice_to_str(default_val)
         elif default_val == "":
             default = '""'
         else:

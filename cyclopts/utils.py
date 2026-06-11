@@ -287,6 +287,14 @@ def is_option_like(token: str, *, allow_numbers=False) -> bool:
     return token.startswith("-")
 
 
+def slice_to_str(value: slice, /) -> str:
+    """Format a slice in slice notation (e.g. ``0:100:5``)."""
+    parts = ["" if value.start is None else str(value.start), "" if value.stop is None else str(value.stop)]
+    if value.step is not None:
+        parts.append(str(value.step))
+    return ":".join(parts)
+
+
 def is_builtin(obj: Any) -> bool:
     return getattr(obj, "__module__", "").split(".")[0] in stdlib_module_names
 

@@ -778,6 +778,9 @@ The supplied value must contain 1 or 2 colons (``start:stop`` or ``start:stop:st
 - ``0:100:5`` - ``slice(0, 100, 5)``
 - ``::-1`` - ``slice(None, None, -1)``
 
+By default an empty range (e.g. ``3:1``) is allowed.
+To reject empty slices, use the :class:`~cyclopts.validators.Slice` validator.
+
 ********************
 User-Defined Classes
 ********************

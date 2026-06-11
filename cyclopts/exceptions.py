@@ -12,7 +12,7 @@ from cyclopts.annotations import get_hint_name
 from cyclopts.command_spec import CommandSpec
 from cyclopts.group import Group
 from cyclopts.token import Token
-from cyclopts.utils import is_option_like, json_decode_error_verbosifier
+from cyclopts.utils import is_option_like, json_decode_error_verbosifier, slice_to_str
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -237,8 +237,9 @@ class ValidationError(CycloptsError):
             else:
                 provided_by = "" if not token.source or token.source == "cli" else f" provided by {token.source}"
                 name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
+                value_str = slice_to_str(value) if isinstance(value, slice) else f"{value}"
                 body.append(('Invalid value "', ""))
-                body.append((f"{value}", STYLE_OFFENDING_VALUE))
+                body.append((value_str, STYLE_OFFENDING_VALUE))
                 body.append(('" for ', ""))
                 body.append((name, STYLE_NAME))
                 if provided_by:
