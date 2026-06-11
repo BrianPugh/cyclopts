@@ -176,6 +176,27 @@ def _timedelta(s: str) -> timedelta:
     return timedelta(seconds=seconds)
 
 
+def _slice(s: str) -> slice:
+    """Parse a numpy-style slice string.
+
+    Examples: ``0:3``, ``:10``, ``0:100:5``, ``-10:``. Empty fields map to :obj:`None`.
+
+    Returns
+    -------
+    slice
+    """
+    parts = s.split(":")
+    if 2 <= len(parts) <= 3:
+        try:
+            return slice(*(int(part) if part.strip() else None for part in parts))
+        except ValueError:
+            pass
+    raise CoercionError(
+        target_type=slice,
+        msg=f'Unable to interpret "{s}" as a slice; expected "start:stop" or "start:stop:step" with integer or empty fields (e.g. "0:3", ":10", "0:100:5").',
+    )
+
+
 def get_enum_member(
     type_: type[E],
     token: Union["Token", str],
@@ -241,6 +262,7 @@ _converters: dict[Any, Callable] = {
     date: _date,
     datetime: _datetime,
     timedelta: _timedelta,
+    slice: _slice,
 }
 
 

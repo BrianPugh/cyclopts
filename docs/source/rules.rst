@@ -767,6 +767,17 @@ Combining durations is also supported:
 - "1h30m" - 1 hour and 30 minutes
 - "1d12h" - 1 day and 12 hours
 
+*****
+slice
+*****
+Cyclopts supports parsing numpy-style slice strings into a :class:`slice` object.
+The supplied value must contain 1 or 2 colons (``start:stop`` or ``start:stop:step``); empty fields map to :obj:`None`.
+
+- ``0:3`` - ``slice(0, 3)``
+- ``:10`` - ``slice(None, 10)``
+- ``0:100:5`` - ``slice(0, 100, 5)``
+- ``::-1`` - ``slice(None, None, -1)``
+
 ********************
 User-Defined Classes
 ********************
