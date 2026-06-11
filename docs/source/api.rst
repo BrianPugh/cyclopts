@@ -2280,6 +2280,13 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 
 .. autodata:: cyclopts.types.Int64
 
+^^^^^
+Slice
+^^^^^
+Annotated types for parsing :class:`slice` objects from the CLI.
+
+.. autodata:: cyclopts.types.NonEmptySlice
+
 ^^^^
 Json
 ^^^^
