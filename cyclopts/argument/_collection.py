@@ -27,6 +27,7 @@ from .utils import (
     PARAMETER_SUBKEY_BLOCKER,
     extract_docstring_help,
     resolve_parameter_name,
+    resolve_short_alias,
     to_cli_option_name,
     walk_leaves,
 )
@@ -240,6 +241,7 @@ class ArgumentCollection(list[Argument]):
         parse_docstring: bool = True,
         docstring_lookup: dict[tuple[str, ...], Parameter] | None = None,
         positional_index: int | None = None,
+        used_short_aliases: set[str] | None = None,
         _resolve_groups: bool = True,
     ):
         from cyclopts.parameter import get_parameters
@@ -318,6 +320,7 @@ class ArgumentCollection(list[Argument]):
                 PARAMETER_SUBKEY_BLOCKER,
                 immediate_parameter,
             )
+            cparam = resolve_short_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
@@ -333,6 +336,7 @@ class ArgumentCollection(list[Argument]):
                 upstream_parameter,
                 immediate_parameter,
             )
+            cparam = resolve_short_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             assert isinstance(cparam.alias, tuple)
             if cparam.name:
                 if field_info.is_keyword:
@@ -412,6 +416,7 @@ class ArgumentCollection(list[Argument]):
                     parse_docstring=parse_docstring,
                     docstring_lookup=subkey_docstring_lookup,
                     positional_index=positional_index,
+                    used_short_aliases=used_short_aliases,
                     _resolve_groups=_resolve_groups,
                 )
                 if subkey_argument_collection:
@@ -435,6 +440,7 @@ class ArgumentCollection(list[Argument]):
         group_parameters: Group | None = None,
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
+        reserved: Iterable[str] | None = None,
     ):
         out = cls()
 
@@ -458,22 +464,33 @@ class ArgumentCollection(list[Argument]):
 
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
-        for field_info in signature_parameters(func).values():
+        params = signature_parameters(func).values()
+        used_short_aliases: set[str] = set(reserved or ())
+        has_star = any(p.kind is p.KEYWORD_ONLY for p in params)
+        for field_info in params:
             if parse_docstring:
                 subkey_docstring_lookup = {
                     k[1:]: v for k, v in docstring_lookup.items() if k[0] == field_info.name and len(k) > 1
                 }
             else:
                 subkey_docstring_lookup = None
+            auto_alias = field_info.kind is field_info.KEYWORD_ONLY or (
+                field_info.kind is field_info.POSITIONAL_OR_KEYWORD and not has_star and not field_info.required
+            )
+            field_parameters: list[Parameter | None] = [
+                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
+                None if auto_alias else Parameter(auto_alias=False),
+            ]
             iparam_argument_collection = cls._from_type(
                 field_info,
                 (),
                 *default_parameters,
-                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
+                *field_parameters,
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
                 positional_index=positional_index,
+                used_short_aliases=used_short_aliases,
                 parse_docstring=parse_docstring,
                 docstring_lookup=subkey_docstring_lookup,
                 _resolve_groups=_resolve_groups,
