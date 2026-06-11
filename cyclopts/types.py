@@ -79,6 +79,8 @@ __all__ = [
     "NormFloat",
     "SignedNormFloat",
     "PercentInt",
+    # Slice
+    "NonEmptySlice",
     # Json,
     "Json",
     # Web
@@ -271,6 +273,13 @@ SignedNormFloat = Annotated[float, Parameter(validator=validators.Number(gte=-1,
 
 PercentInt = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=100))]
 "An int in the range ``[0, 100]``."
+
+
+#########
+# Slice #
+#########
+NonEmptySlice = Annotated[slice, Parameter(validator=validators.Slice(allow_empty=False))]
+"A :class:`slice` that **must** select a non-empty range."
 
 
 ########

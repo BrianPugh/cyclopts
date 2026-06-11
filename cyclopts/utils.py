@@ -251,7 +251,7 @@ def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:
 def is_option_like(token: str, *, allow_numbers=False) -> bool:
     """Checks if a token looks like an option.
 
-    Namely, negative numbers are not options, but a token like ``--foo`` is.
+    Namely, negative numbers and slices are not options, but a token like ``--foo`` is.
 
     Parameters
     ----------
@@ -259,7 +259,8 @@ def is_option_like(token: str, *, allow_numbers=False) -> bool:
         String to interpret.
     allow_numbers: bool
         If :obj:`True`, then negative numbers (e.g. ``"-2"``) will return :obj:`True`.
-        Otherwise, numbers will be interpreted as non-option-like (:obj:`False`).
+        Otherwise, numbers and slices (e.g. ``"-10:"``) will be interpreted as
+        non-option-like (:obj:`False`).
         Note: ``-j`` **is option-like**, even though it can represent an imaginary number.
 
     Returns
@@ -276,7 +277,22 @@ def is_option_like(token: str, *, allow_numbers=False) -> bool:
                 # https://github.com/BrianPugh/cyclopts/issues/328
                 return True
             return False
+        # Lazy imports to avoid a circular import (exceptions/_convert import utils).
+        from cyclopts._convert import _slice
+        from cyclopts.exceptions import CoercionError
+
+        with suppress(CoercionError):
+            _slice(token)
+            return False
     return token.startswith("-")
+
+
+def slice_to_str(value: slice, /) -> str:
+    """Format a slice in slice notation (e.g. ``0:100:5``)."""
+    parts = ["" if value.start is None else str(value.start), "" if value.stop is None else str(value.stop)]
+    if value.step is not None:
+        parts.append(str(value.step))
+    return ":".join(parts)
 
 
 def is_builtin(obj: Any) -> bool:

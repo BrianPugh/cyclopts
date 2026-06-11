@@ -2037,6 +2037,9 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.Path
    :members:
 
+.. autoclass:: cyclopts.validators.Slice
+   :members:
+
 
 .. _Annotated Types:
 
@@ -2276,6 +2279,13 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 .. autodata:: cyclopts.types.HexUInt64
 
 .. autodata:: cyclopts.types.Int64
+
+^^^^^
+Slice
+^^^^^
+Annotated types for parsing :class:`slice` objects from the CLI.
+
+.. autodata:: cyclopts.types.NonEmptySlice
 
 ^^^^
 Json
