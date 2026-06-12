@@ -12,7 +12,7 @@ from cyclopts.annotations import get_hint_name
 from cyclopts.command_spec import CommandSpec
 from cyclopts.group import Group
 from cyclopts.token import Token
-from cyclopts.utils import is_option_like, json_decode_error_verbosifier
+from cyclopts.utils import apply_name_transform, is_option_like, json_decode_error_verbosifier
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -364,7 +364,7 @@ class CoercionError(CycloptsError):
             plain_choices = [x for x in args if isinstance(x, str)]
         elif isinstance(self.target_type, type) and issubclass(self.target_type, Enum):
             nt = self.argument.parameter.name_transform
-            members = [nt(x) for x in self.target_type.__members__]
+            members = [apply_name_transform(nt, x)[0] for x in self.target_type.__members__]
             choice_strs = [f'"{x}"' for x in members]
             plain_choices = members
 

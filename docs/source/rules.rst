@@ -646,6 +646,11 @@ If coming from Typer_, **Cyclopts Enum handling is the reverse of Typer**.
 Typer attempts to match the token to an Enum **value**; Cyclopts attempts to match the token to an Enum **name**.
 This is done because generally the **name** of the enum is meant to be human readable, while the **value** has some program/machine significance.
 
+.. note::
+   If a custom :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` returns
+   multiple names, a token may match by **any** of them (the canonical name at index 0, or any
+   alias). Only the canonical name is shown in help choices and error messages.
+
 As a real-world example, the PNG image format supports `5 different color-types <https://www.w3.org/TR/2003/REC-PNG-20031110/#6Colour-values>`_, which gets encoded into a `1-byte int in the image header <https://www.w3.org/TR/2003/REC-PNG-20031110/#11IHDR>`_.
 
 .. code-block:: python
@@ -685,6 +690,11 @@ The :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets ap
 By default, this means that a **case-insensitive name** lookup is performed.
 If an enum name contains an underscore, the CLI parameter **may** instead contain a hyphen, ``-``.
 Leading/Trailing underscores will be stripped.
+
+.. note::
+   As with :class:`~enum.Enum`, if the :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>`
+   returns multiple names, tokens are matched against any of them, but help display uses only the
+   canonical name.
 
 .. code-block:: python
 

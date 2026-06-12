@@ -36,7 +36,15 @@ from cyclopts.annotations import (
 )
 from cyclopts.exceptions import CoercionError, ValidationError
 from cyclopts.field_info import FieldInfo, get_field_infos
-from cyclopts.utils import UNSET, default_name_transform, grouper, is_builtin, is_class_and_subclass
+from cyclopts.utils import (
+    UNSET,
+    NameTransform,
+    apply_name_transform,
+    default_name_transform,
+    grouper,
+    is_builtin,
+    is_class_and_subclass,
+)
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -179,19 +187,24 @@ def _timedelta(s: str) -> timedelta:
 def get_enum_member(
     type_: type[E],
     token: Union["Token", str],
-    name_transform: Callable[[str], str],
+    name_transform: NameTransform,
 ) -> E:
     """Match a token's value to an enum's member.
 
-    Applies ``name_transform`` to both the value and the member.
+    A token matches a member if the **raw token** equals any of the member's
+    returned names (needed for ``-``-prefixed aliases that don't round-trip
+    through the transform) **or** the token's canonical transform (index 0)
+    equals any of the member's returned names. First member in ``__members__``
+    order wins.
     """
     from cyclopts.argument import Token
 
     is_token = isinstance(token, Token)
     value = token.value if is_token else token
-    value_transformed = name_transform(value)
+    value_canonical = apply_name_transform(name_transform, value)[0]
     for name, member in type_.__members__.items():
-        if name_transform(name) == value_transformed:
+        member_names = apply_name_transform(name_transform, name)
+        if value in member_names or value_canonical in member_names:
             return member
     raise CoercionError(
         token=token if is_token else None,
@@ -202,7 +215,7 @@ def get_enum_member(
 def convert_enum_flag(
     enum_type: type[F],
     tokens: Iterable[str] | Iterable["Token"],
-    name_transform: Callable[[str], str],
+    name_transform: NameTransform,
 ) -> F:
     """Convert tokens to a Flag enum value.
 
@@ -248,7 +261,7 @@ def _convert_tuple(
     type_: type[Any],
     *tokens: "Token",
     converter: Callable[[type, str], Any] | None,
-    name_transform: Callable[[str], str],
+    name_transform: NameTransform,
 ) -> tuple:
     convert = partial(_convert, converter=converter, name_transform=name_transform)
     inner_types = tuple(x for x in get_args(type_) if x is not ...)
@@ -330,7 +343,7 @@ def _convert_json(
     data: dict,
     field_infos: dict,
     converter: Callable | None,
-    name_transform: Callable[[str], str],
+    name_transform: NameTransform,
 ):
     """Convert JSON dict to dataclass with proper type conversion for fields.
 
@@ -544,7 +557,7 @@ def _convert(
     token: Union["Token", Sequence["Token"]],
     *,
     converter: Callable[[Any, str], Any] | None,
-    name_transform: Callable[[str], str],
+    name_transform: NameTransform,
 ):
     """Inner recursive conversion function for public ``convert``.
 
@@ -753,7 +766,7 @@ def convert(
     type_: Any,
     tokens: Sequence[str] | Sequence["Token"] | NestedCliArgs,
     converter: Callable[[type, str], Any] | None = None,
-    name_transform: Callable[[str], str] | None = None,
+    name_transform: "NameTransform | None" = None,
 ):
     """Coerce variables into a specified type.
 

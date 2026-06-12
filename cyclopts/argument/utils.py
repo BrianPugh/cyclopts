@@ -28,6 +28,7 @@ from cyclopts.field_info import (
     FieldInfo,
 )
 from cyclopts.parameter import Parameter
+from cyclopts.utils import NameTransform, apply_name_transform
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -73,7 +74,7 @@ KIND_PARENT_CHILD_REASSIGNMENT = {
 }
 
 
-def get_choices_from_hint(type_: type, name_transform: Callable[[str], str]) -> list[str]:
+def get_choices_from_hint(type_: type, name_transform: NameTransform) -> list[str]:
     """Extract completion choices from a type hint.
 
     Recursively extracts choices from Literal types, Enum types, and Union types.
@@ -94,7 +95,7 @@ def get_choices_from_hint(type_: type, name_transform: Callable[[str], str]) -> 
     choices = []
     _origin = get_origin(type_)
     if isinstance(type_, type) and is_class_and_subclass(type_, Enum):
-        choices.extend(name_transform(x) for x in type_.__members__)
+        choices.extend(apply_name_transform(name_transform, x)[0] for x in type_.__members__)
     elif is_union(_origin):
         inner_choices = [get_choices(inner) for inner in get_args(type_)]
         for x in inner_choices:
@@ -134,7 +135,7 @@ def missing_keys_factory(
 def enum_flag_from_dict(
     enum_type: type[F],
     data: dict[str, bool],
-    name_transform: Callable[[str], str],
+    name_transform: NameTransform,
 ) -> F:
     """Convert a dictionary of boolean flags to a Flag enum value.
 

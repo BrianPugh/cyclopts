@@ -35,6 +35,7 @@ from cyclopts.annotations import (
 from cyclopts.field_info import get_field_infos, signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import (
+    NameTransform,
     default_name_transform,
     frozen,
     optional_to_tuple_converter,
@@ -138,6 +139,39 @@ def _consume_multiple_converter(
             raise ValueError(f"consume_multiple min must be <= max, got ({mn}, {mx}).")
         return (mn, mx)
     raise TypeError(f"consume_multiple must be None, bool, int, or a (min, max) sequence, got {type(value).__name__}.")
+
+
+def _name_transform_converter(
+    value: "NameTransform | Iterable[NameTransform] | None",
+) -> "NameTransform | None":
+    """Normalize ``name_transform`` into a single callable (or ``None``).
+
+    A single callable (or ``None``) is passed through unchanged. An iterable of
+    callables is *composed* into one callable that invokes each transform on the
+    original identifier and concatenates all of their returned names (the first
+    name of the first callable remains canonical). This makes the converter
+    idempotent under :meth:`Parameter.combine`, which re-passes the stored value.
+    """
+    if value is None or callable(value):
+        return value
+    transforms = tuple(value)
+    if not transforms:
+        return None
+    for transform in transforms:
+        if not callable(transform):
+            raise TypeError(f"name_transform list elements must be callable, got {transform!r}.")
+
+    def composed(s: str) -> list[str]:
+        names: list[str] = []
+        for transform in transforms:
+            result = transform(s)
+            if isinstance(result, str):
+                names.append(result)
+            else:
+                names.extend(result)
+        return names
+
+    return composed
 
 
 def _parse_converter(value: bool | re.Pattern[str] | str | None) -> bool | re.Pattern[str] | None:
@@ -309,9 +343,10 @@ class Parameter:
         kw_only=True,
     )
 
-    _name_transform: Callable[[str], str] | None = field(
+    _name_transform: "NameTransform | None" = field(
         alias="name_transform",
         default=None,
+        converter=_name_transform_converter,
         kw_only=True,
     )
 
@@ -358,7 +393,7 @@ class Parameter:
         return bool(self.parse)
 
     @property
-    def name_transform(self):
+    def name_transform(self) -> NameTransform:
         return self._name_transform if self._name_transform else default_name_transform
 
     def get_negatives(self, type_) -> tuple[str, ...]:

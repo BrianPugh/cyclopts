@@ -545,6 +545,10 @@ API
       If :obj:`None` (default value), uses :func:`~.default_name_transform`.
       Subapps inherit from the first non-:obj:`None` parent :attr:`name_transform`.
 
+      .. note::
+         Unlike :attr:`Parameter.name_transform`, this attribute accepts and
+         returns only a single :class:`str` — it does **not** accept an iterable.
+
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
@@ -1340,7 +1344,7 @@ API
       where ``type_`` is the associated parameter type-hint, and ``val`` is the environment value.
 
    .. attribute:: name_transform
-      :type: Optional[Callable[[str], str]]
+      :type: Optional[Union[Callable[[str], Union[str, Iterable[str]]], Iterable[Callable[[str], Union[str, Iterable[str]]]]]]
       :value: None
 
       A function that converts python parameter names to their CLI command counterparts.
@@ -1349,10 +1353,65 @@ API
 
       .. code-block:: python
 
-         def name_transform(s: str) -> str:
+         def name_transform(s: str) -> Union[str, Iterable[str]]:
              ...
 
+      It may return either a single string (treated as the only name) or an
+      iterable of strings. The **first** element (index 0) is the *canonical*
+      name, used for :attr:`~.Argument.name`, environment-variable display,
+      usage-line labels, and help-page choices. Subsequent names act as
+      additional aliases (like :attr:`.alias`).
+
+      * Returned strings starting with ``"-"`` are used as-is (e.g. ``"-v"``
+        becomes the short flag ``-v``). Bare names (no leading ``"-"``) get
+        ``--`` prepended.
+      * Names are automatically deduplicated within the same parameter (first
+        kept). If a secondary alias (index >= 1) collides with a name already
+        claimed by an *earlier* argument, the alias is silently dropped —
+        canonical and explicit-name collisions are not detected.
+      * Unlike :attr:`.name`/:attr:`.alias`, generated secondary names never
+        become dotted namespace prefixes for nested (child) parameters: with a
+        short-flag transform, ``user: User`` yields ``--user`` / ``-u`` and the
+        nested field is reachable as ``--user.color.red`` / ``-r``, but **not**
+        as ``-u.color.red``.
+      * Returning an empty iterable raises :exc:`ValueError`; any non-string
+        element raises :exc:`TypeError`.
+      * The transform must be pure/deterministic because it is called at
+        multiple phases (collection build, enum conversion, help generation).
+
       If :obj:`None` (default value), uses :func:`cyclopts.default_name_transform`.
+
+      A **list of callables** may also be supplied. The list is composed via
+      *parallel union*: each callable is invoked independently on the original
+      python identifier and all of their returned names are concatenated. The
+      first name from the first callable is canonical. An empty list falls back
+      to the default transform; a non-callable element raises :exc:`TypeError`.
+
+      **Canonical short-flag recipe** (the two forms are equivalent):
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter, default_name_transform
+
+         # Tuple-returning form
+         app = App(
+             default_parameter=Parameter(
+                 name_transform=lambda s: (default_name_transform(s), "-" + s[0])
+             )
+         )
+
+         # List-of-callables form (often easier to compose)
+         app = App(
+             default_parameter=Parameter(
+                 name_transform=[default_name_transform, lambda s: "-" + s[0]]
+             )
+         )
+
+      Both retain the long form (e.g. ``--verbose``) as the canonical name and
+      add a single-letter short flag (``-v``). Apply app-wide via
+      :attr:`~.App.default_parameter`. :func:`cyclopts.name_transforms.short` is a
+      ready-to-use callable that emits just the short flag; compose it as
+      ``[default_name_transform, cyclopts.name_transforms.short]`` for this exact behavior.
 
    .. attribute:: accepts_keys
       :type: Optional[bool]
@@ -1991,6 +2050,12 @@ API
 .. autoclass:: cyclopts.UNSET
 
 .. autofunction:: cyclopts.default_name_transform
+
+.. autodata:: cyclopts.NameTransform
+
+.. autofunction:: cyclopts.name_transforms.default
+
+.. autofunction:: cyclopts.name_transforms.short
 
 .. autofunction:: cyclopts.env_var_split
 

@@ -19,7 +19,7 @@ from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
+from cyclopts.utils import SortHelper, apply_name_transform, frozen, is_class_and_subclass, resolve_callables
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -452,6 +452,7 @@ def _expand_structured_dict_for_help(
             group_parameters=Group.create_default_parameters(),
             _resolve_groups=False,
         )
+        preview._resolve_transform_name_collisions()
         for leaf in preview.filter_by(show=True):
             if _is_dynamic_structured_dict(leaf):
                 yield from _expand_structured_dict_for_help(leaf, format, seen=new_seen)
@@ -498,12 +499,12 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     elif argument.show_default:
         default_val = argument.field_info.default
         if is_class_and_subclass(argument.hint, Enum):
-            default = argument.parameter.name_transform(default_val.name)
+            default = apply_name_transform(argument.parameter.name_transform, default_val.name)[0]
         elif isinstance(default_val, (list, tuple, set, frozenset)):
             formatted_items = []
             for item in default_val:
                 if isinstance(item, Enum):
-                    formatted_items.append(argument.parameter.name_transform(item.name))
+                    formatted_items.append(apply_name_transform(argument.parameter.name_transform, item.name)[0])
                 elif isinstance(item, str):
                     formatted_items.append(f"'{item}'")
                 else:

@@ -24,6 +24,8 @@ __all__ = [
     "EditorDidNotSaveError",
     "EditorDidNotChangeError",
     "Group",
+    "NameTransform",
+    "name_transforms",
     "UnknownCommandError",
     "MissingArgumentError",
     "ConsumeMultipleError",
@@ -75,13 +77,14 @@ from cyclopts.panel import CycloptsPanel
 from cyclopts.parameter import Parameter
 from cyclopts.protocols import Dispatcher
 from cyclopts.token import Token
-from cyclopts.utils import UNSET, default_name_transform
+from cyclopts.utils import UNSET, NameTransform, default_name_transform
 
 # Lazy imports for opt-in features (saves ~6ms on import)
 # These modules are only loaded when explicitly accessed by user code
 _LAZY_IMPORTS = {
     # Submodules - opt-in features not needed for basic CLI parsing
     "config": "cyclopts.config",  # Configuration file parsing (JSON, TOML, YAML, env)
+    "name_transforms": "cyclopts.name_transforms",  # Reusable name_transform callables (default, short)
     "types": "cyclopts.types",  # ~3ms - special types like ResolvedExistingPath
     "validators": "cyclopts.validators",  # ~2ms - validators like Number, Path
     # Editor functionality - rarely used
@@ -99,7 +102,7 @@ def __getattr__(name: str):
         import importlib
 
         module_path = _LAZY_IMPORTS[name]
-        if name in ("config", "types", "validators"):
+        if name in ("config", "name_transforms", "types", "validators"):
             # These are submodules, import the module itself
             module = importlib.import_module(module_path)
             globals()[name] = module

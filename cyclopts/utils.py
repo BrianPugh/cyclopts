@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from operator import itemgetter
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar
 
 from attrs import field, frozen
 
@@ -205,29 +205,48 @@ def _pascal_to_snake(s: str) -> str:
     return snake.lower()
 
 
-def default_name_transform(s: str) -> str:
-    """Converts a python identifier into a CLI token.
+NameTransform: TypeAlias = Callable[[str], "str | Iterable[str]"]
+"""A name-transform callable: maps a python identifier to one or more CLI names (index 0 canonical)."""
 
-    Performs the following operations (in order):
 
-    1. Convert PascalCase to snake_case.
-    2. Convert the string to all lowercase.
-    3. Replace ``_`` with ``-``.
-    4. Strip any leading/trailing ``-`` (also stripping ``_``, due to point 3).
+def apply_name_transform(name_transform: NameTransform, s: str) -> tuple[str, ...]:
+    """Invoke a ``name_transform`` and normalize its result to a tuple of names.
 
-    Intended to be used with :attr:`App.name_transform` and :attr:`Parameter.name_transform`.
+    A ``name_transform`` may return either a single :obj:`str` (treated as a 1-tuple)
+    or an iterable of strings. Index 0 of the returned tuple is the canonical name.
+
+    The transform must be pure/deterministic; it is invoked at multiple phases
+    (collection build, enum conversion, help, trailing-key normalization).
 
     Parameters
     ----------
+    name_transform: Callable[[str], str | Iterable[str]]
+        The transform to invoke.
     s: str
         Input python identifier string.
 
     Returns
     -------
-    str
-        Transformed name.
+    tuple[str, ...]
+        One or more transformed names (index 0 is canonical).
+
+    Raises
+    ------
+    ValueError
+        If the transform returns an empty iterable.
+    TypeError
+        If the transform returns a non-str element.
     """
-    return _pascal_to_snake(s).lower().replace("_", "-").strip("-")
+    result = name_transform(s)
+    if isinstance(result, str):
+        return (result,)
+    names = tuple(result)
+    if not names:
+        raise ValueError(f"name_transform must return at least one name for {s!r}.")
+    for name in names:
+        if not isinstance(name, str):
+            raise TypeError(f"name_transform returned non-str {name!r} for {s!r}.")
+    return names
 
 
 def grouper(iterable: Sequence[Any], n: int) -> Iterator[tuple[Any, ...]]:
@@ -527,3 +546,8 @@ def import_app(module_path: str):
                 return obj
 
     raise AttributeError(f"No Cyclopts App found in '{module_name}'. Specify explicitly: '{module_name}:app_name'")
+
+
+# Backwards-compatible alias; the canonical definition lives in ``cyclopts.name_transforms.default``.
+# Imported at the bottom of the module so ``_pascal_to_snake``/``NameTransform`` are already defined.
+from cyclopts.name_transforms import default as default_name_transform  # noqa: E402, F401
