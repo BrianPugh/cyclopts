@@ -307,6 +307,23 @@ def test_short_alias_callable_can_dedupe_via_used():
     assert collection[1].parameter.name == ("--apex", "-A")
 
 
+def test_short_alias_callable_receives_readonly_frozenset():
+    """The callable is handed a frozenset so it cannot mutate cyclopts' collision state."""
+    seen: list = []
+
+    def cb(field_info, used):
+        seen.append(used)
+        with pytest.raises(AttributeError):
+            used.add("-z")  # frozenset has no .add
+        return None
+
+    def fn(host: str = "", port: int = 0):
+        pass
+
+    ArgumentCollection._from_callable(fn, Parameter(short_alias=cb))
+    assert seen and all(isinstance(u, frozenset) for u in seen)
+
+
 def test_short_alias_callable_collision_deduped():
     """A callable-returned short already claimed by an earlier parameter is dropped (first-wins).
 

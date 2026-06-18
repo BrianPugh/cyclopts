@@ -959,7 +959,7 @@ API
              pass
 
    .. attribute:: short_alias
-      :type: Union[bool, Callable[[FieldInfo, set[str]], Union[str, Iterable[str], None]]]
+      :type: Union[bool, Callable[[FieldInfo, frozenset[str]], Union[str, Iterable[str], None]]]
       :value: None
 
       When ``True``, automatically generates a single-letter short flag (e.g. ``--verbose`` also gets ``-v``).

@@ -194,7 +194,9 @@ def resolve_short_alias(
     short = None
     short_alias = cparam.short_alias
     if callable(short_alias):
-        short = short_alias(field_info, used_short_aliases)
+        # Hand the callable a read-only snapshot so it cannot mutate the internal
+        # collision-tracking set and corrupt assignment for later parameters.
+        short = short_alias(field_info, frozenset(used_short_aliases))
     elif short_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
         # Derive the letter from the transformed CLI name (not the raw python identifier)
         # so it stays consistent with the long flag (``--my-flag`` -> ``-m``, ``_foo`` -> ``-f``).
