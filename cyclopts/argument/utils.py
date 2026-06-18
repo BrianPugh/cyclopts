@@ -154,40 +154,63 @@ def enum_flag_from_dict(
 
 
 def resolve_short_alias(
-    cparam: Parameter,
+    argument: "Argument",
     field_info: FieldInfo,
     immediate_parameter: Parameter,
     used_short_aliases: set[str] | None,
-) -> Parameter:
-    if "alias" in immediate_parameter._provided_args:
-        if used_short_aliases is not None and immediate_parameter.alias:
-            used_short_aliases.update(immediate_parameter.alias)
-        return cparam
-    if cparam.alias:
-        if used_short_aliases is not None:
-            used_short_aliases.update(cparam.alias)
-        return cparam
-    if used_short_aliases is None:
-        return cparam
+    *,
+    top_level: bool,
+) -> tuple[str, ...] | None:
+    """Reserve explicit short aliases and, when eligible, generate an auto short flag.
+
+    Auto-generated short flags apply to **input-binding** parameters only (scalars,
+    dicts, enum flags) — never to promoted containers whose fields become child
+    options. By default they only apply to **top-level** command parameters; a nested
+    field opts in explicitly via ``Annotated[..., Parameter(auto_alias=...)]``.
+
+    Returns the generated short name(s) to append to the argument's name as standalone
+    flags (so they surface globally, e.g. ``-e``, never dotted like ``-u.name``), or
+    :obj:`None`. Always mutates ``used_short_aliases`` to reserve claimed letters.
+    """
+    cparam = argument.parameter
+
+    # An explicitly-provided alias suppresses auto-generation; reserve its letters so
+    # other parameters' auto-generated shorts avoid them.
+    explicit_alias = "alias" in immediate_parameter._provided_args
+    if cparam.alias and used_short_aliases is not None:
+        used_short_aliases.update(cparam.alias)
+    if explicit_alias or cparam.alias or used_short_aliases is None:
+        return None
+
+    # Top-level by default; nested fields require an explicit opt-in.
+    explicit_opt_in = "auto_alias" in immediate_parameter._provided_args
+    if not (top_level or explicit_opt_in):
+        return None
+
+    # Only parameters that bind CLI input directly get a short; containers do not.
+    if argument._accepts_keywords and not argument._enum_flag_type:
+        return None
 
     short = None
     auto_alias = cparam.auto_alias
     if callable(auto_alias):
         short = auto_alias(field_info, used_short_aliases)
     elif auto_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
-        name = field_info.names[0]
-        if name:
-            letter = name[0].lower()
+        # Derive the letter from the transformed CLI name (not the raw python identifier)
+        # so it stays consistent with the long flag (``--my-flag`` -> ``-m``, ``_foo`` -> ``-f``).
+        transformed = cparam.name_transform(field_info.names[0])
+        if transformed:
+            letter = transformed[0].lower()
             for candidate in (f"-{letter}", f"-{letter.upper()}"):
                 if candidate not in used_short_aliases:
                     short = candidate
                     break
 
     if not short:
-        return cparam
+        return None
     shorts = (short,) if isinstance(short, str) else tuple(short)
     used_short_aliases.update(shorts)
-    return Parameter.combine(cparam, Parameter(alias=shorts if len(shorts) != 1 else shorts[0]))
+    return shorts
 
 
 def extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:

@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from typing import Annotated
 
 import pytest
@@ -128,6 +129,77 @@ def test_auto_alias_skips_version_flag(app):
 
     collection = app["main"].assemble_argument_collection()
     assert collection[0].parameter.name == ("--verbose", "-V")
+
+
+def test_auto_alias_nested_dataclass_top_level_only(app, assert_parse_args):
+    """Containers and their promoted fields get no auto short by default; only top-level scalars do."""
+
+    @dataclass
+    class Color:
+        red: int = 0
+        green: int = 0
+
+    @dataclass
+    class User:
+        name: str = ""
+        color: Color = field(default_factory=Color)
+
+    @app.command(auto_alias=True)
+    def foo(*, user: User | None = None, upload: bool = False):
+        pass
+
+    collection = app["foo"].assemble_argument_collection()
+    names = {c.parameter.name[0]: c.parameter.name for c in collection}
+    # The container and every promoted field get no short (no ``-u``, no ``-u.name``, no ``-n``).
+    assert names["--user"] == ("--user",)
+    assert names["--user.name"] == ("--user.name",)
+    assert names["--user.color.red"] == ("--user.color.red",)
+    # Only the top-level scalar gets a short.
+    assert names["--upload"] == ("--upload", "-u")
+    assert_parse_args(foo, "foo -u", upload=True)
+
+
+def test_auto_alias_nested_field_explicit_opt_in(app, assert_parse_args):
+    """A nested leaf field opts in explicitly and surfaces a standalone (not dotted) short."""
+
+    @dataclass
+    class User:
+        name: Annotated[str, Parameter(auto_alias=True)] = ""
+        color: str = ""
+
+    @app.command(auto_alias=True)
+    def foo(*, user: User):
+        pass
+
+    collection = app["foo"].assemble_argument_collection()
+    names = {c.parameter.name[0]: c.parameter.name for c in collection}
+    assert names["--user.name"] == ("--user.name", "-n")
+    assert names["--user.color"] == ("--user.color",)
+    assert_parse_args(foo, "foo -n Bob", user=User(name="Bob"))
+
+
+def test_auto_alias_letter_from_transformed_name(app):
+    """The short letter follows the transformed long flag, not the raw python identifier."""
+
+    @app.command(auto_alias=True)
+    def foo(*, _private: str = "", verbose: bool = False):
+        pass
+
+    collection = app["foo"].assemble_argument_collection()
+    names = {c.parameter.name[0]: c.parameter.name for c in collection}
+    assert names["--private"] == ("--private", "-p")  # not "-_"
+    assert names["--verbose"] == ("--verbose", "-v")
+
+
+def test_auto_alias_letter_respects_custom_name_transform(app):
+    """A custom name_transform drives both the long name and the short letter."""
+
+    @app.command(auto_alias=True, default_parameter=Parameter(name_transform=lambda s: "x" + s))
+    def foo(*, my_flag: bool = False):
+        pass
+
+    collection = app["foo"].assemble_argument_collection()
+    assert collection[0].parameter.name == ("--xmy_flag", "-x")
 
 
 def test_auto_alias_help(app, console):

@@ -320,7 +320,6 @@ class ArgumentCollection(list[Argument]):
                 PARAMETER_SUBKEY_BLOCKER,
                 immediate_parameter,
             )
-            cparam = resolve_short_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             cparam = Parameter.combine(
                 cparam,
                 Parameter(
@@ -336,7 +335,6 @@ class ArgumentCollection(list[Argument]):
                 upstream_parameter,
                 immediate_parameter,
             )
-            cparam = resolve_short_alias(cparam, field_info, immediate_parameter, used_short_aliases)
             assert isinstance(cparam.alias, tuple)
             if cparam.name:
                 if field_info.is_keyword:
@@ -368,6 +366,14 @@ class ArgumentCollection(list[Argument]):
             positional_index = None
 
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
+
+        # Auto-generate a short alias (e.g. ``-e`` for ``--env``), appended as a standalone
+        # flag. Gated to top-level (or explicitly opted-in) input-binding parameters so that
+        # promoted containers and nested fields don't silently claim or namespace letters.
+        shorts = resolve_short_alias(argument, field_info, immediate_parameter, used_short_aliases, top_level=not keys)
+        if shorts:
+            assert isinstance(argument.parameter.name, tuple)
+            argument.parameter = Parameter.combine(argument.parameter, Parameter(name=argument.parameter.name + shorts))
 
         if positional_index is not None:
             if not argument._accepts_keywords or argument._enum_flag_type:
