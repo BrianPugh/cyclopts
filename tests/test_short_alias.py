@@ -84,6 +84,31 @@ def test_short_alias_assignment():
     assert positional_collection[1].parameter.name == ("--replicas", "-r")
 
 
+def test_short_alias_positional_or_keyword_gets_short(app, assert_parse_args):
+    """Every positional-or-keyword param exposes a ``--long`` form, so it also gets a short.
+
+    Applies to required params and to params preceding a ``*`` (keyword-only) marker.
+    """
+
+    @app.command(short_alias=True)
+    def deploy(env: str, region: str = "us-east-1"):
+        pass
+
+    collection = app["deploy"].assemble_argument_collection()
+    assert collection[0].parameter.name == ("--env", "-e")
+    assert collection[1].parameter.name == ("--region", "-r")
+    assert_parse_args(deploy, "deploy -e prod", env="prod")
+    assert_parse_args(deploy, "deploy prod -r eu", env="prod", region="eu")
+
+    @app.command(short_alias=True)
+    def pre_star(src: str, *, verbose: bool = False):
+        pass
+
+    pre_star_collection = app["pre-star"].assemble_argument_collection()
+    assert pre_star_collection[0].parameter.name == ("--src", "-s")
+    assert pre_star_collection[1].parameter.name == ("--verbose", "-v")
+
+
 def test_short_alias_on_app_default():
     app = App(short_alias=True, result_action="return_value")
 

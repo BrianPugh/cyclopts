@@ -470,19 +470,18 @@ class ArgumentCollection(list[Argument]):
 
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
-        params = signature_parameters(func).values()
         used_short_aliases: set[str] = set(reserved or ())
-        has_star = any(p.kind is p.KEYWORD_ONLY for p in params)
-        for field_info in params:
+        for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
                     k[1:]: v for k, v in docstring_lookup.items() if k[0] == field_info.name and len(k) > 1
                 }
             else:
                 subkey_docstring_lookup = None
-            short_alias = field_info.kind is field_info.KEYWORD_ONLY or (
-                field_info.kind is field_info.POSITIONAL_OR_KEYWORD and not has_star and not field_info.required
-            )
+            # Any parameter that exposes a ``--long`` keyword form is short-eligible; the
+            # short flag is just a shorthand for that long flag. Purely-positional kinds
+            # (positional-only, ``*args``, ``**kwargs``) have no long form, so no short.
+            short_alias = field_info.kind in (field_info.POSITIONAL_OR_KEYWORD, field_info.KEYWORD_ONLY)
             field_parameters: list[Parameter | None] = [
                 Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
                 None if short_alias else Parameter(short_alias=False),
