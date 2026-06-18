@@ -346,7 +346,13 @@ class App:
     default_parameter: Parameter | None = field(default=None, kw_only=True)
 
     short_alias: bool | None = field(default=None, kw_only=True)
-    """Generate one-letter CLI aliases from keyword-only parameter names."""
+    """Generate one-letter CLI aliases (e.g. ``-e`` for ``--env``) for parameters with a long flag.
+
+    Applies to every parameter that exposes a ``--long`` form (positional-or-keyword and
+    keyword-only); purely-positional parameters get no short flag. Equivalent to setting
+    :attr:`Parameter.short_alias <cyclopts.Parameter.short_alias>` on the app's
+    :attr:`default_parameter`.
+    """
 
     # This can ONLY ever be None or Tuple[Callable, ...]
     _config: (
