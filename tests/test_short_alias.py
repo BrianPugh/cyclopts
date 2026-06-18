@@ -307,11 +307,11 @@ def test_short_alias_callable_can_dedupe_via_used():
     assert collection[1].parameter.name == ("--apex", "-A")
 
 
-def test_short_alias_callable_collision_not_deduped():
-    """KNOWN LIMITATION: a callable that ignores ``used`` produces duplicate shorts.
+def test_short_alias_callable_collision_deduped():
+    """A callable-returned short already claimed by an earlier parameter is dropped (first-wins).
 
-    Unlike the bool form (lowercase -> uppercase -> drop), cyclopts does not dedupe
-    callable-returned shorts. This locks in the documented current behavior.
+    Even a callable that ignores ``used`` cannot create duplicate flags: ``alpha`` claims
+    ``-a`` and ``beta``'s colliding ``-a`` is silently dropped rather than duplicated.
     """
 
     def fn(alpha: str = "", beta: str = ""):
@@ -319,7 +319,7 @@ def test_short_alias_callable_collision_not_deduped():
 
     collection = ArgumentCollection._from_callable(fn, Parameter(short_alias=lambda fi, used: "-a"))
     assert collection[0].parameter.name == ("--alpha", "-a")
-    assert collection[1].parameter.name == ("--beta", "-a")
+    assert collection[1].parameter.name == ("--beta",)
 
 
 def test_short_alias_propagates_to_subapp_at_runtime():

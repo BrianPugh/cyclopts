@@ -209,6 +209,11 @@ def resolve_short_alias(
     if not short:
         return None
     shorts = (short,) if isinstance(short, str) else tuple(short)
+    # Drop any short already claimed by an earlier parameter (first-wins), so a
+    # callable that ignores ``used_short_aliases`` can't create duplicate flags.
+    shorts = tuple(s for s in shorts if s not in used_short_aliases)
+    if not shorts:
+        return None
     used_short_aliases.update(shorts)
     return shorts
 

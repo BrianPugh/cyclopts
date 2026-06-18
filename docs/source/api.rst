@@ -977,6 +977,7 @@ API
       :obj:`~enum.Flag` parameters are the exception: because they consume tokens directly (e.g. ``--perm read write``), the flag itself does receive a short, even though it also exposes per-member options.
 
       For full control, supply a callable ``(field_info, used_short_aliases) -> Union[str, Iterable[str], None]`` that returns the short name(s) to use (or :obj:`None` to skip).
+      Consult ``used_short_aliases`` to pick a free letter; any returned name already claimed by an earlier parameter is dropped (first-wins).
 
       .. code-block:: python
 
