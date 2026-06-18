@@ -190,6 +190,40 @@ To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app,
        default_parameter=Parameter(name_transform=my_custom_name_transform),
    )
 
+.. _Parameters - Short Flags:
+
+^^^^^^^^^^^
+Short Flags
+^^^^^^^^^^^
+Cyclopts can automatically generate single-letter short flags from your parameter names, so you don't have to specify an alias for every option.
+Enable it per-parameter with :attr:`Parameter.short_alias <cyclopts.Parameter.short_alias>`, or across the whole app with :attr:`App.short_alias <cyclopts.App.short_alias>`.
+
+The letter is the first character of the parameter's CLI name (after :attr:`~cyclopts.Parameter.name_transform`), lowercased.
+If that letter is already claimed, the uppercase variant is used; if both are taken, the parameter gets no short flag.
+The help flag ``-h`` (and ``-v`` when a short version flag is configured) is always reserved.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(short_alias=True)
+
+   @app.command
+   def deploy(env: str, region: str = "us-east-1"):
+       """Deploy to an environment."""
+       print(f"Deploying to {env} in {region}")
+
+.. code-block:: console
+
+   $ my-script deploy -e prod
+   Deploying to prod in us-east-1
+
+The short flag is additional; the long ``--env`` still works.
+
+Short flags only apply to **top-level** parameters that bind input directly.
+A container parameter (such as a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields by default.
+To opt a nested field in, annotate it with ``Annotated[..., Parameter(short_alias=True)]``; its short flag appears as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
+
 ----
 Help
 ----

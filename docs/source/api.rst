@@ -545,6 +545,16 @@ API
       If :obj:`None` (default value), uses :func:`~.default_name_transform`.
       Subapps inherit from the first non-:obj:`None` parent :attr:`name_transform`.
 
+   .. attribute:: short_alias
+      :type: Optional[bool]
+      :value: None
+
+      When ``True``, enables automatic single-letter short flags for all eligible parameters in the app
+      (equivalent to setting ``short_alias=True`` on :attr:`default_parameter`).
+      Can also be set per-command via ``@app.command(short_alias=True)``.
+      See :attr:`.Parameter.short_alias` for the full behavior, including collision handling and the
+      top-level-only / nested opt-in rules.
+
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
@@ -947,6 +957,35 @@ API
          @app.default
          def main(foo: Annotated[int, Parameter(alias="-f")]):
              pass
+
+   .. attribute:: short_alias
+      :type: Union[bool, Callable[[FieldInfo, set[str]], Union[str, Iterable[str], None]]]
+      :value: None
+
+      When ``True``, automatically generates a single-letter short flag (e.g. ``--verbose`` also gets ``-v``).
+      The short flag is **appended** as an additional name; it does not override the long name.
+      This pairs with :attr:`.alias`: use ``alias`` to specify a name yourself, or ``short_alias`` to have Cyclopts derive one.
+
+      The letter is the first character of the parameter's CLI name (after :attr:`.name_transform`), lowercased.
+      If that letter is already claimed, the uppercase variant is tried; if both are taken, no short flag is generated.
+      Reserved short flags (``-h``, and ``-v`` when a short version flag is configured) are never claimed.
+      Explicitly setting :attr:`.alias` or :attr:`.name` on a parameter suppresses auto-generation for it and reserves those letters.
+
+      Only **top-level** parameters that bind input directly receive a short flag.
+      A container parameter (e.g. a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields by default.
+      A child field may opt in via ``Annotated[..., Parameter(short_alias=True)]``; its short flag surfaces as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
+
+      For full control, supply a callable ``(field_info, used_short_aliases) -> Union[str, Iterable[str], None]`` that returns the short name(s) to use (or :obj:`None` to skip).
+
+      .. code-block:: python
+
+         @app.command(short_alias=True)
+         def deploy(env: str = "staging", replicas: int = 10):
+             pass
+
+      .. code-block:: console
+
+         $ my-script deploy -e prod -r 5
 
    .. attribute:: converter
       :type: Optional[Callable]
