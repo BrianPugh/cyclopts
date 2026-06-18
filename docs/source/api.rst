@@ -1307,11 +1307,20 @@ API
       Defaults to whether the parameter is :attr:`parsed <.Parameter.parse>` (usually :obj:`True`).
 
    .. attribute:: show_default
-      :type: Union[None, bool, Callable[[Any], Any]]
+      :type: Union[None, bool, str, Callable[[Any], Any]]
       :value: None
 
       If a variable has a default, display the default on the help page.
       Defaults to :obj:`None`, similar to :obj:`True`, but will **not** display the default if it is :obj:`None`.
+
+      If set to a string, that string is displayed verbatim as the default value, regardless of the actual default.
+      This is useful when the real default cannot be known at help-time (e.g. a value resolved at runtime):
+
+      .. code-block:: python
+
+         input_file: Annotated[Path | None, Parameter(show_default="automatic")] = None
+
+      Results in ``[default: automatic]`` on the help page.
 
       If set to a function with signature:
 
@@ -2069,6 +2078,9 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.Path
    :members:
 
+.. autoclass:: cyclopts.validators.Slice
+   :members:
+
 
 .. _Annotated Types:
 
@@ -2308,6 +2320,13 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 .. autodata:: cyclopts.types.HexUInt64
 
 .. autodata:: cyclopts.types.Int64
+
+^^^^^
+Slice
+^^^^^
+Annotated types for parsing :class:`slice` objects from the CLI.
+
+.. autodata:: cyclopts.types.NonEmptySlice
 
 ^^^^
 Json

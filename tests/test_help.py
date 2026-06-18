@@ -783,6 +783,59 @@ def test_help_format_group_parameters_defaults_no_show(capture_format_group_para
     assert actual == expected
 
 
+def test_help_format_group_parameters_show_default_string(capture_format_group_parameters):
+    def cmd(
+        foo: Annotated[str, Parameter(show_default="automatic", help="Docstring for foo.")] = "fizz",
+        bar: Annotated[str | None, Parameter(show_default="automatic", help="Docstring for bar.")] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  Docstring for foo. [default: automatic]                 │
+        │ BAR --bar  Docstring for bar. [default: automatic]                 │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (slice(0, 3), "0:3"),
+        (slice(None, 10), ":10"),
+        (slice(0, 100, 5), "0:100:5"),
+        (slice(-10, None), "-10:"),
+        (slice(None, None), ":"),
+        (slice(None, None, 2), "::2"),
+    ],
+)
+def test_slice_to_str(value, expected):
+    from cyclopts.utils import slice_to_str
+
+    assert slice_to_str(value) == expected
+
+
+def test_help_format_group_parameters_slice_default(capture_format_group_parameters):
+    def cmd(
+        foo: Annotated[slice, Parameter(help="Docstring for foo.")] = slice(0, 100, 5),  # noqa: B008
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  Docstring for foo. [default: 0:100:5]                   │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_dataclass_default_parameter_negative_propagation(app, console):
     app.default_parameter = Parameter(negative=())
 

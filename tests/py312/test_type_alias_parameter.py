@@ -3,11 +3,13 @@
 Regression tests for https://github.com/BrianPugh/cyclopts/issues/669
 """
 
+from pathlib import Path
 from typing import Annotated, Optional
 
 import pytest
 
 from cyclopts import Parameter
+from cyclopts import types as ct
 from cyclopts.annotations import resolve, resolve_annotated, resolve_optional
 
 # Define type aliases using Python 3.12 'type' statement
@@ -16,6 +18,9 @@ type OptionalIntWithAlias = Optional[Annotated[int, Parameter(alias="-f")]]
 type BoolAlias = bool
 type AnnotatedIntWithMetadata = Annotated[int, "metadata"]
 type OptionalInt = Optional[int]
+# A 'type' alias over a cyclopts.types converter type (which is itself Annotated).
+# https://github.com/BrianPugh/cyclopts/issues/836
+type ResolvedPathAlias = ct.ResolvedPath
 
 
 @pytest.mark.parametrize(
@@ -112,3 +117,23 @@ def test_type_alias_in_help(capsys):
     help_text = captured.out
     assert "--foo" in help_text
     assert "-f" in help_text
+
+
+def test_type_alias_over_cyclopts_type_bare(app, assert_parse_args):
+    """A 'type' alias over a cyclopts.types converter type keeps the converter."""
+
+    @app.default
+    def main(foo: ResolvedPathAlias):
+        pass
+
+    assert_parse_args(main, "bar", Path("bar").resolve())
+
+
+def test_type_alias_over_cyclopts_type_optional(app, assert_parse_args):
+    """A 'type' alias over a cyclopts.types converter type, made optional, keeps the converter."""
+
+    @app.default
+    def main(foo: Annotated[Optional[ResolvedPathAlias], Parameter()]):
+        pass
+
+    assert_parse_args(main, "bar", Path("bar").resolve())

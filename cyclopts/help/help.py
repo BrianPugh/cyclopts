@@ -19,7 +19,7 @@ from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables
+from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables, slice_to_str
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -493,7 +493,9 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         env_var = tuple(argument.parameter.env_var)
 
     default = None
-    if argument.show_default:
+    if isinstance(argument.show_default, str):
+        default = argument.show_default
+    elif argument.show_default:
         default_val = argument.field_info.default
         if is_class_and_subclass(argument.hint, Enum):
             default = argument.parameter.name_transform(default_val.name)
@@ -515,6 +517,8 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
                 default = "[" + ", ".join(formatted_items) + "]"
             else:
                 default = "{" + ", ".join(formatted_items) + "}"
+        elif isinstance(default_val, slice):
+            default = slice_to_str(default_val)
         elif default_val == "":
             default = '""'
         else:
