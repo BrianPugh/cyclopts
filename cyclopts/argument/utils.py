@@ -153,43 +153,75 @@ def enum_flag_from_dict(
     return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)
 
 
-def resolve_short_alias(
+def _is_short_flag(flag: str) -> bool:
+    """Return :obj:`True` for a single-letter flag like ``-e`` (not ``--env`` or ``-`` alone)."""
+    return len(flag) == 2 and flag[0] == "-" and flag[1] != "-"
+
+
+def reserve_short_alias(
     argument: "Argument",
-    field_info: FieldInfo,
     immediate_parameter: Parameter,
     used_short_aliases: set[str] | None,
     *,
     top_level: bool,
-) -> tuple[str, ...] | None:
-    """Reserve explicit short aliases and, when eligible, generate an auto short flag.
+) -> bool:
+    """Phase 1: reserve explicitly-provided short flags and report auto-short eligibility.
 
-    Auto-generated short flags apply to **input-binding** parameters only (scalars,
-    dicts, enum flags) — never to promoted containers whose fields become child
-    options. By default they only apply to **top-level** command parameters; a nested
-    field opts in explicitly via ``Annotated[..., Parameter(short_alias=...)]``.
+    Runs while the argument tree is being built. Every short flag the user explicitly
+    supplied via ``name`` or ``alias`` is reserved into ``used_short_aliases`` here, so
+    that auto-generation (phase 2, deferred until the whole tree is known) avoids them
+    regardless of parameter ordering.
 
-    Returns the generated short name(s) to append to the argument's name as standalone
-    flags (so they surface globally, e.g. ``-e``, never dotted like ``-u.name``), or
-    :obj:`None`. Always mutates ``used_short_aliases`` to reserve claimed letters.
+    Returns :obj:`True` if this argument is eligible for an auto-generated short flag.
+    Auto shorts apply to **input-binding** parameters only (scalars, dicts, enum flags) —
+    never to promoted containers whose fields become child options. By default they only
+    apply to **top-level** command parameters; a nested field opts in explicitly via
+    ``Annotated[..., Parameter(short_alias=...)]``.
     """
+    if used_short_aliases is None:
+        return False
+
     cparam = argument.parameter
 
-    # An explicitly-provided alias suppresses auto-generation; reserve its letters so
-    # other parameters' auto-generated shorts avoid them.
+    # Reserve every explicit short flag (from name or alias) so auto-generated shorts
+    # avoid them. At this point no auto short has been appended yet, so any single-letter
+    # flag present is necessarily user-provided.
+    for flag in (*(cparam.name or ()), *(cparam.alias or ())):
+        if _is_short_flag(flag):
+            used_short_aliases.add(flag)
+
+    # An explicitly-provided alias suppresses auto-generation.
     explicit_alias = "alias" in immediate_parameter._provided_args
-    if cparam.alias and used_short_aliases is not None:
-        used_short_aliases.update(cparam.alias)
-    if explicit_alias or cparam.alias or used_short_aliases is None:
-        return None
+    if explicit_alias or cparam.alias:
+        return False
 
     # Top-level by default; nested fields require an explicit opt-in.
     explicit_opt_in = "short_alias" in immediate_parameter._provided_args
     if not (top_level or explicit_opt_in):
-        return None
+        return False
 
     # Only parameters that bind CLI input directly get a short; containers do not.
     if argument._accepts_keywords and not argument._enum_flag_type:
-        return None
+        return False
+
+    return True
+
+
+def generate_short_alias(
+    argument: "Argument",
+    field_info: FieldInfo,
+    used_short_aliases: set[str],
+) -> tuple[str, ...] | None:
+    """Phase 2: generate the auto short flag(s) for an argument deemed eligible by phase 1.
+
+    Deferred until every parameter's explicit short has been reserved, so an earlier
+    parameter's auto short can never shadow a later parameter's explicit ``alias``.
+
+    Returns the generated short name(s) to append to the argument's name as standalone
+    flags (so they surface globally, e.g. ``-e``, never dotted like ``-u.name``), or
+    :obj:`None`. Mutates ``used_short_aliases`` to reserve claimed letters.
+    """
+    cparam = argument.parameter
 
     short = None
     short_alias = cparam.short_alias

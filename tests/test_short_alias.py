@@ -364,6 +364,35 @@ def test_short_alias_callable_collision_deduped():
     assert collection[1].parameter.name == ("--beta",)
 
 
+def test_short_alias_explicit_alias_not_shadowed_by_earlier_auto(app, assert_parse_args):
+    """An explicit ``alias`` on a later parameter wins over an earlier parameter's auto short.
+
+    ``reset`` would auto-claim ``-r`` first, but ``region`` explicitly asks for ``-r``;
+    the explicit request must win and ``reset`` falls back to ``-R``.
+    """
+
+    @app.command(short_alias=True)
+    def deploy(reset: bool = False, region: Annotated[str, Parameter(alias="-r")] = "x"):
+        pass
+
+    collection = app["deploy"].assemble_argument_collection()
+    assert collection[0].parameter.name == ("--reset", "-R")
+    assert collection[1].parameter.name == ("--region", "-r")
+    assert_parse_args(deploy, "deploy -r eu", region="eu")
+
+
+def test_short_alias_explicit_name_short_not_shadowed_by_earlier_auto(app):
+    """A short embedded in an explicit ``name`` is reserved before auto-generation too."""
+
+    @app.command(short_alias=True)
+    def deploy(reset: bool = False, region: Annotated[str, Parameter(name=("--region", "-r"))] = "x"):
+        pass
+
+    collection = app["deploy"].assemble_argument_collection()
+    assert collection[0].parameter.name == ("--reset", "-R")
+    assert collection[1].parameter.name == ("--region", "-r")
+
+
 def test_short_alias_propagates_to_subapp_at_runtime():
     """``short_alias=True`` on a root app reaches commands registered on a subapp at parse time."""
     root = App(name="root", short_alias=True, result_action="return_value")
