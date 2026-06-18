@@ -14,6 +14,7 @@ from cyclopts.exceptions import (
     UnknownOptionError,
 )
 from cyclopts.field_info import (
+    FieldInfo,
     signature_parameters,
 )
 from cyclopts.group import Group
@@ -243,7 +244,7 @@ class ArgumentCollection(list[Argument]):
         docstring_lookup: dict[tuple[str, ...], Parameter] | None = None,
         positional_index: int | None = None,
         used_short_aliases: set[str] | None = None,
-        pending_short_aliases: list[tuple["Argument", Any]] | None = None,
+        pending_short_aliases: list[tuple["Argument", FieldInfo]] | None = None,
         _resolve_groups: bool = True,
     ):
         from cyclopts.parameter import get_parameters
@@ -475,7 +476,7 @@ class ArgumentCollection(list[Argument]):
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
         used_short_aliases: set[str] = set(reserved or ())
-        pending_short_aliases: list[tuple[Argument, Any]] = []
+        pending_short_aliases: list[tuple[Argument, FieldInfo]] = []
         for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
