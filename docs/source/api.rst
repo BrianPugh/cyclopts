@@ -974,6 +974,7 @@ API
       Only **top-level** parameters that bind input directly receive a short flag.
       A container parameter (e.g. a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields by default.
       A child field may opt in via ``Annotated[..., Parameter(short_alias=True)]``; its short flag surfaces as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
+      :obj:`~enum.Flag` parameters are the exception: because they consume tokens directly (e.g. ``--perm read write``), the flag itself does receive a short, even though it also exposes per-member options.
 
       For full control, supply a callable ``(field_info, used_short_aliases) -> Union[str, Iterable[str], None]`` that returns the short name(s) to use (or :obj:`None` to skip).
 

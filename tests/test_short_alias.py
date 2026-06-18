@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Flag, auto
 from typing import Annotated
 
 import pytest
@@ -213,3 +214,134 @@ def test_short_alias_help(app, console):
     output = capture.get()
     assert "--env -e" in output
     assert "--replicas -r" in output
+
+
+def test_short_alias_rejects_string():
+    """A string is a footgun (looks like an explicit flag); reject it with a clear error."""
+    with pytest.raises(TypeError, match="does not accept a string"):
+        Parameter(short_alias="-z")  # pyright: ignore[reportArgumentType]
+
+
+def test_short_alias_combined_flags(app, assert_parse_args):
+    """Two generated boolean shorts can be combined GNU-style (``-vf``)."""
+    app.default_parameter = Parameter(short_alias=True)
+
+    @app.default
+    def main(*, verbose: bool = False, force: bool = False):
+        pass
+
+    assert_parse_args(main, "-vf", verbose=True, force=True)
+
+
+def test_short_alias_no_negative_for_short(app):
+    """A boolean's short flag does not get a negated form (negatives are long-only)."""
+
+    @app.command(short_alias=True)
+    def main(*, verbose: bool = False):
+        pass
+
+    arg = app["main"].assemble_argument_collection()[0]
+    assert arg.parameter.name == ("--verbose", "-v")
+    assert "--no-verbose" in arg.names
+    assert "--no-v" not in arg.names
+    assert "-no-v" not in arg.names
+
+
+def test_short_alias_enum_flag_gets_short(app):
+    """An enum.Flag binds tokens directly, so it receives a short; its members do not."""
+
+    class Perm(Flag):
+        read = auto()
+        write = auto()
+
+    @app.command(short_alias=True)
+    def main(*, perm: Perm = Perm.read):
+        pass
+
+    names = {c.parameter.name[0]: c.parameter.name for c in app["main"].assemble_argument_collection()}
+    assert names["--perm"] == ("--perm", "-p")
+    assert names["--perm.read"] == ("--perm.read",)
+
+
+def test_short_alias_accepts_keys_false_gets_short(app):
+    """A class with accepts_keys=False consumes tokens directly, so it gets a short."""
+
+    @dataclass
+    class Point:
+        x: int = 0
+        y: int = 0
+
+    @app.command(short_alias=True)
+    def main(*, pt: Annotated[Point, Parameter(accepts_keys=False)]):
+        pass
+
+    assert app["main"].assemble_argument_collection()[0].parameter.name == ("--pt", "-p")
+
+
+def test_short_alias_callable_none_skips():
+    """A callable returning None generates no short for that parameter."""
+
+    def fn(host: str = "", port: int = 0):
+        pass
+
+    collection = ArgumentCollection._from_callable(fn, Parameter(short_alias=lambda fi, used: None))
+    assert collection[0].parameter.name == ("--host",)
+    assert collection[1].parameter.name == ("--port",)
+
+
+def test_short_alias_callable_can_dedupe_via_used():
+    """A well-behaved callable consults ``used`` to avoid collisions."""
+
+    def unique(field_info, used):
+        letter = field_info.names[0][0]
+        for candidate in (f"-{letter}", f"-{letter.upper()}"):
+            if candidate not in used:
+                return candidate
+        return None
+
+    def fn(alpha: str = "", apex: str = ""):
+        pass
+
+    collection = ArgumentCollection._from_callable(fn, Parameter(short_alias=unique))
+    assert collection[0].parameter.name == ("--alpha", "-a")
+    assert collection[1].parameter.name == ("--apex", "-A")
+
+
+def test_short_alias_callable_collision_not_deduped():
+    """KNOWN LIMITATION: a callable that ignores ``used`` produces duplicate shorts.
+
+    Unlike the bool form (lowercase -> uppercase -> drop), cyclopts does not dedupe
+    callable-returned shorts. This locks in the documented current behavior.
+    """
+
+    def fn(alpha: str = "", beta: str = ""):
+        pass
+
+    collection = ArgumentCollection._from_callable(fn, Parameter(short_alias=lambda fi, used: "-a"))
+    assert collection[0].parameter.name == ("--alpha", "-a")
+    assert collection[1].parameter.name == ("--beta", "-a")
+
+
+def test_short_alias_propagates_to_subapp_at_runtime():
+    """``short_alias=True`` on a root app reaches commands registered on a subapp at parse time."""
+    root = App(name="root", short_alias=True, result_action="return_value")
+    sub = App(name="sub")
+    root.command(sub)
+
+    @sub.command
+    def deploy(env: str = "x"):
+        return env
+
+    assert root(["sub", "deploy", "-e", "prod"]) == "prod"
+
+
+def test_short_alias_does_not_affect_env_var(app, assert_parse_args, monkeypatch):
+    """Adding a short flag leaves the canonical-name-derived env var lookup intact."""
+    monkeypatch.setenv("MYAPP_ENV", "from_env")
+
+    @app.default
+    def main(env: Annotated[str, Parameter(env_var="MYAPP_ENV", short_alias=True)] = "default"):
+        pass
+
+    assert app.assemble_argument_collection()[0].parameter.name == ("--env", "-e")
+    assert_parse_args(main, "", env="from_env")

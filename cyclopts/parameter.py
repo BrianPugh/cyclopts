@@ -95,6 +95,12 @@ def _default_if_none_false(value: bool | None) -> bool:
 def _short_alias_converter(
     value: bool | Callable[[FieldInfo, set[str]], str | Iterable[str] | None] | None,
 ) -> bool | Callable[[FieldInfo, set[str]], str | Iterable[str] | None]:
+    if isinstance(value, str):
+        raise TypeError(
+            "Parameter.short_alias does not accept a string. Pass a bool to auto-generate a "
+            'short flag, or a callable for custom logic. To set an explicit flag like "-z", use '
+            "Parameter.alias or Parameter.name instead."
+        )
     return False if value is None else value
 
 

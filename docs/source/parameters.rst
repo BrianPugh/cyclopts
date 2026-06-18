@@ -224,6 +224,8 @@ Short flags only apply to **top-level** parameters that bind input directly.
 A container parameter (such as a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields by default.
 To opt a nested field in, annotate it with ``Annotated[..., Parameter(short_alias=True)]``; its short flag appears as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
 
+:obj:`~enum.Flag` parameters are the one exception to the "containers don't get a short flag" rule: since they consume tokens directly (e.g. ``--perm read write``), the flag itself receives a short flag in addition to its per-member options.
+
 ----
 Help
 ----
