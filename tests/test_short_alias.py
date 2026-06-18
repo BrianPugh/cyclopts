@@ -204,6 +204,37 @@ def test_short_alias_nested_field_explicit_opt_in(app, assert_parse_args):
     assert_parse_args(foo, "foo -n Bob", user=User(name="Bob"))
 
 
+def test_short_alias_flattened_fields_get_short(app, assert_parse_args):
+    """Fields flattened to the root namespace via ``name="*"`` get shorts like top-level params.
+
+    They surface as undotted ``--name``/``--email`` flags, so they're treated as
+    root-namespace parameters. A non-flattened container nested *underneath* the
+    flattened one (``--color``) and its dotted leaf (``--color.red``) still get no short.
+    """
+
+    @dataclass
+    class Color:
+        red: int = 0
+
+    @dataclass
+    class User:
+        name: str = ""
+        email: str = ""
+        color: Color = field(default_factory=Color)
+
+    @app.command(short_alias=True)
+    def foo(user: Annotated[User | None, Parameter(name="*")] = None):
+        pass
+
+    collection = app["foo"].assemble_argument_collection()
+    names = {c.parameter.name[0]: c.parameter.name for c in collection}
+    assert names["--name"] == ("--name", "-n")
+    assert names["--email"] == ("--email", "-e")
+    assert names["--color"] == ("--color",)
+    assert names["--color.red"] == ("--color.red",)
+    assert_parse_args(foo, "foo -n Bob -e b@x", user=User(name="Bob", email="b@x"))
+
+
 def test_short_alias_letter_from_transformed_name(app):
     """The short letter follows the transformed long flag, not the raw python identifier."""
 

@@ -1,7 +1,7 @@
 """Shared helper functions and constants for the argument package."""
 
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import suppress
 from enum import Enum, Flag
 from functools import partial
@@ -158,12 +158,23 @@ def _is_short_flag(flag: str) -> bool:
     return len(flag) == 2 and flag[0] == "-" and flag[1] != "-"
 
 
+def _is_root_namespace(names: str | Iterable[str] | None) -> bool:
+    """Return :obj:`True` if the parameter surfaces at the root CLI namespace.
+
+    A root-namespace parameter has an **undotted** long flag (e.g. ``--env``). This
+    covers genuine top-level command parameters as well as fields promoted to the root
+    via ``Parameter(name="*")`` or PEP 692 unpacking (``--name``), while excluding dotted
+    nested fields such as ``--user.name``.
+    """
+    if isinstance(names, str):  # Defensive: resolved names are always a tuple at this point.
+        names = (names,)
+    return any(n.startswith("--") and "." not in n for n in (names or ()))
+
+
 def reserve_short_alias(
     argument: "Argument",
     immediate_parameter: Parameter,
     used_short_aliases: set[str] | None,
-    *,
-    top_level: bool,
 ) -> bool:
     """Phase 1: reserve explicitly-provided short flags and report auto-short eligibility.
 
@@ -175,8 +186,8 @@ def reserve_short_alias(
     Returns :obj:`True` if this argument is eligible for an auto-generated short flag.
     Auto shorts apply to **input-binding** parameters only (scalars, dicts, enum flags) —
     never to promoted containers whose fields become child options. By default they only
-    apply to **top-level** command parameters; a nested field opts in explicitly via
-    ``Annotated[..., Parameter(short_alias=...)]``.
+    apply to **root-namespace** parameters (an undotted long flag); a dotted nested field
+    opts in explicitly via ``Annotated[..., Parameter(short_alias=...)]``.
     """
     if used_short_aliases is None:
         return False
@@ -195,9 +206,9 @@ def reserve_short_alias(
     if explicit_alias or cparam.alias:
         return False
 
-    # Top-level by default; nested fields require an explicit opt-in.
+    # Root-namespace by default; dotted nested fields require an explicit opt-in.
     explicit_opt_in = "short_alias" in immediate_parameter._provided_args
-    if not (top_level or explicit_opt_in):
+    if not (_is_root_namespace(cparam.name) or explicit_opt_in):
         return False
 
     # Only parameters that bind CLI input directly get a short; containers do not.

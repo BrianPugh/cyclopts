@@ -375,9 +375,7 @@ class ArgumentCollection(list[Argument]):
         # Phase 1 here reserves explicit shorts and records eligibility; the actual short is
         # generated in phase 2 (see ``_from_callable``) once every explicit short is known,
         # so an earlier parameter's auto short can't shadow a later parameter's explicit one.
-        if pending_short_aliases is not None and reserve_short_alias(
-            argument, immediate_parameter, used_short_aliases, top_level=not keys
-        ):
+        if pending_short_aliases is not None and reserve_short_alias(argument, immediate_parameter, used_short_aliases):
             pending_short_aliases.append((argument, field_info))
 
         if positional_index is not None:
