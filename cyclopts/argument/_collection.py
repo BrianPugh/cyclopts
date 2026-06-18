@@ -370,8 +370,8 @@ class ArgumentCollection(list[Argument]):
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
 
         # Auto-generate a short alias (e.g. ``-e`` for ``--env``), appended as a standalone
-        # flag. Gated to top-level (or explicitly opted-in) input-binding parameters so that
-        # promoted containers and nested fields don't silently claim or namespace letters.
+        # flag. Gated to root-namespace (or explicitly opted-in) input-binding parameters so
+        # that promoted containers and dotted nested fields don't silently claim letters.
         # Phase 1 here reserves explicit shorts and records eligibility; the actual short is
         # generated in phase 2 (see ``_from_callable``) once every explicit short is known,
         # so an earlier parameter's auto short can't shadow a later parameter's explicit one.
@@ -483,19 +483,11 @@ class ArgumentCollection(list[Argument]):
                 }
             else:
                 subkey_docstring_lookup = None
-            # Any parameter that exposes a ``--long`` keyword form is short-eligible; the
-            # short flag is just a shorthand for that long flag. Purely-positional kinds
-            # (positional-only, ``*args``, ``**kwargs``) have no long form, so no short.
-            short_alias = field_info.kind in (field_info.POSITIONAL_OR_KEYWORD, field_info.KEYWORD_ONLY)
-            field_parameters: list[Parameter | None] = [
-                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
-                None if short_alias else Parameter(short_alias=False),
-            ]
             iparam_argument_collection = cls._from_type(
                 field_info,
                 (),
                 *default_parameters,
-                *field_parameters,
+                Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
                 group_lookup=group_lookup,
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
