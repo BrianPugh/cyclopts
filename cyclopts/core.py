@@ -345,7 +345,7 @@ class App:
     default_command: Callable[..., Any] | None = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Parameter | None = field(default=None, kw_only=True)
 
-    auto_alias: bool | None = field(default=None, kw_only=True)
+    short_alias: bool | None = field(default=None, kw_only=True)
     """Generate one-letter CLI aliases from keyword-only parameter names."""
 
     # This can ONLY ever be None or Tuple[Callable, ...]
@@ -510,10 +510,10 @@ class App:
         self.help_flags = self._help_flags
         self.version_flags = self._version_flags
 
-        if self.auto_alias is not None:
+        if self.short_alias is not None:
             self.default_parameter = Parameter.combine(
                 self.default_parameter,
-                Parameter(auto_alias=self.auto_alias),
+                Parameter(short_alias=self.short_alias),
             )
 
         # Capture the module name from the instantiating frame.

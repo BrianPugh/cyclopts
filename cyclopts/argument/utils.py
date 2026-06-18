@@ -166,7 +166,7 @@ def resolve_short_alias(
     Auto-generated short flags apply to **input-binding** parameters only (scalars,
     dicts, enum flags) — never to promoted containers whose fields become child
     options. By default they only apply to **top-level** command parameters; a nested
-    field opts in explicitly via ``Annotated[..., Parameter(auto_alias=...)]``.
+    field opts in explicitly via ``Annotated[..., Parameter(short_alias=...)]``.
 
     Returns the generated short name(s) to append to the argument's name as standalone
     flags (so they surface globally, e.g. ``-e``, never dotted like ``-u.name``), or
@@ -183,7 +183,7 @@ def resolve_short_alias(
         return None
 
     # Top-level by default; nested fields require an explicit opt-in.
-    explicit_opt_in = "auto_alias" in immediate_parameter._provided_args
+    explicit_opt_in = "short_alias" in immediate_parameter._provided_args
     if not (top_level or explicit_opt_in):
         return None
 
@@ -192,10 +192,10 @@ def resolve_short_alias(
         return None
 
     short = None
-    auto_alias = cparam.auto_alias
-    if callable(auto_alias):
-        short = auto_alias(field_info, used_short_aliases)
-    elif auto_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
+    short_alias = cparam.short_alias
+    if callable(short_alias):
+        short = short_alias(field_info, used_short_aliases)
+    elif short_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
         # Derive the letter from the transformed CLI name (not the raw python identifier)
         # so it stays consistent with the long flag (``--my-flag`` -> ``-m``, ``_foo`` -> ``-f``).
         transformed = cparam.name_transform(field_info.names[0])

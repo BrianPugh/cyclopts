@@ -14,16 +14,16 @@ from cyclopts.argument import ArgumentCollection
         ("deploy --env staging --replicas 3", {"env": "staging", "replicas": 3}),
     ],
 )
-def test_auto_alias_parses(app, assert_parse_args, cmd, kwargs):
-    @app.command(auto_alias=True)
+def test_short_alias_parses(app, assert_parse_args, cmd, kwargs):
+    @app.command(short_alias=True)
     def deploy(env: str = "staging", replicas: int = 10):
         pass
 
     assert_parse_args(deploy, cmd, **kwargs)
 
 
-def test_auto_alias_opt_out(app, assert_parse_args):
-    @app.command(auto_alias=True)
+def test_short_alias_opt_out(app, assert_parse_args):
+    @app.command(short_alias=True)
     def aliased(env: str = "prod"):
         pass
 
@@ -37,54 +37,54 @@ def test_auto_alias_opt_out(app, assert_parse_args):
     assert collection[0].parameter.name == ("--env",)
 
 
-def test_auto_alias_explicit_alias(app, assert_parse_args):
-    @app.command(auto_alias=True)
+def test_short_alias_explicit_alias(app, assert_parse_args):
+    @app.command(short_alias=True)
     def deploy(env: Annotated[str, Parameter(alias="-E")] = "prod", replicas: int = 10):
         pass
 
     assert_parse_args(deploy, "deploy -E prod -r 5", env="prod", replicas=5)
 
 
-def test_auto_alias_same_letter(app, assert_parse_args):
-    @app.command(auto_alias=True)
+def test_short_alias_same_letter(app, assert_parse_args):
+    @app.command(short_alias=True)
     def deploy(env: str = "dev", endpoint: str = "api"):
         pass
 
     assert_parse_args(deploy, "deploy -e dev -E api", env="dev", endpoint="api")
 
 
-def test_auto_alias_callable():
+def test_short_alias_callable():
     def fn(host: str = "localhost", port: int = 8080):
         pass
 
     collection = ArgumentCollection._from_callable(
         fn,
-        Parameter(auto_alias=lambda field_info, _: f"-{field_info.names[0][0].upper()}"),
+        Parameter(short_alias=lambda field_info, _: f"-{field_info.names[0][0].upper()}"),
     )
     assert collection[0].parameter.name == ("--host", "-H")
     assert collection[1].parameter.name == ("--port", "-P")
 
 
-def test_auto_alias_assignment():
+def test_short_alias_assignment():
     def keyword(env: str = "a", endpoint: str = "b", extra: str = "c", replicas: int = 10):
         pass
 
     def positional(env, /, *, replicas: int = 10):
         pass
 
-    collection = ArgumentCollection._from_callable(keyword, Parameter(auto_alias=True))
+    collection = ArgumentCollection._from_callable(keyword, Parameter(short_alias=True))
     assert collection[0].parameter.name == ("--env", "-e")
     assert collection[1].parameter.name == ("--endpoint", "-E")
     assert collection[2].parameter.name == ("--extra",)
     assert collection[3].parameter.name == ("--replicas", "-r")
 
-    positional_collection = ArgumentCollection._from_callable(positional, Parameter(auto_alias=True))
+    positional_collection = ArgumentCollection._from_callable(positional, Parameter(short_alias=True))
     assert positional_collection[0].parameter.name == ("ENV",)
     assert positional_collection[1].parameter.name == ("--replicas", "-r")
 
 
-def test_auto_alias_on_app_default():
-    app = App(auto_alias=True, result_action="return_value")
+def test_short_alias_on_app_default():
+    app = App(short_alias=True, result_action="return_value")
 
     @app.default
     def main(env: str = "prod"):
@@ -93,8 +93,8 @@ def test_auto_alias_on_app_default():
     assert app("-e prod") == "prod"
 
 
-def test_auto_alias_combines_with_default_parameter(app):
-    @app.command(auto_alias=True, default_parameter=Parameter(negative=""))
+def test_short_alias_combines_with_default_parameter(app):
+    @app.command(short_alias=True, default_parameter=Parameter(negative=""))
     def deploy(env: str = "prod", flag: bool = False):
         pass
 
@@ -103,8 +103,8 @@ def test_auto_alias_combines_with_default_parameter(app):
     assert not collection[1].negatives
 
 
-def test_auto_alias_skips_help_flag(app, assert_parse_args):
-    @app.command(auto_alias=True)
+def test_short_alias_skips_help_flag(app, assert_parse_args):
+    @app.command(short_alias=True)
     def connect(host: str = "localhost", port: int = 8080):
         pass
 
@@ -113,8 +113,8 @@ def test_auto_alias_skips_help_flag(app, assert_parse_args):
     assert_parse_args(connect, "connect -H localhost -p 9000", host="localhost", port=9000)
 
 
-def test_auto_alias_uses_help_flag_when_unreserved(app):
-    @app.command(auto_alias=True, help_flags=["--help"])
+def test_short_alias_uses_help_flag_when_unreserved(app):
+    @app.command(short_alias=True, help_flags=["--help"])
     def connect(host: str = "localhost"):
         pass
 
@@ -122,8 +122,8 @@ def test_auto_alias_uses_help_flag_when_unreserved(app):
     assert collection[0].parameter.name == ("--host", "-h")
 
 
-def test_auto_alias_skips_version_flag(app):
-    @app.command(auto_alias=True, version_flags=["-v", "--version"])
+def test_short_alias_skips_version_flag(app):
+    @app.command(short_alias=True, version_flags=["-v", "--version"])
     def main(verbose: bool = False):
         pass
 
@@ -131,7 +131,7 @@ def test_auto_alias_skips_version_flag(app):
     assert collection[0].parameter.name == ("--verbose", "-V")
 
 
-def test_auto_alias_nested_dataclass_top_level_only(app, assert_parse_args):
+def test_short_alias_nested_dataclass_top_level_only(app, assert_parse_args):
     """Containers and their promoted fields get no auto short by default; only top-level scalars do."""
 
     @dataclass
@@ -144,7 +144,7 @@ def test_auto_alias_nested_dataclass_top_level_only(app, assert_parse_args):
         name: str = ""
         color: Color = field(default_factory=Color)
 
-    @app.command(auto_alias=True)
+    @app.command(short_alias=True)
     def foo(*, user: User | None = None, upload: bool = False):
         pass
 
@@ -159,15 +159,15 @@ def test_auto_alias_nested_dataclass_top_level_only(app, assert_parse_args):
     assert_parse_args(foo, "foo -u", upload=True)
 
 
-def test_auto_alias_nested_field_explicit_opt_in(app, assert_parse_args):
+def test_short_alias_nested_field_explicit_opt_in(app, assert_parse_args):
     """A nested leaf field opts in explicitly and surfaces a standalone (not dotted) short."""
 
     @dataclass
     class User:
-        name: Annotated[str, Parameter(auto_alias=True)] = ""
+        name: Annotated[str, Parameter(short_alias=True)] = ""
         color: str = ""
 
-    @app.command(auto_alias=True)
+    @app.command(short_alias=True)
     def foo(*, user: User):
         pass
 
@@ -178,10 +178,10 @@ def test_auto_alias_nested_field_explicit_opt_in(app, assert_parse_args):
     assert_parse_args(foo, "foo -n Bob", user=User(name="Bob"))
 
 
-def test_auto_alias_letter_from_transformed_name(app):
+def test_short_alias_letter_from_transformed_name(app):
     """The short letter follows the transformed long flag, not the raw python identifier."""
 
-    @app.command(auto_alias=True)
+    @app.command(short_alias=True)
     def foo(*, _private: str = "", verbose: bool = False):
         pass
 
@@ -191,10 +191,10 @@ def test_auto_alias_letter_from_transformed_name(app):
     assert names["--verbose"] == ("--verbose", "-v")
 
 
-def test_auto_alias_letter_respects_custom_name_transform(app):
+def test_short_alias_letter_respects_custom_name_transform(app):
     """A custom name_transform drives both the long name and the short letter."""
 
-    @app.command(auto_alias=True, default_parameter=Parameter(name_transform=lambda s: "x" + s))
+    @app.command(short_alias=True, default_parameter=Parameter(name_transform=lambda s: "x" + s))
     def foo(*, my_flag: bool = False):
         pass
 
@@ -202,8 +202,8 @@ def test_auto_alias_letter_respects_custom_name_transform(app):
     assert collection[0].parameter.name == ("--xmy_flag", "-x")
 
 
-def test_auto_alias_help(app, console):
-    @app.command(auto_alias=True)
+def test_short_alias_help(app, console):
+    @app.command(short_alias=True)
     def deploy(env: str = "staging", replicas: int = 10):
         """Deploy."""
 

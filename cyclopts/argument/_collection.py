@@ -480,12 +480,12 @@ class ArgumentCollection(list[Argument]):
                 }
             else:
                 subkey_docstring_lookup = None
-            auto_alias = field_info.kind is field_info.KEYWORD_ONLY or (
+            short_alias = field_info.kind is field_info.KEYWORD_ONLY or (
                 field_info.kind is field_info.POSITIONAL_OR_KEYWORD and not has_star and not field_info.required
             )
             field_parameters: list[Parameter | None] = [
                 Parameter(help=field_info.help) if field_info.help else docstring_lookup.get((field_info.name,)),
-                None if auto_alias else Parameter(auto_alias=False),
+                None if short_alias else Parameter(short_alias=False),
             ]
             iparam_argument_collection = cls._from_type(
                 field_info,
