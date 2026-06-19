@@ -418,6 +418,33 @@ def test_short_alias_explicit_name_short_not_shadowed_by_earlier_auto(app):
     assert collection[1].parameter.name == ("--region", "-r")
 
 
+def test_short_alias_explicit_name_opts_out_and_frees_letter(app):
+    """An explicit ``name`` opts the parameter out of auto-generation entirely.
+
+    ``foo`` already carries an explicit ``-f`` via ``name``, so it must not also get a
+    redundant auto ``-F``. Crucially, because it comes first, the freed ``-F`` must remain
+    available to the later ``force`` parameter rather than being stolen by ``foo``.
+    """
+
+    @app.command(default_parameter=Parameter(short_alias=True))
+    def deploy(foo: Annotated[str, Parameter(name=("--foo", "-f"))] = "a", force: bool = False):
+        pass
+
+    collection = app["deploy"].assemble_argument_collection()
+    assert collection[0].parameter.name == ("--foo", "-f")  # no redundant -F
+    assert collection[1].parameter.name == ("--force", "-F")  # reclaims the freed letter
+
+
+def test_short_alias_explicit_name_rename_opts_out(app):
+    """A pure rename via ``name`` (no short) also opts out of auto-generation."""
+
+    @app.command(default_parameter=Parameter(short_alias=True))
+    def deploy(env: Annotated[str, Parameter(name="--environment")] = "x"):
+        pass
+
+    assert app["deploy"].assemble_argument_collection()[0].parameter.name == ("--environment",)
+
+
 def test_short_alias_propagates_to_subapp_at_runtime():
     """``short_alias=True`` on a root app reaches commands registered on a subapp at parse time."""
     root = App(name="root", default_parameter=Parameter(short_alias=True), result_action="return_value")

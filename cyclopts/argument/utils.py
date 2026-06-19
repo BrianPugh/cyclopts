@@ -202,9 +202,13 @@ def reserve_short_alias(
         if _is_short_flag(flag):
             used_short_aliases.add(flag)
 
-    # An explicitly-provided alias suppresses auto-generation.
+    # An explicitly-provided alias or name suppresses auto-generation: the user has taken
+    # manual control of this parameter's flags, so Cyclopts only uses what they supplied.
+    # (``name="*"`` flattening sets ``name`` on a container, which is excluded below anyway;
+    # its promoted children carry no explicit ``name`` and remain eligible.)
     explicit_alias = "alias" in immediate_parameter._provided_args
-    if explicit_alias or cparam.alias:
+    explicit_name = "name" in immediate_parameter._provided_args
+    if explicit_alias or cparam.alias or explicit_name:
         return False
 
     # Root-namespace only. A field that stays namespaced (e.g. ``--user.name``) never gets
