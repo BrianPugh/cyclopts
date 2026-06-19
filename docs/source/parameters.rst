@@ -220,6 +220,9 @@ The help flag ``-h`` (and ``-v`` when a short version flag is configured) is alw
 
 The short flag is additional; the long ``--env`` still works.
 
+Explicitly setting :attr:`~cyclopts.Parameter.alias` (or :attr:`~cyclopts.Parameter.name`) on a parameter opts it out of auto-generation: Cyclopts uses only the short flag you provided and does **not** also derive one.
+For example, ``env: Annotated[str, Parameter(alias="-E")]`` exposes ``-E`` but not ``-e``, even when ``short_alias=True`` is enabled app-wide.
+
 Short flags only apply to parameters that bind input directly **and** surface at the root CLI namespace (i.e. an undotted long flag like ``--env``).
 A container parameter (such as a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its dotted child fields by default.
 To opt a nested field in, annotate it with ``Annotated[..., Parameter(short_alias=True)]``; its short flag appears as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.

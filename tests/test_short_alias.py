@@ -6,6 +6,7 @@ import pytest
 
 from cyclopts import App, Parameter
 from cyclopts.argument import ArgumentCollection
+from cyclopts.exceptions import UnknownOptionError
 
 
 @pytest.mark.parametrize(
@@ -24,11 +25,22 @@ def test_short_alias_parses(app, assert_parse_args, cmd, kwargs):
 
 
 def test_short_alias_explicit_alias(app, assert_parse_args):
+    """An explicit ``alias`` opts the parameter out of auto-generation entirely.
+
+    ``env`` gets ``-E`` (the explicit alias) but no auto ``-e``; the explicit
+    alias signals manual control of the short flag.
+    """
+
     @app.command(short_alias=True)
     def deploy(env: Annotated[str, Parameter(alias="-E")] = "prod", replicas: int = 10):
         pass
 
+    assert app["deploy"].assemble_argument_collection()[0].parameter.name == ("--env", "-E")
     assert_parse_args(deploy, "deploy -E prod -r 5", env="prod", replicas=5)
+
+    # The auto short is suppressed, so lowercase ``-e`` is not a valid flag.
+    with pytest.raises(UnknownOptionError):
+        app.parse_args("deploy -e prod", print_error=False, exit_on_error=False)
 
 
 def test_short_alias_callable():
