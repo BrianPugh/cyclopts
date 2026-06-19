@@ -545,16 +545,6 @@ API
       If :obj:`None` (default value), uses :func:`~.default_name_transform`.
       Subapps inherit from the first non-:obj:`None` parent :attr:`name_transform`.
 
-   .. attribute:: short_alias
-      :type: Optional[bool]
-      :value: None
-
-      When ``True``, enables automatic single-letter short flags for all eligible parameters in the app
-      (equivalent to setting ``short_alias=True`` on :attr:`default_parameter`).
-      Can also be set per-command via ``@app.command(short_alias=True)``.
-      See :attr:`.Parameter.short_alias` for the full behavior, including collision handling and the
-      root-namespace-only rule.
-
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
       :value: None
@@ -982,7 +972,9 @@ API
 
       .. code-block:: python
 
-         @app.command(short_alias=True)
+         app = App(default_parameter=Parameter(short_alias=True))
+
+         @app.command
          def deploy(env: str = "staging", replicas: int = 10):
              pass
 

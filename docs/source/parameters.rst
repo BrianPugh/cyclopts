@@ -196,16 +196,16 @@ To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app,
 Short Flags
 ^^^^^^^^^^^
 Cyclopts can automatically generate single-letter short flags from your parameter names, so you don't have to specify an alias for every option.
-Enable it per-parameter with :attr:`Parameter.short_alias <cyclopts.Parameter.short_alias>`, or across the whole app with :attr:`App.short_alias <cyclopts.App.short_alias>`.
+Enable it per-parameter with :attr:`Parameter.short_alias <cyclopts.Parameter.short_alias>`, or across the whole app by setting it on the app's :attr:`~cyclopts.App.default_parameter`.
 
 The letter is the first character of the parameter's CLI name (after :attr:`~cyclopts.Parameter.name_transform`), lowercased.
 If that letter is already claimed, the uppercase variant is used; if both are taken, the parameter gets no short flag.
 
 .. code-block:: python
 
-   from cyclopts import App
+   from cyclopts import App, Parameter
 
-   app = App(short_alias=True)
+   app = App(default_parameter=Parameter(short_alias=True))
 
    @app.command
    def deploy(env: str, region: str = "us-east-1"):

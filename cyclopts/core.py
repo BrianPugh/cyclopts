@@ -346,15 +346,6 @@ class App:
     default_command: Callable[..., Any] | None = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Parameter | None = field(default=None, kw_only=True)
 
-    short_alias: bool | None = field(default=None, kw_only=True)
-    """Generate one-letter CLI aliases (e.g. ``-e`` for ``--env``) for parameters with a long flag.
-
-    Applies to every parameter that exposes a ``--long`` form (positional-or-keyword and
-    keyword-only); purely-positional parameters get no short flag. Equivalent to setting
-    :attr:`Parameter.short_alias <cyclopts.Parameter.short_alias>` on the app's
-    :attr:`default_parameter`.
-    """
-
     # This can ONLY ever be None or Tuple[Callable, ...]
     _config: (
         None
@@ -516,12 +507,6 @@ class App:
         # Trigger the setters
         self.help_flags = self._help_flags
         self.version_flags = self._version_flags
-
-        if self.short_alias is not None:
-            self.default_parameter = Parameter.combine(
-                self.default_parameter,
-                Parameter(short_alias=self.short_alias),
-            )
 
         # Capture the module name from the instantiating frame.
         # This is cheap (just dict lookup) compared to inspect.getmodule().

@@ -25,7 +25,7 @@ def test_short_alias_parses(app, assert_parse_args, cmd, kwargs):
     uses its short.
     """
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def deploy(env: str, replicas: int = 10):
         pass
 
@@ -39,7 +39,7 @@ def test_short_alias_explicit_alias(app, assert_parse_args):
     alias signals manual control of the short flag.
     """
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def deploy(env: Annotated[str, Parameter(alias="-E")] = "prod", replicas: int = 10):
         pass
 
@@ -82,7 +82,7 @@ def test_short_alias_assignment():
 
 
 def test_short_alias_on_app_default():
-    app = App(short_alias=True, result_action="return_value")
+    app = App(default_parameter=Parameter(short_alias=True), result_action="return_value")
 
     @app.default
     def main(env: str = "prod"):
@@ -92,7 +92,7 @@ def test_short_alias_on_app_default():
 
 
 def test_short_alias_combines_with_default_parameter(app):
-    @app.command(short_alias=True, default_parameter=Parameter(negative=""))
+    @app.command(default_parameter=Parameter(short_alias=True, negative=""))
     def deploy(env: str = "prod", flag: bool = False):
         pass
 
@@ -102,7 +102,7 @@ def test_short_alias_combines_with_default_parameter(app):
 
 
 def test_short_alias_skips_help_flag(app, assert_parse_args):
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def connect(host: str = "localhost", port: int = 8080):
         pass
 
@@ -112,7 +112,7 @@ def test_short_alias_skips_help_flag(app, assert_parse_args):
 
 
 def test_short_alias_uses_help_flag_when_unreserved(app):
-    @app.command(short_alias=True, help_flags=["--help"])
+    @app.command(default_parameter=Parameter(short_alias=True), help_flags=["--help"])
     def connect(host: str = "localhost"):
         pass
 
@@ -121,7 +121,7 @@ def test_short_alias_uses_help_flag_when_unreserved(app):
 
 
 def test_short_alias_skips_version_flag(app):
-    @app.command(short_alias=True, version_flags=["-v", "--version"])
+    @app.command(default_parameter=Parameter(short_alias=True), version_flags=["-v", "--version"])
     def main(verbose: bool = False):
         pass
 
@@ -142,7 +142,7 @@ def test_short_alias_nested_dataclass_top_level_only(app, assert_parse_args):
         name: str = ""
         color: Color = field(default_factory=Color)
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def foo(*, user: User | None = None, upload: bool = False):
         pass
 
@@ -169,7 +169,7 @@ def test_short_alias_nested_field_opt_in_is_inert(app):
         name: Annotated[str, Parameter(short_alias=True)] = ""
         color: str = ""
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def foo(*, user: User):
         pass
 
@@ -197,7 +197,7 @@ def test_short_alias_flattened_fields_get_short(app, assert_parse_args):
         email: str = ""
         color: Color = field(default_factory=Color)
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def foo(user: Annotated[User | None, Parameter(name="*")] = None):
         pass
 
@@ -213,7 +213,7 @@ def test_short_alias_flattened_fields_get_short(app, assert_parse_args):
 def test_short_alias_letter_from_transformed_name(app):
     """The short letter follows the transformed long flag, not the raw python identifier."""
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def foo(*, _private: str = "", verbose: bool = False):
         pass
 
@@ -226,7 +226,7 @@ def test_short_alias_letter_from_transformed_name(app):
 def test_short_alias_letter_respects_custom_name_transform(app):
     """A custom name_transform drives both the long name and the short letter."""
 
-    @app.command(short_alias=True, default_parameter=Parameter(name_transform=lambda s: "x" + s))
+    @app.command(default_parameter=Parameter(short_alias=True, name_transform=lambda s: "x" + s))
     def foo(*, my_flag: bool = False):
         pass
 
@@ -235,7 +235,7 @@ def test_short_alias_letter_respects_custom_name_transform(app):
 
 
 def test_short_alias_help(app, console):
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def deploy(env: str = "staging", replicas: int = 10):
         """Deploy."""
 
@@ -267,7 +267,7 @@ def test_short_alias_combined_flags(app, assert_parse_args):
 def test_short_alias_no_negative_for_short(app):
     """A boolean's short flag does not get a negated form (negatives are long-only)."""
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def main(*, verbose: bool = False):
         pass
 
@@ -286,7 +286,7 @@ def test_short_alias_skips_bool_defaulting_true(app):
     get shorts.
     """
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def main(*, force: bool = True, file: str = "", verbose: bool = False, req: bool):
         pass
 
@@ -304,7 +304,7 @@ def test_short_alias_enum_flag_gets_short(app):
         read = auto()
         write = auto()
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def main(*, perm: Perm = Perm.read):
         pass
 
@@ -321,7 +321,7 @@ def test_short_alias_accepts_keys_false_gets_short(app):
         x: int = 0
         y: int = 0
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def main(*, pt: Annotated[Point, Parameter(accepts_keys=False)]):
         pass
 
@@ -396,7 +396,7 @@ def test_short_alias_explicit_alias_not_shadowed_by_earlier_auto(app, assert_par
     the explicit request must win and ``reset`` falls back to ``-R``.
     """
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def deploy(reset: bool = False, region: Annotated[str, Parameter(alias="-r")] = "x"):
         pass
 
@@ -409,7 +409,7 @@ def test_short_alias_explicit_alias_not_shadowed_by_earlier_auto(app, assert_par
 def test_short_alias_explicit_name_short_not_shadowed_by_earlier_auto(app):
     """A short embedded in an explicit ``name`` is reserved before auto-generation too."""
 
-    @app.command(short_alias=True)
+    @app.command(default_parameter=Parameter(short_alias=True))
     def deploy(reset: bool = False, region: Annotated[str, Parameter(name=("--region", "-r"))] = "x"):
         pass
 
@@ -420,7 +420,7 @@ def test_short_alias_explicit_name_short_not_shadowed_by_earlier_auto(app):
 
 def test_short_alias_propagates_to_subapp_at_runtime():
     """``short_alias=True`` on a root app reaches commands registered on a subapp at parse time."""
-    root = App(name="root", short_alias=True, result_action="return_value")
+    root = App(name="root", default_parameter=Parameter(short_alias=True), result_action="return_value")
     sub = App(name="sub")
     root.command(sub)
 
