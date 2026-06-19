@@ -553,7 +553,7 @@ API
       (equivalent to setting ``short_alias=True`` on :attr:`default_parameter`).
       Can also be set per-command via ``@app.command(short_alias=True)``.
       See :attr:`.Parameter.short_alias` for the full behavior, including collision handling and the
-      top-level-only / nested opt-in rules.
+      root-namespace-only rule.
 
    .. attribute:: config
       :type: Union[None, Callable, Iterable[Callable]]
@@ -971,9 +971,9 @@ API
       Reserved short flags (``-h``, and ``-v`` when a short version flag is configured) are never claimed.
       Explicitly setting :attr:`.alias` or :attr:`.name` on a parameter suppresses auto-generation for it and reserves those letters.
 
-      Only **top-level** parameters that bind input directly receive a short flag.
-      A container parameter (e.g. a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields by default.
-      A child field may opt in via ``Annotated[..., Parameter(short_alias=True)]``; its short flag surfaces as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
+      Only **root-namespace** parameters that bind input directly receive a short flag.
+      A container parameter (e.g. a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields; ``short_alias`` is inert on a field that stays namespaced.
+      To give a nested field a short flag, flatten it to the root namespace with ``Parameter(name="*")``.
       :obj:`~enum.Flag` parameters are the exception: because they consume tokens directly (e.g. ``--perm read write``), the flag itself does receive a short, even though it also exposes per-member options.
       A boolean parameter that defaults to :obj:`True` also gets no short, since the positive short would be a no-op and the off-switch ``--no-flag`` is long-only; the letter is left free for another parameter.
 

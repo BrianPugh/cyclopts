@@ -371,11 +371,12 @@ class ArgumentCollection(list[Argument]):
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
 
         # Auto-generate a short alias (e.g. ``-e`` for ``--env``), appended as a standalone
-        # flag. Gated to root-namespace (or explicitly opted-in) input-binding parameters so
-        # that promoted containers and dotted nested fields don't silently claim letters.
-        # Phase 1 here reserves explicit shorts and records eligibility; the actual short is
-        # generated in phase 2 (see ``_from_callable``) once every explicit short is known,
-        # so an earlier parameter's auto short can't shadow a later parameter's explicit one.
+        # flag. Gated to root-namespace input-binding parameters so that promoted containers
+        # and dotted nested fields don't silently claim letters. Phase 1 here still reserves
+        # explicit shorts from *every* argument (including nested fields, whose explicit shorts
+        # are global) and records eligibility; the actual short is generated in phase 2 (see
+        # ``_from_callable``) once every explicit short is known, so an earlier parameter's
+        # auto short can't shadow a later parameter's explicit one.
         if pending_short_aliases is not None and reserve_short_alias(argument, immediate_parameter, used_short_aliases):
             pending_short_aliases.append((argument, field_info))
 

@@ -224,10 +224,11 @@ Explicitly setting :attr:`~cyclopts.Parameter.alias` (or :attr:`~cyclopts.Parame
 For example, ``env: Annotated[str, Parameter(alias="-E")]`` exposes ``-E`` but not ``-e``, even when ``short_alias=True`` is enabled app-wide.
 
 Short flags only apply to parameters that bind input directly **and** surface at the root CLI namespace (i.e. an undotted long flag like ``--env``).
-A container parameter (such as a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its dotted child fields by default.
-To opt a nested field in, annotate it with ``Annotated[..., Parameter(short_alias=True)]``; its short flag appears as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
+A container parameter (such as a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its dotted child fields.
+``short_alias`` is inert on a field that stays namespaced: setting it on a nested leaf has no effect.
 
-Fields flattened to the root namespace via ``Parameter(name="*")`` are treated like top-level parameters, so they receive short flags automatically.
+To give a nested field a short flag, flatten it to the root namespace with ``Parameter(name="*")``.
+Flattened fields are treated like top-level parameters (they surface as undotted ``--name`` flags), so they receive short flags automatically.
 
 :obj:`~enum.Flag` parameters are the one exception to the "containers don't get a short flag" rule: since they consume tokens directly (e.g. ``--perm read write``), the flag itself receives a short flag in addition to its per-member options.
 

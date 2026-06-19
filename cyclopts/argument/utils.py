@@ -185,9 +185,10 @@ def reserve_short_alias(
 
     Returns :obj:`True` if this argument is eligible for an auto-generated short flag.
     Auto shorts apply to **input-binding** parameters only (scalars, dicts, enum flags) —
-    never to promoted containers whose fields become child options. By default they only
-    apply to **root-namespace** parameters (an undotted long flag); a dotted nested field
-    opts in explicitly via ``Annotated[..., Parameter(short_alias=...)]``.
+    never to promoted containers whose fields become child options. They apply only to
+    **root-namespace** parameters (an undotted long flag). A field that stays namespaced
+    (e.g. ``--user.name``) never gets one — ``short_alias`` on such a field is inert;
+    flatten it to the root namespace via ``name="*"`` to expose it for a short.
     """
     if used_short_aliases is None:
         return False
@@ -206,9 +207,9 @@ def reserve_short_alias(
     if explicit_alias or cparam.alias:
         return False
 
-    # Root-namespace by default; dotted nested fields require an explicit opt-in.
-    explicit_opt_in = "short_alias" in immediate_parameter._provided_args
-    if not (_is_root_namespace(cparam.name) or explicit_opt_in):
+    # Root-namespace only. A field that stays namespaced (e.g. ``--user.name``) never gets
+    # a short, even with ``short_alias=True`` set directly on it; flatten it via ``name="*"``.
+    if not _is_root_namespace(cparam.name):
         return False
 
     # Only parameters that bind CLI input directly get a short; containers do not.

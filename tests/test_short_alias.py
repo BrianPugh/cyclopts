@@ -157,8 +157,12 @@ def test_short_alias_nested_dataclass_top_level_only(app, assert_parse_args):
     assert_parse_args(foo, "foo -u", upload=True)
 
 
-def test_short_alias_nested_field_explicit_opt_in(app, assert_parse_args):
-    """A nested leaf field opts in explicitly and surfaces a standalone (not dotted) short."""
+def test_short_alias_nested_field_opt_in_is_inert(app):
+    """``short_alias`` is inert on a field that stays namespaced; only root-namespace gets a short.
+
+    A nested leaf keeps its dotted ``--user.name`` flag and no short, even when it sets
+    ``short_alias=True`` directly. Flattening via ``name="*"`` is the way to give it a short.
+    """
 
     @dataclass
     class User:
@@ -171,9 +175,8 @@ def test_short_alias_nested_field_explicit_opt_in(app, assert_parse_args):
 
     collection = app["foo"].assemble_argument_collection()
     names = {c.parameter.name[0]: c.parameter.name for c in collection}
-    assert names["--user.name"] == ("--user.name", "-n")
+    assert names["--user.name"] == ("--user.name",)
     assert names["--user.color"] == ("--user.color",)
-    assert_parse_args(foo, "foo -n Bob", user=User(name="Bob"))
 
 
 def test_short_alias_flattened_fields_get_short(app, assert_parse_args):
