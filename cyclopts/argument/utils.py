@@ -225,7 +225,6 @@ def reserve_short_alias(
 
 def generate_short_alias(
     argument: "Argument",
-    field_info: FieldInfo,
     used_short_aliases: set[str],
 ) -> tuple[str, ...] | None:
     """Phase 2: generate the auto short flag(s) for an argument deemed eligible by phase 1.
@@ -238,6 +237,7 @@ def generate_short_alias(
     :obj:`None`. Mutates ``used_short_aliases`` to reserve claimed letters.
     """
     cparam = argument.parameter
+    field_info = argument.field_info
 
     short = None
     short_alias = cparam.short_alias

@@ -14,7 +14,6 @@ from cyclopts.exceptions import (
     UnknownOptionError,
 )
 from cyclopts.field_info import (
-    FieldInfo,
     signature_parameters,
 )
 from cyclopts.group import Group
@@ -244,7 +243,7 @@ class ArgumentCollection(list[Argument]):
         docstring_lookup: dict[tuple[str, ...], Parameter] | None = None,
         positional_index: int | None = None,
         used_short_aliases: set[str] | None = None,
-        pending_short_aliases: list[tuple["Argument", FieldInfo]] | None = None,
+        pending_short_aliases: list["Argument"] | None = None,
         _resolve_groups: bool = True,
     ):
         from cyclopts.parameter import get_parameters
@@ -378,7 +377,7 @@ class ArgumentCollection(list[Argument]):
         # ``_from_callable``) once every explicit short is known, so an earlier parameter's
         # auto short can't shadow a later parameter's explicit one.
         if pending_short_aliases is not None and reserve_short_alias(argument, immediate_parameter, used_short_aliases):
-            pending_short_aliases.append((argument, field_info))
+            pending_short_aliases.append(argument)
 
         if positional_index is not None:
             if not argument._accepts_keywords or argument._enum_flag_type:
@@ -477,7 +476,7 @@ class ArgumentCollection(list[Argument]):
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
         used_short_aliases: set[str] = set(reserved or ())
-        pending_short_aliases: list[tuple[Argument, FieldInfo]] = []
+        pending_short_aliases: list[Argument] = []
         for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
@@ -509,8 +508,8 @@ class ArgumentCollection(list[Argument]):
         # Phase 2: now that every explicit short flag has been reserved, generate auto
         # shorts in tree order (first-wins). Deferring to here ensures an explicit alias
         # on a later parameter is never shadowed by an earlier parameter's auto short.
-        for argument, field_info in pending_short_aliases:
-            shorts = generate_short_alias(argument, field_info, used_short_aliases)
+        for argument in pending_short_aliases:
+            shorts = generate_short_alias(argument, used_short_aliases)
             if shorts:
                 assert isinstance(argument.parameter.name, tuple)
                 argument.parameter = Parameter.combine(
