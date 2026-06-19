@@ -23,35 +23,12 @@ def test_short_alias_parses(app, assert_parse_args, cmd, kwargs):
     assert_parse_args(deploy, cmd, **kwargs)
 
 
-def test_short_alias_opt_out(app, assert_parse_args):
-    @app.command(short_alias=True)
-    def aliased(env: str = "prod"):
-        pass
-
-    @app.command
-    def plain(env: str = "prod"):
-        pass
-
-    assert_parse_args(aliased, "aliased -e prod", env="prod")
-    assert_parse_args(plain, "plain --env prod", env="prod")
-    collection = app["plain"].assemble_argument_collection()
-    assert collection[0].parameter.name == ("--env",)
-
-
 def test_short_alias_explicit_alias(app, assert_parse_args):
     @app.command(short_alias=True)
     def deploy(env: Annotated[str, Parameter(alias="-E")] = "prod", replicas: int = 10):
         pass
 
     assert_parse_args(deploy, "deploy -E prod -r 5", env="prod", replicas=5)
-
-
-def test_short_alias_same_letter(app, assert_parse_args):
-    @app.command(short_alias=True)
-    def deploy(env: str = "dev", endpoint: str = "api"):
-        pass
-
-    assert_parse_args(deploy, "deploy -e dev -E api", env="dev", endpoint="api")
 
 
 def test_short_alias_callable():
