@@ -14,11 +14,19 @@ from cyclopts.exceptions import UnknownOptionError
     [
         ("deploy -e prod -r 5", {"env": "prod", "replicas": 5}),
         ("deploy --env staging --replicas 3", {"env": "staging", "replicas": 3}),
+        ("deploy prod -r 5", {"env": "prod", "replicas": 5}),
     ],
 )
 def test_short_alias_parses(app, assert_parse_args, cmd, kwargs):
+    """Shorts work alongside the long names and positional binding.
+
+    ``env`` is required (no default), exercising that a required positional-or-keyword
+    param still gets a short; the final case binds ``env`` positionally while ``replicas``
+    uses its short.
+    """
+
     @app.command(short_alias=True)
-    def deploy(env: str = "staging", replicas: int = 10):
+    def deploy(env: str, replicas: int = 10):
         pass
 
     assert_parse_args(deploy, cmd, **kwargs)
@@ -71,31 +79,6 @@ def test_short_alias_assignment():
     positional_collection = ArgumentCollection._from_callable(positional, Parameter(short_alias=True))
     assert positional_collection[0].parameter.name == ("ENV",)
     assert positional_collection[1].parameter.name == ("--replicas", "-r")
-
-
-def test_short_alias_positional_or_keyword_gets_short(app, assert_parse_args):
-    """Every positional-or-keyword param exposes a ``--long`` form, so it also gets a short.
-
-    Applies to required params and to params preceding a ``*`` (keyword-only) marker.
-    """
-
-    @app.command(short_alias=True)
-    def deploy(env: str, region: str = "us-east-1"):
-        pass
-
-    collection = app["deploy"].assemble_argument_collection()
-    assert collection[0].parameter.name == ("--env", "-e")
-    assert collection[1].parameter.name == ("--region", "-r")
-    assert_parse_args(deploy, "deploy -e prod", env="prod")
-    assert_parse_args(deploy, "deploy prod -r eu", env="prod", region="eu")
-
-    @app.command(short_alias=True)
-    def pre_star(src: str, *, verbose: bool = False):
-        pass
-
-    pre_star_collection = app["pre-star"].assemble_argument_collection()
-    assert pre_star_collection[0].parameter.name == ("--src", "-s")
-    assert pre_star_collection[1].parameter.name == ("--verbose", "-v")
 
 
 def test_short_alias_on_app_default():
@@ -290,6 +273,25 @@ def test_short_alias_no_negative_for_short(app):
     assert "--no-verbose" in arg.names
     assert "--no-v" not in arg.names
     assert "-no-v" not in arg.names
+
+
+def test_short_alias_skips_bool_defaulting_true(app):
+    """A bool that defaults to True gets no auto short; the positive short would be a no-op.
+
+    The off-switch (``--no-flag``) is long-only, so the letter is freed for a parameter
+    that can use it. A required bool (no default) and a ``False``-defaulting bool still
+    get shorts.
+    """
+
+    @app.command(short_alias=True)
+    def main(*, force: bool = True, file: str = "", verbose: bool = False, req: bool):
+        pass
+
+    names = {c.parameter.name[0]: c.parameter.name for c in app["main"].assemble_argument_collection()}
+    assert names["--force"] == ("--force",)  # no-op positive short skipped
+    assert names["--file"] == ("--file", "-f")  # reclaims the letter force did not take
+    assert names["--verbose"] == ("--verbose", "-v")
+    assert names["--req"] == ("--req", "-r")  # required bool still gets a short
 
 
 def test_short_alias_enum_flag_gets_short(app):

@@ -975,6 +975,7 @@ API
       A container parameter (e.g. a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields by default.
       A child field may opt in via ``Annotated[..., Parameter(short_alias=True)]``; its short flag surfaces as a standalone global flag (e.g. ``-n``), never dotted like ``-u.name``.
       :obj:`~enum.Flag` parameters are the exception: because they consume tokens directly (e.g. ``--perm read write``), the flag itself does receive a short, even though it also exposes per-member options.
+      A boolean parameter that defaults to :obj:`True` also gets no short, since the positive short would be a no-op and the off-switch ``--no-flag`` is long-only; the letter is left free for another parameter.
 
       For full control, supply a callable ``(field_info, used_short_aliases) -> Union[str, Iterable[str], None]`` that returns the short name(s) to use (or :obj:`None` to skip).
       Consult ``used_short_aliases`` to pick a free letter; any returned name already claimed by an earlier parameter is dropped (first-wins).

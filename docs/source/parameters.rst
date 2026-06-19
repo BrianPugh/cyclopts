@@ -231,6 +231,10 @@ Fields flattened to the root namespace via ``Parameter(name="*")`` are treated l
 
 :obj:`~enum.Flag` parameters are the one exception to the "containers don't get a short flag" rule: since they consume tokens directly (e.g. ``--perm read write``), the flag itself receives a short flag in addition to its per-member options.
 
+A boolean parameter that already defaults to :obj:`True` gets no short flag.
+Its short would map to the positive long form (e.g. ``-f`` → ``--flag``), which is a no-op since the value is already :obj:`True`; the meaningful off-switch ``--no-flag`` is long-only.
+The letter is left free for another parameter to use.
+
 ----
 Help
 ----

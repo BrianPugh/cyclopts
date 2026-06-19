@@ -241,6 +241,11 @@ def generate_short_alias(
         # collision-tracking set and corrupt assignment for later parameters.
         short = short_alias(field_info, frozenset(used_short_aliases))
     elif short_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
+        # A boolean that already defaults to True would only get a no-op positive short
+        # (the meaningful off-switch ``--no-flag`` is long-only), so skip auto-generation
+        # and leave the letter free for a parameter that can actually use it.
+        if argument.hint is bool and field_info.default is True:
+            return None
         # Derive the letter from the transformed CLI name (not the raw python identifier)
         # so it stays consistent with the long flag (``--my-flag`` -> ``-m``, ``_foo`` -> ``-f``).
         transformed = cparam.name_transform(field_info.names[0])
