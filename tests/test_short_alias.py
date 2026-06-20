@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Flag, auto
-from typing import Annotated
+from typing import Annotated, Optional, Union
 
 import pytest
 
@@ -295,6 +295,28 @@ def test_short_alias_skips_bool_defaulting_true(app):
     assert names["--file"] == ("--file", "-f")  # reclaims the letter force did not take
     assert names["--verbose"] == ("--verbose", "-v")
     assert names["--req"] == ("--req", "-r")  # required bool still gets a short
+
+
+def test_short_alias_optional_bool_defaulting_true_skipped(app):
+    """``Optional[bool]`` is resolved to ``bool`` upstream, so the default-True skip still applies.
+
+    A ``True``-defaulting optional bool gets no short (no-op positive), while a
+    ``False``-defaulting one still does — matching plain ``bool`` behavior.
+    """
+
+    @app.command(default_parameter=Parameter(short_alias=True))
+    def main(
+        *,
+        verbose: Optional[bool] = True,
+        kappa: Union[bool, None] = True,
+        debug: Optional[bool] = False,
+    ):
+        pass
+
+    names = {c.parameter.name[0]: c.parameter.name for c in app["main"].assemble_argument_collection()}
+    assert names["--verbose"] == ("--verbose",)  # default-True optional bool: no short
+    assert names["--kappa"] == ("--kappa",)  # same for the Union spelling
+    assert names["--debug"] == ("--debug", "-d")  # default-False optional bool still gets one
 
 
 def test_short_alias_enum_flag_gets_short(app):
