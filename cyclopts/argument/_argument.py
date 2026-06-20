@@ -1170,17 +1170,41 @@ class Argument:
                 out[keys[0]] = token.value if token.implicit_value is UNSET else token.implicit_value
         return out
 
+    def _resolve_missing_keys(self, data) -> "list[tuple[tuple[str, ...], Argument | None]]":
+        """Map each required-but-absent key reported by the checker to its child ``Argument``.
+
+        Non-raising core shared by :meth:`_run_missing_keys_checker` (the conversion-time
+        error path) and :meth:`_missing_children` (the read-only query path). The checker
+        only inspects ``set(data)`` — the keys — so the values in ``data`` are irrelevant.
+
+        Returns a list of ``(full_keys, argument)`` pairs in checker order; ``argument`` is
+        ``None`` for a required key that maps to no Cyclopts-accessible child.
+        """
+        if not self._missing_keys_checker:
+            return []
+        out = []
+        for key in self._missing_keys_checker(self, data):
+            keys = self.keys + (key,)
+            matched = self.children.filter_by(keys_prefix=keys)
+            out.append((keys, matched[0] if matched else None))
+        return out
+
+    def _missing_children(self) -> "list[Argument]":
+        """Direct child arguments the checker reports as required-and-absent (non-raising).
+
+        Builds the provided-key set from token presence rather than converted values, so it
+        can be called before/without conversion. When no child currently has a token (a
+        fully-omitted composite) the checker returns every required child.
+        """
+        data = {child.keys[-1]: None for child in self.children if child.has_tokens}
+        return [argument for _, argument in self._resolve_missing_keys(data) if argument is not None]
+
     def _run_missing_keys_checker(self, data):
         if not self._missing_keys_checker or (not self.required and not data):
             return
-        if not (missing_keys := self._missing_keys_checker(self, data)):
-            return
-        missing_key = missing_keys[0]
-        keys = self.keys + (missing_key,)
-        missing_arguments = self.children.filter_by(keys_prefix=keys)
-        if missing_arguments:
-            raise MissingArgumentError(argument=missing_arguments[0])
-        else:
+        for keys, argument in self._resolve_missing_keys(data):
+            if argument is not None:
+                raise MissingArgumentError(argument=argument)
             missing_description = self.field_info.names[0] + "->" + "->".join(keys)
             raise ValueError(
                 f'Required field "{missing_description}" is not accessible by Cyclopts; possibly due to conflicting POSITIONAL/KEYWORD requirements.'

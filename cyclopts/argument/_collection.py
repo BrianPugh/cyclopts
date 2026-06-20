@@ -506,6 +506,50 @@ class ArgumentCollection(list[Argument]):
     def _max_index(self) -> int | None:
         return max((x.index for x in self if x.index is not None), default=None)
 
+    def _missing(self) -> "ArgumentCollection":
+        """Leaf arguments still needing a value, given what's been parsed.
+
+        Tree-aware counterpart to the static :attr:`Argument.required`. Includes
+        conditionally-required fields of composites that have been *partially* supplied
+        (e.g. ``--end`` when only ``--start`` was given) by delegating to each composite's
+        own missing-keys checker — so it is correct for dataclasses, pydantic, attrs and
+        TypedDicts alike. A *required* composite that received no tokens contributes all of
+        its required leaves; an *optional* one contributes nothing.
+
+        Returns leaf arguments in declaration order. Read-only: nothing is converted.
+        """
+        cls = type(self)
+        out = cls()
+
+        def expand_required(argument: Argument) -> None:
+            # ``argument`` is known to be required and currently has no tokens.
+            if not argument.children:
+                if argument.parse:
+                    out.append(argument)
+                return
+            for child in argument._missing_children():  # empty data -> every required child
+                expand_required(child)
+
+        def walk(argument: Argument) -> None:
+            if not argument.children:  # leaf
+                if argument.parse and argument.required and not argument.has_tokens:
+                    out.append(argument)
+                return
+            if argument.has_tokens:  # activated composite
+                missing_ids = {id(a) for a in argument._missing_children()}
+                for child in argument.children:
+                    if child.has_tokens:
+                        walk(child)  # recurse into (possibly nested) partial fills
+                    elif id(child) in missing_ids:
+                        expand_required(child)
+            elif argument.required:  # fully-omitted required composite
+                expand_required(argument)
+            # optional composite with no tokens: contributes nothing
+
+        for argument in self._root_arguments:
+            walk(argument)
+        return out
+
     def filter_by(
         self,
         *,
@@ -514,6 +558,7 @@ class ArgumentCollection(list[Argument]):
         has_tree_tokens: bool | None = None,
         keys_prefix: tuple[str, ...] | None = None,
         kind: inspect._ParameterKind | None = None,
+        missing: bool | None = None,
         parse: bool | None = None,
         show: bool | None = None,
         value_set: bool | None = None,
@@ -532,6 +577,10 @@ class ArgumentCollection(list[Argument]):
             :class:`Argument` and/or it's children have parsed tokens.
         kind: inspect._ParameterKind | None
             The :attr:`~inspect.Parameter.kind` of the argument.
+        missing: bool | None
+            The leaf :class:`Argument` still needs a value given what's been parsed,
+            accounting for conditionally-required fields of partially-supplied composites.
+            See :meth:`_missing`. ``False`` selects the complement.
         parse: bool | None
             If the argument is intended to be parsed or not.
         show: bool | None
@@ -542,6 +591,9 @@ class ArgumentCollection(list[Argument]):
         ac = self.copy()
         cls = type(self)
 
+        if missing is not None:
+            missing_ids = {id(x) for x in self._missing()}
+            ac = cls(x for x in ac if not ((id(x) in missing_ids) ^ bool(missing)))
         if group is not None:
             ac = cls(x for x in ac if group in x.parameter.group)  # pyright: ignore
         if kind is not None:

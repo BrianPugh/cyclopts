@@ -1,4 +1,6 @@
+import inspect
 from collections import namedtuple
+from dataclasses import dataclass
 from typing import Annotated, Dict, Optional, TypedDict, Union  # noqa: UP035
 
 import pytest
@@ -441,6 +443,217 @@ def test_argument_collection_filter_by_has_tree_tokens():
 
     # ``has_tokens`` (immediate) must NOT match the root.
     assert root not in collection.filter_by(has_tokens=True)
+
+
+def _names(collection):
+    return [argument.name for argument in collection]
+
+
+def test_filter_by_missing_simple_leaf():
+    def foo(a: int, b: int = 5):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+    # Nothing supplied: required ``a`` is missing, defaulted ``b`` is not.
+    assert _names(collection.filter_by(missing=True)) == ["--a"]
+
+    collection["--a"].append(Token(value="1", source="test"))
+    assert _names(collection.filter_by(missing=True)) == []
+
+
+def test_filter_by_missing_partial_composite():
+    """The headline case: a partially-supplied optional composite reports its absent field."""
+
+    @Parameter(name="*")
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    def cli(data_source: str, /, *, time_range: Optional[TimeRange] = None):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--start"].append(Token(keyword="--start", value="1", source="test"))
+
+    assert _names(collection.filter_by(missing=True)) == ["DATA_SOURCE", "--end"]
+
+
+def test_filter_by_missing_optional_composite_untouched():
+    @Parameter(name="*")
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    def cli(data_source: str, /, *, time_range: Optional[TimeRange] = None):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    # Untouched optional composite contributes nothing.
+    assert _names(collection.filter_by(missing=True)) == ["DATA_SOURCE"]
+
+
+def test_filter_by_missing_required_composite_omitted():
+    @Parameter(name="*")
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    def cli(*, time_range: TimeRange):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    # Fully-omitted *required* composite surfaces all of its required leaves.
+    assert _names(collection.filter_by(missing=True)) == ["--start", "--end"]
+
+
+def test_filter_by_missing_defaulted_subfield_excluded():
+    @Parameter(name="*")
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int = 5
+
+    def cli(*, time_range: Optional[TimeRange] = None):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--start"].append(Token(keyword="--start", value="1", source="test"))
+    # ``end`` has a default, so it is not missing.
+    assert _names(collection.filter_by(missing=True)) == []
+
+
+def test_filter_by_missing_nested_composite():
+    @dataclass
+    class Inner:
+        a: int
+        b: int
+
+    @dataclass
+    class Outer:
+        inner: Inner
+        name: str
+
+    def cli(o: Outer):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--o.inner.a"].append(Token(value="1", source="test"))
+    # Recurses into the activated inner composite to find ``b``.
+    assert _names(collection.filter_by(missing=True)) == ["--o.inner.b", "--o.name"]
+
+
+def test_filter_by_missing_typeddict():
+    class Inner(TypedDict):
+        x: int
+        y: int
+
+    def cli(d: Inner):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--d.x"].append(Token(value="1", source="test"))
+    assert _names(collection.filter_by(missing=True)) == ["--d.y"]
+
+
+def test_filter_by_missing_pydantic():
+    import pydantic
+
+    @Parameter(name="*")
+    class TimeRange(pydantic.BaseModel):
+        start: int
+        end: int
+
+    def cli(*, time_range: Optional[TimeRange] = None):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--start"].append(Token(keyword="--start", value="1", source="test"))
+    assert _names(collection.filter_by(missing=True)) == ["--end"]
+
+
+def test_filter_by_missing_attrs():
+    import attrs
+
+    @Parameter(name="*")
+    @attrs.define
+    class TimeRange:
+        start: int
+        end: int
+
+    def cli(*, time_range: Optional[TimeRange] = None):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--start"].append(Token(keyword="--start", value="1", source="test"))
+    assert _names(collection.filter_by(missing=True)) == ["--end"]
+
+
+def test_filter_by_missing_false_is_complement():
+    def foo(a: int, b: int = 5):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+    missing = collection.filter_by(missing=True)
+    not_missing = collection.filter_by(missing=False)
+    assert _names(missing) == ["--a"]
+    assert _names(not_missing) == ["--b"]
+
+
+def test_filter_by_missing_composes_with_other_filters():
+    @Parameter(name="*")
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    def cli(data_source: str, /, *, time_range: Optional[TimeRange] = None):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--start"].append(Token(keyword="--start", value="1", source="test"))
+    # ``missing`` intersects with the other (AND) filters.
+    result = collection.filter_by(missing=True, kind=inspect.Parameter.KEYWORD_ONLY)
+    assert _names(result) == ["--end"]
+
+
+def test_filter_by_missing_end_to_end_prompt():
+    """The ``while`` recipe from the docs, driven by an activated-on-CLI composite.
+
+    ``--start`` on the CLI activates the optional composite, so ``--end`` becomes a
+    conditionally-required missing field that the static ``Argument.required`` can't see.
+    """
+    from cyclopts import App
+
+    @Parameter(name="*")
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    answers = iter(["my_source", "2"])
+
+    def prompt_for_missing(app, commands, arguments):
+        prompted = []
+        while missing := arguments.filter_by(missing=True):
+            argument = missing[0]
+            prompted.append(argument.name)
+            argument.tokens.append(Token(keyword=argument.name, value=next(answers), source="interactive"))
+        assert prompted == ["DATA_SOURCE", "--end"]
+
+    app = App(name="cli", config=prompt_for_missing, result_action="return_value")
+
+    captured = {}
+
+    @app.command
+    def run(data_source: str, /, *, time_range: Optional[TimeRange] = None):
+        captured["data_source"] = data_source
+        captured["time_range"] = time_range
+
+    app(["run", "--start", "1"], exit_on_error=False)
+    assert captured == {"data_source": "my_source", "time_range": TimeRange(start=1, end=2)}
 
 
 @pytest.mark.parametrize(
