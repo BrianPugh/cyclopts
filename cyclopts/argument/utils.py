@@ -171,44 +171,48 @@ def _is_root_namespace(names: str | Iterable[str] | None) -> bool:
     return any(n.startswith("--") and "." not in n for n in (names or ()))
 
 
-def reserve_short_alias(
-    argument: "Argument",
-    immediate_parameter: Parameter,
-    used_short_aliases: set[str] | None,
-) -> bool:
-    """Phase 1: reserve explicitly-provided short flags and report auto-short eligibility.
+def reserve_explicit_shorts(argument: "Argument", used_short_aliases: set[str]) -> None:
+    """Phase 1a: reserve every explicitly-provided short flag into ``used_short_aliases``.
 
-    Runs while the argument tree is being built. Every short flag the user explicitly
-    supplied via ``name`` or ``alias`` is reserved into ``used_short_aliases`` here, so
-    that auto-generation (phase 2, deferred until the whole tree is known) avoids them
-    regardless of parameter ordering.
-
-    Returns :obj:`True` if this argument is eligible for an auto-generated short flag.
-    Auto shorts apply to **input-binding** parameters only (scalars, dicts, enum flags) —
-    never to promoted containers whose fields become child options. They apply only to
-    **root-namespace** parameters (an undotted long flag). A field that stays namespaced
-    (e.g. ``--user.name``) never gets one — ``short_alias`` on such a field is inert;
-    flatten it to the root namespace via ``name="*"`` to expose it for a short.
+    Runs for *every* argument as the tree is built (independent of eligibility), so that
+    auto-generation (phase 2, deferred until the whole tree is known) avoids user-supplied
+    shorts regardless of parameter ordering. At this point no auto short has been appended
+    yet, so any single-letter flag present is necessarily user-provided.
     """
-    if used_short_aliases is None:
-        return False
-
     cparam = argument.parameter
-
-    # Reserve every explicit short flag (from name or alias) so auto-generated shorts
-    # avoid them. At this point no auto short has been appended yet, so any single-letter
-    # flag present is necessarily user-provided.
     for flag in (*(cparam.name or ()), *(cparam.alias or ())):
         if is_short_flag(flag):
             used_short_aliases.add(flag)
 
+
+def is_short_alias_eligible(argument: "Argument", immediate_parameter: Parameter) -> bool:
+    """Phase 1b: pure predicate for whether this argument should receive an auto-generated short flag.
+
+    Auto shorts apply to opted-in (``short_alias``), **input-binding** parameters only
+    (scalars, dicts, enum flags) — never to promoted containers whose fields become child
+    options. They apply only to **root-namespace** parameters (an undotted long flag). A
+    field that stays namespaced (e.g. ``--user.name``) never gets one — ``short_alias`` on
+    such a field is inert; flatten it to the root namespace via ``name="*"`` to expose it.
+    """
+    cparam = argument.parameter
+
+    if not cparam.short_alias:
+        return False
+
     # An explicitly-provided alias or name suppresses auto-generation: the user has taken
     # manual control of this parameter's flags, so Cyclopts only uses what they supplied.
-    # (``name="*"`` flattening sets ``name`` on a container, which is excluded below anyway;
-    # its promoted children carry no explicit ``name`` and remain eligible.)
-    explicit_alias = "alias" in immediate_parameter._provided_args
-    explicit_name = "name" in immediate_parameter._provided_args
-    if explicit_alias or cparam.alias or explicit_name:
+    # The checks deliberately differ:
+    #   - ``name`` uses ``immediate_parameter._provided_args`` (the user's own annotation),
+    #     because Cyclopts always re-injects a resolved ``name`` into ``cparam`` — so
+    #     ``"name" in cparam._provided_args`` is always True and useless here.
+    #   - ``alias`` uses ``cparam.alias`` *truthiness* rather than ``_provided_args``:
+    #     internal subkey combining (``PARAMETER_SUBKEY_BLOCKER``) injects ``alias=None``,
+    #     which pollutes ``cparam._provided_args`` with a spurious ``"alias"``. Truthiness
+    #     ignores that ``None`` while still catching a real alias from a global
+    #     ``App(default_parameter=Parameter(alias=...))``.
+    # (``name="*"`` flattening sets ``name`` on a container, excluded below anyway; its
+    # promoted children carry no explicit ``name`` and remain eligible.)
+    if "name" in immediate_parameter._provided_args or "alias" in immediate_parameter._provided_args or cparam.alias:
         return False
 
     # Root-namespace only. A field that stays namespaced (e.g. ``--user.name``) never gets
