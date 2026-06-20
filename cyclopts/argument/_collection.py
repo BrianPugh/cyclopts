@@ -522,7 +522,10 @@ class ArgumentCollection(list[Argument]):
         out = cls()
 
         def expand_required(argument: Argument) -> None:
-            # ``argument`` is known to be required and currently has no tokens.
+            # ``argument`` is known to be required and currently has no tokens. Append it
+            # (if it's a parseable leaf) or recurse into each of its required children.
+            # Requiredness is established by the caller/checker, *not* re-derived from the
+            # static ``argument.required`` — conditionally-required leaves have it ``False``.
             if not argument.children:
                 if argument.parse:
                     out.append(argument)
@@ -531,20 +534,18 @@ class ArgumentCollection(list[Argument]):
                 expand_required(child)
 
         def walk(argument: Argument) -> None:
-            if not argument.children:  # leaf
-                if argument.parse and argument.required and not argument.has_tokens:
-                    out.append(argument)
-                return
-            if argument.has_tokens:  # activated composite
-                missing_ids = {id(a) for a in argument._missing_children()}
+            if argument.has_tokens:
+                if not argument.children:  # leaf already satisfied
+                    return
+                missing_ids = {id(a) for a in argument._missing_children()}  # activated composite
                 for child in argument.children:
                     if child.has_tokens:
                         walk(child)  # recurse into (possibly nested) partial fills
                     elif id(child) in missing_ids:
                         expand_required(child)
-            elif argument.required:  # fully-omitted required composite
+            elif argument.required:  # fully-omitted required leaf or composite
                 expand_required(argument)
-            # optional composite with no tokens: contributes nothing
+            # optional, no tokens: contributes nothing
 
         for argument in self._root_arguments:
             walk(argument)
@@ -601,7 +602,7 @@ class ArgumentCollection(list[Argument]):
         if has_tokens is not None:
             ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tokens)))
         if has_tree_tokens is not None:
-            ac = cls(x for x in ac if not (bool(x.has_tokens) ^ bool(has_tree_tokens)))
+            ac = cls(x for x in ac if not (x.has_tokens ^ bool(has_tree_tokens)))
         if keys_prefix is not None:
             ac = cls(x for x in ac if x.keys[: len(keys_prefix)] == keys_prefix)
         if show is not None:
