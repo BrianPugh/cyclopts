@@ -412,6 +412,37 @@ def test_argument_collection_var_keyword_match():
     assert argument.field_info.name == "b"
 
 
+def test_argument_collection_filter_by_has_tree_tokens():
+    """``has_tree_tokens`` must be tree-aware, unlike ``has_tokens``.
+
+    A composite whose only tokens live on a child must be matched by
+    ``has_tree_tokens=True`` even though it has no immediate tokens of its own.
+    """
+
+    class Inner(TypedDict):
+        fizz: float
+        buzz: int
+
+    def foo(a: Inner):
+        pass
+
+    collection = ArgumentCollection._from_callable(foo)
+
+    leaf = collection["--a.fizz"]
+    leaf.append(Token(value="1.5", source="test"))
+
+    root = collection["--a"]
+    assert not root.tokens  # no immediate tokens
+    assert root.has_tokens  # but tree-aware: a child has a token
+
+    has_tree_tokens = collection.filter_by(has_tree_tokens=True)
+    assert root in has_tree_tokens
+    assert leaf in has_tree_tokens
+
+    # ``has_tokens`` (immediate) must NOT match the root.
+    assert root not in collection.filter_by(has_tokens=True)
+
+
 @pytest.mark.parametrize(
     "args, expected",
     [

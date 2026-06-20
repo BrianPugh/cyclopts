@@ -549,7 +549,7 @@ class ArgumentCollection(list[Argument]):
         if has_tokens is not None:
             ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tokens)))
         if has_tree_tokens is not None:
-            ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tree_tokens)))
+            ac = cls(x for x in ac if not (bool(x.has_tokens) ^ bool(has_tree_tokens)))
         if keys_prefix is not None:
             ac = cls(x for x in ac if x.keys[: len(keys_prefix)] == keys_prefix)
         if show is not None:
