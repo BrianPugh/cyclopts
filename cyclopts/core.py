@@ -28,7 +28,7 @@ from attrs import Factory, define, field
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
-from cyclopts.argument.utils import _is_short_flag
+from cyclopts.argument.utils import is_short_flag
 from cyclopts.bind import create_bound_arguments, is_option_like, normalize_tokens
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
@@ -1554,7 +1554,7 @@ class App:
             group_arguments=self._group_arguments,  # pyright: ignore
             group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
-            reserved=(f for f in (*self.help_flags, *self.version_flags) if _is_short_flag(f)),
+            reserved=(f for f in (*self.help_flags, *self.version_flags) if is_short_flag(f)),
         )
 
     def parse_known_args(

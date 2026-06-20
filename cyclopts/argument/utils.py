@@ -153,7 +153,7 @@ def enum_flag_from_dict(
     return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)
 
 
-def _is_short_flag(flag: str) -> bool:
+def is_short_flag(flag: str) -> bool:
     """Return :obj:`True` for a single-letter flag like ``-e`` (not ``--env`` or ``-`` alone)."""
     return len(flag) == 2 and flag[0] == "-" and flag[1] != "-"
 
@@ -199,7 +199,7 @@ def reserve_short_alias(
     # avoid them. At this point no auto short has been appended yet, so any single-letter
     # flag present is necessarily user-provided.
     for flag in (*(cparam.name or ()), *(cparam.alias or ())):
-        if _is_short_flag(flag):
+        if is_short_flag(flag):
             used_short_aliases.add(flag)
 
     # An explicitly-provided alias or name suppresses auto-generation: the user has taken
