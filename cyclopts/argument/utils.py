@@ -267,7 +267,23 @@ def generate_short_alias(
 
     if not short:
         return None
-    shorts = (short,) if isinstance(short, str) else tuple(short)
+    if isinstance(short, str):
+        shorts = (short,)
+    else:
+        try:
+            shorts = tuple(short)
+        except TypeError:
+            raise TypeError(
+                f"Parameter.short_alias callable must return a str, an iterable of str, or None; got {short!r}."
+            ) from None
+    # The callable is custom logic, but it still must produce single-letter short flags
+    # (e.g. ``-e``) — anything else would be silently appended as a long flag or, worse, a
+    # positional name. Fail loudly instead, mirroring the field-level str rejection.
+    for s in shorts:
+        if not isinstance(s, str) or not is_short_flag(s):
+            raise ValueError(
+                f"Parameter.short_alias callable must return single-letter short flags like '-e'; got {s!r}."
+            )
     # Drop any short already claimed by an earlier parameter (first-wins), so a
     # callable that ignores ``used_short_aliases`` can't create duplicate flags.
     shorts = tuple(s for s in shorts if s not in used_short_aliases)

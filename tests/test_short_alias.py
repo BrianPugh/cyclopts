@@ -389,6 +389,25 @@ def test_short_alias_callable_collision_deduped():
     assert collection[1].parameter.name == ("--beta",)
 
 
+@pytest.mark.parametrize(
+    "returned, exc, match",
+    [
+        ("e", ValueError, "single-letter short flags"),  # missing leading dash -> would be positional
+        ("--foo", ValueError, "single-letter short flags"),  # long flag, not a short
+        (["-e", "x"], ValueError, "single-letter short flags"),  # one bad item in the iterable
+        (42, TypeError, "must return a str"),  # not a str or iterable
+    ],
+)
+def test_short_alias_callable_bad_return_rejected(returned, exc, match):
+    """A callable must return single-letter shorts; anything else fails loudly, not silently."""
+
+    def fn(env: str = ""):
+        pass
+
+    with pytest.raises(exc, match=match):
+        ArgumentCollection._from_callable(fn, Parameter(short_alias=lambda fi, used: returned))
+
+
 def test_short_alias_explicit_alias_not_shadowed_by_earlier_auto(app, assert_parse_args):
     """An explicit ``alias`` on a later parameter wins over an earlier parameter's auto short.
 
