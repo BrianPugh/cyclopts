@@ -96,13 +96,18 @@ def _default_if_none_false(value: bool | None) -> bool:
 def _short_alias_converter(
     value: bool | Callable[[FieldInfo, frozenset[str]], str | Iterable[str] | None] | None,
 ) -> bool | Callable[[FieldInfo, frozenset[str]], str | Iterable[str] | None]:
+    return False if value is None else value
+
+
+def _short_alias_validator(instance, attribute, value):
+    # A str is also an Iterable[str], so an explicit "-z" would silently expand into
+    # individual letters. Reject it so the developer reaches for alias/name instead.
     if isinstance(value, str):
         raise TypeError(
             "Parameter.short_alias does not accept a string. Pass a bool to auto-generate a "
             'short flag, or a callable for custom logic. To set an explicit flag like "-z", use '
             "Parameter.alias or Parameter.name instead."
         )
-    return False if value is None else value
 
 
 def _negative_converter(default: tuple[str, ...]):
@@ -352,6 +357,7 @@ class Parameter:
     short_alias: bool | Callable[[FieldInfo, frozenset[str]], str | Iterable[str] | None] = field(
         default=None,
         converter=_short_alias_converter,
+        validator=_short_alias_validator,
         kw_only=True,
     )
 
