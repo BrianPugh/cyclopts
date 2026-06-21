@@ -1297,8 +1297,20 @@ class Argument:
         fully-omitted composite) the checker returns every required child. For multi-branch
         ``Union`` composites, requiredness is branch-aware (see
         :meth:`_active_branch_required_keys`).
+
+        Special case: a *required* multi-branch ``Union`` with no supplied fields hasn't
+        committed to a branch, so :meth:`_active_branch_required_keys` owes nothing — which
+        would leave an interactive prompt loop blind to a value it must collect. Default to
+        the first branch's required fields so the loop converges on (and instantiates) it,
+        matching the declaration-order preference of :meth:`_resolve_union_member`. This
+        read-only query path only; conversion still errors on the composite itself.
         """
         supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
+        if self._union_branches and self.required and not supplied_keys:
+            first_branch_required = {k for k, v in self._union_branches[0][1].items() if v.required}
+            return [
+                child for child in self.children if not child.has_tokens and child.keys[-1] in first_branch_required
+            ]
         active_required = self._active_branch_required_keys(supplied_keys)
         if active_required is not None:
             return [child for child in self.children if not child.has_tokens and child.keys[-1] in active_required]

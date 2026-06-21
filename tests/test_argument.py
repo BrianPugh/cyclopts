@@ -683,8 +683,31 @@ def test_filter_by_missing_multi_branch_union_active_branch():
     assert _names(collection.filter_by(missing=True)) == ["--time-period.end"]
 
 
-def test_filter_by_missing_multi_branch_union_untouched():
-    """A fully-omitted Union composite can't pick a branch, so it reports nothing."""
+def test_filter_by_missing_multi_branch_union_untouched_required():
+    """A fully-omitted *required* Union defaults to the first branch so a prompt loop can fill it.
+
+    Only the first branch's *required* fields are reported; its optional field (``step``) is not.
+    """
+
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+        step: int = 1
+
+    @dataclass
+    class Live:
+        live: bool
+
+    def cli(*, time_period: Union[TimeRange, Live]):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    assert _names(collection.filter_by(missing=True)) == ["--time-period.start", "--time-period.end"]
+
+
+def test_filter_by_missing_multi_branch_union_untouched_optional():
+    """A fully-omitted *optional* Union uses its default, so it reports nothing."""
 
     @dataclass
     class TimeRange:
@@ -695,7 +718,7 @@ def test_filter_by_missing_multi_branch_union_untouched():
     class Live:
         live: bool
 
-    def cli(*, time_period: Union[TimeRange, Live]):
+    def cli(*, time_period: Optional[Union[TimeRange, Live]] = None):
         pass
 
     collection = ArgumentCollection._from_callable(cli)
