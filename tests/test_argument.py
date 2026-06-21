@@ -656,6 +656,52 @@ def test_filter_by_missing_end_to_end_prompt():
     assert captured == {"data_source": "my_source", "time_range": TimeRange(start=1, end=2)}
 
 
+def test_filter_by_missing_multi_branch_union_active_branch():
+    """Supplying one Union member's field must not mark a sibling member's fields missing."""
+
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    @dataclass
+    class Live:
+        live: bool
+
+    def cli(*, time_period: Union[TimeRange, Live]):
+        pass
+
+    # Activate the ``Live`` branch -> nothing missing (it's fully supplied).
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--time-period.live"].append(Token(value="true", source="test"))
+    assert _names(collection.filter_by(missing=True)) == []
+
+    # Activate the ``TimeRange`` branch with only ``start`` -> only ``end`` is missing,
+    # *not* the ``Live`` branch's ``live``.
+    collection = ArgumentCollection._from_callable(cli)
+    collection["--time-period.start"].append(Token(value="1", source="test"))
+    assert _names(collection.filter_by(missing=True)) == ["--time-period.end"]
+
+
+def test_filter_by_missing_multi_branch_union_untouched():
+    """A fully-omitted Union composite can't pick a branch, so it reports nothing."""
+
+    @dataclass
+    class TimeRange:
+        start: int
+        end: int
+
+    @dataclass
+    class Live:
+        live: bool
+
+    def cli(*, time_period: Union[TimeRange, Live]):
+        pass
+
+    collection = ArgumentCollection._from_callable(cli)
+    assert _names(collection.filter_by(missing=True)) == []
+
+
 @pytest.mark.parametrize(
     "args, expected",
     [

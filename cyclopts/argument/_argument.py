@@ -22,6 +22,7 @@ from cyclopts.annotations import (
     ITERABLE_TYPES,
     contains_hint,
     get_annotated_discriminator,
+    get_hint_name,
     is_attrs,
     is_dataclass,
     is_enum_flag,
@@ -166,6 +167,15 @@ class Argument:
 
     _enum_flag_type: Any | None = field(default=None, init=False, repr=False)
 
+    _union_branches: "list[tuple[Any, dict[str, FieldInfo]]]" = field(factory=list, init=False, repr=False)
+    """Per-branch ``(member_type, field_infos)`` when :attr:`hint` is a ``Union`` of 2+ keyword-accepting types.
+
+    Empty for non-unions and single-composite optionals (e.g. ``Foo | None``). Drives
+    branch-aware required-field detection so that supplying one ``Union`` member's fields
+    doesn't demand another member's required fields, and selects the member to instantiate.
+    See :meth:`_active_branch_required_keys` and :meth:`_resolve_union_member`.
+    """
+
     def __attrs_post_init__(self):
         from cyclopts.argument._collection import ArgumentCollection
 
@@ -267,6 +277,18 @@ class Argument:
                     self._default = field_info.annotation
                 else:
                     self._update_lookup({field_info.name: field_info})
+
+        if self._accepts_keywords and len(hints) > 1:
+            # Genuine multi-branch ``Union`` of keyword-accepting types (not ``Foo | None``,
+            # whose only composite branch collapses to a single dict). Record each branch's
+            # type and fields so requiredness can be evaluated per-branch at conversion time.
+            branches = [(member, fis) for member in hints if (fis := get_field_infos(member))]
+            if len(branches) > 1:
+                self._union_branches = branches
+                # The generic checker would introspect the ``typing.Union`` alias itself
+                # (yielding phantom fields like ``origin``); branch-aware gating in
+                # :meth:`_convert` supersedes it.
+                self._missing_keys_checker = None
 
     def _update_lookup(self, field_infos: dict[str, FieldInfo]):
         from typing import Literal
@@ -782,11 +804,16 @@ class Argument:
                 if positional_tokens:
                     return safe_converter(self.hint, tuple(positional_tokens))
 
+            supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
+            active_required = self._active_branch_required_keys(supplied_keys)
             for child in self.children:
                 assert len(child.keys) == (len(self.keys) + 1)
+                # For multi-branch unions, requiredness is decided per active branch rather
+                # than by the (cross-branch, over-counting) static ``child.required``.
+                child_required = child.keys[-1] in active_required if active_required is not None else child.required
                 if child.has_tokens:
                     data[child.keys[-1]] = child.convert_and_validate(converter=converter)
-                elif child.required:
+                elif child_required:
                     obj = data
                     for k in child.keys:
                         try:
@@ -794,6 +821,13 @@ class Argument:
                         except Exception:
                             raise MissingArgumentError(argument=child) from None
                     child._marked = True
+                elif active_required is not None:
+                    # Inactive-branch leaf of a multi-branch union: the parent owns the whole
+                    # subtree, so mark it (and descendants) handled to stop the collection loop
+                    # from converting it standalone and raising on its static ``required``.
+                    child._marked = True
+                    for descendant in child.children_recursive:
+                        descendant._marked = True
 
             self._run_missing_keys_checker(data)
 
@@ -802,7 +836,20 @@ class Argument:
                 if not out:
                     out = UNSET
             elif data:
-                out = instantiate_from_dict(self.hint, data)
+                target_hint = self.hint
+                if self._union_branches:
+                    # ``instantiate_from_dict`` cannot build a bare ``Union``; pick the branch
+                    # whose fields accept the supplied data.
+                    member = self._resolve_union_member(set(data))
+                    if member is None:
+                        # Supplied fields span multiple branches / match no single one.
+                        raise CoercionError(
+                            msg=f"Cannot determine which {get_hint_name(self.hint)} variant the supplied fields belong to.",
+                            argument=self,
+                            target_type=self.hint,
+                        )
+                    target_hint = member
+                out = instantiate_from_dict(target_hint, data)
             elif self.required:
                 raise MissingArgumentError(argument=self)  # pragma: no cover
             else:
@@ -1189,14 +1236,73 @@ class Argument:
             out.append((keys, matched[0] if matched else None))
         return out
 
+    def _union_candidate_branches(self, supplied_keys: "set[str]") -> "list[tuple[Any, set[str]]]":
+        """Branches that can fully account for ``supplied_keys`` (i.e. ``supplied ⊆ branch``).
+
+        These are the ``Union`` members the user could be completing; a branch that doesn't
+        contain every supplied field can't be the intended one. Yields ``(member, required_keys)``
+        — the only branch information either caller needs. Returns ``[]`` when the supplied
+        fields span multiple branches (over-supplied / ambiguous input) or when this is not a
+        multi-branch ``Union``. In declaration order.
+        """
+        return [
+            (member, {k for k, v in fis.items() if v.required})
+            for member, fis in self._union_branches
+            if supplied_keys <= set(fis)
+        ]
+
+    def _active_branch_required_keys(self, supplied_keys: "set[str]") -> "set[str] | None":
+        """Required child keys still owed by the chosen branch of a multi-branch ``Union``.
+
+        Picks among the candidate branches (see :meth:`_union_candidate_branches`): if any is
+        already fully satisfied, nothing is owed (``set()``); otherwise the candidate closest
+        to completion (fewest missing required fields, ties broken by declaration order) guides
+        which fields are still required. This convergent guidance means the prompt loop fills
+        the same branch that :meth:`_resolve_union_member` later instantiates. Supplying one
+        ``Union`` member's fields never demands a sibling member's
+        required fields. Returns ``None`` when :attr:`hint` is not a multi-branch ``Union``
+        (caller falls back to the static :attr:`Argument.required` per child).
+        """
+        if not self._union_branches:
+            return None
+        if not supplied_keys:
+            # Nothing supplied: the user hasn't committed to a branch, so don't demand any
+            # particular one. Total omission is handled by the composite-level required check.
+            return set()
+        candidates = self._union_candidate_branches(supplied_keys)
+        if not candidates:  # ambiguous/over-supplied: owe nothing, let instantiation error cleanly
+            return set()
+        required_per_candidate = [required for _, required in candidates]
+        if any(required <= supplied_keys for required in required_per_candidate):
+            return set()  # a complete branch exists
+        return min(required_per_candidate, key=lambda required: len(required - supplied_keys))
+
+    def _resolve_union_member(self, data_keys: "set[str]"):
+        """The ``Union`` member to instantiate given the converted ``data_keys``.
+
+        Picks the first candidate branch (``data ⊆ branch``) whose required fields are all
+        present, since :func:`instantiate_from_dict` cannot instantiate a bare ``Union``.
+        Returns ``None`` if no branch is satisfied (caller raises a clean error).
+        """
+        for member, required in self._union_candidate_branches(data_keys):
+            if required <= data_keys:
+                return member
+        return None
+
     def _missing_children(self) -> "list[Argument]":
         """Direct child arguments the checker reports as required-and-absent (non-raising).
 
         Builds the provided-key set from token presence rather than converted values, so it
         can be called before/without conversion. When no child currently has a token (a
-        fully-omitted composite) the checker returns every required child.
+        fully-omitted composite) the checker returns every required child. For multi-branch
+        ``Union`` composites, requiredness is branch-aware (see
+        :meth:`_active_branch_required_keys`).
         """
-        data = {child.keys[-1]: None for child in self.children if child.has_tokens}
+        supplied_keys = {child.keys[-1] for child in self.children if child.has_tokens}
+        active_required = self._active_branch_required_keys(supplied_keys)
+        if active_required is not None:
+            return [child for child in self.children if not child.has_tokens and child.keys[-1] in active_required]
+        data = dict.fromkeys(supplied_keys)
         return [argument for _, argument in self._resolve_missing_keys(data) if argument is not None]
 
     def _run_missing_keys_checker(self, data):
