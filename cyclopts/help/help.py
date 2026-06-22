@@ -14,6 +14,7 @@ from typing import (
 from attrs import define, evolve, field
 
 from cyclopts.annotations import resolve_annotated
+from cyclopts.argument.utils import is_short_flag
 from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
 from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
@@ -183,10 +184,6 @@ class HelpPanel:
             self.entries = [x.value for x in sorted_sort_helper]
         else:
             raise NotImplementedError
-
-
-def _is_short(s):
-    return not s.startswith("--") and s.startswith("-")
 
 
 def _categorize_keyword_arguments(argument_collection: "ArgumentCollection") -> tuple[list, list]:
@@ -417,7 +414,7 @@ def _expand_structured_dict_for_help(
     value_type = argument._default
 
     negatives = set(argument.negatives)
-    outer_long_names = tuple(o for o in argument.names if o not in negatives and not _is_short(o))
+    outer_long_names = tuple(o for o in argument.names if o not in negatives and not is_short_flag(o))
 
     is_unresolvable = isinstance(value_type, (str, ForwardRef))
     is_cycle = id(value_type) in seen
@@ -479,10 +476,10 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
             options = [arg_name, *options]
 
     negatives = set(argument.negatives)
-    positive_names = [o for o in options if o not in negatives and not _is_short(o)]
-    positive_shorts = [o for o in options if o not in negatives and _is_short(o)]
-    negative_names = [o for o in options if o in negatives and not _is_short(o)]
-    negative_shorts = [o for o in options if o in negatives and _is_short(o)]
+    positive_names = [o for o in options if o not in negatives and not is_short_flag(o)]
+    positive_shorts = [o for o in options if o not in negatives and is_short_flag(o)]
+    negative_names = [o for o in options if o in negatives and not is_short_flag(o)]
+    negative_shorts = [o for o in options if o in negatives and is_short_flag(o)]
 
     help_description = InlineText.from_format(argument.parameter.help, format=format)
 
@@ -598,7 +595,7 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
         # Commands don't have negative variants, so all names are "positive"
         short_names, long_names = [], []
         for name in names:
-            short_names.append(name) if _is_short(name) else long_names.append(name)
+            short_names.append(name) if is_short_flag(name) else long_names.append(name)
 
         sort_key = resolve_callables(app.sort_key, app)
 
