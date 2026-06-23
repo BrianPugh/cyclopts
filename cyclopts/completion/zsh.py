@@ -52,10 +52,15 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
     completion_data = extract_completion_data(app)
 
+    # Namespace the function (and the install file) as ``_cyclopts_<prog>`` so
+    # that command names which happen to match a zsh completion helper —
+    # ``files``, ``directories``, ``describe``, etc. — don't shadow the builtin
+    # when compinit autoloads our script. Plain ``_<prog>`` would otherwise
+    # recurse on internal ``_files`` / ``_directories`` calls.
     lines = [
         f"#compdef {prog_name}",
         "",
-        f"_{prog_name}() {{",
+        f"_cyclopts_{prog_name}() {{",
         "  local line state",
         "",
     ]

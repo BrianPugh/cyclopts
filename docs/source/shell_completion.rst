@@ -104,7 +104,7 @@ For programmatic control, use :meth:`App.install_completion <cyclopts.App.instal
 Default Installation Paths
 ---------------------------
 
-- **Zsh**: ``~/.zsh/completions/_<app_name>``
+- **Zsh**: ``~/.zsh/completions/_cyclopts_<app_name>``
 - **Bash**: ``~/.local/share/bash-completion/completions/<app_name>``
 - **Fish**: ``~/.config/fish/completions/<app_name>.fish``
 

@@ -559,6 +559,60 @@ def test_coerce_datetime_invalid_format():
         convert(datetime, ["not-a-date"])
 
 
+@pytest.mark.parametrize(
+    "input_string, expected_output",
+    [
+        ("0:3", slice(0, 3)),
+        (":10", slice(None, 10)),
+        ("0:100:5", slice(0, 100, 5)),
+        ("-10:", slice(-10, None)),
+        ("5:-5", slice(5, -5)),
+        ("::2", slice(None, None, 2)),
+        ("::-1", slice(None, None, -1)),
+        (":", slice(None, None)),
+        ("::", slice(None, None, None)),
+        (" 1 : 2 ", slice(1, 2)),  # int() tolerates surrounding whitespace
+    ],
+)
+def test_coerce_slice_valid(input_string, expected_output):
+    assert convert(slice, [input_string]) == expected_output
+
+
+@pytest.mark.parametrize(
+    "invalid_input",
+    [
+        "",  # Empty string
+        "5",  # No colon
+        "1:2:3:4",  # Too many fields
+        "a:3",  # Non-integer field
+        "1.5:2",  # Floats are not valid slice fields
+        "1:2:c",  # Non-integer step
+    ],
+)
+def test_coerce_slice_invalid(invalid_input):
+    with pytest.raises(CoercionError):
+        convert(slice, [invalid_input])
+
+
+@pytest.mark.parametrize(
+    "cmd_str, expected",
+    [
+        ("foo 0:3", slice(0, 3)),
+        ("foo -10:", slice(-10, None)),
+        ("foo --time :10", slice(None, 10)),
+        ("foo --time=0:100:5", slice(0, 100, 5)),
+        ("foo --time=-10:", slice(-10, None)),
+        ("foo --time -10:-2:-1", slice(-10, -2, -1)),
+    ],
+)
+def test_bind_slice(app, cmd_str, expected, assert_parse_args):
+    @app.command
+    def foo(time: slice):
+        pass
+
+    assert_parse_args(foo, cmd_str, expected)
+
+
 def test_parse_timedelta_equivalence():
     """Test that equivalent timedelta formats produce the same result."""
     assert convert(timedelta, ["1h"]) == convert(timedelta, ["60m"])

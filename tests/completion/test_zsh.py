@@ -1167,6 +1167,13 @@ def test_collection_option_repeats(zsh_tester):
     Without ``*`` prefix on the spec, zsh would refuse to complete a second
     ``--file`` value, breaking the natural ``--file a --file b --file c``
     usage of collection-typed parameters.
+
+    Doubles as a regression test for issue #821: prog_name ``files`` happens
+    to match zsh's built-in ``_files`` completion helper, so the generated
+    autoload entry must be namespaced (e.g. ``_cyclopts_files``) — otherwise
+    ``_arguments``'s ``:file:_files`` action recurses into our own function
+    and zsh hits its recursion limit (visible on macOS as a captured error
+    string, fatal pty EOF on aarch64 Linux/Nix).
     """
     import os
     import tempfile
@@ -1187,7 +1194,10 @@ def test_collection_option_repeats(zsh_tester):
             completions = tester.get_completions("files --file first.txt --file ")
         finally:
             os.chdir(cwd)
-    assert completions, f"expected file completion on second --file, got {completions!r}"
+    # Assert the actual file appears — not just *some* output. Without a
+    # tight assertion zsh's "recursion limit exceeded" error gets scraped
+    # as a "completion" and the test silently passes.
+    assert "first.txt" in completions, f"expected 'first.txt' in file completion on second --file, got {completions!r}"
 
 
 def test_multiple_iterable_positionals_emit_one_rest_spec(zsh_tester):

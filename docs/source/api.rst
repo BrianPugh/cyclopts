@@ -948,6 +948,40 @@ API
          def main(foo: Annotated[int, Parameter(alias="-f")]):
              pass
 
+   .. attribute:: short_alias
+      :type: Union[bool, Callable[[FieldInfo, frozenset[str]], Union[str, Iterable[str], None]]]
+      :value: None
+
+      When ``True``, automatically generates a single-letter short flag (e.g. ``--verbose`` also gets ``-v``).
+      The short flag is **appended** as an additional name; it does not override the long name.
+      This pairs with :attr:`.alias`: use ``alias`` to specify a name yourself, or ``short_alias`` to have Cyclopts derive one.
+
+      The letter is the first character of the parameter's CLI name (after :attr:`.name_transform`), lowercased.
+      If that letter is already claimed, the uppercase variant is tried; if both are taken, no short flag is generated.
+      Reserved short flags (``-h``, and ``-v`` when a short version flag is configured) are never claimed.
+      Explicitly setting :attr:`.alias` or :attr:`.name` on a parameter suppresses auto-generation for it and reserves those letters.
+
+      Only **root-namespace** parameters that bind input directly receive a short flag.
+      A container parameter (e.g. a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its promoted child fields; ``short_alias`` is inert on a field that stays namespaced.
+      To give a nested field a short flag, flatten it to the root namespace with ``Parameter(name="*")``.
+      :obj:`~enum.Flag` parameters are the exception: because they consume tokens directly (e.g. ``--perm read write``), the flag itself does receive a short, even though it also exposes per-member options.
+      A boolean parameter that defaults to :obj:`True` also gets no short, since the positive short would be a no-op and the off-switch ``--no-flag`` is long-only; the letter is left free for another parameter.
+
+      For full control, supply a callable ``(field_info, used_short_aliases) -> Union[str, Iterable[str], None]`` that returns the short name(s) to use (or :obj:`None` to skip).
+      Consult ``used_short_aliases`` to pick a free letter; any returned name already claimed by an earlier parameter is dropped (first-wins).
+
+      .. code-block:: python
+
+         app = App(default_parameter=Parameter(short_alias=True))
+
+         @app.command
+         def deploy(env: str = "staging", replicas: int = 10):
+             pass
+
+      .. code-block:: console
+
+         $ my-script deploy -e prod -r 5
+
    .. attribute:: converter
       :type: Optional[Callable]
       :value: None
@@ -1266,11 +1300,20 @@ API
       Defaults to whether the parameter is :attr:`parsed <.Parameter.parse>` (usually :obj:`True`).
 
    .. attribute:: show_default
-      :type: Union[None, bool, Callable[[Any], Any]]
+      :type: Union[None, bool, str, Callable[[Any], Any]]
       :value: None
 
       If a variable has a default, display the default on the help page.
       Defaults to :obj:`None`, similar to :obj:`True`, but will **not** display the default if it is :obj:`None`.
+
+      If set to a string, that string is displayed verbatim as the default value, regardless of the actual default.
+      This is useful when the real default cannot be known at help-time (e.g. a value resolved at runtime):
+
+      .. code-block:: python
+
+         input_file: Annotated[Path | None, Parameter(show_default="automatic")] = None
+
+      Results in ``[default: automatic]`` on the help page.
 
       If set to a function with signature:
 
@@ -2028,6 +2071,9 @@ Cyclopts has several builtin validators for common CLI inputs.
 .. autoclass:: cyclopts.validators.Path
    :members:
 
+.. autoclass:: cyclopts.validators.Slice
+   :members:
+
 
 .. _Annotated Types:
 
@@ -2267,6 +2313,13 @@ All of these types will also work on sequence of numbers (e.g. ``tuple[int, int]
 .. autodata:: cyclopts.types.HexUInt64
 
 .. autodata:: cyclopts.types.Int64
+
+^^^^^
+Slice
+^^^^^
+Annotated types for parsing :class:`slice` objects from the CLI.
+
+.. autodata:: cyclopts.types.NonEmptySlice
 
 ^^^^
 Json

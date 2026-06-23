@@ -7,19 +7,35 @@ on:
       - "v*.*.*"
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
-    environment:
-      name: pypi
-      url: https://pypi.org/p/cyclopts
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Needed for hatch-vcs to get version from git tags
       - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: false
       - run: uv build
-      - run: uv publish
-        if: github.event_name != 'workflow_dispatch'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cyclopts
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@v1.14.0
