@@ -168,6 +168,7 @@ def _parse_kw_and_flags(
                 # Once we hit an option that takes a value, the rest is the value
                 chars = cli_option.lstrip("-")
                 position = 0
+                unmatched_flags: list[str] = []
 
                 while position < len(chars):
                     char = chars[position]
@@ -197,13 +198,18 @@ def _parse_kw_and_flags(
                         if stop_at_first_unknown:
                             unused_tokens.extend(tokens[i:])
                             return unused_tokens, None
-                        unused_tokens.append(test_flag)
-                        unused_token_original_indices.append(i)
+                        unmatched_flags.append(test_flag)
                         position += 1
 
                 if not matches:
-                    # No valid matches found at all
+                    # No character matched a known short option, so this wasn't a
+                    # combined-short-option token after all; keep the original token intact.
+                    unused_tokens.append(token)
+                    unused_token_original_indices.append(i)
                     continue
+                for unmatched_flag in unmatched_flags:
+                    unused_tokens.append(unmatched_flag)
+                    unused_token_original_indices.append(i)
             else:
                 if stop_at_first_unknown:
                     # Unknown option, stop parsing and return all remaining tokens
