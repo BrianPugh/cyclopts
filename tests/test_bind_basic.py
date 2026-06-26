@@ -945,6 +945,19 @@ def test_long_option_should_not_be_split(app, assert_parse_args):
     # (This maintains current behavior)
 
 
+def test_unknown_short_option_not_split_into_varargs(app, assert_parse_args):
+    """A short token whose characters match no known option should reach ``*args`` intact."""
+
+    @app.default
+    def main(
+        *args: Annotated[str, Parameter(allow_leading_hyphen=True)],
+    ):
+        pass
+
+    assert_parse_args(main, ["-c=blue", "build", "thing"], "-c=blue", "build", "thing")
+    assert_parse_args(main, ["-xyz"], "-xyz")
+
+
 def test_hyphenated_value_attached(app, assert_parse_args):
     """Test that hyphenated values work when attached."""
 
