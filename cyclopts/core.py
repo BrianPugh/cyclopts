@@ -2443,7 +2443,9 @@ class App:
         def build(node, subapp: "App", depth: int) -> None:
             if max_depth is not None and depth > max_depth:
                 return
-            for name, child in iterate_commands(subapp, include_hidden=include_hidden):
+            # resolve_lazy=True so the tree shows the complete hierarchy; lazy
+            # commands left unresolved would be silently omitted entirely.
+            for name, child in iterate_commands(subapp, include_hidden=include_hidden, resolve_lazy=True):
                 branch = node.add(node_label(name, child))
                 build(branch, child, depth + 1)
 
