@@ -11,11 +11,9 @@ app.register_install_completion_command(
 )
 
 
-# Explicitly import command modules
-from cyclopts.cli import (
-    _complete,  # noqa: F401
-    docs,  # noqa: F401
-    run,  # noqa: F401
-)
+from cyclopts.cli import _complete as _complete
+from cyclopts.cli import docs as docs
+from cyclopts.cli import run as run
+from cyclopts.cli import tree as tree
 
 __all__ = ["app"]
