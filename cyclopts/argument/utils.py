@@ -40,7 +40,6 @@ PARAMETER_SUBKEY_BLOCKER = Parameter(
     converter=None,  # pyright: ignore
     validator=None,
     accepts_keys=None,
-    consume_multiple=None,
     env_var=None,
 )
 
