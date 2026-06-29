@@ -69,6 +69,7 @@ with suppress(ImportError):
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from rich.tree import Tree
 
     from cyclopts.docs.types import DocFormat
     from cyclopts.help import HelpPanel
@@ -2381,6 +2382,76 @@ class App:
             )
 
         return doc
+
+    def command_tree(
+        self,
+        *,
+        description: bool = True,
+        include_hidden: bool = False,
+        max_depth: int | None = None,
+    ) -> "Tree":
+        """Build a :class:`rich.tree.Tree` of this application's command hierarchy.
+
+        The returned tree is a Rich renderable; print it with
+        ``console.print(app.command_tree())`` or embed it within other Rich
+        output. Hidden commands and built-in help/version flags are excluded by
+        default.
+
+        Parameters
+        ----------
+        description : bool
+            Show each command's short description (from its docstring) next to
+            its name. Default is True.
+        include_hidden : bool
+            Include hidden commands (``show=False``). Default is False.
+        max_depth : int | None
+            Maximum subcommand depth to display. ``None`` (default) shows all
+            levels; ``1`` shows only top-level commands.
+
+        Returns
+        -------
+        rich.tree.Tree
+            A renderable tree of the command hierarchy.
+
+        Examples
+        --------
+        >>> from rich.console import Console
+        >>> app = App(name="myapp")
+        >>> Console().print(app.command_tree())  # doctest: +SKIP
+        """
+        from rich.text import Text
+        from rich.tree import Tree
+
+        from cyclopts.docs.base import iterate_commands
+        from cyclopts.help.help import docstring_parse
+
+        def short_description(subapp: "App") -> str:
+            try:
+                return docstring_parse(subapp.help, "restructuredtext").short_description or ""
+            except Exception:
+                return ""
+
+        def node_label(name: str, subapp: "App") -> Text:
+            label = Text(name)
+            if description:
+                short = short_description(subapp)
+                if short:
+                    label.append("  ")
+                    label.append(short, style="dim")
+            return label
+
+        def build(node, subapp: "App", depth: int) -> None:
+            if max_depth is not None and depth > max_depth:
+                return
+            # resolve_lazy=True so the tree shows the complete hierarchy; lazy
+            # commands left unresolved would be silently omitted entirely.
+            for name, child in iterate_commands(subapp, include_hidden=include_hidden, resolve_lazy=True):
+                branch = node.add(node_label(name, child))
+                build(branch, child, depth + 1)
+
+        tree = Tree(node_label(self.name[0], self))
+        build(tree, self, 1)
+        return tree
 
     def generate_completion(
         self,
