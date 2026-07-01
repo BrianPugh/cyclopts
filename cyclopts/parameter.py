@@ -30,9 +30,10 @@ from cyclopts.annotations import (
     is_union,
     resolve,
     resolve_annotated,
+    resolve_new_type,
     resolve_type_alias,
 )
-from cyclopts.field_info import get_field_infos, signature_parameters
+from cyclopts.field_info import FieldInfo, get_field_infos, signature_parameters
 from cyclopts.group import Group
 from cyclopts.utils import (
     default_name_transform,
@@ -90,6 +91,23 @@ def _default_if_none_true(value: bool | None) -> bool:
 
 def _default_if_none_false(value: bool | None) -> bool:
     return value if value is not None else False
+
+
+def _short_alias_converter(
+    value: bool | Callable[[FieldInfo, frozenset[str]], str | Iterable[str] | None] | None,
+) -> bool | Callable[[FieldInfo, frozenset[str]], str | Iterable[str] | None]:
+    return False if value is None else value
+
+
+def _short_alias_validator(instance, attribute, value):
+    # A str is also an Iterable[str], so an explicit "-z" would silently expand into
+    # individual letters. Reject it so the developer reaches for alias/name instead.
+    if isinstance(value, str):
+        raise TypeError(
+            "Parameter.short_alias does not accept a string. Pass a bool to auto-generate a "
+            'short flag, or a callable for custom logic. To set an explicit flag like "-z", use '
+            "Parameter.alias or Parameter.name instead."
+        )
 
 
 def _negative_converter(default: tuple[str, ...]):
@@ -239,7 +257,7 @@ class Parameter:
         kw_only=True,
     )
 
-    show_default: None | bool | Callable[[Any], Any] = field(
+    show_default: None | bool | str | Callable[[Any], Any] = field(
         default=None,
         kw_only=True,
     )
@@ -336,6 +354,13 @@ class Parameter:
         kw_only=True,
     )
 
+    short_alias: bool | Callable[[FieldInfo, frozenset[str]], str | Iterable[str] | None] = field(
+        default=None,
+        converter=_short_alias_converter,
+        validator=_short_alias_validator,
+        kw_only=True,
+    )
+
     allow_repeating: bool | None = field(
         default=None,
         kw_only=True,
@@ -371,7 +396,7 @@ class Parameter:
             # Sort union members by priority: non-None types first, then None/NoneType
             # This ensures that if bool | None both produce the same custom negative,
             # we only include it once from the higher-priority type (bool).
-            sorted_args = sorted(union_args, key=lambda x: (is_nonetype(x) or x is None))
+            sorted_args = sorted(union_args, key=lambda x: is_nonetype(x) or x is None)
             out: list[str] = []
             for x in sorted_args:
                 for neg in self.get_negatives(x):
@@ -606,35 +631,50 @@ def get_parameters(hint: T, skip_converter_params: bool = False) -> tuple[T, lis
     Returns
     -------
     hint
-        Annotation hint with :obj:`Annotated` resolved.
+        Annotation hint with :obj:`Annotated`, :obj:`NewType`, and type aliases resolved.
     list[Parameter]
         List of parameters discovered, ordered by priority (lowest to highest):
         converter-decoration < type-decoration < annotation.
     """
-    # NOTE: We intentionally do NOT call resolve_optional() here.
+    # NOTE: We intentionally do NOT call resolve_optional() to strip None here.
     # None is a meaningful type that users can explicitly provide via "none"/"null" strings,
     # so we preserve it in unions for proper handling downstream.
 
-    # Resolve TypeAliasType (Python 3.12+ 'type' statement) first
-    hint = resolve_type_alias(hint)
-
-    # Extract parameters from Annotated metadata
+    # Extract parameters from Annotated metadata.
+    # Loop to handle nested Annotated/NewType/type-alias combinations, e.g.
+    # ``Annotated[cyclopts.types.ResolvedPath | None, Parameter()]`` or a ``NewType``
+    # wrapping ``ResolvedPath`` -- the inner wrapper is itself an ``Annotated`` carrying a
+    # converter/validator that must not be lost. After unwrapping one layer the hint can
+    # become Annotated again, so we keep unwrapping until it stabilizes.
     annotated_params = []
-    if is_annotated(hint):
-        inner = get_args(hint)
-        hint = inner[0]
-        annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
-    elif is_union(hint):  # pyright: ignore[reportArgumentType]
-        # For Optional patterns (T | None with exactly one non-None type),
-        # extract Annotated parameters from the non-None member.
-        # Don't do this for real unions (T | U) as each member's parameters
-        # should only apply when that specific type is selected.
-        non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
-        if len(non_none_args) == 1 and is_annotated(non_none_args[0]):
-            inner = get_args(non_none_args[0])
-            annotated_params.extend(x for x in inner[1:] if isinstance(x, Parameter))
-            # Unwrap Annotated but preserve the Optional: Annotated[T, ...] | None -> T | None
-            hint = inner[0] | NoneType  # pyright: ignore[reportAssignmentType]
+    while True:
+        hint_prev = hint
+        hint = cast(T, resolve_new_type(hint))
+        hint = resolve_type_alias(hint)
+        if is_annotated(hint):
+            inner = get_args(hint)
+            hint = inner[0]
+            # Prepend so that more deeply nested annotations have lower priority than outer ones.
+            annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
+            continue
+        elif is_union(hint):  # pyright: ignore[reportArgumentType]
+            # For Optional patterns (T | None with exactly one non-None type),
+            # resolve/unwrap the non-None member while preserving the Optional.
+            # Don't do this for real unions (T | U) as each member's parameters
+            # should only apply when that specific type is selected.
+            non_none_args = [arg for arg in get_args(hint) if not is_nonetype(arg)]
+            if len(non_none_args) == 1:
+                member = resolve_type_alias(cast(T, resolve_new_type(non_none_args[0])))
+                if is_annotated(member):
+                    inner = get_args(member)
+                    annotated_params[:0] = [x for x in inner[1:] if isinstance(x, Parameter)]
+                    # Unwrap Annotated but preserve the Optional: Annotated[T, ...] | None -> T | None
+                    member = inner[0]
+                if member is not non_none_args[0]:
+                    hint = member | NoneType  # pyright: ignore[reportAssignmentType]
+                    continue
+        if hint == hint_prev:
+            break
 
     # Extract parameters from type's __cyclopts__ attribute (after unwrapping Annotated)
     # For Optional patterns (T | None), check the non-None member for __cyclopts__

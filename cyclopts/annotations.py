@@ -11,9 +11,9 @@ import attrs
 from cyclopts.utils import is_class_and_subclass
 
 if sys.version_info < (3, 11):  # pragma: no cover
-    from typing_extensions import NotRequired, Required
+    from typing_extensions import NotRequired, Required, Unpack
 else:  # pragma: no cover
-    from typing import NotRequired, Required
+    from typing import NotRequired, Required, Unpack
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType
@@ -234,6 +234,25 @@ def get_annotated_discriminator(annotation) -> Any:
 def resolve_required(type_: Any) -> type:
     if get_origin(type_) in (Required, NotRequired):
         type_ = get_args(type_)[0]
+    return type_
+
+
+def is_unpack(type_: Any) -> bool:
+    """Check if a type is ``typing.Unpack[...]`` (PEP-646 / PEP-692).
+
+    Looks through ``Annotated[...]`` wrappers.
+    """
+    return get_origin(resolve_annotated(type_)) is Unpack
+
+
+def resolve_unpack(type_: Any) -> Any:
+    """Unwrap ``Unpack[X]`` to ``X``. If not an ``Unpack``, returns ``type_`` unchanged.
+
+    Looks through ``Annotated[...]`` wrappers.
+    """
+    type_ = resolve_annotated(type_)
+    if get_origin(type_) is Unpack:
+        return get_args(type_)[0]
     return type_
 
 

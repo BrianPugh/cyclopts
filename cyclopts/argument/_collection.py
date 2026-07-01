@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, SupportsIndex, TypeVar, overload
 if TYPE_CHECKING:
     from cyclopts.core import App
 
-from cyclopts.annotations import resolve
+from cyclopts.annotations import get_hint_name, is_typeddict, is_unpack, resolve, resolve_unpack
 from cyclopts.exceptions import (
     UnknownOptionError,
 )
@@ -27,6 +27,9 @@ from .utils import (
     KIND_PARENT_CHILD_REASSIGNMENT,
     PARAMETER_SUBKEY_BLOCKER,
     extract_docstring_help,
+    generate_short_alias,
+    is_short_alias_eligible,
+    reserve_explicit_shorts,
     resolve_parameter_name,
     to_cli_option_name,
     walk_leaves,
@@ -262,6 +265,8 @@ class ArgumentCollection(list[Argument]):
         parse_docstring: bool = True,
         docstring_lookup: dict[tuple[str, ...], Parameter] | None = None,
         positional_index: int | None = None,
+        used_short_aliases: set[str] | None = None,
+        pending_short_aliases: list["Argument"] | None = None,
         _resolve_groups: bool = True,
     ):
         from cyclopts.parameter import get_parameters
@@ -274,13 +279,26 @@ class ArgumentCollection(list[Argument]):
         cyclopts_parameters_no_group = []
 
         hint = field_info.hint
-        _, hint_parameters = get_parameters(hint)
-        hint = resolve(hint, optional=False)  # Strip Annotated, keep Optional
+        # ``get_parameters`` resolves Annotated/NewType/type-aliases (including those nested
+        # inside an ``Optional``, which ``resolve`` does not recurse into) while preserving Optional.
+        hint, hint_parameters = get_parameters(hint)
+        hint = resolve(hint, optional=False)  # Strip any remaining Annotated/Required, keep Optional
         cyclopts_parameters_no_group.extend(hint_parameters)
 
         if not keys:
             if field_info.kind is field_info.VAR_KEYWORD:
-                hint = dict[str, hint]
+                if is_unpack(hint):
+                    # PEP 692: ``**kwargs: Unpack[SomeTypedDict]`` — the TypedDict
+                    # defines the schema, so unwrap and let the TypedDict-expansion
+                    # machinery promote its fields to top-level CLI options.
+                    hint = resolve_unpack(hint)
+                    if not is_typeddict(hint):
+                        raise TypeError(
+                            f"`**{field_info.name}: Unpack[{get_hint_name(hint)}]` — PEP 692 "
+                            f"requires the Unpack target to be a TypedDict."
+                        )
+                else:
+                    hint = dict[str, hint]
             elif field_info.kind is field_info.VAR_POSITIONAL:
                 hint = tuple[hint, ...]
 
@@ -356,7 +374,12 @@ class ArgumentCollection(list[Argument]):
                 if field_info.kind in (field_info.POSITIONAL_ONLY, field_info.VAR_POSITIONAL):
                     cparam = Parameter.combine(cparam, Parameter(name=(name.upper() for name in field_info.names)))
                 elif field_info.kind is field_info.VAR_KEYWORD:
-                    cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
+                    if is_unpack(field_info.hint):
+                        # PEP 692: TypedDict fields are promoted to top-level options,
+                        # so the kwargs argument itself must not contribute a name prefix.
+                        cparam = Parameter.combine(cparam, Parameter(name=()))
+                    else:
+                        cparam = Parameter.combine(cparam, Parameter(name=("--[KEYWORD]",)))
                 else:
                     assert cparam.name_transform is not None
                     cparam = Parameter.combine(
@@ -371,6 +394,19 @@ class ArgumentCollection(list[Argument]):
             positional_index = None
 
         argument = Argument(field_info=field_info, parameter=cparam, keys=keys, hint=hint)
+
+        # Auto-generate a short alias (e.g. ``-e`` for ``--env``), appended as a standalone
+        # flag. Gated to root-namespace input-binding parameters so that promoted containers
+        # and dotted nested fields don't silently claim letters. Phase 1 reserves explicit
+        # shorts from *every* argument (including nested fields, whose explicit shorts are
+        # global) and collects eligible arguments; the actual short is generated in phase 2
+        # (see ``_from_callable``) once every explicit short is known, so an earlier
+        # parameter's auto short can't shadow a later parameter's explicit one.
+        if used_short_aliases is not None:
+            reserve_explicit_shorts(argument, used_short_aliases)
+            if is_short_alias_eligible(argument, immediate_parameter):
+                assert pending_short_aliases is not None
+                pending_short_aliases.append(argument)
 
         if positional_index is not None:
             if not argument._accepts_keywords or argument._enum_flag_type:
@@ -397,6 +433,13 @@ class ArgumentCollection(list[Argument]):
                     k[1:]: v for k, v in hint_docstring_lookup.items() if k[0] == sub_field_name and len(k) > 1
                 }
 
+                # PEP 692: VAR_KEYWORD's `required=False` should not suppress an Unpack[TypedDict]
+                # field's own Required marker — each field's required-ness comes from the TypedDict.
+                if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+                    child_required = sub_field_info.required
+                else:
+                    child_required = argument.required & sub_field_info.required
+
                 subkey_argument_collection = cls._from_type(
                     sub_field_info,
                     keys + (sub_field_name,),
@@ -406,13 +449,15 @@ class ArgumentCollection(list[Argument]):
                         if sub_field_info.help
                         else hint_docstring_lookup.get((sub_field_name,))
                     ),
-                    Parameter(required=argument.required & sub_field_info.required),
+                    Parameter(required=child_required),
                     group_lookup=group_lookup,
                     group_arguments=group_arguments,
                     group_parameters=group_parameters,
                     parse_docstring=parse_docstring,
                     docstring_lookup=subkey_docstring_lookup,
                     positional_index=positional_index,
+                    used_short_aliases=used_short_aliases,
+                    pending_short_aliases=pending_short_aliases,
                     _resolve_groups=_resolve_groups,
                 )
                 if subkey_argument_collection:
@@ -436,6 +481,7 @@ class ArgumentCollection(list[Argument]):
         group_parameters: Group | None = None,
         parse_docstring: bool = True,
         _resolve_groups: bool = True,
+        reserved: Iterable[str] | None = None,
     ):
         out = cls()
 
@@ -459,6 +505,8 @@ class ArgumentCollection(list[Argument]):
 
         docstring_lookup = extract_docstring_help(func) if parse_docstring else {}
         positional_index = 0
+        used_short_aliases: set[str] = set(reserved or ())
+        pending_short_aliases: list[Argument] = []
         for field_info in signature_parameters(func).values():
             if parse_docstring:
                 subkey_docstring_lookup = {
@@ -475,6 +523,8 @@ class ArgumentCollection(list[Argument]):
                 group_arguments=group_arguments,
                 group_parameters=group_parameters,
                 positional_index=positional_index,
+                used_short_aliases=used_short_aliases,
+                pending_short_aliases=pending_short_aliases,
                 parse_docstring=parse_docstring,
                 docstring_lookup=subkey_docstring_lookup,
                 _resolve_groups=_resolve_groups,
@@ -484,6 +534,17 @@ class ArgumentCollection(list[Argument]):
                 if positional_index is not None:
                     positional_index += 1
             out.extend(iparam_argument_collection)
+
+        # Phase 2: now that every explicit short flag has been reserved, generate auto
+        # shorts in tree order (first-wins). Deferring to here ensures an explicit alias
+        # on a later parameter is never shadowed by an earlier parameter's auto short.
+        for argument in pending_short_aliases:
+            shorts = generate_short_alias(argument, used_short_aliases)
+            if shorts:
+                assert isinstance(argument.parameter.name, tuple)
+                argument.parameter = Parameter.combine(
+                    argument.parameter, Parameter(name=argument.parameter.name + shorts)
+                )
 
         return out
 
@@ -507,6 +568,51 @@ class ArgumentCollection(list[Argument]):
     def _max_index(self) -> int | None:
         return max((x.index for x in self if x.index is not None), default=None)
 
+    def _missing(self) -> "ArgumentCollection":
+        """Leaf arguments still needing a value, given what's been parsed.
+
+        Tree-aware counterpart to the static :attr:`Argument.required`. Includes
+        conditionally-required fields of composites that have been *partially* supplied
+        (e.g. ``--end`` when only ``--start`` was given) by delegating to each composite's
+        own missing-keys checker — so it is correct for dataclasses, pydantic, attrs and
+        TypedDicts alike. A *required* composite that received no tokens contributes all of
+        its required leaves; an *optional* one contributes nothing.
+
+        Returns leaf arguments in declaration order. Read-only: nothing is converted.
+        """
+        cls = type(self)
+        out = cls()
+
+        def expand_required(argument: Argument) -> None:
+            # ``argument`` is known to be required and currently has no tokens. Append it
+            # (if it's a parseable leaf) or recurse into each of its required children.
+            # Requiredness is established by the caller/checker, *not* re-derived from the
+            # static ``argument.required`` — conditionally-required leaves have it ``False``.
+            if not argument.children:
+                if argument.parse:
+                    out.append(argument)
+                return
+            for child in argument._missing_children():  # empty data -> every required child
+                expand_required(child)
+
+        def walk(argument: Argument) -> None:
+            if argument.has_tokens:
+                if not argument.children:  # leaf already satisfied
+                    return
+                missing_ids = {id(a) for a in argument._missing_children()}  # activated composite
+                for child in argument.children:
+                    if child.has_tokens:
+                        walk(child)  # recurse into (possibly nested) partial fills
+                    elif id(child) in missing_ids:
+                        expand_required(child)
+            elif argument.required:  # fully-omitted required leaf or composite
+                expand_required(argument)
+            # optional, no tokens: contributes nothing
+
+        for argument in self._root_arguments:
+            walk(argument)
+        return out
+
     def filter_by(
         self,
         *,
@@ -515,6 +621,7 @@ class ArgumentCollection(list[Argument]):
         has_tree_tokens: bool | None = None,
         keys_prefix: tuple[str, ...] | None = None,
         kind: inspect._ParameterKind | None = None,
+        missing: bool | None = None,
         parse: bool | None = None,
         show: bool | None = None,
         value_set: bool | None = None,
@@ -533,6 +640,10 @@ class ArgumentCollection(list[Argument]):
             :class:`Argument` and/or it's children have parsed tokens.
         kind: inspect._ParameterKind | None
             The :attr:`~inspect.Parameter.kind` of the argument.
+        missing: bool | None
+            The leaf :class:`Argument` still needs a value given what's been parsed,
+            accounting for conditionally-required fields of partially-supplied composites.
+            See :meth:`_missing`. ``False`` selects the complement.
         parse: bool | None
             If the argument is intended to be parsed or not.
         show: bool | None
@@ -543,6 +654,9 @@ class ArgumentCollection(list[Argument]):
         ac = self.copy()
         cls = type(self)
 
+        if missing is not None:
+            missing_ids = {id(x) for x in self._missing()}
+            ac = cls(x for x in ac if not ((id(x) in missing_ids) ^ bool(missing)))
         if group is not None:
             ac = cls(x for x in ac if group in x.parameter.group)  # pyright: ignore
         if kind is not None:
@@ -550,7 +664,7 @@ class ArgumentCollection(list[Argument]):
         if has_tokens is not None:
             ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tokens)))
         if has_tree_tokens is not None:
-            ac = cls(x for x in ac if not (bool(x.tokens) ^ bool(has_tree_tokens)))
+            ac = cls(x for x in ac if not (x.has_tokens ^ bool(has_tree_tokens)))
         if keys_prefix is not None:
             ac = cls(x for x in ac if x.keys[: len(keys_prefix)] == keys_prefix)
         if show is not None:

@@ -242,6 +242,69 @@ Finally, if you would like to register an **additional** name to the Cyclopts-de
     $ my-script bar
     Running bar.
 
+.. _Synonyms:
+
+--------
+Synonyms
+--------
+A common CLI problem is remembering subcommand synonyms. Did this CLI's developer decide to call it ``remove``, ``uninstall``, or ``delete``?
+
+The :attr:`~.App.synonym` field declares **alternate names** that trigger a "Did you mean..."
+suggestion **without** registering the command under those names.
+It accepts either a single :obj:`str` or an iterable of strings:
+
+.. code-block:: python
+
+    from cyclopts import App
+
+    app = App()
+
+    @app.command(synonym="add")               # single string
+    def install(name: str): ...
+
+    @app.command(synonym=["remove", "rm"])    # list of strings
+    def uninstall(name: str):
+        print(f"uninstalling {name}")
+
+    app()
+
+.. code-block:: console
+
+    $ my-script uninstall mypackage
+    uninstalling mypackage
+
+    $ my-script remove mypackage
+    ╭─ Error ────────────────────────────────────────────────────────────────────╮
+    │ Unknown command "remove". Did you mean "uninstall"? Available commands:    │
+    │ uninstall.                                                                 │
+    ╰────────────────────────────────────────────────────────────────────────────╯
+
+Synonyms differ from :attr:`~.App.alias` in two important ways:
+
+* **Synonyms are not runnable.** ``my-script remove`` raises an error; it doesn't invoke ``uninstall``.
+  Use :attr:`~.App.alias` when you want the command to be callable under multiple names.
+* **Synonyms are hidden from** ``--help``. They exist only to guide users who type the "wrong" word.
+
+If two commands declare the same synonym, both are suggested:
+
+.. code-block:: python
+
+    @app.command(synonym="erase")
+    def uninstall(name: str): ...
+
+    @app.command(synonym="erase")
+    def purge(name: str): ...
+
+.. code-block:: console
+
+    $ my-script erase mypackage
+    ╭─ Error ────────────────────────────────────────────────────────────────────╮
+    │ Unknown command "erase". Did you mean "uninstall" or "purge"? ...          │
+    ╰────────────────────────────────────────────────────────────────────────────╯
+
+When a typed token is not declared as any synonym, Cyclopts falls back to its standard
+typo-fuzzy-match suggestion.
+
 -----------
 Adding Help
 -----------

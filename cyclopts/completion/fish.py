@@ -7,6 +7,7 @@ Completions auto-load from ~/.config/fish/completions/PROGNAME.fish.
 import re
 from typing import TYPE_CHECKING
 
+from cyclopts.annotations import is_iterable_type
 from cyclopts.completion._base import (
     CompletionAction,
     CompletionData,
@@ -57,12 +58,34 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         lines.extend(_generate_helper_functions(prog_name, completion_data))
         lines.append("")
 
+    if _any_nested_positional_choices(completion_data):
+        lines.extend(_generate_positional_index_helper(prog_name, completion_data))
+        lines.append("")
+
     help_flags = tuple(app.help_flags) if app.help_flags else ()
     version_flags = tuple(app.version_flags) if app.version_flags else ()
 
     lines.extend(_generate_completions(completion_data, prog_name, help_flags, version_flags))
 
     return "\n".join(lines) + "\n"
+
+
+def _any_nested_positional_choices(completion_data: dict[tuple[str, ...], CompletionData]) -> bool:
+    """Whether any nested command path has a positional argument with choices.
+
+    The positional-index helper is only needed when there is at least one
+    nested positional that emits a choice list — without choices, fish's
+    default file fallback already produces sensible completions.
+    """
+    for path, data in completion_data.items():
+        if not path:
+            continue
+        for argument in data.arguments:
+            if argument.index is None or not argument.show:
+                continue
+            if argument.get_choices(force=True):
+                return True
+    return False
 
 
 def _escape_fish_string(text: str) -> str:
@@ -83,6 +106,19 @@ def _generate_helper_functions(
 ) -> list[str]:
     """Generate helper function for command path detection.
 
+    Non-option words are classified by membership in a globally-aggregated
+    set of registered command names (``all_commands``) — this matches the
+    bash detector's behavior and prevents positional argument *values* from
+    being mistaken for subcommands. Without this filter, typing any
+    positional after the subcommand causes the helper to count it as a
+    deeper command path, which then makes every ``-n '<helper> <path>'``
+    rule (including option and positional-choice rules) stop firing.
+
+    Note: ``all_commands`` is built globally across all command levels —
+    a positional value that happens to equal a real subcommand name from
+    *some* level can still be misclassified, but that represents poor CLI
+    design and matches the bash detector's behavior.
+
     Parameters
     ----------
     prog_name : str
@@ -96,12 +132,17 @@ def _generate_helper_functions(
         Lines defining the helper function.
     """
     options_with_values = set()
+    all_commands = set()
     for data in completion_data.values():
         for argument in data.arguments:
             if not argument.is_flag() and argument.parameter.name:
                 for name in argument.parameter.name:
                     if name.startswith("-"):
                         options_with_values.add(name)
+        for registered_command in data.commands:
+            for cmd_name in registered_command.names:
+                if not cmd_name.startswith("-"):
+                    all_commands.add(cmd_name)
 
     func_name = f"__fish_{prog_name}_using_command"
     lines = [
@@ -117,10 +158,16 @@ def _generate_helper_functions(
     else:
         lines.append("    set -l options_with_values ''")
 
+    if all_commands:
+        escaped_cmds = " ".join(_escape_fish_string(cmd) for cmd in sorted(all_commands))
+        lines.append(f"    set -l all_commands '{escaped_cmds}'")
+    else:
+        lines.append("    set -l all_commands ''")
+
     lines.extend(
         [
             "    set -l skip_next 0",
-            "    # Extract non-option words (commands) from command line",
+            "    # Extract command words (only real subcommand names) from command line",
             "    for i in (seq 2 (count $cmd))",
             "        set -l word $cmd[$i]",
             "        if test $skip_next -eq 1",
@@ -133,8 +180,10 @@ def _generate_helper_functions(
             "                set skip_next 1",
             "            end",
             "        else",
-            "            # Non-option word is a command",
-            "            set -a subcommands $word",
+            "            # Only add to subcommands if word is a registered command name",
+            '            if string match -q -- "* $word *" " $all_commands "',
+            "                set -a subcommands $word",
+            "            end",
             "        end",
             "    end",
             "    # Check if subcommand sequence matches expected path",
@@ -147,6 +196,70 @@ def _generate_helper_functions(
             "        end",
             "    end",
             "    return 0",
+            "end",
+        ]
+    )
+    return lines
+
+
+def _generate_positional_index_helper(
+    prog_name: str,
+    completion_data: dict[tuple[str, ...], CompletionData],
+) -> list[str]:
+    """Emit a fish function that returns the current positional slot index.
+
+    The function takes one argument — the length of the active command path
+    — and walks ``commandline -opc`` to count non-option, non-path tokens
+    encountered before the cursor. Options that take a value are detected
+    using a globally-aggregated list (same approach as the
+    ``__fish_<prog>_using_command`` helper) so their value tokens don't get
+    counted as positionals.
+    """
+    options_with_values = set()
+    for data in completion_data.values():
+        for argument in data.arguments:
+            if not argument.is_flag() and argument.parameter.name:
+                for name in argument.parameter.name:
+                    if name.startswith("-"):
+                        options_with_values.add(name)
+
+    func_name = f"__fish_{prog_name}_positional_index"
+    lines = [
+        "# Helper: print the index of the next positional slot for the active command path.",
+        f"function {func_name}",
+        "    set -l cmd (commandline -opc)",
+        "    set -l path_len $argv[1]",
+    ]
+    if options_with_values:
+        escaped_opts = " ".join(_escape_fish_string(opt) for opt in sorted(options_with_values))
+        lines.append(f"    set -l options_with_values '{escaped_opts}'")
+    else:
+        lines.append("    set -l options_with_values ''")
+
+    lines.extend(
+        [
+            "    set -l skip_next 0",
+            "    set -l consumed_path 0",
+            "    set -l count 0",
+            "    for i in (seq 2 (count $cmd))",
+            "        set -l word $cmd[$i]",
+            "        if test $skip_next -eq 1",
+            "            set skip_next 0",
+            "            continue",
+            "        end",
+            "        if string match -qr -- '^-' $word",
+            '            if string match -q -- "* $word *" " $options_with_values "',
+            "                set skip_next 1",
+            "            end",
+            "        else",
+            "            if test $consumed_path -lt $path_len",
+            "                set consumed_path (math $consumed_path + 1)",
+            "            else",
+            "                set count (math $count + 1)",
+            "            end",
+            "        end",
+            "    end",
+            "    echo $count",
             "end",
         ]
     )
@@ -257,6 +370,92 @@ def _generate_completions_for_path(
         lines.extend(_generate_help_version_completions(prog_name, condition, help_flags, version_flags))
         lines.extend(_generate_keyword_arg_completions(keyword_args, prog_name, condition, data.help_format))
         lines.extend(_generate_command_option_completions(data.commands, prog_name, condition, data.help_format))
+
+    lines.extend(_generate_positional_completions(data, command_path, prog_name))
+
+    return lines
+
+
+def _generate_positional_completions(
+    data: CompletionData,
+    command_path: tuple[str, ...],
+    prog_name: str,
+) -> list[str]:
+    """Emit per-position choice rules for positional args at a nested path.
+
+    Only nested paths (``len(command_path) > 0``) are handled. At root, the
+    natural fish gate ``__fish_use_subcommand`` flips false as soon as the
+    first positional is typed, so a position-N rule for N>0 can't be
+    expressed cleanly there; root-level positional values (rare in practice)
+    fall back to fish's default behavior.
+
+    Positionals without choices (e.g. ``Path``) emit nothing — fish's
+    default file completion kicks in automatically at positions where no
+    rule fires.
+
+    Iterable positionals (``list[X]``, ``set[X]``, ``*args``) own every
+    slot from their index onwards. To avoid emitting two competing
+    rest-arg specs (mirrors the bash/zsh "first iterable wins" rule), only
+    the first iterable contributes a rest rule; later iterables remain
+    reachable via their ``--name`` keyword forms.
+    """
+    if not command_path:
+        return []
+
+    positional_args = [arg for arg in data.arguments if arg.index is not None and arg.show]
+    if not positional_args:
+        return []
+
+    positional_args.sort(key=lambda a: a.index or 0)
+
+    rest_idx = None
+    for i, arg in enumerate(positional_args):
+        if arg.is_var_positional():
+            rest_idx = i
+            break
+    if rest_idx is None:
+        for i, arg in enumerate(positional_args):
+            if is_iterable_type(arg.hint):
+                rest_idx = i
+                break
+
+    head = positional_args if rest_idx is None else positional_args[:rest_idx]
+    rest_owner = None if rest_idx is None else positional_args[rest_idx]
+
+    helper_fn = f"__fish_{prog_name}_positional_index"
+    using_cmd_fn = f"__fish_{prog_name}_using_command"
+    path_len = len(command_path)
+    escaped_commands = " ".join(_escape_fish_string(cmd) for cmd in command_path)
+    base_predicate = f"{using_cmd_fn} {escaped_commands}"
+
+    lines: list[str] = []
+    header_emitted = False
+
+    def _ensure_header() -> None:
+        nonlocal header_emitted
+        if not header_emitted:
+            lines.append(f"# Positionals for: {' '.join(command_path)}")
+            header_emitted = True
+
+    for slot_idx, argument in enumerate(head):
+        choices = argument.get_choices(force=True)
+        if not choices:
+            continue
+        escaped_choices = [_escape_fish_string(clean_choice_text(c)) for c in choices]
+        choices_str = " ".join(escaped_choices)
+        pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) = {slot_idx}"
+        _ensure_header()
+        lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '{choices_str}'")
+
+    if rest_owner is not None:
+        choices = rest_owner.get_choices(force=True)
+        if choices:
+            rest_slot = rest_idx if rest_idx is not None else 0
+            escaped_choices = [_escape_fish_string(clean_choice_text(c)) for c in choices]
+            choices_str = " ".join(escaped_choices)
+            pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) -ge {rest_slot}"
+            _ensure_header()
+            lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '{choices_str}'")
 
     return lines
 

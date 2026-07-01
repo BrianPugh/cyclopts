@@ -32,6 +32,7 @@ __all__ = [
     "RequiresEqualsError",
     "Parameter",
     "ResultAction",
+    "resolve_returncode",
     "UnknownOptionError",
     "UnusedCliTokensError",
     "UNSET",
@@ -48,7 +49,7 @@ __all__ = [
 
 from cyclopts._convert import convert
 from cyclopts._env_var import env_var_split
-from cyclopts._result_action import ResultAction
+from cyclopts._result_action import ResultAction, resolve_returncode
 from cyclopts._run import run
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App

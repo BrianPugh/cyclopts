@@ -12,7 +12,7 @@ from cyclopts.annotations import get_hint_name
 from cyclopts.command_spec import CommandSpec
 from cyclopts.group import Group
 from cyclopts.token import Token
-from cyclopts.utils import is_option_like, json_decode_error_verbosifier
+from cyclopts.utils import is_option_like, json_decode_error_verbosifier, slice_to_str
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -22,13 +22,16 @@ if TYPE_CHECKING:
     from cyclopts.core import App
 
 
-# Rich style palette for error messages. Kept conservative; this is error
-# output, not a TUI. Empty string in a segment means "no styling".
-_STYLE_VALUE = "bold red"  # offending user-supplied value
-_STYLE_NAME = "bold"  # parameter / command name
-_STYLE_CHOICE = "cyan"  # valid choices in "Choose from:" lists
-_STYLE_SUGGESTION = "bold green"  # "Did you mean ..." suggestion
-_STYLE_DIM = "dim"  # source suffixes like " from <CONFIG>"
+STYLE_OFFENDING_VALUE = "bold red"
+"""Rich style for an offending user-supplied value."""
+STYLE_NAME = "bold"
+"""Rich style for a parameter, option, or command name."""
+STYLE_VALID_CHOICE = "cyan"
+"""Rich style for valid choices in ``Choose from:`` lists."""
+STYLE_SUGGESTION = "bold green"
+"""Rich style for ``Did you mean ...`` suggestions."""
+STYLE_SOURCE = "dim"
+"""Rich style for source suffixes like ``from <CONFIG>``."""
 
 
 __all__ = [
@@ -46,6 +49,11 @@ __all__ = [
     "UnusedCliTokensError",
     "ValidationError",
     "CombinedShortOptionError",
+    "STYLE_OFFENDING_VALUE",
+    "STYLE_NAME",
+    "STYLE_VALID_CHOICE",
+    "STYLE_SUGGESTION",
+    "STYLE_SOURCE",
 ]
 
 
@@ -71,9 +79,31 @@ class CycloptsError(Exception):
     As CycloptsErrors bubble up the Cyclopts call-stack, more information is added to it.
     """
 
-    msg: str | None = None
+    msg: "str | Text | None" = None
     """
     If set, override automatic message generation.
+
+    A :class:`str` is rendered as literal text. To apply styling, pass a
+    :class:`rich.text.Text` instance — either constructed from `Rich
+    console markup <https://rich.readthedocs.io/en/stable/markup.html>`_::
+
+        from rich.text import Text
+        raise CycloptsError(msg=Text.from_markup("Invalid value [bold red]foo[/]."))
+
+    or assembled directly using the built-in palette
+    (:data:`STYLE_OFFENDING_VALUE`, :data:`STYLE_NAME`,
+    :data:`STYLE_VALID_CHOICE`, :data:`STYLE_SUGGESTION`,
+    :data:`STYLE_SOURCE`) to keep custom errors visually consistent with
+    the framework's output::
+
+        from rich.text import Text
+        from cyclopts.exceptions import STYLE_NAME, STYLE_OFFENDING_VALUE
+
+        t = Text("Invalid value ")
+        t.append("foo", style=STYLE_OFFENDING_VALUE)
+        t.append(" for ")
+        t.append("--name", style=STYLE_NAME)
+        raise CycloptsError(msg=t)
     """
 
     verbose: bool = True
@@ -115,16 +145,30 @@ class CycloptsError(Exception):
     console: Optional["Console"] = field(default=None, kw_only=True)
     """:class:`~rich.console.Console` to display runtime errors."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
-        """Yield (text, style) pairs that compose the error message.
+    def _resolved_msg(self) -> "Text":
+        """Resolve ``self.msg`` (str | Text) into a Rich ``Text`` instance.
 
-        Drives both ``__str__`` (joins text) and ``__rich__`` (applies styles).
-        Empty string in the style position means "no styling". Subclasses
-        override to add their body, typically prefixing with
+        Strings are wrapped as literal text -- only ``Text`` instances carry
+        styling, so the caller opts in by constructing one explicitly.
+        """
+        from rich.text import Text
+
+        assert self.msg is not None
+        if isinstance(self.msg, Text):
+            return self.msg
+        return Text(self.msg)
+
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
+        """Yield segments that compose the error message.
+
+        Each item is either a ``(text, style)`` tuple (empty string = no
+        styling) or a pre-rendered :class:`rich.text.Text`. Drives both
+        ``__str__`` (joins plain text) and ``__rich__`` (applies styles).
+        Subclasses override to add their body, typically prefixing with
         ``yield from super()._segments()`` to include the verbose preamble.
         """
         if self.msg is not None:
-            yield self.msg, ""
+            yield self._resolved_msg()
             return
 
         if not self.verbose:
@@ -140,7 +184,13 @@ class CycloptsError(Exception):
         yield "\n".join(strings) + "\n", ""
 
     def __str__(self):
-        return "".join(text for text, _ in self._segments())
+        parts: list[str] = []
+        for item in self._segments():
+            if isinstance(item, tuple):
+                parts.append(item[0])
+            else:
+                parts.append(item.plain)
+        return "".join(parts)
 
     def __rich__(self) -> "Text":
         from rich.text import Text
@@ -148,8 +198,12 @@ class CycloptsError(Exception):
         # style="default" prevents the enclosing panel's border style (e.g. "red")
         # from bleeding through into unstyled body segments.
         out = Text(style="default")
-        for text, style in self._segments():
-            out.append(text, style=style or None)
+        for item in self._segments():
+            if isinstance(item, tuple):
+                text, style = item
+                out.append(text, style=style or None)
+            else:
+                out.append_text(item)
         return out
 
 
@@ -171,7 +225,7 @@ class ValidationError(CycloptsError):
     value: Any = cyclopts.utils.UNSET
     """Converted value that failed validation."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         body: list[tuple[str, str]] = []
 
         if self.argument:
@@ -183,21 +237,22 @@ class ValidationError(CycloptsError):
             else:
                 provided_by = "" if not token.source or token.source == "cli" else f" provided by {token.source}"
                 name = token.keyword if token.keyword else self.argument.name.lstrip("-").upper()
+                value_str = slice_to_str(value) if isinstance(value, slice) else f"{value}"
                 body.append(('Invalid value "', ""))
-                body.append((f"{value}", _STYLE_VALUE))
+                body.append((value_str, STYLE_OFFENDING_VALUE))
                 body.append(('" for ', ""))
-                body.append((name, _STYLE_NAME))
+                body.append((name, STYLE_NAME))
                 if provided_by:
-                    body.append((provided_by, _STYLE_DIM))
+                    body.append((provided_by, STYLE_SOURCE))
                 body.append((".", ""))
         elif self.group:
             if self.group.name:
                 body.append(("Invalid values for group ", ""))
-                body.append((self.group.name, _STYLE_NAME))
+                body.append((self.group.name, STYLE_NAME))
                 body.append((".", ""))
         elif self.command_chain:
             body.append(('Invalid values for command "', ""))
-            body.append((self.command_chain[-1], _STYLE_NAME))
+            body.append((self.command_chain[-1], STYLE_NAME))
             body.append(('".', ""))
         else:
             raise NotImplementedError
@@ -228,7 +283,7 @@ class UnknownOptionError(CycloptsError):
     parent_apps_with_collections: list[tuple[str, "ArgumentCollection"]] | None = None
     """List of ``(app_name, argument_collection)`` from parent/meta apps, for scope-aware suggestions."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         value = self.token.keyword or self.token.value
         # Option-like values (start with '-') are self-delimiting; quoting them is noise.
         quoted = not is_option_like(value)
@@ -236,14 +291,14 @@ class UnknownOptionError(CycloptsError):
         yield from super()._segments()
 
         yield ('Unknown option: "' if quoted else "Unknown option: "), ""
-        yield value, _STYLE_VALUE
+        yield value, STYLE_OFFENDING_VALUE
         close = '"' if quoted else ""
         if self.token.source == "cli":
             yield f"{close}.", ""
         else:
             if close:
                 yield close, ""
-            yield f" from {self.token.source}", _STYLE_DIM
+            yield f" from {self.token.source}", STYLE_SOURCE
             yield ".", ""
 
         if keyword := self.token.keyword or self.token.value:
@@ -257,7 +312,7 @@ class UnknownOptionError(CycloptsError):
                         continue
                     if self.command_chain:
                         yield ' Did you mean to place it directly after "', ""
-                        yield parent_name, _STYLE_NAME
+                        yield parent_name, STYLE_NAME
                         yield '"?', ""
                     else:
                         yield " This option is defined in a parent scope.", ""
@@ -270,7 +325,7 @@ class UnknownOptionError(CycloptsError):
             close_matches = difflib.get_close_matches(keyword, candidates, n=1, cutoff=0.6)
             if close_matches:
                 yield " Did you mean ", ""
-                yield close_matches[0], _STYLE_SUGGESTION
+                yield close_matches[0], STYLE_SUGGESTION
                 yield "?", ""
 
 
@@ -288,20 +343,23 @@ class CoercionError(CycloptsError):
     Intended type to coerce into.
     """
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
-        """Yield (text, style) pairs that compose the error message.
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
+        """Yield segments that compose the error message.
 
-        Empty string in the style position means "no styling". Drives both
-        ``__str__`` (which joins the text) and ``__rich__`` (which applies
-        the styles).
+        Tuples are ``(text, style)`` pairs; ``Text`` items are emitted
+        verbatim (so user-supplied Rich markup / ``Text`` is preserved).
         """
-        # Branch 1: explicit msg override. Yield exactly what str() would
-        # produce as a single unstyled segment -- user content stays plain.
+        # Branch 1: explicit msg override. User-supplied markup is preserved;
+        # the framework wraps it with the standard prefix when a keyword exists.
         if self.msg is not None:
+            msg_text = self._resolved_msg()
             if not self.token or self.token.keyword is None:
-                yield self.msg, ""
+                yield msg_text
             else:
-                yield f"Invalid value for {self.token.keyword}: {self.msg}", ""
+                from rich.text import Text
+
+                prefix = Text(f"Invalid value for {self.token.keyword}: ")
+                yield prefix + msg_text
             return
 
         # Branch 2: JSONDecodeError verbosifier path. Plain, like branch 1.
@@ -334,16 +392,16 @@ class CoercionError(CycloptsError):
         if choice_strs is not None and self.token is not None:
             name = self.token.keyword if self.token.keyword else self.argument.name.lstrip("-").upper()
             yield 'Invalid value "', ""
-            yield self.token.value, _STYLE_VALUE
+            yield self.token.value, STYLE_OFFENDING_VALUE
             yield '" for ', ""
-            yield name, _STYLE_NAME
+            yield name, STYLE_NAME
             if self.token.source not in ("", "cli"):
-                yield f" from {self.token.source}", _STYLE_DIM
+                yield f" from {self.token.source}", STYLE_SOURCE
             yield ". Choose from: ", ""
             for i, choice in enumerate(choice_strs):
                 if i:
                     yield ", ", ""
-                yield choice, _STYLE_CHOICE
+                yield choice, STYLE_VALID_CHOICE
             yield ".", ""
 
             import difflib
@@ -351,7 +409,7 @@ class CoercionError(CycloptsError):
             close = difflib.get_close_matches(self.token.value, plain_choices or [], n=1, cutoff=0.6)
             if close:
                 yield ' Did you mean "', ""
-                yield close[0], _STYLE_SUGGESTION
+                yield close[0], STYLE_SUGGESTION
                 yield '"?', ""
             return
 
@@ -362,7 +420,7 @@ class CoercionError(CycloptsError):
 
         if not self.token:
             yield "Invalid value for ", ""
-            yield self.argument.name, _STYLE_NAME
+            yield self.argument.name, STYLE_NAME
             yield f": unable to convert value to {target_type_name}.", ""
             return
 
@@ -372,33 +430,34 @@ class CoercionError(CycloptsError):
             display_name = self.token.keyword
 
         yield "Invalid value for ", ""
-        yield display_name, _STYLE_NAME
+        yield display_name, STYLE_NAME
         if self.token.source not in ("", "cli"):
-            yield f" from {self.token.source}", _STYLE_DIM
+            yield f" from {self.token.source}", STYLE_SOURCE
         yield ': unable to convert "', ""
-        yield self.token.value, _STYLE_VALUE
+        yield self.token.value, STYLE_OFFENDING_VALUE
         yield f'" into {target_type_name}.', ""
 
 
 class UnknownCommandError(CycloptsError):
     """CLI token combination did not yield a valid command."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.unused_tokens
         token = self.unused_tokens[0]
 
         yield from super()._segments()
 
         yield 'Unknown command "', ""
-        yield token, _STYLE_VALUE
+        yield token, STYLE_OFFENDING_VALUE
         yield '".', ""
 
         if not (self.app and self.app._commands):
             return
 
-        import difflib
-
         visible_commands: list[str] = []
+        synonym_matches: list[str] = []
+        seen_subapps: set[int] = set()
+
         for name, app_or_spec in self.app._commands.items():
             if name in self.app._help_flags or name in self.app._version_flags:
                 continue
@@ -408,14 +467,44 @@ class UnknownCommandError(CycloptsError):
             if not isinstance(subapp, type(self.app)):
                 continue
 
-            if subapp.show:
-                visible_commands.append(name)
+            if not subapp.show:
+                continue
 
-        close_matches = difflib.get_close_matches(token, visible_commands, n=1, cutoff=0.6)
-        if close_matches:
-            yield ' Did you mean "', ""
-            yield close_matches[0], _STYLE_SUGGESTION
-            yield '"?', ""
+            visible_commands.append(name)
+
+            # First registration of this subapp is its primary name; only check synonyms once per subapp.
+            subapp_id = id(subapp)
+            if subapp_id not in seen_subapps:
+                seen_subapps.add(subapp_id)
+                synonym = subapp.synonym
+                if isinstance(synonym, str):
+                    if token == synonym:
+                        synonym_matches.append(name)
+                elif synonym and token in synonym:
+                    synonym_matches.append(name)
+
+        if synonym_matches:
+            yield " Did you mean ", ""
+            for i, match in enumerate(synonym_matches):
+                if i > 0:
+                    if len(synonym_matches) == 2:
+                        yield " or ", ""
+                    elif i == len(synonym_matches) - 1:
+                        yield ", or ", ""
+                    else:
+                        yield ", ", ""
+                yield '"', ""
+                yield match, STYLE_SUGGESTION
+                yield '"', ""
+            yield "?", ""
+        else:
+            import difflib
+
+            close_matches = difflib.get_close_matches(token, visible_commands, n=1, cutoff=0.6)
+            if close_matches:
+                yield ' Did you mean "', ""
+                yield close_matches[0], STYLE_SUGGESTION
+                yield '"?', ""
 
         # Heuristic: list the visible commands to help users who forgot the command name.
         max_commands = 8
@@ -429,13 +518,13 @@ class UnknownCommandError(CycloptsError):
             for i, name in enumerate(shown):
                 if i:
                     yield ", ", ""
-                yield name, _STYLE_CHOICE
+                yield name, STYLE_VALID_CHOICE
             yield ", ...", ""
         else:
             for i, name in enumerate(available_commands):
                 if i:
                     yield ", ", ""
-                yield name, _STYLE_CHOICE
+                yield name, STYLE_VALID_CHOICE
             yield ".", ""
 
 
@@ -443,7 +532,7 @@ class UnknownCommandError(CycloptsError):
 class UnusedCliTokensError(CycloptsError):
     """Not all CLI tokens were used as expected."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.unused_tokens is not None
         yield from super()._segments()
         yield f"Unused Tokens: {self.unused_tokens}.", ""
@@ -459,7 +548,7 @@ class MissingArgumentError(CycloptsError):
     keyword: str | None = None
     """The keyword that was used when the error was raised (e.g., '-o' instead of '--option')."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.argument is not None
         count, _ = self.argument.token_count()
         if count == 0:
@@ -495,18 +584,18 @@ class MissingArgumentError(CycloptsError):
 
         if self.command_chain:
             yield 'Command "', ""
-            yield " ".join(self.command_chain), _STYLE_NAME
+            yield " ".join(self.command_chain), STYLE_NAME
             yield '" parameter ', ""
         else:
             yield "Parameter ", ""
-        yield param_name, _STYLE_NAME
+        yield param_name, STYLE_NAME
         yield f" {required_string}.{only_got_string}", ""
 
         if close_match is not None:
             yield " Did you mean ", ""
-            yield self.argument.name, _STYLE_SUGGESTION
+            yield self.argument.name, STYLE_SUGGESTION
             yield " instead of ", ""
-            yield close_match, _STYLE_VALUE
+            yield close_match, STYLE_OFFENDING_VALUE
             yield "?", ""
 
         if self.verbose:
@@ -521,7 +610,7 @@ class ConsumeMultipleError(MissingArgumentError):
     max_allowed: int | None = None
     actual_count: int = 0
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.argument is not None
         param_name = self.keyword or self.argument.name
 
@@ -535,11 +624,11 @@ class ConsumeMultipleError(MissingArgumentError):
 
         if self.command_chain:
             yield 'Command "', ""
-            yield " ".join(self.command_chain), _STYLE_NAME
+            yield " ".join(self.command_chain), STYLE_NAME
             yield '" parameter ', ""
         else:
             yield "Parameter ", ""
-        yield param_name, _STYLE_NAME
+        yield param_name, STYLE_NAME
         yield f" {constraint} elements. Got {self.actual_count}.", ""
 
 
@@ -550,14 +639,14 @@ class RequiresEqualsError(CycloptsError):
     keyword: str | None = None
     """The keyword that was used (e.g., '--name')."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.argument is not None
         param_name = self.keyword or self.argument.name
         yield from super()._segments()
         yield "Parameter ", ""
-        yield param_name, _STYLE_NAME
+        yield param_name, STYLE_NAME
         yield " requires a value assigned with `=`. Use ", ""
-        yield param_name, _STYLE_NAME
+        yield param_name, STYLE_NAME
         yield "=VALUE.", ""
 
 
@@ -568,13 +657,13 @@ class RepeatArgumentError(CycloptsError):
     token: "Token"
     """The repeated token."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         # Invariant: positional duplication is routed to UnusedCliTokensError by the binder,
         # so any token reaching this error path was matched by keyword.
         assert self.token.keyword is not None
         yield from super()._segments()
         yield "Parameter ", ""
-        yield self.token.keyword, _STYLE_NAME
+        yield self.token.keyword, STYLE_NAME
         yield " specified multiple times.", ""
 
 
@@ -585,7 +674,7 @@ class ArgumentOrderError(CycloptsError):
     token: str
     prior_positional_or_keyword_supplied_as_keyword_arguments: list["Argument"]
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.argument is not None
         plural = len(self.prior_positional_or_keyword_supplied_as_keyword_arguments) > 1
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name).lstrip("-")
@@ -594,17 +683,17 @@ class ArgumentOrderError(CycloptsError):
 
         yield from super()._segments()
         yield 'Cannot specify token "', ""
-        yield self.token, _STYLE_VALUE
+        yield self.token, STYLE_OFFENDING_VALUE
         yield '" positionally for parameter ', ""
-        yield display_name, _STYLE_NAME
+        yield display_name, STYLE_NAME
         yield f" due to previously specified keyword{'s' if plural else ''} ", ""
-        yield f"{prior_display}", _STYLE_NAME
+        yield f"{prior_display}", STYLE_NAME
         yield ". ", ""
-        yield f"{prior_display}", _STYLE_NAME
+        yield f"{prior_display}", STYLE_NAME
         yield ' must either be passed positionally, or "', ""
-        yield self.token, _STYLE_VALUE
+        yield self.token, STYLE_OFFENDING_VALUE
         yield '" must be passed as a keyword to ', ""
-        yield self.argument.name, _STYLE_NAME
+        yield self.argument.name, STYLE_NAME
         yield ".", ""
 
 
@@ -612,10 +701,10 @@ class ArgumentOrderError(CycloptsError):
 class MixedArgumentError(CycloptsError):
     """Cannot supply keywords and non-keywords to the same argument."""
 
-    def _segments(self) -> Iterator[tuple[str, str]]:
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
         assert self.argument is not None
         display_name = next((x.keyword for x in self.argument.tokens if x.keyword), self.argument.name)
         yield from super()._segments()
         yield "Cannot supply keyword & non-keyword arguments to ", ""
-        yield display_name, _STYLE_NAME
+        yield display_name, STYLE_NAME
         yield ".", ""

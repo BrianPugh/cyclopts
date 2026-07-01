@@ -9,36 +9,33 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      PYTHON: 3.12
-
+    permissions:
+      contents: read
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Needed for hatch-vcs to get version from git tags
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
-          enable-cache: true
-
-      - name: Set up python ${{ env.PYTHON }}
-        id: setup-python
-        run: uv python install ${{ env.PYTHON }}
-
-      - name: Install project
-        run: uv sync --all-extras
-
-      - name: Build package
-        run: uv build
-
-      - name: Publish package
-        if: github.event_name != 'workflow_dispatch'
-        run: uv publish --token ${{ secrets.PYPI_TOKEN }}
-
-      - uses: actions/upload-artifact@v4
-        if: always()
+          enable-cache: false
+      - run: uv build
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
+
+  publish:
+    needs: build
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cyclopts
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@v1.14.0

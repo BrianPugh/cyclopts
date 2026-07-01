@@ -30,6 +30,7 @@ from cyclopts._convert import _convert
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
+from cyclopts.argument.utils import is_short_flag
 from cyclopts.bind import (
     create_bound_arguments,
     is_option_like,
@@ -76,6 +77,7 @@ with suppress(ImportError):
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from rich.tree import Tree
 
     from cyclopts.docs.types import DocFormat
     from cyclopts.help import HelpPanel
@@ -375,6 +377,18 @@ class App:
         converter=_app_str_tuple_converter,
         kw_only=True,
     )
+
+    synonym: None | str | tuple[str, ...] = field(
+        default=None,
+        converter=_app_str_tuple_converter,
+        kw_only=True,
+    )
+    """Alternate command names that are NOT runnable but trigger a "Did you mean..." suggestion.
+
+    Unlike :attr:`alias`, synonyms do not register the command under additional names. They exist
+    purely to guide users who type a semantically-equivalent but orthographically-dissimilar token
+    (e.g., ``remove`` when the command is ``uninstall``).
+    """
 
     default_command: Callable[..., Any] | None = field(default=None, converter=_validate_default_command, kw_only=True)
     default_parameter: Parameter | None = field(default=None, kw_only=True)
@@ -1610,6 +1624,7 @@ class App:
             group_arguments=self._group_arguments,  # pyright: ignore
             group_parameters=self._group_parameters,  # pyright: ignore
             parse_docstring=parse_docstring,
+            reserved=(f for f in (*self.help_flags, *self.version_flags) if is_short_flag(f)),
         )
 
     def parse_known_args(
@@ -2632,6 +2647,76 @@ class App:
 
         return doc
 
+    def command_tree(
+        self,
+        *,
+        description: bool = True,
+        include_hidden: bool = False,
+        max_depth: int | None = None,
+    ) -> "Tree":
+        """Build a :class:`rich.tree.Tree` of this application's command hierarchy.
+
+        The returned tree is a Rich renderable; print it with
+        ``console.print(app.command_tree())`` or embed it within other Rich
+        output. Hidden commands and built-in help/version flags are excluded by
+        default.
+
+        Parameters
+        ----------
+        description : bool
+            Show each command's short description (from its docstring) next to
+            its name. Default is True.
+        include_hidden : bool
+            Include hidden commands (``show=False``). Default is False.
+        max_depth : int | None
+            Maximum subcommand depth to display. ``None`` (default) shows all
+            levels; ``1`` shows only top-level commands.
+
+        Returns
+        -------
+        rich.tree.Tree
+            A renderable tree of the command hierarchy.
+
+        Examples
+        --------
+        >>> from rich.console import Console
+        >>> app = App(name="myapp")
+        >>> Console().print(app.command_tree())  # doctest: +SKIP
+        """
+        from rich.text import Text
+        from rich.tree import Tree
+
+        from cyclopts.docs.base import iterate_commands
+        from cyclopts.help.help import docstring_parse
+
+        def short_description(subapp: "App") -> str:
+            try:
+                return docstring_parse(subapp.help, "restructuredtext").short_description or ""
+            except Exception:
+                return ""
+
+        def node_label(name: str, subapp: "App") -> Text:
+            label = Text(name)
+            if description:
+                short = short_description(subapp)
+                if short:
+                    label.append("  ")
+                    label.append(short, style="dim")
+            return label
+
+        def build(node, subapp: "App", depth: int) -> None:
+            if max_depth is not None and depth > max_depth:
+                return
+            # resolve_lazy=True so the tree shows the complete hierarchy; lazy
+            # commands left unresolved would be silently omitted entirely.
+            for name, child in iterate_commands(subapp, include_hidden=include_hidden, resolve_lazy=True):
+                branch = node.add(node_label(name, child))
+                build(branch, child, depth + 1)
+
+        tree = Tree(node_label(self.name[0], self))
+        build(tree, self, 1)
+        return tree
+
     def generate_completion(
         self,
         *,
@@ -2714,7 +2799,7 @@ class App:
             Shell type for completion. If not specified, attempts to auto-detect current shell.
         output : Path | None
             Output path for the completion script. If not specified, uses shell-specific default:
-            - zsh: ~/.zsh/completions/_<prog_name> (or $ZSH_CUSTOM/completions/_<prog_name> with oh-my-zsh)
+            - zsh: ~/.zsh/completions/_cyclopts_<prog_name> (or $ZSH_CUSTOM/completions/_cyclopts_<prog_name> with oh-my-zsh)
             - bash: ~/.local/share/bash-completion/completions/<prog_name>
             - fish: ~/.config/fish/completions/<prog_name>.fish
         add_to_startup : bool
@@ -2860,7 +2945,10 @@ class App:
                 def dispatcher(command: Callable, bound: inspect.BoundArguments, ignored: dict[str, Any]) -> Any:
                     return command(*bound.args, **bound.kwargs)
 
-            The above is the default dispatcher implementation.
+            The default dispatcher additionally runs ``async`` commands using the
+            resolved :attr:`App.backend` (defaulting to ``"asyncio"``), mirroring
+            :meth:`App.__call__`. A custom ``dispatcher`` is responsible for handling
+            async commands itself (e.g. via :func:`asyncio.run`).
         console: Console | None
             Rich Console to use for output. If :obj:`None`, uses :attr:`App.console`.
         exit_on_error: bool
@@ -2886,7 +2974,8 @@ class App:
             quit = [quit]
 
         def default_dispatcher(command, bound, _):
-            return command(*bound.args, **bound.kwargs)
+            resolved_backend = cast(Literal["asyncio", "trio"], self.app_stack.resolve("backend", fallback="asyncio"))
+            return _run_maybe_async_command(command, bound, resolved_backend)
 
         if dispatcher is None:
             dispatcher = default_dispatcher

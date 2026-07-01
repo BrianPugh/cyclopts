@@ -1,7 +1,7 @@
 """Shared helper functions and constants for the argument package."""
 
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import suppress
 from enum import Enum, Flag
 from functools import partial
@@ -40,7 +40,6 @@ PARAMETER_SUBKEY_BLOCKER = Parameter(
     converter=None,  # pyright: ignore
     validator=None,
     accepts_keys=None,
-    consume_multiple=None,
     env_var=None,
 )
 
@@ -152,6 +151,148 @@ def enum_flag_from_dict(
         The combined flag value.
     """
     return convert_enum_flag(enum_type, (k for k, v in data.items() if v), name_transform)
+
+
+def is_short_flag(flag: str) -> bool:
+    """Return :obj:`True` for a single-letter flag like ``-e`` (not ``--env`` or ``-`` alone)."""
+    return len(flag) == 2 and flag[0] == "-" and flag[1] != "-"
+
+
+def _is_root_namespace(names: str | Iterable[str] | None) -> bool:
+    """Return :obj:`True` if the parameter surfaces at the root CLI namespace.
+
+    A root-namespace parameter has an **undotted** long flag (e.g. ``--env``). This
+    covers genuine top-level command parameters as well as fields promoted to the root
+    via ``Parameter(name="*")`` or PEP 692 unpacking (``--name``), while excluding dotted
+    nested fields such as ``--user.name``.
+    """
+    if isinstance(names, str):  # Defensive: resolved names are always a tuple at this point.
+        names = (names,)
+    return any(n.startswith("--") and "." not in n for n in (names or ()))
+
+
+def reserve_explicit_shorts(argument: "Argument", used_short_aliases: set[str]) -> None:
+    """Phase 1a: reserve every explicitly-provided short flag into ``used_short_aliases``.
+
+    Runs for *every* argument as the tree is built (independent of eligibility), so that
+    auto-generation (phase 2, deferred until the whole tree is known) avoids user-supplied
+    shorts regardless of parameter ordering. At this point no auto short has been appended
+    yet, so any single-letter flag present is necessarily user-provided.
+    """
+    cparam = argument.parameter
+    for flag in (*(cparam.name or ()), *(cparam.alias or ())):
+        if is_short_flag(flag):
+            used_short_aliases.add(flag)
+
+
+def is_short_alias_eligible(argument: "Argument", immediate_parameter: Parameter) -> bool:
+    """Phase 1b: pure predicate for whether this argument should receive an auto-generated short flag.
+
+    Auto shorts apply to opted-in (``short_alias``), **input-binding** parameters only
+    (scalars, dicts, enum flags) — never to promoted containers whose fields become child
+    options. They apply only to **root-namespace** parameters (an undotted long flag). A
+    field that stays namespaced (e.g. ``--user.name``) never gets one — ``short_alias`` on
+    such a field is inert; flatten it to the root namespace via ``name="*"`` to expose it.
+    """
+    cparam = argument.parameter
+
+    if not cparam.short_alias:
+        return False
+
+    # An explicitly-provided alias or name suppresses auto-generation: the user has taken
+    # manual control of this parameter's flags, so Cyclopts only uses what they supplied.
+    # The checks deliberately differ:
+    #   - ``name`` uses ``immediate_parameter._provided_args`` (the user's own annotation),
+    #     because Cyclopts always re-injects a resolved ``name`` into ``cparam`` — so
+    #     ``"name" in cparam._provided_args`` is always True and useless here.
+    #   - ``alias`` uses ``cparam.alias`` *truthiness* rather than ``_provided_args``:
+    #     internal subkey combining (``PARAMETER_SUBKEY_BLOCKER``) injects ``alias=None``,
+    #     which pollutes ``cparam._provided_args`` with a spurious ``"alias"``. Truthiness
+    #     ignores that ``None`` while still catching a real alias from a global
+    #     ``App(default_parameter=Parameter(alias=...))``.
+    # (``name="*"`` flattening sets ``name`` on a container, excluded below anyway; its
+    # promoted children carry no explicit ``name`` and remain eligible.)
+    if "name" in immediate_parameter._provided_args or "alias" in immediate_parameter._provided_args or cparam.alias:
+        return False
+
+    # Root-namespace only. A field that stays namespaced (e.g. ``--user.name``) never gets
+    # a short, even with ``short_alias=True`` set directly on it; flatten it via ``name="*"``.
+    if not _is_root_namespace(cparam.name):
+        return False
+
+    # Only parameters that bind CLI input directly get a short; containers do not.
+    if argument._accepts_keywords and not argument._enum_flag_type:
+        return False
+
+    return True
+
+
+def generate_short_alias(
+    argument: "Argument",
+    used_short_aliases: set[str],
+) -> tuple[str, ...] | None:
+    """Phase 2: generate the auto short flag(s) for an argument deemed eligible by phase 1.
+
+    Deferred until every parameter's explicit short has been reserved, so an earlier
+    parameter's auto short can never shadow a later parameter's explicit ``alias``.
+
+    Returns the generated short name(s) to append to the argument's name as standalone
+    flags (so they surface globally, e.g. ``-e``, never dotted like ``-u.name``), or
+    :obj:`None`. Mutates ``used_short_aliases`` to reserve claimed letters.
+    """
+    cparam = argument.parameter
+    field_info = argument.field_info
+
+    short = None
+    short_alias = cparam.short_alias
+    if callable(short_alias):
+        # Hand the callable a read-only snapshot so it cannot mutate the internal
+        # collision-tracking set and corrupt assignment for later parameters.
+        short = short_alias(field_info, frozenset(used_short_aliases))
+    elif short_alias and field_info.kind not in (POSITIONAL_ONLY, VAR_POSITIONAL):
+        # A boolean that already defaults to True would only get a no-op positive short
+        # (the meaningful off-switch ``--no-flag`` is long-only), so skip auto-generation
+        # and leave the letter free for a parameter that can actually use it.
+        # ``resolved_hint`` strips ``Optional`` so a ``True``-defaulting ``Optional[bool]``
+        # is treated like a plain ``bool`` here (its only short would be a no-op positive).
+        if argument.resolved_hint is bool and field_info.default is True:
+            return None
+        # Derive the letter from the transformed CLI name (not the raw python identifier)
+        # so it stays consistent with the long flag (``--my-flag`` -> ``-m``, ``_foo`` -> ``-f``).
+        transformed = cparam.name_transform(field_info.names[0])
+        if transformed:
+            letter = transformed[0].lower()
+            for candidate in (f"-{letter}", f"-{letter.upper()}"):
+                if candidate not in used_short_aliases:
+                    short = candidate
+                    break
+
+    if not short:
+        return None
+    if isinstance(short, str):
+        shorts = (short,)
+    else:
+        try:
+            shorts = tuple(short)
+        except TypeError:
+            raise TypeError(
+                f"Parameter.short_alias callable must return a str, an iterable of str, or None; got {short!r}."
+            ) from None
+    # The callable is custom logic, but it still must produce single-letter short flags
+    # (e.g. ``-e``) — anything else would be silently appended as a long flag or, worse, a
+    # positional name. Fail loudly instead, mirroring the field-level str rejection.
+    for s in shorts:
+        if not isinstance(s, str) or not is_short_flag(s):
+            raise ValueError(
+                f"Parameter.short_alias callable must return single-letter short flags like '-e'; got {s!r}."
+            )
+    # Drop any short already claimed by an earlier parameter (first-wins), so a
+    # callable that ignores ``used_short_aliases`` can't create duplicate flags.
+    shorts = tuple(s for s in shorts if s not in used_short_aliases)
+    if not shorts:
+        return None
+    used_short_aliases.update(shorts)
+    return shorts
 
 
 def extract_docstring_help(f: Callable) -> dict[tuple[str, ...], Parameter]:

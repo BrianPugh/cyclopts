@@ -190,6 +190,43 @@ To change the :attr:`~cyclopts.Parameter.name_transform` across your entire app,
        default_parameter=Parameter(name_transform=my_custom_name_transform),
    )
 
+.. _Parameters - Short Flags:
+
+^^^^^^^^^^^
+Short Flags
+^^^^^^^^^^^
+Cyclopts can automatically generate single-letter short flags from your parameter names, so you don't have to specify an alias for every option.
+Enable it per-parameter with :attr:`Parameter.short_alias <cyclopts.Parameter.short_alias>`, or across the whole app by setting it on the app's :attr:`~cyclopts.App.default_parameter`.
+
+The letter is the first character of the parameter's CLI name (after :attr:`~cyclopts.Parameter.name_transform`), lowercased.
+If that letter is already claimed, the uppercase variant is used; if both are taken, the parameter gets no short flag.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+
+   app = App(default_parameter=Parameter(short_alias=True))
+
+   @app.command
+   def deploy(env: str, region: str = "us-east-1"):
+       """Deploy to an environment."""
+       print(f"Deploying to {env} in {region}")
+
+.. code-block:: console
+
+   $ my-script deploy -e prod
+   Deploying to prod in us-east-1
+
+Explicitly setting :attr:`~cyclopts.Parameter.alias` (or :attr:`~cyclopts.Parameter.name`) on a parameter **opts it out** of auto-generation: Cyclopts will only use the short flag you provided.
+For example, ``env: Annotated[str, Parameter(alias="-E")]`` exposes ``-E`` but not ``-e``, even when ``short_alias=True`` is enabled app-wide.
+
+Short flags only apply to parameters that bind input directly **and** surface at the root CLI namespace (i.e. an undotted long flag like ``--env``).
+A container parameter (such as a dataclass whose fields become ``--user.name`` options) gets no short flag, and neither do its dotted child fields.
+``short_alias`` is inert on a field that stays namespaced: setting it on a nested leaf has no effect.
+
+A boolean parameter that already defaults to :obj:`True` gets no automatic short flag.
+Its short would map to the positive long form (e.g. ``-f`` → ``--flag``), which is a no-op since the value is already :obj:`True`; the meaningful off-switch ``--no-flag`` is long-only.
+
 ----
 Help
 ----

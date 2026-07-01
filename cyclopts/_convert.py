@@ -180,6 +180,27 @@ def _timedelta(s: str) -> timedelta:
     return timedelta(seconds=seconds)
 
 
+def _slice(s: str) -> slice:
+    """Parse a string in slice notation.
+
+    Examples: ``0:3``, ``:10``, ``0:100:5``, ``-10:``. Empty fields map to :obj:`None`.
+
+    Returns
+    -------
+    slice
+    """
+    parts = s.split(":")
+    if 2 <= len(parts) <= 3:
+        try:
+            return slice(*(int(part) if part.strip() else None for part in parts))
+        except ValueError:
+            pass
+    raise CoercionError(
+        target_type=slice,
+        msg=f'Unable to interpret "{s}" as a slice; expected "start:stop" or "start:stop:step" with integer or empty fields (e.g. "0:3", ":10", "0:100:5").',
+    )
+
+
 def get_enum_member(
     type_: type[E],
     token: Union["Token", str],
@@ -246,6 +267,7 @@ _converters: dict[Any, Callable] = {
     datetime: _datetime,
     timedelta: _timedelta,
     NoneType: _none,
+    slice: _slice,
 }
 
 
@@ -580,7 +602,9 @@ def _convert(
     from cyclopts.argument import Token
     from cyclopts.parameter import Parameter
 
-    converter_needs_token = False
+    # The flag travels with the converter so recursive calls (e.g. through a preserved
+    # ``Optional``/``Union`` member) keep passing the full ``Token`` rather than ``token.value``.
+    converter_needs_token = getattr(converter, "_cyclopts_needs_token", False)
     if is_annotated(type_):
         from cyclopts.parameter import Parameter
 
@@ -603,6 +627,7 @@ def _convert(
                     # Regular function - pass type and tokens
                     return resolved_converter(t_, (value,))
 
+            converter_with_token._cyclopts_needs_token = True  # pyright: ignore[reportFunctionMemberAccess]
             converter = converter_with_token
 
         if cparam.name_transform:

@@ -202,12 +202,24 @@ class FishCompletionTester(CompletionTesterBase):
                 raise RuntimeError(
                     f"fish driver failed (exit {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
                 )
-            # `complete -C` prints "completion\tdescription" per line (description optional).
+            # ``complete -C`` prints the *full* token that would replace the
+            # current word ("completion\tdescription" per line). For
+            # ``--opt=p`` the returned token is ``--opt=prod``, but bash's
+            # driver splits on ``=`` (COMP_WORDBREAKS) and zsh's compsys
+            # consumes the ``--opt=`` prefix via ``compset -P`` — both yield
+            # ``prod`` directly. Strip the matching prefix here so the
+            # cross-shell behavioral assertions can compare values uniformly.
+            current_word = "" if partial_command.endswith(" ") else partial_command.rsplit(maxsplit=1)[-1]
+            eq_prefix = current_word[: current_word.rindex("=") + 1] if "=" in current_word else ""
+
             completions = []
             for line in result.stdout.splitlines():
                 if not line:
                     continue
-                completions.append(line.split("\t", 1)[0])
+                token = line.split("\t", 1)[0]
+                if eq_prefix and token.startswith(eq_prefix):
+                    token = token[len(eq_prefix) :]
+                completions.append(token)
             return completions
 
 
@@ -282,7 +294,7 @@ class ZshCompletionTester(CompletionTesterBase):
 
     def validate_script_syntax(self) -> bool:
         with tempfile.TemporaryDirectory() as tmpdir:
-            comp_file = Path(tmpdir) / f"_{self.prog_name}"
+            comp_file = Path(tmpdir) / f"_cyclopts_{self.prog_name}"
             comp_file.write_text(self.completion_script)
             result = subprocess.run(
                 ["zsh", "-n", str(comp_file)],
@@ -300,7 +312,7 @@ class ZshCompletionTester(CompletionTesterBase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            (td / f"_{self.prog_name}").write_text(self.completion_script)
+            (td / f"_cyclopts_{self.prog_name}").write_text(self.completion_script)
 
             (td / ".zshrc").write_text(
                 "PROMPT='ZTEST> '\n"
@@ -333,7 +345,11 @@ class ZshCompletionTester(CompletionTesterBase):
                 "TERM": "dumb",
             }
             child = pexpect.spawn(
-                "zsh -i",
+                # --no-globalrcs skips /etc/zsh/{zshenv,zprofile,zshrc,...}; Ubuntu's
+                # /etc/zsh/zshrc calls bare `compinit`, which blocks on the
+                # "insecure directories" prompt on GitHub-hosted runners before our
+                # own `compinit -u` below has a chance to run.
+                "zsh --no-globalrcs -i",
                 encoding="utf-8",
                 env=env_vars,  # pyright: ignore[reportArgumentType]
                 timeout=5,

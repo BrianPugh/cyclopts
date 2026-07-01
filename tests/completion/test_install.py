@@ -336,11 +336,11 @@ def test_install_completion_command_fish(temp_home, monkeypatch, capsys):
 
 
 def test_install_completion_zsh_ohmyzsh_default_path(omz_dir):
-    """Test that $ZSH set with valid dir installs to $ZSH/custom/completions/_testapp."""
+    """Test that $ZSH set with valid dir installs to $ZSH/custom/completions/_cyclopts_testapp."""
     app = App(name="testapp")
     install_path = app.install_completion(shell="zsh", add_to_startup=True)
 
-    assert install_path == omz_dir / "custom" / "completions" / "_testapp"
+    assert install_path == omz_dir / "custom" / "completions" / "_cyclopts_testapp"
     assert install_path.exists()
 
 
@@ -353,7 +353,7 @@ def test_install_completion_zsh_ohmyzsh_zsh_custom_env(omz_dir, temp_home, monke
     app = App(name="testapp")
     install_path = app.install_completion(shell="zsh", add_to_startup=True)
 
-    assert install_path == custom_dir / "completions" / "_testapp"
+    assert install_path == custom_dir / "completions" / "_cyclopts_testapp"
     assert install_path.exists()
 
 
@@ -373,7 +373,7 @@ def test_install_completion_zsh_ohmyzsh_dir_missing(temp_home, monkeypatch):
     app = App(name="testapp")
     install_path = app.install_completion(shell="zsh", add_to_startup=False)
 
-    expected = temp_home / ".zsh" / "completions" / "_testapp"
+    expected = temp_home / ".zsh" / "completions" / "_cyclopts_testapp"
     assert install_path == expected
     assert install_path.exists()
 
