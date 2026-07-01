@@ -5,6 +5,7 @@ from typing import Annotated
 
 import pytest
 
+import cyclopts
 from cyclopts import Parameter
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -804,3 +805,34 @@ def test_bind_dataclass_with_parameter_alias_issue_696(app, assert_parse_args, c
         "--source.server=localhost --from.port=9000",
         source=Source(server="localhost", port=9000),
     )
+
+
+def test_bind_dataclass_default_parameter_consume_multiple_propagates(assert_parse_args):
+    """``default_parameter`` settings should propagate to inner dataclass fields.
+
+    Previously ``name_transform`` propagated correctly, but ``consume_multiple`` did
+    not unless the inner class field was explicitly annotated.
+
+    https://github.com/BrianPugh/cyclopts/issues/841
+    """
+    app = cyclopts.App(
+        result_action="return_value",
+        default_parameter=Parameter(consume_multiple=True),
+    )
+
+    @dataclass
+    class Inner:
+        names: list[str]
+
+    @app.command
+    def cmd(office: str, /, *, inner: Inner):
+        pass
+
+    actual_command, actual_bind, _ = app.parse_args(
+        "cmd my_office --inner.names name1 name2",
+        print_error=False,
+        exit_on_error=False,
+    )
+    assert actual_command == cmd
+    assert actual_bind.args == ("my_office",)
+    assert actual_bind.kwargs == {"inner": Inner(names=["name1", "name2"])}
