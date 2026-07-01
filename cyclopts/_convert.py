@@ -963,17 +963,14 @@ def convert(
         # enum.Flag object.
         return convert_enum_flag(dispatch_origin, tokens, name_transform)
     else:
-        tokens_per_element, consume_all = token_count(type_)
-        if consume_all:
-            return convert_priv(type_, tokens)  # pyright: ignore
-        elif len(tokens) == 1:
-            return convert_priv(type_, tokens[0])  # pyright: ignore
         # Pass Token objects to token_count for consistent union type resolution
         # tokens is Sequence[Token] at this point (strings were converted to Tokens earlier in this function)
         tokens_per_element, consume_all = token_count(type_, upcoming_tokens=tokens)  # pyright: ignore[reportArgumentType]
         if consume_all:
             # For consume_all types (like list[T] in unions), process all tokens together
             return convert_priv(type_, tokens)  # pyright: ignore
+        elif len(tokens) == 1:
+            return convert_priv(type_, tokens[0])  # pyright: ignore
         elif tokens_per_element == 1:
             return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
         elif len(tokens) == tokens_per_element:
@@ -1075,7 +1072,12 @@ def _union_conversion(
         # Use the Token objects directly - they were created upfront in bind.py
         # This enables identity-based caching since the same Token objects
         # will be used for both probing and actual conversion.
-        token_input = tokens_to_try[0] if len(tokens_to_try) == 1 else list(tokens_to_try)
+        # consume_all (and multi-token) types like ``list[T]`` always expect a
+        # sequence; only unpack when the member takes a single, scalar token.
+        if consume_all or tc > 1:
+            token_input = list(tokens_to_try)
+        else:
+            token_input = tokens_to_try[0] if len(tokens_to_try) == 1 else list(tokens_to_try)
 
         try:
             result = _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)
@@ -1120,13 +1122,13 @@ def token_count(
         If this is ``True`` and positional, consume all remaining tokens.
         The returned number of tokens constitutes a single element of the iterable-to-be-parsed.
     """
+    from cyclopts.parameter import get_parameters
+
     # Discriminated unions (e.g. Annotated[Cat | Dog, pydantic.Field(discriminator="type")])
     # consume a single JSON string token regardless of member field counts.
     # Check before get_parameters strips the Annotated metadata.
     if get_annotated_discriminator(resolve_optional(type_)) is not None:
         return 1, False
-
-    from cyclopts.parameter import get_parameters
 
     # Token-aware union handling MUST happen before get_parameters() because
     # get_parameters() strips None from Optional unions via resolve_optional().
