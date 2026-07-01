@@ -1035,3 +1035,143 @@ class TestVarPositionalShadowing:
         assert captured["sub_positional"] == "hello"
         assert captured["sub_args"] == ()
         assert result == ("hello", ())
+
+
+class TestScopingRegressions:
+    """Regression tests for the probe-based scoping rewrite (child-first, real parser passes)."""
+
+    def test_combined_short_option_split_across_scopes(self):
+        """``-vd`` where the child owns ``-v`` and the meta owns ``-d`` must split
+        the token: meta binds debug, child binds verbose.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            debug: Annotated[bool, Parameter(name=["-d", "--debug"])] = False,
+        ):
+            captured["debug"] = debug
+            return app(tokens)
+
+        @app.command
+        def go(*, verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False):
+            captured["verbose"] = verbose
+
+        app.meta(["go", "-vd"], exit_on_error=False)
+        assert captured == {"debug": True, "verbose": True}
+
+    def test_combined_short_option_child_wins(self):
+        """``-vd`` where both levels define ``-v``: the child wins its flag while
+        the meta binds only its own ``-d``.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            mverbose: Annotated[bool, Parameter(name=["-v", "--mverbose"])] = False,
+            debug: Annotated[bool, Parameter(name=["-d", "--debug"])] = False,
+        ):
+            captured["mverbose"] = mverbose
+            captured["debug"] = debug
+            return app(tokens)
+
+        @app.command
+        def sub(*, verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False):
+            captured["verbose"] = verbose
+
+        app.meta(["sub", "-vd"], exit_on_error=False)
+        assert captured == {"mverbose": False, "debug": True, "verbose": True}
+
+    def test_meta_flag_between_child_option_and_value(self):
+        """A meta flag interleaved between a child option and its value must
+        bubble to the meta, letting the child pair its option with the value.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            mflag: bool = False,
+        ):
+            captured["mflag"] = mflag
+            return app(tokens)
+
+        @app.command
+        def cmd(*, copt: str = "unset"):
+            captured["copt"] = copt
+
+        app.meta(["cmd", "--copt", "--mflag", "value"], exit_on_error=False)
+        assert captured == {"mflag": True, "copt": "value"}
+
+    def test_child_alh_positional_list_keeps_option_like_tokens(self):
+        """A child whose positional-only ``list`` has ``allow_leading_hyphen=True``
+        consumes option-like tokens itself; they must not bubble to the meta.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False,
+        ):
+            captured["verbose"] = verbose
+            return app(tokens)
+
+        @app.command
+        def run(files: Annotated[list[str], Parameter(allow_leading_hyphen=True)], /):
+            captured["files"] = files
+
+        app.meta(["run", "a", "b", "-v"], exit_on_error=False)
+        assert captured == {"verbose": False, "files": ["a", "b", "-v"]}
+
+    def test_positional_only_list_contiguity_preserved(self):
+        """Issue #763 protection applies on the hierarchical path: a
+        POSITIONAL_ONLY consume-all list must not vacuum up tokens that
+        appeared after a bubbled-up keyword flag.
+        """
+        from cyclopts.exceptions import UnusedCliTokensError
+
+        app = App(name="myapp", result_action="return_value")
+
+        @app.meta.default
+        def meta(files: list[str], /, verbose: bool = False):
+            pass
+
+        @app.command
+        def cmd():
+            pass
+
+        # 'cmd' at index 0 engages the hierarchical path; --verbose bubbles to
+        # the meta, creating a gap. 'b' appeared after --verbose so `files`
+        # must not consume it; it is left over and raises.
+        with pytest.raises(UnusedCliTokensError):
+            app.meta(["cmd", "a", "--verbose", "b"], exit_on_error=False)
+
+    def test_var_keyword_parent_does_not_suppress_suggestion(self):
+        """A ``**kwargs`` catch-all on a parent meta must not claim every unknown
+        option in strict-mode error hints; the nearest-neighbor suggestion for
+        the child's own parameters should still appear.
+        """
+        app = App(parse_mode="strict", name="myapp", result_action="return_value")
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            **kwargs: str,
+        ):
+            return app(tokens)
+
+        @app.command
+        def sub(*, alpha: str = "unset"):
+            return alpha
+
+        # "--alpxa" is a deliberate misspelling of "--alpha" (chosen so the
+        # typos pre-commit hook doesn't auto-correct it).
+        with pytest.raises(UnknownOptionError, match=r"Did you mean --alpha\?"):
+            app.meta(["sub", "--alpxa", "q"], exit_on_error=False)

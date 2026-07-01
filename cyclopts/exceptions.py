@@ -307,8 +307,13 @@ class UnknownOptionError(CycloptsError):
                 for parent_name, parent_ac in self.parent_apps_with_collections:
                     try:
                         # Strip "=value" suffix so "--verbose=true" matches "--verbose".
-                        parent_ac.match(keyword.split("=", 1)[0])
+                        argument, _, _ = parent_ac.match(keyword.split("=", 1)[0])
                     except ValueError:
+                        continue
+                    if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+                        # A ``**kwargs`` catch-all matches ANY keyword; that is not
+                        # evidence the option belongs to the parent scope, and hinting
+                        # here would suppress the nearest-neighbor suggestion below.
                         continue
                     if self.command_chain:
                         yield ' Did you mean to place it directly after "', ""

@@ -1073,11 +1073,9 @@ def _union_conversion(
         # This enables identity-based caching since the same Token objects
         # will be used for both probing and actual conversion.
         # consume_all (and multi-token) types like ``list[T]`` always expect a
-        # sequence; only unpack when the member takes a single, scalar token.
-        if consume_all or tc > 1:
-            token_input = list(tokens_to_try)
-        else:
-            token_input = tokens_to_try[0] if len(tokens_to_try) == 1 else list(tokens_to_try)
+        # sequence; only unpack when the member takes a single, scalar token
+        # (the remaining case is exactly ``tc == 1`` with one token).
+        token_input = list(tokens_to_try) if (consume_all or tc > 1) else tokens_to_try[0]
 
         try:
             result = _convert(arg, token_input, converter=effective_converter, name_transform=effective_name_transform)

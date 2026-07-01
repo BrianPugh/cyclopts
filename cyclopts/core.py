@@ -32,11 +32,11 @@ from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
 from cyclopts.argument.utils import is_short_flag
 from cyclopts.bind import (
+    _parse_kw_and_flags,
+    _scope_tokens_for_meta,
     create_bound_arguments,
     is_option_like,
     normalize_tokens,
-    partition_tokens,
-    segment_tokens_by_command,
 )
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
@@ -279,14 +279,13 @@ def _build_strict_parent_info(app_stack: "AppStack") -> list[tuple[str, Argument
     parent_info: list[tuple[str, ArgumentCollection]] = []
     for stack_apps in app_stack.stack:
         for stack_app in stack_apps:
-            meta = stack_app._meta
-            while meta and meta.default_command:
+            metas = list(_walk_metas(stack_app))[:-1]  # Exclude the app itself; deepest-first.
+            for meta in reversed(metas):  # Shallowest-first.
                 parent = meta._meta_parent
                 parent_name = parent.name[0] if parent else ""
                 meta_argument_collection = _safe_assemble_argument_collection(meta)
                 if meta_argument_collection is not None:
                     parent_info.append((parent_name, meta_argument_collection))
-                meta = meta._meta
     return parent_info or None
 
 
@@ -1087,12 +1086,13 @@ class App:
         tokens: list[str],
         *,
         include_parent_meta: bool = True,
-    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str], list[int]]:
+    ) -> tuple[tuple[str, ...], tuple["App", ...], list[str], list[int], list["App"]]:
         """Internal command parsing with richer return data.
 
         Unlike the public :meth:`parse_commands`, this method:
         - Accepts already-normalized tokens (list[str]).
         - Returns command indices into the original token list.
+        - Returns the resolved app for each command token.
 
         Parameters
         ----------
@@ -1111,12 +1111,15 @@ class App:
             The remaining non-command tokens.
         list[int]
             Index (into the original token list) of each command token found.
+        list[App]
+            The resolved app for each command token (parallel to the chain).
         """
         command_chain = []
         app = self
         apps: list[App] = []
         unused_tokens = tokens
         command_indices: list[int] = []
+        command_apps: list[App] = []
         # Track the current offset into the original token list.
         # This is needed because _consume_leading_meta_options can
         # remove tokens, shifting the relationship between unused_tokens
@@ -1175,10 +1178,11 @@ class App:
             command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)
             command_chain.append(token)
             command_indices.append(token_offset)
+            command_apps.append(app)
             token_offset += 1
             unused_tokens = unused_tokens[1:]
 
-        return tuple(command_chain), tuple(apps), unused_tokens, command_indices
+        return tuple(command_chain), tuple(apps), unused_tokens, command_indices, command_apps
 
     def parse_commands(
         self,
@@ -1218,7 +1222,7 @@ class App:
         list[str]
             The remaining non-command tokens.
         """
-        command_chain, apps, unused_tokens, _ = self._parse_commands(
+        command_chain, apps, unused_tokens, _, _ = self._parse_commands(
             normalize_tokens(tokens),
             include_parent_meta=include_parent_meta,
         )
@@ -1284,8 +1288,6 @@ class App:
         """
         if not apps or not tokens:
             return tokens
-
-        from cyclopts.bind import _parse_kw_and_flags
 
         # Resolve end_of_options_delimiter from the partially-resolved app stack
         with self.app_stack(apps):
@@ -1695,11 +1697,14 @@ class App:
 
         # We need both versions of the apps list:
         # 1. apps_for_context (with parent metas) - for setting up the app_stack context
+        #    and, in meta dispatch, for hierarchical token scoping.
         # 2. execution_apps (without parent metas) - for determining the actual execution command
         # These can differ when parse_commands is called from a meta app, so we must
         # call parse_commands twice. This is not inefficient since the parsing is fast.
-        _, apps_for_context, _ = self.parse_commands(tokens, include_parent_meta=True)
-        command_chain, execution_apps, unused_tokens = self.parse_commands(tokens, include_parent_meta=False)
+        full_chain, apps_for_context, _, full_command_indices, full_command_apps = self._parse_commands(
+            tokens, include_parent_meta=True
+        )
+        command_chain, execution_apps, unused_tokens, _, _ = self._parse_commands(tokens, include_parent_meta=False)
 
         # We don't want the command_app to be the version/help handler; we handle those specially
         command_app = execution_apps[-1]
@@ -1719,39 +1724,20 @@ class App:
         command_app = execution_apps[-1]
         del execution_apps  # Always use AppStack from here-on.
 
-        # Assemble the resolved command's argument collection once; it powers
-        # both the trailing-flag restoration below and the shadowing check used
-        # by the help/version interception block further down.
-        command_argument_collection = (
-            _safe_assemble_argument_collection(command_app) if command_app.default_command else None
-        )
-
-        def _flag_shadowed_by_user_param(flag: str) -> bool:
-            if command_argument_collection is None:
-                return False
-            try:
-                command_argument_collection.match(flag)
-            except ValueError:
-                return False
-            return True
-
-        # If a removed trailing help/version "command" is actually shadowed by a
-        # parameter on the resolved command (e.g. ``def sub(version: bool = False)``),
-        # restore it to ``unused_tokens`` so normal binding can claim it.
-        #
-        # Order invariant: ``_parse_commands`` consumes command tokens
-        # left-to-right and stops at the first non-command, so any token that
-        # ended up in the chain originally appeared *before* every token still
-        # in ``unused_tokens``. Prepending the restored flags (in original
-        # order; ``removed_help_version_tokens`` was filled LIFO so we reverse)
-        # therefore reproduces the input order for the suffix.
-        if removed_help_version_tokens:
-            restored: list[str] = []
-            for flag in reversed(removed_help_version_tokens):
-                if _flag_shadowed_by_user_param(flag):
-                    restored.append(flag)
-            if restored:
-                unused_tokens = restored + unused_tokens
+        # Analogously strip trailing help/version pseudo-commands from the
+        # meta-aware parse so they don't masquerade as subcommands for
+        # hierarchical token scoping (e.g. ``myapp --version`` where a user
+        # parameter shadows ``--version``).
+        hier_chain = list(full_chain)
+        hier_command_indices = list(full_command_indices)
+        hier_command_apps = list(full_command_apps)
+        while hier_chain:
+            parent = hier_command_apps[-2] if len(hier_command_apps) >= 2 else self
+            if hier_chain[-1] not in set(parent.help_flags + parent.version_flags):  # pyright: ignore[reportOperatorIssue]
+                break
+            hier_chain.pop()
+            hier_command_indices.pop()
+            hier_command_apps.pop()
 
         ignored: dict[str, Any] = {}
 
@@ -1759,6 +1745,59 @@ class App:
             config: tuple[Callable, ...] = command_app.app_stack.resolve("_config") or ()
             config = tuple(partial(x, command_app, command_chain) for x in config)
             end_of_options_delimiter = self.app_stack.resolve("end_of_options_delimiter", fallback="--")
+
+            # Assemble the resolved command's argument collection once (inside the
+            # app_stack context so stack-resolved defaults apply); it powers the
+            # trailing-flag restoration below, the help/version shadowing checks,
+            # and the main binding pass.
+            command_argument_collection = (
+                _safe_assemble_argument_collection(command_app) if command_app.default_command else None
+            )
+
+            # In meta dispatch (the flat parse resolved no commands, but the
+            # meta-aware parse finds subcommands the meta will forward tokens to),
+            # the deepest resolved command also participates: its parameters can
+            # shadow help/version flags and claim post-command tokens.
+            hier_child_app: App | None = None
+            if not command_chain and hier_command_indices:
+                hier_child_app = hier_command_apps[-1]
+            child_argument_collection = (
+                _safe_assemble_argument_collection(hier_child_app)
+                if hier_child_app is not None and hier_child_app.default_command
+                else None
+            )
+
+            def _flag_shadowed_by_user_param(flag: str) -> bool:
+                for collection in (command_argument_collection, child_argument_collection):
+                    if collection is None:
+                        continue
+                    try:
+                        argument, _, _ = collection.match(flag)
+                    except ValueError:
+                        continue
+                    # A ``**kwargs`` catch-all matches ANY keyword; that is not an
+                    # explicit shadow of the help/version flag.
+                    if argument.field_info.kind is not argument.field_info.VAR_KEYWORD:
+                        return True
+                return False
+
+            # If a removed trailing help/version "command" is actually shadowed by a
+            # parameter on the resolved command (e.g. ``def sub(version: bool = False)``),
+            # restore it to ``unused_tokens`` so normal binding can claim it.
+            #
+            # Order invariant: ``_parse_commands`` consumes command tokens
+            # left-to-right and stops at the first non-command, so any token that
+            # ended up in the chain originally appeared *before* every token still
+            # in ``unused_tokens``. Prepending the restored flags (in original
+            # order; ``removed_help_version_tokens`` was filled LIFO so we reverse)
+            # therefore reproduces the input order for the suffix.
+            if removed_help_version_tokens:
+                restored: list[str] = []
+                for flag in reversed(removed_help_version_tokens):
+                    if _flag_shadowed_by_user_param(flag):
+                        restored.append(flag)
+                if restored:
+                    unused_tokens = restored + unused_tokens
 
             # Special flags (help/version) get intercepted by the root app.
             # Special flags are allows to be **anywhere** in the token stream.
@@ -1800,146 +1839,44 @@ class App:
                     if command_app.default_command:
                         command = command_app.default_command
                         validate_command(command)
-                        argument_collection = command_app.assemble_argument_collection()
+                        # Reuse the collection assembled for the shadowing checks;
+                        # re-assemble directly only if the safe assembly swallowed a
+                        # NameError, so the genuine annotation error propagates here.
+                        argument_collection = (
+                            command_argument_collection
+                            if command_argument_collection is not None
+                            else command_app.assemble_argument_collection()
+                        )
                         ignored: dict[str, Any] = {
                             argument.field_info.name: resolve_annotated(argument.field_info.annotation)
                             for argument in argument_collection.filter_by(parse=False)
                         }
 
-                        # Determine if flag scoping should be applied.
-                        # Scoping is active when:
-                        # 1. parse_mode is set
-                        # 2. The flat parse found no commands (command_app is
-                        #    the meta app itself, not a resolved subcommand)
-                        # 3. The full parse (with parent meta) finds subcommands
-                        #    that the meta app will forward tokens to
+                        # Hierarchical token scoping applies in meta dispatch: the
+                        # flat parse resolved no commands (command_app is the meta
+                        # level itself) but the meta-aware parse found subcommands
+                        # that this level will forward tokens to.
                         parse_mode = self.app_stack.resolve("parse_mode", fallback="fallthrough")
-                        full_command_indices: list[int] = []
-                        full_apps: tuple[App, ...] | None = None
-                        if not command_chain:
-                            _, full_apps, _, full_command_indices = self._parse_commands(
-                                tokens, include_parent_meta=True
-                            )
-
-                        if full_command_indices and full_apps is not None:
-                            # Split tokens into per-command-level segments.
-                            segments = segment_tokens_by_command(tokens, full_command_indices)
-
-                            # Reconstruct the positional tokens for the meta app's *tokens:
-                            # command name(s) + all post-command tokens.
-                            positional_tokens: list[str] = []
-                            for i, cmd_idx in enumerate(full_command_indices):
-                                positional_tokens.append(tokens[cmd_idx])  # command name
-                                positional_tokens.extend(segments[i + 1])  # tokens after this command
-
-                            # Partition pre-command tokens: tokens matching the current
-                            # level's argument collection go to meta_kw_tokens; the rest
-                            # are prepended to positional_tokens (for nested meta scenarios
-                            # where pre-command tokens belong to an intermediate meta level).
-                            meta_kw_tokens, pre_command_passthrough = partition_tokens(
-                                argument_collection,
-                                segments[0],
-                                end_of_options_delimiter=end_of_options_delimiter,
-                            )
-                            positional_tokens = pre_command_passthrough + positional_tokens
-
-                            # Bubble-up: scan post-command tokens for flags that match the
-                            # meta's argument collection but NOT the child's. Move them from
-                            # positional_tokens to meta_kw_tokens so the meta binds them.
-                            if parse_mode == "fallthrough":
-                                child_app = full_apps[-1]
-                                if child_app.default_command:
-                                    child_argument_collection = (
-                                        _safe_assemble_argument_collection(child_app) or ArgumentCollection()
-                                    )
-                                else:
-                                    child_argument_collection = ArgumentCollection()
-
-                                # Per-token bubble-up: simulate the child's positional
-                                # binding over the post-deepest-command segment and reserve
-                                # tokens the child will absorb as positional values. The
-                                # ``_parse_kw_and_flags`` pass that powers ``partition_tokens``
-                                # only sees kw/flag arguments, so without this reservation a
-                                # VAR_POSITIONAL with ``allow_leading_hyphen=True`` would lose
-                                # option-like tokens to the meta. This also correctly lets
-                                # meta flags pass through when an upstream non-ALH positional
-                                # would have rejected them.
-                                from cyclopts.bind import _parse_kw_and_flags  # local import: tight scope
-
-                                positional_slots: list[bool] = []
-                                var_positional_alh: bool | None = None
-                                positional_args = sorted(
-                                    (
-                                        a
-                                        for a in child_argument_collection
-                                        if a.field_info.is_positional and a.index is not None
-                                    ),
-                                    key=lambda a: a.index if a.index is not None else 0,
-                                )
-                                for arg in positional_args:
-                                    if arg.is_var_positional():
-                                        var_positional_alh = arg.parameter.allow_leading_hyphen
-                                        break
-                                    positional_slots.append(arg.parameter.allow_leading_hyphen)
-
-                                # Special case: the child's only positional is ``*args``
-                                # with ``allow_leading_hyphen=True``. The user explicitly
-                                # asked for every post-command token to land in the child,
-                                # so suppress bubble-up entirely — including tokens the
-                                # meta would otherwise have claimed by name.
-                                if not positional_slots and var_positional_alh is True:
-                                    bubbled = []
-                                else:
-                                    from cyclopts.bind import (
-                                        _parse_kw_and_flags,  # local import: tight scope
-                                    )
-
-                                    # Tokens the meta's kw/flag pass would claim (including
-                                    # values for keyword args) must NOT be treated as
-                                    # candidate positionals for the child.
-                                    meta_collection_probe = argument_collection.copy(reset_tokens=True)
-                                    _, meta_unused_indices, _ = _parse_kw_and_flags(
-                                        meta_collection_probe,
-                                        positional_tokens,
-                                        end_of_options_delimiter=end_of_options_delimiter,
-                                    )
-                                    meta_unused_set = set(meta_unused_indices)
-
-                                    extra_claimed: set[int] = set()
-                                    post_start = len(positional_tokens) - len(segments[-1])
-                                    slot_idx = 0
-                                    for k in range(post_start, len(positional_tokens)):
-                                        if k not in meta_unused_set:
-                                            # Token (or its value-pair partner) is claimed
-                                            # by meta; don't model it as child positional.
-                                            continue
-                                        tok = positional_tokens[k]
-                                        opt_like = is_option_like(tok)
-                                        if slot_idx < len(positional_slots):
-                                            slot_alh = positional_slots[slot_idx]
-                                            if opt_like and not slot_alh:
-                                                # Slot rejects option-like; meta may claim.
-                                                continue
-                                            extra_claimed.add(k)
-                                            slot_idx += 1
-                                        elif var_positional_alh is True:
-                                            extra_claimed.add(k)
-                                        elif var_positional_alh is False and not opt_like:
-                                            extra_claimed.add(k)
-
-                                    bubbled, positional_tokens = partition_tokens(
-                                        argument_collection,
-                                        positional_tokens,
-                                        exclude=child_argument_collection,
-                                        extra_claimed_indices=extra_claimed,
-                                        end_of_options_delimiter=end_of_options_delimiter,
-                                    )
-                                meta_kw_tokens.extend(bubbled)
-                            elif parse_mode == "strict":
-                                pass  # No fallthrough; post-command flags stay with the child.
+                        scoped: tuple[list[str], list[str], int | None] | None = None
+                        if hier_child_app is not None:
+                            if hier_child_app.default_command and child_argument_collection is None:
+                                # The child's signature couldn't be assembled
+                                # (unresolvable forward reference). Fall back to flat
+                                # parsing so the genuine error surfaces when the
+                                # forwarded tokens reach the child's own parse.
+                                pass
                             else:
-                                raise ValueError(f"Unknown parse_mode: {parse_mode!r}")
+                                scoped = _scope_tokens_for_meta(
+                                    argument_collection,
+                                    child_argument_collection,
+                                    tokens,
+                                    hier_command_indices,
+                                    parse_mode=parse_mode,
+                                    end_of_options_delimiter=end_of_options_delimiter,
+                                )
 
+                        if scoped is not None:
+                            meta_kw_tokens, positional_tokens, positional_contiguous_count = scoped
                             bound, unused_tokens = create_bound_arguments(
                                 command_app.default_command,
                                 argument_collection,
@@ -1947,6 +1884,7 @@ class App:
                                 config,
                                 end_of_options_delimiter=end_of_options_delimiter,
                                 positional_tokens=positional_tokens,
+                                positional_contiguous_count=positional_contiguous_count,
                             )
                         else:
                             bound, unused_tokens = create_bound_arguments(
@@ -1983,15 +1921,13 @@ class App:
                             unused_tokens = []
                             argument_collection = ArgumentCollection()
                 if raise_on_unused_tokens and unused_tokens:
-                    strict_parent_info = _build_strict_parent_info(self.app_stack)
-
                     for token in unused_tokens:
                         if is_option_like(token):
                             token = token.split("=")[0]
                             raise UnknownOptionError(
                                 token=Token(keyword=token, source="cli"),
                                 argument_collection=argument_collection,
-                                parent_apps_with_collections=strict_parent_info,
+                                parent_apps_with_collections=_build_strict_parent_info(self.app_stack),
                             )
                     raise UnusedCliTokensError(target=command, unused_tokens=unused_tokens)
             except CycloptsError as e:

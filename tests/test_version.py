@@ -417,3 +417,60 @@ def test_subcommand_repeated_version_flag_restores_all():
 
     with pytest.raises(RepeatArgumentError):
         app(["sub", "--version", "--version"], exit_on_error=False)
+
+
+def test_var_keyword_command_keeps_help_and_version(capsys):
+    """A command taking ``**kwargs`` must not be treated as shadowing the
+    help/version flags (a VAR_KEYWORD catch-all matches ANY keyword).
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="9.9.9", result_action="return_value")
+
+    @app.command
+    def cmd(**kwargs: str):
+        return kwargs
+
+    app(["cmd", "--help"], exit_on_error=False)
+    assert "Usage" in capsys.readouterr().out
+
+    app(["cmd", "--version"], exit_on_error=False)
+    assert "9.9.9" in capsys.readouterr().out
+
+
+def test_meta_driven_subcommand_version_shadowing():
+    """A subcommand's own ``version`` parameter must win over the auto handler
+    when the app is driven through its meta.
+    """
+    from typing import Annotated
+
+    from cyclopts import App, Parameter
+
+    app = App(name="myapp", version="9.9.9", result_action="return_value")
+    captured: dict[str, object] = {}
+
+    @app.meta.default
+    def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+        return app(tokens)
+
+    @app.command
+    def cmd(*, version: bool = False):
+        captured["version"] = version
+
+    app.meta(["cmd", "--version"], exit_on_error=False)
+    assert captured == {"version": True}
+
+
+def test_strict_mode_shadowed_version_on_plain_app():
+    """``parse_mode='strict'`` must not strand a shadowed ``--version`` token in
+    the (pseudo-command driven) hierarchical path.
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", parse_mode="strict", version="9.9.9", result_action="return_value")
+
+    @app.default
+    def main(version: bool = False):
+        return version
+
+    assert app(["--version"], exit_on_error=False) is True

@@ -1162,26 +1162,26 @@ def test_parse_kw_and_flags_stop_at_first_unknown_preserves_end_of_options(app):
     assert "raw2" in unused_tokens
 
 
-def test_partition_tokens_combined_short_option_no_duplicate(console):
-    """When the exclude collection doesn't recognize any flags in a combined
-    short option (e.g. ``-vd``), ``partition_tokens`` must pass the original
-    token to the parent collection exactly once, not once per exploded flag.
+def test_scope_tokens_combined_short_option_no_duplicate(console):
+    """When the child collection doesn't recognize any flags in a combined
+    short option (e.g. ``-vd``), the meta level must claim the original token
+    exactly once, not once per exploded flag.
     """
     from cyclopts import App, Parameter
-    from cyclopts.bind import partition_tokens
+    from cyclopts.bind import _scope_tokens_for_meta
 
-    # Parent recognizes -v/--verbose and -d/--debug
-    parent_app = App(console=console)
+    # Meta recognizes -v/--verbose and -d/--debug
+    meta_app = App(console=console)
 
-    @parent_app.default
-    def parent_cmd(
+    @meta_app.default
+    def meta_cmd(
         *,
         verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False,
         debug: Annotated[bool, Parameter(name=["-d", "--debug"])] = False,
     ):
         pass
 
-    parent_ac = parent_app.assemble_argument_collection()
+    meta_ac = meta_app.assemble_argument_collection()
 
     # Child recognizes -f/--force — neither -v nor -d
     child_app = App(console=console)
@@ -1192,14 +1192,45 @@ def test_partition_tokens_combined_short_option_no_duplicate(console):
 
     child_ac = child_app.assemble_argument_collection()
 
-    # -vd: child recognizes neither flag, so both get unused with the same
-    # original index. partition_tokens must not duplicate the token.
-    matched, unmatched = partition_tokens(
-        parent_ac,
-        ["-vd", "pos1"],
-        exclude=child_ac,
+    meta_kw_tokens, positional_tokens, _ = _scope_tokens_for_meta(
+        meta_ac,
+        child_ac,
+        ["cmd", "-vd", "pos1"],
+        [0],
+        parse_mode="fallthrough",
     )
-    # Parent should match -vd (it knows both -v and -d).
-    assert "-vd" in matched
-    # pos1 is unmatched.
-    assert unmatched == ["pos1"]
+    # Meta should claim -vd exactly once (it knows both -v and -d).
+    assert meta_kw_tokens == ["-vd"]
+    # The command token and pos1 are forwarded.
+    assert positional_tokens == ["cmd", "pos1"]
+
+
+def test_scope_tokens_combined_short_option_split_across_scopes(console):
+    """A combined short-option token whose characters belong to different
+    scopes (child ``-v``, meta ``-d``) must be split: the meta claims its
+    residual and the child keeps its own flag.
+    """
+    from cyclopts import App, Parameter
+    from cyclopts.bind import _scope_tokens_for_meta
+
+    meta_app = App(console=console)
+
+    @meta_app.default
+    def meta_cmd(*, debug: Annotated[bool, Parameter(name=["-d", "--debug"])] = False):
+        pass
+
+    child_app = App(console=console)
+
+    @child_app.default
+    def child_cmd(*, verbose: Annotated[bool, Parameter(name=["-v", "--verbose"])] = False):
+        pass
+
+    meta_kw_tokens, positional_tokens, _ = _scope_tokens_for_meta(
+        meta_app.assemble_argument_collection(),
+        child_app.assemble_argument_collection(),
+        ["cmd", "-vd"],
+        [0],
+        parse_mode="fallthrough",
+    )
+    assert meta_kw_tokens == ["-d"]
+    assert positional_tokens == ["cmd", "-v"]

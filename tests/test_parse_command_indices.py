@@ -12,7 +12,7 @@ def test_command_indices_simple():
     def foo():
         pass
 
-    _, _, _, indices = app._parse_commands(normalize_tokens(["foo"]))
+    _, _, _, indices, _ = app._parse_commands(normalize_tokens(["foo"]))
     assert indices == [0]
 
 
@@ -31,7 +31,7 @@ def test_command_indices_with_leading_flags():
     ):
         app(tokens)
 
-    _, _, _, indices = app.meta._parse_commands(normalize_tokens(["--verbose", "foo"]))
+    _, _, _, indices, _ = app.meta._parse_commands(normalize_tokens(["--verbose", "foo"]))
     assert indices == [1]
 
 
@@ -45,7 +45,7 @@ def test_command_indices_nested_commands():
     def bar():
         pass
 
-    _, _, _, indices = app._parse_commands(normalize_tokens(["sub", "bar"]))
+    _, _, _, indices, _ = app._parse_commands(normalize_tokens(["sub", "bar"]))
     assert indices == [0, 1]
 
 
@@ -57,7 +57,7 @@ def test_command_indices_with_trailing_args():
     def foo(name: str):
         pass
 
-    _, _, _, indices = app._parse_commands(normalize_tokens(["foo", "myname"]))
+    _, _, _, indices, _ = app._parse_commands(normalize_tokens(["foo", "myname"]))
     assert indices == [0]
 
 
@@ -69,7 +69,7 @@ def test_command_indices_no_commands():
     def main(name: str):
         pass
 
-    _, _, _, indices = app._parse_commands(normalize_tokens(["myname"]))
+    _, _, _, indices, _ = app._parse_commands(normalize_tokens(["myname"]))
     assert indices == []
 
 
@@ -90,7 +90,7 @@ def test_command_indices_flags_between_commands():
     ):
         app(tokens)
 
-    _, _, _, indices = app.meta._parse_commands(normalize_tokens(["--verbose", "sub", "bar", "--extra"]))
+    _, _, _, indices, _ = app.meta._parse_commands(normalize_tokens(["--verbose", "sub", "bar", "--extra"]))
     # --verbose consumed by meta, sub at original index 1, bar at original index 2
     assert indices == [1, 2]
 
@@ -103,7 +103,7 @@ def test_command_indices_empty_tokens():
     def main():
         pass
 
-    _, _, _, indices = app._parse_commands(normalize_tokens([]))
+    _, _, _, indices, _ = app._parse_commands(normalize_tokens([]))
     assert indices == []
 
 

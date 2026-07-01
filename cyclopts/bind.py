@@ -3,7 +3,7 @@ import itertools
 import os
 import shlex
 import sys
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
@@ -63,132 +63,328 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     return tokens
 
 
-def segment_tokens_by_command(
-    tokens: list[str],
-    command_indices: list[int],
-) -> list[list[str]]:
-    """Split tokens into segments, one per command level.
-
-    Segments are delimited by command tokens. Command tokens themselves
-    are excluded from the segments.
-
-    Parameters
-    ----------
-    tokens: list[str]
-        The full normalized token list.
-    command_indices: list[int]
-        Indices in ``tokens`` where command names were found.
-        Returned by :meth:`App._parse_commands`.
-
-    Returns
-    -------
-    list[list[str]]
-        ``segments[0]`` contains tokens before the first command,
-        ``segments[i]`` contains tokens after the i-th command but
-        before the (i+1)-th command. There are always
-        ``len(command_indices) + 1`` segments.
-    """
-    segments: list[list[str]] = []
-    prev = 0
-    for idx in command_indices:
-        segments.append(tokens[prev:idx])
-        prev = idx + 1  # skip the command token itself
-    segments.append(tokens[prev:])
-    return segments
-
-
-def partition_tokens(
+def _probe_unclaimed(
     argument_collection: ArgumentCollection,
     tokens: list[str],
     *,
-    exclude: "ArgumentCollection | None" = None,
-    extra_claimed_indices: set[int] | None = None,
     end_of_options_delimiter: str = "--",
-) -> tuple[list[str], list[str]]:
-    """Partition tokens into those matching an argument collection and those that don't.
+    include_positionals: bool = False,
+) -> list[tuple[int, str]] | None:
+    """Determine which tokens ``argument_collection`` would NOT consume.
 
-    Delegates to :func:`_parse_kw_and_flags` on a throwaway copy of the
-    argument collection, so all matching edge cases (combined short flags,
-    GNU-style attached values, ``=`` splitting, etc.) are handled correctly
-    without duplicating logic.
-
-    Parameters
-    ----------
-    argument_collection: ArgumentCollection
-        The argument collection to match against.
-    tokens: list[str]
-        Token list to partition.
-    exclude: ArgumentCollection | None
-        If provided, tokens matching this collection take priority and
-        are placed into ``unmatched`` even if they also match
-        ``argument_collection``. Used for child-wins semantics.
-    extra_claimed_indices: set[int] | None
-        Token indices that should be forced into ``unmatched`` in addition
-        to those claimed by ``exclude``. Used by hierarchical parsing to
-        reserve tokens that a child's positional arguments will consume
-        (which ``_parse_kw_and_flags`` cannot detect on its own).
-    end_of_options_delimiter: str
-        Token that marks the end of options. Tokens at or after this
-        delimiter are treated as positional-only. Defaults to ``"--"``.
+    Runs the real parsing passes (:func:`_parse_kw_and_flags`, and optionally
+    :func:`_parse_pos`) on a throwaway copy of the collection, so all matching
+    edge cases (combined short flags, GNU-style attached values, ``=``
+    splitting, positional ``token_count``/``consume_all`` semantics, etc.)
+    behave exactly like the eventual real parse.
 
     Returns
     -------
-    matched: list[str]
-        Tokens (and their values) that match ``argument_collection``.
-    unmatched: list[str]
-        Everything else, in original order.
+    list[tuple[int, str]] | None
+        Ordered ``(original_index, token)`` pairs the collection leaves
+        unconsumed. For partially-consumed combined short options (e.g.
+        ``-vd`` where only ``-v`` is known), the unconsumed remainder appears
+        as synthetic single-flag tokens (``-d``) sharing the original index.
+
+        ``None`` if the keyword/flag pass raised a :class:`CycloptsError`
+        (e.g. a known option missing its value) — the claims cannot be
+        determined; the caller decides how to proceed.
     """
-    # First, determine which tokens the exclude collection (if any) would claim.
-    # Those indices are forced into ``unmatched`` regardless of whether the
-    # parent argument collection would also match them (child-wins semantics).
-    if exclude is not None:
-        exclude_copy = exclude.copy(reset_tokens=True)
-        _, exclude_unused_indices, _ = _parse_kw_and_flags(
-            exclude_copy, tokens, end_of_options_delimiter=end_of_options_delimiter
+    collection_copy = argument_collection.copy(reset_tokens=True)
+    try:
+        unused, unused_indices, contiguous_positional_count = _parse_kw_and_flags(
+            collection_copy, tokens, end_of_options_delimiter=end_of_options_delimiter
         )
-        # Indices NOT in exclude_unused_indices are claimed by the exclude collection.
-        # Deduplicate indices (preserving order) because combined short options
-        # (e.g. -vd) can produce multiple unused entries sharing the same
-        # original index.  Without dedup the same original token would be
-        # forwarded to the parent collection more than once.
-        seen: set[int] = set()
-        deduped_indices: list[int] = []
-        for idx in exclude_unused_indices:
-            if idx not in seen:
-                seen.add(idx)
-                deduped_indices.append(idx)
-        exclude_unused_index_set = set(deduped_indices)
-        excluded_claimed_indices = {k for k in range(len(tokens)) if k not in exclude_unused_index_set}
-        # Tokens eligible for matching against the parent collection.
-        tokens_for_parent = [tokens[k] for k in deduped_indices]
-        # Map from parent-local index -> original index in ``tokens``.
-        parent_to_original = list(deduped_indices)
+    except CycloptsError:
+        return None
+    if not include_positionals:
+        return list(zip(unused_indices, unused, strict=True))
+
+    try:
+        leftover = _parse_pos(
+            collection_copy,
+            unused,
+            end_of_options_delimiter=end_of_options_delimiter,
+            contiguous_positional_count=contiguous_positional_count,
+        )
+    except CycloptsError:
+        # Positional binding failed mid-stream (e.g. an option-like token in a
+        # non-allow_leading_hyphen slot). Treat the positional pass as claiming
+        # nothing; callers typically re-probe after another collection has
+        # claimed the offending token.
+        return list(zip(unused_indices, unused, strict=True))
+
+    # ``_parse_pos`` consumes from the front of a preprocessed stream that
+    # excludes the end_of_options_delimiter token itself; ``leftover`` is a
+    # suffix of that stream. Map leftover entries back to ``unused`` positions.
+    if end_of_options_delimiter and end_of_options_delimiter in unused:
+        delimiter_pos = unused.index(end_of_options_delimiter)
+        preprocessed_to_unused = [p for p in range(len(unused)) if p != delimiter_pos]
     else:
-        excluded_claimed_indices = set()
-        tokens_for_parent = list(tokens)
-        parent_to_original = list(range(len(tokens)))
+        preprocessed_to_unused = list(range(len(unused)))
+    leftover_positions = preprocessed_to_unused[len(preprocessed_to_unused) - len(leftover) :]
+    return [(unused_indices[p], unused[p]) for p in leftover_positions]
 
-    # Second pass: match remaining tokens against the target collection.
-    parent_copy = argument_collection.copy(reset_tokens=True)
-    _, parent_unused_indices, _ = _parse_kw_and_flags(
-        parent_copy, tokens_for_parent, end_of_options_delimiter=end_of_options_delimiter
-    )
 
-    # Translate parent-local unused indices back into original-token indices.
-    parent_unused_original = {parent_to_original[k] for k in parent_unused_indices}
+def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
+    """Remove single-character short flags (e.g. ``-d``) from a combined short-option token.
 
-    # A token is matched iff the parent consumed it AND neither the exclude
-    # collection nor ``extra_claimed_indices`` already claimed it.
-    extra_claimed = extra_claimed_indices or set()
-    matched: list[str] = []
-    unmatched: list[str] = []
-    for k, tok in enumerate(tokens):
-        if k in excluded_claimed_indices or k in parent_unused_original or k in extra_claimed:
-            unmatched.append(tok)
+    Removes the first occurrence of each flag character in order, mirroring the
+    left-to-right scan of :func:`_parse_kw_and_flags` (so characters belonging
+    to an attached value are never removed).
+
+    Returns the remaining token, or ``None`` if no characters remain.
+    """
+    chars = list(token.lstrip("-"))
+    for flag in flags:
+        char = flag.lstrip("-")
+        if char in chars:
+            chars.remove(char)
+    return "-" + "".join(chars) if chars else None
+
+
+def _partition_claims(
+    tokens: list[str],
+    unclaimed: list[tuple[int, str]],
+) -> tuple[list[str], list[tuple[int, str]]]:
+    """Split ``tokens`` into claimed/unclaimed streams given probe results.
+
+    Parameters
+    ----------
+    tokens: list[str]
+        The token stream that was probed.
+    unclaimed: list[tuple[int, str]]
+        ``(index, token)`` pairs from :func:`_probe_unclaimed`.
+
+    Returns
+    -------
+    claimed: list[str]
+        Tokens (or claimed remainders of combined short options) the
+        collection consumed, in original order.
+    unclaimed_out: list[tuple[int, str]]
+        Same entries as ``unclaimed`` (identity pass-through, for symmetry).
+    """
+    unclaimed_by_position: dict[int, list[str]] = {}
+    for position, token in unclaimed:
+        unclaimed_by_position.setdefault(position, []).append(token)
+
+    claimed: list[str] = []
+    for position, token in enumerate(tokens):
+        synthetics = unclaimed_by_position.get(position)
+        if synthetics is None:
+            claimed.append(token)
+        elif len(synthetics) == 1 and synthetics[0] == token:
+            pass  # Fully unclaimed.
         else:
-            matched.append(tok)
+            # Partially-claimed combined short option: the claimed remainder
+            # is the original token minus the unclaimed flag characters.
+            remainder = _remove_short_flags(token, synthetics)
+            if remainder is not None:
+                claimed.append(remainder)
+    return claimed, unclaimed
 
-    return matched, unmatched
+
+def _scope_tokens_for_meta(
+    meta_collection: ArgumentCollection,
+    child_collection: "ArgumentCollection | None",
+    tokens: list[str],
+    command_indices: list[int],
+    *,
+    parse_mode: str,
+    end_of_options_delimiter: str = "--",
+) -> tuple[list[str], list[str], int | None]:
+    """Scope tokens between a meta-app level and the subcommand it forwards to.
+
+    Decides which tokens the meta app's keyword parameters may bind
+    (``meta_kw_tokens``) and which tokens are forwarded through the meta's
+    positional parameters to the child command (``positional_tokens``),
+    using the real parser passes on throwaway collection copies so the
+    decision exactly matches what each level's eventual parse will do.
+
+    In ``"strict"`` mode the meta only binds tokens appearing before the first
+    command token. In ``"fallthrough"`` mode, post-command tokens the child
+    would leave unconsumed additionally "bubble up" to the meta (child wins
+    on conflicts, computed child-first).
+
+    Parameters
+    ----------
+    meta_collection: ArgumentCollection
+        The current (meta) level's argument collection.
+    child_collection: ArgumentCollection | None
+        The resolved deepest command's argument collection. ``None`` means the
+        child has no bindable parameters (claims nothing).
+    tokens: list[str]
+        The full normalized token list.
+    command_indices: list[int]
+        Indices into ``tokens`` of the command tokens (from
+        ``App._parse_commands``), help/version pseudo-commands excluded.
+    parse_mode: str
+        ``"fallthrough"`` or ``"strict"``.
+    end_of_options_delimiter: str
+        Token that marks the end of options.
+
+    Returns
+    -------
+    meta_kw_tokens: list[str]
+        Tokens eligible for the meta level's keyword/flag binding.
+    positional_tokens: list[str]
+        Tokens for the meta level's positional binding (command name(s) plus
+        everything forwarded to the child), in original order.
+    contiguous_positional_count: int | None
+        First-gap index for ``positional_tokens`` (see
+        :func:`_parse_kw_and_flags`), preserving issue-#763 protection.
+    """
+    if parse_mode not in ("fallthrough", "strict"):
+        raise ValueError(f"Unknown parse_mode: {parse_mode!r}")
+
+    first = command_indices[0]
+    last = command_indices[-1]
+    pre = tokens[:first]
+
+    # Pre-command region: the meta claims what its keyword parameters match;
+    # leftovers pass through to the positional stream (relevant for nested
+    # meta patterns where pre-command tokens belong to an inner meta level).
+    pre_unclaimed = _probe_unclaimed(
+        meta_collection, pre, end_of_options_delimiter=end_of_options_delimiter, include_positionals=False
+    )
+    if pre_unclaimed is None:
+        # The meta's own region is malformed (e.g. option missing its value).
+        # Hand everything to the meta's real keyword pass so it raises the
+        # proper user-facing error.
+        meta_kw_tokens = list(pre)
+        pre_passthrough: list[tuple[int, str]] = []
+    else:
+        meta_kw_tokens, _ = _partition_claims(pre, pre_unclaimed)
+        pre_passthrough = pre_unclaimed
+
+    positional_indices: list[int] = [position for position, _ in pre_passthrough]
+    positional_tokens: list[str] = [token for _, token in pre_passthrough]
+
+    if parse_mode == "strict":
+        # Post-command tokens are exclusively the child's; no bubble-up.
+        positional_indices.extend(range(first, len(tokens)))
+        positional_tokens.extend(tokens[first:])
+        return meta_kw_tokens, positional_tokens, _first_gap(positional_indices)
+
+    # Fallthrough: compute the child's claims first (child wins), then let the
+    # meta claim from the child's leftovers. Iterate because each side's
+    # claims can unblock the other (e.g. the child can only bind its option's
+    # value after the meta claims an interleaved flag). The loop is monotone:
+    # ``child_stream`` only ever shrinks, so it terminates.
+    child_stream: list[tuple[int, str]] = [(position, token) for position, token in enumerate(tokens[last + 1 :])]
+    bubbled: list[str] = []
+    while True:
+        stream_tokens = [token for _, token in child_stream]
+        if child_collection is None:
+            child_unclaimed = list(enumerate(stream_tokens))
+        else:
+            child_unclaimed = _probe_unclaimed(
+                child_collection,
+                stream_tokens,
+                end_of_options_delimiter=end_of_options_delimiter,
+                include_positionals=True,
+            )
+            if child_unclaimed is None:
+                # Cannot determine the child's claims this round (e.g. a child
+                # option is missing its value because a meta flag sits between
+                # them); treat the child as claiming nothing and let the meta
+                # claim, then re-probe.
+                child_unclaimed = list(enumerate(stream_tokens))
+
+        # Candidates the meta may claim: the child's leftovers, but never
+        # tokens at/after the end-of-options delimiter (those are positional
+        # by definition). Probe per contiguous run so the meta can only pair
+        # an option with a value that was actually adjacent in the input.
+        delimiter_pos = (
+            stream_tokens.index(end_of_options_delimiter)
+            if end_of_options_delimiter and end_of_options_delimiter in stream_tokens
+            else len(stream_tokens)
+        )
+        candidates = [(position, token) for position, token in child_unclaimed if position < delimiter_pos]
+
+        newly_claimed_positions: dict[int, list[str]] = {}
+        for run in _contiguous_runs(candidates):
+            run_tokens = [token for _, token in run]
+            meta_unclaimed = _probe_unclaimed(
+                meta_collection, run_tokens, end_of_options_delimiter=end_of_options_delimiter
+            )
+            if meta_unclaimed is None:
+                continue  # Malformed for the meta; leave the run with the child.
+            meta_unclaimed_by_run_pos: dict[int, list[str]] = {}
+            for run_pos, token in meta_unclaimed:
+                meta_unclaimed_by_run_pos.setdefault(run_pos, []).append(token)
+            for run_pos, (stream_pos, token) in enumerate(run):
+                synthetics = meta_unclaimed_by_run_pos.get(run_pos)
+                if synthetics is not None and len(synthetics) == 1 and synthetics[0] == token:
+                    continue  # Meta claimed nothing from this token.
+                if synthetics is None:
+                    # Meta claimed the whole (possibly synthetic) token.
+                    newly_claimed_positions.setdefault(stream_pos, []).append(token)
+                    bubbled.append(token)
+                else:
+                    # Meta claimed part of a combined short-option token.
+                    claimed_part = _remove_short_flags(token, synthetics)
+                    if claimed_part is not None:
+                        newly_claimed_positions.setdefault(stream_pos, []).append(claimed_part)
+                        bubbled.append(claimed_part)
+
+        if not newly_claimed_positions:
+            break
+
+        # Remove the meta's claims from the child stream and re-probe.
+        new_child_stream: list[tuple[int, str]] = []
+        for stream_pos, token in child_stream:
+            claimed_parts = newly_claimed_positions.get(stream_pos)
+            if claimed_parts is None:
+                new_child_stream.append((stream_pos, token))
+                continue
+            remainder: str | None = token
+            for part in claimed_parts:
+                if remainder is None or part == remainder:
+                    remainder = None
+                    break
+                remainder = _remove_short_flags(remainder, [part])
+            if remainder is not None:
+                new_child_stream.append((stream_pos, remainder))
+        child_stream = new_child_stream
+
+    meta_kw_tokens.extend(bubbled)
+    # Forwarded stream: pre-command passthrough, then the command token(s) and
+    # any tokens between commands, then whatever remains of the child segment.
+    positional_indices.extend(range(first, last + 1))
+    positional_tokens.extend(tokens[first : last + 1])
+    positional_indices.extend(last + 1 + position for position, _ in child_stream)
+    positional_tokens.extend(token for _, token in child_stream)
+    return meta_kw_tokens, positional_tokens, _first_gap(positional_indices)
+
+
+def _first_gap(indices: list[int]) -> int | None:
+    """Index of the first non-contiguous jump in ``indices``, or ``None`` if contiguous.
+
+    Repeated indices (synthetic residuals of one combined short-option token)
+    count as contiguous. Mirrors the ``contiguous_positional_count``
+    computation in :func:`_parse_kw_and_flags`.
+    """
+    for j in range(1, len(indices)):
+        if indices[j] not in (indices[j - 1], indices[j - 1] + 1):
+            return j
+    return None
+
+
+def _contiguous_runs(entries: list[tuple[int, str]]) -> Iterator[list[tuple[int, str]]]:
+    """Group ``(position, token)`` entries into runs of contiguous positions.
+
+    Entries sharing a position (synthetic residuals of one combined
+    short-option token) belong to the same run.
+    """
+    run: list[tuple[int, str]] = []
+    for entry in entries:
+        if run and entry[0] not in (run[-1][0], run[-1][0] + 1):
+            yield run
+            run = []
+        run.append(entry)
+    if run:
+        yield run
 
 
 def _common_root_keys(argument_collection) -> tuple[str, ...]:
@@ -738,6 +934,7 @@ def create_bound_arguments(
     *,
     end_of_options_delimiter: str = "--",
     positional_tokens: list[str] | None = None,
+    positional_contiguous_count: int | None = None,
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -757,6 +954,9 @@ def create_bound_arguments(
         instead of the leftover tokens from keyword/flag parsing. This is
         used by flag scoping to separate which tokens are eligible for
         keyword/flag matching vs positional assignment.
+    positional_contiguous_count: int | None
+        ``contiguous_positional_count`` (see :func:`_parse_kw_and_flags`) for
+        ``positional_tokens``. Only used when ``positional_tokens`` is provided.
 
     Returns
     -------
@@ -774,7 +974,7 @@ def create_bound_arguments(
         )
         if positional_tokens is not None:
             unused_tokens = positional_tokens
-            contiguous_positional_count = None
+            contiguous_positional_count = positional_contiguous_count
         unused_tokens = _parse_pos(
             argument_collection,
             unused_tokens,
