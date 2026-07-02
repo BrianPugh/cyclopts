@@ -1768,6 +1768,13 @@ class App:
             )
 
             def _flag_shadowed_by_user_param(flag: str) -> bool:
+                # A flag that never appears in the input can neither be
+                # intercepted nor restored, so its shadow status is irrelevant;
+                # skip the collection match scans on the common no-flag path.
+                # (Interception/restoration match flag tokens exactly, so exact
+                # membership is the right gate.)
+                if flag not in tokens:
+                    return False
                 for collection in (command_argument_collection, child_argument_collection):
                     if collection is None:
                         continue

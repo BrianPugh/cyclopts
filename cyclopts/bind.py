@@ -148,8 +148,8 @@ def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
 def _partition_claims(
     tokens: list[str],
     unclaimed: list[tuple[int, str]],
-) -> tuple[list[str], list[tuple[int, str]]]:
-    """Split ``tokens`` into claimed/unclaimed streams given probe results.
+) -> list[str]:
+    """Extract the claimed tokens from ``tokens`` given probe results.
 
     Parameters
     ----------
@@ -163,8 +163,6 @@ def _partition_claims(
     claimed: list[str]
         Tokens (or claimed remainders of combined short options) the
         collection consumed, in original order.
-    unclaimed_out: list[tuple[int, str]]
-        Same entries as ``unclaimed`` (identity pass-through, for symmetry).
     """
     unclaimed_by_position: dict[int, list[str]] = {}
     for position, token in unclaimed:
@@ -183,7 +181,7 @@ def _partition_claims(
             remainder = _remove_short_flags(token, synthetics)
             if remainder is not None:
                 claimed.append(remainder)
-    return claimed, unclaimed
+    return claimed
 
 
 def _scope_tokens_for_meta(
@@ -256,7 +254,7 @@ def _scope_tokens_for_meta(
         meta_kw_tokens = list(pre)
         pre_passthrough: list[tuple[int, str]] = []
     else:
-        meta_kw_tokens, _ = _partition_claims(pre, pre_unclaimed)
+        meta_kw_tokens = _partition_claims(pre, pre_unclaimed)
         pre_passthrough = pre_unclaimed
 
     positional_indices: list[int] = [position for position, _ in pre_passthrough]
@@ -287,8 +285,7 @@ def _scope_tokens_for_meta(
             # segment to the meta's real pass so it raises the proper error.
             meta_kw_tokens.extend(segment)
             continue
-        claimed, _ = _partition_claims(segment, segment_unclaimed)
-        meta_kw_tokens.extend(claimed)
+        meta_kw_tokens.extend(_partition_claims(segment, segment_unclaimed))
         inter_passthrough.extend((segment_start + position, token) for position, token in segment_unclaimed)
 
     # Fallthrough: compute the child's claims first (child wins), then let the
@@ -439,8 +436,9 @@ def _first_gap(indices: list[int]) -> int | None:
     """Index of the first non-contiguous jump in ``indices``, or ``None`` if contiguous.
 
     Repeated indices (synthetic residuals of one combined short-option token)
-    count as contiguous. Mirrors the ``contiguous_positional_count``
-    computation in :func:`_parse_kw_and_flags`.
+    count as contiguous. This is the ``contiguous_positional_count``
+    computation used by both :func:`_parse_kw_and_flags` and
+    :func:`_scope_tokens_for_meta`.
     """
     for j in range(1, len(indices)):
         if indices[j] not in (indices[j - 1], indices[j - 1] + 1):
@@ -815,11 +813,9 @@ def _parse_kw_and_flags(
     # before the first gap caused by keyword extraction. This prevents positional-only
     # list parameters from consuming tokens that appeared after keyword arguments.
     # Only set when a gap is detected; None means no gap (all tokens are contiguous).
-    contiguous_positional_count: int | None = None
-    for j in range(1, len(unused_token_original_indices)):
-        if unused_token_original_indices[j] != unused_token_original_indices[j - 1] + 1:
-            contiguous_positional_count = j
-            break
+    # Synthetic residuals of one combined short-option token share an index and
+    # count as contiguous.
+    contiguous_positional_count = _first_gap(unused_token_original_indices)
 
     unused_tokens.extend(positional_only_tokens)
     if positional_only_start is not None:
@@ -1049,7 +1045,13 @@ def create_bound_arguments(
         unused_tokens, _, contiguous_positional_count = _parse_kw_and_flags(
             argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
         )
+        leftover_kw_tokens: list[str] = []
         if positional_tokens is not None:
+            # A scoped keyword stream consists solely of probe-predicted claims,
+            # so the real pass should consume it entirely. If the probe and the
+            # real parse ever disagree, surface the leftovers as ordinary unused
+            # tokens rather than silently dropping them.
+            leftover_kw_tokens = unused_tokens
             unused_tokens = positional_tokens
             contiguous_positional_count = positional_contiguous_count
         unused_tokens = _parse_pos(
@@ -1058,6 +1060,8 @@ def create_bound_arguments(
             end_of_options_delimiter=end_of_options_delimiter,
             contiguous_positional_count=contiguous_positional_count,
         )
+        if leftover_kw_tokens:
+            unused_tokens = leftover_kw_tokens + unused_tokens
 
         _parse_env(argument_collection)
         _parse_configs(argument_collection, configs)
