@@ -1439,3 +1439,75 @@ class TestForwardedDelimiter:
             return args
 
         assert app(["w0", "--", "-x"], exit_on_error=False) == ("w0", "-x")
+
+
+class TestMergedShortNamespace:
+    """Combined short-option tokens are resolved against the MERGED flag
+    namespace of meta + child (child wins collisions after its command), with
+    standard GNU rules: flags consume their character, the first value-taking
+    option absorbs the remainder (or the next token) as its value, unknown
+    characters are reported by the child.
+    """
+
+    @staticmethod
+    def _build():
+        app = App(name="demo", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def main(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+            user: Annotated[str, Parameter(name=["--user", "-u"])] = "nobody",
+        ):
+            captured["verbose"] = verbose
+            captured["user"] = user
+            return app(tokens)
+
+        @app.command
+        def cmd(
+            *,
+            extract: Annotated[bool, Parameter(name=["--extract", "-x"])] = False,
+            file: Annotated[bool, Parameter(name=["--file", "-f"])] = False,
+        ):
+            captured["extract"] = extract
+            captured["file"] = file
+
+        return app, captured
+
+    def test_mixed_combined_flags_across_scopes(self):
+        """tar-style ``-xvf``: child and meta flags freely combined in one token."""
+        app, captured = self._build()
+        app.meta(["cmd", "-xvf"], exit_on_error=False)
+        assert captured == {"verbose": True, "user": "nobody", "extract": True, "file": True}
+
+    def test_meta_attached_value_after_child_flag(self):
+        """``-xuroot``: child flag, then meta option absorbing the remainder as
+        its attached value — even though 'r' would match nothing and 'o'/'t'
+        are unknown; the value-taking option ends the scan.
+        """
+        app, captured = self._build()
+        app.meta(["cmd", "-xuroot"], exit_on_error=False)
+        assert captured == {"verbose": False, "user": "root", "extract": True, "file": False}
+
+    def test_meta_option_takes_next_token_after_combined(self):
+        """``-xu alice``: the meta option ends the token with no remainder, so
+        the next stream token is its value.
+        """
+        app, captured = self._build()
+        app.meta(["cmd", "-xu", "alice"], exit_on_error=False)
+        assert captured == {"verbose": False, "user": "alice", "extract": True, "file": False}
+
+    def test_unknown_residual_char_errors(self):
+        """``-xvz``: known characters bind at their owners; the unknown ``-z``
+        is reported by the child.
+        """
+        app, captured = self._build()
+        with pytest.raises(UnknownOptionError, match="-z"):
+            app.meta(["cmd", "-xvz"], exit_on_error=False)
+
+    def test_meta_option_missing_value_in_combined(self):
+        """``-xu`` at end of stream: proper missing-argument error at the meta."""
+        app, captured = self._build()
+        with pytest.raises(MissingArgumentError, match="-u"):
+            app.meta(["cmd", "-xu"], exit_on_error=False)

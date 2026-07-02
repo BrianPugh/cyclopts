@@ -137,23 +137,108 @@ def _probe_unclaimed(
     return _ProbeResult([(unused_indices[p], unused[p]) for p in leftover_positions], claims)
 
 
-def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
-    """Remove short-flag characters from a combined short-option token.
+class _MergedScanResult(NamedTuple):
+    """Result of :func:`_merged_combined_short_scan`."""
 
-    Each entry in ``flags`` may carry one or more flag characters (a single
-    synthetic flag like ``-d``, or a multi-flag claimed part like ``-ac``).
-    Removes the first occurrence of each flag character in order, mirroring the
-    left-to-right scan of :func:`_parse_kw_and_flags` (so characters belonging
-    to an attached value are never removed).
+    child_part: str | None
+    """Reconstructed token for the child's stream (its flag characters, any
+    unknown characters, and any attached value it absorbed), or ``None`` if the
+    child keeps nothing."""
 
-    Returns the remaining token, or ``None`` if no characters remain.
+    meta_part: str | None
+    """Reconstructed token for the meta's keyword stream, or ``None``."""
+
+    meta_awaits_value: bool
+    """A meta value-taking option ended the token with no attached value; the
+    next stream token is its value."""
+
+
+def _is_combined_short_candidate(
+    token: str,
+    collections: "Sequence[ArgumentCollection | None]",
+) -> bool:
+    """Whether ``token`` should be resolved by the merged combined-short scan.
+
+    Mirrors the gate in :func:`_parse_kw_and_flags`'s combined-short branch:
+    single-dash, multi-character, non-numeric, no ``=``, and not an exact match
+    of any collection (exact matches are ordinary options, handled by the
+    normal probing paths).
     """
-    chars = list(token.lstrip("-"))
-    for flag in flags:
-        for char in flag.lstrip("-"):
-            if char in chars:
-                chars.remove(char)
-    return "-" + "".join(chars) if chars else None
+    if "=" in token:
+        return False
+    if not (token.startswith("-") and not token.startswith("--") and len(token) > 2):
+        return False
+    if not is_option_like(token, allow_numbers=False):
+        return False
+    for collection in collections:
+        if collection is None:
+            continue
+        try:
+            collection.match(token)
+        except ValueError:
+            continue
+        return False
+    return True
+
+
+def _merged_combined_short_scan(
+    token: str,
+    child_collection: "ArgumentCollection | None",
+    meta_collection: ArgumentCollection,
+) -> _MergedScanResult:
+    """Resolve a combined short-option token against the MERGED flag namespace.
+
+    Fallthrough mode presents the user with one flat flag namespace; this scan
+    makes that literal: a single GNU left-to-right pass where each character is
+    matched against the child first (child wins name collisions after its
+    command), then the meta. Standard rules apply to the merged table:
+
+    - a flag/count match consumes its character;
+    - the first value-taking match absorbs the rest of the token as an attached
+      value (or, with no remainder, the next stream token) and ends the scan;
+    - an unknown character is routed to the child's stream, which reports it.
+
+    Characters are routed to per-owner reconstructed tokens in scan order, so
+    each level's real parse of its part reproduces exactly this reading.
+    """
+    chars = token.lstrip("-")
+    child_chars: list[str] = []
+    meta_chars: list[str] = []
+    meta_awaits_value = False
+    position = 0
+    while position < len(chars):
+        char = chars[position]
+        matched = None
+        for owner_chars, collection in ((child_chars, child_collection), (meta_chars, meta_collection)):
+            if collection is None:
+                continue
+            try:
+                argument, _, implicit = collection.match(f"-{char}")
+            except ValueError:
+                continue
+            matched = (owner_chars, argument, implicit)
+            break
+        if matched is None:
+            child_chars.append(char)  # Unknown flag; the child's parse reports it.
+            position += 1
+            continue
+        owner_chars, argument, implicit = matched
+        owner_chars.append(char)
+        if implicit is not UNSET or argument.parameter.count:
+            position += 1
+            continue
+        # Value-taking option: the rest of the token is its attached value.
+        remainder = chars[position + 1 :]
+        if remainder:
+            owner_chars.extend(remainder)
+        elif owner_chars is meta_chars:
+            meta_awaits_value = True
+        break
+    return _MergedScanResult(
+        "-" + "".join(child_chars) if child_chars else None,
+        "-" + "".join(meta_chars) if meta_chars else None,
+        meta_awaits_value,
+    )
 
 
 def _claimed_tokens(claims: dict[int, tuple[str, str | None]]) -> list[str]:
@@ -299,44 +384,64 @@ def _scope_tokens_for_meta(
             if end_of_options_delimiter and end_of_options_delimiter in stream_tokens
             else len(stream_tokens)
         )
-        newly_claimed_positions: dict[int, list[str]] = {}
+        # Maps compacted stream position -> the child-side replacement token
+        # (``None`` removes the token from the child's stream entirely).
+        newly_replaced: dict[int, str | None] = {}
 
-        # A child's PARTIAL claim of a combined short-option token (synthetic
-        # residuals differing from the original token) may be a misreading of a
-        # meta option with a GNU-style attached value (e.g. ``-uroot`` where the
-        # child knows ``-r`` but the token is really meta ``-u`` + value "root").
-        # If the meta fully claims the ORIGINAL token on its own, the meta's
-        # whole-token interpretation wins and the child's partial claim is
-        # discarded. When the meta claims only part of it too (e.g. ``-vd``
-        # split across scopes), the synthetic-residual run handling below applies.
+        # Combined short-option tokens are resolved against the MERGED flag
+        # namespace of both levels (see :func:`_merged_combined_short_scan`):
+        # fallthrough mode presents the user one flat namespace, so a token
+        # like ``-xvf`` may mix child and meta flags, and ``-uroot`` reads as
+        # the meta's ``-u`` + attached value even when the child owns ``-r``.
+        # This applies to tokens the child leaves (fully or partially)
+        # unclaimed; a token the child claims WHOLLY (e.g. captured
+        # positionally by an ``allow_leading_hyphen`` ``*args``) stays the
+        # child's, per child-wins.
         child_unclaimed_by_position: dict[int, list[str]] = {}
         for position, token in child_unclaimed:
             child_unclaimed_by_position.setdefault(position, []).append(token)
-        for position, synthetics in child_unclaimed_by_position.items():
-            if position >= delimiter_pos:
+        scanned_positions: set[int] = set()
+        for position in sorted(child_unclaimed_by_position):
+            if position >= delimiter_pos or position in scanned_positions:
                 continue
             original = stream_tokens[position]
-            if len(synthetics) == 1 and synthetics[0] == original:
-                continue  # Fully unclaimed by the child; handled by run probing below.
-            synthetics_probe = _probe_unclaimed(
-                meta_collection, list(synthetics), end_of_options_delimiter=end_of_options_delimiter
-            )
-            if synthetics_probe is not None and not synthetics_probe.unclaimed:
-                # The meta cleanly resolves the residual flags as-is; honor the
-                # char-level split (child wins its characters) via the run
-                # handling below.
+            synthetics = child_unclaimed_by_position[position]
+            partially_claimed = not (len(synthetics) == 1 and synthetics[0] == original)
+            if not partially_claimed and not _is_combined_short_candidate(
+                original, (child_collection, meta_collection)
+            ):
                 continue
-            whole_token_probe = _probe_unclaimed(
-                meta_collection, [original], end_of_options_delimiter=end_of_options_delimiter
-            )
-            if whole_token_probe is not None and not whole_token_probe.unclaimed:
-                newly_claimed_positions[position] = [original]
-                bubbled.append(original)
+            scan = _merged_combined_short_scan(original, child_collection, meta_collection)
+            if scan.meta_part is None:
+                if partially_claimed:
+                    # Nothing for the meta; keep the child's own reading and
+                    # exclude the synthetic residuals from long-option runs.
+                    scanned_positions.add(position)
+                continue
+            scanned_positions.add(position)
+            newly_replaced[position] = scan.child_part
+            bubbled.append(scan.meta_part)
+            if scan.meta_awaits_value:
+                # The meta's value-taking option ended the token; the NEXT
+                # stream token is its value — if the child didn't claim it.
+                value_position = position + 1
+                value_synthetics = child_unclaimed_by_position.get(value_position)
+                if (
+                    value_position < delimiter_pos
+                    and value_synthetics is not None
+                    and len(value_synthetics) == 1
+                    and value_synthetics[0] == stream_tokens[value_position]
+                ):
+                    scanned_positions.add(value_position)
+                    newly_replaced[value_position] = None
+                    bubbled.append(stream_tokens[value_position])
+                # Otherwise the meta's real parse raises the proper
+                # missing-value error.
 
         candidates = [
             (position, token)
             for position, token in child_unclaimed
-            if position < delimiter_pos and position not in newly_claimed_positions
+            if position < delimiter_pos and position not in scanned_positions and position not in newly_replaced
         ]
 
         for run in _contiguous_runs(candidates):
@@ -354,41 +459,34 @@ def _scope_tokens_for_meta(
                 # the proper user-facing error; leaving it with the child would
                 # misreport a valid meta option as "Unknown option".
                 for position, token in run:
-                    newly_claimed_positions.setdefault(position, []).append(token)
+                    newly_replaced[position] = None
                     bubbled.append(token)
                 continue
             for run_pos, (stream_pos, _) in enumerate(run):
                 claim = run_probe.kw_claims.get(run_pos)
                 if claim is None:
                     continue  # Meta claimed nothing from this token.
-                # The meta claimed the token wholly (claimed_part == token) or
-                # partially (exact claimed characters of a combined short
-                # option, recorded by the scan itself).
-                claimed_part, _ = claim
-                newly_claimed_positions.setdefault(stream_pos, []).append(claimed_part)
+                # ``remainder`` is the exact unclaimed residue recorded by the
+                # scan itself ((token, None) for a wholly-claimed token).
+                claimed_part, remainder = claim
+                newly_replaced[stream_pos] = remainder
                 bubbled.append(claimed_part)
 
-        if not newly_claimed_positions:
+        if not newly_replaced:
             break
 
-        # Remove the meta's claims from the child stream and re-probe.
-        # ``newly_claimed_positions`` is keyed by positions in the current
-        # (compacted) ``stream_tokens``, i.e. list indices of ``child_stream``,
-        # NOT the original positions stored inside each entry.
+        # Apply the replacements to the child stream and re-probe.
+        # ``newly_replaced`` is keyed by positions in the current (compacted)
+        # ``stream_tokens``, i.e. list indices of ``child_stream``, NOT the
+        # original positions stored inside each entry.
         new_child_stream: list[tuple[int, str]] = []
         for current_pos, (stream_pos, token) in enumerate(child_stream):
-            claimed_parts = newly_claimed_positions.get(current_pos)
-            if claimed_parts is None:
+            if current_pos not in newly_replaced:
                 new_child_stream.append((stream_pos, token))
                 continue
-            remainder: str | None = token
-            for part in claimed_parts:
-                if remainder is None or part == remainder:
-                    remainder = None
-                    break
-                remainder = _remove_short_flags(remainder, [part])
-            if remainder is not None:
-                new_child_stream.append((stream_pos, remainder))
+            replacement = newly_replaced[current_pos]
+            if replacement is not None:
+                new_child_stream.append((stream_pos, replacement))
         child_stream = new_child_stream
 
     meta_kw_tokens.extend(bubbled)
