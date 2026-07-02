@@ -1374,3 +1374,68 @@ class TestScopedFlatParity:
 
         assert captured["verbose"] == flat_captured["verbose"]
         assert captured["args"] == flat_captured["args"]
+
+
+class TestForwardedDelimiter:
+    """A meta level's captured tokens are forwarded to another parse; the
+    end-of-options delimiter must survive forwarding so the inner parse still
+    sees post-delimiter tokens as protected.
+    """
+
+    def test_meta_forwarding_preserves_delimiter(self):
+        """``cmd -- -pvn``: the forwarded stream keeps ``--`` so the child
+        binds ``-pvn`` positionally instead of as its ``-p`` option.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+            captured["forwarded"] = tokens
+            return app(tokens)
+
+        @app.command
+        def cmd(*args: str, opt: Annotated[str, Parameter(name=["--opt", "-p"])] = "unset"):
+            captured["args"] = args
+            captured["opt"] = opt
+
+        app.meta(["cmd", "--", "w0", "-pvn"], exit_on_error=False)
+        assert captured["forwarded"] == ("cmd", "--", "w0", "-pvn")
+        assert captured["args"] == ("w0", "-pvn")
+        assert captured["opt"] == "unset"
+
+    def test_flat_meta_forwarding_preserves_delimiter(self):
+        """The delimiter also survives when hierarchical scoping does not
+        engage (e.g. a shadowed ``-h`` pseudo-command cuts command
+        discovery short, so the meta binds via the flat path).
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            host: Annotated[bool, Parameter(name=["--host", "-h"])] = False,
+        ):
+            captured["host"] = host
+            return app(tokens)
+
+        @app.command
+        def cmd(*args: str):
+            captured["args"] = args
+
+        app.meta(["-h", "cmd", "w2", "--", "--opt", "-x"], exit_on_error=False)
+        assert captured["host"] is True
+        assert captured["args"] == ("w2", "--opt", "-x")
+
+    def test_leaf_command_still_consumes_delimiter(self):
+        """A leaf command (even with an allow_leading_hyphen ``*args``) keeps
+        standard CLI behavior: the delimiter is a marker, not a value.
+        """
+        app = App(name="myapp", result_action="return_value")
+
+        @app.default
+        def main(*args: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+            return args
+
+        assert app(["w0", "--", "-x"], exit_on_error=False) == ("w0", "-x")

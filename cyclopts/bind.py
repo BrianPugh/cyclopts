@@ -21,7 +21,7 @@ from cyclopts.exceptions import (
     UnknownOptionError,
     ValidationError,
 )
-from cyclopts.field_info import POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD
+from cyclopts.field_info import POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD, VAR_POSITIONAL
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, is_option_like
 
@@ -840,12 +840,32 @@ def _future_positional_only_token_count(argument_collection: ArgumentCollection,
     return n_tokens_to_leave
 
 
-def _preprocess_positional_tokens(tokens: Sequence[str], end_of_options_delimiter: str) -> list[tuple[str, bool]]:
+def _captures_raw_stream(argument_collection: ArgumentCollection) -> bool:
+    """Whether the collection has a raw-stream capture parameter.
+
+    A ``*args`` parameter with ``allow_leading_hyphen=True`` captures a raw
+    token stream suitable for re-parsing (the meta-app forwarding pattern).
+    """
+    return any(
+        argument.field_info.kind is VAR_POSITIONAL and argument.parameter.allow_leading_hyphen
+        for argument in argument_collection
+    )
+
+
+def _preprocess_positional_tokens(
+    tokens: Sequence[str],
+    end_of_options_delimiter: str,
+    *,
+    preserve_delimiter: bool = False,
+) -> list[tuple[str, bool]]:
     try:
         delimiter_index = tokens.index(end_of_options_delimiter)
-        return [(t, False) for t in tokens[:delimiter_index]] + [(t, True) for t in tokens[delimiter_index + 1 :]]
     except ValueError:  # delimiter not found
         return [(t, False) for t in tokens]
+    delimiter = [(tokens[delimiter_index], True)] if preserve_delimiter else []
+    return (
+        [(t, False) for t in tokens[:delimiter_index]] + delimiter + [(t, True) for t in tokens[delimiter_index + 1 :]]
+    )
 
 
 def _parse_pos(
@@ -854,6 +874,7 @@ def _parse_pos(
     *,
     end_of_options_delimiter: str = "--",
     contiguous_positional_count: int | None = None,
+    preserve_delimiter: bool = False,
 ) -> list[str]:
     """Assign positional tokens to positional parameters.
 
@@ -864,7 +885,14 @@ def _parse_pos(
     tokens: list[str]
         Unused tokens from ``_parse_kw_and_flags``.
     end_of_options_delimiter: str
-        Delimiter after which all tokens are forced positional.
+        Delimiter after which all tokens are forced positional. Consumed as a
+        marker (standard CLI behavior), unless ``preserve_delimiter``.
+    preserve_delimiter: bool
+        Keep the delimiter token itself in the captured values (force-positional)
+        when the collection has a raw-stream capture parameter. Set when the
+        bound tokens are forwarded to another parse — a meta app's
+        ``app(tokens)`` — which needs the delimiter to keep the trailing tokens
+        protected. Leaf commands keep the standard consume-as-marker behavior.
     contiguous_positional_count: int | None
         If not ``None``, the number of leading contiguous positional tokens
         that were adjacent in the original CLI input (before keyword extraction
@@ -878,7 +906,11 @@ def _parse_pos(
     if not tokens:
         return []
 
-    tokens_and_force_positional = _preprocess_positional_tokens(tokens, end_of_options_delimiter)
+    tokens_and_force_positional = _preprocess_positional_tokens(
+        tokens,
+        end_of_options_delimiter,
+        preserve_delimiter=preserve_delimiter and _captures_raw_stream(argument_collection),
+    )
 
     for i in itertools.count():
         try:
@@ -1007,6 +1039,7 @@ def create_bound_arguments(
     end_of_options_delimiter: str = "--",
     positional_tokens: list[str] | None = None,
     positional_contiguous_count: int | None = None,
+    preserve_delimiter: bool = False,
 ) -> tuple[inspect.BoundArguments, list[str]]:
     """Parse and coerce CLI tokens to match a function's signature.
 
@@ -1029,6 +1062,10 @@ def create_bound_arguments(
     positional_contiguous_count: int | None
         ``contiguous_positional_count`` (see :func:`_parse_kw_and_flags`) for
         ``positional_tokens``. Only used when ``positional_tokens`` is provided.
+    preserve_delimiter: bool
+        Keep the end-of-options delimiter in a raw-stream capture parameter's
+        values (see :func:`_parse_pos`). Set when binding a meta level, whose
+        captured tokens are forwarded to another parse.
 
     Returns
     -------
@@ -1058,6 +1095,7 @@ def create_bound_arguments(
             unused_tokens,
             end_of_options_delimiter=end_of_options_delimiter,
             contiguous_positional_count=contiguous_positional_count,
+            preserve_delimiter=preserve_delimiter,
         )
         if leftover_kw_tokens:
             unused_tokens = leftover_kw_tokens + unused_tokens

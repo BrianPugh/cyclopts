@@ -236,8 +236,7 @@ def _check_parity(seed: int, *, meta_side: bool) -> None:
         post_groups.append([rng.choice(["--junk", "-Z", "-junkk"])])
     for _ in range(rng.randint(0, 3)):
         post_groups.append([f"w{rng.randint(0, 5)}"])
-    has_delimiter = rng.random() < 0.15
-    if has_delimiter:
+    if rng.random() < 0.15:
         post_groups.append(["--"])
         post_groups.append([f"w{rng.randint(0, 5)}"])
     rng.shuffle(post_groups)
@@ -252,14 +251,6 @@ def _check_parity(seed: int, *, meta_side: bool) -> None:
 
     hier_outcome = _outcome(lambda: app.meta(hier_tokens, exit_on_error=False, print_error=False))
     flat_outcome = _outcome(lambda: flat(flat_tokens, exit_on_error=False, print_error=False))
-
-    if has_delimiter:
-        # Pre-existing (v5-develop) quirk unrelated to scoping: a forwarding
-        # meta's ``*tokens`` positional binding consumes the ``--`` marker, so
-        # the inner parse sees the post-delimiter tokens unprotected and can
-        # legitimately diverge from the flat reference. Only termination and
-        # the no-crash guarantee are asserted for these streams.
-        return
 
     context = f"seed={seed} tokens={hier_tokens!r}"
     assert hier_outcome == flat_outcome, (

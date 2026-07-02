@@ -1897,6 +1897,12 @@ class App:
                                     end_of_options_delimiter=end_of_options_delimiter,
                                 )
 
+                        # A meta level's captured tokens are forwarded to
+                        # another parse (``app(tokens)``); keep the
+                        # end-of-options delimiter in the captured values so
+                        # the downstream parse still sees the trailing tokens
+                        # as protected.
+                        preserve_delimiter = command_app._meta_parent is not None
                         if scoped is not None:
                             meta_kw_tokens, positional_tokens, positional_contiguous_count = scoped
                             bound, unused_tokens = create_bound_arguments(
@@ -1907,6 +1913,7 @@ class App:
                                 end_of_options_delimiter=end_of_options_delimiter,
                                 positional_tokens=positional_tokens,
                                 positional_contiguous_count=positional_contiguous_count,
+                                preserve_delimiter=preserve_delimiter,
                             )
                         else:
                             bound, unused_tokens = create_bound_arguments(
@@ -1915,6 +1922,7 @@ class App:
                                 unused_tokens,
                                 config,
                                 end_of_options_delimiter=end_of_options_delimiter,
+                                preserve_delimiter=preserve_delimiter,
                             )
                         try:
                             for validator in command_app.validator:
