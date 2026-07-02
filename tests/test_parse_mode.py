@@ -5,7 +5,7 @@ from typing import Annotated
 import pytest
 
 from cyclopts import App, Parameter
-from cyclopts.exceptions import UnknownOptionError
+from cyclopts.exceptions import MissingArgumentError, UnknownOptionError
 
 
 class TestStrictScope:
@@ -1175,3 +1175,110 @@ class TestScopingRegressions:
         # typos pre-commit hook doesn't auto-correct it).
         with pytest.raises(UnknownOptionError, match=r"Did you mean --alpha\?"):
             app.meta(["sub", "--alpxa", "q"], exit_on_error=False)
+
+    def test_meta_flag_between_command_tokens(self):
+        """A meta flag placed between two command tokens (``sub --verbose leaf``)
+        binds to the meta, exactly like pre- and post-command placements.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+        ):
+            captured["verbose"] = verbose
+            return app(tokens)
+
+        sub = App(name="sub")
+        app.command(sub)
+
+        @sub.command
+        def leaf(name: str):
+            captured["name"] = name
+            return name
+
+        result = app.meta(["sub", "--verbose", "leaf", "alice"], exit_on_error=False)
+        assert captured == {"verbose": True, "name": "alice"}
+        assert result == "alice"
+
+    def test_combined_short_meta_flags_terminate_with_unknown_residual(self):
+        """``cmd -abc`` where the meta owns ``-a`` and ``-c``: both bind and the
+        leftover ``-b`` errors as unknown (formerly an infinite loop because the
+        meta's multi-character claimed part ``-ac`` could never be removed from
+        the child's stream).
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            aa: Annotated[bool, Parameter(name=["--aa", "-a"])] = False,
+            cc: Annotated[bool, Parameter(name=["--cc", "-c"])] = False,
+        ):
+            captured["aa"] = aa
+            captured["cc"] = cc
+            return app(tokens)
+
+        @app.command
+        def cmd(*args: str):
+            captured["args"] = args
+
+        with pytest.raises(UnknownOptionError):
+            app.meta(["cmd", "-abc"], exit_on_error=False)
+        assert captured == {"aa": True, "cc": True}
+
+    def test_meta_short_option_with_attached_value_not_split_by_child(self):
+        """``-uroot`` (meta ``-u`` + GNU-style attached value) must bind to the
+        meta even when the value contains a character matching one of the
+        child's short flags (``-r``); the child's combined-short misreading of
+        the token must not win.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            user: Annotated[str, Parameter(name=["--user", "-u"])] = "default",
+        ):
+            captured["user"] = user
+            return app(tokens)
+
+        @app.command
+        def cmd(*, recursive: Annotated[bool, Parameter(name=["--recursive", "-r"])] = False):
+            captured["recursive"] = recursive
+
+        app.meta(["cmd", "-uroot"], exit_on_error=False)
+        assert captured == {"user": "root", "recursive": False}
+
+    def test_malformed_meta_option_after_command_reports_missing_value(self):
+        """A valid meta flag adjacent to a meta option missing its value must
+        surface the real error (missing argument for the option), not an
+        "Unknown option" error for the valid flag from the child scope.
+        """
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            flag: bool = False,
+            opt: str | None = None,
+        ):
+            captured["flag"] = flag
+            captured["opt"] = opt
+            return app(tokens)
+
+        @app.command
+        def cmd(*args: str):
+            captured["args"] = args
+
+        with pytest.raises(MissingArgumentError):
+            app.meta(["cmd", "--flag", "--opt"], exit_on_error=False)
+
+        captured.clear()
+        app.meta(["cmd", "--flag", "--opt", "value"], exit_on_error=False)
+        assert captured == {"flag": True, "opt": "value", "args": ()}

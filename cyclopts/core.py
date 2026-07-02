@@ -1812,12 +1812,14 @@ class App:
 
             try:
                 if help_flag_index is not None:
-                    # Remove the auto-handled help and version flags from both token lists.
+                    # Remove ALL help and version flags from both token lists.
                     # Users can provide multiple flags (e.g., "myapp --help --help --version").
                     # When help is requested, it takes priority over version, so we remove all
                     # occurrences of both flag types to prevent downstream parsing errors.
-                    # User-shadowed flags are preserved so normal binding can claim them.
-                    flags_to_remove = set(active_help_flags + active_version_flags)
+                    # Shadowed flags are removed too: normal binding never runs on this path,
+                    # and a leftover shadowed flag (e.g. ``--version``) would be re-parsed by
+                    # ``help_print``'s command resolution as a help/version pseudo-command.
+                    flags_to_remove = set(command_app.help_flags + command_app.version_flags)  # pyright: ignore[reportOperatorIssue]
                     tokens[:] = [t for t in tokens if t not in flags_to_remove]
                     unused_tokens[:] = [t for t in unused_tokens if t not in flags_to_remove]
 

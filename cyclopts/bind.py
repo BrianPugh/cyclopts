@@ -127,8 +127,10 @@ def _probe_unclaimed(
 
 
 def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
-    """Remove single-character short flags (e.g. ``-d``) from a combined short-option token.
+    """Remove short-flag characters from a combined short-option token.
 
+    Each entry in ``flags`` may carry one or more flag characters (a single
+    synthetic flag like ``-d``, or a multi-flag claimed part like ``-ac``).
     Removes the first occurrence of each flag character in order, mirroring the
     left-to-right scan of :func:`_parse_kw_and_flags` (so characters belonging
     to an attached value are never removed).
@@ -137,9 +139,9 @@ def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
     """
     chars = list(token.lstrip("-"))
     for flag in flags:
-        char = flag.lstrip("-")
-        if char in chars:
-            chars.remove(char)
+        for char in flag.lstrip("-"):
+            if char in chars:
+                chars.remove(char)
     return "-" + "".join(chars) if chars else None
 
 
@@ -266,6 +268,29 @@ def _scope_tokens_for_meta(
         positional_tokens.extend(tokens[first:])
         return meta_kw_tokens, positional_tokens, _first_gap(positional_indices)
 
+    # Tokens between command tokens (e.g. ``--verbose`` in ``sub --verbose leaf``):
+    # the meta claims what its keyword parameters match, exactly like the
+    # pre-command region; leftovers pass through positionally. Probe each
+    # inter-command segment separately so option/value adjacency is never
+    # fabricated across a command token.
+    inter_passthrough: list[tuple[int, str]] = []  # (original index, token)
+    for segment_number, command_index in enumerate(command_indices[:-1]):
+        segment_start = command_index + 1
+        segment = tokens[segment_start : command_indices[segment_number + 1]]
+        if not segment:
+            continue
+        segment_unclaimed = _probe_unclaimed(
+            meta_collection, segment, end_of_options_delimiter=end_of_options_delimiter
+        )
+        if segment_unclaimed is None:
+            # Malformed for the meta (e.g. option missing its value); hand the
+            # segment to the meta's real pass so it raises the proper error.
+            meta_kw_tokens.extend(segment)
+            continue
+        claimed, _ = _partition_claims(segment, segment_unclaimed)
+        meta_kw_tokens.extend(claimed)
+        inter_passthrough.extend((segment_start + position, token) for position, token in segment_unclaimed)
+
     # Fallthrough: compute the child's claims first (child wins), then let the
     # meta claim from the child's leftovers. Iterate because each side's
     # claims can unblock the other (e.g. the child can only bind its option's
@@ -300,16 +325,61 @@ def _scope_tokens_for_meta(
             if end_of_options_delimiter and end_of_options_delimiter in stream_tokens
             else len(stream_tokens)
         )
-        candidates = [(position, token) for position, token in child_unclaimed if position < delimiter_pos]
-
         newly_claimed_positions: dict[int, list[str]] = {}
+
+        # A child's PARTIAL claim of a combined short-option token (synthetic
+        # residuals differing from the original token) may be a misreading of a
+        # meta option with a GNU-style attached value (e.g. ``-uroot`` where the
+        # child knows ``-r`` but the token is really meta ``-u`` + value "root").
+        # If the meta fully claims the ORIGINAL token on its own, the meta's
+        # whole-token interpretation wins and the child's partial claim is
+        # discarded. When the meta claims only part of it too (e.g. ``-vd``
+        # split across scopes), the synthetic-residual run handling below applies.
+        child_unclaimed_by_position: dict[int, list[str]] = {}
+        for position, token in child_unclaimed:
+            child_unclaimed_by_position.setdefault(position, []).append(token)
+        for position, synthetics in child_unclaimed_by_position.items():
+            if position >= delimiter_pos:
+                continue
+            original = stream_tokens[position]
+            if len(synthetics) == 1 and synthetics[0] == original:
+                continue  # Fully unclaimed by the child; handled by run probing below.
+            if (
+                _probe_unclaimed(meta_collection, list(synthetics), end_of_options_delimiter=end_of_options_delimiter)
+                == []
+            ):
+                # The meta cleanly resolves the residual flags as-is; honor the
+                # char-level split (child wins its characters) via the run
+                # handling below.
+                continue
+            whole_token_probe = _probe_unclaimed(
+                meta_collection, [original], end_of_options_delimiter=end_of_options_delimiter
+            )
+            if whole_token_probe == []:
+                newly_claimed_positions[position] = [original]
+                bubbled.append(original)
+
+        candidates = [
+            (position, token)
+            for position, token in child_unclaimed
+            if position < delimiter_pos and position not in newly_claimed_positions
+        ]
+
         for run in _contiguous_runs(candidates):
             run_tokens = [token for _, token in run]
             meta_unclaimed = _probe_unclaimed(
                 meta_collection, run_tokens, end_of_options_delimiter=end_of_options_delimiter
             )
             if meta_unclaimed is None:
-                continue  # Malformed for the meta; leave the run with the child.
+                # The meta recognized an option in this run but the run is
+                # malformed for it (e.g. an option missing its value).
+                # Attribute the run to the meta so its real keyword pass raises
+                # the proper user-facing error; leaving it with the child would
+                # misreport a valid meta option as "Unknown option".
+                for position, token in run:
+                    newly_claimed_positions.setdefault(position, []).append(token)
+                    bubbled.append(token)
+                continue
             meta_unclaimed_by_run_pos: dict[int, list[str]] = {}
             for run_pos, token in meta_unclaimed:
                 meta_unclaimed_by_run_pos.setdefault(run_pos, []).append(token)
@@ -332,9 +402,12 @@ def _scope_tokens_for_meta(
             break
 
         # Remove the meta's claims from the child stream and re-probe.
+        # ``newly_claimed_positions`` is keyed by positions in the current
+        # (compacted) ``stream_tokens``, i.e. list indices of ``child_stream``,
+        # NOT the original positions stored inside each entry.
         new_child_stream: list[tuple[int, str]] = []
-        for stream_pos, token in child_stream:
-            claimed_parts = newly_claimed_positions.get(stream_pos)
+        for current_pos, (stream_pos, token) in enumerate(child_stream):
+            claimed_parts = newly_claimed_positions.get(current_pos)
             if claimed_parts is None:
                 new_child_stream.append((stream_pos, token))
                 continue
@@ -349,10 +422,14 @@ def _scope_tokens_for_meta(
         child_stream = new_child_stream
 
     meta_kw_tokens.extend(bubbled)
-    # Forwarded stream: pre-command passthrough, then the command token(s) and
-    # any tokens between commands, then whatever remains of the child segment.
-    positional_indices.extend(range(first, last + 1))
-    positional_tokens.extend(tokens[first : last + 1])
+    # Forwarded stream: pre-command passthrough, then the command token(s)
+    # interleaved (in original order) with unclaimed inter-command tokens,
+    # then whatever remains of the child segment.
+    chain_entries: list[tuple[int, str]] = [(index, tokens[index]) for index in command_indices]
+    chain_entries.extend(inter_passthrough)
+    chain_entries.sort()
+    positional_indices.extend(index for index, _ in chain_entries)
+    positional_tokens.extend(token for _, token in chain_entries)
     positional_indices.extend(last + 1 + position for position, _ in child_stream)
     positional_tokens.extend(token for _, token in child_stream)
     return meta_kw_tokens, positional_tokens, _first_gap(positional_indices)

@@ -474,3 +474,22 @@ def test_strict_mode_shadowed_version_on_plain_app():
         return version
 
     assert app(["--version"], exit_on_error=False) is True
+
+
+def test_shadowed_version_with_help_flag_shows_help(console):
+    """``sub --version --help`` where ``sub`` shadows ``--version``: help wins,
+    and the leftover shadowed token must not be re-parsed by ``help_print`` as
+    the version pseudo-command (formerly crashed with ``NameError``).
+    """
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.command
+    def sub(version: bool = False):
+        return version
+
+    with console.capture() as capture:
+        app(["sub", "--version", "--help"], console=console)
+
+    assert "Usage: myapp sub" in capture.get()

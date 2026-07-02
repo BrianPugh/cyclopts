@@ -202,3 +202,15 @@ def test_union_of_dataclasses_ambiguous_fields_error(app):
             print_error=False,
             exit_on_error=False,
         )
+
+
+def test_union_scalar_and_consume_all_member_multiple_tokens(app, assert_parse_args):
+    """A union of a scalar and a list type must convert repeated tokens as ONE
+    list value (a member of the union), not element-wise into a list of scalars.
+    """
+
+    @app.default
+    def default(*, a: str | list[int] = "d"):
+        pass
+
+    assert_parse_args(default, "--a 1 --a 2", a=[1, 2])
