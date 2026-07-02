@@ -274,20 +274,6 @@ def _count_chain_without_trailing_help_version(
     return keep, removed
 
 
-def _filter_apps_for_parse_mode(apps_for_params: list["App"], command_app: "App") -> list["App"]:
-    """Filter ``apps_for_params`` based on ``command_app``'s resolved ``parse_mode``.
-
-    In ``"strict"`` mode, parent meta apps are excluded from the parameter list
-    since their flags are not valid at the child command level. Meta apps whose
-    ``_meta_parent`` is ``command_app`` itself are retained.
-
-    In other parse modes, the input list is returned unchanged.
-    """
-    if command_app.app_stack.resolve("parse_mode") == "strict":
-        return [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
-    return apps_for_params
-
-
 def _safe_assemble_argument_collection(app: "App") -> ArgumentCollection | None:
     """Assemble an :class:`ArgumentCollection` from ``app``'s default command, tolerating unresolvable signatures.
 
@@ -344,14 +330,9 @@ def _iter_resolution_argument_collections(
 
     ``execution_path`` is used when available (help/completion paths). ``fallback_app`` is used
     for standalone calls (e.g. docs generation) that walk only the app's own meta chain.
-
-    In ``"strict"`` parse mode, parent meta apps are excluded so their flags do not appear
-    at the child command level.
     """
     if execution_path:
-        command_app = execution_path[-1]
-        resolution_apps = command_app._get_resolution_context(execution_path)
-        resolution_apps = _filter_apps_for_parse_mode(resolution_apps, command_app)
+        resolution_apps = execution_path[-1]._get_resolution_context(execution_path)
     elif fallback_app is not None:
         resolution_apps = list(_walk_metas(fallback_app))
     else:
@@ -1273,6 +1254,11 @@ class App:
 
         This includes parent meta apps and the meta app of the final command app.
 
+        In ``"strict"`` parse mode, parent meta apps are excluded: their flags are
+        rejected at this command's level, so they must not contribute parameters
+        here either. Keeping the exclusion inside this method keeps parsing, help,
+        completion, and docs generation consistent with each other.
+
         Parameters
         ----------
         execution_path : Sequence[App]
@@ -1302,6 +1288,10 @@ class App:
                         is_meta_command = last_app in app._meta._commands.values()
                         if not is_meta_command:
                             apps.append(app._meta)
+
+            if last_app.app_stack.resolve("parse_mode") == "strict":
+                # Meta apps whose _meta_parent is the command itself are retained.
+                apps = [a for a in apps if a._meta_parent is None or a._meta_parent is last_app]
 
         return apps
 
@@ -1346,19 +1336,24 @@ class App:
         # Try to parse with each meta app's parameters
         unused_tokens = tokens
         for meta_app in meta_apps_to_try:
+            argument_collection = _safe_assemble_argument_collection(meta_app)
+            if argument_collection is None:
+                # Unresolvable forward reference (e.g. cyclopts' own internal
+                # help/version handlers); genuine annotation errors propagate.
+                continue
             try:
-                argument_collection = meta_app.assemble_argument_collection()
-
-                # Try to consume tokens with this meta app's parameters
-                # stop_at_first_unknown=True ensures we only consume contiguous leading options
+                # Try to consume tokens with this meta app's parameters.
+                # stop_at_first_unknown=True ensures we only consume contiguous leading options.
                 unused_tokens, _, _, _ = _parse_kw_and_flags(
                     argument_collection,
                     unused_tokens,
                     end_of_options_delimiter=end_of_options_delimiter,
                     stop_at_first_unknown=True,
                 )
-            except Exception:
-                # If parsing fails, try next meta app
+            except CycloptsError:
+                # The leading region is malformed for this meta (e.g. an option
+                # missing its value); leave the tokens for the real parse (or the
+                # next meta) to handle so the proper user-facing error surfaces.
                 continue
 
         return unused_tokens
