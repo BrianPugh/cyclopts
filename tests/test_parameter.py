@@ -156,3 +156,36 @@ def test_parameter_attributes_are_kw_only():
         elif field.init:  # Only check fields that are part of __init__
             # All other init fields should be keyword-only
             assert field.kw_only, f"Field '{field.name}' should be keyword-only"
+
+
+def test_parameter_negative_alias_appends_to_generated():
+    """negative_alias is additive: the generated ``--no-*`` names are kept."""
+    p = Parameter(name=("--foo",), negative_alias="-F")
+    assert ("--no-foo", "-F") == p.get_negatives(bool)
+
+
+def test_parameter_negative_alias_multiple():
+    p = Parameter(name=("--foo",), negative_alias=("-F", "--nope"))
+    assert ("--no-foo", "-F", "--nope") == p.get_negatives(bool)
+
+
+def test_parameter_negative_alias_with_custom_negative():
+    """Also additive when ``negative`` replaces the generated names."""
+    p = Parameter(name=("--foo",), negative="--quiet", negative_alias="-q")
+    assert ("--quiet", "-q") == p.get_negatives(bool)
+
+
+def test_parameter_negative_alias_iterable():
+    p = Parameter(name=("--foo",), negative_alias="-E")
+    assert ("--empty-foo", "-E") == p.get_negatives(list)
+
+
+def test_parameter_negative_alias_non_negatable_type():
+    """Types without a negative-flag concept stay without negatives."""
+    p = Parameter(name=("--foo",), negative_alias="-F")
+    assert () == p.get_negatives(int)
+
+
+def test_parameter_negative_alias_no_duplicates():
+    p = Parameter(name=("--foo",), negative="--quiet", negative_alias="--quiet")
+    assert ("--quiet",) == p.get_negatives(bool)
