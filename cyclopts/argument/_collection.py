@@ -241,6 +241,22 @@ class ArgumentCollection(list[Argument]):
 
         return best_match_argument, best_match_keys, best_implicit_value
 
+    def _match_explicit(self, term: str) -> "Argument | None":
+        """Match ``term`` against explicitly-declared parameters.
+
+        Like :meth:`match`, but returns ``None`` instead of raising when there
+        is no match, and does not count a ``**kwargs`` (VAR_KEYWORD) catch-all
+        as a match — a catch-all matches ANY keyword, which is not evidence
+        that the option was explicitly declared.
+        """
+        try:
+            argument, _, _ = self.match(term)
+        except ValueError:
+            return None
+        if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+            return None
+        return argument
+
     def _set_marks(self, val: bool):
         for argument in self:
             argument._marked = val

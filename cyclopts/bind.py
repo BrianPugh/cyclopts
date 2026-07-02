@@ -63,13 +63,29 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     return tokens
 
 
+class _ProbeResult(NamedTuple):
+    """Result of :func:`_probe_unclaimed`."""
+
+    unclaimed: list[tuple[int, str]]
+    """Ordered ``(original_index, token)`` pairs the collection leaves
+    unconsumed. For partially-consumed combined short options (e.g. ``-vd``
+    where only ``-v`` is known), the unconsumed remainder appears as synthetic
+    single-flag tokens (``-d``) sharing the original index."""
+
+    kw_claims: dict[int, tuple[str, str | None]]
+    """The keyword pass's exact per-index claims (see
+    :func:`_parse_kw_and_flags`). Tokens consumed by the positional pass
+    (``include_positionals=True``) are NOT reflected here — they only
+    disappear from ``unclaimed``."""
+
+
 def _probe_unclaimed(
     argument_collection: ArgumentCollection,
     tokens: list[str],
     *,
     end_of_options_delimiter: str = "--",
     include_positionals: bool = False,
-) -> list[tuple[int, str]] | None:
+) -> _ProbeResult | None:
     """Determine which tokens ``argument_collection`` would NOT consume.
 
     Runs the real parsing passes (:func:`_parse_kw_and_flags`, and optionally
@@ -80,25 +96,20 @@ def _probe_unclaimed(
 
     Returns
     -------
-    list[tuple[int, str]] | None
-        Ordered ``(original_index, token)`` pairs the collection leaves
-        unconsumed. For partially-consumed combined short options (e.g.
-        ``-vd`` where only ``-v`` is known), the unconsumed remainder appears
-        as synthetic single-flag tokens (``-d``) sharing the original index.
-
+    _ProbeResult | None
         ``None`` if the keyword/flag pass raised a :class:`CycloptsError`
         (e.g. a known option missing its value) — the claims cannot be
         determined; the caller decides how to proceed.
     """
     collection_copy = argument_collection.copy(reset_tokens=True)
     try:
-        unused, unused_indices, contiguous_positional_count = _parse_kw_and_flags(
+        unused, unused_indices, contiguous_positional_count, claims = _parse_kw_and_flags(
             collection_copy, tokens, end_of_options_delimiter=end_of_options_delimiter
         )
     except CycloptsError:
         return None
     if not include_positionals:
-        return list(zip(unused_indices, unused, strict=True))
+        return _ProbeResult(list(zip(unused_indices, unused, strict=True)), claims)
 
     try:
         leftover = _parse_pos(
@@ -112,7 +123,7 @@ def _probe_unclaimed(
         # non-allow_leading_hyphen slot). Treat the positional pass as claiming
         # nothing; callers typically re-probe after another collection has
         # claimed the offending token.
-        return list(zip(unused_indices, unused, strict=True))
+        return _ProbeResult(list(zip(unused_indices, unused, strict=True)), claims)
 
     # ``_parse_pos`` consumes from the front of a preprocessed stream that
     # excludes the end_of_options_delimiter token itself; ``leftover`` is a
@@ -123,7 +134,7 @@ def _probe_unclaimed(
     else:
         preprocessed_to_unused = list(range(len(unused)))
     leftover_positions = preprocessed_to_unused[len(preprocessed_to_unused) - len(leftover) :]
-    return [(unused_indices[p], unused[p]) for p in leftover_positions]
+    return _ProbeResult([(unused_indices[p], unused[p]) for p in leftover_positions], claims)
 
 
 def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
@@ -145,43 +156,9 @@ def _remove_short_flags(token: str, flags: Sequence[str]) -> str | None:
     return "-" + "".join(chars) if chars else None
 
 
-def _partition_claims(
-    tokens: list[str],
-    unclaimed: list[tuple[int, str]],
-) -> list[str]:
-    """Extract the claimed tokens from ``tokens`` given probe results.
-
-    Parameters
-    ----------
-    tokens: list[str]
-        The token stream that was probed.
-    unclaimed: list[tuple[int, str]]
-        ``(index, token)`` pairs from :func:`_probe_unclaimed`.
-
-    Returns
-    -------
-    claimed: list[str]
-        Tokens (or claimed remainders of combined short options) the
-        collection consumed, in original order.
-    """
-    unclaimed_by_position: dict[int, list[str]] = {}
-    for position, token in unclaimed:
-        unclaimed_by_position.setdefault(position, []).append(token)
-
-    claimed: list[str] = []
-    for position, token in enumerate(tokens):
-        synthetics = unclaimed_by_position.get(position)
-        if synthetics is None:
-            claimed.append(token)
-        elif len(synthetics) == 1 and synthetics[0] == token:
-            pass  # Fully unclaimed.
-        else:
-            # Partially-claimed combined short option: the claimed remainder
-            # is the original token minus the unclaimed flag characters.
-            remainder = _remove_short_flags(token, synthetics)
-            if remainder is not None:
-                claimed.append(remainder)
-    return claimed
+def _claimed_tokens(claims: dict[int, tuple[str, str | None]]) -> list[str]:
+    """Ordered claimed parts from a keyword-pass claims map (see :func:`_parse_kw_and_flags`)."""
+    return [claimed for _, (claimed, _) in sorted(claims.items())]
 
 
 def _scope_tokens_for_meta(
@@ -244,18 +221,18 @@ def _scope_tokens_for_meta(
     # Pre-command region: the meta claims what its keyword parameters match;
     # leftovers pass through to the positional stream (relevant for nested
     # meta patterns where pre-command tokens belong to an inner meta level).
-    pre_unclaimed = _probe_unclaimed(
+    pre_probe = _probe_unclaimed(
         meta_collection, pre, end_of_options_delimiter=end_of_options_delimiter, include_positionals=False
     )
-    if pre_unclaimed is None:
+    if pre_probe is None:
         # The meta's own region is malformed (e.g. option missing its value).
         # Hand everything to the meta's real keyword pass so it raises the
         # proper user-facing error.
         meta_kw_tokens = list(pre)
         pre_passthrough: list[tuple[int, str]] = []
     else:
-        meta_kw_tokens = _partition_claims(pre, pre_unclaimed)
-        pre_passthrough = pre_unclaimed
+        meta_kw_tokens = _claimed_tokens(pre_probe.kw_claims)
+        pre_passthrough = pre_probe.unclaimed
 
     positional_indices: list[int] = [position for position, _ in pre_passthrough]
     positional_tokens: list[str] = [token for _, token in pre_passthrough]
@@ -277,16 +254,14 @@ def _scope_tokens_for_meta(
         segment = tokens[segment_start : command_indices[segment_number + 1]]
         if not segment:
             continue
-        segment_unclaimed = _probe_unclaimed(
-            meta_collection, segment, end_of_options_delimiter=end_of_options_delimiter
-        )
-        if segment_unclaimed is None:
+        segment_probe = _probe_unclaimed(meta_collection, segment, end_of_options_delimiter=end_of_options_delimiter)
+        if segment_probe is None:
             # Malformed for the meta (e.g. option missing its value); hand the
             # segment to the meta's real pass so it raises the proper error.
             meta_kw_tokens.extend(segment)
             continue
-        meta_kw_tokens.extend(_partition_claims(segment, segment_unclaimed))
-        inter_passthrough.extend((segment_start + position, token) for position, token in segment_unclaimed)
+        meta_kw_tokens.extend(_claimed_tokens(segment_probe.kw_claims))
+        inter_passthrough.extend((segment_start + position, token) for position, token in segment_probe.unclaimed)
 
     # Fallthrough: compute the child's claims first (child wins), then let the
     # meta claim from the child's leftovers. Iterate because each side's
@@ -300,18 +275,20 @@ def _scope_tokens_for_meta(
         if child_collection is None:
             child_unclaimed = list(enumerate(stream_tokens))
         else:
-            child_unclaimed = _probe_unclaimed(
+            child_probe = _probe_unclaimed(
                 child_collection,
                 stream_tokens,
                 end_of_options_delimiter=end_of_options_delimiter,
                 include_positionals=True,
             )
-            if child_unclaimed is None:
+            if child_probe is None:
                 # Cannot determine the child's claims this round (e.g. a child
                 # option is missing its value because a meta flag sits between
                 # them); treat the child as claiming nothing and let the meta
                 # claim, then re-probe.
                 child_unclaimed = list(enumerate(stream_tokens))
+            else:
+                child_unclaimed = child_probe.unclaimed
 
         # Candidates the meta may claim: the child's leftovers, but never
         # tokens at/after the end-of-options delimiter (those are positional
@@ -341,10 +318,10 @@ def _scope_tokens_for_meta(
             original = stream_tokens[position]
             if len(synthetics) == 1 and synthetics[0] == original:
                 continue  # Fully unclaimed by the child; handled by run probing below.
-            if (
-                _probe_unclaimed(meta_collection, list(synthetics), end_of_options_delimiter=end_of_options_delimiter)
-                == []
-            ):
+            synthetics_probe = _probe_unclaimed(
+                meta_collection, list(synthetics), end_of_options_delimiter=end_of_options_delimiter
+            )
+            if synthetics_probe is not None and not synthetics_probe.unclaimed:
                 # The meta cleanly resolves the residual flags as-is; honor the
                 # char-level split (child wins its characters) via the run
                 # handling below.
@@ -352,7 +329,7 @@ def _scope_tokens_for_meta(
             whole_token_probe = _probe_unclaimed(
                 meta_collection, [original], end_of_options_delimiter=end_of_options_delimiter
             )
-            if whole_token_probe == []:
+            if whole_token_probe is not None and not whole_token_probe.unclaimed:
                 newly_claimed_positions[position] = [original]
                 bubbled.append(original)
 
@@ -364,10 +341,13 @@ def _scope_tokens_for_meta(
 
         for run in _contiguous_runs(candidates):
             run_tokens = [token for _, token in run]
-            meta_unclaimed = _probe_unclaimed(
-                meta_collection, run_tokens, end_of_options_delimiter=end_of_options_delimiter
-            )
-            if meta_unclaimed is None:
+            if not any(is_option_like(token, allow_numbers=True) for token in run_tokens):
+                # The keyword pass can only claim option-like tokens (and their
+                # values); a pure-positional run needs no probe. This is the
+                # common terminating state of the loop.
+                continue
+            run_probe = _probe_unclaimed(meta_collection, run_tokens, end_of_options_delimiter=end_of_options_delimiter)
+            if run_probe is None:
                 # The meta recognized an option in this run but the run is
                 # malformed for it (e.g. an option missing its value).
                 # Attribute the run to the meta so its real keyword pass raises
@@ -377,23 +357,16 @@ def _scope_tokens_for_meta(
                     newly_claimed_positions.setdefault(position, []).append(token)
                     bubbled.append(token)
                 continue
-            meta_unclaimed_by_run_pos: dict[int, list[str]] = {}
-            for run_pos, token in meta_unclaimed:
-                meta_unclaimed_by_run_pos.setdefault(run_pos, []).append(token)
-            for run_pos, (stream_pos, token) in enumerate(run):
-                synthetics = meta_unclaimed_by_run_pos.get(run_pos)
-                if synthetics is not None and len(synthetics) == 1 and synthetics[0] == token:
+            for run_pos, (stream_pos, _) in enumerate(run):
+                claim = run_probe.kw_claims.get(run_pos)
+                if claim is None:
                     continue  # Meta claimed nothing from this token.
-                if synthetics is None:
-                    # Meta claimed the whole (possibly synthetic) token.
-                    newly_claimed_positions.setdefault(stream_pos, []).append(token)
-                    bubbled.append(token)
-                else:
-                    # Meta claimed part of a combined short-option token.
-                    claimed_part = _remove_short_flags(token, synthetics)
-                    if claimed_part is not None:
-                        newly_claimed_positions.setdefault(stream_pos, []).append(claimed_part)
-                        bubbled.append(claimed_part)
+                # The meta claimed the token wholly (claimed_part == token) or
+                # partially (exact claimed characters of a combined short
+                # option, recorded by the scan itself).
+                claimed_part, _ = claim
+                newly_claimed_positions.setdefault(stream_pos, []).append(claimed_part)
+                bubbled.append(claimed_part)
 
         if not newly_claimed_positions:
             break
@@ -486,7 +459,7 @@ def _parse_kw_and_flags(
     *,
     end_of_options_delimiter: str = "--",
     stop_at_first_unknown: bool = False,
-) -> tuple[list[str], list[int], int | None]:
+) -> tuple[list[str], list[int], int | None, dict[int, tuple[str, str | None]]]:
     """Extract keyword arguments and flags from the token stream.
 
     Returns
@@ -507,10 +480,25 @@ def _parse_kw_and_flags(
         The gap between indices 2 and 6 yields ``contiguous_positional_count=3``.
         This is used by ``_parse_pos`` to prevent positional-only list parameters
         from consuming tokens that appeared after keyword arguments.
+    claims: dict[int, tuple[str, str | None]]
+        Maps each consumed token's original index to ``(claimed_part,
+        remainder)``, recorded exactly as the scan consumed it:
+
+        - A wholly-consumed token (option, flag, or an option's value) maps to
+          ``(token, None)``.
+        - A partially-consumed combined short-option token maps to the exact
+          claimed characters (plus any GNU-style attached value) and the exact
+          unmatched-character remainder, in scan order — e.g. ``-abc`` with
+          only ``-a``/``-c`` known yields ``("-ac", "-b")``.
+
+        Untouched tokens have no entry. Hierarchical scoping consumes this to
+        route token fragments between command levels without reconstructing
+        them from the unused-token stream.
     """
     unused_tokens, positional_only_tokens = [], []
     positional_only_start: int | None = None
     unused_token_original_indices: list[int] = []
+    claims: dict[int, tuple[str, str | None]] = {}
     skip_next_iterations = 0
     stop_parsing = False
     if end_of_options_delimiter:
@@ -526,6 +514,7 @@ def _parse_kw_and_flags(
         # If the previous argument was a keyword, then this is its value
         if skip_next_iterations > 0:
             skip_next_iterations -= 1
+            claims[i] = (token, None)
             continue
 
         if not is_option_like(token, allow_numbers=True):
@@ -563,6 +552,8 @@ def _parse_kw_and_flags(
 
         matches: list[_KeywordMatch] = []
         attached_value: str | None = None  # Track value attached to a GNU-style combined option
+        claimed_part: str = token
+        partial_remainder: str | None = None
         try:
             matches.append(_KeywordMatch(cli_option, *argument_collection.match(cli_option)))
         except ValueError:
@@ -619,6 +610,13 @@ def _parse_kw_and_flags(
                 for unmatched_flag in unmatched_flags:
                     unused_tokens.append(unmatched_flag)
                     unused_token_original_indices.append(i)
+                # Record the exact claimed/unclaimed split of this combined
+                # short-option token, in scan order.
+                claimed_part = "-" + "".join(m.matched_token.lstrip("-") for m in matches)
+                if attached_value is not None:
+                    claimed_part += attached_value
+                if unmatched_flags:
+                    partial_remainder = "-" + "".join(f.lstrip("-") for f in unmatched_flags)
             else:
                 if stop_at_first_unknown:
                     # Unknown option, stop parsing and return all remaining tokens
@@ -808,6 +806,7 @@ def _parse_kw_and_flags(
                     # Normal case: append the pre-created Token objects directly
                     for consumed_token in consumed_tokens:
                         match.argument.append(consumed_token)
+        claims[i] = (claimed_part, partial_remainder)
 
     # Compute the number of contiguous positional (non-option-like) unused tokens
     # before the first gap caused by keyword extraction. This prevents positional-only
@@ -822,7 +821,7 @@ def _parse_kw_and_flags(
         unused_token_original_indices.extend(
             range(positional_only_start, positional_only_start + len(positional_only_tokens))
         )
-    return unused_tokens, unused_token_original_indices, contiguous_positional_count
+    return unused_tokens, unused_token_original_indices, contiguous_positional_count, claims
 
 
 def _future_positional_only_token_count(argument_collection: ArgumentCollection, starting_index: int) -> int:
@@ -1042,7 +1041,7 @@ def create_bound_arguments(
     unused_tokens = tokens
 
     try:
-        unused_tokens, _, contiguous_positional_count = _parse_kw_and_flags(
+        unused_tokens, _, contiguous_positional_count, _ = _parse_kw_and_flags(
             argument_collection, unused_tokens, end_of_options_delimiter=end_of_options_delimiter
         )
         leftover_kw_tokens: list[str] = []
