@@ -165,3 +165,36 @@ return value:
 To receive the return value instead of exiting (e.g. in tests), use
 ``result_action="return_value"``. See :attr:`.App.result_action` for all
 available actions and composition rules.
+
+------------------------------------
+6. Parse Errors Exit With Code 2
+------------------------------------
+CLI usage errors (unknown option, missing argument, coercion failure, …) now
+exit with code ``2``, matching :mod:`argparse` and Click. Previously they
+exited with code ``1``, which made them indistinguishable from a command that
+ran and reported failure (the default :attr:`.App.result_action` maps a
+:obj:`False` return to exit code ``1``).
+
+.. code-block:: console
+
+   $ myapp --bogus; echo $?
+   # v4: 1
+   # v5: 2
+
+Update any scripts that check for exit code ``1`` on malformed input.
+Application-level exit codes (from command return values via
+:attr:`.App.result_action`) are unchanged, as is ``130`` for keyboard
+interrupts.
+
+----------------------------------------------
+7. ``--version`` Respects the ``--`` Delimiter
+----------------------------------------------
+A ``--version`` token appearing after the end-of-options delimiter is now
+treated as positional data instead of triggering version printing, matching
+how ``--help`` already behaved.
+
+.. code-block:: console
+
+   $ myapp -- --version
+   # v4: printed the app version (command never ran)
+   # v5: the command runs; "--version" is bound positionally
