@@ -275,3 +275,15 @@ def test_boolean_flag_uppercase_short_negative(app, cmd_str, expected, assert_pa
         pass
 
     assert_parse_args(foo, cmd_str, expected)
+
+
+def test_boolean_negative_alias_binds_false(app, assert_parse_args):
+    """A short negative alias sets the flag to False; generated negative is kept."""
+
+    @app.default
+    def foo(*, description: Annotated[bool, Parameter(negative_alias="-d")] = True):
+        pass
+
+    assert_parse_args(foo, "-d", description=False)
+    assert_parse_args(foo, "--no-description", description=False)
+    assert_parse_args(foo, "--description", description=True)

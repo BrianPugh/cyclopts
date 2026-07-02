@@ -237,6 +237,13 @@ class Parameter:
         kw_only=True,
     )
 
+    # This can ONLY ever be a Tuple[str, ...]
+    negative_alias: None | str | Iterable[str] = field(
+        default=None,
+        converter=_str_tuple_converter,
+        kw_only=True,
+    )
+
     # This can ONLY ever be a Tuple[Union[Group, str], ...]
     group: None | Group | str | Iterable[Group | str] = field(
         default=None,
@@ -419,7 +426,7 @@ class Parameter:
                 (out if negative.startswith("-") else user_negatives).append(negative)
 
             if not user_negatives:
-                return tuple(out)
+                return self._extend_negative_aliases(out)
 
         assert isinstance(self.name, tuple)
         for name in self.name:
@@ -445,7 +452,20 @@ class Parameter:
             else:
                 for negative in user_negatives:
                     out.append(f"--{name_prefix}{negative}")
-        return tuple(out)
+        return self._extend_negative_aliases(out)
+
+    def _extend_negative_aliases(self, negatives: list[str]) -> tuple[str, ...]:
+        """Append :attr:`negative_alias` entries to the computed negative names.
+
+        Unlike :attr:`negative` (which *replaces* the generated negative names),
+        aliases are additive — mirroring the :attr:`name`/:attr:`alias`
+        relationship for positive names.
+        """
+        assert isinstance(self.negative_alias, tuple)
+        for negative_alias in self.negative_alias:
+            if negative_alias not in negatives:
+                negatives.append(negative_alias)
+        return tuple(negatives)
 
     def __repr__(self):
         """Only shows non-default values."""
