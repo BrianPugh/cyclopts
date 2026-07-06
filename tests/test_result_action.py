@@ -1618,3 +1618,39 @@ def test_cyclopts_returncode_default_zero_when_not_defined():
 
     assert result == 0
     assert buf.getvalue() == "Hello Alice!\n"
+
+
+def test_invalid_result_action_constructor_raises_eagerly():
+    """A typo'd action name fails at App construction, not at result-handling time."""
+    with pytest.raises(ValueError, match="Invalid result_action 'bogus'"):
+        App(result_action="bogus")  # pyright: ignore[reportArgumentType]
+
+
+def test_invalid_result_action_in_chain_constructor_raises_eagerly():
+    with pytest.raises(ValueError, match="Invalid result_action 'bogus'"):
+        App(result_action=["return_value", "bogus"])  # pyright: ignore[reportArgumentType]
+
+
+def test_invalid_result_action_runtime_override_raises_before_execution():
+    """An invalid invocation-time override fails before the command runs."""
+    app = App()
+    ran = []
+
+    @app.default
+    def main():
+        ran.append(True)
+
+    with pytest.raises(ValueError, match="Invalid result_action 'return'"):
+        app([], result_action="return", exit_on_error=False)  # pyright: ignore[reportArgumentType]
+    assert not ran
+
+
+def test_invalid_result_action_assignment_raises_eagerly():
+    app = App()
+    with pytest.raises(ValueError, match="Invalid result_action 'bogus'"):
+        app.result_action = "bogus"  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_result_action_error_lists_valid_actions():
+    with pytest.raises(ValueError, match="'return_value'"):
+        App(result_action="bogus")  # pyright: ignore[reportArgumentType]

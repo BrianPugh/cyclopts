@@ -1,6 +1,6 @@
 import sys
 from collections.abc import Callable, Iterable
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args, get_origin
 
 from cyclopts.utils import is_iterable
 
@@ -26,6 +26,25 @@ ResultActionSingle = (
 )
 
 ResultAction = ResultActionSingle | Iterable[ResultActionSingle]
+
+_RESULT_ACTION_NAMES: frozenset[str] = frozenset(
+    get_args(next(arg for arg in get_args(ResultActionSingle) if get_origin(arg) is Literal))
+)
+
+
+def validate_result_action(action: Any) -> None:
+    """Validate a single result action, raising a descriptive :class:`ValueError`.
+
+    Called eagerly (at :class:`App` construction and at invocation-time
+    overrides) so that a typo'd action name fails before any command executes.
+    """
+    if callable(action) or (isinstance(action, str) and action in _RESULT_ACTION_NAMES):
+        return
+    raise ValueError(
+        f"Invalid result_action {action!r}; must be a callable or one of: "
+        + ", ".join(map(repr, sorted(_RESULT_ACTION_NAMES)))
+        + "."
+    )
 
 
 def resolve_returncode(result: Any, default: int = 0) -> int:
@@ -172,4 +191,7 @@ def handle_result_action(
             print_fn(result)
             sys.exit(resolve_returncode(result))
         case _:
-            raise ValueError
+            # Values that bypassed eager validation (e.g. injected through a
+            # config layer) still get the descriptive error.
+            validate_result_action(action)
+            raise ValueError(f"Unhandled result_action: {action!r}")  # pragma: no cover
