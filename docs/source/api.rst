@@ -1176,6 +1176,38 @@ API
          │ --verbose --quiet  [default: False]                            │
          ╰────────────────────────────────────────────────────────────────╯
 
+   .. attribute:: negative_alias
+      :type: Union[None, str, Iterable[str]]
+      :value: None
+
+      *Additional* name(s) for the negative form of the flag, appended to the
+      generated (or :attr:`negative`-supplied) negative names. The
+      :attr:`negative`/:attr:`negative_alias` pair mirrors :attr:`name`/:attr:`alias`:
+      ``negative`` replaces, ``negative_alias`` appends.
+
+      The primary use-case is a short flag that *disables* a default-on boolean:
+
+      .. code-block:: python
+
+         from cyclopts import App, Parameter
+         from typing import Annotated
+
+         app = App()
+
+         @app.default
+         def main(*, description: Annotated[bool, Parameter(negative_alias="-d")] = True):
+            print(f"{description=}")
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script -d
+         description=False
+
+         $ my-script --no-description
+         description=False
+
    .. attribute:: negative_bool
       :type: Optional[str]
       :value: None
