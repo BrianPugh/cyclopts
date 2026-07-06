@@ -234,18 +234,44 @@ def _walk_metas(app: "App"):
     yield from reversed(meta_list)
 
 
-def _filter_apps_for_parse_mode(apps_for_params: list["App"], command_app: "App") -> list["App"]:
-    """Filter ``apps_for_params`` based on ``command_app``'s resolved ``parse_mode``.
+def _count_chain_without_trailing_help_version(
+    chain: Sequence[str],
+    command_apps: Sequence["App"],
+    root_app: "App",
+) -> tuple[int, list[str]]:
+    """Length of ``chain`` once trailing help/version pseudo-commands are stripped.
 
-    In ``"strict"`` mode, parent meta apps are excluded from the parameter list
-    since their flags are not valid at the child command level. Meta apps whose
-    ``_meta_parent`` is ``command_app`` itself are retained.
+    When users provide help/version flags after a command (e.g. ``myapp cmd
+    --help --help``), command parsing may treat them as commands in the chain;
+    they must be stripped so downstream logic sees the real command target.
 
-    In other parse modes, the input list is returned unchanged.
+    Parameters
+    ----------
+    chain: Sequence[str]
+        The parsed command chain.
+    command_apps: Sequence[App]
+        Resolved app per command token, parallel to ``chain`` (excluding the
+        root). Entry ``i``'s parent is ``command_apps[i - 1]``, or
+        ``root_app`` for the first entry.
+    root_app: App
+        Parent of the first chain entry.
+
+    Returns
+    -------
+    keep: int
+        Number of leading chain entries to keep.
+    removed: list[str]
+        The stripped tokens, last-first (LIFO).
     """
-    if command_app.app_stack.resolve("parse_mode") == "strict":
-        return [a for a in apps_for_params if a._meta_parent is None or a._meta_parent is command_app]
-    return apps_for_params
+    keep = len(chain)
+    removed: list[str] = []
+    while keep:
+        parent = command_apps[keep - 2] if keep >= 2 else root_app
+        if chain[keep - 1] not in set(parent.help_flags + parent.version_flags):  # pyright: ignore[reportOperatorIssue]
+            break
+        removed.append(chain[keep - 1])
+        keep -= 1
+    return keep, removed
 
 
 def _safe_assemble_argument_collection(app: "App") -> ArgumentCollection | None:
@@ -304,14 +330,9 @@ def _iter_resolution_argument_collections(
 
     ``execution_path`` is used when available (help/completion paths). ``fallback_app`` is used
     for standalone calls (e.g. docs generation) that walk only the app's own meta chain.
-
-    In ``"strict"`` parse mode, parent meta apps are excluded so their flags do not appear
-    at the child command level.
     """
     if execution_path:
-        command_app = execution_path[-1]
-        resolution_apps = command_app._get_resolution_context(execution_path)
-        resolution_apps = _filter_apps_for_parse_mode(resolution_apps, command_app)
+        resolution_apps = execution_path[-1]._get_resolution_context(execution_path)
     elif fallback_app is not None:
         resolution_apps = list(_walk_metas(fallback_app))
     else:
@@ -1233,6 +1254,11 @@ class App:
 
         This includes parent meta apps and the meta app of the final command app.
 
+        In ``"strict"`` parse mode, parent meta apps are excluded: their flags are
+        rejected at this command's level, so they must not contribute parameters
+        here either. Keeping the exclusion inside this method keeps parsing, help,
+        completion, and docs generation consistent with each other.
+
         Parameters
         ----------
         execution_path : Sequence[App]
@@ -1262,6 +1288,10 @@ class App:
                         is_meta_command = last_app in app._meta._commands.values()
                         if not is_meta_command:
                             apps.append(app._meta)
+
+            if last_app.app_stack.resolve("parse_mode") == "strict":
+                # Meta apps whose _meta_parent is the command itself are retained.
+                apps = [a for a in apps if a._meta_parent is None or a._meta_parent is last_app]
 
         return apps
 
@@ -1306,19 +1336,24 @@ class App:
         # Try to parse with each meta app's parameters
         unused_tokens = tokens
         for meta_app in meta_apps_to_try:
+            argument_collection = _safe_assemble_argument_collection(meta_app)
+            if argument_collection is None:
+                # Unresolvable forward reference (e.g. cyclopts' own internal
+                # help/version handlers); genuine annotation errors propagate.
+                continue
             try:
-                argument_collection = meta_app.assemble_argument_collection()
-
-                # Try to consume tokens with this meta app's parameters
-                # stop_at_first_unknown=True ensures we only consume contiguous leading options
-                unused_tokens, _, _ = _parse_kw_and_flags(
+                # Try to consume tokens with this meta app's parameters.
+                # stop_at_first_unknown=True ensures we only consume contiguous leading options.
+                unused_tokens, _, _, _ = _parse_kw_and_flags(
                     argument_collection,
                     unused_tokens,
                     end_of_options_delimiter=end_of_options_delimiter,
                     stop_at_first_unknown=True,
                 )
-            except Exception:
-                # If parsing fails, try next meta app
+            except CycloptsError:
+                # The leading region is malformed for this meta (e.g. an option
+                # missing its value); leave the tokens for the real parse (or the
+                # next meta) to handle so the proper user-facing error surfaces.
                 continue
 
         return unused_tokens
@@ -1706,38 +1741,22 @@ class App:
         )
         command_chain, execution_apps, unused_tokens, _, _ = self._parse_commands(tokens, include_parent_meta=False)
 
-        # We don't want the command_app to be the version/help handler; we handle those specially
-        command_app = execution_apps[-1]
-        removed_help_version_tokens: list[str] = []
-        with suppress(IndexError):
-            # Remove trailing help/version commands from the execution chain.
-            # When users provide multiple flags (e.g., "myapp cmd --help --help"), the parser
-            # may treat trailing help/version flags as commands in the chain. We must remove ALL
-            # such trailing commands and keep command_chain synchronized with execution_apps.
-            while command_chain and command_chain[-1] in set(
-                execution_apps[-2].help_flags + execution_apps[-2].version_flags  # pyright: ignore[reportOperatorIssue]
-            ):
-                removed_help_version_tokens.append(command_chain[-1])
-                execution_apps = execution_apps[:-1]
-                command_chain = command_chain[:-1]
-
-        command_app = execution_apps[-1]
+        # We don't want the command_app to be the version/help handler; we handle those specially.
+        # ``execution_apps`` is ``[self]`` followed by one resolved app per command token.
+        keep, removed_help_version_tokens = _count_chain_without_trailing_help_version(
+            command_chain, execution_apps[1:], execution_apps[0]
+        )
+        command_chain = command_chain[:keep]
+        command_app = execution_apps[keep]
         del execution_apps  # Always use AppStack from here-on.
 
         # Analogously strip trailing help/version pseudo-commands from the
         # meta-aware parse so they don't masquerade as subcommands for
         # hierarchical token scoping (e.g. ``myapp --version`` where a user
         # parameter shadows ``--version``).
-        hier_chain = list(full_chain)
-        hier_command_indices = list(full_command_indices)
-        hier_command_apps = list(full_command_apps)
-        while hier_chain:
-            parent = hier_command_apps[-2] if len(hier_command_apps) >= 2 else self
-            if hier_chain[-1] not in set(parent.help_flags + parent.version_flags):  # pyright: ignore[reportOperatorIssue]
-                break
-            hier_chain.pop()
-            hier_command_indices.pop()
-            hier_command_apps.pop()
+        keep, _ = _count_chain_without_trailing_help_version(full_chain, full_command_apps, self)
+        hier_command_indices = list(full_command_indices[:keep])
+        hier_command_apps = list(full_command_apps[:keep])
 
         ignored: dict[str, Any] = {}
 
@@ -1775,18 +1794,12 @@ class App:
                 # membership is the right gate.)
                 if flag not in tokens:
                     return False
-                for collection in (command_argument_collection, child_argument_collection):
-                    if collection is None:
-                        continue
-                    try:
-                        argument, _, _ = collection.match(flag)
-                    except ValueError:
-                        continue
-                    # A ``**kwargs`` catch-all matches ANY keyword; that is not an
-                    # explicit shadow of the help/version flag.
-                    if argument.field_info.kind is not argument.field_info.VAR_KEYWORD:
-                        return True
-                return False
+                # A ``**kwargs`` catch-all doesn't count (see _match_explicit).
+                return any(
+                    collection._match_explicit(flag) is not None
+                    for collection in (command_argument_collection, child_argument_collection)
+                    if collection is not None
+                )
 
             # If a removed trailing help/version "command" is actually shadowed by a
             # parameter on the resolved command (e.g. ``def sub(version: bool = False)``),

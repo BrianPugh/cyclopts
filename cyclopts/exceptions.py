@@ -305,15 +305,11 @@ class UnknownOptionError(CycloptsError):
             # Check if a parent scope defines this option (for strict mode hints).
             if self.parent_apps_with_collections is not None:
                 for parent_name, parent_ac in self.parent_apps_with_collections:
-                    try:
-                        # Strip "=value" suffix so "--verbose=true" matches "--verbose".
-                        argument, _, _ = parent_ac.match(keyword.split("=", 1)[0])
-                    except ValueError:
-                        continue
-                    if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
-                        # A ``**kwargs`` catch-all matches ANY keyword; that is not
-                        # evidence the option belongs to the parent scope, and hinting
-                        # here would suppress the nearest-neighbor suggestion below.
+                    # Strip "=value" suffix so "--verbose=true" matches "--verbose".
+                    # A ``**kwargs`` catch-all doesn't count (see _match_explicit) —
+                    # hinting on those would suppress the nearest-neighbor
+                    # suggestion below.
+                    if parent_ac._match_explicit(keyword.split("=", 1)[0]) is None:
                         continue
                     if self.command_chain:
                         yield ' Did you mean to place it directly after "', ""

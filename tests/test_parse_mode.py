@@ -1282,3 +1282,95 @@ class TestScopingRegressions:
         captured.clear()
         app.meta(["cmd", "--flag", "--opt", "value"], exit_on_error=False)
         assert captured == {"flag": True, "opt": "value", "args": ()}
+
+
+class TestScopedFlatParity:
+    """Differential guard for hierarchical scoping.
+
+    When only one level defines keyword parameters, the hierarchically-scoped
+    parse must bind exactly what a flat parse of the same (non-command) tokens
+    would — any divergence means the scoping probes and the real parser
+    passes have fallen out of agreement.
+    """
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["--verbose", "cmd", "a", "b"],
+            ["cmd", "--verbose", "a", "b"],
+            ["cmd", "a", "--verbose", "b"],
+            ["cmd", "a", "b", "--verbose"],
+            ["--name", "n", "cmd", "a", "b"],
+            ["cmd", "--name", "n", "a", "b"],
+            ["cmd", "a", "b", "--name", "n"],
+            ["--verbose", "cmd", "--name", "n", "a"],
+            ["cmd", "--name=n", "--verbose", "a"],
+        ],
+    )
+    def test_meta_only_params_match_flat_parse(self, argv):
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+            verbose: bool = False,
+            name: str = "unset",
+        ):
+            captured["meta"] = {"verbose": verbose, "name": name}
+            return app(tokens)
+
+        @app.command
+        def cmd(*args: str):
+            captured["args"] = args
+
+        app.meta(argv, exit_on_error=False)
+
+        flat = App(name="flat", result_action="return_value")
+        flat_captured: dict[str, object] = {}
+
+        @flat.default
+        def flat_main(*args: str, verbose: bool = False, name: str = "unset"):
+            flat_captured["meta"] = {"verbose": verbose, "name": name}
+            flat_captured["args"] = args
+
+        flat([t for t in argv if t != "cmd"], exit_on_error=False)
+
+        assert captured["meta"] == flat_captured["meta"]
+        assert captured["args"] == flat_captured["args"]
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["cmd", "--verbose", "a", "b"],
+            ["cmd", "a", "--verbose", "b"],
+            ["cmd", "a", "b", "--verbose"],
+        ],
+    )
+    def test_child_only_params_match_flat_parse(self, argv):
+        app = App(name="myapp", result_action="return_value")
+        captured: dict[str, object] = {}
+
+        @app.meta.default
+        def meta(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+            return app(tokens)
+
+        @app.command
+        def cmd(*args: str, verbose: bool = False):
+            captured["verbose"] = verbose
+            captured["args"] = args
+
+        app.meta(argv, exit_on_error=False)
+
+        flat = App(name="flat", result_action="return_value")
+        flat_captured: dict[str, object] = {}
+
+        @flat.default
+        def flat_main(*args: str, verbose: bool = False):
+            flat_captured["verbose"] = verbose
+            flat_captured["args"] = args
+
+        flat(argv[1:], exit_on_error=False)
+
+        assert captured["verbose"] == flat_captured["verbose"]
+        assert captured["args"] == flat_captured["args"]

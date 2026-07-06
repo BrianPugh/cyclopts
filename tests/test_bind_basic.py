@@ -1141,7 +1141,7 @@ def test_parse_kw_and_flags_stop_at_first_unknown_preserves_end_of_options(app):
 
     # Long unknown option followed by positional-only segment.
     tokens = ["--unknown", "--", "raw1", "raw2"]
-    unused_tokens, unused_indices, _ = _parse_kw_and_flags(
+    unused_tokens, unused_indices, _, _ = _parse_kw_and_flags(
         argument_collection,
         tokens,
         stop_at_first_unknown=True,
@@ -1152,7 +1152,7 @@ def test_parse_kw_and_flags_stop_at_first_unknown_preserves_end_of_options(app):
     # Combined short unknown option followed by positional-only segment.
     argument_collection = app.assemble_argument_collection()
     tokens = ["-xyz", "--", "raw1", "raw2"]
-    unused_tokens, unused_indices, _ = _parse_kw_and_flags(
+    unused_tokens, unused_indices, _, _ = _parse_kw_and_flags(
         argument_collection,
         tokens,
         stop_at_first_unknown=True,
