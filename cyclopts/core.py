@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from cyclopts.help import HelpPanel
     from cyclopts.help.protocols import HelpFormatter
 
-from cyclopts._result_action import ResultAction, ResultActionSingle
+from cyclopts._result_action import ResultAction, ResultActionSingle, validate_result_action
 from cyclopts._run import _run_maybe_async_command
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -107,6 +107,9 @@ def _result_action_converter(
 
     if not result:
         raise ValueError("result_action cannot be an empty sequence")
+
+    for action in result:
+        validate_result_action(action)
 
     return result
 
@@ -2148,7 +2151,7 @@ class App:
         result_action: ResultAction | None
             Controls how command return values are handled. Can be a predefined literal string
             or a custom callable that takes the result and returns a processed value.
-            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
+            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_sys_exit".
             See :attr:`App.result_action` for available modes.
 
         Returns
@@ -2171,7 +2174,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "backend": backend,
-                "result_action": result_action,
+                "result_action": _result_action_converter(result_action),
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
@@ -2253,7 +2256,7 @@ class App:
         result_action: ResultAction | None
             Controls how command return values are handled. Can be a predefined literal string
             or a custom callable that takes the result and returns a processed value.
-            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_return_int_as_exit_code".
+            If :obj:`None`, inherits from :attr:`App.result_action`, eventually defaulting to "print_non_int_sys_exit".
             See :attr:`App.result_action` for available modes.
 
         Returns
@@ -2300,7 +2303,7 @@ class App:
                 "help_on_error": help_on_error,
                 "verbose": verbose,
                 "backend": backend,
-                "result_action": result_action,
+                "result_action": _result_action_converter(result_action),
                 "error_formatter": error_formatter,
             }.items()
             if v is not None
