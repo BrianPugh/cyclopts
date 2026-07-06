@@ -1828,7 +1828,7 @@ class App:
             active_help_flags = tuple(f for f in command_app.help_flags if not _flag_shadowed_by_user_param(f))
             active_version_flags = tuple(f for f in command_app.version_flags if not _flag_shadowed_by_user_param(f))
 
-            help_flag_index = _get_help_flag_index(tokens, active_help_flags, end_of_options_delimiter)
+            help_flag_index = _get_flag_index(tokens, active_help_flags, end_of_options_delimiter)
 
             try:
                 if help_flag_index is not None:
@@ -1849,7 +1849,7 @@ class App:
                     bound = inspect.signature(command).bind(tokens, console=command_app.console)
                     unused_tokens = []
                     argument_collection = ArgumentCollection()
-                elif any(flag in tokens for flag in active_version_flags):
+                elif _get_flag_index(tokens, active_version_flags, end_of_options_delimiter) is not None:
                     command = _get_version_command(command_app)
                     while meta_parent := meta_parent._meta_parent:
                         command = _get_version_command(meta_parent)
@@ -3028,15 +3028,16 @@ class App:
         return f"{type(self).__name__}({signature})"
 
 
-def _get_help_flag_index(tokens, help_flags, end_of_options_delimiter) -> int | None:
+def _get_flag_index(tokens, flags, end_of_options_delimiter) -> int | None:
+    """Index of the first of ``flags`` in ``tokens``, ignoring tokens at/after the end-of-options delimiter."""
     delimiter_index = None
     if end_of_options_delimiter:
         with suppress(ValueError):
             delimiter_index = tokens.index(end_of_options_delimiter)
 
-    for help_flag in help_flags:
+    for flag in flags:
         with suppress(ValueError):
-            index = tokens.index(help_flag)
+            index = tokens.index(flag)
             if delimiter_index is None or index < delimiter_index:
                 break
     else:

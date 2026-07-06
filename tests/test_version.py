@@ -493,3 +493,31 @@ def test_shadowed_version_with_help_flag_shows_help(console):
         app(["sub", "--version", "--help"], console=console)
 
     assert "Usage: myapp sub" in capture.get()
+
+
+def test_version_flag_after_end_of_options_delimiter_is_positional():
+    """``--version`` after ``--`` is positional data, not a version request."""
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.default
+    def main(*args: str):
+        return args
+
+    assert app(["--", "--version"], exit_on_error=False) == ("--version",)
+
+
+def test_version_flag_before_end_of_options_delimiter_still_intercepts(console):
+    from cyclopts import App
+
+    app = App(name="myapp", version="1.0.0", result_action="return_value")
+
+    @app.default
+    def main(*args: str):
+        return args
+
+    with console.capture() as capture:
+        app(["--version", "--", "x"], console=console)
+
+    assert "1.0.0\n" == capture.get()
