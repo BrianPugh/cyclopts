@@ -2012,7 +2012,7 @@ class App:
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
         exit_on_error: bool | None
-            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            If there is an error parsing the CLI tokens invoke ``sys.exit(2)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
         help_on_error: bool | None
@@ -2085,7 +2085,7 @@ class App:
                     else:
                         e.console.print(CycloptsPanel(e))
                 if exit_on_error if exit_on_error is not None else True:
-                    sys.exit(1)
+                    sys.exit(2)
                 raise
 
         return command, bound, ignored
@@ -2128,7 +2128,7 @@ class App:
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
         exit_on_error: bool | None
-            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            If there is an error parsing the CLI tokens invoke ``sys.exit(2)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
         help_on_error: bool | None
@@ -2233,7 +2233,7 @@ class App:
             Print a rich-formatted error on error.
             If :obj:`None`, inherits from :attr:`App.print_error`, eventually defaulting to :obj:`True`.
         exit_on_error: bool | None
-            If there is an error parsing the CLI tokens invoke ``sys.exit(1)``.
+            If there is an error parsing the CLI tokens invoke ``sys.exit(2)``.
             Otherwise, continue to raise the exception.
             If :obj:`None`, inherits from :attr:`App.exit_on_error`, eventually defaulting to :obj:`True`.
         help_on_error: bool | None

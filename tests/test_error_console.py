@@ -224,3 +224,19 @@ def test_console_default_is_stdout():
 
     # Verify it's configured for stdout (default)
     assert console.file == sys.stdout
+
+
+def test_parse_error_exit_code_is_2(capfd):
+    """Usage/parse errors exit with code 2 (argparse/click convention),
+    distinguishing them from application failures (result_action False -> 1).
+    """
+    app = App()
+
+    @app.default
+    def main(*, flag: bool = False):
+        pass
+
+    with pytest.raises(SystemExit) as excinfo:
+        app("--invalid-option", exit_on_error=True, print_error=False)
+    assert excinfo.value.code == 2
+    capfd.readouterr()
