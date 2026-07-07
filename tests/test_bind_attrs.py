@@ -53,7 +53,7 @@ def test_bind_attrs(app, assert_parse_args, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.ID --user.id      [required]                               │
         │    USER.NAME --user.name  [default: John Doe]                      │
-        │    --user.tastes                                                   │
+        │    --user.tastes          [default: {}]                            │
         │    --user.outfit.body                                              │
         │    --user.outfit.head                                              │
         │    --user.admin           [default: False]                         │
@@ -93,7 +93,7 @@ def test_bind_attrs_flatten(app, assert_parse_args, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  ID --id              [required]                                 │
         │    NAME --name          [default: John Doe]                        │
-        │    --tastes                                                        │
+        │    --tastes             [default: {}]                              │
         │    --outfit.body                                                   │
         │    --outfit.head                                                   │
         │    --admin --not-admin  [default: False]                           │

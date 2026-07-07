@@ -238,7 +238,9 @@ def _attrs_field_infos(hint) -> dict[str, FieldInfo]:
 
         if isinstance(attribute.default, attrs.Factory):  # pyright: ignore
             required = False
-            default = None  # Not strictly True, but we don't want to invoke factory
+            # ``takes_self`` factories cannot be invoked without an instance; treat those
+            # fields as having no introspectable default.
+            default = FieldInfo.empty if attribute.default.takes_self else attribute.default.factory()
         elif attribute.default is attrs.NOTHING:
             required = True
             default = FieldInfo.empty
