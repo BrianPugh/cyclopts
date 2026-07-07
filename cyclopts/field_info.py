@@ -202,11 +202,23 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
         else:
             annotation = pydantic_field.annotation
 
+        if pydantic_field.default_factory is not None:
+            try:
+                default = pydantic_field.get_default(call_default_factory=True)
+            except (TypeError, ValueError):
+                # Factories that require validated data cannot be invoked during introspection;
+                # treat those fields as having no introspectable default.
+                default = FieldInfo.empty
+        elif pydantic_field.default is PydanticUndefined:
+            default = FieldInfo.empty
+        else:
+            default = pydantic_field.default
+
         out[python_name] = FieldInfo(
             names=tuple(names),
             kind=inspect.Parameter.KEYWORD_ONLY if pydantic_field.kw_only else inspect.Parameter.POSITIONAL_OR_KEYWORD,
             annotation=annotation,
-            default=FieldInfo.empty if pydantic_field.default is PydanticUndefined else pydantic_field.default,
+            default=default,
             required=pydantic_field.is_required(),
             help=help,
         )

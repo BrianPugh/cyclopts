@@ -3175,7 +3175,7 @@ def test_help_pydantic_dict_list_basemodel_is_leaf(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --models.{NAME}.path       path to data                            │
-        │ --models.{NAME}.items --m  list of items                           │
+        │ --models.{NAME}.items --m  list of items [default: []]             │
         │   odels.{NAME}.empty-item                                          │
         │   s                                                                │
         ╰────────────────────────────────────────────────────────────────────╯
@@ -3220,7 +3220,7 @@ def test_help_pydantic_dict_circular_reference(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --root.{NAME}.label        node label                              │
-        │ --root.{NAME}.children.{N  child nodes                             │
+        │ --root.{NAME}.children.{N  child nodes [default: {}]               │
         │   AME}                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         """

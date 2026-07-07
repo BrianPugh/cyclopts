@@ -27,7 +27,7 @@ Demonstrates Pydantic model support for CLI parameters.
 * `--auth.provider`: Authentication provider type.  *[choices: oauth2, jwt, basic, none]*  *[default: jwt]*
 * `--auth.token-expiry`: Token expiration time in seconds.  *[default: 3600]*
 * `--auth.refresh-enabled, --auth.no-refresh-enabled`: Enable token refresh.  *[default: True]*
-* `--auth.allowed-origins, --auth.empty-allowed-origins`: List of allowed CORS origins.
+* `--auth.allowed-origins, --auth.empty-allowed-origins`: List of allowed CORS origins.  *[default: ['*']]*
 
 ### complex-cli server stop
 

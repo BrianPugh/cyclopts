@@ -1014,3 +1014,30 @@ def test_attrs_command_factory(app, assert_parse_args):
     assert_parse_args(Test, "test")
 
     assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"
+
+
+def test_pydantic_default_factory_help(app, console):
+    """Zero-arg ``default_factory`` values render in help, consistent with dataclass/attrs.
+
+    Factories that require validated data cannot be invoked during introspection,
+    so those fields show no default.
+    """
+
+    class Config(BaseModel):
+        numbers: list[int] = Field(default_factory=lambda: [1, 2, 3])
+        derived: int = Field(default_factory=lambda data: len(data["numbers"]))
+
+    @app.command
+    def nested(config: Config | None = None):
+        pass
+
+    @app.command
+    class Direct(BaseModel):
+        numbers: list[int] = Field(default_factory=lambda: [1, 2, 3])
+
+    for cmd in ("nested --help", "direct --help"):
+        with console.capture() as capture:
+            app(cmd, console=console)
+        actual = capture.get()
+        assert "[default: [1, 2, 3]]" in actual
+        assert "factory" not in actual
