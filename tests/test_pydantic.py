@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from textwrap import dedent
 from typing import Annotated, Literal
@@ -918,3 +918,26 @@ def test_pydantic_inheritance_simple(app, console):
     # Check that both base and derived field descriptions are present
     assert "Field from base pydantic model" in actual
     assert "Field from derived pydantic model" in actual
+
+
+def test_stdlib_dataclass_command_default_factory(app, assert_parse_args):
+    """Stdlib dataclass commands with a ``default_factory`` must not be pydantic-validated against the sentinel.
+
+    With pydantic installed, the unfilled ``default_factory`` sentinel
+    (``_HAS_DEFAULT_FACTORY``) was passed to ``pydantic.TypeAdapter.validate_python``,
+    raising a ValidationError even though the user provided no tokens.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+
+    @app.command
+    @dataclass
+    class Test:
+        numbers: list[int] = field(default_factory=lambda: [1, 2, 3])
+
+        def __call__(self) -> str:
+            return str(self.numbers)
+
+    assert_parse_args(Test, "test")
+
+    assert app(["test"], result_action="return_value", exit_on_error=False) == "[1, 2, 3]"
