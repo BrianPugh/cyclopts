@@ -80,6 +80,26 @@ When both the meta app and the subcommand define a parameter with the same name 
    [version flag]
    Hello, Alice!
 
+Combined Short Options
+^^^^^^^^^^^^^^^^^^^^^^
+In fallthrough mode, a combined short-option token (e.g. ``-xvf``) is resolved
+against the **merged** flag namespace of both levels, since the person typing
+the command doesn't know (or care) which level implements each flag. A single
+left-to-right scan applies standard GNU rules to the merged table:
+
+- Each flag character binds at the level that owns it (the subcommand wins if
+  both levels define the same letter).
+- The first value-taking option absorbs the rest of the token as its attached
+  value (or, with no remainder, the next token) and ends the scan.
+- An unknown character is reported as an unknown option.
+
+.. code-block:: console
+
+   # meta owns -v/--verbose and -u/--user; ``cmd`` owns -x and -f:
+   $ my-script cmd -xvf        # -x, -f bind at cmd; -v binds at the meta
+   $ my-script cmd -xuroot     # -x binds at cmd; meta gets user="root"
+   $ my-script cmd -xu alice   # -x binds at cmd; meta gets user="alice"
+
 -----------
 Strict Mode
 -----------

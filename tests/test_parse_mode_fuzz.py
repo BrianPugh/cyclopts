@@ -288,7 +288,24 @@ def _check_mixed(seed: int) -> None:
             combined_pool.append(rng.choice(unknown))
             combined_junk = True
         rng.shuffle(combined_pool)
-        child_groups.append(["-" + "".join(combined_pool)])
+        combined_token = "-" + "".join(combined_pool)
+        if not combined_junk and rng.random() < 0.4:
+            # Terminate the combined token with a meta value-taking short and
+            # a GNU-style attached value (the ``-xuroot`` class): the merged
+            # scan must route the value to the option even when the value's
+            # characters collide with either side's flag letters.
+            unemitted_options = [
+                spec
+                for spec in meta_specs
+                if spec.kind == "option" and spec.short and meta_emission.expected[spec.pyname] == "unset"
+            ]
+            if unemitted_options:
+                spec = rng.choice(unemitted_options)
+                assert spec.short is not None
+                value = _random_value(rng)
+                combined_token += spec.short[1] + value
+                meta_emission.expected[spec.pyname] = value
+        child_groups.append([combined_token])
 
     for i in range(rng.randint(0, 3)):
         child_groups.append([f"w{i}"])
