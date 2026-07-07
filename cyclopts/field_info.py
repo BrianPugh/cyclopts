@@ -363,34 +363,15 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
         annotation = type_hints.get(name, iparam.annotation)
         out[name] = FieldInfo.from_iparam(iparam, annotation=annotation)
 
-    if inspect.isclass(func) and is_dataclass(func):
-        # A dataclass's ``__init__`` signature uses a private sentinel as the default
-        # for ``default_factory`` fields; resolve it to the actual factory value.
-        import dataclasses
-
-        for dataclass_field in dataclasses.fields(func):
-            if dataclass_field.default_factory is not dataclasses.MISSING and dataclass_field.name in out:
-                out[dataclass_field.name] = out[dataclass_field.name].evolve(default=dataclass_field.default_factory())
-    elif inspect.isclass(func) and is_attrs(func):
-        # An attrs class's ``__init__`` signature uses the ``attrs.NOTHING`` sentinel as the
-        # default for factory fields; resolve it to the actual factory value.
-        # ``takes_self`` factories cannot be invoked without an instance; treat those
-        # fields as having no introspectable default.
-        for attribute in func.__attrs_attrs__:
-            if isinstance(attribute.default, attrs.Factory) and attribute.alias in out:  # pyright: ignore
-                default = FieldInfo.empty if attribute.default.takes_self else attribute.default.factory()
-                out[attribute.alias] = out[attribute.alias].evolve(default=default)
-    elif inspect.isclass(func) and is_pydantic(func):
-        # Pydantic's generated ``__signature__`` reuses dataclasses' private
-        # ``_HAS_DEFAULT_FACTORY`` sentinel as the default for ``default_factory`` fields.
-        # Pydantic factories may require validated data, so they cannot always be invoked;
-        # treat those fields as having no introspectable default (matching
-        # ``_pydantic_field_infos``).
-        for name, pydantic_field in getattr(func, "model_fields", {}).items():
-            if pydantic_field.default_factory is None:
-                continue
-            for candidate in (name, pydantic_field.alias):
-                if candidate and candidate in out:
-                    out[candidate] = out[candidate].evolve(default=FieldInfo.empty)
+    if inspect.isclass(func):
+        # ``inspect.signature`` on a class surfaces raw ``__init__`` defaults, which use
+        # library-private sentinels for factory fields (dataclasses' ``_HAS_DEFAULT_FACTORY``
+        # — also reused by pydantic's generated ``__signature__`` — and attrs' ``NOTHING``).
+        # ``get_field_infos`` already resolves defaults per-library; merge its
+        # default/requiredness over the raw signature values.
+        for name, field_info in get_field_infos(func).items():
+            for candidate in field_info.names or (name,):
+                if candidate in out:
+                    out[candidate] = out[candidate].evolve(default=field_info.default, required=field_info.required)
 
     return out
