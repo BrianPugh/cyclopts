@@ -275,7 +275,10 @@ class Argument:
                     continue
                 if field_info.kind is field_info.VAR_KEYWORD:
                     self._default = field_info.annotation
-                else:
+                elif field_info.name not in self._lookup:
+                    # Fields already registered via ``get_field_infos`` have richer metadata
+                    # (e.g. resolved ``default_factory`` values) than the raw ``__init__``
+                    # signature; don't re-register them.
                     self._update_lookup({field_info.name: field_info})
 
         if self._accepts_keywords and len(hints) > 1:

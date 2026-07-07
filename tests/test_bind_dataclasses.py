@@ -836,3 +836,26 @@ def test_bind_dataclass_default_parameter_consume_multiple_propagates(assert_par
     assert actual_command == cmd
     assert actual_bind.args == ("my_office",)
     assert actual_bind.kwargs == {"inner": Inner(names=["name1", "name2"])}
+
+
+def test_bind_dataclass_accepts_keys_default_factory(app, assert_parse_args):
+    """Explicit ``accepts_keys=True`` on a dataclass with a ``default_factory`` field.
+
+    The field was registered twice — once via ``_dataclass_field_infos`` (factory
+    resolved) and once via ``signature_parameters(hint.__init__)`` (raw
+    ``_HAS_DEFAULT_FACTORY`` sentinel) — and the mismatch raised a bare
+    ``NotImplementedError``.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+
+    @dataclass
+    class Config:
+        numbers: list[int] = field(default_factory=lambda: [1, 2, 3])
+
+    @app.command
+    def cmd(config: Annotated[Config | None, Parameter(accepts_keys=True)] = None):
+        pass
+
+    assert_parse_args(cmd, "cmd")
+    assert_parse_args(cmd, "cmd --config.numbers=5", Config(numbers=[5]))
