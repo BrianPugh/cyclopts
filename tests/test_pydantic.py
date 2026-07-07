@@ -941,3 +941,28 @@ def test_stdlib_dataclass_command_default_factory(app, assert_parse_args):
     assert_parse_args(Test, "test")
 
     assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"
+
+
+def test_attrs_command_factory(app, assert_parse_args):
+    """Attrs commands with a ``factory`` must not be pydantic-validated against the ``NOTHING`` sentinel.
+
+    Attrs' generated ``__init__`` signature uses ``attrs.NOTHING`` as the default for
+    factory fields; with pydantic installed it was passed to
+    ``pydantic.TypeAdapter.validate_python``, raising a ValidationError even though
+    the user provided no tokens.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+    import attrs
+
+    @app.command
+    @attrs.define
+    class Test:
+        numbers: list[int] = attrs.field(factory=lambda: [1, 2, 3])
+
+        def __call__(self) -> str:
+            return str(self.numbers)
+
+    assert_parse_args(Test, "test")
+
+    assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"

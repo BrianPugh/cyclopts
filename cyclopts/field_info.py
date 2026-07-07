@@ -369,5 +369,14 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
         for dataclass_field in dataclasses.fields(func):
             if dataclass_field.default_factory is not dataclasses.MISSING and dataclass_field.name in out:
                 out[dataclass_field.name] = out[dataclass_field.name].evolve(default=dataclass_field.default_factory())
+    elif inspect.isclass(func) and is_attrs(func):
+        # An attrs class's ``__init__`` signature uses the ``attrs.NOTHING`` sentinel as the
+        # default for factory fields; resolve it to the actual factory value.
+        # ``takes_self`` factories cannot be invoked without an instance; treat those
+        # fields as having no introspectable default.
+        for attribute in func.__attrs_attrs__:
+            if isinstance(attribute.default, attrs.Factory) and attribute.alias in out:  # pyright: ignore
+                default = FieldInfo.empty if attribute.default.takes_self else attribute.default.factory()
+                out[attribute.alias] = out[attribute.alias].evolve(default=default)
 
     return out

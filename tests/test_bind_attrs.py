@@ -248,3 +248,23 @@ def test_attrs_inheritance_simple(app, console):
     # Check that both base and derived docstrings are present
     assert "BaseClass.some_arg docstring." in actual
     assert "DerivedClass.some_other_arg docstring." in actual
+
+
+def test_bind_attrs_command_factory_help(app, console):
+    """Attrs commands must not leak the ``attrs.NOTHING`` sentinel into help text.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+
+    @app.command
+    @define
+    class Test:
+        numbers: list[int] = field(factory=lambda: [1, 2, 3])
+
+    with console.capture() as capture:
+        app("test --help", console=console)
+
+    actual = capture.get()
+
+    assert "NOTHING" not in actual
+    assert "[default: [1, 2, 3]]" in actual
