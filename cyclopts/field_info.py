@@ -360,4 +360,14 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
     for name, iparam in inspect.signature(f).parameters.items():
         annotation = type_hints.get(name, iparam.annotation)
         out[name] = FieldInfo.from_iparam(iparam, annotation=annotation)
+
+    if inspect.isclass(func) and is_dataclass(func):
+        # A dataclass's ``__init__`` signature uses a private sentinel as the default
+        # for ``default_factory`` fields; resolve it to the actual factory value.
+        import dataclasses
+
+        for dataclass_field in dataclasses.fields(func):
+            if dataclass_field.default_factory is not dataclasses.MISSING and dataclass_field.name in out:
+                out[dataclass_field.name] = out[dataclass_field.name].evolve(default=dataclass_field.default_factory())
+
     return out

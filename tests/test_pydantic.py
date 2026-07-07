@@ -940,4 +940,4 @@ def test_stdlib_dataclass_command_default_factory(app, assert_parse_args):
 
     assert_parse_args(Test, "test")
 
-    assert app(["test"], result_action="return_value", exit_on_error=False) == "[1, 2, 3]"
+    assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"
