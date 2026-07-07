@@ -943,6 +943,29 @@ def test_stdlib_dataclass_command_default_factory(app, assert_parse_args):
     assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"
 
 
+def test_pydantic_basemodel_command_default_factory(app, assert_parse_args):
+    """BaseModel commands with a ``default_factory`` must not be validated against the sentinel.
+
+    Pydantic's generated ``__signature__`` reuses dataclasses'
+    ``_HAS_DEFAULT_FACTORY`` sentinel as the default for ``default_factory``
+    fields, which was passed to ``pydantic.TypeAdapter.validate_python``,
+    raising a ValidationError even though the user provided no tokens.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+
+    @app.command
+    class Test(BaseModel):
+        numbers: list[int] = Field(default_factory=lambda: [1, 2, 3])
+
+        def __call__(self) -> str:
+            return str(self.numbers)
+
+    assert_parse_args(Test, "test")
+
+    assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"
+
+
 def test_attrs_nested_factory(app, assert_parse_args):
     """Attrs fields with a ``factory`` must not have a substituted ``None`` default pydantic-validated.
 

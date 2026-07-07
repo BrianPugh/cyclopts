@@ -380,5 +380,17 @@ def signature_parameters(f: Any) -> dict[str, FieldInfo]:
             if isinstance(attribute.default, attrs.Factory) and attribute.alias in out:  # pyright: ignore
                 default = FieldInfo.empty if attribute.default.takes_self else attribute.default.factory()
                 out[attribute.alias] = out[attribute.alias].evolve(default=default)
+    elif inspect.isclass(func) and is_pydantic(func):
+        # Pydantic's generated ``__signature__`` reuses dataclasses' private
+        # ``_HAS_DEFAULT_FACTORY`` sentinel as the default for ``default_factory`` fields.
+        # Pydantic factories may require validated data, so they cannot always be invoked;
+        # treat those fields as having no introspectable default (matching
+        # ``_pydantic_field_infos``).
+        for name, pydantic_field in getattr(func, "model_fields", {}).items():
+            if pydantic_field.default_factory is None:
+                continue
+            for candidate in (name, pydantic_field.alias):
+                if candidate and candidate in out:
+                    out[candidate] = out[candidate].evolve(default=FieldInfo.empty)
 
     return out
