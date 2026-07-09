@@ -2,7 +2,7 @@ from textwrap import dedent
 from typing import Annotated
 
 import pytest
-from attrs import define, field
+from attrs import Factory, define, field
 
 from cyclopts import Parameter
 from cyclopts.exceptions import MissingArgumentError, UnknownOptionError
@@ -53,7 +53,7 @@ def test_bind_attrs(app, assert_parse_args, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  USER.ID --user.id      [required]                               │
         │    USER.NAME --user.name  [default: John Doe]                      │
-        │    --user.tastes                                                   │
+        │    --user.tastes          [default: {}]                            │
         │    --user.outfit.body                                              │
         │    --user.outfit.head                                              │
         │    --user.admin           [default: False]                         │
@@ -93,7 +93,7 @@ def test_bind_attrs_flatten(app, assert_parse_args, console):
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  ID --id              [required]                                 │
         │    NAME --name          [default: John Doe]                        │
-        │    --tastes                                                        │
+        │    --tastes             [default: {}]                              │
         │    --outfit.body                                                   │
         │    --outfit.head                                                   │
         │    --admin --not-admin  [default: False]                           │
@@ -248,3 +248,62 @@ def test_attrs_inheritance_simple(app, console):
     # Check that both base and derived docstrings are present
     assert "BaseClass.some_arg docstring." in actual
     assert "DerivedClass.some_other_arg docstring." in actual
+
+
+def test_bind_attrs_command_factory_help(app, console):
+    """Attrs commands must not leak the ``attrs.NOTHING`` sentinel into help text.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+
+    @app.command
+    @define
+    class Test:
+        numbers: list[int] = field(factory=lambda: [1, 2, 3])
+
+    with console.capture() as capture:
+        app("test --help", console=console)
+
+    actual = capture.get()
+
+    assert "NOTHING" not in actual
+    assert "[default: [1, 2, 3]]" in actual
+
+
+def test_bind_attrs_command_takes_self_factory(app, console):
+    """``takes_self`` factories cannot be resolved during introspection.
+
+    The factory needs a constructed instance, so the field has no introspectable
+    default: help must not show one (and must not leak the ``attrs.NOTHING``
+    sentinel), yet the factory still runs at construction time when no token is
+    given, and an explicit token overrides it.
+
+    https://github.com/BrianPugh/cyclopts/issues/857
+    """
+
+    @app.command
+    @define
+    class Test:
+        base: int = 5
+        derived: int = field(default=Factory(lambda self: self.base * 2, takes_self=True))
+
+        def __call__(self) -> int:
+            return self.derived
+
+    with console.capture() as capture:
+        app("test --help", console=console)
+
+    actual = capture.get()
+
+    assert "NOTHING" not in actual
+    # ``derived`` has no introspectable default; only ``base`` shows one.
+    assert "[default: 5]" in actual
+    assert actual.count("[default:") == 1
+
+    # Factory resolves at construction when no token is provided.
+    assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == 10
+    assert app(["test", "--base", "10"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == 20
+    # Explicit token overrides the factory.
+    assert (
+        app(["test", "--derived", "99"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == 99
+    )
