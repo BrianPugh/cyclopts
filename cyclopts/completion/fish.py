@@ -402,7 +402,11 @@ def _generate_positional_completions(
     if not command_path:
         return []
 
-    positional_args = [arg for arg in data.arguments if arg.index is not None and arg.show]
+    # Exclude inherited (ancestor-meta) positionals: they were consumed before
+    # this path's command name, so they must not claim a slot here. (This PR
+    # does not attempt the full #759-style subcommand shifting for fish.)
+    local_arguments = data.launcher_arguments + data.own_arguments
+    positional_args = [arg for arg in local_arguments if arg.index is not None and arg.show]
     if not positional_args:
         return []
 
