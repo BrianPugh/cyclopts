@@ -156,6 +156,183 @@ def test_meta_positional_before_subcommand(zsh_tester):
     assert "mute" not in tester.get_completions("vban strip ")
 
 
+def _make_meta_wrapped_app(launcher_signature: str = "positional_only") -> App:
+    """Build the vban/strip/mute meta-app shape used by the meta-positional tests."""
+    root = App(name="vban")
+    strip = App(name="strip")
+    root.command(strip.meta, name="strip")
+
+    if launcher_signature == "positional_only":
+
+        @strip.meta.default
+        def strip_launcher(
+            index: int,
+            /,
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        ):
+            pass
+
+    elif launcher_signature == "positional_or_keyword":
+
+        @strip.meta.default
+        def strip_launcher_pos_or_kw(
+            index: int,
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        ):
+            pass
+
+    elif launcher_signature == "optional_positional":
+
+        @strip.meta.default
+        def strip_launcher_optional(
+            index: int = 0,
+            /,
+            *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+        ):
+            pass
+
+    else:
+        raise ValueError(launcher_signature)
+
+    @strip.command
+    def mute(state: Literal["on", "off"] = "off", /, *, verbose: bool = False):
+        pass
+
+    return root
+
+
+def test_default_positional_does_not_shift_subcommands(zsh_tester):
+    """A plain app's default-command positional must not shift subcommand completion.
+
+    For a non-meta app, the default command's positionals and the subcommands are
+    alternatives at the same word slot (``tool 5`` vs ``tool sub``) -- unlike meta
+    launcher positionals, they are never consumed before a subcommand.
+    """
+    app = App(name="tool")
+
+    @app.default
+    def main(x: int, /):
+        pass
+
+    @app.command
+    def sub(y: int, /, *, verbose: bool = False):
+        pass
+
+    tester = zsh_tester(app, "tool")
+
+    assert "sub" in tester.get_completions("tool ")
+    assert "--verbose" in tester.get_completions("tool sub --v")
+
+
+def test_subcommand_positional_identical_to_default(zsh_tester):
+    """A subcommand keeps its own positional even when it's structurally identical
+    to the default command's positional (they are distinct arguments).
+    """
+    app = App(name="tool")
+
+    @app.default
+    def main(mode: Literal["fast", "slow"], /):
+        pass
+
+    @app.command
+    def sub(mode: Literal["fast", "slow"], /):
+        pass
+
+    tester = zsh_tester(app, "tool")
+
+    assert "fast" in tester.get_completions("tool sub ")
+
+
+def test_meta_positional_subcommand_own_arguments(zsh_tester):
+    """After entering a subcommand past a meta positional, the subcommand's own
+    positionals and options must complete (the word frame is shifted by the
+    meta positional).
+    """
+    root = _make_meta_wrapped_app()
+    tester = zsh_tester(root, "vban")
+
+    assert "--verbose" in tester.get_completions("vban strip 0 mute --v")
+    assert "on" in tester.get_completions("vban strip 0 mute ")
+
+
+def test_meta_positional_two_levels(zsh_tester):
+    """Meta positionals at two nesting levels compose; dispatch and the leaf's
+    own completions stay correct.
+    """
+    root = App(name="vban")
+
+    @root.meta.default
+    def root_launcher(
+        channel: int,
+        /,
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    ):
+        pass
+
+    strip = App(name="strip")
+    root.command(strip.meta, name="strip")
+
+    @strip.meta.default
+    def strip_launcher(
+        index: int,
+        /,
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    ):
+        pass
+
+    @strip.command
+    def mute(state: Literal["on", "off"] = "off", /):
+        pass
+
+    tester = zsh_tester(root, "vban")
+
+    assert "strip" in tester.get_completions("vban 9 ")
+    assert "mute" in tester.get_completions("vban 9 strip 0 ")
+    assert "on" in tester.get_completions("vban 9 strip 0 mute ")
+
+
+def test_meta_positional_or_keyword_before_subcommand(zsh_tester):
+    """A required meta launcher positional without ``/`` still shifts the
+    subcommand slot (the dominant usage is positional).
+    """
+    root = _make_meta_wrapped_app("positional_or_keyword")
+    tester = zsh_tester(root, "vban")
+
+    assert "mute" in tester.get_completions("vban strip 0 ")
+
+
+def test_meta_optional_positional_keeps_command_slot(zsh_tester):
+    """An optional meta launcher positional makes the subcommand's word index
+    non-deterministic; fall back to offering subcommands at slot 1.
+    """
+    root = _make_meta_wrapped_app("optional_positional")
+    tester = zsh_tester(root, "vban")
+
+    assert "mute" in tester.get_completions("vban strip ")
+
+
+def test_meta_interleaved_variadic_keeps_command_slot(zsh_tester):
+    """A variadic positional interleaved among fixed launcher positionals makes
+    every later word slot non-deterministic; fall back to offering subcommands
+    at slot 1 rather than shifting the dispatch to the wrong slot.
+    """
+    root = App(name="vban")
+    strip = App(name="strip")
+    root.command(strip.meta, name="strip")
+
+    @strip.meta.default
+    def strip_launcher(a: int, b: list[str], c: int, /):
+        pass
+
+    @strip.command
+    def mute(state: Literal["on", "off"] = "off", /):
+        pass
+
+    tester = zsh_tester(root, "vban")
+
+    assert "mute" in tester.get_completions("vban strip ")
+
+
 def test_invalid_prog_name():
     """Test that invalid prog names raise ValueError."""
     with pytest.raises(ValueError, match="Invalid prog_name"):
