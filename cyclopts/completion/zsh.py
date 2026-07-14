@@ -261,6 +261,36 @@ def _generate_describe_completion(
     return lines
 
 
+def _get_local_arguments(
+    completion_data: dict[tuple[str, ...], CompletionData],
+    command_path: tuple[str, ...],
+) -> list["Argument"]:
+    """Return arguments introduced at ``command_path``.
+
+    Completion data includes arguments inherited from parent meta apps. Those
+    arguments were already consumed before the current command, so they must
+    not be assigned another positional slot at a nested path.
+    """
+    arguments = list(completion_data[command_path].arguments)
+    if not command_path:
+        return arguments
+
+    parent_data = completion_data.get(command_path[:-1])
+    if parent_data is None:
+        return arguments
+
+    inherited = list(parent_data.arguments)
+    local = []
+    for argument in arguments:
+        for index, inherited_argument in enumerate(inherited):
+            if argument == inherited_argument:
+                inherited.pop(index)
+                break
+        else:
+            local.append(argument)
+    return local
+
+
 def _generate_completion_for_path(
     completion_data: dict[tuple[str, ...], CompletionData],
     command_path: tuple[str, ...],
@@ -294,6 +324,7 @@ def _generate_completion_for_path(
     data = completion_data[command_path]
     commands = data.commands
     arguments = data.arguments
+    local_arguments = _get_local_arguments(completion_data, command_path)
     indent_str = " " * indent
     lines = []
 
@@ -306,7 +337,7 @@ def _generate_completion_for_path(
 
     # Separate positional from keyword arguments
     # Include all arguments with an index (both positional-only and positional-or-keyword)
-    positional_args = [arg for arg in arguments if arg.index is not None and arg.show]
+    positional_args = [arg for arg in local_arguments if arg.index is not None and arg.show]
     keyword_args = [arg for arg in arguments if not arg.is_positional_only() and arg.show]
 
     # Sort positionals by index (should never be None for positional-only args)
@@ -342,12 +373,22 @@ def _generate_completion_for_path(
         not cmd_name.startswith("-") for registered_command in commands for cmd_name in registered_command.names
     )
 
-    # Generate positional argument specs
-    # Only add positionals if there are no subcommands (they conflict in zsh)
-    if positional_args and not has_non_flag_commands:
+    # Generate positional argument specs. Fixed positionals can precede a
+    # subcommand (most commonly on a meta app); the command state is shifted
+    # past them below. A variadic positional has no deterministic end, so keep
+    # the historical behavior of omitting it when subcommands are present.
+    positionals_for_specs = positional_args
+    if has_non_flag_commands:
+        positionals_for_specs = [
+            arg
+            for arg in positional_args
+            if arg.is_positional_only() and not arg.is_var_positional() and not is_iterable_type(arg.hint)
+        ]
+
+    if positionals_for_specs:
         if command_path:
-            # Nested context: use shifted positional indexing (words[1] is subcommand)
-            positional_specs = _generate_nested_positional_specs(positional_args, data.help_format)
+            # Nested context: position 1 is the first argument after the parent command.
+            positional_specs = _generate_nested_positional_specs(positionals_for_specs, data.help_format)
         else:
             # Root context: standard _arguments works fine. As in the
             # nested helper, only one rest-arg (``*:``) spec is allowed —
@@ -355,11 +396,11 @@ def _generate_completion_for_path(
             # (var-positional preferred). The other iterables remain
             # available via their ``--name`` keyword specs.
             seen_rest = False
-            iterable_args = [a for a in positional_args if a.is_var_positional() or is_iterable_type(a.hint)]
+            iterable_args = [a for a in positionals_for_specs if a.is_var_positional() or is_iterable_type(a.hint)]
             chosen_rest = next((a for a in iterable_args if a.is_var_positional()), None)
             if chosen_rest is None and iterable_args:
                 chosen_rest = iterable_args[0]
-            for argument in positional_args:
+            for argument in positionals_for_specs:
                 is_rest = argument.is_var_positional() or is_iterable_type(argument.hint)
                 if is_rest:
                     if argument is not chosen_rest or seen_rest:
@@ -371,8 +412,12 @@ def _generate_completion_for_path(
         # Add positionals BEFORE options to prioritize them in completion
         args_specs = positional_specs + args_specs
 
+    command_position = 1
+    if positionals_for_specs:
+        command_position = max(1 + (arg.index or 0) for arg in positionals_for_specs) + 1
+
     if has_non_flag_commands:
-        args_specs.append("'1: :->cmds'")
+        args_specs.append(f"'{command_position}: :->cmds'")
         args_specs.append("'*::arg:->args'")
 
     # Eq-form pre-pass: zsh's ``_arguments`` only handles ``--opt=value``
@@ -416,7 +461,7 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}    ;;")
 
         lines.append(f"{indent_str}  args)")
-        lines.append(f"{indent_str}    case $words[1] in")
+        lines.append(f"{indent_str}    case $words[{command_position}] in")
 
         for registered_command in commands:
             for cmd_name in registered_command.names:

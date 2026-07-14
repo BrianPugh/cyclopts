@@ -132,6 +132,30 @@ def test_nested_command_uses_correct_word_index(zsh_tester):
     assert len(words_checks) >= 2, "Should have multiple case $words[1] checks for nested commands"
 
 
+def test_meta_positional_before_subcommand(zsh_tester):
+    """Complete subcommands after a meta app's required positional."""
+    root = App(name="vban")
+    strip = App(name="strip")
+    root.command(strip.meta, name="strip")
+
+    @strip.meta.default
+    def strip_launcher(
+        index: int,
+        /,
+        *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    ):
+        pass
+
+    @strip.command
+    def mute(new_state: bool = False):
+        pass
+
+    tester = zsh_tester(root, "vban")
+
+    assert "mute" in tester.get_completions("vban strip 0 ")
+    assert "mute" not in tester.get_completions("vban strip ")
+
+
 def test_invalid_prog_name():
     """Test that invalid prog names raise ValueError."""
     with pytest.raises(ValueError, match="Invalid prog_name"):
