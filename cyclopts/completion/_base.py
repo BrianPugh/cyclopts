@@ -10,6 +10,8 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
+from attrs import field
+
 from cyclopts.annotations import ITERABLE_TYPES, is_annotated, is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
@@ -30,11 +32,33 @@ class CompletionAction(Enum):
 
 @frozen
 class CompletionData:
-    """Completion data for a command path."""
+    """Completion data for a command path.
+
+    Attributes
+    ----------
+    arguments : ArgumentCollection
+        Every argument contributing to this path (inherited meta positionals,
+        this path's meta launcher, and this path's plain default), flattened.
+        Keyword specs and the cyclopts-``run`` path consume the full list.
+    commands : list[RegisteredCommand]
+        Subcommands registered at this path.
+    help_format : str
+        Resolved help format for descriptions.
+    launcher_arguments : ArgumentCollection
+        Arguments contributed by *this path's* meta-app launcher
+        (``app.meta.default``). These are consumed before this path's
+        subcommand dispatch and therefore shift the subcommand's word slot.
+    own_arguments : ArgumentCollection
+        Arguments contributed by *this path's* plain ``@app.default``. These
+        are alternatives to the subcommand at the same word slot and must
+        never shift it.
+    """
 
     arguments: "ArgumentCollection"
     commands: list[RegisteredCommand]
     help_format: str
+    launcher_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
+    own_arguments: "ArgumentCollection" = field(factory=ArgumentCollection)
 
 
 def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]:
@@ -67,12 +91,27 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
             )
             return
 
-        from cyclopts.core import _iter_resolution_argument_collections
+        from cyclopts.core import _iter_resolution_argument_collections, _walk_metas
 
+        # Classify each contributing app's arguments by provenance (see
+        # ``CompletionData`` for what ``launcher_arguments``/``own_arguments``
+        # mean to the shell generators):
+        #   * inherited -- an ancestor path's meta launcher; already consumed, skip.
+        #   * launcher  -- this path's own meta-app default (``_meta_parent`` set).
+        #   * own       -- this path's plain ``@app.default``.
+        current = list(_walk_metas(command_app))
         arguments = ArgumentCollection()
+        launcher_arguments = ArgumentCollection()
+        own_arguments = ArgumentCollection()
         with app.app_stack(execution_path):
-            for _, app_arguments in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
+            for subapp, app_arguments in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
                 arguments.extend(app_arguments)
+                if not any(subapp is a for a in current):
+                    continue  # inherited (ancestor meta launcher)
+                if subapp._meta_parent is not None:
+                    launcher_arguments.extend(app_arguments)  # this path's meta launcher
+                else:
+                    own_arguments.extend(app_arguments)  # plain @app.default
 
         commands = []
         for group, registered_commands in groups_from_app(command_app, resolve_lazy=True):
@@ -83,7 +122,13 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
 
         help_format = command_app.app_stack.resolve("help_format", fallback="markdown")
 
-        completion_data[command_path] = CompletionData(arguments=arguments, commands=commands, help_format=help_format)
+        completion_data[command_path] = CompletionData(
+            arguments=arguments,
+            commands=commands,
+            help_format=help_format,
+            launcher_arguments=launcher_arguments,
+            own_arguments=own_arguments,
+        )
 
         for registered_command in commands:
             for cmd_name in registered_command.names:

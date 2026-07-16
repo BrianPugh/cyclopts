@@ -411,7 +411,11 @@ def _generate_completions_for_path(
             if not cmd_name.startswith("-"):
                 commands.append(cmd_name)
 
-    positional_args = [arg for arg in data.arguments if arg.index is not None and arg.show]
+    # Exclude inherited (ancestor-meta) positionals: they were consumed before
+    # this path's command name, so they must not claim a slot here. (This PR
+    # does not attempt the full #759-style subcommand shifting for bash.)
+    local_arguments = data.launcher_arguments + data.own_arguments
+    positional_args = [arg for arg in local_arguments if arg.index is not None and arg.show]
     positional_args.sort(key=lambda a: a.index if a.index is not None else 0)
 
     lines.append(f"{indent}if [[ ${{cur}} == -* ]]; then")
