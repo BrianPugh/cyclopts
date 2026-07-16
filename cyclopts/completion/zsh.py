@@ -27,6 +27,44 @@ if TYPE_CHECKING:
     from cyclopts.command_spec import CommandSpec
 
 
+def _is_variadic(arg: "Argument") -> bool:
+    """Whether ``arg`` consumes an unbounded number of words positionally.
+
+    Covers both ``*args`` var-positionals and collection-typed positionals
+    (``list[X]``, ``set[X]``, ``tuple[X, ...]``, ...), which zsh must model with
+    a single rest-arg (``*:``) spec rather than a numbered position.
+
+    Parameters
+    ----------
+    arg : Argument
+        Argument to inspect.
+
+    Returns
+    -------
+    bool
+        True if the argument is variadic/iterable.
+    """
+    return arg.is_var_positional() or is_iterable_type(arg.hint)
+
+
+def _choose_rest_arg(positional_args: list["Argument"]) -> "Argument | None":
+    """Pick the single positional that becomes zsh's rest-arg (``*:``) spec.
+
+    zsh's ``_arguments`` errors with "doubled rest argument definition" if more
+    than one ``*:`` spec is present, so multiple variadic positionals (e.g.
+    several ``list[X]`` defaults) must collapse to one. A true var-positional
+    (``*args``) is preferred; otherwise the first iterable wins. The others
+    remain reachable via their ``--name`` keyword specs emitted elsewhere.
+
+    Returns ``None`` when there is no variadic positional.
+    """
+    variadic_args = [arg for arg in positional_args if _is_variadic(arg)]
+    var_positional = next((a for a in variadic_args if a.is_var_positional()), None)
+    if var_positional is not None:
+        return var_positional
+    return variadic_args[0] if variadic_args else None
+
+
 def generate_completion_script(app: "App", prog_name: str) -> str:
     """Generate zsh completion script.
 
@@ -149,6 +187,7 @@ def _generate_run_command_completion(
 def _generate_nested_positional_specs(
     positional_args: list["Argument"],
     help_format: str,
+    offset: int = 0,
 ) -> list[str]:
     """Generate positional argument specs for nested command context.
 
@@ -163,53 +202,24 @@ def _generate_nested_positional_specs(
         Positional arguments to generate specs for.
     help_format : str
         Help text format.
+    offset : int
+        Number of preceding positional slots to skip (e.g. fixed launcher
+        positionals that come before these arguments on the command line).
 
     Returns
     -------
     list[str]
         List of zsh positional argument specs.
     """
-    specs = []
+    # Emit fixed positionals first (each at ``arg.index + 1 + offset``), then at
+    # most one rest-arg (``*:``) spec -- ``_generate_positional_spec`` computes
+    # both forms from the argument itself.
+    non_variadic_args = [arg for arg in positional_args if not _is_variadic(arg)]
+    specs = [_generate_positional_spec(arg, help_format, offset=offset) for arg in non_variadic_args]
 
-    # Check if we have variadic positionals (including collection types like list[X])
-    variadic_args = [arg for arg in positional_args if arg.is_var_positional() or is_iterable_type(arg.hint)]
-    non_variadic_args = [
-        arg for arg in positional_args if not arg.is_var_positional() and not is_iterable_type(arg.hint)
-    ]
-
-    def _build(arg, position: str) -> str:
-        choices = arg.get_choices(force=True)
-        if choices:
-            escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            action = f"({choices_str})"
-            desc = _escape_zsh_description_dq(_description_text(arg, help_format))
-            quote = '"'
-        else:
-            action = _map_completion_action_to_zsh(get_completion_action(arg.hint))
-            desc = _get_description_from_argument(arg, help_format)
-            quote = "'"
-        return f"{quote}{position}:{desc}:{action}{quote}" if action else f"{quote}{position}:{desc}{quote}"
-
-    # Generate specs for non-variadic positionals
-    for arg in non_variadic_args:
-        # Position in nested context: After *::arg:->args, $words[1] is the subcommand
-        # So positionals start at position 1 (not 2)
-        # Use 1-based indexing: first positional is '1:', second is '2:', etc.
-        pos = 1 + (arg.index or 0)
-        specs.append(_build(arg, str(pos)))
-
-    # Emit at most one rest-arg (``*:``) spec. zsh's ``_arguments`` errors
-    # with "doubled rest argument definition" if more than one is present.
-    # When a function has multiple iterable positional-or-keyword params
-    # (e.g. several ``list[X]`` defaults), only the first can realistically
-    # be filled positionally — the others remain available via their
-    # ``--name`` keyword forms emitted elsewhere.
-    chosen = next((a for a in variadic_args if a.is_var_positional()), None)
-    if chosen is None and variadic_args:
-        chosen = variadic_args[0]
+    chosen = _choose_rest_arg(positional_args)
     if chosen is not None:
-        specs.append(_build(chosen, "*"))
+        specs.append(_generate_positional_spec(chosen, help_format, offset=offset))
 
     return specs
 
@@ -261,6 +271,77 @@ def _generate_describe_completion(
     return lines
 
 
+def _generate_root_positional_specs(
+    positional_args: list["Argument"],
+    help_format: str,
+    offset: int = 0,
+) -> list[str]:
+    """Generate positional specs for the root (non-nested) command context.
+
+    Unlike the nested helper, at the root ``_arguments`` sees the real
+    command line, so positions are ``arg.index + 1`` (plus ``offset``). Only
+    one rest-arg (``*:``) spec is allowed, so multiple iterable positionals
+    collapse to the first (var-positional preferred); the others remain
+    reachable via their ``--name`` keyword specs.
+
+    Parameters
+    ----------
+    positional_args : list[Argument]
+        Positional arguments to generate specs for.
+    help_format : str
+        Help text format.
+    offset : int
+        Number of preceding positional slots to skip.
+
+    Returns
+    -------
+    list[str]
+        List of zsh positional argument specs.
+    """
+    specs: list[str] = []
+    chosen_rest = _choose_rest_arg(positional_args)
+    for argument in positional_args:
+        # Keep only the one chosen rest-arg; drop every other variadic positional.
+        if _is_variadic(argument) and argument is not chosen_rest:
+            continue
+        specs.append(_generate_positional_spec(argument, help_format, offset=offset))
+    return specs
+
+
+def _generate_positional_specs(
+    positional_args: list["Argument"],
+    command_path: tuple[str, ...],
+    help_format: str,
+    offset: int = 0,
+) -> list[str]:
+    """Dispatch positional-spec generation to the root or nested helper."""
+    if not positional_args:
+        return []
+    if command_path:
+        return _generate_nested_positional_specs(positional_args, help_format, offset=offset)
+    return _generate_root_positional_specs(positional_args, help_format, offset=offset)
+
+
+def _cap_rest_specs(specs: list[str]) -> list[str]:
+    """Drop every rest-arg (``*:``) spec after the first.
+
+    zsh's ``_arguments`` errors with "doubled rest argument definition" if more
+    than one ``*:`` spec is present. When positional specs from two provenance
+    groups (launcher + own) are concatenated, each group may contribute a rest
+    spec; keep only the first.
+    """
+    result: list[str] = []
+    seen_rest = False
+    for spec in specs:
+        # Specs are quoted (``'...'`` or ``"..."``); a rest spec's body is ``*:``.
+        if spec[1:].startswith("*:"):
+            if seen_rest:
+                continue
+            seen_rest = True
+        result.append(spec)
+    return result
+
+
 def _generate_completion_for_path(
     completion_data: dict[tuple[str, ...], CompletionData],
     command_path: tuple[str, ...],
@@ -304,13 +385,24 @@ def _generate_completion_for_path(
     args_specs = []
     positional_specs = []
 
-    # Separate positional from keyword arguments
-    # Include all arguments with an index (both positional-only and positional-or-keyword)
-    positional_args = [arg for arg in arguments if arg.index is not None and arg.show]
-    keyword_args = [arg for arg in arguments if not arg.is_positional_only() and arg.show]
+    # Positional arguments, split by provenance (see ``CompletionData`` for what
+    # each group means): launcher positionals shift the subcommand's word slot,
+    # own positionals never do. Inherited (ancestor-meta) positionals are in
+    # neither group -- consumed before this path's command name, so no slot here.
+    launcher_positionals = sorted(
+        (arg for arg in data.launcher_arguments if arg.index is not None),
+        key=lambda a: a.index or 0,
+    )
+    own_positionals = sorted(
+        (arg for arg in data.own_arguments if arg.index is not None and arg.show),
+        key=lambda a: a.index or 0,
+    )
+    # Fixed (non-variadic) launcher positionals each consume exactly one word.
+    # Count them regardless of ``show`` -- a hidden fixed positional still
+    # occupies a slot on the command line (so it still shifts the subcommand).
+    fixed_launcher = [arg for arg in launcher_positionals if not _is_variadic(arg)]
 
-    # Sort positionals by index (should never be None for positional-only args)
-    positional_args.sort(key=lambda a: a.index or 0)
+    keyword_args = [arg for arg in arguments if not arg.is_positional_only() and arg.show]
 
     # Generate keyword argument specs
     for argument in keyword_args:
@@ -342,37 +434,48 @@ def _generate_completion_for_path(
         not cmd_name.startswith("-") for registered_command in commands for cmd_name in registered_command.names
     )
 
-    # Generate positional argument specs
-    # Only add positionals if there are no subcommands (they conflict in zsh)
-    if positional_args and not has_non_flag_commands:
-        if command_path:
-            # Nested context: use shifted positional indexing (words[1] is subcommand)
-            positional_specs = _generate_nested_positional_specs(positional_args, data.help_format)
-        else:
-            # Root context: standard _arguments works fine. As in the
-            # nested helper, only one rest-arg (``*:``) spec is allowed —
-            # collapse multiple iterable positionals to the first one
-            # (var-positional preferred). The other iterables remain
-            # available via their ``--name`` keyword specs.
-            seen_rest = False
-            iterable_args = [a for a in positional_args if a.is_var_positional() or is_iterable_type(a.hint)]
-            chosen_rest = next((a for a in iterable_args if a.is_var_positional()), None)
-            if chosen_rest is None and iterable_args:
-                chosen_rest = iterable_args[0]
-            for argument in positional_args:
-                is_rest = argument.is_var_positional() or is_iterable_type(argument.hint)
-                if is_rest:
-                    if argument is not chosen_rest or seen_rest:
-                        continue
-                    seen_rest = True
-                spec = _generate_positional_spec(argument, data.help_format)
-                positional_specs.append(spec)
+    # Positional specs and the subcommand's word slot.
+    command_position = 1
+    if has_non_flag_commands:
+        # The subcommand slot shifts past the fixed launcher positionals only
+        # when every one of them is required (occupies a definite word) and
+        # they form a contiguous prefix (indices 0..k-1) -- a variadic
+        # positional interleaved among them would consume an unbounded number
+        # of words, making every later slot non-deterministic.
+        # Required positional-or-keyword args count the same as positional-only
+        # here: the dominant launcher usage is positional (``prog 5 sub``); the
+        # ``--opt value`` form would offset the slot -- an accepted trade-off.
+        contiguous_prefix = [arg.index for arg in fixed_launcher] == list(range(len(fixed_launcher)))
+        shift_deterministic = contiguous_prefix and all(arg.required for arg in fixed_launcher)
+        if shift_deterministic and fixed_launcher:
+            # ``contiguous_prefix`` guarantees indices are exactly ``0..k-1``, so
+            # the subcommand sits one slot past the last launcher positional.
+            command_position = len(fixed_launcher) + 1
+            # Emit specs for the *shown* fixed launcher positionals only.
+            shown_launcher = [arg for arg in fixed_launcher if arg.show]
+            positional_specs = _generate_positional_specs(shown_launcher, command_path, data.help_format)
+        # Non-deterministic shift (some fixed launcher positional is optional)
+        # or no launcher positionals: ``command_position`` stays 1 and own
+        # positionals get no specs -- they are alternatives to the subcommand
+        # at the same slot (pre-PR rule).
+    else:
+        # No subcommands: launcher and own positionals both complete. Own
+        # indices are offset past the fixed launcher positionals that precede
+        # them on the command line. A single rest-arg (``*:``) cap holds across
+        # both groups combined.
+        launcher_shown = [arg for arg in launcher_positionals if arg.show]
+        positional_specs = _generate_positional_specs(launcher_shown, command_path, data.help_format)
+        positional_specs += _generate_positional_specs(
+            own_positionals, command_path, data.help_format, offset=len(fixed_launcher)
+        )
+        positional_specs = _cap_rest_specs(positional_specs)
 
+    if positional_specs:
         # Add positionals BEFORE options to prioritize them in completion
         args_specs = positional_specs + args_specs
 
     if has_non_flag_commands:
-        args_specs.append("'1: :->cmds'")
+        args_specs.append(f"'{command_position}: :->cmds'")
         args_specs.append("'*::arg:->args'")
 
     # Eq-form pre-pass: zsh's ``_arguments`` only handles ``--opt=value``
@@ -416,6 +519,16 @@ def _generate_completion_for_path(
         lines.append(f"{indent_str}    ;;")
 
         lines.append(f"{indent_str}  args)")
+        # Normalize the ``$words`` frame so the subcommand sits at ``$words[1]``.
+        # When ``command_position > 1`` the fixed launcher positionals occupy
+        # ``$words[1..k]`` here (standard zsh precommand idiom); dropping them
+        # lets the recursively-inlined child code use its own command name at
+        # ``$words[1]`` and its own ``pos = 1 + arg.index`` slots, unchanged at
+        # any nesting depth.
+        k = command_position - 1
+        if k >= 1:
+            lines.append(f"{indent_str}    shift {k} words")
+            lines.append(f"{indent_str}    (( CURRENT -= {k} ))")
         lines.append(f"{indent_str}    case $words[1] in")
 
         for registered_command in commands:
@@ -754,7 +867,7 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
     return specs
 
 
-def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
+def _generate_positional_spec(argument: "Argument", help_format: str, offset: int = 0) -> str:
     """Generate zsh _arguments spec for a positional argument.
 
     Parameters
@@ -763,6 +876,8 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
         Positional argument object.
     help_format : str
         Help text format.
+    offset : int
+        Number of preceding positional slots to skip.
 
     Returns
     -------
@@ -783,14 +898,14 @@ def _generate_positional_spec(argument: "Argument", help_format: str) -> str:
         desc = _get_description_from_argument(argument, help_format)
         quote = "'"
 
-    if argument.is_var_positional() or is_iterable_type(argument.hint):
+    if _is_variadic(argument):
         # Variadic positional (*args) or collection type (list[X], set[X], etc.)
         return f"{quote}*:{desc}:{action}{quote}" if action else f"{quote}*:{desc}{quote}"
 
     # Regular positional - zsh uses 1-based indexing
     if argument.index is None:
         raise ValueError(f"Positional-only argument {argument.names} missing index")
-    pos = argument.index + 1
+    pos = argument.index + 1 + offset
     return f"{quote}{pos}:{desc}:{action}{quote}" if action else f"{quote}{pos}:{desc}{quote}"
 
 
