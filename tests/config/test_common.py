@@ -157,8 +157,7 @@ def test_config_common_search_parents_absolute_true_exists(tmp_path, must_exist,
 
 
 def test_config_common_search_parents_false_ignores_parent(tmp_path, config, mocker):
-    """With the default ``search_parents=False``, a missing path must not fall
-    back to a same-named config file in a parent directory."""
+    """A missing path must not fall back to a parent's same-named config when ``search_parents=False``."""
     spy_load_config = mocker.spy(config, "_load_config")
 
     original_path = config.path
