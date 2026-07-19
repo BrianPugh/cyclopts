@@ -156,6 +156,20 @@ def test_config_common_search_parents_absolute_true_exists(tmp_path, must_exist,
     spy_load_config.assert_called_once_with(original_path)
 
 
+def test_config_common_search_parents_false_ignores_parent(tmp_path, config, mocker):
+    """With the default ``search_parents=False``, a missing path must not fall
+    back to a same-named config file in a parent directory."""
+    spy_load_config = mocker.spy(config, "_load_config")
+
+    original_path = config.path
+    original_path.touch()  # a same-named file exists in the parent directory
+    config.path = tmp_path / "folder1" / "folder2" / config.path.name  # missing
+    # search_parents and must_exist both default to False
+
+    assert config.config == {}
+    spy_load_config.assert_not_called()
+
+
 def test_config_common_search_parents_relative_true_exists(tmp_path, mocker, monkeypatch):
     """Tests finding an existing parent if path is relative."""
     config_path = tmp_path / "cyclopts-config-test-file.dummy"

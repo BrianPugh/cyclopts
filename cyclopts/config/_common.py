@@ -160,11 +160,9 @@ class ConfigFromFile(ConfigBase):
                         msg += exception_msg
                     raise CycloptsError(msg=msg) from e
                 return self._config
-            elif self.search_parents:
-                # Continue iterating over parents.
-                continue
-            elif self.must_exist:
-                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(self.path))
+            if not self.search_parents:
+                # Only look at the specified path; do not walk parent directories.
+                break
 
         # No matching file was found.
         if self.must_exist:
