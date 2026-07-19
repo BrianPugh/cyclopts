@@ -116,6 +116,21 @@ def test_coerce_int():
     assert 123 == convert(int, ["123"])
 
 
+def test_coerce_int_based():
+    assert 255 == convert(int, ["0xff"])
+    assert 15 == convert(int, ["0o17"])
+    assert 5 == convert(int, ["0b101"])
+
+
+def test_coerce_int_based_signed():
+    # A leading sign must not defeat base-prefix detection; decimal already
+    # accepts "-255", so the based branches should be consistent.
+    assert -255 == convert(int, ["-0xff"])
+    assert -15 == convert(int, ["-0o17"])
+    assert -5 == convert(int, ["-0b101"])
+    assert 255 == convert(int, ["+0xff"])
+
+
 def test_coerce_annotated_int():
     assert [123, 456] == convert(Annotated[int, "foo"], ["123", "456"])
     assert [123, 456] == convert(Annotated[list[int], "foo"], ["123", "456"])
