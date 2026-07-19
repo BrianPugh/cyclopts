@@ -90,11 +90,15 @@ def _bool(s: str) -> bool:
 
 def _int(s: str) -> int:
     s = s.lower()
-    if s.startswith("0x"):
+    # Detect the base prefix past an optional leading sign; ``int(s, base)``
+    # handles the sign itself, so negative/explicitly-positive values like
+    # "-0xff" parse the same way "-255" already does.
+    unsigned = s[1:] if s[:1] in ("+", "-") else s
+    if unsigned.startswith("0x"):
         return int(s, 16)
-    elif s.startswith("0o"):
+    elif unsigned.startswith("0o"):
         return int(s, 8)
-    elif s.startswith("0b"):
+    elif unsigned.startswith("0b"):
         return int(s, 2)
     elif "." in s:
         # Casting to a float first allows for things like "30.0"

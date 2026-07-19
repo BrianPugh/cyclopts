@@ -1,6 +1,6 @@
 import pytest
 
-from cyclopts.utils import Sentinel, _pascal_to_snake, grouper, parse_version
+from cyclopts.utils import Sentinel, _pascal_to_snake, grouper, is_option_like, parse_version
 
 
 def test_grouper():
@@ -10,6 +10,33 @@ def test_grouper():
 
     with pytest.raises(ValueError):
         grouper([1, 2, 3, 4], 3)
+
+
+@pytest.mark.parametrize(
+    "token,expected",
+    [
+        ("--foo", True),
+        ("-f", True),
+        ("-j", True),  # Imaginary number, but more likely a short flag; issue #328.
+        ("-255", False),
+        ("-3.14", False),
+        ("-1e5", False),
+        ("-10:", False),  # Slice.
+        ("-0xFF", False),
+        ("-0o17", False),
+        ("-0b101", False),
+        ("0xFF", False),
+        ("-0x", True),  # Not a valid number.
+    ],
+)
+def test_is_option_like(token, expected):
+    assert is_option_like(token) == expected
+
+
+@pytest.mark.parametrize("token", ["-255", "-3.14", "-0xFF", "-0b101", "-10:"])
+def test_is_option_like_allow_numbers(token):
+    """With ``allow_numbers=True``, any leading-hyphen token is option-like."""
+    assert is_option_like(token, allow_numbers=True)
 
 
 def test_sentinel():

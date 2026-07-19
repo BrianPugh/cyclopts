@@ -307,6 +307,21 @@ def test_negative_number_not_combined_short_flags(app, cmd_str, expected, assert
     assert_parse_args(main, cmd_str, expected)
 
 
+@pytest.mark.parametrize("cmd_str", ["-0xFF", "-0o17", "-0b101"])
+def test_negative_base_prefixed_number_positional(app, cmd_str, assert_parse_args):
+    """Negative base-prefixed numbers should be parsed as values, not as options.
+
+    ``-255`` was already accepted positionally, but ``-0xFF`` was treated as an
+    unknown option because the negative-number detection couldn't parse base prefixes.
+    """
+
+    @app.default
+    def main(value: str):
+        pass
+
+    assert_parse_args(main, cmd_str, cmd_str)
+
+
 @pytest.mark.parametrize(
     "cmd_str",
     [

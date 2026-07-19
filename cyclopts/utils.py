@@ -277,6 +277,10 @@ def is_option_like(token: str, *, allow_numbers=False) -> bool:
                 # https://github.com/BrianPugh/cyclopts/issues/328
                 return True
             return False
+        with suppress(ValueError):
+            # ``complex`` cannot parse base-prefixed integers (e.g. ``-0xFF``, ``-0b101``).
+            int(token, 0)
+            return False
         # Lazy imports to avoid a circular import (exceptions/_convert import utils).
         from cyclopts._convert import _slice
         from cyclopts.exceptions import CoercionError
