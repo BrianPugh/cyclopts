@@ -503,6 +503,10 @@ def test_parse_timedelta_valid(input_string, expected_output):
         "1x",  # Invalid unit
         "h1",  # Unit before number
         "3 days",  # Full unit names with spaces not supported
+        "5sfoo",  # Trailing garbage after a valid token
+        "garbage1h",  # Leading garbage before a valid token
+        "1h!!30m",  # Garbage between valid tokens
+        "1h-30m",  # Stray sign between valid tokens
     ],
 )
 def test_parse_timedelta_invalid(invalid_input):
