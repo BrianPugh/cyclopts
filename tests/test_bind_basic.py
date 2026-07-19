@@ -98,6 +98,31 @@ def test_out_of_order_mixed_positional_or_keyword(app, assert_parse_args):
         app.parse_args("foo --b=5 1 2", print_error=False, exit_on_error=False)
 
 
+def test_out_of_order_mixed_positional_or_keyword_with_delimiter(app, assert_parse_args):
+    # The ``--`` end-of-options delimiter only forces the following tokens to be
+    # positional; it must not change the diagnosis. So ``foo --b=5 -- 1 2`` must
+    # raise the same ArgumentOrderError as ``foo --b=5 1 2``, not leak ``--`` into
+    # an "Unknown option: --" error.
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with pytest.raises(ArgumentOrderError):
+        app.parse_args("foo --b=5 -- 1 2", print_error=False, exit_on_error=False)
+
+
+def test_out_of_order_mixed_positional_or_keyword_with_bare_delimiter(app, assert_parse_args):
+    # A trailing bare ``--`` supplies no positional tokens, so ``foo --a=5 --``
+    # must behave like ``foo --a=5``: a MissingArgumentError for the next unfilled
+    # parameter — never an internal error like IndexError.
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("foo --a=5 --", print_error=False, exit_on_error=False)
+
+
 def test_command_rename(app, assert_parse_args):
     @app.command(name="bar")
     def foo():
@@ -280,6 +305,21 @@ def test_negative_number_not_combined_short_flags(app, cmd_str, expected, assert
         pass
 
     assert_parse_args(main, cmd_str, expected)
+
+
+@pytest.mark.parametrize("cmd_str", ["-0xFF", "-0o17", "-0b101"])
+def test_negative_base_prefixed_number_positional(app, cmd_str, assert_parse_args):
+    """Negative base-prefixed numbers should be parsed as values, not as options.
+
+    ``-255`` was already accepted positionally, but ``-0xFF`` was treated as an
+    unknown option because the negative-number detection couldn't parse base prefixes.
+    """
+
+    @app.default
+    def main(value: str):
+        pass
+
+    assert_parse_args(main, cmd_str, cmd_str)
 
 
 @pytest.mark.parametrize(

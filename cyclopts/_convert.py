@@ -94,11 +94,15 @@ def _none(s: str) -> None:
 
 def _int(s: str) -> int:
     s = s.lower()
-    if s.startswith("0x"):
+    # Detect the base prefix past an optional leading sign; ``int(s, base)``
+    # handles the sign itself, so negative/explicitly-positive values like
+    # "-0xff" parse the same way "-255" already does.
+    unsigned = s[1:] if s[:1] in ("+", "-") else s
+    if unsigned.startswith("0x"):
         return int(s, 16)
-    elif s.startswith("0o"):
+    elif unsigned.startswith("0o"):
         return int(s, 8)
-    elif s.startswith("0b"):
+    elif unsigned.startswith("0b"):
         return int(s, 2)
     elif "." in s:
         # Casting to a float first allows for things like "30.0"
@@ -145,6 +149,7 @@ def _datetime(s: str) -> datetime:
 
 def _timedelta(s: str) -> timedelta:
     """Parse a timedelta string."""
+    s = s.strip()
     negative = False
     if s.startswith("-"):
         negative = True
@@ -152,7 +157,10 @@ def _timedelta(s: str) -> timedelta:
 
     matches = re.findall(r"((\d+\.\d+|\d+)([smhdwMy]))", s)
 
-    if not matches:
+    # Every character must belong to a "<number><unit>" token. Without this
+    # check, ``re.findall`` silently ignores stray characters, so a malformed
+    # duration like "5sfoo" would be accepted as 5s instead of raising.
+    if not matches or "".join(match[0] for match in matches) != s:
         raise ValueError(f"Could not parse duration string: {s}")
 
     seconds = 0
