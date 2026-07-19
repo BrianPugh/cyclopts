@@ -141,6 +141,7 @@ def _datetime(s: str) -> datetime:
 
 def _timedelta(s: str) -> timedelta:
     """Parse a timedelta string."""
+    s = s.strip()
     negative = False
     if s.startswith("-"):
         negative = True
@@ -148,7 +149,10 @@ def _timedelta(s: str) -> timedelta:
 
     matches = re.findall(r"((\d+\.\d+|\d+)([smhdwMy]))", s)
 
-    if not matches:
+    # Every character must belong to a "<number><unit>" token. Without this
+    # check, ``re.findall`` silently ignores stray characters, so a malformed
+    # duration like "5sfoo" would be accepted as 5s instead of raising.
+    if not matches or "".join(match[0] for match in matches) != s:
         raise ValueError(f"Could not parse duration string: {s}")
 
     seconds = 0
