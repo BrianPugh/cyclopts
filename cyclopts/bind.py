@@ -448,6 +448,10 @@ def _parse_pos(
                 # Continue in case we hit a VAR_POSITIONAL argument.
                 continue
             if prior_positional_or_keyword_supplied_as_keyword_arguments:
+                if not tokens_and_force_positional:
+                    # ``tokens`` contained only the ``--`` end-of-options delimiter;
+                    # there are no positional tokens to misassign.
+                    break
                 # Use the preprocessed token: ``tokens`` still contains the ``--``
                 # end-of-options delimiter, and ``force_positional`` marks tokens
                 # after it, which must not be treated as options.

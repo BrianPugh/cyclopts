@@ -111,6 +111,18 @@ def test_out_of_order_mixed_positional_or_keyword_with_delimiter(app, assert_par
         app.parse_args("foo --b=5 -- 1 2", print_error=False, exit_on_error=False)
 
 
+def test_out_of_order_mixed_positional_or_keyword_with_bare_delimiter(app, assert_parse_args):
+    # A trailing bare ``--`` supplies no positional tokens, so ``foo --a=5 --``
+    # must behave like ``foo --a=5``: a MissingArgumentError for the next unfilled
+    # parameter — never an internal error like IndexError.
+    @app.command
+    def foo(a, b, c):
+        pass
+
+    with pytest.raises(MissingArgumentError):
+        app.parse_args("foo --a=5 --", print_error=False, exit_on_error=False)
+
+
 def test_command_rename(app, assert_parse_args):
     @app.command(name="bar")
     def foo():
