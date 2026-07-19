@@ -448,8 +448,15 @@ def _parse_pos(
                 # Continue in case we hit a VAR_POSITIONAL argument.
                 continue
             if prior_positional_or_keyword_supplied_as_keyword_arguments:
-                token = tokens[0]
-                if not argument.parameter.allow_leading_hyphen and is_option_like(token):
+                if not tokens_and_force_positional:
+                    # ``tokens`` contained only the ``--`` end-of-options delimiter;
+                    # there are no positional tokens to misassign.
+                    break
+                # Use the preprocessed token: ``tokens`` still contains the ``--``
+                # end-of-options delimiter, and ``force_positional`` marks tokens
+                # after it, which must not be treated as options.
+                token, force_positional = tokens_and_force_positional[0]
+                if not force_positional and not argument.parameter.allow_leading_hyphen and is_option_like(token):
                     # It's more meaningful to interpret the token as an intended option,
                     # rather than an intended positional value for ``argument``.
                     raise UnknownOptionError(token=CliToken(value=token), argument_collection=argument_collection)
@@ -457,7 +464,7 @@ def _parse_pos(
                     raise ArgumentOrderError(
                         argument=argument,
                         prior_positional_or_keyword_supplied_as_keyword_arguments=prior_positional_or_keyword_supplied_as_keyword_arguments,
-                        token=tokens_and_force_positional[0][0],
+                        token=token,
                     )
 
         tokens_per_element, consume_all = argument.token_count()
