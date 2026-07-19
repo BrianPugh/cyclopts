@@ -125,6 +125,27 @@ def test_boolean_flag_app_parameter_negative(app, assert_parse_args):
         app("--no-my-flag=", exit_on_error=False)
 
 
+@pytest.mark.parametrize("cmd_str", ["--my-flag=2", "--no-my-flag=2"])
+def test_boolean_flag_equals_coercion_error_reports_value(app, cmd_str):
+    """A bad ``--flag=VALUE`` bool value must appear in the error message.
+
+    ``rules.rst`` states that a keyword bool with an ``=`` value is parsed by
+    the same rules as a positional bool, whose error message includes the
+    offending value (e.g. ``unable to convert "2" into bool``).  Regression:
+    the token was rebuilt without its value, yielding an empty ``""``.
+    """
+
+    @app.default
+    def foo(my_flag: bool = False):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app.parse_args(cmd_str, exit_on_error=False, print_error=False)
+    assert e.value.token is not None
+    assert e.value.token.value == "2"
+    assert '"2"' in str(e.value)
+
+
 def test_boolean_flag_app_parameter_default_annotated_override(app, assert_parse_args):
     app.default_parameter = Parameter(negative="")
 

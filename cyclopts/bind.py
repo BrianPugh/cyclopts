@@ -233,7 +233,7 @@ def _parse_kw_and_flags(
                         coerced_value = _bool(cli_values[-1])
                     except CoercionError as e:
                         if e.token is None:
-                            e.token = CliToken(keyword=match.matched_token)
+                            e.token = CliToken(keyword=match.matched_token, value=cli_values[-1])
                         if e.argument is None:
                             e.argument = match.argument
                         raise
