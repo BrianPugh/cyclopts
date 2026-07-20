@@ -739,7 +739,7 @@ def _parse_kw_and_flags(
                         coerced_value = _bool(cli_values[-1])
                     except CoercionError as e:
                         if e.token is None:
-                            e.token = CliToken(keyword=match.matched_token)
+                            e.token = CliToken(keyword=match.matched_token, value=cli_values[-1])
                         if e.argument is None:
                             e.argument = match.argument
                         raise
@@ -1098,7 +1098,17 @@ def _parse_env(argument_collection: ArgumentCollection):
             except KeyError:
                 pass
             else:
-                argument.tokens.append(Token(keyword=env_var_name, value=env_var_value, source="env"))
+                # A JSON-looking value is a single token (mirrors the CLI path); otherwise
+                # split it per ``Parameter.env_var_split`` (e.g. whitespace for iterables,
+                # ``os.pathsep`` for path iterables).
+                if argument._should_attempt_json_dict([env_var_value]) or argument._should_attempt_json_list(
+                    [env_var_value]
+                ):
+                    values = [env_var_value]
+                else:
+                    values = argument.env_var_split(env_var_value)
+                for index, value in enumerate(values):
+                    argument.tokens.append(Token(keyword=env_var_name, value=value, index=index, source="env"))
                 break
 
 
