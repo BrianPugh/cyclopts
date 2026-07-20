@@ -639,6 +639,9 @@ class RepeatArgumentError(CycloptsError):
     """The repeated token."""
 
     def _segments(self) -> "Iterator[tuple[str, str] | Text]":
+        if self.msg is not None:
+            yield self._resolved_msg()
+            return
         # Invariant: positional duplication is routed to UnusedCliTokensError by the binder,
         # so any token reaching this error path was matched by keyword.
         assert self.token.keyword is not None

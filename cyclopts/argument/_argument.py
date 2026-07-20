@@ -626,6 +626,17 @@ class Argument:
         if not self.parse:
             raise ValueError
 
+        if self.parameter.count and self.tokens:
+            # An explicit ``=value`` (marked by a non-empty ``value``) sets the count
+            # and must be the flag's only occurrence; plain repeats may still sum.
+            explicit = next((x for x in (token, *self.tokens) if x.value and x.implicit_value is not UNSET), None)
+            if explicit is not None:
+                raise RepeatArgumentError(
+                    token=token,
+                    msg=f'"{explicit.keyword}={explicit.value}" sets the count explicitly '
+                    "and cannot be combined with other occurrences of the flag.",
+                )
+
         if any(x.address == token.address for x in self.tokens):
             if self.parameter.allow_repeating is False:
                 raise RepeatArgumentError(token=token)

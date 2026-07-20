@@ -225,7 +225,34 @@ def _parse_kw_and_flags(
                 cli_values.append(attached_value)
 
             if match.argument.parameter.count:
-                match.argument.append(CliToken(keyword=match.matched_token, implicit_value=1))
+                if cli_values:
+                    # An attached ``=value`` (e.g. --verbose=3) explicitly sets the count.
+                    # Plain ``int()`` parse: a count is a number of occurrences, so
+                    # fractional values like "1.5" are rejected rather than rounded
+                    # (unlike general int coercion via ``_int``), as are negatives.
+                    # The non-empty ``value`` marks the token as an explicit
+                    # assignment, which ``Argument.append`` forbids combining with
+                    # other occurrences.
+                    value = cli_values[-1]
+                    try:
+                        count_value = int(value)
+                    except ValueError:
+                        raise CoercionError(
+                            token=CliToken(keyword=match.matched_token, value=value),
+                            argument=match.argument,
+                            target_type=int,
+                        ) from None
+                    if count_value < 0:
+                        raise CoercionError(
+                            token=CliToken(keyword=match.matched_token, value=value),
+                            argument=match.argument,
+                            msg="Count values must be non-negative.",
+                        )
+                    match.argument.append(
+                        CliToken(keyword=match.matched_token, value=value, implicit_value=count_value)
+                    )
+                else:
+                    match.argument.append(CliToken(keyword=match.matched_token, implicit_value=1))
             elif match.implicit_value is not UNSET:
                 # A flag was parsed
                 if cli_values:
