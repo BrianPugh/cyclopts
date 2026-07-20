@@ -55,3 +55,71 @@ def test_env_var_unset_list_use_signature_default(app, assert_parse_args, monkey
     monkeypatch.delenv("BAZ", raising=False)
 
     assert_parse_args(foo, [])
+
+
+def test_env_var_list_value_whitespace_split(app, assert_parse_args, monkeypatch):
+    """An iterable-typed ``Parameter(env_var=...)`` value is split by ``env_var_split``.
+
+    ``Parameter.env_var_split`` is documented as the function that "splits up the
+    read-in ``Parameter.env_var`` value"; its default splits iterables on
+    whitespace.  Regression: the env-sourcing path appended the raw value as a
+    single token without splitting, so ``list[int]`` from ``"1 2 3"`` raised a
+    CoercionError instead of yielding ``[1, 2, 3]``.
+    """
+
+    @app.default
+    def foo(bar: Annotated[list[int], Parameter(env_var="BAR")] = []):  # noqa: B006
+        pass
+
+    monkeypatch.setenv("BAR", "1 2 3")
+    assert_parse_args(foo, [], [1, 2, 3])
+
+
+def test_env_var_tuple_value_whitespace_split(app, assert_parse_args, monkeypatch):
+    """A multi-token (``tuple[int, int]``) env value is whitespace-split into elements."""
+
+    @app.default
+    def foo(bar: Annotated[tuple[int, int], Parameter(env_var="BAR")] = (0, 0)):
+        pass
+
+    monkeypatch.setenv("BAR", "5 6")
+    assert_parse_args(foo, [], (5, 6))
+
+
+def test_env_var_path_list_value_pathsep_split(app, assert_parse_args, monkeypatch, mocker):
+    """A ``list[Path]`` env value is split on ``os.pathsep`` (mirrors PATH-style vars)."""
+    from pathlib import Path
+
+    mocker.patch("cyclopts._env_var.os.pathsep", ":")
+
+    @app.default
+    def foo(bar: Annotated[list[Path], Parameter(env_var="BAR")] = []):  # noqa: B006
+        pass
+
+    monkeypatch.setenv("BAR", "/a/b:/c/d")
+    assert_parse_args(foo, [], [Path("/a/b"), Path("/c/d")])
+
+
+def test_env_var_str_value_with_spaces_not_split(app, assert_parse_args, monkeypatch):
+    """A scalar-typed env value is passed through as a single token, spaces and all."""
+
+    @app.default
+    def foo(bar: Annotated[str, Parameter(env_var="BAR")] = ""):
+        pass
+
+    monkeypatch.setenv("BAR", "a b c")
+    assert_parse_args(foo, [], "a b c")
+
+
+def test_env_var_single_path_value_with_pathsep_not_split(app, assert_parse_args, monkeypatch, mocker):
+    """A scalar ``Path`` env value containing ``os.pathsep`` stays a single path."""
+    from pathlib import Path
+
+    mocker.patch("cyclopts._env_var.os.pathsep", ":")
+
+    @app.default
+    def foo(bar: Annotated[Path, Parameter(env_var="BAR")] = Path()):
+        pass
+
+    monkeypatch.setenv("BAR", "/a/b:/c/d")
+    assert_parse_args(foo, [], Path("/a/b:/c/d"))
