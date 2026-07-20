@@ -379,7 +379,7 @@ def walk_leaves(
     if parent_keys is None:
         parent_keys = ()
 
-    if isinstance(d, dict):
+    if isinstance(d, dict) and d:
         for key, value in d.items():
             current_keys = parent_keys + (key,)
             if isinstance(value, dict):
@@ -387,7 +387,9 @@ def walk_leaves(
             else:
                 yield current_keys, value
     else:
-        yield (), d
+        # An empty dict is a leaf: an explicitly-supplied empty mapping (e.g. ``x = {}``)
+        # must produce a token, like an empty list does.
+        yield parent_keys, d
 
 
 def to_cli_option_name(*keys: str) -> str:

@@ -59,6 +59,21 @@ def test_bind_dataclass_from_cli_json(app, assert_parse_args, cmd_str):
     assert_parse_args(main, cmd_str, Coordinate(1, 2))
 
 
+def test_bind_dataclass_from_cli_json_empty(app, assert_parse_args):
+    """An explicit empty JSON dict instantiates the dataclass from its defaults."""
+
+    @dataclass
+    class Coordinate:
+        x: int = 0
+        y: int = 0
+
+    @app.default
+    def main(origin: Coordinate):
+        pass
+
+    assert_parse_args(main, "--origin={}", Coordinate())
+
+
 def test_nested_dataclass_from_env_json(app, assert_parse_args, monkeypatch):
     """Test parsing nested dataclasses from environment variable JSON."""
 
