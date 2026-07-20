@@ -35,6 +35,7 @@ STYLE_SOURCE = "dim"
 
 
 __all__ = [
+    "AmbiguousCommandError",
     "CoercionError",
     "CommandCollisionError",
     "CycloptsError",
@@ -507,6 +508,32 @@ class UnknownCommandError(CycloptsError):
                     yield ", ", ""
                 yield name, STYLE_VALID_CHOICE
             yield ".", ""
+
+
+@define(kw_only=True)
+class AmbiguousCommandError(CycloptsError, ValueError):
+    """A command token fuzzy-matched multiple registered command names.
+
+    Derives from :class:`ValueError` for backwards compatibility; this used to be raised as a plain ``ValueError``.
+    """
+
+    command_token: str = ""
+    """The offending CLI token."""
+
+    matches: Sequence[str] = ()
+    """Registered command names that the token could match."""
+
+    def _segments(self) -> "Iterator[tuple[str, str] | Text]":
+        yield from super()._segments()
+
+        yield "Ambiguous command '", ""
+        yield self.command_token, STYLE_OFFENDING_VALUE
+        yield "'. Could match: ", ""
+        for i, name in enumerate(self.matches):
+            if i:
+                yield ", ", ""
+            yield name, STYLE_VALID_CHOICE
+        yield ".", ""
 
 
 @define(kw_only=True)

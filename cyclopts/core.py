@@ -33,6 +33,7 @@ from cyclopts.bind import create_bound_arguments, is_option_like, normalize_toke
 from cyclopts.command_spec import CommandSpec
 from cyclopts.config._env import Env
 from cyclopts.exceptions import (
+    AmbiguousCommandError,
     CommandCollisionError,
     CycloptsError,
     UnknownCommandError,
@@ -1035,6 +1036,7 @@ class App:
         tokens: None | str | Iterable[str] = None,
         *,
         include_parent_meta=True,
+        raise_on_ambiguous: bool = True,
     ) -> tuple[tuple[str, ...], tuple["App", ...], list[str]]:
         """Extract out the command tokens from a command.
 
@@ -1045,6 +1047,12 @@ class App:
         tokens: None | str | Iterable[str]
             Either a string, or a list of strings to launch a command.
             Defaults to ``sys.argv[1:]``
+        raise_on_ambiguous: bool
+            When True (default), raise :class:`.AmbiguousCommandError` if a token
+            fuzzy-matches multiple commands. When False, treat the ambiguous token
+            as a non-command (ending the command chain).
+
+            This parameter is primarily for internal use.
         include_parent_meta: bool
             Controls whether parent meta apps are included in the execution path.
 
@@ -1120,9 +1128,9 @@ class App:
                 if len(matches) == 1:
                     # Single fuzzy match found
                     app_or_spec = command_mapping[matches[0]]
-                elif len(matches) > 1:
+                elif len(matches) > 1 and raise_on_ambiguous:
                     # Ambiguous match - multiple commands match after normalization
-                    raise ValueError(f"Ambiguous command '{token}'. Could match: {', '.join(sorted(matches))}.")
+                    raise AmbiguousCommandError(command_token=token, matches=sorted(matches))
 
             if app_or_spec is None:
                 # Token is not a command. Try to consume it as a meta app parameter.
@@ -1845,7 +1853,10 @@ class App:
 
                 e.verbose = verbose if verbose is not None else False
                 e.root_input_tokens = tokens
-                assert e.console is not None
+                if e.console is None:
+                    # e.g. errors raised during command resolution, before
+                    # ``_parse_known_args``'s error decoration.
+                    e.console = self.error_console
                 if help_on_error if help_on_error is not None else False:
                     self.help_print(tokens, console=e.console)
                 if print_error if print_error is not None else True:

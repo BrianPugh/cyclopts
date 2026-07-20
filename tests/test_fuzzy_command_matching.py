@@ -6,7 +6,7 @@ Should probably be removed in v5.
 import pytest
 
 from cyclopts import App
-from cyclopts.exceptions import UnknownCommandError
+from cyclopts.exceptions import AmbiguousCommandError, UnknownCommandError
 
 
 @pytest.mark.parametrize(
@@ -91,6 +91,25 @@ def test_fuzzy_command_matching_ambiguous_error(app):
     # Both normalize to 'mycommand', so this is ambiguous
     with pytest.raises(ValueError, match="Ambiguous command 'my_command'.*my-command.*mycommand"):
         app.parse_args(["my_command"], exit_on_error=False)
+
+
+def test_fuzzy_command_matching_ambiguous_error_end_to_end(app, console):
+    """The ambiguity error is a CycloptsError: formatted panel + ``exit_on_error`` honored, not a raw traceback."""
+
+    @app.command(name="my-command")
+    def cmd1():
+        pass
+
+    @app.command(name="my_command")
+    def cmd2():
+        pass
+
+    with console.capture() as capture, pytest.raises(AmbiguousCommandError):
+        app(["mycommand"], error_console=console, exit_on_error=False, print_error=True)
+
+    actual = capture.get()
+    assert "Ambiguous command" in actual
+    assert "mycommand" in actual
 
 
 @pytest.mark.parametrize(

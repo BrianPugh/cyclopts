@@ -37,7 +37,11 @@ class AppStack:
         # Convert strings to Apps if needed
         if isinstance(apps[0], str):
             str_apps = cast(Sequence[str], apps)
-            _, apps_tuple, _ = self.stack[0][0].parse_commands(str_apps, include_parent_meta=True)
+            # ``raise_on_ambiguous=False``: this resolution only feeds override propagation;
+            # an ambiguous command raises properly inside ``parse_args``'s error handling.
+            _, apps_tuple, _ = self.stack[0][0].parse_commands(
+                str_apps, include_parent_meta=True, raise_on_ambiguous=False
+            )
             resolved_apps: list[App] = list(apps_tuple)
         else:
             resolved_apps = cast(list["App"], list(apps))

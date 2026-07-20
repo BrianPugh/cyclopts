@@ -2753,6 +2753,10 @@ Exceptions
    :show-inheritance:
    :members:
 
+.. autoexception:: cyclopts.AmbiguousCommandError
+   :show-inheritance:
+   :members:
+
 .. autoexception:: cyclopts.UnusedCliTokensError
    :show-inheritance:
    :members:

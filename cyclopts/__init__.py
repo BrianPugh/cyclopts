@@ -7,6 +7,7 @@ except ImportError:
 
 __all__ = [
     "__version__",
+    "AmbiguousCommandError",
     "App",
     "Argument",
     "ArgumentCollection",
@@ -54,6 +55,7 @@ from cyclopts._run import run
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.core import App
 from cyclopts.exceptions import (
+    AmbiguousCommandError,
     ArgumentOrderError,
     CoercionError,
     CombinedShortOptionError,
