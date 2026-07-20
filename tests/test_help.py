@@ -922,6 +922,25 @@ def test_help_format_group_parameters_choices_literal_no_show(capture_format_gro
     assert actual == expected
 
 
+def test_help_format_group_parameters_choices_literal_none_member(capture_format_group_parameters):
+    """A ``None`` Literal member cannot be entered as a token, so it is not a displayed choice (like ``Optional``)."""
+
+    def cmd(
+        foo: Annotated[Literal[None, "fizz", "buzz"], Parameter(help="Docstring for foo.")] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo  Docstring for foo. [choices: fizz, buzz]                │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
 def test_help_format_group_parameters_choices_literal_union(capture_format_group_parameters):
     def cmd(
         foo: Annotated[int | Literal["fizz", "buzz"] | Literal["bar"], Parameter(help="Docstring for foo.")] = "fizz",

@@ -100,7 +100,8 @@ def get_choices_from_hint(type_: type, name_transform: Callable[[str], str]) -> 
             if x:
                 choices.extend(x)
     elif _origin is Literal:
-        choices.extend(str(x) for x in get_args(type_))
+        # A ``None`` member is only reachable via the default, not a token (like ``Optional``).
+        choices.extend(str(x) for x in get_args(type_) if x is not None)
     elif _origin in ITERABLE_TYPES:
         args = get_args(type_)
         if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):

@@ -340,6 +340,13 @@ def test_coerce_literal():
     assert 3 == convert(Literal["foo", "bar", 3], ["3"])
 
 
+def test_coerce_literal_none_member():
+    """A ``None`` Literal member is only reachable via the default, like ``Optional``; issue: valid tokens after it must still match."""
+    assert "foo" == convert(Literal[None, "foo"], ["foo"])
+    assert "foo" == convert(Literal["foo", None], ["foo"])
+    assert 3 == convert(Literal[None, "foo", 3], ["3"])
+
+
 def assert_convert_coercion_error(*args, msg, name_transform=None, **kwargs):
     if name_transform is None:
         name_transform = default_name_transform
@@ -386,6 +393,15 @@ def test_coerce_literal_invalid_choice_keyword_non_cli_token():
         Literal["foo", "bar", 3],
         [Token(keyword="--MY-KEYWORD", value="invalid-choice", source="TEST")],
         msg='Invalid value "invalid-choice" for --MY-KEYWORD from TEST. Choose from: "foo", "bar", 3.',
+    )
+
+
+def test_coerce_literal_none_member_invalid_choice():
+    """``None`` cannot be entered as a CLI token, so it is omitted from the choices list."""
+    assert_convert_coercion_error(
+        Literal["foo", None],
+        ["invalid-choice"],
+        msg='Invalid value "invalid-choice" for MOCKED_ARGUMENT_NAME. Choose from: "foo".',
     )
 
 

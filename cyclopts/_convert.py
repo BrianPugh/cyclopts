@@ -658,6 +658,9 @@ def _convert(
         # Try coercing the token into each allowed Literal value (left-to-right).
         last_coercion_error = None
         for choice in get_args(type_):
+            if choice is None:
+                # Like ``Optional``, a ``None`` member is only reachable via the default, not a token.
+                continue
             try:
                 res = convert(type(choice), token)
             except CoercionError as e:
