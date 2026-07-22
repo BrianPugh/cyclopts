@@ -409,6 +409,34 @@ def test_config_dict_empty():
     assert result == "Default is 0 years old."
 
 
+def test_config_dict_empty_dict_value():
+    """An empty dict config value binds as ``{}`` instead of raising MissingArgumentError, like an empty list does."""
+    app = App(config=Dict({"x": {}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict):
+        return x
+
+    assert app([]) == {}
+
+
+def test_config_dict_empty_dict_value_dataclass():
+    """An empty dict config value constructs an all-defaults dataclass."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"options": {}}), result_action="return_value")
+
+    @app.default
+    def main(options: Options):
+        return options
+
+    assert app([]) == Options(threshold=5)
+
+
 def test_config_dict_nested_structure():
     """Test Dict config with nested dataclass-like structures."""
     from dataclasses import dataclass
