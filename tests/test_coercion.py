@@ -377,6 +377,28 @@ def test_coerce_literal():
     assert 3 == convert(Literal["foo", "bar", 3], ["3"])
 
 
+def test_coerce_literal_none_member():
+    """A ``None`` Literal member must not break conversion of the other members.
+
+    Regression test: pre-v5 the Literal loop raised an uncaught ``TypeError``
+    (``NoneType takes no arguments``) when trying a ``None`` member against a token.
+    In v5, ``None`` is an enterable choice via "none"/"null" strings.
+    """
+    assert "foo" == convert(Literal[None, "foo"], ["foo"])
+    assert "foo" == convert(Literal["foo", None], ["foo"])
+    assert 3 == convert(Literal[None, "foo", 3], ["3"])
+
+
+@pytest.mark.parametrize("token", NONE_STRINGS)
+def test_coerce_literal_none_member_none_strings(token):
+    assert convert(Literal[None, "foo"], [token]) is None
+
+
+def test_coerce_literal_none_member_invalid_choice():
+    with pytest.raises(CoercionError):
+        convert(Literal[None, "foo"], ["bogus"])
+
+
 def assert_convert_coercion_error(*args, msg, name_transform=None, **kwargs):
     if name_transform is None:
         name_transform = default_name_transform
