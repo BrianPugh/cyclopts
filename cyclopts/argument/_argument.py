@@ -1054,7 +1054,7 @@ class Argument:
 
                 # Recursively call token_count to get the consume_all behavior
                 # We ignore the token count from the recursive call and use our explicit n_tokens
-                _, consume_all_from_type = token_count(hint)
+                _, consume_all_from_type = self._token_count(hint)
                 return self.parameter.n_tokens, consume_all_from_type
 
         if len(keys) > 1:
@@ -1065,8 +1065,23 @@ class Argument:
             hint = self.hint
             if self._enum_flag_type and not keys:
                 return 1, True
-        tokens_per_element, consume_all = token_count(hint)
+        tokens_per_element, consume_all = self._token_count(hint)
         return tokens_per_element, consume_all
+
+    def _token_count(self, hint) -> tuple[int, bool]:
+        """``token_count`` with un-parsable type hints reported as a ``CycloptsError``.
+
+        ``token_count`` raises a plain :class:`ValueError` for an annotation it cannot
+        make sense of (e.g. ``Union[list[int], int]``, whose members consume differing
+        numbers of tokens). That happens during token binding, so without this the end
+        user gets a raw traceback and ``exit_on_error`` is bypassed.
+        """
+        try:
+            return token_count(hint)
+        except CycloptsError:
+            raise
+        except ValueError as e:
+            raise CycloptsError(msg=e.args[0] if e.args else None, argument=self) from e
 
     @property
     def _negatives_hint(self):

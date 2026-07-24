@@ -6,7 +6,7 @@ from typing import Annotated, Union
 import pytest
 
 from cyclopts import Parameter
-from cyclopts.exceptions import CoercionError, MissingArgumentError
+from cyclopts.exceptions import CoercionError, CycloptsError, MissingArgumentError
 
 
 @pytest.mark.parametrize(
@@ -202,3 +202,39 @@ def test_union_of_dataclasses_ambiguous_fields_error(app):
             print_error=False,
             exit_on_error=False,
         )
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        Union[bool, str],
+        Union[bool, int],
+        Union[list[int], int],
+        Union[tuple[int, int], int],
+    ],
+)
+def test_union_differing_token_counts_raises_cyclopts_error(app, annotation):
+    """A Union whose members consume differing token counts reports cleanly.
+
+    Previously a bare ``ValueError`` escaped from ``token_count`` outside of
+    Cyclopts's error handling, so end users got a raw traceback and
+    ``exit_on_error`` was ignored.
+    """
+
+    @app.command
+    def cli(x: annotation):  # pyright: ignore
+        pass
+
+    with pytest.raises(CycloptsError):
+        app.parse_args("cli --x 1", print_error=False, exit_on_error=False)
+
+
+def test_union_differing_token_counts_honors_exit_on_error(app):
+    """The error is routed through Cyclopts's handler rather than escaping as a traceback."""
+
+    @app.command
+    def cli(x: Union[list[int], int]):
+        pass
+
+    with pytest.raises(SystemExit):
+        app(["cli", "--x", "1"], print_error=False, exit_on_error=True)

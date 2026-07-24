@@ -27,6 +27,7 @@ else:
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     get_annotated_discriminator,
+    get_hint_name,
     is_annotated,
     is_enum_flag,
     is_nonetype,
@@ -986,8 +987,12 @@ def token_count(type_: Any, skip_converter_params: bool = False) -> tuple[int, b
         for sub_type_ in sub_args[1:]:
             this = token_count(sub_type_)
             if this != token_count_target:
+                # Callers that reach this while binding CLI tokens (``Argument.token_count``)
+                # translate this into a ``CycloptsError`` so the end user gets a formatted
+                # message instead of a traceback.
                 raise ValueError(
-                    f"Cannot Union types that consume different numbers of tokens: {sub_args[0]} {sub_type_}"
+                    f"Cannot Union types that consume different numbers of tokens: "
+                    f"{get_hint_name(sub_args[0])} and {get_hint_name(sub_type_)}."
                 )
         return token_count_target
     elif is_builtin(type_):
