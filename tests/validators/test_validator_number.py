@@ -79,3 +79,36 @@ def test_validator_number_typeerror():
     validator = Number(gte=5)
     with pytest.raises(TypeError):
         validator(str, "foo")  # pyright: ignore[reportArgumentType]
+
+
+def test_validator_number_set():
+    """Sets are validated element-wise, just like sequences."""
+    validator = Number(lt=5)
+    validator(set[int], {0, 1, 2})
+    validator(frozenset[int], frozenset({0, 1, 2}))
+
+    with pytest.raises(ValueError):
+        validator(set[int], {0, 6})
+
+    with pytest.raises(ValueError):
+        validator(frozenset[int], frozenset({0, 6}))
+
+
+def test_validator_number_mapping():
+    """Mapping **values** are validated element-wise."""
+    validator = Number(lt=5)
+    validator(dict[str, int], {"a": 0, "b": 1})
+
+    with pytest.raises(ValueError):
+        validator(dict[str, int], {"a": 0, "b": 6})
+
+
+def test_validator_number_nested_containers():
+    validator = Number(lt=5)
+    validator(dict[str, list[int]], {"a": [0, 1]})
+
+    with pytest.raises(ValueError):
+        validator(dict[str, list[int]], {"a": [0, 6]})
+
+    with pytest.raises(ValueError):
+        validator(list[set[int]], [{0}, {6}])

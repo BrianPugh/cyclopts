@@ -103,3 +103,33 @@ def test_path_extension_not_match_multi(ext):
     with pytest.raises(ValueError) as e:
         validator(Path, Path("foo.mp4"))
     assert str(e.value) == '"foo.mp4" does not match one of supported extensions {"png", "jpg"}.'
+
+
+def test_path_exists_set(tmp_path):
+    """Sets are validated element-wise, just like sequences."""
+    validator = validators.Path(exists=True)
+    validator(set[Path], {tmp_path})
+    validator(frozenset[Path], frozenset({tmp_path}))
+
+    with pytest.raises(ValueError):
+        validator(set[Path], {tmp_path / "foo"})
+
+    with pytest.raises(ValueError):
+        validator(frozenset[Path], frozenset({tmp_path / "foo"}))
+
+
+def test_path_exists_mapping(tmp_path):
+    """Mapping **values** are validated element-wise."""
+    validator = validators.Path(exists=True)
+    validator(dict[str, Path], {"a": tmp_path})
+
+    with pytest.raises(ValueError):
+        validator(dict[str, Path], {"a": tmp_path / "foo"})
+
+
+def test_path_ext_set(tmp_path):
+    validator = validators.Path(ext="txt")
+    validator(set[Path], {tmp_path / "foo.txt"})
+
+    with pytest.raises(ValueError):
+        validator(set[Path], {tmp_path / "foo.bin"})
