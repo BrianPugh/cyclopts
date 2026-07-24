@@ -409,6 +409,76 @@ def test_config_dict_empty():
     assert result == "Default is 0 years old."
 
 
+def test_config_dict_empty_dict_value():
+    """An empty dict config value binds as ``{}`` instead of raising MissingArgumentError, like an empty list does."""
+    app = App(config=Dict({"x": {}}), result_action="return_value")
+
+    @app.default
+    def main(x: dict):
+        return x
+
+    assert app([]) == {}
+
+
+def test_config_dict_empty_dict_value_dataclass():
+    """An empty dict config value constructs an all-defaults dataclass."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Options:
+        threshold: int = 5
+
+    app = App(config=Dict({"options": {}}), result_action="return_value")
+
+    @app.default
+    def main(options: Options):
+        return options
+
+    assert app([]) == Options(threshold=5)
+
+
+def test_config_dict_root_keys_non_mapping_node():
+    """A non-mapping value where ``root_keys`` expects a table raises a clean CycloptsError, not AttributeError."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict({"tool": 5}, root_keys=("tool",)), result_action="return_value")
+
+    @app.default
+    def main(x: int = 0):
+        return x
+
+    with pytest.raises(CycloptsError, match=r"\[tool\].*mapping.*int"):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_root_keys_non_mapping_intermediate_node():
+    """A non-mapping partway through the ``root_keys`` path raises a clean CycloptsError, not TypeError."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict({"tool": [1, 2]}, root_keys=("tool", "cyclopts")), result_action="return_value")
+
+    @app.default
+    def main(x: int = 0):
+        return x
+
+    with pytest.raises(CycloptsError, match=r"\[tool\].*mapping.*list"):
+        app([], exit_on_error=False)
+
+
+def test_config_dict_command_key_non_mapping_node():
+    """A non-mapping value at a command's key raises a clean CycloptsError, not AttributeError."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict({"sub": 5}), result_action="return_value")
+
+    @app.command
+    def sub(x: int = 0):
+        return x
+
+    with pytest.raises(CycloptsError, match=r"\[sub\].*mapping.*int"):
+        app(["sub"], exit_on_error=False)
+
+
 def test_config_dict_nested_structure():
     """Test Dict config with nested dataclass-like structures."""
     from dataclasses import dataclass

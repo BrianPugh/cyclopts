@@ -631,6 +631,17 @@ class Argument:
         if not self.parse:
             raise ValueError
 
+        if self.parameter.count and self.tokens:
+            # An explicit ``=value`` (marked by a non-empty ``value``) sets the count
+            # and must be the flag's only occurrence; plain repeats may still sum.
+            explicit = next((x for x in (token, *self.tokens) if x.value and x.implicit_value is not UNSET), None)
+            if explicit is not None:
+                raise RepeatArgumentError(
+                    token=token,
+                    msg=f'"{explicit.keyword}={explicit.value}" sets the count explicitly '
+                    "and cannot be combined with other occurrences of the flag.",
+                )
+
         if any(x.address == token.address for x in self.tokens):
             if self.parameter.allow_repeating is False:
                 raise RepeatArgumentError(token=token)
@@ -796,6 +807,9 @@ class Argument:
         else:
             data = {}
             out = UNSET
+            # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file, or
+            # ``--x={}`` on the cli) means "instantiate from defaults", not "missing".
+            explicit_empty_mapping = False
 
             if self._enum_flag_type:
                 out = self._enum_flag_type(0)
@@ -805,26 +819,36 @@ class Argument:
                 out |= reduce(operator.or_, converted_flags) if isinstance(converted_flags, list) else converted_flags
 
             if self._should_attempt_json_dict():
-                while self.tokens:
-                    token = self.tokens.pop(0)
+                json_tokens, self.tokens = self.tokens, []
+                for token in json_tokens:
                     try:
                         parsed_json = json.loads(token.value)
                     except json.JSONDecodeError as e:
                         raise CoercionError(token=token, target_type=self.hint) from e
                     _validate_json_extra_keys(parsed_json, self.hint, token)
-                    update_argument_collection(
-                        {self.name.lstrip("-"): parsed_json},
-                        token.source,
-                        self.children_recursive,
-                        root_keys=(),
-                        allow_unknown=False,
-                    )
+                    if parsed_json:
+                        update_argument_collection(
+                            {self.name.lstrip("-"): parsed_json},
+                            token.source,
+                            self.children_recursive,
+                            root_keys=(),
+                            allow_unknown=False,
+                        )
+                    else:
+                        explicit_empty_mapping = True
+                        # Placeholder so ``has_tokens`` still reports this argument as supplied.
+                        self.tokens.append(token.evolve(value="", implicit_value={}))
 
             if self._use_pydantic_type_adapter:
                 return self._convert_pydantic()
 
             if self.tokens and not self._enum_flag_type:
                 positional_tokens = [token for token in self.tokens if not token.keys]
+                if any(isinstance(token.implicit_value, dict) for token in positional_tokens):
+                    explicit_empty_mapping = True
+                    positional_tokens = [
+                        token for token in positional_tokens if not isinstance(token.implicit_value, dict)
+                    ]
                 if positional_tokens:
                     return safe_converter(self.hint, tuple(positional_tokens))
 
@@ -859,7 +883,7 @@ class Argument:
                 out |= enum_flag_from_dict(self._enum_flag_type, data, self.parameter.name_transform)
                 if not out:
                     out = UNSET
-            elif data:
+            elif data or explicit_empty_mapping:
                 # Use resolved_hint to get the actual class type (Optional stripped)
                 target_hint = self.resolved_hint
                 if self._union_branches:
@@ -1213,6 +1237,10 @@ class Argument:
         out = {}
         if self._accepts_keywords:
             for token in self.tokens:
+                if not token.keys and isinstance(token.implicit_value, dict):
+                    # An explicitly-supplied empty mapping (e.g. ``x = {}`` in a config file);
+                    # contributes no keys, but ``has_tokens`` already marks the argument as supplied.
+                    continue
                 node = out
                 for key in token.keys[:-1]:
                     node = node.setdefault(key, {})

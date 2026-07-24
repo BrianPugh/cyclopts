@@ -54,11 +54,19 @@ class ConfigBase(ABC):
         arguments: ArgumentCollection,
     ):
         config: dict[str, Any] = self.config.copy()
-        try:
-            for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
+        traversed: list[str] = []
+        for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
+            try:
                 config = config[key]
-        except KeyError:
-            return
+            except KeyError:
+                return
+            traversed.append(key)
+            if not isinstance(config, dict):
+                keyword = "".join(f"[{k}]" for k in traversed)
+                raise CycloptsError(
+                    msg=f'Configuration key {keyword} in "{self.source}" must be a mapping, '
+                    f"but got {type(config).__name__}."
+                )
 
         # Hierarchical config uses current app; flat config uses root app to filter sibling commands
         if self.use_commands_as_keys:

@@ -1016,6 +1016,22 @@ def test_attrs_command_factory(app, assert_parse_args):
     assert app(["test"], result_action=("call_if_callable", "return_value"), exit_on_error=False) == "[1, 2, 3]"
 
 
+def test_pydantic_empty_dict_config_value(app, assert_parse_args):
+    """An empty dict config value constructs an all-defaults model instead of raising MissingArgumentError."""
+    from cyclopts.config import Dict
+
+    class Options(BaseModel):
+        threshold: int = 5
+
+    app.config = (Dict({"options": {}}),)
+
+    @app.default
+    def main(options: Options):
+        pass
+
+    assert_parse_args(main, "", Options(threshold=5))
+
+
 def test_pydantic_default_factory_help(app, console):
     """Zero-arg ``default_factory`` values render in help, consistent with dataclass/attrs.
 
