@@ -11,6 +11,7 @@ from enum import Enum, Flag
 from functools import partial, reduce
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Literal,
     TypeVar,
@@ -868,6 +869,11 @@ def convert(
 
     convert_priv = partial(_convert, converter=converter, name_transform=name_transform)
     convert_tuple = partial(_convert_tuple, converter=converter, name_transform=name_transform)
+    # ``_convert`` applies a type's own ``Parameter`` metadata (converter/validator), but
+    # ``resolve`` discards it. Stash the metadata so it can be re-attached to the
+    # *normalized* type for the scalar dispatch below; this is what lets a container's
+    # value type carry its own ``Parameter``, e.g. ``dict[str, PositiveInt]``.
+    annotations_ = get_args(type_)[1:] if is_annotated(type_) else ()
     type_ = resolve(type_)
 
     if type_ is Any:
@@ -910,14 +916,15 @@ def convert(
         return convert_enum_flag(maybe_origin_type, tokens, name_transform)
     else:
         tokens_per_element, consume_all = token_count(type_)
+        annotated_type_ = Annotated[(type_, *annotations_)] if annotations_ else type_
         if consume_all:
-            return convert_priv(type_, tokens)  # pyright: ignore
+            return convert_priv(annotated_type_, tokens)  # pyright: ignore
         elif len(tokens) == 1:
-            return convert_priv(type_, tokens[0])  # pyright: ignore
+            return convert_priv(annotated_type_, tokens[0])  # pyright: ignore
         elif tokens_per_element == 1:
-            return [convert_priv(type_, item) for item in tokens]  # pyright: ignore
+            return [convert_priv(annotated_type_, item) for item in tokens]  # pyright: ignore
         elif len(tokens) == tokens_per_element:
-            return convert_priv(type_, tokens)  # pyright: ignore
+            return convert_priv(annotated_type_, tokens)  # pyright: ignore
         else:
             raise NotImplementedError("Unreachable?")
 
