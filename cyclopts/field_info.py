@@ -24,6 +24,7 @@ from cyclopts.annotations import (
     is_annotated,
     is_attrs,
     is_dataclass,
+    is_enum,
     is_enum_flag,
     is_namedtuple,
     is_pydantic,
@@ -356,6 +357,10 @@ def get_field_infos(hint) -> dict[str, FieldInfo]:
         return _attrs_field_infos(hint)
     elif is_enum_flag(hint):
         return _enum_flag_field_infos(hint)
+    elif is_enum(hint):
+        # Plain (non-Flag) Enums are leaf choice-sets converted by member name;
+        # a user-defined ``__init__`` must not cause decomposition into children.
+        return {}
     else:
         return _generic_class_field_infos(hint)
 
