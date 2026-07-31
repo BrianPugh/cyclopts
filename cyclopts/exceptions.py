@@ -596,9 +596,12 @@ class ConsumeMultipleError(MissingArgumentError):
         param_name = self.keyword or self.argument.name
 
         if self.actual_count < self.min_required:
-            constraint = f"requires at least {self.min_required}"
+            count = self.min_required
+            constraint = f"requires at least {count}"
         else:
-            constraint = f"accepts at most {self.max_allowed}"
+            count = self.max_allowed
+            constraint = f"accepts at most {count}"
+        noun = "element" if count == 1 else "elements"
 
         # Skip MissingArgumentError._segments; we want just the base verbose preamble.
         yield from CycloptsError._segments(self)
@@ -610,7 +613,7 @@ class ConsumeMultipleError(MissingArgumentError):
         else:
             yield "Parameter ", ""
         yield param_name, STYLE_NAME
-        yield f" {constraint} elements. Got {self.actual_count}.", ""
+        yield f" {constraint} {noun}. Got {self.actual_count}.", ""
 
 
 @define(kw_only=True)
