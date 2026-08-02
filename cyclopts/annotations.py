@@ -2,7 +2,7 @@ import inspect
 import sys
 import typing
 from collections.abc import Iterable, Sequence
-from enum import Flag
+from enum import Enum, Flag
 from types import UnionType
 from typing import Annotated, Any, Union, get_args, get_origin
 
@@ -77,6 +77,11 @@ def is_namedtuple(hint) -> bool:
 
 def is_attrs(hint) -> bool:
     return attrs.has(hint)
+
+
+def is_enum(hint) -> bool:
+    """Check if a type hint is an enum.Enum subclass."""
+    return is_class_and_subclass(hint, Enum)
 
 
 def is_enum_flag(hint) -> bool:

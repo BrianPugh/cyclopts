@@ -1,3 +1,4 @@
+from enum import Enum
 from functools import partial
 from typing import Annotated, Any
 
@@ -58,6 +59,25 @@ def test_basic_2(app, cmd_str, assert_parse_args):
         pass
 
     assert_parse_args(foo, cmd_str, 1, 2, 3, d=10, some_flag=True)
+
+
+def test_enum_with_init_is_a_choice_set(app, assert_parse_args):
+    """An Enum defining ``__init__`` must still be treated as a set of choices.
+
+    https://github.com/BrianPugh/cyclopts/issues/876
+    """
+
+    class Choice(Enum):
+        A = 0
+        B = 2
+
+        def __init__(self, value: int) -> None: ...
+
+    @app.default
+    def default(choice: Choice):
+        pass
+
+    assert_parse_args(default, "a", Choice.A)
 
 
 def test_functools_partial_default(app, assert_parse_args):

@@ -82,7 +82,7 @@ def test_consume_multiple_int_rejects_empty(app):
     def foo(*, my_list: Annotated[list[str] | None, Parameter(consume_multiple=1)] = None):
         pass
 
-    with pytest.raises(ConsumeMultipleError, match="requires at least 1 elements. Got 0"):
+    with pytest.raises(ConsumeMultipleError, match="requires at least 1 element. Got 0"):
         app.parse_args("--my-list", print_error=False, exit_on_error=False)
 
 
@@ -202,6 +202,20 @@ def test_consume_multiple_error_message_max(app):
 
     with pytest.raises(ConsumeMultipleError, match="accepts at most 5 elements. Got 6"):
         app.parse_args("--urls a b c d e f", print_error=False, exit_on_error=False)
+
+
+def test_consume_multiple_error_message_singular(app):
+    """A constraint of exactly 1 should say "element", not "elements"."""
+
+    @app.default
+    def foo(*, urls: Annotated[list[str] | None, Parameter(consume_multiple=(1, 1))] = None):
+        pass
+
+    with pytest.raises(ConsumeMultipleError, match=r"requires at least 1 element\. Got 0\."):
+        app.parse_args("--urls", print_error=False, exit_on_error=False)
+
+    with pytest.raises(ConsumeMultipleError, match=r"accepts at most 1 element\. Got 2\."):
+        app.parse_args("--urls a b", print_error=False, exit_on_error=False)
 
 
 def test_consume_multiple_error_panel_min(app):
