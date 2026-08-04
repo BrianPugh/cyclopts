@@ -99,10 +99,14 @@ def test_abstract_iterable_consume_multiple_empty(app, hint, expected, assert_pa
 @pytest.mark.parametrize(
     "hint,expected",
     [
-        # Only the hints that cyclopts already exposes an ``--empty-*`` flag for
-        # (i.e. members of ``ITERABLE_TYPES``).
         (collections.abc.Iterable[int], []),
         (collections.abc.Sequence[int], []),
+        (collections.abc.MutableSequence[int], []),
+        (collections.abc.Collection[int], []),
+        (collections.abc.Container[int], []),
+        (collections.abc.Reversible[int], []),
+        (collections.abc.Set[int], set()),
+        (collections.abc.MutableSet[int], set()),
     ],
 )
 def test_abstract_iterable_empty_flag(app, hint, expected, assert_parse_args):

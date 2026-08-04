@@ -1,3 +1,4 @@
+import collections.abc
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -731,6 +732,25 @@ def test_help_format_group_parameters_bool_or_none_custom_negative(capture_forma
 def test_help_format_group_parameters_list_flag(capture_format_group_parameters):
     def cmd(
         foo: Annotated[list[int] | None, Parameter(help="Docstring for foo.")] = None,
+    ):
+        pass
+
+    actual = capture_format_group_parameters(cmd)
+    expected = dedent(
+        """\
+        ╭─ Parameters ───────────────────────────────────────────────────────╮
+        │ FOO --foo --empty-foo  Docstring for foo.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
+
+
+def test_help_format_group_parameters_abstract_collection_flag(capture_format_group_parameters):
+    """Abstract collection hints get the same ``--empty-*`` flag as their concrete counterparts."""
+
+    def cmd(
+        foo: Annotated[collections.abc.MutableSequence[int] | None, Parameter(help="Docstring for foo.")] = None,
     ):
         pass
 
