@@ -77,6 +77,19 @@ _abstract_to_concrete_type_mapping: dict[type, type] = {
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
 
 
+def create_empty_instance(hint: Any) -> Any:
+    """Create an empty instance of ``hint``'s container type.
+
+    Abstract collections (e.g. ``collections.abc.Sequence[int]``) cannot be
+    instantiated, so they are first normalized to the same concrete type that
+    :func:`convert` would produce (e.g. ``list``).
+    """
+    type_ = get_origin(hint) or hint
+    if type_ in _abstract_to_concrete_type_mapping:
+        type_ = _abstract_to_concrete_type_mapping[type_]
+    return type_()
+
+
 def _bool(s: str) -> bool:
     s = s.lower()
     if s in {"no", "n", "0", "false", "f"}:

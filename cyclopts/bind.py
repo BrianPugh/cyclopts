@@ -6,9 +6,9 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
+from typing import TYPE_CHECKING, Any, NamedTuple
 
-from cyclopts._convert import _bool
+from cyclopts._convert import _bool, create_empty_instance
 from cyclopts.annotations import resolve_optional
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
@@ -351,8 +351,7 @@ def _parse_kw_and_flags(
                                 actual_count=0,
                             )
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
-                        hint = resolve_optional(match.argument.hint)
-                        empty_container = (get_origin(hint) or hint)()
+                        empty_container = create_empty_instance(resolve_optional(match.argument.hint))
                         match.argument.append(
                             CliToken(keyword=match.matched_token, implicit_value=empty_container, keys=match.keys)
                         )
