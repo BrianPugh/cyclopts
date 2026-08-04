@@ -1,3 +1,4 @@
+import collections.abc
 import textwrap
 from io import StringIO
 from typing import Annotated
@@ -70,6 +71,48 @@ def test_optional_list_consume_multiple(app, cmd_str, expected, assert_parse_arg
         assert_parse_args(foo, cmd_str)
     else:
         assert_parse_args(foo, cmd_str, expected)
+
+
+# --- Abstract collection types (https://github.com/BrianPugh/cyclopts/issues/880) ---
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (collections.abc.Iterable[int], []),
+        (collections.abc.Sequence[int], []),
+        (collections.abc.MutableSequence[int], []),
+        (collections.abc.Set[int], set()),
+        (collections.abc.MutableSet[int], set()),
+    ],
+)
+def test_abstract_iterable_consume_multiple_empty(app, hint, expected, assert_parse_args):
+    """An abstract collection hint should resolve to its concrete type when consuming zero values."""
+
+    @app.default
+    def foo(*, values: Annotated[hint, Parameter(consume_multiple=True, allow_repeating=False)]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(foo, "--values", values=expected)
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        # Only the hints that cyclopts already exposes an ``--empty-*`` flag for
+        # (i.e. members of ``ITERABLE_TYPES``).
+        (collections.abc.Iterable[int], []),
+        (collections.abc.Sequence[int], []),
+    ],
+)
+def test_abstract_iterable_empty_flag(app, hint, expected, assert_parse_args):
+    """The ``--empty-*`` flag should resolve an abstract collection hint to its concrete type."""
+
+    @app.default
+    def foo(*, values: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(foo, "--empty-values", values=expected)
 
 
 # --- consume_multiple=int (minimum count) ---
