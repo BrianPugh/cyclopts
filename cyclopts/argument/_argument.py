@@ -15,6 +15,7 @@ from attrs import define, field
 from cyclopts._convert import (
     _validate_json_extra_keys,
     convert,
+    create_empty_instance,
     instantiate_from_dict,
     token_count,
 )
@@ -592,8 +593,7 @@ class Argument:
                         elif is_nonetype(hint) or hint is None:
                             implicit_value = None
                         else:
-                            hint = resolve_optional(hint)
-                            implicit_value = (get_origin(hint) or hint)()
+                            implicit_value = create_empty_instance(resolve_optional(hint))
                         if trailing:
                             if trailing[0] == delimiter:
                                 trailing = trailing[1:]
