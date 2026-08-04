@@ -22,6 +22,7 @@ else:
     from typing_extensions import Self
 
 import cyclopts._env_var
+from cyclopts._convert import _abstract_to_concrete_type_mapping
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     NoneType,
@@ -58,7 +59,23 @@ ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
 
 T = TypeVar("T")
 
-_NEGATIVE_FLAG_TYPES = frozenset([bool, None, NoneType, *ITERABLE_TYPES, *ITERATIVE_BOOL_IMPLICIT_VALUE])
+# Abstract collections get the same negative flag as the concrete type they resolve to,
+# so e.g. ``Sequence[int]`` and ``MutableSequence[int]`` both offer ``--empty-*``.
+# Mappings are excluded for free: ``dict`` is not in ``ITERABLE_TYPES``.
+_ABSTRACT_NEGATIVE_FLAG_TYPES = frozenset(
+    abstract for abstract, concrete in _abstract_to_concrete_type_mapping.items() if concrete in ITERABLE_TYPES
+)
+
+_NEGATIVE_FLAG_TYPES = frozenset(
+    [
+        bool,
+        None,
+        NoneType,
+        *ITERABLE_TYPES,
+        *_ABSTRACT_NEGATIVE_FLAG_TYPES,
+        *ITERATIVE_BOOL_IMPLICIT_VALUE,
+    ]
+)
 
 
 def _not_hyphen_validator(instance, attribute, values):
