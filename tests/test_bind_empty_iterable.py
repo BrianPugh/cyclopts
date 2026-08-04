@@ -7,7 +7,7 @@ import pytest
 from rich.console import Console
 
 from cyclopts import CycloptsPanel, Parameter
-from cyclopts.exceptions import ConsumeMultipleError, MissingArgumentError
+from cyclopts.exceptions import CoercionError, ConsumeMultipleError, MissingArgumentError
 
 
 @pytest.mark.parametrize(
@@ -113,6 +113,30 @@ def test_abstract_iterable_empty_flag(app, hint, expected, assert_parse_args):
         pass
 
     assert_parse_args(foo, "--empty-values", values=expected)
+
+
+def test_unconstructible_empty_container_raises_cyclopts_error(app):
+    """An unconstructible hint should surface a CycloptsError, not a raw TypeError.
+
+    ``n_tokens=-1`` sets ``consume_all`` for *any* type, bypassing the iterable
+    gating that normally keeps unconstructible types away from the empty-container
+    path. Supplying values to the same annotation already raises ``CoercionError``,
+    so the zero-value case should too.
+    """
+
+    class AbstractSeq(collections.abc.Sequence):
+        """Subclasses an ABC without implementing it; cannot be instantiated."""
+
+    @app.default
+    def foo(*, values: Annotated[AbstractSeq, Parameter(n_tokens=-1, consume_multiple=True)]):
+        pass
+
+    # Sanity check: the non-empty case is already a well-formed cyclopts error.
+    with pytest.raises(CoercionError):
+        app.parse_args("--values 1 2", print_error=False, exit_on_error=False)
+
+    with pytest.raises(CoercionError):
+        app.parse_args("--values", print_error=False, exit_on_error=False)
 
 
 # --- consume_multiple=int (minimum count) ---

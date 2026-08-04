@@ -351,7 +351,17 @@ def _parse_kw_and_flags(
                                 actual_count=0,
                             )
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
-                        empty_container = create_empty_instance(resolve_optional(match.argument.hint))
+                        try:
+                            empty_container = create_empty_instance(resolve_optional(match.argument.hint))
+                        except TypeError as e:
+                            # ``n_tokens=-1`` sets ``consume_all`` for any type, so the hint
+                            # here isn't necessarily a constructible container.
+                            raise CoercionError(
+                                msg=e.args[0] if e.args else None,
+                                argument=match.argument,
+                                target_type=match.argument.hint,
+                                token=CliToken(keyword=match.matched_token),
+                            ) from e
                         match.argument.append(
                             CliToken(keyword=match.matched_token, implicit_value=empty_container, keys=match.keys)
                         )
