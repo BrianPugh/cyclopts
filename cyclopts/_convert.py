@@ -63,6 +63,8 @@ _implicit_iterable_type_mapping: dict[type, type] = {
 
 # Mapping from abstract collection types to their concrete implementations.
 # Used to convert abstract types like collections.abc.Set to concrete types like set.
+# ``Iterator``/``Generator`` are intentionally absent: ``list`` is not a valid
+# instance of either, so there is no concrete stand-in that satisfies the hint.
 _abstract_to_concrete_type_mapping: dict[type, type] = {
     Iterable: list,
     typing.Sequence: list,
@@ -70,6 +72,9 @@ _abstract_to_concrete_type_mapping: dict[type, type] = {
     collections.abc.Set: set,
     collections.abc.MutableSet: set,
     collections.abc.MutableSequence: list,
+    collections.abc.Collection: list,
+    collections.abc.Container: list,
+    collections.abc.Reversible: list,
     collections.abc.Mapping: dict,
     collections.abc.MutableMapping: dict,
 }
