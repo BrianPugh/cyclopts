@@ -1,3 +1,4 @@
+import collections.abc
 import textwrap
 from io import StringIO
 from typing import Annotated
@@ -6,7 +7,7 @@ import pytest
 from rich.console import Console
 
 from cyclopts import CycloptsPanel, Parameter
-from cyclopts.exceptions import ConsumeMultipleError, MissingArgumentError
+from cyclopts.exceptions import CoercionError, ConsumeMultipleError, MissingArgumentError
 
 
 @pytest.mark.parametrize(
@@ -70,6 +71,76 @@ def test_optional_list_consume_multiple(app, cmd_str, expected, assert_parse_arg
         assert_parse_args(foo, cmd_str)
     else:
         assert_parse_args(foo, cmd_str, expected)
+
+
+# --- Abstract collection types (https://github.com/BrianPugh/cyclopts/issues/880) ---
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (collections.abc.Iterable[int], []),
+        (collections.abc.Sequence[int], []),
+        (collections.abc.MutableSequence[int], []),
+        (collections.abc.Set[int], set()),
+        (collections.abc.MutableSet[int], set()),
+    ],
+)
+def test_abstract_iterable_consume_multiple_empty(app, hint, expected, assert_parse_args):
+    """An abstract collection hint should resolve to its concrete type when consuming zero values."""
+
+    @app.default
+    def foo(*, values: Annotated[hint, Parameter(consume_multiple=True, allow_repeating=False)]):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(foo, "--values", values=expected)
+
+
+@pytest.mark.parametrize(
+    "hint,expected",
+    [
+        (collections.abc.Iterable[int], []),
+        (collections.abc.Sequence[int], []),
+        (collections.abc.MutableSequence[int], []),
+        (collections.abc.Collection[int], []),
+        (collections.abc.Container[int], []),
+        (collections.abc.Reversible[int], []),
+        (collections.abc.Set[int], set()),
+        (collections.abc.MutableSet[int], set()),
+    ],
+)
+def test_abstract_iterable_empty_flag(app, hint, expected, assert_parse_args):
+    """The ``--empty-*`` flag should resolve an abstract collection hint to its concrete type."""
+
+    @app.default
+    def foo(*, values: hint):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    assert_parse_args(foo, "--empty-values", values=expected)
+
+
+def test_unconstructible_empty_container_raises_cyclopts_error(app):
+    """An unconstructible hint should surface a CycloptsError, not a raw TypeError.
+
+    ``n_tokens=-1`` sets ``consume_all`` for *any* type, bypassing the iterable
+    gating that normally keeps unconstructible types away from the empty-container
+    path. Supplying values to the same annotation already raises ``CoercionError``,
+    so the zero-value case should too.
+    """
+
+    class AbstractSeq(collections.abc.Sequence):
+        """Subclasses an ABC without implementing it; cannot be instantiated."""
+
+    @app.default
+    def foo(*, values: Annotated[AbstractSeq, Parameter(n_tokens=-1, consume_multiple=True)]):
+        pass
+
+    # Sanity check: the non-empty case is already a well-formed cyclopts error.
+    with pytest.raises(CoercionError):
+        app.parse_args("--values 1 2", print_error=False, exit_on_error=False)
+
+    with pytest.raises(CoercionError):
+        app.parse_args("--values", print_error=False, exit_on_error=False)
 
 
 # --- consume_multiple=int (minimum count) ---

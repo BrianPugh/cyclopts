@@ -1,8 +1,11 @@
 import inspect
 import sys
+from collections.abc import Collection as AbcCollection
+from collections.abc import Container as AbcContainer
 from collections.abc import Iterable, Sequence
 from collections.abc import MutableSequence as AbcMutableSequence
 from collections.abc import MutableSet as AbcMutableSet
+from collections.abc import Reversible as AbcReversible
 from collections.abc import Set as AbcSet
 from datetime import date, datetime, timedelta
 from enum import Enum, auto
@@ -356,9 +359,15 @@ def test_coerce_frozenset():
         (AbcSet[str], {"123", "456"}),
         (AbcMutableSet[str], {"123", "456"}),
         (AbcMutableSequence[str], ["123", "456"]),
+        (AbcCollection[str], ["123", "456"]),
+        (AbcContainer[str], ["123", "456"]),
+        (AbcReversible[str], ["123", "456"]),
         (AbcSet, {"123", "456"}),
         (AbcMutableSet, {"123", "456"}),
         (AbcMutableSequence, ["123", "456"]),
+        (AbcCollection, ["123", "456"]),
+        (AbcContainer, ["123", "456"]),
+        (AbcReversible, ["123", "456"]),
     ],
 )
 def test_coerce_abstract_collection_types(hint, expected):

@@ -60,6 +60,8 @@ _implicit_iterable_type_mapping: dict[type, type] = {
 
 # Mapping from abstract collection types to their concrete implementations.
 # Used to convert abstract types like collections.abc.Set to concrete types like set.
+# ``Iterator``/``Generator`` are intentionally absent: ``list`` is not a valid
+# instance of either, so there is no concrete stand-in that satisfies the hint.
 _abstract_to_concrete_type_mapping: dict[type, type] = {
     Iterable: list,
     typing.Sequence: list,
@@ -67,11 +69,27 @@ _abstract_to_concrete_type_mapping: dict[type, type] = {
     collections.abc.Set: set,
     collections.abc.MutableSet: set,
     collections.abc.MutableSequence: list,
+    collections.abc.Collection: list,
+    collections.abc.Container: list,
+    collections.abc.Reversible: list,
     collections.abc.Mapping: dict,
     collections.abc.MutableMapping: dict,
 }
 
 NestedCliArgs = dict[str, Union[Sequence[str], "NestedCliArgs"]]
+
+
+def create_empty_instance(hint: Any) -> Any:
+    """Create an empty instance of ``hint``'s container type.
+
+    Abstract collections (e.g. ``collections.abc.Sequence[int]``) cannot be
+    instantiated, so they are first normalized to the same concrete type that
+    :func:`convert` would produce (e.g. ``list``).
+    """
+    type_ = get_origin(hint) or hint
+    if type_ in _abstract_to_concrete_type_mapping:
+        type_ = _abstract_to_concrete_type_mapping[type_]
+    return type_()
 
 
 def _bool(s: str) -> bool:

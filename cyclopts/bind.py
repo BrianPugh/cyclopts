@@ -6,9 +6,9 @@ import sys
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import suppress
 from functools import partial
-from typing import TYPE_CHECKING, Any, NamedTuple, get_origin
+from typing import TYPE_CHECKING, Any, NamedTuple
 
-from cyclopts._convert import _bool
+from cyclopts._convert import _bool, create_empty_instance
 from cyclopts.argument import Argument, ArgumentCollection
 from cyclopts.exceptions import (
     ArgumentOrderError,
@@ -892,7 +892,17 @@ def _parse_kw_and_flags(
                                 actual_count=0,
                             )
                         # Allow empty iterables (e.g., --urls with no values behaves like --empty-urls)
-                        empty_container = (get_origin(match.argument.resolved_hint) or match.argument.resolved_hint)()
+                        try:
+                            empty_container = create_empty_instance(match.argument.resolved_hint)
+                        except TypeError as e:
+                            # ``n_tokens=-1`` sets ``consume_all`` for any type, so the hint
+                            # here isn't necessarily a constructible container.
+                            raise CoercionError(
+                                msg=e.args[0] if e.args else None,
+                                argument=match.argument,
+                                target_type=match.argument.hint,
+                                token=CliToken(keyword=match.matched_token),
+                            ) from e
                         match.argument.append(
                             CliToken(keyword=match.matched_token, implicit_value=empty_container, keys=match.keys)
                         )
