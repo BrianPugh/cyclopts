@@ -1,0 +1,343 @@
+.. _Migrating to v5:
+
+===============
+Migrating to v5
+===============
+**Most applications need no changes.**
+
+v5's breaking changes are concentrated in :ref:`Meta Apps <Meta App>`, which now
+parse hierarchically (see :ref:`Parse Mode`). Everything else is an edge case you
+were probably not relying on.
+
+.. list-table::
+   :widths: 55 45
+   :header-rows: 1
+
+   * - If your app...
+     - See
+   * - uses ``app.meta`` to forward tokens
+     - :ref:`v5 Meta Apps`
+   * - is invoked by scripts/CI that check exit codes
+     - :ref:`v5 Exit Code`
+   * - has command functions named ``PascalCase`` or ``snake_case``
+     - :ref:`v5 Fuzzy Matching`
+   * - defines a parameter named ``version`` or ``help``
+     - :ref:`v5 Shadowing`
+   * - none of the above
+     - Nothing to do.
+
+New in v5: :attr:`.App.parse_mode`, to opt into ``"strict"`` meta-app parsing.
+
+--------------------
+Likely To Affect You
+--------------------
+
+.. _v5 Fuzzy Matching:
+
+Command Names Must Match Exactly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** apps whose command names contain ``-`` or ``_``.
+
+v4 retried failed command lookups with dashes/underscores stripped, a
+compatibility shim for the v4 `name-transform change
+<https://github.com/BrianPugh/cyclopts/pull/666>`_ (``PascalCase`` →
+``pascal-case``). That shim is removed.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(name="myapp")
+
+   @app.command
+   def MyCommand():  # registers as "my-command"
+       print("Hello!")
+
+   app()
+
+.. code-block:: console
+
+   $ myapp mycommand
+   # v4: Hello!
+   # v5: Error: Unknown command "mycommand". Did you mean "my-command"?
+
+To migrate, either type the exact (name-transformed) name, or register the old
+spelling explicitly:
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(name="myapp")
+
+   @app.command(alias="mycommand")
+   def MyCommand():  # invocable as "my-command" or "mycommand"
+       print("Hello!")
+
+   app()
+
+.. _v5 Exit Code:
+
+Parse Errors Exit With Code 2
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** scripts and CI that check exit codes.
+
+CLI usage errors (unknown option, missing argument, coercion failure, …) now
+exit with ``2``, matching :mod:`argparse` and `Click`_. Previously ``1``, which
+made them indistinguishable from a command that ran and reported failure.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(name="myapp")
+
+   @app.default
+   def main(count: int = 0):
+       print(count)
+
+   app()
+
+.. code-block:: console
+
+   $ myapp --bogus; echo $?
+   # v4: 1
+   # v5: 2
+
+.. _v5 Meta Apps:
+
+--------------------------------------
+Meta Apps: Parsing Is Now Hierarchical
+--------------------------------------
+**Affects:** apps that forward tokens through ``app.meta``.
+
+In v4, a meta app claimed any keyword parameter it recognized, from anywhere on
+the command line. In v5, the default :attr:`.App.parse_mode` is
+``"fallthrough"``: meta parameters may still appear anywhere, but a subcommand
+takes precedence over the meta for tokens placed after it.
+
+Set ``parse_mode="strict"`` to instead bind each parameter *only* at the level
+where it appears, and error when a meta parameter is placed after a subcommand.
+See :ref:`Parse Mode`.
+
+The three consequences below follow from this change.
+
+Subcommands Win On Name Collisions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+When the meta and the subcommand define the same name, the **subcommand wins**
+for tokens placed after it.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App(name="myapp")
+
+   @app.meta.default
+   def main(
+       *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+       verbose: Annotated[bool, Parameter(alias="-v")] = False,
+   ):
+       print(f"meta verbose={verbose}")
+       app(tokens)
+
+   @app.command
+   def greet(name: str, *, version: Annotated[bool, Parameter(alias="-v")] = False):
+       print(f"greet name={name} version={version}")
+
+   app.meta()
+
+.. code-block:: console
+
+   $ myapp greet -v Alice
+   # v4: meta verbose=True;  greet name=Alice version=False
+   # v5: meta verbose=False; greet name=Alice version=True   (child wins)
+
+Placement *before* the subcommand is unchanged: ``myapp -v greet Alice`` binds
+the meta's ``verbose`` in both versions.
+
+Forwarded ``*tokens`` Preserve the ``--`` Delimiter
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A forwarding meta's raw-stream capture parameter (``*tokens`` with
+:attr:`~.Parameter.allow_leading_hyphen`) now keeps the literal ``--`` the user
+typed, so the re-parse inside ``app(tokens)`` still treats trailing tokens as
+positional.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App(name="myapp")
+
+   @app.meta.default
+   def main(*tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)]):
+       print(f"meta captured {tokens}")
+       app(tokens)
+
+   @app.command
+   def sub(value: str):
+       print(f"sub value={value}")
+
+   app.meta()
+
+.. code-block:: console
+
+   $ myapp sub -- -x
+   # v4: meta captured ('sub', '-x')       → Error: Unknown option: -x.
+   # v5: meta captured ('sub', '--', '-x') → sub value=-x
+
+* If your wrapper manually re-inserted ``--`` as a workaround, **remove it**;
+  otherwise the inner parse receives it twice.
+* Leaf commands (those that don't forward) are unchanged: ``--`` is consumed as
+  a marker and never appears in bound values.
+
+A Greedy ``*args`` Subcommand Claims Everything After It
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If a subcommand's only positional parameter is ``*args`` with
+:attr:`~.Parameter.allow_leading_hyphen`, it claims **every** token after the
+command. Meta parameters placed after it no longer bubble up.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App(name="myapp")
+
+   @app.meta.default
+   def main(
+       *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+       user: str = "default",
+   ):
+       print(f"meta user={user}")
+       app(tokens)
+
+   @app.command
+   def sub(*args: Annotated[str, Parameter(allow_leading_hyphen=True)]):
+       print(f"sub args={args}")
+
+   app.meta()
+
+.. code-block:: console
+
+   $ myapp sub --user=alice
+   # v4: meta user=alice;   sub args=()
+   # v5: meta user=default; sub args=('--user=alice',)
+
+To migrate, either:
+
+* Place meta parameters before the subcommand: ``myapp --user=alice sub``.
+* Give the subcommand explicit keyword parameters instead of a catch-all.
+
+-----------
+Edge Cases
+-----------
+
+.. _v5 Shadowing:
+
+User Parameters Shadow ``--help`` / ``--version``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** commands defining a parameter named ``version`` or ``help``.
+
+Such a parameter now *shadows* the auto-registered flag on that command: the
+token binds to your parameter instead of triggering the help/version handler,
+and the help page lists your parameter.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(name="myapp", version="1.2.3")
+
+   @app.command
+   def sub(*, version: bool = False):
+       print(f"version={version}")
+
+   app()
+
+.. code-block:: console
+
+   $ myapp sub --version
+   # v4: 1.2.3        (the app version)
+   # v5: version=True (bound to the parameter)
+
+If you relied on such a parameter *not* capturing those tokens, rename the
+parameter or its :attr:`~.Parameter.name`.
+
+.. note::
+   Shadowing is per-flag:
+
+   * ``--version`` shadowed → ``--help`` still shows help.
+   * ``--help`` shadowed → a ``--version`` token still triggers the version
+     handler (interception runs before binding), and the shadowed ``--help``
+     token is discarded along with all other tokens.
+
+``--version`` Respects the ``--`` Delimiter
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+A ``--version`` token after the end-of-options delimiter is now positional data
+instead of triggering version printing, matching ``--help``.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   app = App(name="myapp", version="1.2.3")
+
+   @app.default
+   def main(value: str):
+       print(f"value={value}")
+
+   app()
+
+.. code-block:: console
+
+   $ myapp -- --version
+   # v4: 1.2.3             (command never ran)
+   # v5: value=--version
+
+``result_action`` Names Are Validated Eagerly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+An invalid :attr:`.App.result_action` name now raises :class:`ValueError` at
+:class:`.App` construction, attribute assignment, or invocation-time override,
+*before* any command executes rather than after.
+
+.. code-block:: python
+
+   from cyclopts import App
+
+   App(result_action="bogus")  # ValueError, raised immediately
+
+The error message lists the valid names.
+
+``cyclopts tree``: ``-d`` Now Disables Descriptions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** the bundled ``cyclopts tree`` CLI tool, not your own apps.
+
+``-d`` was an alias for ``--description``, a no-op since descriptions show by
+default. It is now equivalent to ``--no-description``.
+
+.. code-block:: python
+
+   # my_script.py
+   from cyclopts import App
+
+   app = App(name="myapp")
+
+   @app.command
+   def greet(name: str):
+       """Greet someone."""
+       print(f"Hello {name}")
+
+   app()
+
+.. code-block:: console
+
+   $ cyclopts tree my_script.py -d
+   # v4: myapp
+   #     └── greet  Greet someone.
+   # v5: myapp
+   #     └── greet
+
+.. _Click: https://click.palletsprojects.com
