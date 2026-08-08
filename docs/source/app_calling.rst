@@ -85,12 +85,14 @@ See :ref:`Result Action` for all available modes and detailed behavior.
 Exception Handling and Exiting
 ------------------------------
 For the most part, Cyclopts is **hands-off** when it comes to handling exceptions and exiting the application.
-However, by default, if there is a **Cyclopts runtime error**, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a :func:`sys.exit(1) <sys.exit>`.
+However, by default, if there is a **Cyclopts runtime error**, like :exc:`.CoercionError` or a :exc:`.ValidationError`, then Cyclopts will perform a :func:`sys.exit(2) <sys.exit>`.
 This is to avoid displaying the unformatted, uncaught exception to the CLI user.
+
+Exceptions raised by your **command function** are never intercepted; they propagate out of the :class:`.App` call like any other Python exception, regardless of the settings below.
 
 These behaviors can be controlled via :class:`.App` attributes or method parameters:
 
-- :attr:`.App.exit_on_error` - Calls :func:`sys.exit(1) <sys.exit>` on errors (defaults to :obj:`True`)
+- :attr:`.App.exit_on_error` - Calls :func:`sys.exit(2) <sys.exit>` on Cyclopts parsing/validation errors (defaults to :obj:`True`)
 - :attr:`.App.print_error` - Formatted errors are printed (defaults to :obj:`True`)
 - :attr:`.App.help_on_error` - The help-page is printed before errors (defaults to :obj:`False`)
 - :attr:`.App.verbose` - Include verbose error information that might be useful for **developers** using Cyclopts (defaults to :obj:`False`)
@@ -109,10 +111,12 @@ These attributes are inherited by child apps and can be overridden by providing 
 
 .. code-block:: python
 
+   from cyclopts import App
+
    # Configure error handling at the app level
    app = App(
-       exit_on_error=False,  # Don't exit on errors
-       print_error=False,    # Don't print formatted errors
+       exit_on_error=False,  # Don't exit on parsing errors; raise instead
+       print_error=False,  # Don't print formatted errors
    )
 
    # Child apps inherit these settings
@@ -121,33 +125,43 @@ These attributes are inherited by child apps and can be overridden by providing 
 
 **Method-Level Override:**
 
+With the defaults, a parsing error prints a formatted error and exits:
+
 .. code-block:: python
 
+   from cyclopts import App
+
+   app = App()
+
    app("this-is-not-a-registered-command")
-   print("this will not be printed since cyclopts exited above.")
+   print("This will not be printed since Cyclopts exited above.")
    # ╭─ Error ─────────────────────────────────────────────────────────────╮
    # │ Unknown command "this-is-not-a-registered-command".                 │
    # ╰─────────────────────────────────────────────────────────────────────╯
 
-   app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
-   # Traceback (most recent call last):
-   #   File "/cyclopts/scratch.py", line 9, in <module>
-   #     app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
-   #   File "/cyclopts/cyclopts/core.py", line 1102, in __call__
-   #     command, bound, _ = self.parse_args(
-   #   File "/cyclopts/cyclopts/core.py", line 1037, in parse_args
-   #     command, bound, unused_tokens, ignored, argument_collection = self._parse_known_args(
-   #   File "/cyclopts/cyclopts/core.py", line 966, in _parse_known_args
-   #     raise UnknownCommandError(unused_tokens=unused_tokens)
-   # cyclopts.exceptions.UnknownCommandError: Unknown command "this-is-not-a-registered-command".
+Passing ``exit_on_error=False, print_error=False`` raises the error instead:
+
+.. code-block:: text
+
+   Traceback (most recent call last):
+     File "scratch.py", line 5, in <module>
+       app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
+     ...
+   cyclopts.exceptions.UnknownCommandError: Unknown command "this-is-not-a-registered-command".
+
+So it can be caught like any other python exception:
+
+.. code-block:: python
+
+   from cyclopts import App, CycloptsError
+
+   app = App()
 
    try:
        app("this-is-not-a-registered-command", exit_on_error=False, print_error=False)
    except CycloptsError:
        pass
    print("Execution continues since we caught the exception.")
-
-With ``exit_on_error=False``, the ``UnknownCommandError`` is raised the same as a normal python exception.
 
 .. _Custom Error Formatting:
 

@@ -272,8 +272,9 @@ API
       :type: Optional[bool]
       :value: None
 
-      If there is an error parsing the CLI tokens, invoke :func:`sys.exit(1) <sys.exit>`.
+      If there is an error parsing the CLI tokens, invoke :func:`sys.exit(2) <sys.exit>`.
       Otherwise, continue to raise the exception.
+      Only applies to Cyclopts parsing/validation errors; exceptions raised by the command function itself always propagate.
       If not set, attempts to inherit from parenting :class:`.App`, eventually defaulting to :obj:`True`.
 
    .. attribute:: verbose
