@@ -4,10 +4,10 @@ Administrative commands for system management.
 
 **Global Options**:
 
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv).  *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output.  *[default: False]*
-* `--log-level`: Logging level.  *[choices: debug, info, warning, error, critical]*  *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output  *[default: False]*
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 #### complex-cli admin users
 
@@ -31,8 +31,8 @@ Grant permissions to a user.
 
 **Arguments**:
 
-* `USERNAME`: Target username.  **[required]**
-* `PERMISSION`: Permission flags to grant.  **[required]**  *[choices: none, read, write, execute, admin]*
+* `USERNAME`: Target username. **[required]**
+* `PERMISSION`: Permission flags to grant. **[required]** *[choices: none, read, write, execute, admin]*
 
 **Parameters**:
 
@@ -49,8 +49,8 @@ Revoke permissions from a user.
 
 **Arguments**:
 
-* `USERNAME`: Target username.  **[required]**
-* `PERMISSION`: Permission flags to revoke.  **[required]**  *[choices: none, read, write, execute, admin]*
+* `USERNAME`: Target username. **[required]**
+* `PERMISSION`: Permission flags to revoke. **[required]** *[choices: none, read, write, execute, admin]*
 
 ###### complex-cli admin users permissions audit
 
@@ -63,8 +63,8 @@ Audit permission changes.
 **Parameters**:
 
 * `USERNAME, --username`: Filter by username (all users if not specified).
-* `DAYS, --days`: Number of days to look back.  *[default: 30]*
-* `FORMAT, --format`: Output format for audit report.  *[choices: json, yaml, table, csv]*  *[default: table]*
+* `DAYS, --days`: Number of days to look back. *[default: 30]*
+* `FORMAT, --format`: Output format for audit report. *[choices: json, yaml, table, csv]* *[default: table]*
 
 ###### complex-cli admin users permissions roles
 
@@ -85,7 +85,7 @@ List all role templates.
 
 **Parameters**:
 
-* `INCLUDE-SYSTEM, --include-system, --no-include-system`: Include built-in system roles.  *[default: False]*
+* `INCLUDE-SYSTEM, --include-system, --no-include-system`: Include built-in system roles. *[default: False]*
 
 ###### complex-cli admin users permissions roles create-role
 
@@ -97,13 +97,13 @@ Create a new role template.
 
 **Arguments**:
 
-* `NAME`: Role name.  **[required]**
+* `NAME`: Role name. **[required]**
 
 **Parameters**:
 
-* `--permissions.none, --permissions.no-none`: Default permissions for this role.  *[default: False]*
-* `--permissions.read, --permissions.no-read`: Default permissions for this role.  *[default: False]*
-* `--permissions.write, --permissions.no-write`: Default permissions for this role.  *[default: False]*
-* `--permissions.execute, --permissions.no-execute`: Default permissions for this role.  *[default: False]*
-* `--permissions.admin, --permissions.no-admin`: Default permissions for this role.  *[default: False]*
-* `--description`: Role description.  *[default: ""]*
+* `--permissions.none, --permissions.no-none`: Default permissions for this role. *[default: False]*
+* `--permissions.read, --permissions.no-read`: Default permissions for this role. *[default: False]*
+* `--permissions.write, --permissions.no-write`: Default permissions for this role. *[default: False]*
+* `--permissions.execute, --permissions.no-execute`: Default permissions for this role. *[default: False]*
+* `--permissions.admin, --permissions.no-admin`: Default permissions for this role. *[default: False]*
+* `--description`: Role description. *[default: ""]*
