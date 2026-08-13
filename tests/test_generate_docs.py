@@ -279,6 +279,41 @@ def test_generate_docs_with_required_parameters():
     assert actual == expected
 
 
+def test_generate_docs_consistent_whitespace_after_param_colon():
+    """Regression test for #887.
+
+    ``generate_docs()`` should emit exactly one space after the parameter
+    colon when there is following text (help and/or metadata), and no
+    trailing whitespace when there is nothing after the colon.
+    """
+    app = App(name="something")
+
+    @app.command
+    def do_something(
+        *,
+        has_help: str | None = None,
+        has_metadata: str,
+        has_no_help: str | None = None,
+        is_last: str | None = None,
+    ):
+        """Do something.
+
+        Args:
+            has_help: Some help text.
+        """
+
+    actual = app.generate_docs()
+
+    assert "* `--has-help`: Some help text.\n" in actual
+    assert "* `--has-metadata`: **[required]**\n" in actual
+    assert "* `--has-no-help`:\n" in actual
+    assert "* `--is-last`:\n" in actual
+
+    # No line should have trailing whitespace.
+    for line in actual.splitlines():
+        assert line == line.rstrip(), f"Line has trailing whitespace: {line!r}"
+
+
 def test_generate_docs_with_choices():
     """Test documentation with parameter choices."""
     from enum import Enum
