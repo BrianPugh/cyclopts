@@ -1,12 +1,6 @@
 """InlineText class for rich text rendering with appended metadata."""
 
-import sys
-from typing import TYPE_CHECKING
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from rich.console import RenderableType

@@ -1,21 +1,16 @@
 import inspect
 import itertools
-import sys
 from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
     Optional,
+    Self,
     Union,
 )
 
 from attrs import field
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 from cyclopts.utils import (
     UNSET,

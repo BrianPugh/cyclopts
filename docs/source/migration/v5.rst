@@ -23,6 +23,8 @@ were probably not relying on.
      - :ref:`v5 Fuzzy Matching`
    * - defines a parameter named ``version`` or ``help``
      - :ref:`v5 Shadowing`
+   * - still runs on Python 3.10, or installs the ``toml`` extra
+     - :ref:`v5 Requirements`
    * - none of the above
      - Nothing to do.
 
@@ -310,6 +312,21 @@ An invalid :attr:`.App.result_action` name now raises :class:`ValueError` at
    App(result_action="bogus")  # ValueError, raised immediately
 
 The error message lists the valid names.
+
+.. _v5 Requirements:
+
+Python 3.10 Dropped; ``toml`` Extra Removed
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** environments on Python 3.10, and installs using ``cyclopts[toml]``.
+
+Cyclopts now requires Python >=3.11. Python 3.10 reached end-of-life, and
+dropping it lets Cyclopts use standard-library ``tomllib`` and typing features
+directly instead of the ``tomli`` and ``typing-extensions`` backports.
+
+Because TOML config support now uses the built-in ``tomllib``, the ``toml``
+install extra is no longer needed and has been removed. Replace
+``pip install cyclopts[toml]`` with ``pip install cyclopts``; TOML config files
+work out of the box.
 
 ``cyclopts tree``: ``-d`` Now Disables Descriptions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

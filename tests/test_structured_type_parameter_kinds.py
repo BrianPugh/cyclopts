@@ -1,10 +1,7 @@
 """Tests for structured types with various parameter kinds (POSITIONAL_ONLY, VAR_POSITIONAL, etc)."""
 
-import sys
 from dataclasses import dataclass, field
 from typing import Annotated
-
-import pytest
 
 from cyclopts import Parameter
 
@@ -193,7 +190,6 @@ def test_dataclass_fully_kw_only_with_accepts_keys_false(app, assert_parse_args)
     assert_parse_args(cmd, "--config Bob", config=Config(name="Bob"))
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+ for positional-only in dataclass")
 def test_dataclass_positional_only_and_keyword_only():
     """Test dataclass with both positional-only and keyword-only fields.
 

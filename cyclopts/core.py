@@ -6,7 +6,7 @@ import traceback
 from collections.abc import Callable, Coroutine, Iterable, Iterator, Sequence
 from contextlib import suppress
 from copy import copy
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache, partial
 from itertools import chain
 from pathlib import Path
@@ -64,11 +64,6 @@ from cyclopts.utils import (
     to_list_converter,
     to_tuple_converter,
 )
-
-if sys.version_info < (3, 11):  # pragma: no cover
-    pass
-else:  # pragma: no cover
-    pass
 
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
@@ -3049,7 +3044,7 @@ def _get_flag_index(tokens, flags, end_of_options_delimiter) -> int | None:
     return index
 
 
-class TestFramework(str, Enum):
+class TestFramework(StrEnum):
     UNKNOWN = ""
     PYTEST = "pytest"
 

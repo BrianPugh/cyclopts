@@ -25,12 +25,6 @@ from cyclopts.field_info import POSITIONAL_ONLY, POSITIONAL_OR_KEYWORD, VAR_POSI
 from cyclopts.token import Token
 from cyclopts.utils import UNSET, is_option_like
 
-if sys.version_info < (3, 11):  # pragma: no cover
-    pass
-else:  # pragma: no cover
-    pass
-
-
 if TYPE_CHECKING:
     from cyclopts.group import Group
 

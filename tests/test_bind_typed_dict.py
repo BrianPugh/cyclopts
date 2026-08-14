@@ -1,16 +1,10 @@
-import sys
 from textwrap import dedent
-from typing import Annotated, TypedDict
+from typing import Annotated, NotRequired, Required, TypedDict
 
 import pytest
 
 from cyclopts import MissingArgumentError, Parameter
 from cyclopts.exceptions import UnknownOptionError
-
-if sys.version_info < (3, 11):  # pragma: no cover
-    from typing_extensions import NotRequired, Required
-else:  # pragma: no cover
-    from typing import NotRequired, Required
 
 
 class MyDict(TypedDict):
