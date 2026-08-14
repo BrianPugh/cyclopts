@@ -1,15 +1,9 @@
 import inspect
-import sys
 from collections.abc import Callable, Coroutine
 from functools import partial
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, assert_never, overload
 
 from cyclopts._result_action import ResultAction
-
-if sys.version_info < (3, 11):  # pragma: no cover
-    from typing_extensions import assert_never
-else:  # pragma: no cover
-    from typing import assert_never
 
 if TYPE_CHECKING:
     from cyclopts.core import App

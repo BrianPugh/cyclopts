@@ -4,16 +4,11 @@ import typing
 from collections.abc import Iterable, Sequence
 from enum import Enum, Flag
 from types import UnionType
-from typing import Annotated, Any, Union, get_args, get_origin
+from typing import Annotated, Any, NotRequired, Required, Union, Unpack, get_args, get_origin
 
 import attrs
 
 from cyclopts.utils import is_class_and_subclass
-
-if sys.version_info < (3, 11):  # pragma: no cover
-    from typing_extensions import NotRequired, Required, Unpack
-else:  # pragma: no cover
-    from typing import NotRequired, Required, Unpack
 
 if sys.version_info >= (3, 12):  # pragma: no cover
     from typing import TypeAliasType

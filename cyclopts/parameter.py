@@ -1,12 +1,12 @@
 import collections.abc
 import inspect
 import re
-import sys
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from typing import (  # noqa: UP035
     Any,
     List,
+    Self,
     Tuple,
     TypeVar,
     cast,
@@ -15,11 +15,6 @@ from typing import (  # noqa: UP035
 )
 
 from attrs import define, field
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 import cyclopts._env_var
 from cyclopts._convert import _abstract_to_concrete_type_mapping
