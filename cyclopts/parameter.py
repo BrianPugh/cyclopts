@@ -294,6 +294,8 @@ class Parameter:
 
     help: str | None = field(default=None, kw_only=True)
 
+    metavar: str | None = field(default=None, kw_only=True)
+
     show_env_var: bool = field(
         default=None,
         converter=_default_if_none_true,

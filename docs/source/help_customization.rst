@@ -427,10 +427,8 @@ using :class:`~cyclopts.help.ColumnSpec`:
 
    # Define custom column renderers
    def names_renderer(entry):
-       """Combine parameter names and shorts."""
-       names = " ".join(entry.names) if entry.names else ""
-       shorts = " ".join(entry.shorts) if entry.shorts else ""
-       return f"{names} {shorts}".strip()
+       """Combine the positional metavar (if any) with the option names."""
+       return " ".join(entry.display_labels)
 
    def type_renderer(entry):
        """Show the parameter type."""
@@ -532,7 +530,7 @@ conditions:
        # Adjust name column width based on console size
        max_width = min(40, int(console.width * 0.3))
        columns.append(ColumnSpec(
-           renderer=lambda e: " ".join(e.names + e.shorts),
+           renderer=lambda e: " ".join(e.display_labels),
            header="Option",
            max_width=max_width,
            style="cyan",
@@ -588,6 +586,91 @@ Output (adjusts based on terminal width):
    │     <span style="color: #0088cc">--no-verbose</span>                                                             │
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
+
+--------
+Metavars
+--------
+
+A **metavar** is the placeholder standing in for a parameter's *value*, e.g. the ``PATH`` in ``--config PATH``.
+:attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` carries it for every parameter that consumes a value;
+it is :obj:`None` for boolean flags and :attr:`count <cyclopts.Parameter.count>` parameters, which consume none.
+The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``PATH``, :class:`str` → ``STR``);
+:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it.
+
+This is distinct from a positional parameter's *identifier* — the ``SRC`` in ``SRC --src`` — which is its
+:attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via
+:attr:`Parameter.name <cyclopts.Parameter.name>`). ``metavar`` never affects the identifier.
+
+The builtin panels show the metavar only in the usage line (for required keyword parameters); the parameter
+rows show identifiers only. A custom column can render the metavar next to every option instead:
+
+.. code-block:: python
+
+   from pathlib import Path
+   from typing import Annotated
+
+   from cyclopts import App, Group, Parameter
+   from cyclopts.help import ColumnSpec, DefaultFormatter
+
+
+   def names_renderer(entry):
+       """Render ``--option -o METAVAR``."""
+       options = " ".join(entry.all_options)
+       return f"{options} {entry.metavar}" if entry.metavar else options
+
+
+   options = Group(
+       "Options",
+       help_formatter=DefaultFormatter(
+           column_specs=(
+               ColumnSpec(renderer=names_renderer, style="cyan"),
+               ColumnSpec(renderer="description", overflow="fold"),
+           )
+       ),
+   )
+
+   app = App(name="my-script")
+
+
+   @app.default
+   def main(
+       *,
+       config: Annotated[
+           Path | None,
+           Parameter(name=["--config", "-c"], metavar="FILE", group=options, help="Configuration file."),
+       ] = None,
+       output_directory: Annotated[Path, Parameter(group=options, help="Where to write results.")] = Path(),
+       verbose: Annotated[bool, Parameter(name=["--verbose", "-v"], group=options, help="Increase output.")] = False,
+   ):
+       pass
+
+
+   if __name__ == "__main__":
+       app()
+
+Output:
+
+.. code-block:: console
+
+   $ my-script --help
+   Usage: my-script [OPTIONS]
+
+   ╭─ Options ────────────────────────────────────────────────────────────────────╮
+   │ --config -c FILE           Configuration file.                               │
+   │ --output-directory PATH    Where to write results.                           │
+   │ --verbose -v --no-verbose  Increase output.                                  │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+
+``--config`` uses an explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`, ``--output-directory``
+falls back to its type name (``PATH``), and ``--verbose`` has no metavar at all because a flag consumes no value.
+
+.. note::
+
+   :attr:`all_options <cyclopts.help.HelpEntry.all_options>` (and
+   :attr:`names <cyclopts.help.HelpEntry.names>`) contain option names only.
+   Use :attr:`display_labels <cyclopts.help.HelpEntry.display_labels>` to
+   reproduce the builtin layout, which prefixes the
+   :attr:`positional_label <cyclopts.help.HelpEntry.positional_label>` for positional parameters.
 
 --------------------------
 Creating Custom Formatters

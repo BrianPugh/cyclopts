@@ -130,31 +130,19 @@ class MarkdownFormatter:
         """
         # Always use list style for Typer-like output
         for entry in entries:
-            if names := entry.all_options:
-                # Separate positional names from option names
-                positional_names = [n for n in names if not n.startswith("-")]
-                short_opts = [n for n in names if n.startswith("-") and not n.startswith("--")]
-                long_opts = [n for n in names if n.startswith("--")]
+            if entry.display_labels:
+                is_positional = entry.positional
+                long_opts = list(entry.positive_names + entry.negative_names)
+                short_opts = list(entry.positive_shorts + entry.negative_shorts)
 
-                # Determine if this is a positional argument (required, no default)
-                is_positional = entry.required and entry.default is None
-
-                if is_positional and positional_names:
-                    # Show uppercase positional name first, then any option names
-                    parts = [positional_names[0].upper()]
-                    parts.extend(long_opts)
-                    name_str = ", ".join(parts)
+                if is_positional and entry.positional_label:
+                    # Positional label first, then any option aliases (long before short),
+                    # matching the rich and rst renderers. ``positional_label`` already
+                    # carries the correct casing.
+                    name_str = ", ".join([entry.positional_label, *long_opts, *short_opts])
                 else:
-                    # For options, show long opts first, then short opts
-                    if short_opts:
-                        name_str = ", ".join(long_opts + short_opts)
-                    elif positional_names:
-                        # Has positional name but not required - show all
-                        parts = [positional_names[0].upper()]
-                        parts.extend(long_opts)
-                        name_str = ", ".join(parts)
-                    else:
-                        name_str = ", ".join(long_opts)
+                    # Options: long forms first, then short forms.
+                    name_str = ", ".join(long_opts + short_opts)
 
                 # Start the entry (no type display)
                 self._output.write(f"* `{name_str}`: ")

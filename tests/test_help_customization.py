@@ -114,12 +114,15 @@ def test_group_custom_columns(console: Console):
     """Test that custom columns can be specified via DefaultFormatter."""
 
     def names_renderer(entry):
-        """Render names and shorts as a single string."""
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-        if names_str and shorts_str:
-            return names_str + " " + shorts_str
-        return names_str or shorts_str
+        """Render the positional label (positionals only), names, and shorts as a single string.
+
+        Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
+        positional label for positional parameters.
+        """
+        parts = [entry.positional_label] if entry.positional and entry.positional_label else []
+        parts.extend(entry.names)
+        parts.extend(entry.shorts)
+        return " ".join(parts)
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, style="green bold", header="Option"),
@@ -442,7 +445,7 @@ def test_table_headers_suppressed_when_all_empty(console: Console):
 
     # Create columns with explicitly empty headers
     custom_columns = (
-        ColumnSpec(renderer=lambda entry: " ".join(entry.names) if entry.names else "", header="", style="cyan"),
+        ColumnSpec(renderer=lambda entry: " ".join(entry.display_labels), header="", style="cyan"),
         ColumnSpec(renderer=DescriptionRenderer(), header=""),
     )
 
@@ -488,12 +491,15 @@ def test_table_headers_with_non_empty_headers(console: Console):
     """Test that headers appear when column headers have text."""
 
     def names_renderer(entry):
-        """Render names and shorts as a single string."""
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-        if names_str and shorts_str:
-            return names_str + " " + shorts_str
-        return names_str or shorts_str
+        """Render the positional label (positionals only), names, and shorts as a single string.
+
+        Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
+        positional label for positional parameters.
+        """
+        parts = [entry.positional_label] if entry.positional and entry.positional_label else []
+        parts.extend(entry.names)
+        parts.extend(entry.shorts)
+        return " ".join(parts)
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, header="Option", style="cyan"),
@@ -568,9 +574,10 @@ class SimpleCustomFormatter:
                 console.print(f"| {desc_text:<66} |")
 
         for entry in panel.entries:
+            label = entry.positional_label if entry.positional and entry.positional_label else ""
             names = " ".join(entry.names) if entry.names else ""
             shorts = " ".join(entry.shorts) if entry.shorts else ""
-            name_part = f"{names} {shorts}".strip()
+            name_part = f"{label} {names} {shorts}".strip()
 
             # Handle entry description - convert to plain text if needed
             desc = ""
@@ -695,6 +702,8 @@ def test_custom_help_formatter_with_optional_methods(console: Console):
                 shorts = " ".join(entry.shorts) if entry.shorts else ""
                 if shorts:
                     names += " " + shorts
+                if entry.positional and entry.positional_label:
+                    names = f"{entry.positional_label} {names}".strip()
 
                 # Handle entry description - convert to plain text if needed
                 desc = ""
@@ -768,7 +777,7 @@ def test_multiple_groups_different_formatters(console: Console):
 
             console.print(f">> {panel.title}")
             for entry in panel.entries:
-                names = " ".join(entry.names) if entry.names else ""
+                names = " ".join(entry.display_labels) if entry.display_labels else ""
 
                 # Handle entry description - convert to plain text if needed
                 desc = ""
@@ -852,7 +861,7 @@ def test_custom_formatter_protocol_validation(console: Console):
     def minimal_formatter(console, options, panel):
         console.print(f"[{panel.title}]")
         for entry in panel.entries:
-            names = " ".join(entry.names) if entry.names else ""
+            names = " ".join(entry.display_labels) if entry.display_labels else ""
             console.print(f"  {names}")
 
     custom_group = Group(
@@ -952,7 +961,7 @@ def test_custom_formatter_receives_correct_arguments(console: Console):
             assert len(panel.entries) == 1
             entry = panel.entries[0]
             assert "test" in " ".join(entry.names).lower() and "param" in " ".join(entry.names).lower()
-            console.print(f"  Entry: {' '.join(entry.names)}")
+            console.print(f"  Entry: {' '.join(entry.display_labels)}")
 
     custom_group = Group(
         "Validated Group",

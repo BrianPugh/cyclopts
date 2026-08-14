@@ -112,9 +112,9 @@ class PlainFormatter:
             desc = _to_plain_text(entry.description, console)
 
             # Format the entry line
-            if entry.all_options:
+            if entry.display_labels:
                 if panel.format == "parameter":
-                    self._format_parameter_entry(entry.all_options, desc, console, entry)
+                    self._format_parameter_entry(entry.display_labels, desc, console, entry)
                 else:
                     # Command formatter needs separate longs/shorts for its specific layout
                     self._format_command_entry(entry.positive_names, entry.positive_shorts, desc, console)

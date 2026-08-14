@@ -1750,7 +1750,7 @@ def test_help_print_parameters_no_negative_from_default_parameter(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo --flag BOOL
+        Usage: app foo --flag
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --flag  [required]                                              │

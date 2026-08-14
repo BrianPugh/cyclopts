@@ -132,17 +132,11 @@ class RstFormatter:
             Console for text extraction.
         """
         for entry in entries:
-            if names := entry.all_options:
-                # Determine if we should display as positional based on requirement and default
-                is_positional = entry.required and entry.default is None and not any(n.startswith("-") for n in names)
-
-                if is_positional:
-                    # For positional arguments, show in uppercase
-                    positional_names = [n for n in names if not n.startswith("-")]
-                    name_str = positional_names[0].upper() if positional_names else names[0].upper()
-                else:
-                    # For options, format with all forms
-                    name_str = ", ".join(names)
+            if names := entry.display_labels:
+                # ``display_labels`` already leads with the ``positional_label``
+                # ahead of any option names, so render it directly. A positional-only
+                # row is just the label with no option forms.
+                name_str = ", ".join(names)
 
                 # Use definition list format
                 self._output.write(f"``{name_str}``\n")
@@ -164,9 +158,7 @@ class RstFormatter:
                 # Add metadata
                 metadata = []
 
-                if is_positional and entry.required:
-                    metadata.append("**Required**")
-                elif entry.required and not is_positional:
+                if entry.required:
                     metadata.append("**Required**")
 
                 if entry.choices:

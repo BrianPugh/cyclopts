@@ -163,7 +163,7 @@ class HtmlFormatter:
 
         for entry in entries:
             # Format name with code tags
-            if names := entry.all_options:
+            if names := entry.display_labels:
                 name_html = ", ".join(f"<code>{escape_html(n)}</code>" for n in names)
             else:
                 name_html = ""

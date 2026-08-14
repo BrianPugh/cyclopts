@@ -74,20 +74,56 @@ class HelpEntry:
     """Container for help table entry data."""
 
     positive_names: tuple[str, ...] = ()
-    """Positive long option names (e.g., "--verbose", "--dry-run")."""
+    """Positive long option names (e.g., ``--verbose``, ``--dry-run``)."""
 
     positive_shorts: tuple[str, ...] = ()
-    """Positive short option names (e.g., "-v", "-n")."""
+    """Positive short option names (e.g., ``-v``, ``-n``)."""
 
     negative_names: tuple[str, ...] = ()
-    """Negative long option names (e.g., "--no-verbose", "--no-dry-run")."""
+    """Negative long option names (e.g., ``--no-verbose``, ``--no-dry-run``)."""
 
     negative_shorts: tuple[str, ...] = ()
-    """Negative short option names (e.g., "-N"). Rarely used."""
+    """Negative short option names (e.g., ``-N``). Rarely used."""
+
+    metavar: str | None = None
+    """Placeholder text for this parameter's **value** (e.g., the ``PATH`` in ``--config PATH``).
+
+    Describes the *shape* of the value a token becomes; it defaults to the parameter's
+    **type** in uppercase (``--config`` typed :class:`~pathlib.Path` → ``PATH``; ``str`` → ``STR``)
+    and can be overridden with :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`.
+    :obj:`None` for entries that do not consume a value, such as boolean flags,
+    counting parameters, and commands.
+
+    This is *not* how a positional parameter is displayed — that is its :attr:`positional_label`,
+    derived from the parameter's name. ``metavar`` never affects the identifier.
+    """
+
+    positional_label: str | None = None
+    """Display identifier for a **positional** parameter (e.g., the ``SRC`` in ``SRC --src``).
+
+    Derived from the parameter's **name** in uppercase; change it via
+    :attr:`Parameter.name <cyclopts.Parameter.name>`. :obj:`None` for keyword-only
+    parameters (which are identified by their option names) and commands. Unaffected
+    by :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. Prefixed onto
+    :attr:`display_labels` for positional parameters.
+    """
+
+    positional: bool = False
+    """Whether this parameter can be supplied positionally.
+
+    The builtin formatters prefix :attr:`positional_label` onto the option names for these
+    entries; see :attr:`display_labels`.
+    """
 
     @property
     def names(self) -> tuple[str, ...]:
-        """All long option names (positive + negative). For backward compatibility."""
+        """All long **option** names (positive + negative). For backward compatibility.
+
+        Only contains ``--`` option names. A positional-only parameter has no option
+        names, so this is empty for it — its display identifier lives in
+        :attr:`positional_label`. Use :attr:`display_labels` to render an entry the way
+        the builtin formatters do.
+        """
         return self.positive_names + self.negative_names
 
     @property
@@ -97,8 +133,21 @@ class HelpEntry:
 
     @property
     def all_options(self) -> tuple[str, ...]:
-        """All options in display order: positive longs, positive shorts, negative longs, negative shorts."""
+        """All options in display order: positive longs, positive shorts, negative longs, negative shorts.
+
+        Never includes the :attr:`positional_label`; see :attr:`display_labels`.
+        """
         return self.positive_names + self.positive_shorts + self.negative_names + self.negative_shorts
+
+    @property
+    def display_labels(self) -> tuple[str, ...]:
+        """:attr:`all_options`, preceded by :attr:`positional_label` for positional parameters.
+
+        This is what the builtin formatters render.
+        """
+        if self.positional and self.positional_label:
+            return (self.positional_label,) + self.all_options
+        return self.all_options
 
     description: Any = None
     """Help text description for this entry.
@@ -123,6 +172,15 @@ class HelpEntry:
 
     default: str | None = None
     """Default value for this parameter to display. None means no default to show."""
+
+    _source_id: Any = field(default=None, eq=False, repr=False, alias="source_id")
+    """Internal: stable identity of the source parameter, used only for de-duplication.
+
+    Distinguishes different parameters that happen to render identically (e.g. two
+    positional-only parameters sharing an explicit :attr:`~cyclopts.Parameter.name`),
+    while still collapsing the *same* parameter surfaced via multiple resolution paths.
+    Excluded from equality so it does not alter :class:`HelpEntry` comparisons.
+    """
 
     def copy(self, **kwargs):
         return evolve(self, **kwargs)
@@ -156,7 +214,12 @@ class HelpPanel:
     def _remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            hashable = (item.names, item.shorts)
+            # ``_source_id`` keys de-duplication on the underlying parameter's identity:
+            # positional-only entries have no option names, so keying on the rendered
+            # ``names``/``positional_label`` alone would wrongly merge distinct parameters
+            # that share a label.  ``names``/``shorts`` remain in the key so synthetic
+            # preview entries (which share a source) stay distinct.
+            hashable = (item._source_id, item.names, item.shorts, item.positional_label)
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
@@ -260,8 +323,6 @@ def format_usage(
 ):
     from rich.text import Text
 
-    from cyclopts.annotations import get_hint_name
-
     usage = []
 
     # If we're at the root level (no command chain), the app has a default_command,
@@ -304,19 +365,19 @@ def format_usage(
         optional_positional_args.extend(opos)
 
     for argument in required_keyword_params:
-        param_name = argument.name
-        type_name = get_hint_name(argument.hint).upper()
-        usage.append(f"{param_name} {type_name}")
+        # Keyword parameters show the value placeholder (``--foo STR``); positionals
+        # below show their name-derived label instead.
+        metavar = _resolve_metavar(argument)
+        usage.append(f"{argument.name} {metavar}" if metavar else argument.name)
 
     if optional_keyword_params:
         usage.append("[OPTIONS]")
 
     for argument in required_positional_args:
+        arg_name = _resolve_positional_label(argument) or argument.name.lstrip("-").upper()
         if argument.field_info.kind == argument.field_info.VAR_POSITIONAL:
-            arg_name = argument.name.lstrip("-").upper()
             usage.append(f"{arg_name}...")
         else:
-            arg_name = argument.name.lstrip("-").upper()
             usage.append(arg_name)
 
     if optional_positional_args:
@@ -425,8 +486,18 @@ def _expand_structured_dict_for_help(
         # to the names.
         base = _make_help_entry(argument, format)
         if outer_long_names:
+            # The ``.{NAME}`` suffix marks the next identifier layer, so it belongs on
+            # the names/positional_label (identifiers), never on the metavar (which
+            # describes the *value shape* — a ``STR`` is still a ``STR``).
             suffixed_names = tuple(f"{n}.{{NAME}}" for n in base.positive_names)
-            yield evolve(base, positive_names=suffixed_names)
+            suffixed_positional_label = (
+                f"{base.positional_label}.{{NAME}}" if base.positional_label else base.positional_label
+            )
+            yield evolve(
+                base,
+                positive_names=suffixed_names,
+                positional_label=suffixed_positional_label,
+            )
         else:
             yield base
         return
@@ -456,6 +527,50 @@ def _expand_structured_dict_for_help(
                 yield _make_help_entry(leaf, format)
 
 
+def _resolve_metavar(argument: "Argument") -> str | None:
+    """Resolve the value placeholder representing ``argument``'s **value** (the ``PATH`` in ``--config PATH``).
+
+    Describes the shape of the value a token becomes. An explicit
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty string
+    suppresses it); otherwise the default derives from the type hint (``STR``, ``PATH``).
+
+    Returns :obj:`None` for arguments that never consume a value, such as boolean
+    flags and counting parameters.  Independent of the positional display identifier;
+    see :func:`_resolve_positional_label`.
+    """
+    positional = argument.index is not None
+    if argument.parameter.count or (not positional and not argument.token_count()[0]):
+        # Parameters with no value to stand in for get no metavar, even when one is
+        # explicitly set. A count parameter never consumes a value (positional or
+        # keyword); a keyword flag consumes none either. A positional bool is *not*
+        # value-less — it is supplied positionally as a value (``myapp true``) — so it
+        # keeps its metavar. A positional's display identifier is the positional_label,
+        # never the metavar.
+        return None
+    override = argument.parameter.metavar
+    if override is not None:
+        return override or None
+    from cyclopts.annotations import get_hint_name
+
+    return get_hint_name(argument.hint).upper() or None
+
+
+def _resolve_positional_label(argument: "Argument") -> str | None:
+    """Resolve the display identifier for a **positional** parameter (the ``SRC`` in ``SRC --src``).
+
+    Derived from the parameter's name; :obj:`None` for keyword-only parameters, which
+    are identified by their option names. Never affected by
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` — use
+    :attr:`Parameter.name <cyclopts.Parameter.name>` to change it.
+    """
+    if argument.index is None:  # keyword-only: no positional face
+        return None
+    if not argument.names:
+        return None
+    label_source = next((o for o in argument.names if o.startswith("--")), argument.names[0])
+    return label_source.lstrip("-").upper() or None
+
+
 def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     """Build a single ``HelpEntry`` for one ``Argument``.
 
@@ -469,11 +584,15 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     seen: set[str] = set()
     options = [x for x in options if x not in seen and not seen.add(x)]
 
-    if argument.index is not None:
-        label_source = next((o for o in options if o.startswith("--")), options[0])
-        arg_name = label_source.lstrip("-").upper()
-        if arg_name != options[0]:
-            options = [arg_name, *options]
+    positional = argument.index is not None
+    metavar = _resolve_metavar(argument)
+    positional_label = _resolve_positional_label(argument)
+
+    if positional:
+        # Positional-only arguments have no real option names (user-supplied names are
+        # always normalized to a "--" prefix); their bare "name" is a synthesized display
+        # label, which ``positional_label`` now carries.
+        options = [o for o in options if o.startswith("-")]
 
     negatives = set(argument.negatives)
     positive_names = [o for o in options if o not in negatives and not is_short_flag(o)]
@@ -528,12 +647,16 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         positive_shorts=tuple(positive_shorts),
         negative_names=tuple(negative_names),
         negative_shorts=tuple(negative_shorts),
+        metavar=metavar,
+        positional_label=positional_label,
+        positional=positional,
         description=help_description,
         required=argument.required,
         type=resolve_annotated(argument.field_info.annotation),
         choices=choices,
         env_var=env_var,
         default=default,
+        source_id=argument.field_info.name,
     )
 
 

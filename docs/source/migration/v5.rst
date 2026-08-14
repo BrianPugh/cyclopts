@@ -311,6 +311,28 @@ An invalid :attr:`.App.result_action` name now raises :class:`ValueError` at
 
 The error message lists the valid names.
 
+Custom Help Formatters: Positional Labels Left ``names``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** custom :class:`~cyclopts.help.ColumnSpec` renderers, not your own apps.
+
+A positional parameter's display identifier (the ``SRC`` in ``SRC --src``) is no
+longer part of :attr:`HelpEntry.names <cyclopts.help.HelpEntry.names>`, which now
+holds ``--`` option names only. It moved to the new
+:attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`.
+Render :attr:`HelpEntry.display_labels <cyclopts.help.HelpEntry.display_labels>`
+— the positional label followed by every option name — to reproduce the v4 row.
+
+.. code-block:: python
+
+   # A custom "names" column renderer.
+   def names_renderer(entry):
+       # v4: return " ".join(entry.names + entry.shorts)
+       return " ".join(entry.display_labels)  # v5
+
+The separate :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` now
+carries the value placeholder (the ``PATH`` in ``--config PATH``); see
+:ref:`Help Customization`.
+
 ``cyclopts tree``: ``-d`` Now Disables Descriptions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 **Affects:** the bundled ``cyclopts tree`` CLI tool, not your own apps.

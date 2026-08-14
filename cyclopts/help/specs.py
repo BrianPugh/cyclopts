@@ -51,9 +51,10 @@ class NameRenderer:
         -------
         ~rich.console.RenderableType
             Combined names and shorts, optionally wrapped.
-            Order: positive_names, positive_shorts, negative_names, negative_shorts
+            Order: positional_label (positional only), positive_names, positive_shorts,
+            negative_names, negative_shorts
         """
-        text = " ".join(entry.all_options)
+        text = " ".join(entry.display_labels)
 
         if self.max_width is None:
             return text
@@ -276,9 +277,11 @@ class ColumnSpec:
         # String renderer - get attribute directly
         ColumnSpec(renderer="description")
 
-        # Callable renderer - custom formatting
+        # Callable renderer - custom formatting.
+        # ``display_labels`` includes the ``positional_label`` for positional parameters;
+        # use ``all_options`` for option names only (see HelpEntry).
         def format_names(entry: HelpEntry) -> str:
-            return ", ".join(entry.names) if entry.names else ""
+            return ", ".join(entry.display_labels)
         ColumnSpec(renderer=format_names)
     """
 
