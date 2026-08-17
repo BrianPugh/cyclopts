@@ -156,8 +156,11 @@ class MarkdownFormatter:
                     else:
                         name_str = ", ".join(long_opts)
 
-                # Start the entry (no type display)
-                self._output.write(f"* `{name_str}`: ")
+                # Start the entry (no type display). No trailing space after the
+                # colon; each following piece (description/metadata) supplies its
+                # own single leading space so there is never trailing whitespace
+                # or multiple spaces after the colon (see #887).
+                self._output.write(f"* `{name_str}`:")
 
                 # Add description with proper indentation for nested content
                 desc = extract_text(entry.description, console, preserve_markup=True)
@@ -166,7 +169,7 @@ class MarkdownFormatter:
 
                     # Split into lines and indent continuation lines to nest under the bullet
                     lines = desc.split("\n")
-                    self._output.write(lines[0])  # First line on same line as bullet
+                    self._output.write(" " + lines[0])  # First line on same line as bullet
 
                     # Track what type of list context we're in for proper nesting
                     in_numbered_list = False
@@ -222,11 +225,11 @@ class MarkdownFormatter:
 
                 # Write required in bold and separate brackets first
                 if is_required:
-                    self._output.write("  **[required]**")
+                    self._output.write(" **[required]**")
 
                 # Write each metadata item in its own brackets with italics
                 for item in metadata:
-                    self._output.write(f"  *[{item}]*")
+                    self._output.write(f" *[{item}]*")
 
                 self._output.write("\n")
 

@@ -2,10 +2,10 @@ Administrative commands for system management.
 
 **Global Options**:
 
-* `--verbose, -v`: Verbosity level (-v, -vv, -vvv).  *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output.  *[default: False]*
-* `--log-level`: Logging level.  *[choices: debug, info, warning, error, critical]*  *[default: info]*
-* `--no-color, --no-no-color`: Disable colored output  *[default: False]*
+* `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
+* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
+* `--no-color, --no-no-color`: Disable colored output *[default: False]*
 
 ### complex-cli admin status
 
@@ -18,8 +18,8 @@ Show system status.
 **Parameters**:
 
 * `SERVICES, --services`: Specific services to check (all if not specified).
-* `--watch, -w`: Continuously watch status.  *[default: False]*
-* `--interval`: Refresh interval in seconds when watching.  *[default: 5]*
+* `--watch, -w`: Continuously watch status. *[default: False]*
+* `--interval`: Refresh interval in seconds when watching. *[default: 5]*
 
 ### complex-cli admin config-cmd
 
@@ -31,12 +31,12 @@ Configure database settings.
 
 **Parameters**:
 
-* `--host`: Database server hostname.  *[default: localhost]*
-* `--port`: Database server port number.  *[default: 5432]*
-* `--username`: Authentication username.  *[default: admin]*
+* `--host`: Database server hostname. *[default: localhost]*
+* `--port`: Database server port number. *[default: 5432]*
+* `--username`: Authentication username. *[default: admin]*
 * `--password`: Authentication password (optional).
-* `--ssl-mode`: SSL connection mode.  *[choices: disable, prefer, require, verify-full]*  *[default: prefer]*
-* `--pool-size`: Connection pool size.  *[default: 10]*
+* `--ssl-mode`: SSL connection mode. *[choices: disable, prefer, require, verify-full]* *[default: prefer]*
+* `--pool-size`: Connection pool size. *[default: 10]*
 
 ### complex-cli admin users
 
@@ -59,10 +59,10 @@ List all users.
 
 **Parameters**:
 
-* `ACTIVE-ONLY, --active-only, --no-active-only`: Show only active users.  *[default: False]*
-* `ROLE, --role`: Filter by user role.  *[choices: admin, user, guest]*
-* `LIMIT, --limit`: Maximum number of users to display.  *[default: 100]*
-* `FORMAT, --format`: Output format.  *[choices: json, yaml, table, csv]*  *[default: table]*
+* `ACTIVE-ONLY, --active-only, --no-active-only`: Show only active users. *[default: False]*
+* `ROLE, --role`: Filter by user role. *[choices: admin, user, guest]*
+* `LIMIT, --limit`: Maximum number of users to display. *[default: 100]*
+* `FORMAT, --format`: Output format. *[choices: json, yaml, table, csv]* *[default: table]*
 
 #### complex-cli admin users create
 
@@ -74,18 +74,18 @@ Create a new user.
 
 **Arguments**:
 
-* `USERNAME`: Unique username for the new user.  **[required]**
-* `EMAIL`: Email address for the new user.  **[required]**
+* `USERNAME`: Unique username for the new user. **[required]**
+* `EMAIL`: Email address for the new user. **[required]**
 
 **Parameters**:
 
-* `--role`: User role assignment.  *[choices: admin, user, guest]*  *[default: user]*
-* `--permissions.none, --permissions.no-none`: Initial permission flags.  *[default: False]*
-* `--permissions.read, --permissions.no-read`: Initial permission flags.  *[default: False]*
-* `--permissions.write, --permissions.no-write`: Initial permission flags.  *[default: False]*
-* `--permissions.execute, --permissions.no-execute`: Initial permission flags.  *[default: False]*
-* `--permissions.admin, --permissions.no-admin`: Initial permission flags.  *[default: False]*
-* `--send-welcome, --no-send-welcome`: Send welcome email after creation.  *[default: True]*
+* `--role`: User role assignment. *[choices: admin, user, guest]* *[default: user]*
+* `--permissions.none, --permissions.no-none`: Initial permission flags. *[default: False]*
+* `--permissions.read, --permissions.no-read`: Initial permission flags. *[default: False]*
+* `--permissions.write, --permissions.no-write`: Initial permission flags. *[default: False]*
+* `--permissions.execute, --permissions.no-execute`: Initial permission flags. *[default: False]*
+* `--permissions.admin, --permissions.no-admin`: Initial permission flags. *[default: False]*
+* `--send-welcome, --no-send-welcome`: Send welcome email after creation. *[default: True]*
 
 #### complex-cli admin users delete
 
@@ -97,12 +97,12 @@ Delete a user.
 
 **Arguments**:
 
-* `USERNAME`: Username to delete.  **[required]**
+* `USERNAME`: Username to delete. **[required]**
 
 **Parameters**:
 
-* `--force, --no-force, -f`: Skip confirmation prompt.  *[default: False]*
-* `--backup, --no-backup`: Create backup before deletion.  *[default: True]*
+* `--force, --no-force, -f`: Skip confirmation prompt. *[default: False]*
+* `--backup, --no-backup`: Create backup before deletion. *[default: True]*
 
 #### complex-cli admin users permissions
 
@@ -118,8 +118,8 @@ Grant permissions to a user.
 
 **Arguments**:
 
-* `USERNAME`: Target username.  **[required]**
-* `PERMISSION`: Permission flags to grant.  **[required]**  *[choices: none, read, write, execute, admin]*
+* `USERNAME`: Target username. **[required]**
+* `PERMISSION`: Permission flags to grant. **[required]** *[choices: none, read, write, execute, admin]*
 
 **Parameters**:
 
@@ -136,8 +136,8 @@ Revoke permissions from a user.
 
 **Arguments**:
 
-* `USERNAME`: Target username.  **[required]**
-* `PERMISSION`: Permission flags to revoke.  **[required]**  *[choices: none, read, write, execute, admin]*
+* `USERNAME`: Target username. **[required]**
+* `PERMISSION`: Permission flags to revoke. **[required]** *[choices: none, read, write, execute, admin]*
 
 ##### complex-cli admin users permissions audit
 
@@ -150,8 +150,8 @@ Audit permission changes.
 **Parameters**:
 
 * `USERNAME, --username`: Filter by username (all users if not specified).
-* `DAYS, --days`: Number of days to look back.  *[default: 30]*
-* `FORMAT, --format`: Output format for audit report.  *[choices: json, yaml, table, csv]*  *[default: table]*
+* `DAYS, --days`: Number of days to look back. *[default: 30]*
+* `FORMAT, --format`: Output format for audit report. *[choices: json, yaml, table, csv]* *[default: table]*
 
 ##### complex-cli admin users permissions roles
 
@@ -172,7 +172,7 @@ List all role templates.
 
 **Parameters**:
 
-* `INCLUDE-SYSTEM, --include-system, --no-include-system`: Include built-in system roles.  *[default: False]*
+* `INCLUDE-SYSTEM, --include-system, --no-include-system`: Include built-in system roles. *[default: False]*
 
 ###### complex-cli admin users permissions roles create-role
 
@@ -184,13 +184,13 @@ Create a new role template.
 
 **Arguments**:
 
-* `NAME`: Role name.  **[required]**
+* `NAME`: Role name. **[required]**
 
 **Parameters**:
 
-* `--permissions.none, --permissions.no-none`: Default permissions for this role.  *[default: False]*
-* `--permissions.read, --permissions.no-read`: Default permissions for this role.  *[default: False]*
-* `--permissions.write, --permissions.no-write`: Default permissions for this role.  *[default: False]*
-* `--permissions.execute, --permissions.no-execute`: Default permissions for this role.  *[default: False]*
-* `--permissions.admin, --permissions.no-admin`: Default permissions for this role.  *[default: False]*
-* `--description`: Role description.  *[default: ""]*
+* `--permissions.none, --permissions.no-none`: Default permissions for this role. *[default: False]*
+* `--permissions.read, --permissions.no-read`: Default permissions for this role. *[default: False]*
+* `--permissions.write, --permissions.no-write`: Default permissions for this role. *[default: False]*
+* `--permissions.execute, --permissions.no-execute`: Default permissions for this role. *[default: False]*
+* `--permissions.admin, --permissions.no-admin`: Default permissions for this role. *[default: False]*
+* `--description`: Role description. *[default: ""]*
