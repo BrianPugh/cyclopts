@@ -99,8 +99,8 @@ def test_markdown_formatter_parameter_panel_table():
     expected = dedent("""\
         ## Parameters
 
-        * `--port, -p`: Port number  **[required]**  *[default: 8080]*
-        * `--verbose, -v`: Enable verbose mode  *[choices: true, false]*
+        * `--port, -p`: Port number **[required]** *[default: 8080]*
+        * `--verbose, -v`: Enable verbose mode *[choices: true, false]*
 
         """)
 
@@ -136,8 +136,8 @@ def test_markdown_formatter_parameter_panel_list():
     expected = dedent("""\
         ## Parameters
 
-        * `--port, -p`: Port number  **[required]**  *[default: 8080]*
-        * `--verbose`: Enable verbose mode  *[env: VERBOSE]*
+        * `--port, -p`: Port number **[required]** *[default: 8080]*
+        * `--verbose`: Enable verbose mode *[env: VERBOSE]*
 
         """)
 
@@ -297,7 +297,7 @@ def test_parameter_table_with_all_metadata():
     expected = dedent("""\
         ## Parameters
 
-        * `--config, -c`: Configuration file path  **[required]**  *[choices: /etc/app.conf, ~/.app.conf, ./app.conf]*  *[env: APP_CONFIG, CONFIG_PATH]*  *[default: /etc/app.conf]*
+        * `--config, -c`: Configuration file path **[required]** *[choices: /etc/app.conf, ~/.app.conf, ./app.conf]* *[env: APP_CONFIG, CONFIG_PATH]* *[default: /etc/app.conf]*
 
         """)
 
@@ -331,7 +331,7 @@ def test_parameter_table_no_required_column():
     expected = dedent("""\
         ## Options
 
-        * `--debug`: Enable debug mode  *[default: False]*
+        * `--debug`: Enable debug mode *[default: False]*
         * `--quiet, -q`: Suppress output
 
         """)
@@ -360,7 +360,7 @@ def test_parameter_with_no_description():
     expected = dedent("""\
         ## Parameters
 
-        * `--flag`:   *[default: True]*
+        * `--flag`: *[default: True]*
 
         """)
 
