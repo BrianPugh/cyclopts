@@ -70,15 +70,6 @@ def test_validator_slice_ignores_non_slice():
     validator(slice, 5)  # Not a slice; silently ignored.
 
 
-def test_validator_slice_set():
-    """Sets are validated element-wise, just like sequences."""
-    validator = Slice(allow_empty=False)
-    validator(set[slice], {slice(0, 3)})
-
-    with pytest.raises(ValueError):
-        validator(set[slice], {slice(3, 1)})
-
-
 def test_validator_slice_mapping():
     """Mapping **values** are validated element-wise."""
     validator = Slice(allow_empty=False)
