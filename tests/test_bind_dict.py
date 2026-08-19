@@ -84,6 +84,30 @@ def test_bind_dict_value_type_converter(app):
     assert app("foo --d.a=xyz", exit_on_error=False, result_action="return_value") == {"a": "XYZ"}
 
 
+def test_bind_dict_value_type_multi_token_converter(app):
+    """A ``dict`` value type's converter that consumes ``n_tokens > 1`` receives all its tokens.
+
+    Regression: ``token_count`` was computed on the metadata-stripped value type, so each
+    value was split token-by-token and the converter was invoked per-token instead of once
+    per ``n_tokens``-sized group.
+    """
+    from typing import Annotated
+
+    from cyclopts import Parameter
+
+    def combine_xy(type_, tokens):
+        return f"{tokens[0].value},{tokens[1].value}"
+
+    @app.command
+    def foo(points: dict[str, Annotated[str, Parameter(n_tokens=2, converter=combine_xy)]]):
+        return points
+
+    assert app("foo --points.a 1 2 --points.b 3 4", exit_on_error=False, result_action="return_value") == {
+        "a": "1,2",
+        "b": "3,4",
+    }
+
+
 def test_bind_dict_value_type_validator_nested_in_dataclass(app):
     from dataclasses import dataclass
 

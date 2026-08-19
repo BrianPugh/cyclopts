@@ -627,8 +627,10 @@ def _convert(
                     # Call with just tokens - cls/self already bound
                     return resolved_converter((value,))
                 else:
-                    # Regular function - pass type and tokens
-                    return resolved_converter(t_, (value,))
+                    # Regular function - pass type and tokens.
+                    # ``value`` may be a single Token or a sequence of Tokens (n_tokens > 1).
+                    tokens_ = tuple(value) if isinstance(value, (list, tuple)) else (value,)
+                    return resolved_converter(t_, tokens_)
 
             converter = converter_with_token
 
@@ -735,24 +737,28 @@ def _convert(
         # This is common for many types, such as libraries that try to mimic pathlib.Path interface.
         # TODO: This doesn't respect the type-annotation of ``*args``.
         if is_builtin(type_) or not field_infos:
-            assert isinstance(token, Token)
             try:
-                if token.implicit_value is not UNSET:
-                    out = token.implicit_value
-                elif converter is None:
-                    out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
-                elif converter_needs_token:
-                    out = converter(type_, token)  # pyright: ignore[reportArgumentType]
+                if converter_needs_token and not isinstance(token, Token):
+                    # Multi-token converter (n_tokens > 1) receives the full token sequence.
+                    out = converter(type_, token)  # pyright: ignore[reportOptionalCall, reportArgumentType]
                 else:
-                    out = converter(type_, token.value)
+                    assert isinstance(token, Token)
+                    if token.implicit_value is not UNSET:
+                        out = token.implicit_value
+                    elif converter is None:
+                        out = _converters.get(type_, type_)(token.value)  # pyright: ignore[reportOptionalCall]
+                    elif converter_needs_token:
+                        out = converter(type_, token)  # pyright: ignore[reportArgumentType]
+                    else:
+                        out = converter(type_, token.value)
             except CoercionError as e:
                 if e.target_type is None:
                     e.target_type = type_
-                if e.token is None:
+                if e.token is None and isinstance(token, Token):
                     e.token = token
                 raise
             except ValueError:
-                raise CoercionError(token=token, target_type=type_) from None
+                raise CoercionError(token=token if isinstance(token, Token) else None, target_type=type_) from None
         else:
             # Convert it into a user-supplied class.
             # First check if we have a single token that's a JSON string
@@ -915,8 +921,8 @@ def convert(
         # enum.Flag object.
         return convert_enum_flag(maybe_origin_type, tokens, name_transform)
     else:
-        tokens_per_element, consume_all = token_count(type_)
         annotated_type_ = Annotated[(type_, *annotations_)] if annotations_ else type_
+        tokens_per_element, consume_all = token_count(annotated_type_)
         if consume_all:
             return convert_priv(annotated_type_, tokens)  # pyright: ignore
         elif len(tokens) == 1:
