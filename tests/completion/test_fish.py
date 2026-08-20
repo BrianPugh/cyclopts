@@ -17,6 +17,7 @@ from .apps import (
     app_nested,
     app_path,
     app_rst,
+    app_var_keyword,
 )
 
 
@@ -618,3 +619,10 @@ def test_fish_path_completion_reflects_caller_cwd(fish_tester):
     assert any("myfile.txt" in c for c in completions), (
         f"expected 'myfile.txt' from caller cwd, got {completions!r} (driver likely overrode cwd to its own tmpdir)"
     )
+
+
+def test_var_keyword_skipped(fish_tester):
+    """``**kwargs`` emits no spec; siblings still complete."""
+    tester = fish_tester(app_var_keyword, "varkw")
+    assert "KEYWORD" not in tester.completion_script
+    assert "-l verbose" in tester.completion_script
