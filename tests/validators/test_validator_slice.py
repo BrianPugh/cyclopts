@@ -68,3 +68,12 @@ def test_validator_slice_sequence_type():
 def test_validator_slice_ignores_non_slice():
     validator = Slice(allow_empty=False)
     validator(slice, 5)  # Not a slice; silently ignored.
+
+
+def test_validator_slice_mapping():
+    """Mapping **values** are validated element-wise."""
+    validator = Slice(allow_empty=False)
+    validator(dict[str, slice], {"a": slice(0, 3)})
+
+    with pytest.raises(ValueError):
+        validator(dict[str, slice], {"a": slice(3, 1)})
