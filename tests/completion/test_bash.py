@@ -20,6 +20,7 @@ from .apps import (
     app_path,
     app_positional_literal,
     app_positional_path,
+    app_var_keyword,
 )
 
 
@@ -1123,3 +1124,10 @@ def test_bash_path_completion_reflects_caller_cwd(bash_tester):
     assert "myfile.txt" in completions, (
         f"expected 'myfile.txt' from caller cwd, got {completions!r} (driver likely overrode cwd to its own tmpdir)"
     )
+
+
+def test_var_keyword_skipped(bash_tester):
+    """``**kwargs`` emits no spec; siblings still complete."""
+    tester = bash_tester(app_var_keyword, "varkw")
+    assert "KEYWORD" not in tester.completion_script
+    assert "--verbose" in tester.completion_script

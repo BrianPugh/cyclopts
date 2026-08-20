@@ -15,6 +15,7 @@ from attrs import field
 from cyclopts.annotations import ITERABLE_TYPES, is_annotated, is_union
 from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CycloptsError
+from cyclopts.field_info import VAR_KEYWORD
 from cyclopts.group_extractors import RegisteredCommand, groups_from_app
 from cyclopts.utils import frozen, is_class_and_subclass
 
@@ -105,6 +106,13 @@ def extract_completion_data(app: "App") -> dict[tuple[str, ...], CompletionData]
         own_arguments = ArgumentCollection()
         with app.app_stack(execution_path):
             for subapp, app_arguments in _iter_resolution_argument_collections(execution_path, parse_docstring=True):
+                # ``**kwargs`` accepts arbitrary option names, so no per-option spec can
+                # represent it; its ``--[KEYWORD]`` placeholder name is invalid shell
+                # syntax (zsh's ``_arguments`` aborts on it, breaking completion for the
+                # entire command).
+                app_arguments = ArgumentCollection(
+                    argument for argument in app_arguments if argument.field_info.kind is not VAR_KEYWORD
+                )
                 arguments.extend(app_arguments)
                 if not any(subapp is a for a in current):
                     continue  # inherited (ancestor meta launcher)
