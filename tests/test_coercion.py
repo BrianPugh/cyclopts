@@ -1,5 +1,4 @@
 import inspect
-import sys
 from collections.abc import Collection as AbcCollection
 from collections.abc import Container as AbcContainer
 from collections.abc import Iterable, Sequence
@@ -300,7 +299,6 @@ def test_coerce_tuple_len_mismatch_overflow():
         convert(tuple[int, int], ["1", "2", "3"])
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="Typing")
 def test_coerce_tuple_ellipsis_too_many_inner_types():
     with pytest.raises(ValueError):  # This is a ValueError because it happens prior to runtime.
         # Only 1 inner type annotation allowed
@@ -516,7 +514,6 @@ def test_coerce_date():
     assert expected == convert(date, ["1956-01-31"])
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="Not implemented in stdlib")
 def test_coerce_date_other_iso_formats():
     expected = date(year=2021, month=1, day=4)
     assert expected == convert(date, ["2021-W01-1"])

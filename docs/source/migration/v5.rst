@@ -23,6 +23,8 @@ were probably not relying on.
      - :ref:`v5 Fuzzy Matching`
    * - defines a parameter named ``version`` or ``help``
      - :ref:`v5 Shadowing`
+   * - still runs on Python 3.10, or installs the ``toml`` extra
+     - :ref:`v5 Requirements`
    * - none of the above
      - Nothing to do.
 
@@ -332,6 +334,21 @@ Render :attr:`HelpEntry.display_labels <cyclopts.help.HelpEntry.display_labels>`
 The separate :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` now
 carries the value placeholder (the ``PATH`` in ``--config PATH``); see
 :ref:`Help Customization`.
+
+.. _v5 Requirements:
+
+Python 3.10 Dropped; ``toml`` Extra Removed
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** environments on Python 3.10, and installs using ``cyclopts[toml]``.
+
+Cyclopts now requires Python >=3.11. Python 3.10 reached end-of-life, and
+dropping it lets Cyclopts use standard-library ``tomllib`` and typing features
+directly instead of the ``tomli`` and ``typing-extensions`` backports.
+
+Because TOML config support now uses the built-in ``tomllib``, the ``toml``
+install extra is no longer needed and has been removed. Replace
+``pip install cyclopts[toml]`` with ``pip install cyclopts``; TOML config files
+work out of the box.
 
 ``cyclopts tree``: ``-d`` Now Disables Descriptions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

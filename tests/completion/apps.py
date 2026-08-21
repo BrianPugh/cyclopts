@@ -283,3 +283,23 @@ def collect(
         Optional tags.
     """
     pass
+
+
+# ``**kwargs`` accepts arbitrary option names; its ``--[KEYWORD]`` placeholder
+# must not leak into completion scripts (zsh's ``_arguments`` rejects it and
+# breaks completion for the whole command).
+app_var_keyword = App(name="varkw")
+
+
+@app_var_keyword.command
+def create(*, verbose: bool = False, **overrides: str):
+    """Create a thing.
+
+    Parameters
+    ----------
+    verbose : bool
+        Verbose output.
+    overrides : str
+        Arbitrary overrides.
+    """
+    pass

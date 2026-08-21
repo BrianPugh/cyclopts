@@ -5,6 +5,7 @@ from typing import Any
 from attrs import field
 
 from cyclopts.utils import frozen, to_tuple_converter
+from cyclopts.validators._utils import iter_container_elements
 
 
 def ext_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
@@ -14,6 +15,10 @@ def ext_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
 @frozen(kw_only=True)
 class Path:
     """Assertions on properties of :class:`pathlib.Path`.
+
+    If the annotated parameter is a container (``list``, ``tuple``, ``set``,
+    ``frozenset``, or ``dict``), each element is validated individually.
+    For a ``dict``, the **values** are validated; keys are not.
 
     Example Usage:
 
@@ -89,11 +94,9 @@ class Path:
             raise ValueError("(exists=True, file_okay=False, dir_okay=False) is an invalid configuration.")
 
     def __call__(self, type_: Any, path: Any):
-        if isinstance(path, Sequence):
-            if isinstance(path, str):
-                raise TypeError
-
-            for p in path:
+        elements = iter_container_elements(path)
+        if elements is not None:
+            for p in elements:
                 self(type_, p)
         else:
             if not isinstance(path, pathlib.Path):

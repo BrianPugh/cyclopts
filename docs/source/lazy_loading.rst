@@ -37,9 +37,9 @@ Use an import path string:
    user_app = App(name="user")
 
    # No imports! Modules loaded only when commands execute
-   user_app.command("myapp.commands.users:create")
-   user_app.command("myapp.commands.users:delete")
-   user_app.command("myapp.commands.users:list_users", name="list")
+   user_app.command("myapp.commands.users:create", help="Create a new user.")
+   user_app.command("myapp.commands.users:delete", help="Delete a user.")
+   user_app.command("myapp.commands.users:list_users", name="list", help="List all users.")
 
    app.command(user_app)
 
@@ -53,6 +53,7 @@ Lazy commands are resolved/imported in these situations:
 
 Parent ``--help`` (e.g., ``myapp --help``) displays lazy commands using metadata provided at registration time
 (``help=``, ``group=``, ``show=``, ``sort_key=``) **without** resolving them.
+Commands registered without ``help=`` will still appear, but with no description.
 
 In order to benefit from lazy loading, you have to make sure that the files are not imported by other means when your CLI starts up.
 

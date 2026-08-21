@@ -18,6 +18,7 @@ from .apps import (
     app_nested,
     app_path,
     app_rst,
+    app_var_keyword,
 )
 
 
@@ -1480,3 +1481,11 @@ def test_naked_tab_at_no_arg_subcommand_offers_help(zsh_tester):
     completions = tester.get_completions("probe noarg ")
     assert "--help" in completions
     assert "--version" in completions
+
+
+def test_var_keyword_skipped(zsh_tester):
+    """``**kwargs`` emits no spec; siblings still complete and the script stays valid."""
+    tester = zsh_tester(app_var_keyword, "varkw")
+    assert "KEYWORD" not in tester.completion_script
+    assert "--verbose" in tester.completion_script
+    assert tester.validate_script_syntax()

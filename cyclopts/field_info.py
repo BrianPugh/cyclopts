@@ -5,6 +5,7 @@ from typing import (  # noqa: F401
     Any,
     ClassVar,
     Optional,
+    Self,
     get_args,
     get_origin,
     get_type_hints,
@@ -12,11 +13,6 @@ from typing import (  # noqa: F401
 
 import attrs
 from attrs import field
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 from cyclopts.annotations import (
     NotRequired,

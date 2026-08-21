@@ -1,12 +1,16 @@
-from collections.abc import Sequence
 from typing import Any
 
 from cyclopts.utils import frozen
+from cyclopts.validators._utils import iter_container_elements
 
 
 @frozen(kw_only=True)
 class Number:
     """Limit input number to a value range.
+
+    If the annotated parameter is a container (``list``, ``tuple``, ``set``,
+    ``frozenset``, or ``dict``), each element is validated individually.
+    For a ``dict``, the **values** are validated; keys are not.
 
     Example Usage:
 
@@ -57,10 +61,9 @@ class Number:
     """Input value must be a multiple of this value."""
 
     def __call__(self, type_: Any, value: Any):
-        if isinstance(value, Sequence):
-            if isinstance(value, str):
-                raise TypeError
-            for v in value:
+        elements = iter_container_elements(value)
+        if elements is not None:
+            for v in elements:
                 self(type_, v)
         else:
             if not isinstance(value, int | float):
