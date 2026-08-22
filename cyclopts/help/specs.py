@@ -1,10 +1,16 @@
 import math
+import sys
 import textwrap
 from collections.abc import Iterable
 from operator import attrgetter
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from attrs import evolve
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 from cyclopts.utils import frozen
 
@@ -394,7 +400,7 @@ class ColumnSpec:
             value = None
         return "" if value is None else value
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
 
@@ -698,7 +704,7 @@ class TableSpec:
 
         return table
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
 
@@ -830,5 +836,5 @@ class PanelSpec:
 
         return Panel(renderable, **opts)
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
