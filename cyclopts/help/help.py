@@ -13,6 +13,11 @@ from typing import (
 
 from attrs import define, evolve, field
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 from cyclopts.annotations import resolve_annotated
 from cyclopts.argument.utils import is_short_flag
 from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
@@ -124,7 +129,7 @@ class HelpEntry:
     default: str | None = None
     """Default value for this parameter to display. None means no default to show."""
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
 
@@ -150,7 +155,7 @@ class HelpPanel:
     entries: list[HelpEntry] = field(factory=list)
     """List of help entries to display (in order) in the panel."""
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
     def _remove_duplicates(self):
