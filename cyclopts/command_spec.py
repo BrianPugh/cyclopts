@@ -27,6 +27,8 @@ class CommandSpec:
         CLI command name. If None, will be derived from the attribute name via name_transform.
         For function imports: used as the name of the wrapper App.
         For App imports: must match the App's internal name, or ValueError is raised at resolution.
+    deprecated : str | tuple[str, str] | None
+        Optional deprecation message or tuple of (version, message) to indicate when the command was deprecated.
     app_kwargs : dict
         Keyword arguments to pass to App() if wrapping a function.
         Raises ValueError if used with App imports (Apps should be configured in their own definition).
@@ -43,6 +45,7 @@ class CommandSpec:
     import_path: str
     name: str | tuple[str, ...] | None = None
     app_kwargs: dict[str, Any] = Factory(dict)
+    deprecated: str | tuple[str, str] | None = None
     help: str | None = None
     sort_key: Any = None
     group: "Group | str | tuple[Group | str, ...] | None" = None
@@ -156,6 +159,8 @@ class CommandSpec:
             self._resolved.sort_key = self.sort_key
         if self.group is not None:
             self._resolved.group = self.group
+        if self.deprecated is not None:
+            self._resolved.deprecated = self.deprecated
         if self._show is not None:
             self._resolved.show = self._show
         if self._resolved._name_transform is None:

@@ -1077,3 +1077,54 @@ def test_iterate_commands_resolve_lazy(lazy_module):
 
     # Lazy command should now be resolved
     assert app._commands["lazy"].is_resolved
+
+
+def test_command_spec_deprecated_applied_on_resolve(app):
+    """CommandSpec.deprecated is copied onto the resolved App."""
+    spec = CommandSpec(import_path="os.path:join", name="join", deprecated=("3.0", "Use pathlib instead."))
+
+    # Not applied until resolved.
+    assert spec.deprecated == ("3.0", "Use pathlib instead.")
+
+    resolved = spec.resolve(app)
+
+    assert resolved.deprecated == ("3.0", "Use pathlib instead.")
+
+
+def test_command_spec_deprecated_unset_leaves_resolved_app_alone(app, lazy_module):
+    """When CommandSpec.deprecated is unset, the resolved App keeps its own default (None)."""
+    test_module = lazy_module()
+
+    def cmd():
+        pass
+
+    test_module.cmd = cmd  # type: ignore[attr-defined]
+
+    spec = CommandSpec(import_path="test_lazy_module:cmd", name="cmd")
+    resolved = spec.resolve(app)
+
+    assert resolved.deprecated is None
+
+
+def test_lazy_command_deprecated_via_app_command(console, lazy_module, normalize_trailing_whitespace):
+    """app.command(..., deprecated=...) on an import-path string reaches the resolved App and renders."""
+    test_module = lazy_module()
+
+    def old_cmd():
+        """Old command."""
+        pass
+
+    test_module.old_cmd = old_cmd  # type: ignore[attr-defined]
+
+    app = App(name="myapp")
+    app.command("test_lazy_module:old_cmd", name="old", deprecated=("1.0", "Use new instead."))
+
+    # Stored on the CommandSpec pre-resolution.
+    spec = app._commands["old"]
+    assert isinstance(spec, CommandSpec)
+    assert spec.deprecated == ("1.0", "Use new instead.")
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    assert "[⚠ Deprecated in v1.0]" in normalize_trailing_whitespace(capture.get())

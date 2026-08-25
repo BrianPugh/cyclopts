@@ -25,7 +25,14 @@ from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables, slice_to_str
+from cyclopts.utils import (
+    SortHelper,
+    frozen,
+    is_class_and_subclass,
+    normalize_deprecated,
+    resolve_callables,
+    slice_to_str,
+)
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
@@ -371,10 +378,26 @@ def format_deprecated_tag(version: str | None, content: str | None) -> str:
     return f"{tag} {content}" if content else tag
 
 
+def _resolve_deprecation(
+    explicit: str | tuple[str, str] | None,
+    parsed_deprecation,
+) -> tuple[str | None, str | None] | None:
+    """Resolve the deprecation metadata to render, if any.
+
+    An explicit ``deprecated`` field (set directly on an :class:`App`/:class:`Parameter`)
+    takes priority over a docstring's ``.. deprecated::`` directive.
+    """
+    if explicit is not None:
+        return normalize_deprecated(explicit)
+    if parsed_deprecation is not None:
+        return parsed_deprecation.version, parsed_deprecation.description
+    return None
+
+
 def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     raw_doc_string = app.help
 
-    if not raw_doc_string:
+    if not raw_doc_string and app.deprecated is None:
         return SILENT
 
     parsed = docstring_parse(raw_doc_string, format)
@@ -386,15 +409,19 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     # docstring_parser extracts a top-level ``.. deprecated::`` directive into
     # ``parsed.deprecation`` metadata, so it never reaches the renderer as text;
     # reconstruct it here for every help format.
-    if parsed.deprecation:
+    deprecation = _resolve_deprecation(app.deprecated, parsed.deprecation)
+    if deprecation is not None:
         if components:
             components.append("\n")
-        components.append(format_deprecated_tag(parsed.deprecation.version, parsed.deprecation.description) + "\n")
+        components.append(format_deprecated_tag(*deprecation) + "\n")
 
     if parsed.long_description:
         if components:
             components.append("\n")
         components.append(parsed.long_description + "\n")
+
+    if not components:
+        return SILENT
 
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
@@ -515,7 +542,11 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     negative_names = [o for o in options if o in negatives and not is_short_flag(o)]
     negative_shorts = [o for o in options if o in negatives and is_short_flag(o)]
 
-    help_description = InlineText.from_format(argument.parameter.help, format=format)
+    help_text = argument.parameter.help
+    if argument.parameter.deprecated is not None:
+        tag = format_deprecated_tag(*normalize_deprecated(argument.parameter.deprecated))
+        help_text = f"{tag} {help_text}" if help_text else tag
+    help_description = InlineText.from_format(help_text, format=format)
 
     choices = argument.get_choices()
 
@@ -635,9 +666,10 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
 
         parsed = docstring_parse(app.help, format)
         description = parsed.short_description
-        if parsed.deprecation:
+        deprecation = _resolve_deprecation(app.deprecated, parsed.deprecation)
+        if deprecation is not None:
             # Tag-only in the command list; the full deprecation message shows on the command's own help page.
-            tag = format_deprecated_tag(parsed.deprecation.version, None)
+            tag = format_deprecated_tag(deprecation[0], None)
             description = f"{tag} {description}" if description else tag
 
         entry = HelpEntry(
