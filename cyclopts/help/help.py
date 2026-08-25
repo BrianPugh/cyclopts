@@ -351,6 +351,26 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
+def format_deprecated_tag(version: str | None, content: str | None) -> str:
+    """Format a "Deprecated" tag, shared by the ``.. deprecated::`` directive and ``DocstringDeprecated`` metadata.
+
+    Parameters
+    ----------
+    version : str | None
+        Version the deprecation applies to, if any.
+    content : str | None
+        Optional explanatory content (e.g. "Use something else instead").
+
+    Returns
+    -------
+    str
+        Formatted tag, e.g. ``"[⚠ Deprecated in v1.0] Use something else instead"``.
+    """
+    tag = f"[⚠ Deprecated in v{version}]" if version else "[⚠ Deprecated]"
+    content = (content or "").strip()
+    return f"{tag} {content}" if content else tag
+
+
 def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     raw_doc_string = app.help
 
@@ -363,9 +383,10 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     if parsed.short_description:
         components.append(parsed.short_description + "\n")
 
-    if parsed.deprecation and format in ("restructuredtext", "rst"):
-        from cyclopts.help.rst_preprocessor import format_deprecated_tag
-
+    # docstring_parser extracts a top-level ``.. deprecated::`` directive into
+    # ``parsed.deprecation`` metadata, so it never reaches the renderer as text;
+    # reconstruct it here for every help format.
+    if parsed.deprecation:
         if components:
             components.append("\n")
         components.append(format_deprecated_tag(parsed.deprecation.version, parsed.deprecation.description) + "\n")
@@ -613,17 +634,16 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
         sort_key = resolve_callables(app.sort_key, app)
 
         parsed = docstring_parse(app.help, format)
-        description_text = parsed.short_description or ""
-        if parsed.deprecation and format in ("restructuredtext", "rst"):
-            from cyclopts.help.rst_preprocessor import format_deprecated_tag
-
-            tag = format_deprecated_tag(parsed.deprecation.version, parsed.deprecation.description)
-            description_text = f"{tag} {description_text}" if description_text else tag
+        description = parsed.short_description
+        if parsed.deprecation:
+            # Tag-only in the command list; the full deprecation message shows on the command's own help page.
+            tag = format_deprecated_tag(parsed.deprecation.version, None)
+            description = f"{tag} {description}" if description else tag
 
         entry = HelpEntry(
             positive_names=tuple(long_names),
             positive_shorts=tuple(short_names),
-            description=InlineText.from_format(description_text, format=format),
+            description=InlineText.from_format(description, format=format),
             sort_key=sort_key,
         )
         if entry not in entries:
