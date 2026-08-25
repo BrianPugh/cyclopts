@@ -212,10 +212,11 @@ def _handle_deprecated_directive(
     next_index : int
         Next line index to process.
     """
+    from cyclopts.help.help import format_deprecated_tag
+
     paragraphs, next_i = _gather_indented_block(lines, start_index + 1, current_indent)
     content = "\n\n".join(paragraphs).strip()
-    tag = f"[⚠ Deprecated in v{directive_arg}]"
-    return f"{tag} {content}" if content else tag, next_i
+    return format_deprecated_tag(directive_arg, content), next_i
 
 
 def _handle_admonition_directive(
