@@ -363,10 +363,18 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     if parsed.short_description:
         components.append(parsed.short_description + "\n")
 
+    if parsed.deprecation and format in ("restructuredtext", "rst"):
+        from cyclopts.help.rst_preprocessor import format_deprecated_tag
+
+        if components:
+            components.append("\n")
+        components.append(format_deprecated_tag(parsed.deprecation.version, parsed.deprecation.description) + "\n")
+
     if parsed.long_description:
-        if parsed.short_description:
+        if components:
             components.append("\n")
         components.append(parsed.long_description + "\n")
+
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
@@ -604,10 +612,18 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
 
         sort_key = resolve_callables(app.sort_key, app)
 
+        parsed = docstring_parse(app.help, format)
+        description_text = parsed.short_description or ""
+        if parsed.deprecation and format in ("restructuredtext", "rst"):
+            from cyclopts.help.rst_preprocessor import format_deprecated_tag
+
+            tag = format_deprecated_tag(parsed.deprecation.version, parsed.deprecation.description)
+            description_text = f"{tag} {description_text}" if description_text else tag
+
         entry = HelpEntry(
             positive_names=tuple(long_names),
             positive_shorts=tuple(short_names),
-            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
+            description=InlineText.from_format(description_text, format=format),
             sort_key=sort_key,
         )
         if entry not in entries:

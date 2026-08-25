@@ -187,6 +187,26 @@ def _handle_version_directive(
     return tag, start_index + 1
 
 
+def format_deprecated_tag(version: str | None, content: str | None) -> str:
+    """Format a "Deprecated" tag, shared by the ``.. deprecated::`` directive and ``DocstringDeprecated`` metadata.
+
+    Parameters
+    ----------
+    version : str | None
+        Version the deprecation applies to, if any.
+    content : str | None
+        Optional explanatory content (e.g. "Use something else instead").
+
+    Returns
+    -------
+    str
+        Formatted tag, e.g. ``"[⚠ Deprecated in v1.0] Use something else instead"``.
+    """
+    tag = f"[⚠ Deprecated in v{version}]" if version else "[⚠ Deprecated]"
+    content = (content or "").strip()
+    return f"{tag} {content}" if content else tag
+
+
 def _handle_deprecated_directive(
     directive_name: str, directive_arg: str, lines: list[str], start_index: int, current_indent: int
 ) -> tuple[str, int]:
@@ -214,8 +234,7 @@ def _handle_deprecated_directive(
     """
     paragraphs, next_i = _gather_indented_block(lines, start_index + 1, current_indent)
     content = "\n\n".join(paragraphs).strip()
-    tag = f"[⚠ Deprecated in v{directive_arg}]"
-    return f"{tag} {content}" if content else tag, next_i
+    return format_deprecated_tag(directive_arg, content), next_i
 
 
 def _handle_admonition_directive(
