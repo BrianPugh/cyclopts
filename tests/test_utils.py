@@ -1,6 +1,15 @@
+import json
+
 import pytest
 
-from cyclopts.utils import Sentinel, _pascal_to_snake, grouper, is_option_like, parse_version
+from cyclopts.utils import (
+    Sentinel,
+    _pascal_to_snake,
+    grouper,
+    is_option_like,
+    json_decode_error_verbosifier,
+    parse_version,
+)
 
 
 def test_grouper():
@@ -117,3 +126,35 @@ def test_pascal_to_snake(input_str, expected):
 )
 def test_parse_version(version_string, expected):
     assert parse_version(version_string) == expected
+
+
+@pytest.mark.parametrize(
+    "doc",
+    [
+        "",
+        "{\n",
+        '{\n  "a": 1,\n',
+    ],
+)
+def test_json_decode_error_verbosifier_error_at_end_of_document(doc):
+    """A document ending in a newline reports an error on a line ``str.splitlines`` discards."""
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        json.loads(doc)
+
+    assert json_decode_error_verbosifier(exc_info.value).split("\n")[:3] == ["JSONDecodeError:", "    ", "    ^"]
+
+
+def test_json_decode_error_verbosifier_line_separator_in_string():
+    r"""``\u2028`` is legal raw inside a JSON string, but ``str.splitlines`` breaks on it.
+
+    ``JSONDecodeError.lineno`` counts only ``\n``, so splitting any other way points the caret
+    at a different line than the one the error refers to.
+    """
+    with pytest.raises(json.JSONDecodeError) as exc_info:
+        json.loads('{"a": "x\u2028y",\n  bad}')
+
+    assert json_decode_error_verbosifier(exc_info.value).split("\n")[:3] == [
+        "JSONDecodeError:",
+        "      bad}",
+        "      ^",
+    ]

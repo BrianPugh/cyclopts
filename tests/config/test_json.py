@@ -112,3 +112,24 @@ def test_config_invalid_json(tmp_path, console):
         """
     )
     assert actual == expected
+
+
+def test_config_empty_json(tmp_path, console):
+    """An empty config file reports the decode error rather than raising out of the error panel."""
+    Path("config.json").write_text("")
+
+    with pytest.raises(CycloptsError), console.capture() as capture:
+        app("create", error_console=console, exit_on_error=False)
+
+    actual = capture.get()
+    expected = dedent(
+        """\
+        ╭─ Error ────────────────────────────────────────────────────────────╮
+        │ JSONDecodeError:                                                   │
+        │                                                                    │
+        │     ^                                                              │
+        │ Expecting value: line 1 column 1 (char 0)                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+    assert actual == expected
