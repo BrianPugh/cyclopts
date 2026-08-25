@@ -2130,6 +2130,52 @@ def test_help_markdown(app, console, normalize_trailing_whitespace):
     assert normalize_trailing_whitespace(actual) == expected
 
 
+@pytest.mark.parametrize("help_format", ["markdown", "rst"])
+def test_help_docstring_deprecated_metadata(console, normalize_trailing_whitespace, help_format):
+    """A top-level ``.. deprecated::`` is extracted into metadata by docstring_parser and must be re-rendered."""
+    description = dedent(
+        """\
+        Main summary.
+
+        .. deprecated:: 2.0
+            Use ``other-tool`` instead.
+
+        Long description.
+        """
+    )
+    app = App(help=description, help_format=help_format)
+
+    @app.command
+    def sub():
+        """Subcommand summary.
+
+        .. deprecated::
+        """
+
+    with console.capture() as capture:
+        app.help_print([], console=console)
+
+    expected = dedent(
+        """\
+        Usage: test_help COMMAND
+
+        Main summary.
+
+        [⚠ Deprecated in v2.0] Use other-tool instead.
+
+        Long description.
+
+        ╭─ Commands ─────────────────────────────────────────────────────────╮
+        │ sub          [⚠ Deprecated] Subcommand summary.                    │
+        │ --help (-h)  Display this message and exit.                        │
+        │ --version    Display application version.                          │
+        ╰────────────────────────────────────────────────────────────────────╯
+        """
+    )
+
+    assert normalize_trailing_whitespace(capture.get()) == expected
+
+
 def test_help_rich(app, console, normalize_trailing_whitespace):
     """Newlines actually get interpreted with rich."""
     description = dedent(
