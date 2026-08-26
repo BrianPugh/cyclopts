@@ -47,26 +47,41 @@ class ConfigBase(ABC):
         """Return a string identifying the configuration source for error messages."""
         raise NotImplementedError
 
+    def _ensure_mapping(self, node: Any, traversed: list[str]) -> None:
+        """Raise a :class:`CycloptsError` if a visited configuration node is not a mapping.
+
+        Parameters
+        ----------
+        node: Any
+            The configuration node reached so far.
+        traversed: list[str]
+            Keys descended through to reach ``node``; empty for the document root.
+        """
+        if isinstance(node, dict):
+            return
+        keyword = "".join(f"[{k}]" for k in traversed)
+        location = f"key {keyword} " if keyword else ""
+        raise CycloptsError(
+            msg=f'Configuration {location}in "{self.source}" must be a mapping, but got {type(node).__name__}.'
+        )
+
     def __call__(
         self,
         app: "App",
         commands: tuple[str, ...],
         arguments: ArgumentCollection,
     ):
-        config: dict[str, Any] = self.config.copy()
         traversed: list[str] = []
+        root = self.config
+        self._ensure_mapping(root, traversed)
+        config: dict[str, Any] = root.copy()
         for key in chain(self.root_keys, commands if self.use_commands_as_keys else ()):
             try:
                 config = config[key]
             except KeyError:
                 return
             traversed.append(key)
-            if not isinstance(config, dict):
-                keyword = "".join(f"[{k}]" for k in traversed)
-                raise CycloptsError(
-                    msg=f'Configuration key {keyword} in "{self.source}" must be a mapping, '
-                    f"but got {type(config).__name__}."
-                )
+            self._ensure_mapping(config, traversed)
 
         # Hierarchical config uses current app; flat config uses root app to filter sibling commands
         if self.use_commands_as_keys:
@@ -167,7 +182,7 @@ class ConfigFromFile(ConfigBase):
                             msg += ": "
                         msg += exception_msg
                     raise CycloptsError(msg=msg) from e
-                return self._config
+                return self._config or {}
             if not self.search_parents:
                 # Only look at the specified path; do not walk parent directories.
                 break

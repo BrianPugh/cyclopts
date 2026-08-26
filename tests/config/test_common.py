@@ -309,3 +309,18 @@ def test_config_exception_during_load_config_msg(tmp_path):
     with pytest.raises(CycloptsError) as e:
         _ = dummy_error_config.config
     assert str(e.value) == "ValueError: My exception's message."
+
+
+class DummyEmptyDocument(ConfigFromFile):
+    def _load_config(self, path: Path) -> dict[str, Any]:
+        return None  # pyright: ignore[reportReturnType]
+
+
+def test_config_common_empty_document_is_empty_mapping(tmp_path):
+    """A file whose document is empty loads as an empty config, on every access."""
+    path = tmp_path / "config"
+    path.touch()
+    config = DummyEmptyDocument(path)
+
+    assert config.config == {}  # freshly loaded
+    assert config.config == {}  # served from the cache

@@ -1048,3 +1048,35 @@ def test_config_dict_with_negative_numbers():
 
     result = app([])
     assert result == "offset=-10, temperature=-5.5"
+
+
+def test_config_dict_root_non_mapping_node():
+    """A non-mapping document root raises a clean CycloptsError, not AttributeError."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict([1, 2], source="dict"), result_action="return_value")  # pyright: ignore[reportArgumentType]
+
+    @app.default
+    def main(x: int = 0):
+        return x
+
+    with pytest.raises(CycloptsError) as e:
+        app([], exit_on_error=False)
+
+    assert str(e.value) == 'Configuration in "dict" must be a mapping, but got list.'
+
+
+def test_config_dict_root_non_mapping_node_with_root_keys():
+    """A non-mapping document root is reported before ``root_keys`` are descended."""
+    from cyclopts import CycloptsError
+
+    app = App(config=Dict(5, root_keys=("tool",), source="dict"), result_action="return_value")  # pyright: ignore[reportArgumentType]
+
+    @app.default
+    def main(x: int = 0):
+        return x
+
+    with pytest.raises(CycloptsError) as e:
+        app([], exit_on_error=False)
+
+    assert str(e.value) == 'Configuration in "dict" must be a mapping, but got int.'
