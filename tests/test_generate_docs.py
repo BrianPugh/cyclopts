@@ -1073,3 +1073,43 @@ def test_generate_docs_usage_name_empty_string_is_inserted_verbatim():
     first_line = next(line for line in subcommand_usage.splitlines() if line.strip())
     assert not first_line.startswith("cli ")
     assert first_line.startswith("serve")
+
+
+@pytest.mark.parametrize("fmt", ["markdown", "rst", "html"])
+def test_generate_docs_flattened_subapp_commands(fmt):
+    """Commands flattened via app.command(subapp, name="*") get their own doc sections."""
+    app = App(name="app")
+    sub_app = App(name="sub")
+
+    @sub_app.command
+    def star(bar: int):
+        """Star command."""
+        pass
+
+    app.command(sub_app, name="*")
+
+    actual = app.generate_docs(output_format=fmt)
+    assert "app star" in actual
+    assert "bar" in actual.lower()
+
+
+def test_generate_docs_flattened_subapp_parent_precedence():
+    """On a name collision, the parent's command is documented, not the flattened subapp's."""
+    app = App(name="app")
+    sub_app = App(name="sub")
+
+    @app.command
+    def run():
+        """Parent run."""
+        pass
+
+    @sub_app.command(name="run")
+    def sub_run():
+        """Subapp run."""
+        pass
+
+    app.command(sub_app, name="*")
+
+    actual = app.generate_docs()
+    assert "Parent run" in actual
+    assert "Subapp run" not in actual
