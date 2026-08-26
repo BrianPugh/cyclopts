@@ -2,7 +2,7 @@ import math
 import textwrap
 from collections.abc import Iterable
 from operator import attrgetter
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Self, Union
 
 from attrs import evolve
 
@@ -394,7 +394,7 @@ class ColumnSpec:
             value = None
         return "" if value is None else value
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
 
@@ -698,7 +698,7 @@ class TableSpec:
 
         return table
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
 
@@ -830,5 +830,5 @@ class PanelSpec:
 
         return Panel(renderable, **opts)
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)

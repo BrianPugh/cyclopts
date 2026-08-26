@@ -503,12 +503,16 @@ def iterate_commands(app: "App", include_hidden: bool = False, resolve_lazy: boo
     Tuple[str, App]
         (command_name, resolved_subapp) for each valid command.
     """
-    if not app._commands:
-        return
+    commands: dict[str, App | CommandSpec] = dict(app._commands)
+    # Merge commands from flattened subapps (registered via name="*"); parent commands take precedence.
+    for flattened in app._flattened_subapps:
+        for cmd_name in flattened:
+            if cmd_name not in commands and not _is_builtin_flag(flattened, cmd_name):
+                commands[cmd_name] = flattened._get_item(cmd_name, recurse_meta=False)
 
     seen: set[int] = set()
 
-    for name, app_or_spec in app._commands.items():
+    for name, app_or_spec in commands.items():
         if _is_builtin_flag(app, name):
             continue
 
