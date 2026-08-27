@@ -416,7 +416,7 @@ def test_generate_html_docs_usage_name_none_is_default_behavior():
     assert app.generate_docs(output_format="html") == app.generate_docs(output_format="html", usage_name=None)
 
 
-def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monkeypatch):
+def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(importable_tmp_path, monkeypatch):
     """An unnamed app's HTML docs derive the root name from its module, not sys.argv[0].
 
     ``App.name`` otherwise falls back to ``Path(sys.argv[0]).name``, which in a
@@ -430,7 +430,7 @@ def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monk
     # Simulate a build where sys.argv[0] is the generator, not the CLI.
     monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
 
-    module_file = tmp_path / "htmltool.py"
+    module_file = importable_tmp_path / "htmltool.py"
     module_file.write_text(
         dedent(
             """\
@@ -446,13 +446,8 @@ def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monk
         )
     )
 
-    sys.path.insert(0, str(tmp_path))
-    try:
-        app = import_app("htmltool:app")
-        docs = generate_html_docs(app)
-        assert "sphinx-build" not in docs  # not in title, anchors, or the Usage line
-        assert '<h1 class="app-title">htmltool</h1>' in docs
-        assert 'id="htmltool-serve"' in docs
-    finally:
-        sys.path.remove(str(tmp_path))
-        sys.modules.pop("htmltool", None)
+    app = import_app("htmltool:app")
+    docs = generate_html_docs(app)
+    assert "sphinx-build" not in docs  # not in title, anchors, or the Usage line
+    assert '<h1 class="app-title">htmltool</h1>' in docs
+    assert 'id="htmltool-serve"' in docs

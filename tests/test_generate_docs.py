@@ -1134,7 +1134,7 @@ def test_generate_docs_flattened_subapp_parent_precedence():
     assert "Subapp run" not in actual
 
 
-def test_generate_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monkeypatch):
+def test_generate_docs_unnamed_app_uses_module_name_not_argv(importable_tmp_path, monkeypatch):
     """Standalone docs for an unnamed app use the module name everywhere.
 
     Title, anchors, and the root ``Usage:`` line must all use the app's module
@@ -1148,7 +1148,7 @@ def test_generate_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monkeypat
     # Simulate a build where sys.argv[0] is the generator, not the CLI.
     monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
 
-    module_file = tmp_path / "docstool.py"
+    module_file = importable_tmp_path / "docstool.py"
     module_file.write_text(
         dedent('''\
         from cyclopts import App
@@ -1162,17 +1162,12 @@ def test_generate_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monkeypat
     ''')
     )
 
-    sys.path.insert(0, str(tmp_path))
-    try:
-        app = import_app("docstool:app")
-        rst = app.generate_docs(output_format="restructuredtext")
-        assert "sphinx-build" not in rst  # title, anchors, AND the root Usage: line
-        assert ".. _cyclopts-docstool:" in rst
-        assert "docstool COMMAND" in rst  # root Usage: line
+    app = import_app("docstool:app")
+    rst = app.generate_docs(output_format="restructuredtext")
+    assert "sphinx-build" not in rst  # title, anchors, AND the root Usage: line
+    assert ".. _cyclopts-docstool:" in rst
+    assert "docstool COMMAND" in rst  # root Usage: line
 
-        md = app.generate_docs(output_format="markdown")
-        assert "sphinx-build" not in md
-        assert "docstool COMMAND" in md
-    finally:
-        sys.path.remove(str(tmp_path))
-        sys.modules.pop("docstool", None)
+    md = app.generate_docs(output_format="markdown")
+    assert "sphinx-build" not in md
+    assert "docstool COMMAND" in md
