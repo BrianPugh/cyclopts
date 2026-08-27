@@ -17,6 +17,7 @@ Typer has builtin argument validation for certain type annotations.
 This works for a select few builtins, but the Typer solution doesn't abstract out validation properly.
 Why does the generic ``typer.Argument`` have fields that only have meaning if the annotated type is a number?
 The ``typer.Argument`` signature has a ridiculous number of fields that only apply for certain types.
+The signature below is from Typer v0.9.0; later versions have only grown it further (35 parameters as of v0.27).
 
 .. code-block:: python
 
@@ -76,7 +77,7 @@ Cyclopts has an explicit :attr:`~.Parameter.validator` field that accepts a func
 
 .. code-block:: python
 
-   from cyclopts import App, parameter
+   from cyclopts import App, Parameter
    from typing import Annotated
 
    cyclopts_app = App()
@@ -89,7 +90,7 @@ Cyclopts has an explicit :attr:`~.Parameter.validator` field that accepts a func
    def foo(age: Annotated[int, Parameter(validator=age_validator)]):
        pass
 
-    cyclopts_app()
+   cyclopts_app()
 
 This solution is similar to how other libraries, like Attrs_ or Pydantic_, perform validation.
 

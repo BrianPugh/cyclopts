@@ -41,15 +41,18 @@ Consider the following Typer program:
 
    $ my-script foo --help
    Foo Docstring.
-   Parameters ---------- bar: str     Bar parameter docstring.
+
+   Parameters
+   ----------
+   bar: str
+       Bar parameter docstring.
 
    ╭─ Arguments ───────────────────────────────────────────────────────────╮
-   │ *    bar      TEXT  [default: None] [required]                        │
+   │ *    bar      <str>  [required]                                       │
    ╰───────────────────────────────────────────────────────────────────────╯
 
 The ``foo`` command's short description was properly parsed from the docstring.
-However, it mangles the Numpy-style docstring (or any docstring format for that matter) and doesn't correctly display ``bar``'s help.
-Typer just displays the entire docstring.
+However, the entire docstring (``Parameters`` section and all) is dumped into the command's long description, and ``bar``'s help is not displayed.
 
 To achieve the desired result with Typer, we have to explicitly annotate the parameter ``bar``:
 

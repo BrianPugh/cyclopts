@@ -8,4 +8,7 @@ Typer's documentation contains many good tutorials and demonstrations on how to 
 Frequently the only way to discover options and behavior is to dive into the source code.
 This becomes further confusing as the lines of where Typer ends and Click begins is quite blurred.
 
+.. note::
+   Typer added an `API reference section <https://typer.tiangolo.com/reference/>`_ to its documentation in February 2026.
+
 Cyclopts has a full :ref:`API` page, containing all the configurable options and defined behaviors in a single place.
