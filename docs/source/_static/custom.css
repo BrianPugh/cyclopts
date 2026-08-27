@@ -32,3 +32,36 @@
 .py.property {
     display: block !important;
 }
+
+/* Tighten the result_action reference table (issue #896). The RTD theme wraps
+   each code sample in a bordered box with a large 24px bottom margin, which
+   pools whitespace at the bottom of every row. Drop the box and the extra
+   margins so the code sits flush with the rest of the row. Scoped to this one
+   table via :class: result-action-modes so other code blocks are unaffected. */
+.rst-content table.result-action-modes td,
+.rst-content table.result-action-modes th {
+    padding: 6px 10px;
+    vertical-align: top;
+}
+.rst-content table.result-action-modes td p {
+    margin-bottom: 0;
+}
+.rst-content table.result-action-modes div[class^="highlight"],
+.rst-content table.result-action-modes div[class^="highlight"] pre {
+    /* The theme sets overflow-x:auto here; leaving overflow-y unset makes the
+       browser force it to auto too (CSS spec), which fires a spurious vertical
+       scrollbar on single-line cells from subpixel line-height rounding. Pin
+       overflow-y:hidden on BOTH the wrapper div and the pre so only horizontal
+       scrolling (for the odd long line) remains. */
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+.rst-content table.result-action-modes div[class^="highlight"] {
+    margin: 0;
+    border: none;
+    background: transparent;
+}
+.rst-content table.result-action-modes div[class^="highlight"] pre {
+    padding: 0;
+    background: transparent;
+}

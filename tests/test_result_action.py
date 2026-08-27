@@ -674,6 +674,131 @@ def test_result_action_sys_exit_with_none(monkeypatch):
 
 
 # ==============================================================================
+# sys_exit_if_non_zero_else_return tests
+# ==============================================================================
+
+
+def test_result_action_sys_exit_if_non_zero_else_return_with_zero():
+    """sys_exit_if_non_zero_else_return: returns 0 without exiting on success."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def succeed() -> int:
+        return 0
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["succeed"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_if_non_zero_else_return_with_none():
+    """sys_exit_if_non_zero_else_return: None resolves to 0 and returns without exiting."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def do_nothing() -> None:
+        pass
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        result = app(["do-nothing"])
+
+    assert result == 0
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_if_non_zero_else_return_with_true():
+    """sys_exit_if_non_zero_else_return: True is success (0), returns without exiting."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def check() -> bool:
+        return True
+
+    result = app(["check"])
+    assert result == 0
+
+
+def test_result_action_sys_exit_if_non_zero_else_return_with_nonzero(monkeypatch):
+    """sys_exit_if_non_zero_else_return: non-zero int calls sys.exit."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def fail(code: int) -> int:
+        return code
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    buf = StringIO()
+    with redirect_stdout(buf):
+        app(["fail", "3"])
+
+    assert exit_code == 3
+    assert buf.getvalue() == ""
+
+
+def test_result_action_sys_exit_if_non_zero_else_return_with_false(monkeypatch):
+    """sys_exit_if_non_zero_else_return: False is failure (1), calls sys.exit(1)."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def check() -> bool:
+        return False
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    app(["check"])
+    assert exit_code == 1
+
+
+def test_cyclopts_returncode_sys_exit_if_non_zero_else_return(monkeypatch):
+    """sys_exit_if_non_zero_else_return honors __cyclopts_returncode__ for non-int results."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=7)
+
+    exit_code = None
+
+    def mock_exit(code):
+        nonlocal exit_code
+        exit_code = code
+
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    app(["run"])
+    assert exit_code == 7
+
+
+def test_cyclopts_returncode_sys_exit_if_non_zero_else_return_zero():
+    """sys_exit_if_non_zero_else_return returns without exiting when resolved code is 0."""
+    app = App(result_action="sys_exit_if_non_zero_else_return")
+
+    @app.command
+    def run() -> _CustomResult:
+        return _CustomResult(returncode=0)
+
+    result = app(["run"])
+    assert result == 0
+
+
+# ==============================================================================
 # Default and inheritance tests
 # ==============================================================================
 
