@@ -171,17 +171,31 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
     for python_name, pydantic_field in model.model_fields.items():
         names = []
         if pydantic_field.alias:
-            if model.model_config.get("populate_by_name", False):
-                names.append(python_name)
-            names.append(pydantic_field.alias)
+            # Register a CLI name only if the model would actually accept it during
+            # validation (cyclopts builds the model via TypeAdapter.validate_python).
+            #   * validate_by_name  -> field names are accepted.
+            #   * validate_by_alias -> aliases are accepted (defaults to True).
+            # populate_by_name is the pre-2.11 spelling of validate_by_name; it is not
+            # recommended in pydantic 2.11+ and is slated for removal in pydantic v3, so
+            # we honor both across the supported pydantic range. pydantic forbids both
+            # validate_by_* being False, so at least one name is always registered.
+            validate_by_name = model.model_config.get("validate_by_name", False) or model.model_config.get(
+                "populate_by_name", False
+            )
+            validate_by_alias = model.model_config.get("validate_by_alias", True)
 
-            # Add legacy-compatible CLI form if not already present.
-            # This allows both "user-name" (new) and "username" (legacy) to work as CLI options.
-            # Old transform behavior: alias.lower() (no pascal_to_snake)
-            # New transform behavior: _pascal_to_snake(alias).lower()
-            legacy_form = pydantic_field.alias.lower()
-            if legacy_form not in names:
-                names.append(legacy_form)
+            if validate_by_name:
+                names.append(python_name)
+            if validate_by_alias:
+                names.append(pydantic_field.alias)
+
+                # Add legacy-compatible CLI form if not already present.
+                # This allows both "user-name" (new) and "username" (legacy) to work as CLI options.
+                # Old transform behavior: alias.lower() (no pascal_to_snake)
+                # New transform behavior: _pascal_to_snake(alias).lower()
+                legacy_form = pydantic_field.alias.lower()
+                if legacy_form not in names:
+                    names.append(legacy_form)
         else:
             names.append(python_name)
 
