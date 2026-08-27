@@ -238,6 +238,45 @@ def adjust_filters_for_subcommand(
     return sub_commands_filter, sub_exclude_commands
 
 
+def resolve_doc_root_name(app: "App") -> str:
+    """Resolve the root command name to use in generated documentation.
+
+    When an app has no explicit ``name`` and no ``default_command``, ``App.name``
+    falls back to ``Path(sys.argv[0]).name``. That is correct for the *runtime*
+    help screen (``argv[0]`` is the invoked command), but wrong during
+    documentation generation: when a Sphinx build or a generator script imports
+    the app, ``argv[0]`` is the *generator's* name (``sphinx-build``, ``python``,
+    ...), not the CLI's. In that specific case, prefer the root package of the
+    module where the App was instantiated (captured as
+    ``_instantiating_module_name``), which is a much better default than the
+    generator's name -- though for a ``package.module`` layout it may still
+    differ from the actual console-script name (users wanting an exact name
+    should pass ``name=``). Explicit names and the ``default_command``
+    function-name fallback are left untouched.
+
+    Parameters
+    ----------
+    app : App
+        The cyclopts App instance.
+
+    Returns
+    -------
+    str
+        The resolved root command name.
+    """
+    # Only intervene when App.name would fall back to Path(sys.argv[0]).name.
+    if app._name or app.default_command is not None:
+        return app.name[0]
+
+    module_name = app._instantiating_module_name
+    if module_name:
+        root_package = module_name.split(".")[0]
+        if root_package and root_package != "__main__":
+            return root_package
+
+    return app.name[0]
+
+
 def get_app_info(app: "App", command_chain: list[str] | None = None) -> tuple[str, str, str]:
     """Get app name, full command path, and title.
 
@@ -254,7 +293,7 @@ def get_app_info(app: "App", command_chain: list[str] | None = None) -> tuple[st
         (app_name, full_command, title)
     """
     if not command_chain:
-        app_name = app.name[0]
+        app_name = resolve_doc_root_name(app)
         full_command = app_name
         title = app_name
     else:
@@ -319,6 +358,40 @@ def apply_usage_name(command_chain: list[str], usage_name: str | None) -> list[s
     if not command_chain:
         return [usage_name]
     return [usage_name, *command_chain[1:]]
+
+
+def usage_display_chain(command_chain: list[str], usage_name: str | None, root_name: str | None) -> list[str]:
+    """Return the display command chain for a ``Usage:`` line.
+
+    Like :func:`apply_usage_name`, but at the root (empty ``command_chain``) with
+    no explicit ``usage_name`` override, substitutes ``root_name`` for the
+    app-name token that ``format_usage`` embedded. That token comes from
+    ``App.name``, which may be the ``Path(sys.argv[0]).name`` fallback (e.g.
+    ``sphinx-build`` during a docs build); ``root_name`` should be the
+    :func:`resolve_doc_root_name` result so the Usage line matches the title and
+    anchors. See #910.
+
+    Parameters
+    ----------
+    command_chain : list[str]
+        The logical command chain (root app name first).
+    usage_name : str | None
+        Explicit Usage: line root override, or ``None`` for the default.
+    root_name : str | None
+        The resolved documentation name to substitute at the root when there is
+        no ``usage_name`` override. Pass ``None`` to leave the root usage text
+        untouched -- required for a user-provided custom ``app.usage`` string,
+        whose first token is not necessarily the app name and must not be
+        rewritten.
+
+    Returns
+    -------
+    list[str]
+        The display chain to feed to the Usage: line formatter.
+    """
+    if not command_chain and usage_name is None and root_name is not None:
+        return [root_name]
+    return apply_usage_name(command_chain, usage_name)
 
 
 def generate_anchor(command_path: str) -> str:

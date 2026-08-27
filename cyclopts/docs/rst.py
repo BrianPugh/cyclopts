@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import extract_text
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
-    apply_usage_name,
     extract_description,
     extract_usage,
     generate_anchor,
@@ -15,6 +14,7 @@ from cyclopts.docs.base import (
     normalize_command_filters,
     should_include_command,
     should_show_usage,
+    usage_display_chain,
 )
 
 if TYPE_CHECKING:
@@ -308,8 +308,9 @@ def generate_rst_docs(
                 else:
                     usage_text = extract_text(usage, None, preserve_markup=False)
 
-                # Apply usage_name override to the display chain (only for the Usage: line)
-                display_chain = apply_usage_name(command_chain, usage_name)
+                # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
+                root_name = app_name if app.usage is None else None
+                display_chain = usage_display_chain(command_chain, usage_name, root_name)
 
                 # Format usage with the display chain when one is present
                 if display_chain:

@@ -1050,6 +1050,113 @@ def serve(port: int = 8000):
             if "test_usage_name_module" in sys.modules:
                 del sys.modules["test_usage_name_module"]
 
+    def test_unnamed_app_uses_module_name_not_argv(self, tmp_path, monkeypatch):
+        """An unnamed command-group app derives its docs name from its module.
+
+        ``App.name`` otherwise falls back to ``Path(sys.argv[0]).name``, which in
+        a Sphinx build is the generator (``sphinx-build``), not the CLI (#910).
+        """
+        # Simulate a Sphinx build: sys.argv[0] is the generator, not the CLI.
+        monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
+
+        module_file = tmp_path / "myapptool.py"
+        module_file.write_text("""from cyclopts import App
+
+app = App(help="My tool.")
+
+@app.command
+def serve(port: int = 8000):
+    '''Start the server.'''
+    pass
+""")
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            from cyclopts.ext.sphinx import CycloptsDirective
+
+            mock_state = MagicMock()
+            mock_state.nested_parse = MagicMock()
+
+            directive = CycloptsDirective(
+                name="cyclopts",
+                arguments=["myapptool:app"],
+                options={},
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state,
+                state_machine=MagicMock(),
+            )
+            directive.run()
+
+            rst_content = "\n".join(
+                line for call in mock_state.nested_parse.call_args_list if call for line in call[0][0]
+            )
+            assert "sphinx-build" not in rst_content
+            assert "myapptool serve" in rst_content  # Usage: line
+            assert ".. _cyclopts-myapptool-serve:" in rst_content  # anchor
+        finally:
+            sys.path.remove(str(tmp_path))
+            sys.modules.pop("myapptool", None)
+
+    def test_no_duplicate_root_label_across_directives(self, tmp_path):
+        """Directives for different commands of one app must not share a root label.
+
+        Every ``.. cyclopts::`` used to emit an identical ``cyclopts-<app>`` root
+        label, so documenting different commands of the same app across pages
+        produced Sphinx "duplicate label" warnings (#910).
+        """
+        module_file = tmp_path / "dupmod.py"
+        module_file.write_text("""from cyclopts import App
+
+app = App(name="myapp", help="My app.")
+
+@app.command
+def make_x(name: str):
+    '''Make an X.'''
+    pass
+
+@app.command
+def make_y(name: str):
+    '''Make a Y.'''
+    pass
+""")
+
+        sys.path.insert(0, str(tmp_path))
+        try:
+            from cyclopts.ext.sphinx import CycloptsDirective
+
+            def render(command: str) -> str:
+                mock_state = MagicMock()
+                mock_state.nested_parse = MagicMock()
+                directive = CycloptsDirective(
+                    name="cyclopts",
+                    arguments=["dupmod:app"],
+                    options={"commands": command},
+                    content=StringList(),
+                    lineno=1,
+                    content_offset=0,
+                    block_text="",
+                    state=mock_state,
+                    state_machine=MagicMock(),
+                )
+                directive.run()
+                return "\n".join(line for call in mock_state.nested_parse.call_args_list if call for line in call[0][0])
+
+            page_x = render("make-x")
+            page_y = render("make-y")
+
+            # No shared root label between the two pages (the duplicate-label source).
+            assert ".. _cyclopts-myapp:" not in page_x
+            assert ".. _cyclopts-myapp:" not in page_y
+            # Each page keeps its own unique, referenceable command anchor.
+            assert ".. _cyclopts-myapp-make-x:" in page_x
+            assert ".. _cyclopts-myapp-make-y:" in page_y
+        finally:
+            sys.path.remove(str(tmp_path))
+            sys.modules.pop("dupmod", None)
+
 
 class TestRstContentParsing:
     """Test RST content parsing and formatting."""
