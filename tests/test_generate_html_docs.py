@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from textwrap import dedent
 from typing import Annotated
 
 from cyclopts import App, Parameter
@@ -430,15 +431,20 @@ def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(tmp_path, monk
     monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
 
     module_file = tmp_path / "htmltool.py"
-    module_file.write_text("""from cyclopts import App
+    module_file.write_text(
+        dedent(
+            """\
+            from cyclopts import App
 
-app = App(help="My tool.")
+            app = App(help="My tool.")
 
-@app.command
-def serve(port: int = 8000):
-    '''Start the server.'''
-    pass
-""")
+            @app.command
+            def serve(port: int = 8000):
+                '''Start the server.'''
+                pass
+            """
+        )
+    )
 
     sys.path.insert(0, str(tmp_path))
     try:

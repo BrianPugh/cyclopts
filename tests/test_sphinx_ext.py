@@ -1,6 +1,7 @@
 """Tests for the Cyclopts Sphinx extension."""
 
 import sys
+from textwrap import dedent
 from unittest.mock import ANY, MagicMock
 
 import pytest
@@ -1060,15 +1061,20 @@ def serve(port: int = 8000):
         monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
 
         module_file = tmp_path / "myapptool.py"
-        module_file.write_text("""from cyclopts import App
+        module_file.write_text(
+            dedent(
+                """\
+                from cyclopts import App
 
-app = App(help="My tool.")
+                app = App(help="My tool.")
 
-@app.command
-def serve(port: int = 8000):
-    '''Start the server.'''
-    pass
-""")
+                @app.command
+                def serve(port: int = 8000):
+                    '''Start the server.'''
+                    pass
+                """
+            )
+        )
 
         sys.path.insert(0, str(tmp_path))
         try:
@@ -1108,20 +1114,25 @@ def serve(port: int = 8000):
         produced Sphinx "duplicate label" warnings (#910).
         """
         module_file = tmp_path / "dupmod.py"
-        module_file.write_text("""from cyclopts import App
+        module_file.write_text(
+            dedent(
+                """\
+                from cyclopts import App
 
-app = App(name="myapp", help="My app.")
+                app = App(name="myapp", help="My app.")
 
-@app.command
-def make_x(name: str):
-    '''Make an X.'''
-    pass
+                @app.command
+                def make_x(name: str):
+                    '''Make an X.'''
+                    pass
 
-@app.command
-def make_y(name: str):
-    '''Make a Y.'''
-    pass
-""")
+                @app.command
+                def make_y(name: str):
+                    '''Make a Y.'''
+                    pass
+                """
+            )
+        )
 
         sys.path.insert(0, str(tmp_path))
         try:
