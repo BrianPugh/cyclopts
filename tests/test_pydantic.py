@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, SecretBytes, Sec
 from pydantic import ValidationError as PydanticValidationError
 from pydantic.alias_generators import to_camel
 
-from cyclopts import MissingArgumentError, Parameter, ValidationError
+from cyclopts import MissingArgumentError, Parameter, UnknownOptionError, ValidationError
 
 
 # Modified from https://docs.pydantic.dev/latest/#pydantic-examples
@@ -286,6 +286,34 @@ def test_pydantic_validate_by_name(app, assert_parse_args):
 
     # The alias continues to work.
     assert_parse_args(main, "--model.user-name Alice", model=Model(userName="Alice"))
+
+
+def test_pydantic_validate_by_alias_false(app, assert_parse_args):
+    """When ``validate_by_alias=False``, the alias is not registered as a CLI option.
+
+    https://github.com/BrianPugh/cyclopts/issues/908
+
+    ``validate_by_alias=False`` tells pydantic to reject the alias during validation
+    (it implies ``validate_by_name=True``), so only the field-name CLI option should
+    be registered; the alias form must not silently parse into a value the model then
+    rejects.
+    """
+
+    class Model(BaseModel):
+        model_config = ConfigDict(validate_by_alias=False)
+
+        full_name: str = Field(alias="userName")
+
+    @app.default
+    def main(model: Model):
+        pass
+
+    # The field name is accepted.
+    assert_parse_args(main, "--model.full_name Alice", model=Model.model_validate({"full_name": "Alice"}))
+
+    # The alias is not registered, since the model would reject it during validation.
+    with pytest.raises(UnknownOptionError):
+        app.parse_args("--model.user-name Alice", exit_on_error=False)
 
 
 @pytest.mark.parametrize(
