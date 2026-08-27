@@ -261,6 +261,33 @@ def test_pydantic_alias_1(app, console, assert_parse_args):
     )
 
 
+def test_pydantic_validate_by_name(app, assert_parse_args):
+    """Field-name CLI options are registered when ``validate_by_name`` is set.
+
+    https://github.com/BrianPugh/cyclopts/issues/908
+
+    pydantic 2.11 split ``validate_by_name`` out of ``populate_by_name``. A model
+    that configures ``validate_by_name=True`` accepts its field names during
+    validation, so cyclopts must register the field-name CLI option even though
+    ``populate_by_name`` is unset.
+    """
+
+    class Model(BaseModel):
+        model_config = ConfigDict(validate_by_name=True)
+
+        full_name: str = Field(alias="userName")
+
+    @app.default
+    def main(model: Model):
+        pass
+
+    # The field name (the thing ``validate_by_name=True`` opts into).
+    assert_parse_args(main, "--model.full_name Alice", model=Model(userName="Alice"))
+
+    # The alias continues to work.
+    assert_parse_args(main, "--model.user-name Alice", model=Model(userName="Alice"))
+
+
 @pytest.mark.parametrize(
     "env_var",
     [
