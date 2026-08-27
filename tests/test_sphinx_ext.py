@@ -380,9 +380,12 @@ def action():
 
             rst_content = "\n".join(all_content)
 
-            # Should contain RST reference labels with new format
-            assert ".. _cyclopts-test-cli:" in rst_content
-            # Check for the subcommand anchor
+            # The title-less root (the directive sets no_root_title) must NOT emit
+            # a root anchor: its bare ``cyclopts-<app>`` label is identical across
+            # every page documenting the same app and triggers Sphinx "duplicate
+            # label" warnings (issue #910).
+            assert ".. _cyclopts-test-cli:" not in rst_content
+            # Subcommand anchors are unique per command and are always emitted.
             assert ".. _cyclopts-test-cli-sub:" in rst_content
             assert ".. _cyclopts-test-cli-sub-action:" in rst_content
 
