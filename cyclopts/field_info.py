@@ -171,7 +171,7 @@ def _pydantic_field_infos(model) -> dict[str, FieldInfo]:
     for python_name, pydantic_field in model.model_fields.items():
         names = []
         if pydantic_field.alias:
-            if model.model_config.get("populate_by_name", False):
+            if model.model_config.get("validate_by_name", False) or model.model_config.get("populate_by_name", False):
                 names.append(python_name)
             names.append(pydantic_field.alias)
 
