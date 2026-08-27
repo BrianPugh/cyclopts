@@ -16,6 +16,7 @@ ResultActionSingle = (
         "return_int_as_exit_code_else_zero",
         "print_non_int_sys_exit",
         "sys_exit",
+        "sys_exit_if_non_zero_else_return",
         "return_none",
         "return_zero",
         "print_return_zero",
@@ -116,6 +117,16 @@ def handle_result_action(
                 sys.exit(result)
             else:
                 sys.exit(resolve_returncode(result))
+        case "sys_exit_if_non_zero_else_return":
+            if isinstance(result, bool):
+                returncode = 0 if result else 1
+            elif isinstance(result, int):
+                returncode = result
+            else:
+                returncode = resolve_returncode(result)
+            if returncode == 0:
+                return returncode
+            sys.exit(returncode)
         case "print_non_int_return_int_as_exit_code":
             if isinstance(result, bool):
                 return 0 if result else 1

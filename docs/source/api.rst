@@ -615,184 +615,165 @@ API
          app(backend="trio")  # Override the app's backend for this call
 
    .. attribute:: result_action
-      :type: Literal["return_value", "call_if_callable", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | Iterable[Literal[...] | Callable[[Any], Any]] | None
+      :type: Literal["return_value", "call_if_callable", "print_non_int_return_int_as_exit_code", "print_str_return_int_as_exit_code", "print_str_return_zero", "print_non_none_return_int_as_exit_code", "print_non_none_return_zero", "return_int_as_exit_code_else_zero", "print_non_int_sys_exit", "sys_exit", "sys_exit_if_non_zero_else_return", "return_none", "return_zero", "print_return_zero", "sys_exit_zero", "print_sys_exit_zero"] | Callable[[Any], Any] | Iterable[Literal[...] | Callable[[Any], Any]] | None
       :value: None
 
       Controls how :meth:`.App.__call__` and :meth:`.App.run_async` handle command return values. By default (``"print_non_int_sys_exit"``), the app will call :func:`sys.exit` with an appropriate exit code. This default was chosen for consistent functionality between standalone scripts, and console entrypoints.
 
       Can be a predefined literal string, a custom callable that takes the result and returns a processed value, or a **sequence of actions** to be applied left-to-right in a pipeline.
 
-      Each predefined mode's exact behavior is shown below:
+      Every predefined mode is listed below with its exact behavior. See :ref:`Result Action` for a higher-level overview and common gotchas.
 
-      **"print_non_int_sys_exit"** (default)
+      .. list-table::
+         :header-rows: 1
+         :widths: 28 32 40
+         :class: result-action-modes
 
-         The default CLI mode. Prints non-int values to stdout, then calls :func:`sys.exit` with the appropriate exit code.
+         * - ``result_action``
+           - Effect
+           - Equivalent code
+         * - ``"return_value"``
+           - ``app()`` returns the command's value unchanged. Best for embedding or testing.
+           - .. code-block:: python
 
-         .. code-block:: python
+                return result
+         * - ``"call_if_callable"``
+           - Calls the result if it's callable, otherwise returns it unchanged. Compose with another action; see :ref:`Dataclass Commands`.
+           - .. code-block:: python
 
-            if isinstance(result, bool):
-                sys.exit(0 if result else 1)  # i.e. True is success
-            elif isinstance(result, int):
-                sys.exit(result)
-            elif result is not None:
+                return (
+                    result()
+                    if callable(result)
+                    else result
+                )
+         * - ``"print_non_int_sys_exit"`` (**default**)
+           - Prints non-int results, then :func:`sys.exit` with the exit code.
+           - .. code-block:: python
+
+                if isinstance(result, bool):
+                    sys.exit(0 if result else 1)
+                elif isinstance(result, int):
+                    sys.exit(result)
+                elif result is not None:
+                    print(result)
+                    sys.exit(resolve_returncode(result))
+                else:
+                    sys.exit(resolve_returncode(result))
+         * - ``"sys_exit"``
+           - Never prints; :func:`sys.exit` with the exit code.
+           - .. code-block:: python
+
+                if isinstance(result, bool):
+                    sys.exit(0 if result else 1)
+                elif isinstance(result, int):
+                    sys.exit(result)
+                else:
+                    sys.exit(resolve_returncode(result))
+         * - ``"sys_exit_if_non_zero_else_return"``
+           - Returns the exit code on success (``0``); only calls :func:`sys.exit` when the exit code is non-zero.
+           - .. code-block:: python
+
+                if isinstance(result, bool):
+                    returncode = 0 if result else 1
+                elif isinstance(result, int):
+                    returncode = result
+                else:
+                    returncode = resolve_returncode(result)
+                if returncode == 0:
+                    return returncode
+                sys.exit(returncode)
+         * - ``"return_int_as_exit_code_else_zero"``
+           - Never prints; returns int/bool as the exit code, else ``0``.
+           - .. code-block:: python
+
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                else:
+                    return resolve_returncode(result)
+         * - ``"print_non_int_return_int_as_exit_code"``
+           - Prints non-int results; returns int/bool as the exit code, else ``0``.
+           - .. code-block:: python
+
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                elif result is not None:
+                    print(result)
+                    return resolve_returncode(result)
+                else:
+                    return resolve_returncode(result)
+         * - ``"print_str_return_int_as_exit_code"``
+           - Prints only ``str`` results; returns int/bool as the exit code, else ``0``.
+           - .. code-block:: python
+
+                if isinstance(result, str):
+                    print(result)
+                    return resolve_returncode(result)
+                elif isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                else:
+                    return resolve_returncode(result)
+         * - ``"print_non_none_return_int_as_exit_code"``
+           - Prints all non-``None`` results; returns int/bool as the exit code, else ``0``.
+           - .. code-block:: python
+
+                if result is not None:
+                    print(result)
+                if isinstance(result, bool):
+                    return 0 if result else 1
+                elif isinstance(result, int):
+                    return result
+                return resolve_returncode(result)
+         * - ``"print_str_return_zero"``
+           - Prints only ``str`` results; always returns ``0``.
+           - .. code-block:: python
+
+                if isinstance(result, str):
+                    print(result)
+                return resolve_returncode(result)
+         * - ``"print_non_none_return_zero"``
+           - Prints all non-``None`` results; always returns ``0``.
+           - .. code-block:: python
+
+                if result is not None:
+                    print(result)
+                return resolve_returncode(result)
+         * - ``"print_return_zero"``
+           - Prints the result (even ``None``); always returns ``0``.
+           - .. code-block:: python
+
+                print(result)
+                return resolve_returncode(result)
+         * - ``"return_zero"``
+           - Never prints; always returns ``0``.
+           - .. code-block:: python
+
+                return resolve_returncode(result)
+         * - ``"return_none"``
+           - Never prints; always returns ``None``.
+           - .. code-block:: python
+
+                return None
+         * - ``"sys_exit_zero"``
+           - Never prints; always :func:`sys.exit(0) <sys.exit>`.
+           - .. code-block:: python
+
+                sys.exit(resolve_returncode(result))
+         * - ``"print_sys_exit_zero"``
+           - Prints the result (even ``None``); always :func:`sys.exit(0) <sys.exit>`.
+           - .. code-block:: python
+
                 print(result)
                 sys.exit(resolve_returncode(result))
-            else:
-                sys.exit(resolve_returncode(result))
 
-         See :ref:`Custom Return Code Protocol <custom-return-code-protocol>` for :func:`~cyclopts.resolve_returncode`.
+      .. note::
 
-      **"return_value"**
-
-         Returns the command's value unchanged. Use for embedding Cyclopts in other Python code or testing.
-
-         .. code-block:: python
-
-            return result
-
-      **"call_if_callable"**
-
-         Calls the result if it's callable (with no arguments), otherwise returns it unchanged. Useful for the dataclass command pattern where commands return class instances with ``__call__`` methods. Intended to be used in composition with other result actions (e.g., ``["call_if_callable", "print_non_int_sys_exit"]``).
-
-         .. code-block:: python
-
-            return result() if callable(result) else result
-
-         See :ref:`Dataclass Commands` for usage examples.
-
-      **"sys_exit"**
-
-         Never prints output. Calls :func:`sys.exit` with the appropriate exit code. Useful for CLI apps that handle their own output and just need exit code handling.
-
-         .. code-block:: python
-
-            if isinstance(result, bool):
-                sys.exit(0 if result else 1)  # i.e. True is success
-            elif isinstance(result, int):
-                sys.exit(result)
-            else:
-                sys.exit(resolve_returncode(result))
-
-      **"print_non_int_return_int_as_exit_code"**
-
-         Prints non-int values, returns int/bool as exit codes. Useful for testing and embedding.
-
-         .. code-block:: python
-
-            if isinstance(result, bool):
-                return 0 if result else 1  # i.e. True is success
-            elif isinstance(result, int):
-                return result
-            elif result is not None:
-                print(result)
-                return resolve_returncode(result)
-            else:
-                return resolve_returncode(result)
-
-      **"print_str_return_int_as_exit_code"**
-
-         Only prints string return values. Returns int/bool as exit codes, silently returns 0 for other types.
-
-         .. code-block:: python
-
-            if isinstance(result, str):
-                print(result)
-                return resolve_returncode(result)
-            elif isinstance(result, bool):
-                return 0 if result else 1  # i.e. True is success
-            elif isinstance(result, int):
-                return result
-            else:
-                return resolve_returncode(result)
-
-      **"print_str_return_zero"**
-
-         Only prints string return values, always returns 0. Useful for simple output-only CLIs.
-
-         .. code-block:: python
-
-            if isinstance(result, str):
-                print(result)
-            return resolve_returncode(result)
-
-      **"print_non_none_return_int_as_exit_code"**
-
-         Prints all non-None values (including ints), returns int/bool as exit codes.
-
-         .. code-block:: python
-
-            if result is not None:
-                print(result)
-            if isinstance(result, bool):
-                return 0 if result else 1  # i.e. True is success
-            elif isinstance(result, int):
-                return result
-            return resolve_returncode(result)
-
-      **"print_non_none_return_zero"**
-
-         Prints all non-None values (including ints), always returns 0.
-
-         .. code-block:: python
-
-            if result is not None:
-                print(result)
-            return resolve_returncode(result)
-
-      **"return_int_as_exit_code_else_zero"**
-
-         Never prints output. Returns int/bool as exit codes, 0 for all other types. Useful for silent CLIs.
-
-         .. code-block:: python
-
-            if isinstance(result, bool):
-                return 0 if result else 1  # i.e. True is success
-            elif isinstance(result, int):
-                return result
-            else:
-                return resolve_returncode(result)
-
-      **"return_none"**
-
-         Always returns None, regardless of the command's return value.
-
-         .. code-block:: python
-
-            return None
-
-      **"return_zero"**
-
-         Always returns 0, regardless of the command's return value.
-
-         .. code-block:: python
-
-            return resolve_returncode(result)
-
-      **"print_return_zero"**
-
-         Always prints the result (even None), then always returns 0.
-
-         .. code-block:: python
-
-            print(result)
-            return resolve_returncode(result)
-
-      **"sys_exit_zero"**
-
-         Always calls :func:`sys.exit(0) <sys.exit>`, regardless of the command's return value.
-
-         .. code-block:: python
-
-            sys.exit(resolve_returncode(result))
-
-      **"print_sys_exit_zero"**
-
-         Always prints the result (even None), then calls :func:`sys.exit(0) <sys.exit>`.
-
-         .. code-block:: python
-
-            print(result)
-            sys.exit(resolve_returncode(result))
+         ``bool`` results are treated as exit codes: :obj:`True` → ``0`` (success), :obj:`False` → ``1``. Where the table above says "``0``", the value is actually :func:`~cyclopts.resolve_returncode` of the result, which is ``0`` unless the result defines a :ref:`__cyclopts_returncode__ <custom-return-code-protocol>` method.
 
       **Custom Callable**
 
