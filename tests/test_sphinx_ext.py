@@ -1216,6 +1216,11 @@ def serve(port: int = 8000):
         both = render({"anchor-prefix": "admin", "anchor-suffix": "full"})
         assert ".. _admin-cyclopts-myapp-mycommand-full:" in both
 
+        # The title-less root normally has no anchor, but a prefix/suffix
+        # disambiguates its bare label and opts the root anchor back in.
+        assert ".. _admin-cyclopts-myapp:" in prefixed
+        assert ".. _cyclopts-myapp-full:" in suffixed
+
 
 class TestRstContentParsing:
     """Test RST content parsing and formatting."""

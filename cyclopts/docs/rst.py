@@ -263,14 +263,16 @@ def generate_rst_docs(
         title = base_title
 
     # Generate RST anchor/label with improved namespacing (RST uses a
-    # "cyclopts-" prefix for namespacing). Skip the anchor for a title-less root
-    # (e.g. the Sphinx ``.. cyclopts::`` directive, which always sets
-    # ``no_root_title``): a title-less root has nothing to reference, and its
+    # "cyclopts-" prefix for namespacing). Skip the anchor for an *unqualified*
+    # title-less root (e.g. the Sphinx ``.. cyclopts::`` directive, which always
+    # sets ``no_root_title``): a title-less root has nothing to reference, and its
     # bare ``cyclopts-<app>`` label is identical across every page documenting
     # the same app, producing "duplicate label" warnings that make the sections
-    # unreferenceable. Subcommand anchors (which have command_chain) are unique
-    # per command and are always emitted.
-    if not (no_root_title and not command_chain):
+    # unreferenceable. An ``anchor_prefix``/``anchor_suffix`` disambiguates that
+    # label, so it opts the root anchor back in. Subcommand anchors (which have
+    # command_chain) are unique per command and are always emitted.
+    unqualified_root = no_root_title and not command_chain and not anchor_prefix and not anchor_suffix
+    if not unqualified_root:
         # ``anchor_prefix`` sits outside the ``cyclopts-`` namespace (a page/section
         # namespace); ``anchor_suffix`` trails the command path (a per-page variant
         # qualifier). Both let the same command be documented by multiple directives
