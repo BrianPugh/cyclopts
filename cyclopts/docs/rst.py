@@ -171,6 +171,8 @@ def generate_rst_docs(
     code_block_title: bool = False,
     skip_preamble: bool = False,
     usage_name: str | None = None,
+    anchor_prefix: str = "",
+    anchor_suffix: str = "",
 ) -> str:
     """Generate reStructuredText documentation for a CLI application.
 
@@ -221,6 +223,17 @@ def generate_rst_docs(
         Optional replacement for the root app name used in ``Usage:`` lines
         only. Section headings, anchors, and TOC continue to use ``app.name[0]``.
         Default is None.
+    anchor_prefix : str
+        Optional token prepended to every generated anchor/label (outside the
+        ``cyclopts-`` namespace, e.g. ``<prefix>-cyclopts-<app>-<command>``).
+        Use it to namespace a whole directive by page or section so the same
+        command documented on multiple pages keeps distinct, referenceable
+        ``:ref:`` targets. Default is ``""`` (no prefix).
+    anchor_suffix : str
+        Optional token appended to every generated anchor/label (e.g.
+        ``cyclopts-<app>-<command>-<suffix>``). Use it to distinguish multiple
+        renderings of the same command on a single page. Default is ``""`` (no
+        suffix).
 
     Returns
     -------
@@ -258,12 +271,23 @@ def generate_rst_docs(
     # unreferenceable. Subcommand anchors (which have command_chain) are unique
     # per command and are always emitted.
     if not (no_root_title and not command_chain):
-        anchor_parts = ["cyclopts"]
+        # ``anchor_prefix`` sits outside the ``cyclopts-`` namespace (a page/section
+        # namespace); ``anchor_suffix`` trails the command path (a per-page variant
+        # qualifier). Both let the same command be documented by multiple directives
+        # while keeping distinct, referenceable ``:ref:`` targets.
+        anchor_parts = []
+        if anchor_prefix:
+            anchor_parts.append(anchor_prefix)
+        anchor_parts.append("cyclopts")
         if command_chain:
             anchor_parts.extend(command_chain)
         else:
             anchor_parts.append(app_name)
-        # Use shared anchor generation logic, then add RST-specific slash replacement
+        if anchor_suffix:
+            anchor_parts.append(anchor_suffix)
+        # generate_anchor() slugifies a space-joined command path into hyphens
+        # (the same contract used for markdown/HTML anchors); the join spaces never
+        # survive into the anchor. Then apply RST-specific slash replacement.
         anchor_name = generate_anchor(" ".join(anchor_parts)).replace("/", "-")
         lines.append(f".. _{anchor_name}:")
         lines.append("")
@@ -479,6 +503,8 @@ def generate_rst_docs(
                     code_block_title=code_block_title,
                     skip_preamble=is_single_target or is_intermediate_path,  # Skip preamble for target or intermediate
                     usage_name=usage_name,
+                    anchor_prefix=anchor_prefix,
+                    anchor_suffix=anchor_suffix,
                 )
             lines.append(subdocs)
 
