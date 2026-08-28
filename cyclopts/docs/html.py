@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from cyclopts._markup import escape_html, extract_text
 from cyclopts.docs.base import (
-    apply_usage_name,
     build_command_chain,
     extract_description,
     extract_usage,
@@ -529,7 +528,7 @@ def generate_html_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_display_chain = apply_usage_name(sub_command_chain, usage_name)
+                    sub_display_chain = usage_display_chain(sub_command_chain, usage_name)
                     sub_usage_text = format_usage_line(sub_usage_text, sub_display_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")

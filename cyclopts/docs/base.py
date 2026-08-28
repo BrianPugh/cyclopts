@@ -327,49 +327,20 @@ def build_command_chain(command_chain: list[str] | None, command_name: str, app_
         return [app_name, command_name]
 
 
-def apply_usage_name(command_chain: list[str], usage_name: str | None) -> list[str]:
-    """Return a display command chain with the root replaced by ``usage_name``.
-
-    When ``usage_name`` is ``None``, returns ``command_chain`` unchanged so callers
-    can use this helper unconditionally. When ``usage_name`` is ``""``, the root
-    token is dropped rather than substituted, so downstream formatters never see
-    an empty element (which would render as stray leading/internal whitespace).
-    When the chain is empty and ``usage_name`` is a non-empty string, returns a
-    single-element list containing ``usage_name``.
-
-    Parameters
-    ----------
-    command_chain : list[str]
-        The logical command chain (root app name first).
-    usage_name : str | None
-        Replacement for the chain's root element used in Usage: lines only.
-        An empty string drops the root token entirely.
-
-    Returns
-    -------
-    list[str]
-        A new list with the root replaced/dropped, or the original chain when
-        ``usage_name`` is ``None``.
-    """
-    if usage_name is None:
-        return command_chain
-    if usage_name == "":
-        return command_chain[1:]
-    if not command_chain:
-        return [usage_name]
-    return [usage_name, *command_chain[1:]]
-
-
-def usage_display_chain(command_chain: list[str], usage_name: str | None, root_name: str | None) -> list[str]:
+def usage_display_chain(command_chain: list[str], usage_name: str | None, root_name: str | None = None) -> list[str]:
     """Return the display command chain for a ``Usage:`` line.
 
-    Like :func:`apply_usage_name`, but at the root (empty ``command_chain``) with
-    no explicit ``usage_name`` override, substitutes ``root_name`` for the
-    app-name token that ``format_usage`` embedded. That token comes from
-    ``App.name``, which may be the ``Path(sys.argv[0]).name`` fallback (e.g.
-    ``sphinx-build`` during a docs build); ``root_name`` should be the
-    :func:`resolve_doc_root_name` result so the Usage line matches the title and
-    anchors. See #910.
+    Applies, in order of precedence:
+
+    - an explicit ``usage_name`` override (replaces the root token; an empty
+      string drops it entirely so downstream formatters never see an empty
+      element, which would render as stray whitespace);
+    - otherwise, at the root (empty ``command_chain``) with no override,
+      ``root_name`` substituted for the app-name token that ``format_usage``
+      embedded. That token comes from ``App.name``, which may be the
+      ``Path(sys.argv[0]).name`` fallback (e.g. ``sphinx-build`` during a docs
+      build); pass the :func:`resolve_doc_root_name` result so the Usage line
+      matches the title and anchors. See #910.
 
     Parameters
     ----------
@@ -377,21 +348,28 @@ def usage_display_chain(command_chain: list[str], usage_name: str | None, root_n
         The logical command chain (root app name first).
     usage_name : str | None
         Explicit Usage: line root override, or ``None`` for the default.
+        An empty string drops the root token entirely.
     root_name : str | None
         The resolved documentation name to substitute at the root when there is
-        no ``usage_name`` override. Pass ``None`` to leave the root usage text
-        untouched -- required for a user-provided custom ``app.usage`` string,
-        whose first token is not necessarily the app name and must not be
-        rewritten.
+        no ``usage_name`` override. Defaults to ``None``, which leaves the root
+        usage text untouched -- required for a user-provided custom ``app.usage``
+        string (whose first token is not necessarily the app name and must not be
+        rewritten) and for subcommand chains (which have no root token to fix up).
 
     Returns
     -------
     list[str]
         The display chain to feed to the Usage: line formatter.
     """
-    if not command_chain and usage_name is None and root_name is not None:
-        return [root_name]
-    return apply_usage_name(command_chain, usage_name)
+    if usage_name is None:
+        if not command_chain and root_name is not None:
+            return [root_name]
+        return command_chain
+    if usage_name == "":
+        return command_chain[1:]
+    if not command_chain:
+        return [usage_name]
+    return [usage_name, *command_chain[1:]]
 
 
 def generate_anchor(command_path: str) -> str:
