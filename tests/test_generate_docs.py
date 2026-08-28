@@ -365,6 +365,25 @@ def test_generate_docs_with_custom_usage():
     assert actual == expected
 
 
+def test_generate_docs_custom_usage_first_token_preserved():
+    """A custom ``app.usage`` whose first token isn't the app name is left intact.
+
+    The root Usage-line substitution added for #910 must only rewrite the
+    auto-generated app-name token, never a user-provided custom usage string.
+    """
+    app = App(name="mytool", usage="Custom usage: do the thing [OPTIONS]")
+
+    @app.command
+    def serve():
+        """Serve."""
+        pass
+
+    for output_format in ("markdown", "restructuredtext", "html"):
+        docs = app.generate_docs(output_format=output_format)
+        assert "Custom usage: do the thing [OPTIONS]" in docs
+        assert "mytool usage:" not in docs  # first token must not be clobbered
+
+
 def test_generate_docs_no_usage():
     """Test documentation with suppressed usage."""
     app = App(name="myapp", usage="")  # Empty string suppresses usage
@@ -1113,3 +1132,42 @@ def test_generate_docs_flattened_subapp_parent_precedence():
     actual = app.generate_docs()
     assert "Parent run" in actual
     assert "Subapp run" not in actual
+
+
+def test_generate_docs_unnamed_app_uses_module_name_not_argv(importable_tmp_path, monkeypatch):
+    """Standalone docs for an unnamed app use the module name everywhere.
+
+    Title, anchors, and the root ``Usage:`` line must all use the app's module
+    name rather than the ``Path(sys.argv[0]).name`` fallback (e.g. the doc
+    generator's name in a build context). See #910.
+    """
+    import sys
+
+    from cyclopts.utils import import_app
+
+    # Simulate a build where sys.argv[0] is the generator, not the CLI.
+    monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
+
+    module_file = importable_tmp_path / "docstool.py"
+    module_file.write_text(
+        dedent('''\
+        from cyclopts import App
+
+        app = App(help="My tool.")
+
+        @app.command
+        def serve(port: int = 8000):
+            """Start the server."""
+            pass
+    ''')
+    )
+
+    app = import_app("docstool:app")
+    rst = app.generate_docs(output_format="restructuredtext")
+    assert "sphinx-build" not in rst  # title, anchors, AND the root Usage: line
+    assert ".. _cyclopts-docstool:" in rst
+    assert "docstool COMMAND" in rst  # root Usage: line
+
+    md = app.generate_docs(output_format="markdown")
+    assert "sphinx-build" not in md
+    assert "docstool COMMAND" in md

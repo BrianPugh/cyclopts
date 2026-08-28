@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from cyclopts._markup import escape_html, extract_text
 from cyclopts.docs.base import (
-    apply_usage_name,
     build_command_chain,
     extract_description,
     extract_usage,
@@ -12,6 +11,8 @@ from cyclopts.docs.base import (
     format_usage_line,
     generate_anchor,
     iterate_commands,
+    resolve_doc_root_name,
+    usage_display_chain,
 )
 
 if TYPE_CHECKING:
@@ -396,8 +397,10 @@ def generate_html_docs(
 
     # Determine the app name and full command path
     if not command_chain:
-        # Root level - use app name or derive from sys.argv
-        app_name = app.name[0]
+        # Root level - use the app name, or (for an unnamed app) the module it was
+        # defined in rather than the sys.argv[0] fallback, which is the doc
+        # generator's name (e.g. "sphinx-build") in a build context. See #910.
+        app_name = resolve_doc_root_name(app)
         full_command = app_name
         title = app_name
         # Add title for all levels
@@ -442,7 +445,9 @@ def generate_html_docs(
             usage_text = usage
         else:
             usage_text = extract_text(usage, None)
-        display_chain = apply_usage_name(command_chain, usage_name)
+        # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
+        root_name = app_name if app.usage is None else None
+        display_chain = usage_display_chain(command_chain, usage_name, root_name)
         usage_text = format_usage_line(usage_text, display_chain, prefix="$")
         lines.append(f'<pre class="usage">{escape_html(usage_text)}</pre>')
         lines.append("</div>")
@@ -523,7 +528,7 @@ def generate_html_docs(
                         sub_usage_text = sub_usage
                     else:
                         sub_usage_text = extract_text(sub_usage, None)
-                    sub_display_chain = apply_usage_name(sub_command_chain, usage_name)
+                    sub_display_chain = usage_display_chain(sub_command_chain, usage_name)
                     sub_usage_text = format_usage_line(sub_usage_text, sub_display_chain, prefix="$")
                     lines.append(f'<pre class="usage">{escape_html(sub_usage_text)}</pre>')
                     lines.append("</div>")

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from cyclopts._markup import extract_text
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
-    apply_usage_name,
     extract_description,
     extract_usage,
     generate_anchor,
@@ -15,6 +14,7 @@ from cyclopts.docs.base import (
     normalize_command_filters,
     should_include_command,
     should_show_usage,
+    usage_display_chain,
 )
 
 if TYPE_CHECKING:
@@ -249,17 +249,24 @@ def generate_rst_docs(
         # Root app: use base title
         title = base_title
 
-    # Always generate RST anchor/label with improved namespacing
-    # RST uses a "cyclopts-" prefix for namespacing
-    anchor_parts = ["cyclopts"]
-    if command_chain:
-        anchor_parts.extend(command_chain)
-    else:
-        anchor_parts.append(app_name)
-    # Use shared anchor generation logic, then add RST-specific slash replacement
-    anchor_name = generate_anchor(" ".join(anchor_parts)).replace("/", "-")
-    lines.append(f".. _{anchor_name}:")
-    lines.append("")
+    # Generate RST anchor/label with improved namespacing (RST uses a
+    # "cyclopts-" prefix for namespacing). Skip the anchor for a title-less root
+    # (e.g. the Sphinx ``.. cyclopts::`` directive, which always sets
+    # ``no_root_title``): a title-less root has nothing to reference, and its
+    # bare ``cyclopts-<app>`` label is identical across every page documenting
+    # the same app, producing "duplicate label" warnings that make the sections
+    # unreferenceable. Subcommand anchors (which have command_chain) are unique
+    # per command and are always emitted.
+    if not (no_root_title and not command_chain):
+        anchor_parts = ["cyclopts"]
+        if command_chain:
+            anchor_parts.extend(command_chain)
+        else:
+            anchor_parts.append(app_name)
+        # Use shared anchor generation logic, then add RST-specific slash replacement
+        anchor_name = generate_anchor(" ".join(anchor_parts)).replace("/", "-")
+        lines.append(f".. _{anchor_name}:")
+        lines.append("")
 
     # Determine effective heading level for this command
     if no_root_title and not command_chain:
@@ -301,8 +308,9 @@ def generate_rst_docs(
                 else:
                     usage_text = extract_text(usage, None, preserve_markup=False)
 
-                # Apply usage_name override to the display chain (only for the Usage: line)
-                display_chain = apply_usage_name(command_chain, usage_name)
+                # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
+                root_name = app_name if app.usage is None else None
+                display_chain = usage_display_chain(command_chain, usage_name, root_name)
 
                 # Format usage with the display chain when one is present
                 if display_chain:

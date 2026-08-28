@@ -46,6 +46,26 @@ def rst_snapshot(snapshot):
     return snapshot.use_extension(RstSnapshotExtension)
 
 
+@pytest.fixture
+def importable_tmp_path(tmp_path, monkeypatch):
+    """Make ``tmp_path`` importable and clean up ``sys.modules`` after the test.
+
+    Usage:
+        def test_foo(importable_tmp_path):
+            module_file = importable_tmp_path / "my_module.py"
+            module_file.write_text("...")
+            import my_module  # Works!
+            # Cleanup is automatic
+    """
+    monkeypatch.syspath_prepend(str(tmp_path))
+    modules_before = set(sys.modules.keys())
+    yield tmp_path
+    # Clean up any modules that were imported during the test
+    for mod_name in list(sys.modules.keys()):
+        if mod_name not in modules_before:
+            del sys.modules[mod_name]
+
+
 def pytest_ignore_collect(collection_path):
     for minor in range(8, 20):
         if sys.version_info < (3, minor) and collection_path.stem.startswith(f"test_py3{minor}_"):

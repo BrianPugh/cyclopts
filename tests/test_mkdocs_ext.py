@@ -9,26 +9,6 @@ from cyclopts import App
 from cyclopts.utils import import_app
 
 
-@pytest.fixture
-def importable_tmp_path(tmp_path, monkeypatch):
-    """Fixture that makes tmp_path importable and cleans up sys.modules after test.
-
-    Usage:
-        def test_foo(importable_tmp_path):
-            module_file = importable_tmp_path / "my_module.py"
-            module_file.write_text("...")
-            import my_module  # Works!
-            # Cleanup is automatic
-    """
-    monkeypatch.syspath_prepend(str(tmp_path))
-    modules_before = set(sys.modules.keys())
-    yield tmp_path
-    # Clean up any modules that were imported during the test
-    for mod_name in list(sys.modules.keys()):
-        if mod_name not in modules_before:
-            del sys.modules[mod_name]
-
-
 class TestImportApp:
     """Test the import_app function."""
 
