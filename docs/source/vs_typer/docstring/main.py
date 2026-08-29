@@ -32,13 +32,18 @@ typer_app(["--help"], standalone_mode=False)
 # ╰────────────────────────────────────────────────────────────────╯
 
 
-# However, it fails at parsing the rest of the docstring.
+# However, it dumps the entire docstring into the long description
+# instead of parsing out the parameter help.
 typer_app(["foo", "--help"], standalone_mode=False)
 # Foo Docstring.
-#  Parameters ---------- bar: str     Bar parameter docstring.
+#
+# Parameters
+# ----------
+# bar: str
+#     Bar parameter docstring.
 #
 # ╭─ Arguments ────────────────────────────────────────────────────╮
-# │ *    bar      TEXT  [default: None] [required]                 │
+# │ *    bar      <str>  [required]                                │
 # ╰────────────────────────────────────────────────────────────────╯
 
 cyclopts_app = cyclopts.App()

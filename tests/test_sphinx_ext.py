@@ -1,6 +1,7 @@
 """Tests for the Cyclopts Sphinx extension."""
 
 import sys
+from textwrap import dedent
 from unittest.mock import ANY, MagicMock
 
 import pytest
@@ -380,9 +381,12 @@ def action():
 
             rst_content = "\n".join(all_content)
 
-            # Should contain RST reference labels with new format
-            assert ".. _cyclopts-test-cli:" in rst_content
-            # Check for the subcommand anchor
+            # The title-less root (the directive sets no_root_title) must NOT emit
+            # a root anchor: its bare ``cyclopts-<app>`` label is identical across
+            # every page documenting the same app and triggers Sphinx "duplicate
+            # label" warnings (issue #910).
+            assert ".. _cyclopts-test-cli:" not in rst_content
+            # Subcommand anchors are unique per command and are always emitted.
             assert ".. _cyclopts-test-cli-sub:" in rst_content
             assert ".. _cyclopts-test-cli-sub-action:" in rst_content
 
@@ -1046,6 +1050,176 @@ def serve(port: int = 8000):
             sys.path.remove(str(tmp_path))
             if "test_usage_name_module" in sys.modules:
                 del sys.modules["test_usage_name_module"]
+
+    def test_unnamed_app_uses_module_name_not_argv(self, importable_tmp_path, monkeypatch):
+        """An unnamed command-group app derives its docs name from its module.
+
+        ``App.name`` otherwise falls back to ``Path(sys.argv[0]).name``, which in
+        a Sphinx build is the generator (``sphinx-build``), not the CLI (#910).
+        """
+        # Simulate a Sphinx build: sys.argv[0] is the generator, not the CLI.
+        monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
+
+        module_file = importable_tmp_path / "myapptool.py"
+        module_file.write_text(
+            dedent(
+                """\
+                from cyclopts import App
+
+                app = App(help="My tool.")
+
+                @app.command
+                def serve(port: int = 8000):
+                    '''Start the server.'''
+                    pass
+                """
+            )
+        )
+
+        from cyclopts.ext.sphinx import CycloptsDirective
+
+        mock_state = MagicMock()
+        mock_state.nested_parse = MagicMock()
+
+        directive = CycloptsDirective(
+            name="cyclopts",
+            arguments=["myapptool:app"],
+            options={},
+            content=StringList(),
+            lineno=1,
+            content_offset=0,
+            block_text="",
+            state=mock_state,
+            state_machine=MagicMock(),
+        )
+        directive.run()
+
+        rst_content = "\n".join(line for call in mock_state.nested_parse.call_args_list if call for line in call[0][0])
+        assert "sphinx-build" not in rst_content
+        assert "myapptool serve" in rst_content  # Usage: line
+        assert ".. _cyclopts-myapptool-serve:" in rst_content  # anchor
+
+    def test_no_duplicate_root_label_across_directives(self, importable_tmp_path):
+        """Directives for different commands of one app must not share a root label.
+
+        Every ``.. cyclopts::`` used to emit an identical ``cyclopts-<app>`` root
+        label, so documenting different commands of the same app across pages
+        produced Sphinx "duplicate label" warnings (#910).
+        """
+        module_file = importable_tmp_path / "dupmod.py"
+        module_file.write_text(
+            dedent(
+                """\
+                from cyclopts import App
+
+                app = App(name="myapp", help="My app.")
+
+                @app.command
+                def make_x(name: str):
+                    '''Make an X.'''
+                    pass
+
+                @app.command
+                def make_y(name: str):
+                    '''Make a Y.'''
+                    pass
+                """
+            )
+        )
+
+        from cyclopts.ext.sphinx import CycloptsDirective
+
+        def render(command: str) -> str:
+            mock_state = MagicMock()
+            mock_state.nested_parse = MagicMock()
+            directive = CycloptsDirective(
+                name="cyclopts",
+                arguments=["dupmod:app"],
+                options={"commands": command},
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state,
+                state_machine=MagicMock(),
+            )
+            directive.run()
+            return "\n".join(line for call in mock_state.nested_parse.call_args_list if call for line in call[0][0])
+
+        page_x = render("make-x")
+        page_y = render("make-y")
+
+        # No shared root label between the two pages (the duplicate-label source).
+        assert ".. _cyclopts-myapp:" not in page_x
+        assert ".. _cyclopts-myapp:" not in page_y
+        # Each page keeps its own unique, referenceable command anchor.
+        assert ".. _cyclopts-myapp-make-x:" in page_x
+        assert ".. _cyclopts-myapp-make-y:" in page_y
+
+    def test_anchor_prefix_and_suffix(self, importable_tmp_path):
+        """``:anchor-prefix:`` / ``:anchor-suffix:`` namespace the generated anchors.
+
+        Documenting the same app+command from more than one directive duplicates the
+        ``cyclopts-<app>-<command>`` label (an ambiguous ``:ref:`` target). A user-set
+        prefix (a page/section namespace, outside ``cyclopts-``) or suffix (a per-page
+        variant qualifier) disambiguates them while keeping predictable, referenceable
+        labels. Both apply to the root and every subcommand anchor and compose.
+        """
+        module_file = importable_tmp_path / "anchormod.py"
+        module_file.write_text(
+            dedent(
+                """\
+                from cyclopts import App
+
+                app = App(name="myapp", help="My app.")
+
+                @app.command
+                def mycommand(name: str):
+                    '''Do a thing.'''
+                    pass
+                """
+            )
+        )
+
+        from cyclopts.ext.sphinx import CycloptsDirective
+
+        def render(options: dict) -> str:
+            mock_state = MagicMock()
+            mock_state.nested_parse = MagicMock()
+            directive = CycloptsDirective(
+                name="cyclopts",
+                arguments=["anchormod:app"],
+                options=options,
+                content=StringList(),
+                lineno=1,
+                content_offset=0,
+                block_text="",
+                state=mock_state,
+                state_machine=MagicMock(),
+            )
+            directive.run()
+            return "\n".join(line for call in mock_state.nested_parse.call_args_list if call for line in call[0][0])
+
+        # Suffix trails the command path (variant qualifier).
+        suffixed = render({"anchor-suffix": "full"})
+        assert ".. _cyclopts-myapp-mycommand-full:" in suffixed
+
+        # Prefix sits outside the ``cyclopts-`` namespace (page/section namespace).
+        prefixed = render({"anchor-prefix": "admin"})
+        assert ".. _admin-cyclopts-myapp-mycommand:" in prefixed
+
+        # Values are slugified consistently with the rest of the anchor.
+        spaced = render({"anchor-prefix": "Admin Guide"})
+        assert ".. _admin-guide-cyclopts-myapp-mycommand:" in spaced
+
+        # Prefix and suffix compose.
+        both = render({"anchor-prefix": "admin", "anchor-suffix": "full"})
+        assert ".. _admin-cyclopts-myapp-mycommand-full:" in both
+
+        # The title-less root normally has no anchor, but a prefix/suffix
+        # disambiguates its bare label and opts the root anchor back in.
+        assert ".. _admin-cyclopts-myapp:" in prefixed
+        assert ".. _cyclopts-myapp-full:" in suffixed
 
 
 class TestRstContentParsing:

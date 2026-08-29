@@ -100,7 +100,7 @@ See [the docs](https://cyclopts.readthedocs.io) for more advanced usage.
 
 # Compared to Typer
 Cyclopts is what you thought Typer was.
-Cyclopts's includes information from docstrings, support more complex types (even Unions and Literals!), and include proper validation support.
+Cyclopts includes information from docstrings, supports more complex types (even Unions!), and includes proper validation support.
 See [the documentation for a complete Typer comparison](https://cyclopts.readthedocs.io/en/latest/vs_typer/README.html).
 
 Consider the following short 29-line Cyclopts application:
@@ -167,20 +167,14 @@ $ my-script --version
 0.0.0
 ```
 
-In its current state, this application would be impossible to implement in Typer.
-However, lets see how close we can get with Typer (47-lines):
+In its current state, this application would be impossible to implement in Typer; Typer does not support the union type-hint of `replicas`.
+However, let's see how close we can get with Typer (41-lines):
 
 ```python
 import typer
 from typing import Annotated, Literal
-from enum import Enum
 
 app = typer.Typer()
-
-class Environment(str, Enum):
-    dev = "dev"
-    staging = "staging"
-    prod = "prod"
 
 def replica_parser(value: str):
     if value == "default":
@@ -205,7 +199,7 @@ def callback(
 
 @app.command(help="Deploy code to an environment.")
 def deploy(
-    env: Annotated[Environment, typer.Argument(help="Environment to deploy to.")],
+    env: Annotated[Literal["dev", "staging", "prod"], typer.Argument(help="Environment to deploy to.")],
     replicas: Annotated[
         int,
         typer.Argument(
@@ -214,7 +208,7 @@ def deploy(
         ),
     ] = replica_parser("default"),
 ):
-    print(f"Deploying to {env.name} with {replicas} replicas.")
+    print(f"Deploying to {env} with {replicas} replicas.")
 
 if __name__ == "__main__":
     app()
@@ -223,13 +217,13 @@ if __name__ == "__main__":
 ```console
 $ my-script deploy --help
 
-Usage: my-script deploy [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
+ Usage: my-script deploy [OPTIONS] {env}:<dev|staging|prod> [replicas]
 
  Deploy code to an environment.
 
 ╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────╮
-│ *    env           ENV:{dev|staging|prod}  Environment to deploy to. [default: None] [required] │
-│      replicas      [REPLICAS]              Number of workers to spin up. [default: 10]          │
+│ *    env           <dev|staging|prod>  Environment to deploy to. [required]                     │
+│      replicas      <replica_parser>    Number of workers to spin up. [default: 10]              │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ───────────────────────────────────────────────────────────────────────────────────────╮
 │ --help          Show this message and exit.                                                     │
@@ -245,19 +239,19 @@ $ my-script deploy staging performance
 Deploying to staging with 20 replicas.
 
 $ my-script deploy nonexistent-env
-Usage: my-script.py deploy [OPTIONS] ENV:{dev|staging|prod} [REPLICAS]
-Try 'my-script.py deploy --help' for help.
+Usage: my-script deploy [OPTIONS] {env}:<dev|staging|prod> [replicas]
+Try 'my-script deploy --help' for help.
 ╭─ Error ─────────────────────────────────────────────────────────────────────────────────────────╮
-│ Invalid value for '[REPLICAS]': nonexistent-env                                                 │
+│ Invalid value for 'env': 'nonexistent-env' is not one of 'dev', 'staging', 'prod'.              │
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 $ my-script --version
 0.0.0
 ```
 
-The Typer implementation is 47 lines long, while the Cyclopts implementation is just 29 (38% shorter!).
+The Typer implementation is 41 lines long, while the Cyclopts implementation is just 29 (29% shorter!).
 Not only is the Cyclopts implementation significantly shorter, but the code is easier to read.
-Since Typer does not support Unions, the choices for ``replica`` could not be displayed on the help page.
+Since Typer does not support Unions, the choices for ``replicas`` could not be displayed on the help page.
 Cyclopts is much more terse, much more readable, and much more intuitive to use.
 
 # Contributing
