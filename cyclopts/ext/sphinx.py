@@ -27,6 +27,8 @@ class DirectiveOptions:
     commands: list[str] | None = None
     exclude_commands: list[str] | None = None
     usage_name: str | None = None
+    anchor_prefix: str = ""
+    anchor_suffix: str = ""
 
     # All booleans must have ``False`` default.
     no_recursive: bool = False
@@ -360,6 +362,8 @@ class CycloptsDirective(SphinxDirective):  # type: ignore[misc,valid-type]
             code_block_title=opts.code_block_title,
             skip_preamble=opts.skip_preamble,
             usage_name=opts.usage_name,
+            anchor_prefix=opts.anchor_prefix,
+            anchor_suffix=opts.anchor_suffix,
         )
 
     def _create_nodes(self, rst_content: str, opts: DirectiveOptions) -> list["nodes.Node"]:

@@ -213,6 +213,21 @@ Replace the app name shown in ``Usage:`` lines of the generated documentation wi
 
 This is useful when the documented invocation differs from the app's configured name. For example, an ``App(name="cli", ...)`` installed as a project entry point might typically be invoked as ``uv run cli``; setting ``:usage-name: uv run cli`` renders that in every ``Usage:`` block while section headings, anchors, and the table of contents continue to reference the plain ``cli`` name.
 
+``:anchor-prefix:`` / ``:anchor-suffix:`` - Namespace the Reference Labels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Add a token to every generated reference label so the *same* command can be documented by more than one directive without colliding:
+
+.. code-block:: rst
+
+   .. cyclopts:: mypackage.cli:app
+      :anchor-prefix: admin
+
+   .. cyclopts:: mypackage.cli:app
+      :anchor-suffix: summary
+
+``:anchor-prefix:`` sits outside the ``cyclopts-`` namespace (``admin-cyclopts-myapp-deploy``) and is the natural choice for namespacing a whole directive by page or section. ``:anchor-suffix:`` trails the command path (``cyclopts-myapp-deploy-summary``) and is the natural choice for distinguishing multiple renderings of a command on a single page. Both apply to the root and every subcommand anchor, are slugified like the rest of the label, and can be combined (``admin-cyclopts-myapp-deploy-summary``).
+
 Automatic Reference Labels
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -224,6 +239,8 @@ For example:
 - Nested subcommand: ``cyclopts-myapp-deploy-production``
 
 You can reference these commands elsewhere in your documentation using ``:ref:`cyclopts-myapp-deploy```.
+
+Because a reference label must be unique to be usable, documenting the same command with two directives emits the same label twice and Sphinx warns (``Duplicate explicit target name`` on one page, ``duplicate label`` across pages). Give one of the directives an ``:anchor-prefix:`` or ``:anchor-suffix:`` so each rendering keeps its own referenceable label.
 
 Complete Example
 ----------------
