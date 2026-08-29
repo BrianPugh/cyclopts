@@ -107,12 +107,14 @@ class DefaultFormatter:
             name_column = ColumnSpec(
                 renderer=NameRenderer(max_width=max_width),
                 header="Option",
-                style="cyan",
+                style="cyclopts.name",
                 max_width=max_width,
             )
 
             description_column = ColumnSpec(
-                renderer=DescriptionRenderer(newline_metadata=True), header="Description", overflow="fold"
+                renderer=DescriptionRenderer(newline_metadata=True),
+                header="Description",
+                overflow="fold",
             )
 
             if any(x.required for x in entries):
@@ -188,6 +190,7 @@ class DefaultFormatter:
         from rich.text import Text
 
         from cyclopts.help.specs import (
+            DefaultStyled,
             PanelSpec,
             TableSpec,
             get_default_command_columns,
@@ -228,4 +231,6 @@ class DefaultFormatter:
         else:
             panel = panel_spec.build(RichGroup(panel_description, table))
 
-        return panel
+        # Wrap so the bare cyclopts.* style names resolve on whatever console
+        # prints this, regardless of the print path.
+        return DefaultStyled(panel)
