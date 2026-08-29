@@ -280,6 +280,40 @@ Output:
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
 
+Color Styles
+^^^^^^^^^^^^
+
+Cyclopts renders the inline metadata annotations (``[default: ...]``,
+``[choices: ...]``, ``[env var: ...]``) with Rich's ``dim`` style, and
+``[required]`` with ``dim red``. On some dark terminal color schemes ``dim``
+text can be hard to read. Because Rich resolves a style string against the
+console's theme *before* parsing it, you can remap these annotations by
+redefining those style strings in a :class:`~rich.theme.Theme` and passing the
+themed :class:`~rich.console.Console` to your :class:`~cyclopts.App`:
+
+.. code-block:: python
+
+   from pathlib import Path
+
+   from rich.console import Console
+   from rich.theme import Theme
+
+   from cyclopts import App
+
+   theme = Theme({"dim": "grey58", "dim red": "bright_red"})
+   app = App(console=Console(theme=theme))
+
+   @app.default
+   def compress(src: Path, dst: Path = Path("out.zip")):
+       """Compress a file."""
+
+   if __name__ == "__main__":
+       app()
+
+Note that redefining ``dim`` affects **all** text Cyclopts styles as ``dim``,
+not just parameter metadata. This is usually what you want for readability, but
+it is not a per-annotation override.
+
 Combining Customizations
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
