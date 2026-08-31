@@ -348,6 +348,25 @@ Override any key to match your own palette:
    if __name__ == "__main__":
        app()
 
+Output:
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py SRC [ARGS]</span>
+
+   Compress a file.
+
+   ╭─ Commands ───────────────────────────────────────────────────────────╮
+   │ <span style="color: #00cccc">--help (-h)  </span>Display this message and exit.                          │
+   │ <span style="color: #00cccc">--version    </span>Display application version.                            │
+   ╰──────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────╮
+   │ <span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #00cccc">SRC --src  </span><span style="color: #ff3333">[required]</span>                                             │
+   │ <span style="color: #cc3333; font-weight: bold">   </span><span style="color: #00cccc">DST --dst  </span><span style="color: #3333cc">[default: out.zip]</span>                                     │
+   ╰──────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
+
 Because the console is resolved through the app hierarchy, a theme set on a
 parent :class:`~cyclopts.App` is inherited by its subcommands' help output.
 
