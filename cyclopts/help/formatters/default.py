@@ -236,5 +236,6 @@ class DefaultFormatter:
             panel = panel_spec.build(RichGroup(panel_description, table))
 
         # Wrap so the bare cyclopts.* style names resolve on whatever console
-        # prints this, regardless of the print path.
-        return DefaultStyled(panel)
+        # prints this, regardless of the print path; the group's theme (if any)
+        # is layered on top to restyle just this panel.
+        return DefaultStyled(panel, theme=help_panel.theme)

@@ -10,6 +10,7 @@ from typing import (
     ForwardRef,
     Literal,
     Self,
+    Union,
 )
 
 from attrs import define, evolve, field
@@ -25,6 +26,7 @@ from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_ca
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
+    from rich.theme import Theme
 
     from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
@@ -150,6 +152,9 @@ class HelpPanel:
 
     entries: list[HelpEntry] = field(factory=list)
     """List of help entries to display (in order) in the panel."""
+
+    theme: Union[dict[str, str], "Theme", None] = None
+    """Per-group theme (from :attr:`Group.theme`) layered over the ``cyclopts.*`` style defaults for this panel."""
 
     def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
@@ -577,6 +582,7 @@ def create_parameter_help_panel(
     kwargs = {
         "format": "parameter",
         "title": group.name,
+        "theme": group.theme,
         "description": InlineText.from_format(group.help, format=format, force_empty_end=True)
         if group.help
         else Text(),

@@ -370,6 +370,53 @@ Output:
 Because the console is resolved through the app hierarchy, a theme set on a
 parent :class:`~cyclopts.App` is inherited by its subcommands' help output.
 
+Per-Group Styles
+^^^^^^^^^^^^^^^^
+
+To restyle a single panel, give its :class:`~cyclopts.Group` a
+:attr:`~cyclopts.Group.theme`. It accepts the same ``cyclopts.*`` keys as the
+app-wide styles (as a mapping or a :class:`~rich.theme.Theme`) and layers them on
+top for just that group's panel, leaving every other panel on the app's styles:
+
+.. code-block:: python
+
+   from cyclopts import App, Group
+
+   app = App()
+
+   danger = Group("Danger Zone", theme={"cyclopts.border": "red", "cyclopts.name": "bright_red"})
+
+   @app.command
+   def build():
+       """Build the project."""
+
+   @app.command(group=danger)
+   def destroy():
+       """Tear down all infrastructure."""
+
+   if __name__ == "__main__":
+       app()
+
+Output:
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py COMMAND</span>
+
+   ╭─ Commands ───────────────────────────────────────────────────────────╮
+   │ <span style="color: #0088cc">build        </span>Build the project.                                      │
+   │ <span style="color: #0088cc">--help (-h)  </span>Display this message and exit.                          │
+   │ <span style="color: #0088cc">--version    </span>Display application version.                            │
+   ╰──────────────────────────────────────────────────────────────────────╯
+   <span style="color: #cc3333">╭─ Danger Zone ────────────────────────────────────────────────────────╮</span>
+   <span style="color: #cc3333">│</span> <span style="color: #ff3333">destroy  </span>Tear down all infrastructure.                               <span style="color: #cc3333">│</span>
+   <span style="color: #cc3333">╰──────────────────────────────────────────────────────────────────────╯</span></pre>
+   </div>
+
+Keys the group's theme doesn't define fall through to the app's styles, so a
+group can override just its border while inheriting every other color.
+
 Combining Customizations
 ^^^^^^^^^^^^^^^^^^^^^^^^
 

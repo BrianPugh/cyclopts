@@ -25,6 +25,8 @@ from cyclopts.utils import (
 )
 
 if TYPE_CHECKING:
+    from rich.theme import Theme
+
     from cyclopts.argument import ArgumentCollection
     from cyclopts.help.protocols import HelpFormatter
     from cyclopts.parameter import Parameter
@@ -107,6 +109,8 @@ class Group:
         default=None, converter=help_formatter_converter, kw_only=True
     )
 
+    theme: Union[dict[str, str], "Theme", None] = field(default=None, eq=False, kw_only=True)
+
     @property
     def name(self) -> str:
         return "" if type(self._name) is object else self._name
@@ -142,6 +146,7 @@ class Group:
         validator=None,
         default_parameter=None,
         help_formatter=None,
+        theme=None,
     ) -> Self:
         """Create a group with a globally incrementing :attr:`~Group.sort_key`.
 
@@ -168,6 +173,8 @@ class Group:
             Default parameter for elements within the group.
         help_formatter: cyclopts.help.protocols.HelpFormatter | None
             Custom help formatter for this group's help display.
+        theme: dict[str, str] | rich.theme.Theme | None
+            Per-group theme overriding ``cyclopts.*`` styles for this group's help panel.
         """
         count = next(_sort_key_counter)
         if inspect.isgenerator(sort_key):
@@ -186,6 +193,7 @@ class Group:
             validator=validator,
             default_parameter=default_parameter,
             help_formatter=help_formatter,
+            theme=theme,
         )
 
 

@@ -1780,3 +1780,53 @@ def test_help_usage_style_override_end_to_end():
     # The Usage line is printed outside the panel's DefaultStyled wrapper, so
     # this also guards that render_usage applies the theme.
     assert "\x1b[35mUsage:" in output  # cyclopts.usage -> magenta
+
+
+def test_group_theme_does_not_affect_equality():
+    """Group.theme is excluded from equality (presentation, not identity)."""
+    from cyclopts import Group
+
+    assert Group("X") == Group("X")
+    assert Group("X", theme={"cyclopts.border": "red"}) == Group("X")
+
+
+def test_help_group_theme_end_to_end():
+    """Group.theme restyles only its own panel; both dict and Theme forms work."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts import Group
+
+    console = Console(
+        width=70,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="demo")
+    danger = Group("Danger Zone", theme={"cyclopts.border": "red", "cyclopts.name": "bright_red"})
+    safe = Group("Safe Zone", theme=Theme({"cyclopts.border": "green"}))
+
+    @app.command(group=danger)
+    def delete():
+        """Delete everything."""
+
+    @app.command(group=safe)
+    def keep():
+        """Keep things."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    lines = capture.get().splitlines()
+
+    danger_border = next(x for x in lines if "Danger Zone" in x)
+    safe_border = next(x for x in lines if "Safe Zone" in x)
+    danger_row = next(x for x in lines if "delete" in x)
+    safe_row = next(x for x in lines if "keep" in x)
+
+    assert "\x1b[31m╭" in danger_border  # border -> red (dict form)
+    assert "\x1b[91mdelete" in danger_row  # name -> bright_red (reaches the cell)
+    assert "\x1b[32m╭" in safe_border  # border -> green (Theme form)
+    # Safe Zone only overrode its border; its names fall back to the base cyan.
+    assert "\x1b[36mkeep" in safe_row

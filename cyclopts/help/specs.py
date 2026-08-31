@@ -67,14 +67,30 @@ class DefaultStyled:
     renderable applies that theme at render time, so the styles resolve on any
     console and via any print path (a user's own theme keys still win) without
     callers having to set up the theme themselves.
+
+    A per-group ``theme`` (from :attr:`Group.theme`) is layered on top so its
+    ``cyclopts.*`` keys override the defaults for just that group's panel.
     """
 
-    def __init__(self, renderable: "RenderableType"):
+    def __init__(self, renderable: "RenderableType", theme: "dict[str, str] | Theme | None" = None):
         self.renderable = renderable
+        self.theme = theme
 
     def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
+        from contextlib import nullcontext
+
+        from rich.theme import Theme
+
+        theme = self.theme
+        if theme is not None and not isinstance(theme, Theme):
+            # A mapping is wrapped with inherit=False so it carries only its own
+            # keys, overriding just those when layered over the defaults below.
+            theme = Theme(theme, inherit=False)
+
         with console.use_theme(default_styles_theme(console)):
-            yield from console.render(self.renderable, options)
+            # The group theme is pushed on top so its keys win for this panel.
+            with console.use_theme(theme) if theme is not None else nullcontext():
+                yield from console.render(self.renderable, options)
 
 
 class NameRenderer:
