@@ -153,17 +153,21 @@ class DefaultFormatter:
         if usage:
             from rich.text import Text
 
+            from cyclopts.help.specs import DefaultStyled
+
             # Add "Usage:" prefix if not already present (for custom usage strings)
             usage_str = str(usage)
             if not usage_str.strip().startswith("Usage:"):
                 if isinstance(usage, Text):
-                    usage_with_label = Text("Usage: ", style="bold") + usage
+                    usage_with_label = Text("Usage: ", style="cyclopts.usage") + usage
                 else:
-                    usage_with_label = Text(f"Usage: {usage}", style="bold")
+                    usage_with_label = Text(f"Usage: {usage}", style="cyclopts.usage")
             else:
                 # Custom usage already has "Usage:", use as-is
-                usage_with_label = usage if isinstance(usage, Text) else Text(str(usage), style="bold")
-            console.print(usage_with_label)
+                usage_with_label = usage if isinstance(usage, Text) else Text(str(usage), style="cyclopts.usage")
+            # Wrap so the bare cyclopts.usage style name resolves (defaults to bold);
+            # render_usage prints outside the panel's DefaultStyled wrapper.
+            console.print(DefaultStyled(usage_with_label))
 
     def render_description(self, console: "Console", options: "ConsoleOptions", description: Any) -> None:
         """Render the description.

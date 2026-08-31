@@ -329,7 +329,7 @@ def format_usage(
         else:
             usage.append("[ARGS]")
 
-    return Text(" ".join(usage) + "\n", style="bold")
+    return Text(" ".join(usage) + "\n", style="cyclopts.usage")
 
 
 def _smart_join(strings: Sequence[str]) -> str:

@@ -35,6 +35,7 @@ DEFAULT_STYLES: Mapping[str, str] = MappingProxyType(
         "cyclopts.default": "gray58",  # [default: ...]
         "cyclopts.required": "red",  # [required]
         "cyclopts.border": "none",  # help panel border
+        "cyclopts.usage": "bold",  # "Usage:" line
     }
 )
 

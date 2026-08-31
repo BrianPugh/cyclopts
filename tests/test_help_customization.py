@@ -1728,3 +1728,55 @@ def test_help_border_style_override_end_to_end():
 
     # The rounded panel border is drawn in magenta.
     assert "\x1b[35m╭" in output  # cyclopts.border -> magenta
+
+
+def test_help_usage_default_style_end_to_end():
+    """With no theme, the Usage line defaults to bold."""
+    from rich.console import Console
+
+    console = Console(
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="mytool")
+
+    @app.default
+    def main(src: str):
+        """Compress a file."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "\x1b[1mUsage:" in output  # cyclopts.usage -> bold
+
+
+def test_help_usage_style_override_end_to_end():
+    """A theme override of cyclopts.usage restyles the Usage line."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.usage": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="mytool")
+
+    @app.default
+    def main(src: str):
+        """Compress a file."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The Usage line is printed outside the panel's DefaultStyled wrapper, so
+    # this also guards that render_usage applies the theme.
+    assert "\x1b[35mUsage:" in output  # cyclopts.usage -> magenta
