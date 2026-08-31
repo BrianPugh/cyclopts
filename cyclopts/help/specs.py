@@ -467,7 +467,7 @@ NameColumn = ColumnSpec(
     renderer=NameRenderer(),
     header="Option",
     justify="left",
-    style="cyan",
+    style="cyclopts.name",
 )
 
 DescriptionColumn = ColumnSpec(renderer=DescriptionRenderer(), header="Description", justify="left", overflow="fold")
