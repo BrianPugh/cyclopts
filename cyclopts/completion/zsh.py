@@ -103,6 +103,23 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         "",
     ]
 
+    # The shared runtime-completion helper is only needed when some argument
+    # carries a ``Parameter.completer``. Define it as a nested function at the top
+    # of the body so it is guaranteed in scope by the time any ``_arguments`` spec
+    # references it as an action (an autoloaded ``#compdef`` function is
+    # re-invoked after self-redefinition, so a *sibling* top-level function is not
+    # reliably defined on that first call — a nested one always is).
+    if any(
+        argument.parameter.completer is not None for data in completion_data.values() for argument in data.arguments
+    ):
+        # Snapshot the *full* command line before ``_arguments`` rebases ``$words``
+        # for subcommand frames (``*::arg:->args`` re-slices it), so the helper can
+        # forward the whole path to ``__complete`` regardless of nesting depth.
+        # ``local`` is dynamically scoped, so the nested helper sees it when
+        # ``_arguments`` calls it within this frame.
+        lines.append('  local -a _cyc_words=("${words[@]}")')
+        lines.extend(f"  {line}" if line else "" for line in _generate_dynamic_helper(prog_name))
+
     lines.extend(
         _generate_completion_for_path(
             completion_data,
@@ -188,6 +205,7 @@ def _generate_nested_positional_specs(
     positional_args: list["Argument"],
     help_format: str,
     offset: int = 0,
+    prog_name: str = "",
 ) -> list[str]:
     """Generate positional argument specs for nested command context.
 
@@ -215,13 +233,55 @@ def _generate_nested_positional_specs(
     # most one rest-arg (``*:``) spec -- ``_generate_positional_spec`` computes
     # both forms from the argument itself.
     non_variadic_args = [arg for arg in positional_args if not _is_variadic(arg)]
-    specs = [_generate_positional_spec(arg, help_format, offset=offset) for arg in non_variadic_args]
+    specs = [
+        _generate_positional_spec(arg, help_format, offset=offset, prog_name=prog_name) for arg in non_variadic_args
+    ]
 
     chosen = _choose_rest_arg(positional_args)
     if chosen is not None:
-        specs.append(_generate_positional_spec(chosen, help_format, offset=offset))
+        specs.append(_generate_positional_spec(chosen, help_format, offset=offset, prog_name=prog_name))
 
     return specs
+
+
+def _completer_action_fn(prog_name: str) -> str:
+    """Name of the shared runtime-completion helper function for this script."""
+    return f"_cyclopts_{prog_name}_complete"
+
+
+def _generate_dynamic_helper(prog_name: str) -> list[str]:
+    """Emit the shared zsh helper that fetches dynamic completions at TAB time.
+
+    Referenced as the ``action`` of any ``_arguments`` spec whose argument has a
+    :attr:`.Parameter.completer`. Calls the reserved ``__complete`` command with
+    the words typed after the program name and feeds the
+    ``value<TAB>description`` lines to ``compadd`` (with a parallel display array
+    so descriptions show). ``_describe`` is avoided because a ``format ''`` style
+    can suppress it. Errors are swallowed so a broken completer can't disrupt the
+    shell.
+    """
+    fn = _completer_action_fn(prog_name)
+    return [
+        f"{fn}() {{",
+        "  local -a _cyc_lines _cyc_vals _cyc_disp",
+        "  local _cyc_line _cyc_cmd _cyc_val",
+        '  _cyc_cmd="${words[1]}"',
+        f'  (( $+commands[$_cyc_cmd] )) || _cyc_cmd="{prog_name}"',
+        '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,-1]}" 2>/dev/null)}")',
+        '  for _cyc_line in "${_cyc_lines[@]}"; do',
+        '    [[ -z "$_cyc_line" ]] && continue',
+        "    _cyc_val=\"${_cyc_line%%$'\\t'*}\"",
+        '    _cyc_vals+=("$_cyc_val")',
+        "    if [[ \"$_cyc_line\" == *$'\\t'* ]]; then",
+        "      _cyc_disp+=(\"${_cyc_val} -- ${_cyc_line#*$'\\t'}\")",
+        "    else",
+        '      _cyc_disp+=("$_cyc_val")',
+        "    fi",
+        "  done",
+        "  (( ${#_cyc_vals} )) && compadd -d _cyc_disp -a _cyc_vals",
+        "}",
+        "",
+    ]
 
 
 def _generate_describe_completion(
@@ -275,6 +335,7 @@ def _generate_root_positional_specs(
     positional_args: list["Argument"],
     help_format: str,
     offset: int = 0,
+    prog_name: str = "",
 ) -> list[str]:
     """Generate positional specs for the root (non-nested) command context.
 
@@ -304,7 +365,7 @@ def _generate_root_positional_specs(
         # Keep only the one chosen rest-arg; drop every other variadic positional.
         if _is_variadic(argument) and argument is not chosen_rest:
             continue
-        specs.append(_generate_positional_spec(argument, help_format, offset=offset))
+        specs.append(_generate_positional_spec(argument, help_format, offset=offset, prog_name=prog_name))
     return specs
 
 
@@ -313,13 +374,14 @@ def _generate_positional_specs(
     command_path: tuple[str, ...],
     help_format: str,
     offset: int = 0,
+    prog_name: str = "",
 ) -> list[str]:
     """Dispatch positional-spec generation to the root or nested helper."""
     if not positional_args:
         return []
     if command_path:
-        return _generate_nested_positional_specs(positional_args, help_format, offset=offset)
-    return _generate_root_positional_specs(positional_args, help_format, offset=offset)
+        return _generate_nested_positional_specs(positional_args, help_format, offset=offset, prog_name=prog_name)
+    return _generate_root_positional_specs(positional_args, help_format, offset=offset, prog_name=prog_name)
 
 
 def _cap_rest_specs(specs: list[str]) -> list[str]:
@@ -406,7 +468,7 @@ def _generate_completion_for_path(
 
     # Generate keyword argument specs
     for argument in keyword_args:
-        specs = _generate_keyword_specs(argument, data.help_format)
+        specs = _generate_keyword_specs(argument, data.help_format, prog_name=prog_name)
         args_specs.extend(specs)
 
     # Check for flag commands (commands that look like options)
@@ -453,7 +515,9 @@ def _generate_completion_for_path(
             command_position = len(fixed_launcher) + 1
             # Emit specs for the *shown* fixed launcher positionals only.
             shown_launcher = [arg for arg in fixed_launcher if arg.show]
-            positional_specs = _generate_positional_specs(shown_launcher, command_path, data.help_format)
+            positional_specs = _generate_positional_specs(
+                shown_launcher, command_path, data.help_format, prog_name=prog_name
+            )
         # Non-deterministic shift (some fixed launcher positional is optional)
         # or no launcher positionals: ``command_position`` stays 1 and own
         # positionals get no specs -- they are alternatives to the subcommand
@@ -464,9 +528,11 @@ def _generate_completion_for_path(
         # them on the command line. A single rest-arg (``*:``) cap holds across
         # both groups combined.
         launcher_shown = [arg for arg in launcher_positionals if arg.show]
-        positional_specs = _generate_positional_specs(launcher_shown, command_path, data.help_format)
+        positional_specs = _generate_positional_specs(
+            launcher_shown, command_path, data.help_format, prog_name=prog_name
+        )
         positional_specs += _generate_positional_specs(
-            own_positionals, command_path, data.help_format, offset=len(fixed_launcher)
+            own_positionals, command_path, data.help_format, offset=len(fixed_launcher), prog_name=prog_name
         )
         positional_specs = _cap_rest_specs(positional_specs)
 
@@ -768,7 +834,7 @@ def _generate_eq_form_prepass(keyword_args: list, indent_str: str) -> list[str]:
     return lines
 
 
-def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]:
+def _generate_keyword_specs(argument: "Argument", help_format: str, prog_name: str = "") -> list[str]:
     """Generate zsh _arguments specs for a keyword argument.
 
     Parameters
@@ -793,7 +859,11 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
     action = ""
     has_choices = False
     choices = argument.get_choices(force=True)
-    if choices:
+    if argument.parameter.completer is not None and prog_name:
+        # Dynamic value completion: dispatch to the shared runtime helper.
+        action = _completer_action_fn(prog_name)
+        flag = False
+    elif choices:
         has_choices = True
         escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
@@ -867,7 +937,7 @@ def _generate_keyword_specs(argument: "Argument", help_format: str) -> list[str]
     return specs
 
 
-def _generate_positional_spec(argument: "Argument", help_format: str, offset: int = 0) -> str:
+def _generate_positional_spec(argument: "Argument", help_format: str, offset: int = 0, prog_name: str = "") -> str:
     """Generate zsh _arguments spec for a positional argument.
 
     Parameters
@@ -887,7 +957,12 @@ def _generate_positional_spec(argument: "Argument", help_format: str, offset: in
     # Check for choices first (Literal/Enum types). Choice-bearing specs use
     # double-quoted outer to allow embedding a literal ``'`` in a choice.
     choices = argument.get_choices(force=True)
-    if choices:
+    if argument.parameter.completer is not None and prog_name:
+        # Dynamic value completion: dispatch to the shared runtime helper.
+        action = _completer_action_fn(prog_name)
+        desc = _get_description_from_argument(argument, help_format)
+        quote = "'"
+    elif choices:
         escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
         action = f"({choices_str})"

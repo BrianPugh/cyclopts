@@ -86,6 +86,11 @@ V = TypeVar("V")
 
 DEFAULT_FORMAT = "markdown"
 
+#: Reserved first token the generated shell-completion script uses to request
+#: dynamic completions (see :meth:`App._run_complete`). Shared by the sync and
+#: async entrypoints so their interception guards can't drift apart.
+_COMPLETE_COMMAND = "__complete"
+
 
 def _result_action_converter(
     value: "ResultAction | ResultActionSingle | None",
@@ -2159,6 +2164,13 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
+        # Reserved command: the generated shell-completion script calls back into
+        # the application as ``<prog> __complete <words...>`` to obtain dynamic
+        # completions from ``Parameter.completer`` callbacks. Intercept it before
+        # normal dispatch so it never collides with user commands.
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            return self._run_complete(tokens[1:])
+
         overrides = {
             k: v
             for k, v in {
@@ -2287,6 +2299,13 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
+
+        # Reserved command: the generated shell-completion script calls back into
+        # the application as ``<prog> __complete <words...>`` to obtain dynamic
+        # completions from ``Parameter.completer`` callbacks. Intercept it before
+        # normal dispatch so it never collides with user commands.
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            return self._run_complete(tokens[1:])
 
         overrides = {
             k: v
@@ -2680,6 +2699,36 @@ class App:
         tree = Tree(node_label(self.name[0], self))
         build(tree, self, 1)
         return tree
+
+    def _run_complete(self, words: Iterable[str]) -> None:
+        """Handle the reserved ``__complete`` command.
+
+        Computes dynamic completion candidates for the partial command line in
+        ``words`` (see :func:`cyclopts.completion._engine.compute_completions`)
+        and prints them one per line as ``value<TAB>description``. The generated
+        shell script parses this output.
+
+        Errors are swallowed: a broken completer must never surface a traceback
+        into the user's interactive shell. Set ``CYCLOPTS_COMPLETION_DEBUG`` and
+        run ``<prog> __complete <words...>`` by hand to see the traceback and the
+        engine's resolution diagnostics on stderr.
+        """
+        from cyclopts.completion._engine import completion_debug_enabled, compute_completions
+
+        try:
+            completions = compute_completions(self, list(words))
+        except Exception:
+            if completion_debug_enabled():
+                import traceback
+
+                traceback.print_exc()
+            return None
+        for completion in completions:
+            if completion.help:
+                print(f"{completion.value}\t{completion.help}")
+            else:
+                print(completion.value)
+        return None
 
     def generate_completion(
         self,

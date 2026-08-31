@@ -81,6 +81,23 @@ def _escape_bash_choice(choice: str) -> str:
     return choice
 
 
+def _emit_completer_completion(indent: str) -> list[str]:
+    """Emit bash that asks the app for dynamic completions at TAB time.
+
+    Calls the reserved ``__complete`` command with the words typed after the
+    program name (``COMP_WORDS`` includes the current, possibly-empty, word), so
+    the engine can resolve the active argument and run its
+    :attr:`.Parameter.completer`. Descriptions (after a tab) are dropped -- bash
+    ``COMPREPLY`` shows values only -- and ``compgen`` filters by the current
+    prefix. Errors are swallowed so a broken completer can't disrupt the shell.
+    """
+    return [
+        f"{indent}COMPREPLY=( $(compgen -W "
+        f'"$("${{COMP_WORDS[0]}}" __complete "${{COMP_WORDS[@]:1}}" 2>/dev/null | cut -f1)" '
+        f'-- "${{cur}}") )',
+    ]
+
+
 def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
     """Emit bash that prefix-matches ``$cur`` against an array of choices.
 
@@ -464,6 +481,8 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
     lines = []
 
     def _emit_one(argument, body_indent: str) -> list[str]:
+        if argument.parameter.completer is not None:
+            return _emit_completer_completion(body_indent)
         choices = argument.get_choices(force=True)
         if choices:
             cleaned = [clean_choice_text(c) for c in choices]
@@ -579,13 +598,16 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
             continue
 
         has_cases = True
+        has_completer = argument.parameter.completer is not None
         choices = argument.get_choices(force=True)
         action = get_completion_action(argument.hint)
 
         for name in names:
             lines.append(f"{indent}  {name})")
 
-            if choices:
+            if has_completer:
+                lines.extend(_emit_completer_completion(f"{indent}    "))
+            elif choices:
                 cleaned = [clean_choice_text(c) for c in choices]
                 lines.extend(_emit_choice_completion(cleaned, f"{indent}    "))
             else:

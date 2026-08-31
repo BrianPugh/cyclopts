@@ -235,6 +235,19 @@ class Parameter:
         kw_only=True,
     )
 
+    # Called at shell-completion time to produce dynamic candidate values for this
+    # parameter (e.g. names fetched from a database or remote service that cannot be
+    # baked into a static completion script). Invoked as ``completer(context)`` where
+    # ``context`` is a ``cyclopts.completion.CompletionContext`` (the word being
+    # completed is ``context.incomplete``). May return a single ``str``, or an
+    # iterable of ``str`` values and/or ``(value, description)`` tuples.
+    # Typed loosely here (rather than as ``Completer``) to avoid importing the
+    # optional completion subsystem at ``Parameter`` definition time.
+    completer: Callable[..., Any] | None = field(
+        default=None,
+        kw_only=True,
+    )
+
     # This can ONLY ever be a Tuple[str, ...]
     alias: None | str | Iterable[str] = field(
         default=None,

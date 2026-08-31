@@ -1101,6 +1101,58 @@ API
                  if value.bold and value.italic:
                      raise ValueError("Cannot use both --bold and --italic together.")
 
+   .. attribute:: completer
+      :type: Optional[Callable]
+      :value: None
+
+      A callback invoked at shell-completion time to produce dynamic candidate values
+      for this parameter. Use it when the valid values cannot be baked into a static
+      completion script (e.g. usernames from a database, or resources fetched from a
+      remote service).
+
+      The callback is always invoked as ``completer(context)``, where ``context`` is a
+      :class:`~cyclopts.completion.CompletionContext`. It may return a single ``str``,
+      or an iterable of ``str`` values and/or ``(value, description)`` tuples.
+
+      .. code-block:: python
+
+          def complete_user(ctx) -> list[str]:
+              return [u for u in fetch_users() if u.startswith(ctx.incomplete)]
+
+
+          @app.command
+          def grant(user: Annotated[str, Parameter(completer=complete_user)]): ...
+
+      The context also lets a completer base its candidates on the *other* arguments
+      already typed on the command line. It exposes:
+
+      * ``ctx.incomplete`` - the partial word being completed.
+      * ``ctx[name]`` - an argument looked up by option name (``"--region"`` or
+        ``"region"``) or field name, returning an
+        :class:`~cyclopts.completion.ArgumentValue` with ``.raw`` (the typed string, or
+        :obj:`None`), ``.value`` (best-effort coerced value, :obj:`~cyclopts.UNSET` if
+        unavailable), and ``.provided`` (whether it was supplied).
+        ``ctx.get(name, default)`` returns ``default`` for an unknown name instead of
+        raising.
+      * ``ctx.argument`` / ``ctx.parameter`` - the argument (and its
+        :class:`Parameter`) currently being completed.
+
+      .. code-block:: python
+
+          def complete_cluster(ctx) -> list[str]:
+              return clusters_in(ctx["--region"].value)  # depends on --region
+
+
+          @app.command
+          def deploy(
+              *,
+              region: str = "us-west",
+              cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
+          ): ...
+
+      Dynamic completion re-invokes your application on each ``<TAB>``, so it is slower
+      than static completion; keep the callback (and your module imports) fast.
+
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]
       :value: None
@@ -2078,6 +2130,23 @@ API
 .. autofunction:: cyclopts.resolve_returncode
 
 .. autoclass:: cyclopts.CycloptsPanel
+
+.. _API Completion:
+
+----------
+Completion
+----------
+Types for dynamic shell completion, used with :attr:`.Parameter.completer`.
+See the :attr:`.Parameter.completer` documentation for usage.
+
+.. autoclass:: cyclopts.completion.CompletionContext
+   :members:
+
+.. autoclass:: cyclopts.completion.ArgumentValue
+   :members:
+
+.. autoclass:: cyclopts.completion.Completion
+   :members:
 
 .. _API Validators:
 

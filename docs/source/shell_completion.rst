@@ -137,3 +137,110 @@ To install without modifying shell RC files, use:
 .. code-block:: python
 
    app.register_install_completion_command(add_to_startup=False)
+
+Custom Completers
+=================
+
+Static completion can only offer values that are known when the completion script is generated: :obj:`~typing.Literal` and :class:`~enum.Enum` choices, and :class:`~pathlib.Path` values. But many valid values are only known at runtime: usernames fetched from a database, resources listed from a remote API, or IDs derived from a live system. For these cases, attach a **completer callback** to a parameter. The callback is invoked when the user presses ``<TAB>``, enabling **runtime value completion** for bash, zsh, and fish.
+
+.. note::
+
+   Runtime value completion, like static completion, only works for installed commands. Shells can only complete executables found in ``$PATH``, so your application must be installed as a command before runtime completion will function.
+
+Basic Usage
+-----------
+
+A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument. Use ``ctx.incomplete`` to get the partial word the user has typed, and return either a single string, or an iterable of strings and/or ``(value, description)`` tuples:
+
+.. code-block:: python
+
+   from typing import Annotated
+
+   from cyclopts import App, Parameter
+
+   app = App(name="deployer")
+
+   USERS = ["alice", "bob", "carol"]
+
+
+   def complete_user(ctx):
+       return [u for u in USERS if u.startswith(ctx.incomplete)]
+
+
+   @app.command
+   def grant(user: Annotated[str, Parameter(completer=complete_user)]): ...
+
+
+   app()
+
+When the user types ``deployer grant al<TAB>``, Cyclopts calls ``complete_user`` with ``ctx.incomplete == "al"`` and offers ``alice``. Returning a plain string is also allowed, which is convenient when the completer resolves to exactly one value.
+
+Descriptions
+------------
+
+To display descriptions alongside completions, return ``(value, description)`` tuples. zsh and fish render these in the completion menu; bash shows the values only.
+
+.. code-block:: python
+
+   def complete_environment(ctx):
+       return [("dev", "Development"), ("prod", "Production")]
+
+Dependent Completions
+---------------------
+
+Often the valid values for a parameter depend on another parameter already supplied on the command line. Access those values through the :class:`~cyclopts.completion.CompletionContext` by indexing with the option name (``ctx["--region"]``), its bare name (``ctx["region"]``), or the Python field name. The returned object exposes:
+
+- ``.value`` -- the best-effort coerced Python value (:obj:`~cyclopts.UNSET` if unavailable)
+- ``.raw`` -- the raw typed string, or :obj:`None` if not provided
+- ``.provided`` -- :obj:`True` if the argument was explicitly given
+
+Use ``ctx.get(name, default)`` to return a default instead of raising for an unknown name.
+
+The following example completes ``--cluster`` based on the already-typed ``--region``:
+
+.. code-block:: python
+
+   from typing import Annotated
+
+   from cyclopts import App, Parameter
+
+   app = App(name="deployer")
+
+   CLUSTERS = {"us-east": ["web-prod", "web-staging"], "us-west": ["data-prod", "data-dev"]}
+
+
+   def complete_cluster(ctx):
+       return CLUSTERS.get(ctx["--region"].value, [])
+
+
+   @app.command
+   def deploy(
+       *,
+       region: str = "us-east",
+       cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
+   ): ...
+
+
+   app()
+
+.. warning::
+
+   Runtime completion re-invokes your application on every ``<TAB>`` press, so it is inherently slower than static completion. Keep completer callbacks and module-level imports fast, and consider :ref:`Lazy Loading` for commands with heavy dependencies.
+
+See :attr:`.Parameter.completer` and :class:`~cyclopts.completion.CompletionContext` for full API details.
+
+Troubleshooting
+---------------
+
+Runtime completion swallows all errors so that a broken completer can never corrupt the shell's candidate list, which also means a misbehaving completer silently produces nothing. To see what the engine is doing, set ``CYCLOPTS_COMPLETION_DEBUG`` and invoke the hidden ``__complete`` command by hand the way the shell does -- passing the words after the program name, with an empty final argument for the word being completed:
+
+.. code-block:: console
+
+   $ CYCLOPTS_COMPLETION_DEBUG=1 deployer __complete deploy --region us-east --cluster ""
+   [cyclopts:completion] words=['deploy', '--region', 'us-east', '--cluster', ''] ...
+   [cyclopts:completion] resolved command=('deploy',) unused=['--region', 'us-east', '--cluster']
+   [cyclopts:completion] active argument='--cluster' completer='complete_cluster'
+   [cyclopts:completion] completer returned 1 candidate(s): [('va-1', '')]
+   va-1
+
+The diagnostics print to stderr (the candidates still print to stdout), and a completer that raises has its full traceback surfaced instead of swallowed.
