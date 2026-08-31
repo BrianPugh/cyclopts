@@ -314,6 +314,9 @@ element; keys you don't define fall back to the built-in default.
    * - ``cyclopts.env_var``
      - ``gray58``
      - The ``[env var: ...]`` annotation.
+   * - ``cyclopts.border``
+     - ``none``
+     - The help panel border.
 
 The muted annotations default to ``gray58``, a fixed grey that stays legible
 across light and dark terminal themes. Override any key to match your own

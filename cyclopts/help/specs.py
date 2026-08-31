@@ -34,6 +34,7 @@ DEFAULT_STYLES: Mapping[str, str] = MappingProxyType(
         "cyclopts.env_var": "gray58",  # [env var: ...]
         "cyclopts.default": "gray58",  # [default: ...]
         "cyclopts.required": "red",  # [required]
+        "cyclopts.border": "none",  # help panel border
     }
 )
 
@@ -803,10 +804,12 @@ class PanelSpec:
     Corresponds to the ``style`` parameter of :class:`~rich.panel.Panel`.
     """
 
-    border_style: Optional["StyleType"] = "none"
+    border_style: Optional["StyleType"] = "cyclopts.border"
     """Style applied to the panel border.
 
     Corresponds to the ``border_style`` parameter of :class:`~rich.panel.Panel`.
+    Defaults to the ``cyclopts.border`` named style (``none``), which can be
+    remapped via a :class:`~rich.theme.Theme` on the :class:`~cyclopts.App`'s console.
     """
 
     box: Optional["Box"] = None  # Will use ROUNDED as default when building

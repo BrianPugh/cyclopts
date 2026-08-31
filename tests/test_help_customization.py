@@ -1695,3 +1695,36 @@ def test_help_column_style_override_end_to_end():
     # The name column is a Table column style; it only resolves through the
     # DefaultStyled wrapper, so this also guards that path.
     assert "\x1b[35mSRC --src" in output  # cyclopts.name -> magenta
+
+
+def test_help_border_style_override_end_to_end():
+    """A theme override of cyclopts.border restyles the help panel border."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.border": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The rounded panel border is drawn in magenta.
+    assert "\x1b[35m╭" in output  # cyclopts.border -> magenta
