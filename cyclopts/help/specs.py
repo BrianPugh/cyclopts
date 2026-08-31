@@ -1,7 +1,8 @@
 import math
 import textwrap
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from operator import attrgetter
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, Optional, Self, Union
 
 from attrs import evolve
@@ -10,14 +11,86 @@ from cyclopts.utils import frozen
 
 if TYPE_CHECKING:
     from rich.box import Box
-    from rich.console import Console, ConsoleOptions, RenderableType
+    from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
     from rich.padding import PaddingDimensions
     from rich.panel import Panel
     from rich.style import StyleType
     from rich.table import Table
+    from rich.theme import Theme
 
     from cyclopts.help import HelpEntry
     from cyclopts.help.protocols import Renderer
+
+
+# Every color Cyclopts renders in help output is referred to by one of these
+# named styles. Define any of these keys in your Console's ``rich.theme.Theme``
+# to restyle that element, e.g. ``Theme({"cyclopts.required": "bold yellow"})``;
+# keys you don't define fall back to the paired default below.
+DEFAULT_STYLES: Mapping[str, str] = MappingProxyType(
+    {
+        "cyclopts.name": "cyan",  # parameter / command name column
+        "cyclopts.required_marker": "red bold",  # required "*" marker
+        "cyclopts.choices": "gray58",  # [choices: ...]
+        "cyclopts.env_var": "gray58",  # [env var: ...]
+        "cyclopts.default": "gray58",  # [default: ...]
+        "cyclopts.required": "red",  # [required]
+        "cyclopts.border": "none",  # help panel border
+        "cyclopts.usage": "bold",  # "Usage:" line
+    }
+)
+
+
+def default_styles_theme(console: "Console") -> "Theme":
+    """Build a theme supplying the ``cyclopts.*`` defaults ``console`` lacks.
+
+    Only names the console doesn't already resolve are included, so a user's own
+    theme keys take precedence (Rich's :meth:`~rich.console.Console.use_theme`
+    layers on top, so a full default theme would otherwise clobber overrides).
+    """
+    from rich.errors import MissingStyle
+    from rich.theme import Theme
+
+    styles: dict[str, str] = {}
+    for name, fallback in DEFAULT_STYLES.items():
+        try:
+            console.get_style(name)
+        except MissingStyle:
+            styles[name] = fallback
+    return Theme(styles)
+
+
+class DefaultStyled:
+    """Wrap a renderable so it renders under the ``cyclopts.*`` style defaults.
+
+    Help output refers to colors by bare ``cyclopts.*`` style names; those names
+    only resolve while :func:`default_styles_theme` is active. Wrapping the
+    renderable applies that theme at render time, so the styles resolve on any
+    console and via any print path (a user's own theme keys still win) without
+    callers having to set up the theme themselves.
+
+    A per-group ``theme`` (from :attr:`Group.theme`) is layered on top so its
+    ``cyclopts.*`` keys override the defaults for just that group's panel.
+    """
+
+    def __init__(self, renderable: "RenderableType", theme: "dict[str, str] | Theme | None" = None):
+        self.renderable = renderable
+        self.theme = theme
+
+    def __rich_console__(self, console: "Console", options: "ConsoleOptions") -> "RenderResult":
+        from contextlib import nullcontext
+
+        from rich.theme import Theme
+
+        theme = self.theme
+        if theme is not None and not isinstance(theme, Theme):
+            # A mapping is wrapped with inherit=False so it carries only its own
+            # keys, overriding just those when layered over the defaults below.
+            theme = Theme(theme, inherit=False)
+
+        with console.use_theme(default_styles_theme(console)):
+            # The group theme is pushed on top so its keys win for this panel.
+            with console.use_theme(theme) if theme is not None else nullcontext():
+                yield from console.render(self.renderable, options)
 
 
 class NameRenderer:
@@ -184,17 +257,17 @@ class DescriptionRenderer:
 
         if entry.choices:
             choices_str = ", ".join(entry.choices)
-            metadata_items.append(Text(rf"[choices: {choices_str}]", "dim"))
+            metadata_items.append(Text(rf"[choices: {choices_str}]", "cyclopts.choices"))
 
         if entry.env_var:
             env_vars_str = ", ".join(entry.env_var)
-            metadata_items.append(Text(rf"[env var: {env_vars_str}]", "dim"))
+            metadata_items.append(Text(rf"[env var: {env_vars_str}]", "cyclopts.env_var"))
 
         if entry.default is not None:
-            metadata_items.append(Text(rf"[default: {entry.default}]", "dim"))
+            metadata_items.append(Text(rf"[default: {entry.default}]", "cyclopts.default"))
 
         if entry.required:
-            metadata_items.append(Text(r"[required]", "dim red"))
+            metadata_items.append(Text(r"[required]", "cyclopts.required"))
 
         # Apply metadata based on formatting mode
         if self.newline_metadata and metadata_items:
@@ -404,14 +477,14 @@ AsteriskColumn = ColumnSpec(
     header="",
     justify="left",
     width=1,
-    style="red bold",
+    style="cyclopts.required_marker",
 )
 
 NameColumn = ColumnSpec(
     renderer=NameRenderer(),
     header="Option",
     justify="left",
-    style="cyan",
+    style="cyclopts.name",
 )
 
 DescriptionColumn = ColumnSpec(renderer=DescriptionRenderer(), header="Description", justify="left", overflow="fold")
@@ -441,7 +514,7 @@ def get_default_command_columns(
         renderer=CommandNameRenderer(max_width=max_width),
         header="Command",
         justify="left",
-        style="cyan",
+        style="cyclopts.name",
         max_width=max_width,
     )
 
@@ -475,7 +548,7 @@ def get_default_parameter_columns(
         renderer=NameRenderer(max_width=max_width),
         header="Option",
         justify="left",
-        style="cyan",
+        style="cyclopts.name",
         max_width=max_width,
     )
 
@@ -748,10 +821,12 @@ class PanelSpec:
     Corresponds to the ``style`` parameter of :class:`~rich.panel.Panel`.
     """
 
-    border_style: Optional["StyleType"] = "none"
+    border_style: Optional["StyleType"] = "cyclopts.border"
     """Style applied to the panel border.
 
     Corresponds to the ``border_style`` parameter of :class:`~rich.panel.Panel`.
+    Defaults to the ``cyclopts.border`` named style (``none``), which can be
+    remapped via a :class:`~rich.theme.Theme` on the :class:`~cyclopts.App`'s console.
     """
 
     box: Optional["Box"] = None  # Will use ROUNDED as default when building

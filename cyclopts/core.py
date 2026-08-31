@@ -2439,7 +2439,7 @@ class App:
                 try:
                     _, command_panel = panels[group.name]
                 except KeyError:
-                    command_panel = HelpPanel(title=group.name, format="command")
+                    command_panel = HelpPanel(title=group.name, theme=group.theme, format="command")
                     panels[group.name] = (group, command_panel)
 
                 if group.help:

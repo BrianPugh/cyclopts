@@ -1544,3 +1544,289 @@ def test_description_renderer_no_extra_whitespace():
         if line.strip():  # Skip empty lines
             # The line should start with "[metadata...]" with no indentation
             assert line.startswith("["), f"Line should not be indented: {repr(line)}"
+
+
+def test_default_styles_theme_gap_fill():
+    """default_styles_theme supplies only the cyclopts.* keys the console lacks."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts.help.specs import DEFAULT_STYLES, default_styles_theme
+
+    # No user theme -> every default is supplied.
+    plain = default_styles_theme(Console())
+    assert set(plain.styles) >= set(DEFAULT_STYLES)
+    assert str(plain.styles["cyclopts.required"]) == "red"
+
+    # User defines a key -> it is omitted (so the user's value wins downstream).
+    themed = default_styles_theme(Console(theme=Theme({"cyclopts.required": "green"})))
+    assert "cyclopts.required" not in themed.styles
+    assert "cyclopts.default" in themed.styles
+
+
+def test_description_renderer_theme_override():
+    """Under the formatter's theme, a cyclopts.* key restyles its annotation."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts.help.specs import default_styles_theme
+
+    entry = HelpEntry(
+        positive_names=("src",),
+        positive_shorts=("--src",),
+        description="File to compress",
+        required=True,
+    )
+
+    console = Console(
+        theme=Theme({"cyclopts.required": "green"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+    )
+    rendered = DescriptionRenderer()(entry)
+    with console.use_theme(default_styles_theme(console)):
+        with console.capture() as capture:
+            console.print(rendered, end="")
+    output = capture.get()
+
+    assert "[required]" in output
+    assert "\x1b[32m" in output  # override green applied
+    assert "\x1b[31m" not in output  # default red not used
+
+
+def test_help_theme_override_end_to_end():
+    """A theme on the App's console reaches the rendered help page."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.required": "green"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "[required]" in output
+    assert "\x1b[32m" in output  # themed required color reached the page
+
+
+def test_help_default_colors_end_to_end():
+    """With no theme, the built-in cyclopts.* defaults render (no dim)."""
+    from rich.console import Console
+
+    console = Console(
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str, dst: str = "out.zip"):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        dst: str
+            Where to write it.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "\x1b[31m[required]" in output  # cyclopts.required -> red
+    assert "\x1b[38;5;246m[default:" in output  # cyclopts.default -> gray58
+    assert "\x1b[2m" not in output  # no dim styling anywhere
+
+
+def test_help_column_style_override_end_to_end():
+    """A theme override of the cyclopts.name column style reaches the page."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.name": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The name column is a Table column style; it only resolves through the
+    # DefaultStyled wrapper, so this also guards that path.
+    assert "\x1b[35mSRC --src" in output  # cyclopts.name -> magenta
+
+
+def test_help_border_style_override_end_to_end():
+    """A theme override of cyclopts.border restyles the help panel border."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.border": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console)
+
+    @app.default
+    def main(src: str):
+        """Compress a file.
+
+        Parameters
+        ----------
+        src: str
+            File to compress.
+        """
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The rounded panel border is drawn in magenta.
+    assert "\x1b[35m╭" in output  # cyclopts.border -> magenta
+
+
+def test_help_usage_default_style_end_to_end():
+    """With no theme, the Usage line defaults to bold."""
+    from rich.console import Console
+
+    console = Console(
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="mytool")
+
+    @app.default
+    def main(src: str):
+        """Compress a file."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    assert "\x1b[1mUsage:" in output  # cyclopts.usage -> bold
+
+
+def test_help_usage_style_override_end_to_end():
+    """A theme override of cyclopts.usage restyles the Usage line."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    console = Console(
+        theme=Theme({"cyclopts.usage": "magenta"}),
+        width=80,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="mytool")
+
+    @app.default
+    def main(src: str):
+        """Compress a file."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    output = capture.get()
+
+    # The Usage line is printed outside the panel's DefaultStyled wrapper, so
+    # this also guards that render_usage applies the theme.
+    assert "\x1b[35mUsage:" in output  # cyclopts.usage -> magenta
+
+
+def test_group_theme_does_not_affect_equality():
+    """Group.theme is excluded from equality (presentation, not identity)."""
+    from cyclopts import Group
+
+    assert Group("X") == Group("X")
+    assert Group("X", theme={"cyclopts.border": "red"}) == Group("X")
+
+
+def test_help_group_theme_end_to_end():
+    """Group.theme restyles only its own panel; both dict and Theme forms work."""
+    from rich.console import Console
+    from rich.theme import Theme
+
+    from cyclopts import Group
+
+    console = Console(
+        width=70,
+        force_terminal=True,
+        color_system="truecolor",
+        legacy_windows=False,
+        highlight=False,
+    )
+    app = App(console=console, name="demo")
+    danger = Group("Danger Zone", theme={"cyclopts.border": "red", "cyclopts.name": "bright_red"})
+    safe = Group("Safe Zone", theme=Theme({"cyclopts.border": "green"}))
+
+    @app.command(group=danger)
+    def delete():
+        """Delete everything."""
+
+    @app.command(group=safe)
+    def keep():
+        """Keep things."""
+
+    with console.capture() as capture:
+        app.help_print([])
+    lines = capture.get().splitlines()
+
+    danger_border = next(x for x in lines if "Danger Zone" in x)
+    safe_border = next(x for x in lines if "Safe Zone" in x)
+    danger_row = next(x for x in lines if "delete" in x)
+    safe_row = next(x for x in lines if "keep" in x)
+
+    assert "\x1b[31m╭" in danger_border  # border -> red (dict form)
+    assert "\x1b[91mdelete" in danger_row  # name -> bright_red (reaches the cell)
+    assert "\x1b[32m╭" in safe_border  # border -> green (Theme form)
+    # Safe Zone only overrode its border; its names fall back to the base cyan.
+    assert "\x1b[36mkeep" in safe_row

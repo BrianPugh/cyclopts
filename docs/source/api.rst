@@ -1869,6 +1869,17 @@ API
 
       See :ref:`Help Customization` for detailed examples.
 
+   .. attribute:: theme
+      :type: Union[dict[str, str], rich.theme.Theme, None]
+      :value: None
+
+      Per-group theme overriding ``cyclopts.*`` styles for this group's help panel.
+
+      Accepts a ``{style_name: definition}`` mapping or a :class:`~rich.theme.Theme`, keyed by the
+      same ``cyclopts.*`` names as the app-wide help styles (e.g. ``{"cyclopts.border": "red"}``).
+      These layer on top of the app's styles for just this group's panel; keys the theme doesn't
+      define fall through to the app's styles. See :ref:`Help Customization` for detailed examples.
+
    .. attribute:: sort_key
       :type: Any
       :value: None
