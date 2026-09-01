@@ -81,6 +81,29 @@ def test_metavar_derives_from_type_label_from_name(app):
     ]
 
 
+def test_metavar_tuple_renders_one_placeholder_per_token(app):
+    """Tuples render argparse-style, matching how the values are typed on the CLI."""
+
+    @app.default
+    def main(
+        *,
+        size: tuple[int, int] = (1, 2),
+        nested: tuple[int, tuple[float, float]] = (0, (0.0, 0.0)),
+        var: tuple[int, ...] = (),
+        opt: tuple[int | None, str] | None = None,
+        pts: list[tuple[int, str]] = [],  # noqa: B006
+    ):
+        pass
+
+    assert [e.metavar for e in _parameter_entries(app)] == [
+        "INT INT",
+        "INT FLOAT FLOAT",
+        "INT...",
+        "INT STR",
+        "LIST[TUPLE[INT, STR]]",
+    ]
+
+
 def test_label_uses_long_name(app):
     """The positional label derives from the first long name, not a short flag."""
 

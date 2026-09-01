@@ -11,6 +11,8 @@ from typing import (
     Literal,
     Self,
     Union,
+    get_args,
+    get_origin,
 )
 
 from attrs import define, evolve, field
@@ -585,13 +587,29 @@ def _resolve_metavar(argument: "Argument") -> str | None:
     override = argument.parameter.metavar
     if override is not None:
         return override or None
+    return _type_metavar(argument.hint) or None
+
+
+def _type_metavar(hint) -> str:
+    """Derive the default metavar from a type hint.
+
+    Tuples render argparse-style, one placeholder per token the user types
+    (``tuple[int, int]`` -> ``INT INT``, ``tuple[int, ...]`` -> ``INT...``), with nested
+    tuples flattened. Everything else is the uppercased type name (``PATH``,
+    ``LIST[STR]``).
+    """
     from cyclopts.annotations import get_hint_name, resolve_optional
 
     # Strip ``None`` from the value shape: an ``Optional[Path]`` value is always a
     # ``PATH`` (its absence is conveyed by the parameter being optional, not by a
     # ``NONE`` you would ever type). ``resolve_optional`` drops ``NoneType`` at the
     # type level, so member ordering (``PATH|NONE`` vs ``NONE|PATH``) is irrelevant.
-    return get_hint_name(resolve_optional(argument.hint)).upper() or None
+    hint = resolve_optional(hint)
+    if get_origin(hint) is tuple and (args := get_args(hint)):
+        if args[-1] is Ellipsis:
+            return f"{_type_metavar(args[0])}..."
+        return " ".join(_type_metavar(arg) for arg in args)
+    return get_hint_name(hint).upper()
 
 
 def _resolve_positional_label(argument: "Argument") -> str | None:
