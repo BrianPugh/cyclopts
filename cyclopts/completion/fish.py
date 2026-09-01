@@ -455,11 +455,20 @@ def _generate_positional_completions(
             lines.append(f"# Positionals for: {' '.join(command_path)}")
             header_emitted = True
 
+    # Fish evaluates ``-a`` command substitutions even while the user is typing
+    # an option name (current token starts with ``-``); guard completer entries
+    # so a full ``<prog> __complete`` subprocess isn't spawned on option-name TABs
+    # the engine would refuse anyway.
+    not_option_cond = '; and not string match -q -- "-*" (commandline -ct)'
+
     for slot_idx, argument in enumerate(head):
         pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) = {slot_idx}"
         if argument.parameter.completer is not None:
             _ensure_header()
-            lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '({_completer_substitution(prog_name)})'")
+            lines.append(
+                f"complete -c {prog_name} -n '{pos_cond}{not_option_cond}' "
+                f"-f -a '({_completer_substitution(prog_name)})'"
+            )
             continue
         choices = argument.get_choices(force=True)
         if not choices:
@@ -474,7 +483,10 @@ def _generate_positional_completions(
         pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) -ge {rest_slot}"
         if rest_owner.parameter.completer is not None:
             _ensure_header()
-            lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '({_completer_substitution(prog_name)})'")
+            lines.append(
+                f"complete -c {prog_name} -n '{pos_cond}{not_option_cond}' "
+                f"-f -a '({_completer_substitution(prog_name)})'"
+            )
         else:
             choices = rest_owner.get_choices(force=True)
             if choices:

@@ -265,7 +265,11 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
         f"{fn}() {{",
         "  local -a _cyc_lines _cyc_vals _cyc_disp",
         "  local _cyc_line _cyc_cmd _cyc_val",
-        '  _cyc_cmd="${words[1]}"',
+        # Use the snapshot, not live ``$words``: ``_arguments`` rebases ``$words``
+        # inside subcommand frames (``*::arg:->args``), so ``words[1]`` is the
+        # *subcommand* name there — if that name happens to match a PATH
+        # executable (env, git, test, ...), that binary would be exec'd instead.
+        '  _cyc_cmd="${_cyc_words[1]}"',
         f'  (( $+commands[$_cyc_cmd] )) || _cyc_cmd="{prog_name}"',
         '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,-1]}" 2>/dev/null)}")',
         '  for _cyc_line in "${_cyc_lines[@]}"; do',

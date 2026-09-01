@@ -339,6 +339,20 @@ def test_generated_script_delegates_to_complete(completer_app, shell):
     assert "__complete" in script
 
 
+def test_fish_positional_completer_guarded_against_option_tokens():
+    """Positional completer entries must not spawn ``__complete`` while an option name is being typed."""
+    app = App(name="deployer")
+
+    @app.command
+    def deploy(service: Annotated[str, Parameter(completer=lambda ctx: ["web"])]):
+        pass
+
+    script = app.generate_completion(prog_name="deployer", shell="fish")
+    positional_entries = [line for line in script.splitlines() if "__complete" in line and "positional_index" in line]
+    assert positional_entries
+    assert all('not string match -q -- "-*" (commandline -ct)' in line for line in positional_entries)
+
+
 def test_zsh_helper_only_emitted_when_completer_present():
     """Completer-free apps generate no runtime helper (keeps the autoload structure)."""
     app = App(name="plain")
@@ -423,6 +437,41 @@ def test_e2e_descriptions(dynamic_completion_tester, shell):
     tester = dynamic_completion_tester(E2E_APP_SOURCE, prog_name="deployer", shell=shell)
     result = sorted(_lead(c) for c in tester.get_completions("deployer deploy --env "))
     assert result == ["dev", "prod"]
+
+
+E2E_SUBCOMMAND_NAMED_ENV_SOURCE = """
+from typing import Annotated
+
+from cyclopts import App, Parameter
+
+app = App(name="deployer")
+
+
+def complete_user(ctx):
+    return ["alice", "bob", "carol"]
+
+
+@app.command
+def env(*, user: Annotated[str, Parameter(completer=complete_user)] = ""):
+    pass
+
+
+if __name__ == "__main__":
+    app()
+"""
+
+
+def test_e2e_subcommand_named_like_path_executable(dynamic_completion_tester, shell):
+    """A subcommand named after a PATH executable (``env``) must still complete.
+
+    Regression test for the zsh helper reading live ``$words[1]`` inside a
+    subcommand frame, where ``_arguments`` rebases ``$words`` so ``words[1]`` is
+    the subcommand name -- ``/usr/bin/env __complete ...`` was exec'd instead of
+    the program.
+    """
+    tester = dynamic_completion_tester(E2E_SUBCOMMAND_NAMED_ENV_SOURCE, prog_name="deployer", shell=shell)
+    result = [_lead(c) for c in tester.get_completions("deployer env --user ")]
+    assert sorted(result) == ["alice", "bob", "carol"]
 
 
 E2E_INJECTION_APP_SOURCE = """
