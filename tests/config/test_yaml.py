@@ -35,11 +35,16 @@ def test_config_yaml(tmp_path):
 
 
 def test_config_yaml_default_encoding_reads_non_ascii(tmp_path):
-    """Non-ASCII content is read correctly with the default (UTF-8-encoded file)."""
+    """Non-ASCII content round-trips through the default encoding.
+
+    Written and read with the same (default) encoding, so this is
+    platform-independent -- the default is the locale encoding on Python <3.15
+    (e.g. cp1252 on Windows) and UTF-8 on Python >=3.15 per PEP 686.
+    """
     fn = tmp_path / "test.yaml"
-    fn.write_text("name: café ☕\n", encoding="utf-8")
+    fn.write_text("name: café\n")
     config = Yaml(fn)
-    assert config.config == {"name": "café ☕"}
+    assert config.config == {"name": "café"}
 
 
 def test_config_yaml_explicit_encoding(tmp_path):
