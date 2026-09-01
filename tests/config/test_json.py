@@ -39,6 +39,22 @@ def test_config_json(tmp_path):
     }
 
 
+def test_config_json_default_encoding_reads_non_ascii(tmp_path):
+    """Non-ASCII content is read correctly with the default (UTF-8-encoded file)."""
+    fn = tmp_path / "test.json"
+    fn.write_text('{"name": "café ☕"}', encoding="utf-8")
+    config = Json(fn)
+    assert config.config == {"name": "café ☕"}
+
+
+def test_config_json_explicit_encoding(tmp_path):
+    """An explicit ``encoding`` reads a file written in that (non-UTF-8) encoding."""
+    fn = tmp_path / "test.json"
+    fn.write_text('{"name": "café"}', encoding="latin-1")
+    config = Json(fn, encoding="latin-1")
+    assert config.config == {"name": "café"}
+
+
 """
 Test file-caching and chdir after app has been instantiated. See discussion:
     https://github.com/BrianPugh/cyclopts/issues/309

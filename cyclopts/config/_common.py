@@ -134,6 +134,7 @@ class ConfigFromFile(ConfigBase):
     path: str | Path = field(converter=Path)
     must_exist: bool = field(default=False, kw_only=True)
     search_parents: bool = field(default=False, kw_only=True)
+    encoding: str | None = field(default=None, kw_only=True)
 
     _config: dict[str, Any] | None = field(default=None, init=False, repr=False)
     "Loaded configuration structure (to be loaded by subclassed ``_load_config`` method)."
