@@ -190,9 +190,9 @@ Dependent Completions
 
 Often the valid values for a parameter depend on another parameter already supplied on the command line. Access those values through the :class:`~cyclopts.completion.CompletionContext` by indexing with the option name (``ctx["--region"]``), its bare name (``ctx["region"]``), or the Python field name. The returned object exposes:
 
-- ``.value`` -- the best-effort coerced Python value (:obj:`~cyclopts.UNSET` if unavailable)
+- ``.value`` -- the best-effort coerced Python value. Sourced like a real invocation: CLI tokens, then the parameter's ``env_var``, then config sources, then its default (:obj:`~cyclopts.UNSET` if none of those apply or coercion fails).
 - ``.raw`` -- the raw typed string, or :obj:`None` if not provided
-- ``.provided`` -- :obj:`True` if the argument was explicitly given
+- ``.provided`` -- :obj:`True` if the argument was explicitly given (CLI, env var, or config)
 
 Use ``ctx.get(name, default)`` to return a default instead of raising for an unknown name.
 

@@ -15,12 +15,14 @@ static choice lists; this engine only contributes the values a completer emits.
 import os
 import sys
 from collections.abc import Callable, Iterable
+from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from attrs import field
 
-from cyclopts.bind import _parse_kw_and_flags, _parse_pos
+from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
 from cyclopts.exceptions import CycloptsError, MissingArgumentError
+from cyclopts.field_info import VAR_KEYWORD
 from cyclopts.utils import UNSET, frozen, is_option_like
 
 
@@ -102,15 +104,18 @@ class ArgumentValue:
     def value(self) -> Any:
         """Best-effort coerced value, or :obj:`~.UNSET` if unavailable.
 
-        Runs the argument's normal type conversion over the tokens typed so far,
-        which means it may invoke a user-supplied :attr:`.Parameter.converter` on
-        partial input. Intended for the common cases (``str``/``int``/``Path``/
-        ``Literal``/``Enum``/simple unions); if conversion fails (partial input,
-        or a complex type) this returns :obj:`~.UNSET` rather than raising. The
-        value is *not* validated.
+        Runs the argument's normal type conversion over the tokens supplied so
+        far (CLI, env var, or config source), which means it may invoke a
+        user-supplied :attr:`.Parameter.converter` on partial input. Intended for
+        the common cases (``str``/``int``/``Path``/``Literal``/``Enum``/simple
+        unions); if conversion fails (partial input, or a complex type) this
+        returns :obj:`~.UNSET` rather than raising. The value is *not* validated.
+        With no tokens at all, falls back to the parameter's default (matching
+        what a real invocation would bind), or :obj:`~.UNSET` if it has none.
         """
         if not self.argument.has_tokens:
-            return UNSET
+            default = self.argument.field_info.default
+            return UNSET if default is self.argument.field_info.empty else default
         try:
             return self.argument.convert()
         except Exception:
@@ -139,7 +144,11 @@ class CompletionContext:
     def _match(self, name: str) -> "Argument":
         try:
             argument, _, _ = self.arguments.match(name)
-            return argument
+            # ``ArgumentCollection.match`` resolves any unrecognized term to a
+            # ``**kwargs`` catch-all; a bare name like ``"region"`` must keep
+            # falling through to the explicit field/option-name scan below.
+            if argument.field_info.kind is not VAR_KEYWORD:
+                return argument
         except ValueError:
             pass
         for argument in self.arguments:
@@ -334,8 +343,18 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
             f"active argument={active.name!r} completer={getattr(active.parameter.completer, '__name__', active.parameter.completer)!r}"
         )
 
-        # The sibling arguments already carry the prior tokens from the same
-        # parse that resolved the active argument.
+        # The sibling arguments already carry the CLI tokens from the same parse
+        # that resolved the active argument. Layer in env-var and config-sourced
+        # values (like the real binding pass) so a dependent completer sees the
+        # same sibling values the command itself would receive. Best effort — a
+        # broken config source must not kill completion.
+        try:
+            _parse_env(arguments)
+            configs = command_app.app_stack.resolve("_config") or ()
+            _parse_configs(arguments, tuple(partial(x, command_app, command_chain) for x in configs))
+        except Exception as e:
+            debug(f"applying env/config sources failed (sibling values may be partial): {_exc(e)}")
+
         context = CompletionContext(
             incomplete=incomplete,
             argument=active,

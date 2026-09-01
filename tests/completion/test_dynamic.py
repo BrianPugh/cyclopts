@@ -289,6 +289,82 @@ def test_default_parameter_completer_applies():
     assert _values(compute_completions(app, ["cmd", ""])) == ["dp"]
 
 
+def test_bare_name_lookup_with_kwargs_catch_all():
+    """A bare-name lookup resolves the named sibling, not the ``**kwargs`` catch-all."""
+    app = App(name="myapp")
+    clusters = {"us-west": ["wa-1"]}
+
+    def complete_cluster(ctx):
+        return clusters.get(ctx["region"].value, [])
+
+    @app.command
+    def d(
+        *,
+        region: str = "",
+        cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
+        **kwargs: str,
+    ):
+        pass
+
+    assert _values(compute_completions(app, ["d", "--region", "us-west", "--cluster", ""])) == ["wa-1"]
+
+
+def test_sibling_value_from_env_var(monkeypatch):
+    app = App(name="myapp")
+    seen = {}
+
+    def complete_cluster(ctx):
+        seen["provided"] = ctx["region"].provided
+        seen["value"] = ctx["region"].value
+        return ["c"]
+
+    @app.command
+    def d(
+        *,
+        region: Annotated[str, Parameter(env_var="MYAPP_REGION")] = "",
+        cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
+    ):
+        pass
+
+    monkeypatch.setenv("MYAPP_REGION", "us-west")
+    compute_completions(app, ["d", "--cluster", ""])
+    assert seen == {"provided": True, "value": "us-west"}
+
+
+def test_sibling_value_falls_back_to_default():
+    """An untyped sibling's ``.value`` is its parameter default (the docs' Dependent Completions example)."""
+    app = App(name="myapp")
+    seen = {}
+
+    def complete_cluster(ctx):
+        seen["provided"] = ctx["region"].provided
+        seen["value"] = ctx["region"].value
+        return ["c"]
+
+    @app.command
+    def d(*, region: str = "us-east", cluster: Annotated[str, Parameter(completer=complete_cluster)] = ""):
+        pass
+
+    compute_completions(app, ["d", "--cluster", ""])
+    assert seen == {"provided": False, "value": "us-east"}
+
+
+def test_sibling_value_unset_without_default():
+    app = App(name="myapp")
+    seen = {}
+
+    def complete_note(ctx):
+        seen["value"] = ctx["req"].value
+        return ["t"]
+
+    @app.command
+    def d(*, req: str, note: Annotated[str, Parameter(completer=complete_note)] = ""):
+        pass
+
+    compute_completions(app, ["d", "--note", ""])
+    assert seen == {"value": UNSET}
+
+
 # --- CYCLOPTS_COMPLETION_DEBUG diagnostic ------------------------------------
 
 
@@ -415,7 +491,7 @@ def test_context_raw_and_coerced_value():
 
 
 def test_context_unprovided_sibling():
-    """An untyped sibling reports not-provided, raw None, value UNSET."""
+    """An untyped sibling reports not-provided, raw None, and its default as value."""
     captured = {}
     app = App(name="myapp")
 
@@ -432,7 +508,7 @@ def test_context_unprovided_sibling():
 
     compute_completions(app, ["scale", "--note", ""])
     assert captured["raw"] is None
-    assert captured["value"] is UNSET
+    assert captured["value"] == 1
     assert captured["provided"] is False
 
 
