@@ -291,35 +291,35 @@ element; keys you don't define fall back to the built-in default.
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 20 50
+   :widths: 30 50 20
 
    * - Style name
-     - Default
      - Applies to
-   * - ``cyclopts.name``
-     - ``cyan``
-     - Parameter and command names.
-   * - ``cyclopts.required_marker``
-     - ``red bold``
-     - The ``*`` required marker.
-   * - ``cyclopts.required``
-     - ``red``
-     - The ``[required]`` annotation.
-   * - ``cyclopts.default``
-     - ``gray58``
-     - The ``[default: ...]`` annotation.
-   * - ``cyclopts.choices``
-     - ``gray58``
-     - The ``[choices: ...]`` annotation.
-   * - ``cyclopts.env_var``
-     - ``gray58``
-     - The ``[env var: ...]`` annotation.
-   * - ``cyclopts.border``
-     - ``none``
-     - The help panel border.
-   * - ``cyclopts.usage``
-     - ``bold``
-     - The ``Usage:`` line.
+     - Default
+   * - ``"cyclopts.name"``
+     - parameter and command names
+     - ``"cyan"``
+   * - ``"cyclopts.required_marker"``
+     - the asterisk marker for required parameters
+     - ``"red bold"``
+   * - ``"cyclopts.required"``
+     - the "[required]" annotation
+     - ``"red"``
+   * - ``"cyclopts.default"``
+     - the "[default: ...]" annotation
+     - ``"gray58"``
+   * - ``"cyclopts.choices"``
+     - the "[choices: ...]" annotation
+     - ``"gray58"``
+   * - ``"cyclopts.env_var"``
+     - the "[env var: ...]" annotation
+     - ``"gray58"``
+   * - ``"cyclopts.border"``
+     - the help panel border
+     - ``"none"``
+   * - ``"cyclopts.usage"``
+     - the "Usage:" line
+     - ``"bold"``
 
 Override any key to match your own palette:
 
@@ -374,8 +374,8 @@ Per-Group Styles
 ^^^^^^^^^^^^^^^^
 
 To restyle a single panel, give its :class:`~cyclopts.Group` a
-:attr:`~cyclopts.Group.theme`. It accepts the same ``cyclopts.*`` keys as the
-app-wide styles (as a mapping or a :class:`~rich.theme.Theme`) and layers them on
+:attr:`~cyclopts.Group.theme`. It accepts the same ``"cyclopts."``-prefixed keys as
+the app-wide styles (as a mapping or a :class:`~rich.theme.Theme`) and layers them on
 top for just that group's panel, leaving every other panel on the app's styles:
 
 .. code-block:: python
