@@ -379,4 +379,19 @@ default. It is now equivalent to ``--no-description``.
    # v5: myapp
    #     └── greet
 
+Help Metadata Colors Changed; Colors Are Now Themeable
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** the appearance of the default help page, not behavior.
+
+The ``dim`` styling on the help annotations was hard to read on some terminal
+color schemes. The ``[required]`` annotation is now plain ``red`` (was
+``dim red``), and the ``[default: ...]``, ``[choices: ...]``, and
+``[env var: ...]`` annotations are now ``gray58``, a fixed grey that stays
+legible across light and dark themes (was ``dim``). Every color in the default
+help output is also now routed through a named Rich style (``cyclopts.name``,
+``cyclopts.required_marker``, ``cyclopts.required``, ``cyclopts.default``,
+``cyclopts.choices``, ``cyclopts.env_var``), so you can restyle any of them by
+defining that key in your Console's :class:`~rich.theme.Theme`. See
+:ref:`Help Customization`.
+
 .. _Click: https://click.palletsprojects.com

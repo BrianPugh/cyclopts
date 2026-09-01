@@ -112,7 +112,39 @@ When using Cyclopts as a CLI application, command return values are automaticall
 - Boolean returns are converted: :obj:`True` → :func:`sys.exit(0) <sys.exit>`, :obj:`False` → :func:`sys.exit(1) <sys.exit>`
 - :obj:`None` returns call :func:`sys.exit(0) <sys.exit>`
 
-This default behavior makes Cyclopts applications work consistently whether run directly as scripts or installed via `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_. The :attr:`~cyclopts.App.result_action` can be customized if different behavior is needed:
+This default behavior makes Cyclopts applications work consistently whether run directly as scripts or installed via `console_scripts entry points <https://packaging.python.org/en/latest/specifications/entry-points/#use-for-scripts>`_.
+
+Broadly, each mode does two things with the command's return value: it optionally **prints** the value, and it either **returns** it from ``app()`` or passes it to :func:`sys.exit` as an exit code. The mode you pick decides which of those happen and when. Cyclopts ships a mode for many common combinations; see :attr:`.App.result_action` in the API reference.
+
+^^^^^^^^^^^^^^^
+Common Gotchas
+^^^^^^^^^^^^^^^
+
+**sys_exit modes raise SystemExit even on success.** If your ``result_action`` calls :func:`sys.exit` (including the default ``"print_non_int_sys_exit"``), then invoking ``app()`` raises :exc:`SystemExit` *even when the command succeeds*:
+
+.. code-block:: python
+
+   # Raises SystemExit even on success:
+   def test_my_app():
+       app("foo")  # <-- crashes with SystemExit
+
+Catch it with ``pytest.raises(SystemExit)``, or configure a non-exiting mode such as ``result_action="return_value"`` (see :meth:`.App.__call__` to override ``result_action`` per-invocation).
+
+**return\_ modes drop the exit code unless you pass it to sys.exit.** If your ``result_action`` is in the ``return_`` family, ``app()`` returns the exit code rather than exiting, so your entrypoint must forward it to :func:`sys.exit`. Otherwise the process always exits ``0`` regardless of what the command returned:
+
+.. code-block:: python
+
+   app = App(result_action="return_value")
+
+   # Loses the exit code -- process always exits 0:
+   if __name__ == "__main__":
+       app()
+
+   # Propagates the exit code:
+   if __name__ == "__main__":
+       sys.exit(app())
+
+If you'd rather not write ``sys.exit(app())`` but still want a failing exit code to propagate, use ``result_action="sys_exit_if_non_zero_else_return"`` instead.
 
 
 .. _custom-return-code-protocol:

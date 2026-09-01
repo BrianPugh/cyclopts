@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from textwrap import dedent
 from typing import Annotated
 
 from cyclopts import App, Parameter
@@ -413,3 +414,40 @@ def test_generate_html_docs_usage_name_none_is_default_behavior():
         pass
 
     assert app.generate_docs(output_format="html") == app.generate_docs(output_format="html", usage_name=None)
+
+
+def test_generate_html_docs_unnamed_app_uses_module_name_not_argv(importable_tmp_path, monkeypatch):
+    """An unnamed app's HTML docs derive the root name from its module, not sys.argv[0].
+
+    ``App.name`` otherwise falls back to ``Path(sys.argv[0]).name``, which in a
+    build/generator context is the generator (``sphinx-build``), not the CLI (#910).
+    """
+    import sys
+
+    from cyclopts.docs.html import generate_html_docs
+    from cyclopts.utils import import_app
+
+    # Simulate a build where sys.argv[0] is the generator, not the CLI.
+    monkeypatch.setattr(sys, "argv", ["/usr/bin/sphinx-build", *sys.argv[1:]])
+
+    module_file = importable_tmp_path / "htmltool.py"
+    module_file.write_text(
+        dedent(
+            """\
+            from cyclopts import App
+
+            app = App(help="My tool.")
+
+            @app.command
+            def serve(port: int = 8000):
+                '''Start the server.'''
+                pass
+            """
+        )
+    )
+
+    app = import_app("htmltool:app")
+    docs = generate_html_docs(app)
+    assert "sphinx-build" not in docs  # not in title, anchors, or the Usage line
+    assert '<h1 class="app-title">htmltool</h1>' in docs
+    assert 'id="htmltool-serve"' in docs

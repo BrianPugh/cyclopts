@@ -404,7 +404,11 @@ def json_decode_error_verbosifier(decode_error: "JSONDecodeError", context: int 
     context: int
         Number of surrounding-character context
     """
-    lines = decode_error.doc.splitlines()
+    # ``JSONDecodeError.lineno`` is derived from ``doc.count("\n", 0, pos) + 1``, so the document
+    # has to be split on ``"\n"`` to stay in step with it. ``str.splitlines()`` additionally breaks
+    # on ``\v``, ``\f``, ``\u2028`` and friends, which JSON allows raw inside strings, and it drops
+    # the empty final line, so it can select the wrong line or index past the end.
+    lines = decode_error.doc.split("\n")
     line = lines[decode_error.lineno - 1]
 
     error_index = decode_error.colno - 1  # colno is 1-indexed

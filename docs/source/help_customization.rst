@@ -110,8 +110,8 @@ Output:
    │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
    ╰──────────────────────────────────────────────────────────────────────────────╯
    ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
-   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">NAME --name</span>    Person to greet. <span style="color: #cc3333; opacity: 0.7">[required]</span>                                │
-   │    <span style="color: #0088cc">COUNT --count</span>  Number of times to greet. <span style="opacity: 0.7">[default: 1]</span>                     │
+   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">NAME --name</span>    Person to greet. <span style="color: #cc3333">[required]</span>                                │
+   │    <span style="color: #0088cc">COUNT --count</span>  Number of times to greet. <span style="color: #949494">[default: 1]</span>                     │
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
 
@@ -215,8 +215,8 @@ Output:
    <span style="color: #0088cc">╚══════════════════════════════════════════════════════════════════════╝</span>
    <span style="color: #0088cc">╔═ Parameters ═════════════════════════════════════════════════════════╗</span>
    <span style="color: #0088cc">║                                                                      ║</span>
-   <span style="color: #0088cc">║  </span><span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #0088cc">PATH --path                   </span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                       <span style="color: #0088cc">║</span>
-   <span style="color: #0088cc">║     </span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="opacity: 0.7">[default: False]</span>                              <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║  </span><span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #0088cc">PATH --path                   </span>  <span style="color: #cc3333">[required]</span>                       <span style="color: #0088cc">║</span>
+   <span style="color: #0088cc">║     </span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #949494">[default: False]</span>                              <span style="color: #0088cc">║</span>
    <span style="color: #0088cc">║       </span><span style="color: #0088cc">--no-verbose   </span>                                                <span style="color: #0088cc">║</span>
    <span style="color: #0088cc">║                                                                      ║</span>
    <span style="color: #0088cc">╚══════════════════════════════════════════════════════════════════════╝</span></pre>
@@ -273,12 +273,149 @@ Output:
    ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
    │    <span style="color: #00aa00">│</span>Option             <span style="color: #00aa00">│</span>Description                                          │
    │ <span style="color: #00aa00">───┼───────────────────┼────────────────────────────────────────────────────</span> │
-   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #00aa00">│</span><span style="color: #0088cc">PATH --path</span>        <span style="color: #00aa00">│</span><span style="color: #cc3333; opacity: 0.7">[required]</span>                                           │
+   │ <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #00aa00">│</span><span style="color: #0088cc">PATH --path</span>        <span style="color: #00aa00">│</span><span style="color: #cc3333">[required]</span>                                           │
    │ <span style="color: #00aa00">───┼───────────────────┼────────────────────────────────────────────────────</span> │
-   │    <span style="color: #00aa00">│</span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #00aa00">│</span><span style="opacity: 0.7">[default: False]</span>                                     │
+   │    <span style="color: #00aa00">│</span><span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #00aa00">│</span><span style="color: #949494">[default: False]</span>                                     │
    │    <span style="color: #00aa00">│</span><span style="color: #0088cc">  --no-verbose</span>     <span style="color: #00aa00">│</span>                                                     │
    ╰──────────────────────────────────────────────────────────────────────────────╯</pre>
    </div>
+
+Color Styles
+^^^^^^^^^^^^
+
+Every color Cyclopts renders in help output is routed through a named
+`Rich style <https://rich.readthedocs.io/en/stable/style.html#style-themes>`_.
+Define any of these keys in your :class:`~rich.theme.Theme` and pass the themed
+:class:`~rich.console.Console` to your :class:`~cyclopts.App` to restyle that
+element; keys you don't define fall back to the built-in default.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 50
+
+   * - Style name
+     - Default
+     - Applies to
+   * - ``cyclopts.name``
+     - ``cyan``
+     - Parameter and command names.
+   * - ``cyclopts.required_marker``
+     - ``red bold``
+     - The ``*`` required marker.
+   * - ``cyclopts.required``
+     - ``red``
+     - The ``[required]`` annotation.
+   * - ``cyclopts.default``
+     - ``gray58``
+     - The ``[default: ...]`` annotation.
+   * - ``cyclopts.choices``
+     - ``gray58``
+     - The ``[choices: ...]`` annotation.
+   * - ``cyclopts.env_var``
+     - ``gray58``
+     - The ``[env var: ...]`` annotation.
+   * - ``cyclopts.border``
+     - ``none``
+     - The help panel border.
+   * - ``cyclopts.usage``
+     - ``bold``
+     - The ``Usage:`` line.
+
+Override any key to match your own palette:
+
+.. code-block:: python
+
+   from pathlib import Path
+
+   from rich.console import Console
+   from rich.theme import Theme
+
+   from cyclopts import App
+
+   theme = Theme(
+       {
+           "cyclopts.default": "blue",
+           "cyclopts.required": "bright_red",
+           "cyclopts.name": "bright_cyan",
+       }
+   )
+   app = App(console=Console(theme=theme))
+
+   @app.default
+   def compress(src: Path, dst: Path = Path("out.zip")):
+       """Compress a file."""
+
+   if __name__ == "__main__":
+       app()
+
+Output:
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py SRC [ARGS]</span>
+
+   Compress a file.
+
+   ╭─ Commands ───────────────────────────────────────────────────────────╮
+   │ <span style="color: #00cccc">--help (-h)  </span>Display this message and exit.                          │
+   │ <span style="color: #00cccc">--version    </span>Display application version.                            │
+   ╰──────────────────────────────────────────────────────────────────────╯
+   ╭─ Parameters ─────────────────────────────────────────────────────────╮
+   │ <span style="color: #cc3333; font-weight: bold">*  </span><span style="color: #00cccc">SRC --src  </span><span style="color: #ff3333">[required]</span>                                             │
+   │ <span style="color: #cc3333; font-weight: bold">   </span><span style="color: #00cccc">DST --dst  </span><span style="color: #3333cc">[default: out.zip]</span>                                     │
+   ╰──────────────────────────────────────────────────────────────────────╯</pre>
+   </div>
+
+Because the console is resolved through the app hierarchy, a theme set on a
+parent :class:`~cyclopts.App` is inherited by its subcommands' help output.
+
+Per-Group Styles
+^^^^^^^^^^^^^^^^
+
+To restyle a single panel, give its :class:`~cyclopts.Group` a
+:attr:`~cyclopts.Group.theme`. It accepts the same ``cyclopts.*`` keys as the
+app-wide styles (as a mapping or a :class:`~rich.theme.Theme`) and layers them on
+top for just that group's panel, leaving every other panel on the app's styles:
+
+.. code-block:: python
+
+   from cyclopts import App, Group
+
+   app = App()
+
+   danger = Group("Danger Zone", theme={"cyclopts.border": "red", "cyclopts.name": "bright_red"})
+
+   @app.command
+   def build():
+       """Build the project."""
+
+   @app.command(group=danger)
+   def destroy():
+       """Tear down all infrastructure."""
+
+   if __name__ == "__main__":
+       app()
+
+Output:
+
+.. raw:: html
+
+   <div class="highlight-default notranslate">
+         <pre style="font-family: monospace;"><span style="font-weight: bold">Usage: demo.py COMMAND</span>
+
+   ╭─ Commands ───────────────────────────────────────────────────────────╮
+   │ <span style="color: #0088cc">build        </span>Build the project.                                      │
+   │ <span style="color: #0088cc">--help (-h)  </span>Display this message and exit.                          │
+   │ <span style="color: #0088cc">--version    </span>Display application version.                            │
+   ╰──────────────────────────────────────────────────────────────────────╯
+   <span style="color: #cc3333">╭─ Danger Zone ────────────────────────────────────────────────────────╮</span>
+   <span style="color: #cc3333">│</span> <span style="color: #ff3333">destroy  </span>Tear down all infrastructure.                               <span style="color: #cc3333">│</span>
+   <span style="color: #cc3333">╰──────────────────────────────────────────────────────────────────────╯</span></pre>
+   </div>
+
+Keys the group's theme doesn't define fall through to the app's styles, so a
+group can override just its border while inheriting every other color.
 
 Combining Customizations
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -328,8 +465,8 @@ Output:
    <span style="color: #00aaaa">│ </span><span style="color: #0088cc">--version</span>  Display application version.                             <span style="color: #00aaaa">│</span>
    <span style="color: #00aaaa">╰─────────────────────────────────────────────────────────────────────╯</span>
    <span style="color: #00aaaa">╭─ Parameters ────────────────────────────────────────────────────────╮</span>
-   <span style="color: #00aaaa">│ </span><span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">PATH --path</span>       <span style="color: #cc3333; opacity: 0.7">[required]</span>                                     <span style="color: #00aaaa">│</span>
-   <span style="color: #00aaaa">│    </span><span style="color: #0088cc">VERBOSE --verbose</span> <span style="opacity: 0.7">[default: False]</span>                               <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">│ </span><span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">PATH --path</span>       <span style="color: #cc3333">[required]</span>                                     <span style="color: #00aaaa">│</span>
+   <span style="color: #00aaaa">│    </span><span style="color: #0088cc">VERBOSE --verbose</span> <span style="color: #949494">[default: False]</span>                               <span style="color: #00aaaa">│</span>
    <span style="color: #00aaaa">╰─────────────────────────────────────────────────────────────────────╯</span></pre>
    </div>
 
@@ -402,13 +539,13 @@ Output:
    │ <span style="color: #0088cc">--version</span>  Display application version.                                      │
    ╰──────────────────────────────────────────────────────────────────────────────╯
    <span style="color: #00aa00">   Optional Settings                                                            </span>
-   <span style="color: #00aa00"> </span> <span style="color: #0088cc">VERBOSE --verbose</span>  <span style="opacity: 0.7">[default: False]</span>                                          <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">VERBOSE --verbose</span>  <span style="color: #949494">[default: False]</span>                                          <span style="color: #00aa00"> </span>
    <span style="color: #00aa00"> </span> <span style="color: #0088cc">  --no-verbose</span>     <span style="opacity: 0.7"></span>                                                          <span style="color: #00aa00"> </span>
-   <span style="color: #00aa00"> </span> <span style="color: #0088cc">THREADS --threads</span>  <span style="opacity: 0.7">[default: 4]</span>                                              <span style="color: #00aa00"> </span>
+   <span style="color: #00aa00"> </span> <span style="color: #0088cc">THREADS --threads</span>  <span style="color: #949494">[default: 4]</span>                                              <span style="color: #00aa00"> </span>
    <span style="color: #00aa00">                                                                                </span>
    <span style="color: #cc3333; font-weight: bold">╔═ Required Options ═══════════════════════════════════════════════════════════╗</span>
-   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">INPUT-FILE --input-file</span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
-   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">OUTPUT-DIR --output-dir</span>  <span style="color: #cc3333; opacity: 0.7">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
+   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">INPUT-FILE --input-file</span>  <span style="color: #cc3333">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
+   <span style="color: #cc3333; font-weight: bold">║</span> <span style="color: #cc3333; font-weight: bold">*</span>  <span style="color: #0088cc">OUTPUT-DIR --output-dir</span>  <span style="color: #cc3333">[required]</span>                                       <span style="color: #cc3333; font-weight: bold">║</span>
    <span style="color: #cc3333; font-weight: bold">╚══════════════════════════════════════════════════════════════════════════════╝</span></pre>
    </div>
 

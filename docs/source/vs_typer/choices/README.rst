@@ -23,7 +23,7 @@ With Typer, this is accomplished via declaring an :class:`~enum.Enum`.
 
    typer_app = typer.Typer()
 
-   @typer_app.command
+   @typer_app.command()
    def foo(env: Environment = Environment.DEV):
        print(f"Using: {env.name}")
 

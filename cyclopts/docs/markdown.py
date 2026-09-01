@@ -6,7 +6,6 @@ from cyclopts._markup import extract_text
 from cyclopts.core import DEFAULT_FORMAT
 from cyclopts.docs.base import (
     adjust_filters_for_subcommand,
-    apply_usage_name,
     build_command_chain,
     extract_description,
     extract_usage,
@@ -16,9 +15,11 @@ from cyclopts.docs.base import (
     is_all_builtin_flags,
     iterate_commands,
     normalize_command_filters,
+    resolve_doc_root_name,
     should_include_command,
     should_show_commands_list,
     should_show_usage,
+    usage_display_chain,
 )
 
 if TYPE_CHECKING:
@@ -196,7 +197,9 @@ def _render_usage_section(
                 usage_text = usage
             else:
                 usage_text = extract_text(usage, None, preserve_markup=False)
-            display_chain = apply_usage_name(command_chain, usage_name)
+            # Root Usage-line name substitution; None leaves a custom app.usage intact. See #910.
+            root_name = resolve_doc_root_name(app) if app.usage is None else None
+            display_chain = usage_display_chain(command_chain, usage_name, root_name)
             usage_line = format_usage_line(usage_text, display_chain)
             lines.append(usage_line)
             lines.append("```")

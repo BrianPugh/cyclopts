@@ -9,6 +9,8 @@ from typing import (
     Any,
     ForwardRef,
     Literal,
+    Self,
+    Union,
 )
 
 from attrs import define, evolve, field
@@ -24,6 +26,7 @@ from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_ca
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
+    from rich.theme import Theme
 
     from cyclopts.argument import Argument, ArgumentCollection
     from cyclopts.core import App
@@ -182,7 +185,7 @@ class HelpEntry:
     Excluded from equality so it does not alter :class:`HelpEntry` comparisons.
     """
 
-    def copy(self, **kwargs):
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
 
@@ -208,7 +211,10 @@ class HelpPanel:
     entries: list[HelpEntry] = field(factory=list)
     """List of help entries to display (in order) in the panel."""
 
-    def copy(self, **kwargs):
+    theme: Union[dict[str, str], "Theme", None] = None
+    """Per-group theme (from :attr:`Group.theme`) layered over the ``cyclopts.*`` style defaults for this panel."""
+
+    def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
     def _remove_duplicates(self):
@@ -389,7 +395,7 @@ def format_usage(
         else:
             usage.append("[ARGS]")
 
-    return Text(" ".join(usage) + "\n", style="bold")
+    return Text(" ".join(usage) + "\n", style="cyclopts.usage")
 
 
 def _smart_join(strings: Sequence[str]) -> str:
@@ -407,6 +413,26 @@ def _smart_join(strings: Sequence[str]) -> str:
     return "".join(result)
 
 
+def format_deprecated_tag(version: str | None, content: str | None) -> str:
+    """Format a "Deprecated" tag, shared by the ``.. deprecated::`` directive and ``DocstringDeprecated`` metadata.
+
+    Parameters
+    ----------
+    version : str | None
+        Version the deprecation applies to, if any.
+    content : str | None
+        Optional explanatory content (e.g. "Use something else instead").
+
+    Returns
+    -------
+    str
+        Formatted tag, e.g. ``"[⚠ Deprecated in v1.0] Use something else instead"``.
+    """
+    tag = f"[⚠ Deprecated in v{version}]" if version else "[⚠ Deprecated]"
+    content = (content or "").strip()
+    return f"{tag} {content}" if content else tag
+
+
 def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     raw_doc_string = app.help
 
@@ -419,10 +445,19 @@ def format_doc(app: "App", format: str) -> InlineText | SilentRich:
     if parsed.short_description:
         components.append(parsed.short_description + "\n")
 
+    # docstring_parser extracts a top-level ``.. deprecated::`` directive into
+    # ``parsed.deprecation`` metadata, so it never reaches the renderer as text;
+    # reconstruct it here for every help format.
+    if parsed.deprecation:
+        if components:
+            components.append("\n")
+        components.append(format_deprecated_tag(parsed.deprecation.version, parsed.deprecation.description) + "\n")
+
     if parsed.long_description:
-        if parsed.short_description:
+        if components:
             components.append("\n")
         components.append(parsed.long_description + "\n")
+
     return InlineText.from_format(_smart_join(components), format=format, force_empty_end=True)
 
 
@@ -674,6 +709,7 @@ def create_parameter_help_panel(
     kwargs = {
         "format": "parameter",
         "title": group.name,
+        "theme": group.theme,
         "description": InlineText.from_format(group.help, format=format, force_empty_end=True)
         if group.help
         else Text(),
@@ -726,10 +762,17 @@ def format_command_entries(apps_with_names: Iterable, format: str) -> list[HelpE
 
         sort_key = resolve_callables(app.sort_key, app)
 
+        parsed = docstring_parse(app.help, format)
+        description = parsed.short_description
+        if parsed.deprecation:
+            # Tag-only in the command list; the full deprecation message shows on the command's own help page.
+            tag = format_deprecated_tag(parsed.deprecation.version, None)
+            description = f"{tag} {description}" if description else tag
+
         entry = HelpEntry(
             positive_names=tuple(long_names),
             positive_shorts=tuple(short_names),
-            description=InlineText.from_format(docstring_parse(app.help, format).short_description, format=format),
+            description=InlineText.from_format(description, format=format),
             sort_key=sort_key,
         )
         if entry not in entries:

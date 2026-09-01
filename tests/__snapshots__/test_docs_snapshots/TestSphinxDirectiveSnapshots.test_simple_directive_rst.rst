@@ -1,5 +1,3 @@
-.. _cyclopts-complex-cli:
-
 Complex CLI application for comprehensive documentation testing.
 
 .. _cyclopts-complex-cli-version:
