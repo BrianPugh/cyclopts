@@ -70,11 +70,7 @@ class DefaultFormatter:
     """Column specifications or builder function for table columns (width, style, alignment, etc)."""
 
     show_metavar: bool = True
-    """Append the type-derived value placeholder to keyword-only parameters (e.g. ``--config PATH``).
-
-    Only affects the default parameter columns; ignored when a custom ``column_specs`` is
-    supplied. Set to False to render option names alone.
-    """
+    """Append the type-derived value placeholder to keyword-only parameters (e.g. ``--config PATH``)."""
 
     @classmethod
     def with_newline_metadata(cls, **kwargs):
@@ -100,6 +96,7 @@ class DefaultFormatter:
         >>> from cyclopts.help import DefaultFormatter
         >>> app = App(help_formatter=DefaultFormatter.with_newline_metadata())
         """
+        show_metavar = kwargs.get("show_metavar", True)
 
         def column_builder(console, options, entries):
             import math
@@ -113,7 +110,7 @@ class DefaultFormatter:
 
             max_width = math.ceil(console.width * 0.35)
             name_column = ColumnSpec(
-                renderer=NameRenderer(max_width=max_width),
+                renderer=NameRenderer(max_width=max_width, show_metavar=show_metavar),
                 header="Option",
                 style="cyan",
                 max_width=max_width,

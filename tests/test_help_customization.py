@@ -1489,6 +1489,39 @@ def test_with_newline_metadata_classmethod(console: Console):
             break
 
 
+def test_show_metavar_toggle(console: Console):
+    """``DefaultFormatter.show_metavar`` controls the keyword-only value placeholder."""
+
+    def render(fmt):
+        app = App(name="app", help_formatter=fmt)
+
+        @app.default
+        def main(*, config: str = "cfg", timeout: int = 30):
+            pass
+
+        with console.capture() as capture:
+            app.help_print(console=console)
+        return capture.get()
+
+    # Default (True): keyword-only rows show the type-derived metavar.
+    on = render(DefaultFormatter())
+    assert "--config STR" in on
+    assert "--timeout INT" in on
+
+    # Disabled: option names only, no placeholder.
+    off = render(DefaultFormatter(show_metavar=False))
+    assert "--config STR" not in off
+    assert "--timeout INT" not in off
+    assert "--config" in off
+    assert "--timeout" in off
+
+    # with_newline_metadata must honor the toggle too (it previously ignored it).
+    off_newline = render(DefaultFormatter.with_newline_metadata(show_metavar=False))
+    assert "--config STR" not in off_newline
+    assert "--timeout INT" not in off_newline
+    assert "--config" in off_newline
+
+
 def test_default_formatter_regular_inline(console: Console):
     """Test that regular DefaultFormatter still shows metadata inline."""
     app = App(help_formatter=DefaultFormatter())
