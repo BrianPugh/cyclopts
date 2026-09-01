@@ -2494,6 +2494,15 @@ All Cyclopts builtins index into the configuration file with the following rules
 
       Path to YAML configuration file.
 
+   .. attribute:: encoding
+      :type: str | None
+      :value: None
+
+      Text encoding used to read the file. ``None`` uses Python's default
+      (locale encoding on Python <3.15, UTF-8 on Python >=3.15 per :pep:`686`).
+      Set explicitly (e.g. ``"utf-8"``) for deterministic behavior across
+      Python versions.
+
    .. attribute:: source
       :type: str | None
       :value: None
@@ -2555,6 +2564,15 @@ All Cyclopts builtins index into the configuration file with the following rules
       :type: str | pathlib.Path
 
       Path to JSON configuration file.
+
+   .. attribute:: encoding
+      :type: str | None
+      :value: None
+
+      Text encoding used to read the file. ``None`` uses Python's default
+      (locale encoding on Python <3.15, UTF-8 on Python >=3.15 per :pep:`686`).
+      Set explicitly (e.g. ``"utf-8"``) for deterministic behavior across
+      Python versions.
 
    .. attribute:: source
       :type: str | None
