@@ -4,6 +4,7 @@ These exercise the shell-agnostic engine (``compute_completions``) and the
 reserved ``__complete`` command routing, without spawning a real shell.
 """
 
+from pathlib import Path
 from typing import Annotated
 
 import pytest
@@ -422,6 +423,40 @@ def test_e2e_descriptions(dynamic_completion_tester, shell):
     tester = dynamic_completion_tester(E2E_APP_SOURCE, prog_name="deployer", shell=shell)
     result = sorted(_lead(c) for c in tester.get_completions("deployer deploy --env "))
     assert result == ["dev", "prod"]
+
+
+E2E_INJECTION_APP_SOURCE = """
+from typing import Annotated
+
+from cyclopts import App, Parameter
+
+app = App(name="deployer")
+
+
+def complete_place(ctx):
+    return ["New York", "$(touch pwned)"]
+
+
+@app.command
+def deploy(*, place: Annotated[str, Parameter(completer=complete_place)] = ""):
+    pass
+
+
+if __name__ == "__main__":
+    app()
+"""
+
+
+def test_e2e_bash_candidates_not_shell_expanded(dynamic_completion_tester):
+    """Completer output must reach COMPREPLY verbatim: no word-splitting, no expansion.
+
+    Regression test for the ``compgen -W "$(...)"`` path, where a candidate
+    containing ``$(...)`` executed on TAB and whitespace split values.
+    """
+    tester = dynamic_completion_tester(E2E_INJECTION_APP_SOURCE, prog_name="deployer", shell="bash")
+    result = tester.get_completions("deployer deploy --place ")
+    assert sorted(result) == ["$(touch pwned)", "New York"]
+    assert not Path("pwned").exists()
 
 
 def test_e2e_dependent_completion(dynamic_completion_tester, shell):

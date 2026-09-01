@@ -87,14 +87,24 @@ def _emit_completer_completion(indent: str) -> list[str]:
     Calls the reserved ``__complete`` command with the words typed after the
     program name (``COMP_WORDS`` includes the current, possibly-empty, word), so
     the engine can resolve the active argument and run its
-    :attr:`.Parameter.completer`. Descriptions (after a tab) are dropped -- bash
-    ``COMPREPLY`` shows values only -- and ``compgen`` filters by the current
-    prefix. Errors are swallowed so a broken completer can't disrupt the shell.
+    :attr:`.Parameter.completer`. Candidates are read line-by-line into an array
+    and prefix-matched against ``$cur`` -- never fed to ``compgen -W``, which
+    word-splits values containing whitespace and shell-expands each word
+    (``$(...)``/backticks in completer output would execute on TAB).
+    Descriptions (after a tab) are dropped -- bash ``COMPREPLY`` shows values
+    only. Errors are swallowed so a broken completer can't disrupt the shell.
     """
     return [
-        f"{indent}COMPREPLY=( $(compgen -W "
-        f'"$("${{COMP_WORDS[0]}}" __complete "${{COMP_WORDS[@]:1}}" 2>/dev/null | cut -f1)" '
-        f'-- "${{cur}}") )',
+        f"{indent}local -a _c=()",
+        f"{indent}local _line",
+        f"{indent}while IFS= read -r _line; do",
+        f"{indent}  _line=\"${{_line%%$'\\t'*}}\"",
+        f'{indent}  [[ -n "$_line" ]] && _c+=("$_line")',
+        f'{indent}done < <("${{COMP_WORDS[0]}}" __complete "${{COMP_WORDS[@]:1}}" 2>/dev/null)',
+        f"{indent}COMPREPLY=()",
+        f'{indent}for _x in "${{_c[@]}}"; do',
+        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && COMPREPLY+=("$_x")',
+        f"{indent}done",
     ]
 
 
