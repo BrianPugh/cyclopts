@@ -590,6 +590,20 @@ def test_fish_positional_completer_guarded_against_option_tokens():
     assert all('not string match -q -- "-*" (commandline -ct)' in line for line in positional_entries)
 
 
+def test_zsh_bool_flag_with_completer_stays_a_flag():
+    """A completer on a bool flag is inert: the zsh spec must not demand a value."""
+    app = App(name="myapp")
+
+    @app.command
+    def deploy(*, verbose: Annotated[bool, Parameter(completer=lambda ctx: ["x"])] = False):
+        pass
+
+    script = app.generate_completion(prog_name="myapp", shell="zsh")
+    flag_specs = [line for line in script.splitlines() if "--verbose[" in line]
+    assert flag_specs
+    assert all("_cyclopts_myapp_complete" not in line for line in flag_specs)
+
+
 def test_zsh_helper_only_emitted_when_completer_present():
     """Completer-free apps generate no runtime helper (keeps the autoload structure)."""
     app = App(name="plain")

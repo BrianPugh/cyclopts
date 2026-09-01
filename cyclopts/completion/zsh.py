@@ -865,10 +865,11 @@ def _generate_keyword_specs(argument: "Argument", help_format: str, prog_name: s
     action = ""
     has_choices = False
     choices = argument.get_choices(force=True)
-    if argument.parameter.completer is not None and prog_name:
-        # Dynamic value completion: dispatch to the shared runtime helper.
+    if argument.parameter.completer is not None and prog_name and not flag:
+        # Dynamic value completion: dispatch to the shared runtime helper. A
+        # bool flag consumes no value, so a completer on it stays inert — the
+        # spec must remain a flag (bash/fish/the runtime engine agree).
         action = _completer_action_fn(prog_name)
-        flag = False
     elif choices:
         has_choices = True
         escaped_choices = [_escape_choice_for_dq_spec(clean_choice_text(c)) for c in choices]
