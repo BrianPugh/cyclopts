@@ -21,7 +21,7 @@ def users():
 
 @pytest.fixture
 def app(users):
-    app = App(name="myapp")
+    app = App(name="myapp", result_action="return_value")
 
     def complete_user(ctx):
         return [u for u in users if u.startswith(ctx.incomplete)]
@@ -131,9 +131,23 @@ def test_complete_command_bare_values_have_no_tab(app, capsys):
     assert all("\t" not in line for line in out)
 
 
+def test_complete_command_via_parse_args(app, capsys):
+    """``__complete`` is intercepted inside the shared parse pipeline, so entry points that skip ``__call__`` (e.g. custom scripts using ``parse_args``) still handle it."""
+    command, bound, _ = app.parse_args(["__complete", "deploy", "--user", ""])
+    command(*bound.args, **bound.kwargs)
+    assert capsys.readouterr().out.strip().splitlines() == ["alice", "bob", "carol"]
+
+
+def test_complete_command_via_parse_known_args(app, capsys):
+    command, bound, unused, _ = app.parse_known_args(["__complete", "deploy", ""])
+    assert unused == []
+    command(*bound.args, **bound.kwargs)
+    assert capsys.readouterr().out.strip().splitlines() == ["dev\tDevelopment", "prod\tProduction"]
+
+
 def test_broken_completer_is_swallowed(capsys):
     """A completer that raises must not surface a traceback into the shell."""
-    app = App(name="myapp")
+    app = App(name="myapp", result_action="return_value")
 
     def boom(ctx):
         raise RuntimeError("kaboom")
@@ -168,7 +182,7 @@ def test_debug_reports_resolution_on_stderr(app, capsys, monkeypatch):
 
 def test_debug_surfaces_broken_completer_traceback(capsys, monkeypatch):
     monkeypatch.setenv("CYCLOPTS_COMPLETION_DEBUG", "1")
-    app = App(name="myapp")
+    app = App(name="myapp", result_action="return_value")
 
     def boom(ctx):
         raise RuntimeError("kaboom")

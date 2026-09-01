@@ -1731,6 +1731,17 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
+        # Reserved command: the generated shell-completion script calls back into
+        # the application as ``<prog> __complete <words...>`` to obtain dynamic
+        # completions from ``Parameter.completer`` callbacks. Intercepted here —
+        # like the help/version pseudo-commands — so every entry point
+        # (``__call__``, ``run_async``, ``parse_args``, ``parse_known_args``)
+        # handles it and it never collides with user commands.
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            command = self._run_complete
+            bound = inspect.signature(command).bind(tokens[1:])
+            return command, bound, [], {}, ArgumentCollection()
+
         meta_parent = self
 
         # We need both versions of the apps list:
@@ -2164,13 +2175,6 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
-        # Reserved command: the generated shell-completion script calls back into
-        # the application as ``<prog> __complete <words...>`` to obtain dynamic
-        # completions from ``Parameter.completer`` callbacks. Intercept it before
-        # normal dispatch so it never collides with user commands.
-        if tokens and tokens[0] == _COMPLETE_COMMAND:
-            return self._run_complete(tokens[1:])
-
         overrides = {
             k: v
             for k, v in {
@@ -2299,13 +2303,6 @@ class App:
             _log_framework_warning(_detect_test_framework())
 
         tokens = normalize_tokens(tokens)
-
-        # Reserved command: the generated shell-completion script calls back into
-        # the application as ``<prog> __complete <words...>`` to obtain dynamic
-        # completions from ``Parameter.completer`` callbacks. Intercept it before
-        # normal dispatch so it never collides with user commands.
-        if tokens and tokens[0] == _COMPLETE_COMMAND:
-            return self._run_complete(tokens[1:])
 
         overrides = {
             k: v
