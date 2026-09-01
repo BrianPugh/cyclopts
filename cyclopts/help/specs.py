@@ -138,7 +138,15 @@ class NameRenderer:
             # for their value, so surface the type-derived shape (``--config PATH``).
             # Positional-capable rows already show their name-derived identifier, and
             # rows with ``[choices]`` convey the shape better than a raw ``LITERAL[...]``.
-            labels = (*labels, entry.metavar)
+            # The metavar goes right after the value-taking names; negatives such as
+            # ``--empty-custom`` take no value and must not appear to.
+            labels = (
+                *entry.positive_names,
+                *entry.positive_shorts,
+                entry.metavar,
+                *entry.negative_names,
+                *entry.negative_shorts,
+            )
         text = " ".join(labels)
 
         if self.max_width is None:

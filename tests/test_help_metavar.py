@@ -555,7 +555,7 @@ def test_metavar_default_panel_rendering_unchanged(app, console: Console):
     assert "│ *  URL  [required]" in actual
     # Optional positional-or-keyword: name-derived label precedes the option name.
     assert "DEST --dest" in actual
-    # Keyword-only: option name only, no inline label.
+    # Keyword-only with choices: option name only; ``[choices]`` suppresses the metavar.
     assert "│ --quality " in actual
     assert "QUALITY" not in actual
     # Keyword-only boolean flag: negatives shown, never a label.
@@ -564,12 +564,12 @@ def test_metavar_default_panel_rendering_unchanged(app, console: Console):
 
 
 def test_metavar_option_rendered_by_custom_formatter(console: Console):
-    """A custom column can surface the metavar for keyword options (``--config -c FILE``).
+    """A custom column can render ``entry.metavar`` directly (``--config -c FILE``).
 
-    The builtin panels only show the positional ``label``; this is the sanctioned way to
-    render ``--option METAVAR`` for keyword options, per the "Metavars" section of
-    ``docs/source/help_customization.rst``. The default metavar is type-derived
-    (``--out STR``); an explicit override wins (``--config FILE``).
+    Demonstrates how custom columns opt into the metavar, independent of the default
+    :class:`NameRenderer`, per the "Metavars" section of ``docs/source/help_customization.rst``.
+    The default metavar is type-derived (``--out STR``); an explicit override wins
+    (``--config FILE``).
     """
     from cyclopts import Group
     from cyclopts.help import ColumnSpec, DefaultFormatter

@@ -564,7 +564,7 @@ using :class:`~cyclopts.help.ColumnSpec`:
 
    # Define custom column renderers
    def names_renderer(entry):
-       """Combine the positional metavar (if any) with the option names."""
+       """Combine the positional label (if any) with the option names."""
        return " ".join(entry.display_labels)
 
    def type_renderer(entry):
