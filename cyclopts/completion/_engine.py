@@ -18,8 +18,6 @@ from collections.abc import Callable, Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-from attrs import field
-
 from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
 from cyclopts.exceptions import CycloptsError, MissingArgumentError
 from cyclopts.field_info import VAR_KEYWORD
@@ -134,7 +132,6 @@ class CompletionContext:
     incomplete: str
     argument: "Argument"
     arguments: "ArgumentCollection"
-    tokens: tuple[str, ...] = field(factory=tuple)
 
     @property
     def parameter(self):
@@ -371,7 +368,6 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
             incomplete=incomplete,
             argument=active,
             arguments=arguments,
-            tokens=tuple(unused),
         )
 
         completions = active.get_completions(context)

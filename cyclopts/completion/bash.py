@@ -100,7 +100,10 @@ def _emit_completer_completion(indent: str) -> list[str]:
         f"{indent}while IFS= read -r _line; do",
         f"{indent}  _line=\"${{_line%%$'\\t'*}}\"",
         f'{indent}  [[ -n "$_line" ]] && _c+=("$_line")',
-        f'{indent}done < <("${{COMP_WORDS[0]}}" __complete "${{COMP_WORDS[@]:1}}" 2>/dev/null)',
+        # Words after the cursor (mid-line TAB) must not be forwarded — the final
+        # word the engine sees is the one being completed. The slice sends
+        # indices 1..COMP_CWORD inclusive.
+        f'{indent}done < <("${{COMP_WORDS[0]}}" __complete "${{COMP_WORDS[@]:1:COMP_CWORD}}" 2>/dev/null)',
         f"{indent}COMPREPLY=()",
         f'{indent}for _x in "${{_c[@]}}"; do',
         f'{indent}  [[ "$_x" == "${{cur}}"* ]] && COMPREPLY+=("$_x")',
@@ -527,8 +530,10 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
         # Rest-owner at index 0 — no case statement needed; the iterable
         # answers every position.
         lines.extend(_emit_one(rest_owner, indent))
-    elif len(head) == 1 and rest_owner is None:
-        # Single non-iterable positional — simple case.
+    elif len(head) == 1 and rest_owner is None and head[0].parameter.completer is None:
+        # Single non-iterable positional — simple case. Completer-backed args
+        # take the case statement below so an already-filled slot doesn't spawn
+        # a useless ``__complete`` subprocess on every TAB.
         lines.extend(_emit_one(head[0], indent))
     else:
         lines.append(f"{indent}case ${{positional_count}} in")
