@@ -1439,11 +1439,11 @@ API
          │ *  SOURCE  [required]                                          │
          ╰────────────────────────────────────────────────────────────────╯
          ╭─ Parameters ───────────────────────────────────────────────────╮
-         │ *  --output  [required]                                        │
+         │ *  --output DIR  [required]                                    │
          ╰────────────────────────────────────────────────────────────────╯
 
-      The positional ``source`` is identified by its name (``SOURCE``); ``--output`` shows its metavar (``DIR``) in the usage line.
-      The builtin panels never show the metavar next to an option; it is always available to custom formatters as :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>`, which is how a custom formatter can render ``--output DIR`` inline.
+      The positional ``source`` is identified by its name (``SOURCE``); the keyword-only ``--output`` shows its metavar (``DIR``) in both the usage line and its parameter row.
+      The builtin panels append the metavar to keyword-only parameters; positional-capable rows show their name-derived identifier instead, and rows with a ``[choices]`` list omit it. It is also available to custom formatters as :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>`. Disable the panel metavars with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>` set to ``False``.
 
    .. attribute:: show_env_var
       :type: Optional[bool]

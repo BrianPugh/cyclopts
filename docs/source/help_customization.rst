@@ -595,14 +595,28 @@ A **metavar** is the placeholder standing in for a parameter's *value*, e.g. the
 :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` carries it for every parameter that consumes a value;
 it is :obj:`None` for boolean flags and :attr:`count <cyclopts.Parameter.count>` parameters, which consume none.
 The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``PATH``, :class:`str` → ``STR``);
-:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it.
+:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it. For an optional type the ``None`` is
+stripped, so ``Path | None`` yields ``PATH`` rather than ``PATH|NONE`` (the value you provide is always a
+:class:`~pathlib.Path`; its absence is conveyed by the parameter being optional).
 
 This is distinct from a positional parameter's *identifier* — the ``SRC`` in ``SRC --src`` — which is its
 :attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via
 :attr:`Parameter.name <cyclopts.Parameter.name>`). ``metavar`` never affects the identifier.
 
-The builtin panels show the metavar only in the usage line (for required keyword parameters); the parameter
-rows show identifiers only. A custom column can render the metavar next to every option instead:
+The builtin panels append the metavar to **keyword-only** parameters (``--config PATH``), and show it in the
+usage line for required keyword parameters. Positional-capable rows show their identifier instead (the
+``CONFIG`` in ``CONFIG --config``, since it already stands in for the value), and rows carrying a ``[choices]``
+list omit the metavar because the choices convey the value's shape better than a raw type name. Disable the
+panel metavars entirely with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`:
+
+.. code-block:: python
+
+   from cyclopts import App
+   from cyclopts.help import DefaultFormatter
+
+   app = App(help_formatter=DefaultFormatter(show_metavar=False))
+
+A custom column can instead render the metavar next to *every* option, positional-capable rows included:
 
 .. code-block:: python
 
