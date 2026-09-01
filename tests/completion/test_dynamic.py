@@ -289,6 +289,24 @@ def test_default_parameter_completer_applies():
     assert _values(compute_completions(app, ["cmd", ""])) == ["dp"]
 
 
+def test_meta_launcher_option_completer():
+    """A meta launcher's option completer resolves at the root and after a subcommand."""
+    app = App(name="myapp")
+
+    @app.command
+    def deploy(service: Annotated[str, Parameter(completer=lambda ctx: ["svc"])]):
+        pass
+
+    @app.meta.default
+    def launcher(*tokens: str, env: Annotated[str, Parameter(completer=lambda ctx: ["dev", "prod"])] = ""):
+        app(tokens)
+
+    assert _values(compute_completions(app.meta, ["--env", ""])) == ["dev", "prod"]
+    assert _values(compute_completions(app.meta, ["deploy", "--env", ""])) == ["dev", "prod"]
+    # The command's own positional slot is unaffected by launcher parameters.
+    assert _values(compute_completions(app.meta, ["deploy", ""])) == ["svc"]
+
+
 def test_bare_name_lookup_with_kwargs_catch_all():
     """A bare-name lookup resolves the named sibling, not the ``**kwargs`` catch-all."""
     app = App(name="myapp")

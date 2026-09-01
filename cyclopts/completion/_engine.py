@@ -326,6 +326,18 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     with app.app_stack(execution_path):
         try:
             arguments = command_app.assemble_argument_collection(parse_docstring=False)
+            # Merge keyword parameters contributed by meta launchers on the path
+            # (mirroring the static extractor): a meta option like ``--env`` shares
+            # the command line with the resolved command (``myapp deploy --env
+            # prod``), so its value slot must resolve here too. Positionals stay
+            # command-only — launcher positionals are consumed before the command
+            # name and must not shift the command's own slots.
+            from cyclopts.core import _iter_resolution_argument_collections
+
+            for subapp, collection in _iter_resolution_argument_collections(execution_path, parse_docstring=False):
+                if subapp is command_app:
+                    continue
+                arguments.extend(argument for argument in collection if not argument.field_info.is_positional)
         except Exception as e:
             debug(f"assembling arguments failed: {_exc(e)}")
             return []
