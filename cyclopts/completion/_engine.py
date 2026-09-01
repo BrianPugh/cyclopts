@@ -19,9 +19,9 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from attrs import field
 
-from cyclopts.exceptions import CycloptsError
-from cyclopts.field_info import VAR_KEYWORD
-from cyclopts.utils import UNSET, frozen
+from cyclopts.bind import _parse_kw_and_flags, _parse_pos
+from cyclopts.exceptions import CycloptsError, MissingArgumentError
+from cyclopts.utils import UNSET, frozen, is_option_like
 
 
 def completion_debug_enabled() -> bool:
@@ -182,68 +182,80 @@ def _normalize_item(item: "str | tuple") -> tuple[str, str]:
     return (str(value), str(rest[0]) if rest else "")
 
 
-def _value_option_argument(arguments: "ArgumentCollection", token: str) -> "Argument | None":
-    """Return the argument ``token`` names iff it consumes a value (not a flag)."""
-    if not token.startswith("-") or "=" in token:
-        return None
-    try:
-        argument, _, implicit_value = arguments.match(token)
-    except ValueError:
-        return None
-    if implicit_value is not UNSET or argument.is_flag():
-        return None  # a flag/count: no value token follows
-    return argument
+#: Stands in for the word being completed while the real parser distributes
+#: tokens. Contains NUL so it can never collide with a real shell word, and is
+#: never option-like, so the parser routes it exactly like the value the user
+#: is about to type.
+_ACTIVE_SENTINEL = "\x00cyclopts-active\x00"
 
 
-def _positional_arguments(arguments: "ArgumentCollection") -> list["Argument"]:
-    """Arguments (in signature order) that can be filled positionally."""
-    return [
-        argument
-        for argument in arguments
-        if argument.show and argument.field_info.is_positional and argument.field_info.kind is not VAR_KEYWORD
-    ]
+def _merge_eq_wordbreaks(words: list[str]) -> list[str]:
+    """Reassemble bash's ``COMP_WORDBREAKS`` splits of ``--opt=value``.
 
-
-def _active_positional(arguments: "ArgumentCollection", prior: list[str]) -> "Argument | None":
-    """Resolve which positional slot the next token would fill.
-
-    Walks the already-typed ``prior`` tokens, skipping option names and their
-    value tokens, to count how many positional values have been consumed.
+    Interactive bash tokenizes ``--user=al`` into ``['--user', '=', 'al']`` and
+    the generated script forwards the words verbatim; rejoin them so the engine
+    sees the same single eq-form token that zsh and fish send.
     """
-    positionals = _positional_arguments(arguments)
-    consumed = 0
-    skip_next = False
-    for token in prior:
-        if skip_next:
-            skip_next = False
+    merged: list[str] = []
+    i = 0
+    while i < len(words):
+        word = words[i]
+        if word == "=" and merged and merged[-1].startswith("-") and "=" not in merged[-1]:
+            if i + 1 < len(words):
+                merged[-1] += "=" + words[i + 1]
+                i += 2
+            else:
+                merged[-1] += "="
+                i += 1
             continue
-        if token.startswith("-"):
-            if _value_option_argument(arguments, token) is not None:
-                skip_next = True  # the following token is this option's value
-            continue
-        consumed += 1
-    if consumed < len(positionals):
-        return positionals[consumed]
-    return None
+        merged.append(word)
+        i += 1
+    return merged
 
 
-def _attach_prior_tokens(arguments: "ArgumentCollection", prior: list[str]) -> None:
-    """Best-effort: distribute already-typed ``prior`` tokens onto ``arguments``.
+def _resolve_active_argument(
+    arguments: "ArgumentCollection",
+    tokens: list[str],
+    end_of_options_delimiter: str,
+) -> "Argument | None":
+    """Run the real parser over ``tokens`` and return the argument that owns the cursor.
 
-    Reuses the real parser (:func:`._parse_kw_and_flags`/:func:`._parse_pos`) so
-    ``--opt=value``, ``--opt value``, and positionals all land on the right
-    argument, but deliberately stops short of ``_convert``/validation so partial
-    input never raises. Whatever attaches before an error is kept. Safe to mutate
-    ``arguments`` in place because the collection is freshly assembled per
-    :func:`compute_completions` call and discarded afterward.
+    ``tokens`` are the already-typed tokens plus a trailing sentinel standing in
+    for the word being completed. Reusing :func:`.bind._parse_kw_and_flags` /
+    :func:`.bind._parse_pos` (stopping short of ``_convert``/validation) means
+    option value consumption (``token_count``, ``=`` forms, ``--`` end-of-options,
+    negative numbers, hidden/variadic positionals) all behave exactly like a real
+    invocation, and the prior tokens land on the sibling arguments so a completer
+    can inspect them. Whichever argument the sentinel attaches to is the active
+    one; the sentinel is stripped afterwards so completers never see it.
     """
-    from cyclopts.bind import _parse_kw_and_flags, _parse_pos
-
+    active: Argument | None = None
     try:
-        unused, _, contiguous, _ = _parse_kw_and_flags(arguments, prior)
-        _parse_pos(arguments, unused, contiguous_positional_count=contiguous)
+        unused, _, contiguous, _ = _parse_kw_and_flags(
+            arguments, tokens, end_of_options_delimiter=end_of_options_delimiter
+        )
+        _parse_pos(
+            arguments,
+            unused,
+            end_of_options_delimiter=end_of_options_delimiter,
+            contiguous_positional_count=contiguous,
+        )
+    except MissingArgumentError as e:
+        # A multi-token argument (e.g. ``tuple[int, int]``) raised before the
+        # sentinel could complete its token set: the cursor is filling its next
+        # element. Best effort — the error can also stem from malformed *prior*
+        # input, in which case the real parse would reject the line anyway.
+        active = e.argument
+        debug(f"active argument resolved from incomplete multi-token argument: {_exc(e)}")
     except Exception as e:
-        debug(f"attaching prior tokens {prior!r} failed (sibling values may be partial): {_exc(e)}")
+        debug(f"parsing prior tokens {tokens[:-1]!r} failed: {_exc(e)}")
+        return None
+
+    for argument in arguments:
+        if any(token.value == _ACTIVE_SENTINEL for token in argument.tokens):
+            active = argument
+            argument.tokens = [token for token in argument.tokens if token.value != _ACTIVE_SENTINEL]
+    return active
 
 
 def compute_completions(app: "App", words: list[str]) -> list[Completion]:
@@ -268,8 +280,21 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     """
     if not words:
         words = [""]
+    words = _merge_eq_wordbreaks(words)
     prior, incomplete = words[:-1], words[-1]
     debug(f"words={words!r} prior={prior!r} incomplete={incomplete!r}")
+
+    # The sentinel stands in for the word being completed. For an eq-form token
+    # (``--user=al``) the sentinel replaces only the value part so the real
+    # parser routes it to ``--user``; a plain option-name-in-progress has no
+    # value slot to complete (that's the static script's job).
+    parse_token = _ACTIVE_SENTINEL
+    if is_option_like(incomplete):
+        if "=" not in incomplete:
+            debug("completing an option name; static completion handles it")
+            return []
+        option, _, incomplete = incomplete.partition("=")
+        parse_token = f"{option}={_ACTIVE_SENTINEL}"
 
     # Resolve the active command from the tokens typed so far. ``unused`` strips
     # the resolved command chain, leaving only option/positional tokens so slot
@@ -285,44 +310,40 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     if command_app.default_command is None:
         debug("resolved command has no default_command; nothing to complete")
         return []
-    try:
-        arguments = command_app.assemble_argument_collection(parse_docstring=False)
-    except Exception as e:
-        debug(f"assembling arguments failed: {_exc(e)}")
-        return []
 
-    active: Argument | None = None
+    # The app_stack context applies stack-resolved configuration — e.g. an
+    # ``App(default_parameter=Parameter(completer=...))`` — exactly like the
+    # real parse (core.py) and the static extractor (_base.py) do.
+    with app.app_stack(execution_path):
+        try:
+            arguments = command_app.assemble_argument_collection(parse_docstring=False)
+        except Exception as e:
+            debug(f"assembling arguments failed: {_exc(e)}")
+            return []
+        end_of_options_delimiter = app.app_stack.resolve("end_of_options_delimiter", fallback="--")
 
-    # Case 1: completing the *value* of the preceding option (e.g. ``--user <TAB>``).
-    if unused:
-        active = _value_option_argument(arguments, unused[-1])
+        active = _resolve_active_argument(arguments, [*unused, parse_token], end_of_options_delimiter)
 
-    # Case 2: completing a positional value (not an option name).
-    if active is None and not incomplete.startswith("-"):
-        active = _active_positional(arguments, unused)
+        if active is None:
+            debug("no argument occupies this slot (option name or unmatched slot); no dynamic candidates")
+            return []
+        if active.parameter.completer is None:
+            debug(f"active argument {active.name!r} has no completer; static completion handles it")
+            return []
+        debug(
+            f"active argument={active.name!r} completer={getattr(active.parameter.completer, '__name__', active.parameter.completer)!r}"
+        )
 
-    if active is None:
-        debug("no argument occupies this slot (option name or unmatched slot); no dynamic candidates")
-        return []
-    if active.parameter.completer is None:
-        debug(f"active argument {active.name!r} has no completer; static completion handles it")
-        return []
-    debug(
-        f"active argument={active.name!r} completer={getattr(active.parameter.completer, '__name__', active.parameter.completer)!r}"
-    )
+        # The sibling arguments already carry the prior tokens from the same
+        # parse that resolved the active argument.
+        context = CompletionContext(
+            incomplete=incomplete,
+            argument=active,
+            arguments=arguments,
+            tokens=tuple(unused),
+        )
 
-    # Only now (a completer is definitely going to run) pay for building the
-    # context: attach what the user already typed so the completer can inspect
-    # sibling argument values.
-    _attach_prior_tokens(arguments, list(unused))
-    context = CompletionContext(
-        incomplete=incomplete,
-        argument=active,
-        arguments=arguments,
-        tokens=tuple(unused),
-    )
-
-    completions = active.get_completions(context)
+        completions = active.get_completions(context)
     debug(f"completer returned {len(completions or [])} candidate(s): {completions!r}")
     if not completions:
         return []

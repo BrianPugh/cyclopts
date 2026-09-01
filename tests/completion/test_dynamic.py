@@ -160,6 +160,135 @@ def test_broken_completer_is_swallowed(capsys):
     assert capsys.readouterr().out.strip() == ""
 
 
+# --- active-slot resolution (real-parser backbone) ----------------------------
+
+
+def test_sibling_positional_visible_when_completing_option_value():
+    """A typed positional sibling is visible to an option value's completer."""
+    app = App(name="myapp")
+    seen = {}
+
+    def complete_cluster(ctx):
+        seen["provided"] = ctx["service"].provided
+        seen["value"] = ctx["service"].value
+        return ["c1"]
+
+    @app.command
+    def deploy(service: str, *, cluster: Annotated[str, Parameter(completer=complete_cluster)] = ""):
+        pass
+
+    result = compute_completions(app, ["deploy", "web", "--cluster", ""])
+    assert _values(result) == ["c1"]
+    assert seen == {"provided": True, "value": "web"}
+
+
+def test_multi_token_option_does_not_shift_positional_slot():
+    """An option consuming multiple tokens (``tuple[int, int]``) owns both value slots."""
+    app = App(name="myapp")
+
+    @app.command
+    def cmd(
+        target: Annotated[str, Parameter(completer=lambda ctx: ["t1"])] = "",
+        *,
+        point: tuple[int, int] = (0, 0),
+    ):
+        pass
+
+    assert compute_completions(app, ["cmd", "--point", "1", ""]) == []  # still --point's 2nd value
+    assert _values(compute_completions(app, ["cmd", "--point", "1", "2", ""])) == ["t1"]
+
+
+def test_multi_token_option_completer_fires_for_each_element():
+    app = App(name="myapp")
+
+    @app.command
+    def cmd(*, point: Annotated[tuple[int, int], Parameter(completer=lambda ctx: ["0"])] = (0, 0)):
+        pass
+
+    assert _values(compute_completions(app, ["cmd", "--point", ""])) == ["0"]
+    assert _values(compute_completions(app, ["cmd", "--point", "1", ""])) == ["0"]
+    assert compute_completions(app, ["cmd", "--point", "1", "2", ""]) == []
+
+
+def test_var_positional_completer_fires_for_every_slot():
+    app = App(name="myapp")
+
+    @app.command
+    def add(*files: Annotated[str, Parameter(completer=lambda ctx: ["f"])]):
+        pass
+
+    assert _values(compute_completions(app, ["add", ""])) == ["f"]
+    assert _values(compute_completions(app, ["add", "one", ""])) == ["f"]
+    assert _values(compute_completions(app, ["add", "one", "two", ""])) == ["f"]
+
+
+def test_hidden_positional_occupies_a_slot():
+    """A ``show=False`` positional still consumes a real slot."""
+    app = App(name="myapp")
+
+    @app.command
+    def hid(
+        secret: Annotated[str, Parameter(show=False)],
+        service: Annotated[str, Parameter(completer=lambda ctx: ["svc"])],
+    ):
+        pass
+
+    assert compute_completions(app, ["hid", ""]) == []  # the hidden secret's slot
+    assert _values(compute_completions(app, ["hid", "tok", ""])) == ["svc"]
+
+
+def test_end_of_options_delimiter_forces_positional():
+    app = App(name="myapp")
+
+    @app.command
+    def cmd(name: Annotated[str, Parameter(completer=lambda ctx: ["n"])]):
+        pass
+
+    assert _values(compute_completions(app, ["cmd", "--", ""])) == ["n"]
+    # ``--user`` after ``--`` is positional data that already filled ``name``.
+    assert compute_completions(app, ["cmd", "--", "--user", ""]) == []
+
+
+def test_negative_number_fills_positional_slot():
+    app = App(name="myapp")
+
+    @app.command
+    def neg(delta: int, target: Annotated[str, Parameter(completer=lambda ctx: ["t"])]):
+        pass
+
+    assert _values(compute_completions(app, ["neg", "-5", ""])) == ["t"]
+    assert _values(compute_completions(app, ["neg", "5", ""])) == ["t"]
+
+
+def test_eq_form_option_value(app):
+    """``--user=al`` (zsh/fish joined form) completes ``--user``'s value."""
+    assert _values(compute_completions(app, ["deploy", "--user=a"])) == ["alice"]
+    assert _values(compute_completions(app, ["deploy", "--user="])) == ["alice", "bob", "carol"]
+
+
+def test_eq_form_bash_wordbreak_split(app):
+    """Bash forwards ``--user=al`` as ``['--user', '=', 'al']``; the engine rejoins it."""
+    assert _values(compute_completions(app, ["deploy", "--user", "=", "a"])) == ["alice"]
+    assert _values(compute_completions(app, ["deploy", "--user", "="])) == ["alice", "bob", "carol"]
+
+
+def test_keyword_supplied_positional_or_keyword_closes_slot(app):
+    """``--service x`` fills the positional slot; the free word has no argument."""
+    result = compute_completions(app, ["deploy", "--service", "x", ""])
+    assert result == []
+
+
+def test_default_parameter_completer_applies():
+    """A completer supplied via ``App(default_parameter=...)`` is honored at runtime."""
+    app = App(name="myapp", default_parameter=Parameter(completer=lambda ctx: ["dp"]))
+
+    @app.command
+    def cmd(service: str):
+        pass
+
+    assert _values(compute_completions(app, ["cmd", ""])) == ["dp"]
+
+
 # --- CYCLOPTS_COMPLETION_DEBUG diagnostic ------------------------------------
 
 
@@ -520,6 +649,15 @@ def test_e2e_bash_candidates_not_shell_expanded(dynamic_completion_tester):
     result = tester.get_completions("deployer deploy --place ")
     assert sorted(result) == ["$(touch pwned)", "New York"]
     assert not Path("pwned").exists()
+
+
+def test_e2e_eq_form_option_value(dynamic_completion_tester, shell):
+    """``--user=al<TAB>`` completes the same candidates as ``--user al<TAB>``."""
+    tester = dynamic_completion_tester(E2E_APP_SOURCE, prog_name="deployer", shell=shell)
+    result = [_lead(c) for c in tester.get_completions("deployer deploy --user=a")]
+    assert result == ["alice"]
+    result = [_lead(c) for c in tester.get_completions("deployer deploy --user=")]
+    assert sorted(result) == ["alice", "bob", "carol"]
 
 
 def test_e2e_dependent_completion(dynamic_completion_tester, shell):

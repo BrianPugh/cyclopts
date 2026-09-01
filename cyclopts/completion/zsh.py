@@ -557,7 +557,7 @@ def _generate_completion_for_path(
     # the same value action with the ``--opt=`` prefix consumed via
     # ``compset -P``. ``Parameter(requires_equals=True)`` already emits the
     # eq spec directly, so those options are skipped here.
-    eq_prepass = _generate_eq_form_prepass(keyword_args, indent_str)
+    eq_prepass = _generate_eq_form_prepass(keyword_args, indent_str, prog_name=prog_name)
     lines.extend(eq_prepass)
 
     if args_specs:
@@ -765,7 +765,7 @@ def _escape_zsh_description(text: str) -> str:
     return text
 
 
-def _generate_eq_form_prepass(keyword_args: list, indent_str: str) -> list[str]:
+def _generate_eq_form_prepass(keyword_args: list, indent_str: str, prog_name: str = "") -> list[str]:
     """Emit a ``--opt=value`` pattern dispatcher to run before ``_arguments``.
 
     For each keyword argument with a long name and a value action, emits a
@@ -802,7 +802,9 @@ def _generate_eq_form_prepass(keyword_args: list, indent_str: str) -> list[str]:
             continue
 
         choices = argument.get_choices(force=True)
-        if choices:
+        if argument.parameter.completer is not None and prog_name:
+            action_line = _completer_action_fn(prog_name)
+        elif choices:
             # ``compadd`` adds its arguments verbatim — no inner parser to
             # interpret backslash escapes — so we use POSIX single-quoting
             # rather than ``_escape_completion_choice`` (which is built for
