@@ -550,9 +550,13 @@ def _resolve_metavar(argument: "Argument") -> str | None:
     override = argument.parameter.metavar
     if override is not None:
         return override or None
-    from cyclopts.annotations import get_hint_name
+    from cyclopts.annotations import get_hint_name, resolve_optional
 
-    return get_hint_name(argument.hint).upper() or None
+    # Strip ``None`` from the value shape: an ``Optional[Path]`` value is always a
+    # ``PATH`` (its absence is conveyed by the parameter being optional, not by a
+    # ``NONE`` you would ever type). ``resolve_optional`` drops ``NoneType`` at the
+    # type level, so member ordering (``PATH|NONE`` vs ``NONE|PATH``) is irrelevant.
+    return get_hint_name(resolve_optional(argument.hint)).upper() or None
 
 
 def _resolve_positional_label(argument: "Argument") -> str | None:

@@ -164,9 +164,11 @@ def test_bind_pydantic_basemodel_help(app, console):
         │    USER.NAME --user.name      [default: John Doe]                  │
         │ *  USER.SIGNUP-TS             [required]                           │
         │      --user.signup-ts                                              │
-        │ *  --user.tastes              [required]                           │
-        │    --user.outfit.body                                              │
-        │    --user.outfit.head                                              │
+        │ *  --user.tastes DICT[STR,    [required]                           │
+        │      ANNOTATED[INT,                                                │
+        │      GT(GT=0)]]                                                    │
+        │    --user.outfit.body STR                                          │
+        │    --user.outfit.head STR                                          │
         │    --user.outfit.has-socks -                                       │
         │      -user.outfit.no-has-soc                                       │
         │      ks                                                            │
@@ -327,9 +329,9 @@ def test_parameter_decorator_pydantic_nested_1(app, console):
         Usage: test_pydantic action --bucket STR --key STR --area STR
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --bucket  [required]                                            │
-        │ *  --key     [required]                                            │
-        │ *  --area    [required]                                            │
+        │ *  --bucket STR  [required]                                        │
+        │ *  --key STR     [required]                                        │
+        │ *  --area STR    [required]                                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

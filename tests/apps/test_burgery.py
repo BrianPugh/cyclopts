@@ -71,6 +71,7 @@ def test_create_burger_help(console):
         │ --ketchup --no-ketchup   Add ketchup. [default: True]              │
         │ --mayo --no-mayo         [default: True]                           │
         │ --custom --empty-custom                                            │
+        │   LIST[STR]                                                        │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Toppings ─────────────────────────────────────────────────────────╮
         │ --iceberg --no-iceberg  Add lettuce. [default: True]               │

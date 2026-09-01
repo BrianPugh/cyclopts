@@ -61,7 +61,7 @@ def test_keyword_only_has_no_label(app):
     (entry,) = _parameter_entries(app)
     assert entry.positive_names == ("--cookies",)
     assert entry.positional_label is None
-    assert entry.metavar == "PATH|NONE"  # type-derived
+    assert entry.metavar == "PATH"  # type-derived, Optional's None stripped
     assert entry.positional is False
     # Builtin panels show option names only for keyword parameters.
     assert entry.display_labels == ("--cookies",)
@@ -246,7 +246,7 @@ def test_parameter_metavar_override(app):
         pass
 
     entries = {e.names[0]: e for e in _parameter_entries(app)}
-    assert entries["--cookies"].metavar == "PATH|NONE"  # type-derived default
+    assert entries["--cookies"].metavar == "PATH"  # type-derived default, Optional's None stripped
     assert entries["--convert"].metavar == "EXTENSION"  # explicit override
     assert entries["--convert"].positional_label is None  # keyword-only, no positional label
 
@@ -332,7 +332,7 @@ def test_parameter_metavar_override_in_usage(app, console: Console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --out  [required]                                               │
+        │ *  --out DIR  [required]                                           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

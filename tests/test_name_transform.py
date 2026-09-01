@@ -156,7 +156,7 @@ def test_parameter_name_transform_help(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --b_a_r  [required]                                             │
+        │ *  --b_a_r INT  [required]                                         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

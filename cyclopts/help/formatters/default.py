@@ -1,5 +1,6 @@
 """Default Rich-based help formatter."""
 
+from functools import partial
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from attrs import define
@@ -67,6 +68,13 @@ class DefaultFormatter:
 
     column_specs: Union[tuple["ColumnSpec", ...], "ColumnSpecBuilder"] | None = None
     """Column specifications or builder function for table columns (width, style, alignment, etc)."""
+
+    show_metavar: bool = True
+    """Append the type-derived value placeholder to keyword-only parameters (e.g. ``--config PATH``).
+
+    Only affects the default parameter columns; ignored when a custom ``column_specs`` is
+    supplied. Set to False to render option names alone.
+    """
 
     @classmethod
     def with_newline_metadata(cls, **kwargs):
@@ -212,7 +220,7 @@ class DefaultFormatter:
             if help_panel.format == "command":
                 columns = get_default_command_columns
             else:
-                columns = get_default_parameter_columns
+                columns = partial(get_default_parameter_columns, show_metavar=self.show_metavar)
 
         if callable(columns):
             # It's a column builder
