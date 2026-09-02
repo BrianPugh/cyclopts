@@ -88,6 +88,25 @@ def _str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
     return cast(tuple[str, ...], to_tuple_converter(value))
 
 
+def _choices_converter(value: Any) -> tuple[str, ...]:
+    """Normalize ``Parameter.choices`` into a tuple of choice strings.
+
+    Accepts an explicit iterable of strings, or a type hint from which choices
+    can be derived (``Literal``, ``Enum``, unions thereof, and aliases via
+    ``TypeAliasType``) -- resolved with the same logic as hint-derived choices.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, str):
+        from cyclopts.argument.utils import get_choices_from_hint
+        from cyclopts.utils import default_name_transform
+
+        hint_choices = get_choices_from_hint(value, default_name_transform)
+        if hint_choices:
+            return tuple(hint_choices)
+    return _str_tuple_converter(value)
+
+
 def _validator_tuple_converter(
     value: Callable[..., Any] | str | Iterable[Callable[..., Any] | str] | None,
 ) -> tuple[Callable[..., Any] | str, ...]:
@@ -289,6 +308,14 @@ class Parameter:
     show_choices: bool = field(
         default=None,
         converter=_default_if_none_true,
+        kw_only=True,
+    )
+
+    # Stored as a Tuple[str, ...]; an empty tuple means "derive from the type hint".
+    # Accepts an iterable of strings, or a type hint (Literal/Enum/unions/aliases).
+    choices: None | str | Iterable[str] | Any = field(
+        default=None,
+        converter=_choices_converter,
         kw_only=True,
     )
 

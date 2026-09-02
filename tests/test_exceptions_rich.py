@@ -41,6 +41,7 @@ def _provoke_coercion_error(*args, **kwargs) -> CoercionError:
     mock_argument = Mock()
     mock_argument.name = "mocked_argument_name"
     mock_argument.parameter.name_transform = default_name_transform
+    mock_argument.parameter.choices = ()
     kwargs.setdefault("name_transform", default_name_transform)
     try:
         convert(*args, **kwargs)

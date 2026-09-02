@@ -355,6 +355,7 @@ def assert_convert_coercion_error(*args, msg, name_transform=None, **kwargs):
     mock_argument = Mock()
     mock_argument.name = "mocked_argument_name"
     mock_argument.parameter.name_transform = name_transform
+    mock_argument.parameter.choices = ()
     kwargs.setdefault("name_transform", name_transform)
     with pytest.raises(CoercionError) as e:
         try:

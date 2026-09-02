@@ -715,6 +715,18 @@ class Argument:
                         msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
                     ) from e
 
+        if self.parse and not self.parameter.count and self.parameter.choices:
+            # Validate raw token values against the explicit choices *before* the
+            # converter runs, so a custom converter only ever sees a valid member
+            # (and a bad value yields the standard "Choose from" error, not a
+            # converter-internal exception/traceback).
+            allowed = set(self.parameter.choices)
+            for token in self.tokens:
+                if token.keys or token.implicit_value is not UNSET:
+                    continue
+                if token.value not in allowed:
+                    raise CoercionError(token=token, argument=self, target_type=self.hint)
+
         if not self.parse:
             out = UNSET
         elif self.parameter.count:
@@ -1200,6 +1212,10 @@ class Argument:
         """
         if not force and not self.parameter.show_choices:
             return None
+        if self.parameter.choices:
+            # Explicit override; decoupled from the type hint. Used verbatim for both
+            # the help page and shell completion.
+            return tuple(self.parameter.choices)
         choices = get_choices_from_hint(self.hint, self.parameter.name_transform)
         return tuple(choices) if choices else None
 
