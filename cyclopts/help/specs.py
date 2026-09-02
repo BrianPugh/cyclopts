@@ -102,20 +102,15 @@ class NameRenderer:
         Maximum width for wrapping. If None, no wrapping is applied.
     """
 
-    def __init__(self, max_width: int | None = None, show_metavar: bool = True):
+    def __init__(self, max_width: int | None = None):
         """Initialize the renderer with formatting options.
 
         Parameters
         ----------
         max_width : int | None
             Maximum width for wrapping. If None, no wrapping is applied.
-        show_metavar : bool
-            If True (default), append the type-derived value placeholder to
-            keyword-only parameters (e.g. ``--config PATH``). Set to False to
-            render option names alone.
         """
         self.max_width = max_width
-        self.show_metavar = show_metavar
 
     def __call__(self, entry: "HelpEntry") -> "RenderableType":
         """Render the names column with optional text wrapping.
@@ -130,16 +125,13 @@ class NameRenderer:
         ~rich.console.RenderableType
             Combined names and shorts, optionally wrapped.
             Order: positional_label (positional only), positive_names, positive_shorts,
-            negative_names, negative_shorts
+            metavar (keyword-only), negative_names, negative_shorts
         """
         labels = entry.display_labels
-        if self.show_metavar and not entry.positional and entry.metavar and not entry.choices:
+        if not entry.positional and entry.metavar:
             # Keyword-only value-taking parameters have no positional label to stand in
-            # for their value, so surface the type-derived shape (``--config PATH``).
-            # Positional-capable rows already show their name-derived identifier, and
-            # rows with ``[choices]`` convey the shape better than a raw ``LITERAL[...]``.
-            # The metavar goes right after the value-taking names; negatives such as
-            # ``--empty-custom`` take no value and must not appear to.
+            # for their value, so surface the metavar (``--config PATH``) right after the
+            # value-taking names; negatives such as ``--empty-custom`` take no value.
             labels = (
                 *entry.positive_names,
                 *entry.positive_shorts,
@@ -147,13 +139,11 @@ class NameRenderer:
                 *entry.negative_names,
                 *entry.negative_shorts,
             )
-        text = " ".join(labels)
-
         if self.max_width is None:
-            return text
+            return " ".join(labels)
 
         wrapped = textwrap.wrap(
-            text,
+            " ".join(_split_dotted(label, self.max_width) for label in labels),
             self.max_width,
             subsequent_indent="  ",
             break_on_hyphens=False,
@@ -161,6 +151,16 @@ class NameRenderer:
         )
 
         return "\n".join(wrapped)
+
+
+def _split_dotted(label: str, width: int) -> str:
+    """Pre-break an over-long dotted name before a ``.`` so ``textwrap`` does not split it mid-token."""
+    parts = []
+    while len(label) > width and (cut := label.rfind(".", 1, width + 1)) > 0:
+        parts.append(label[:cut])
+        label = label[cut:]
+    parts.append(label)
+    return " ".join(parts)
 
 
 class CommandNameRenderer:
@@ -548,7 +548,7 @@ def get_default_command_columns(
 
 
 def get_default_parameter_columns(
-    console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"], show_metavar: bool = True
+    console: "Console", options: "ConsoleOptions", entries: list["HelpEntry"]
 ) -> tuple[ColumnSpec, ...]:
     """Get default column specifications for parameter display.
 
@@ -568,7 +568,7 @@ def get_default_parameter_columns(
     """
     max_width = math.ceil(console.width * 0.35)
     name_column = ColumnSpec(
-        renderer=NameRenderer(max_width=max_width, show_metavar=show_metavar),
+        renderer=NameRenderer(max_width=max_width),
         header="Option",
         justify="left",
         style="cyclopts.name",

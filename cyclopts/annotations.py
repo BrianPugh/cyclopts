@@ -277,6 +277,8 @@ def get_hint_name(hint) -> str:
         return "None"
     if hint is Any:
         return "Any"
+    if is_annotated(hint):
+        return get_hint_name(get_args(hint)[0])
     if is_union(hint):
         return "|".join(get_hint_name(arg) for arg in get_args(hint))
     if origin := get_origin(hint):

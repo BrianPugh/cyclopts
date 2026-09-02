@@ -9,7 +9,7 @@ from rich.console import Console
 from cyclopts import App, Group, Parameter
 from cyclopts.annotations import get_hint_name
 from cyclopts.help import ColumnSpec, DefaultFormatter, HelpEntry, PanelSpec, TableSpec
-from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer
+from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer, NameColumn
 
 
 def _type_renderer(entry: Any) -> str:
@@ -1515,11 +1515,15 @@ def test_show_metavar_toggle(console: Console):
     assert "--config" in off
     assert "--timeout" in off
 
-    # with_newline_metadata must honor the toggle too (it previously ignored it).
     off_newline = render(DefaultFormatter.with_newline_metadata(show_metavar=False))
     assert "--config STR" not in off_newline
     assert "--timeout INT" not in off_newline
     assert "--config" in off_newline
+
+    # Custom column layouts see the cleared metavar too.
+    off_custom = render(DefaultFormatter(show_metavar=False, column_specs=(NameColumn, DescriptionColumn)))
+    assert "--config STR" not in off_custom
+    assert "--config" in off_custom
 
 
 def test_default_formatter_regular_inline(console: Console):

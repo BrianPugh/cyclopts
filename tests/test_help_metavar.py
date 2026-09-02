@@ -212,7 +212,7 @@ def test_metavar_ignored_for_valueless_count(app, console: Console):
 
 
 def test_positional_bool_labeled_by_name(app):
-    """A positionally-suppliable bool is labeled by its name; its metavar is type-derived and separate."""
+    """A positionally-suppliable bool is labeled by its name and, being a flag, has no metavar."""
 
     @app.default
     def main(flag: bool = False):
@@ -220,21 +220,176 @@ def test_positional_bool_labeled_by_name(app):
 
     (entry,) = _parameter_entries(app)
     assert entry.positional_label == "FLAG"
-    assert entry.metavar == "BOOL"
+    assert entry.metavar is None
     assert entry.display_labels == ("FLAG", "--flag", "--no-flag")
 
 
 def test_metavar_does_not_change_positional_bool_label(app):
-    """A metavar on a positionally-suppliable bool sets the value placeholder, never the label."""
+    """A metavar on a positionally-suppliable bool is ignored (flags take no value) and never touches the label."""
 
     @app.default
     def main(flag: Annotated[bool, Parameter(metavar="TOGGLE")] = False):
         pass
 
     (entry,) = _parameter_entries(app)
-    assert entry.positional_label == "FLAG"  # from the name, unchanged by metavar
-    assert entry.metavar == "TOGGLE"  # the override
+    assert entry.positional_label == "FLAG"
+    assert entry.metavar is None
     assert entry.display_labels == ("FLAG", "--flag", "--no-flag")
+
+
+@pytest.mark.parametrize("annotation", [bool | None, Annotated[bool, Parameter(n_tokens=2)]])
+def test_metavar_none_for_bool_variants_parser_treats_as_flags(app, annotation, console: Console):
+    """Anything the parser accepts as a bare flag (``Optional[bool]``, ``n_tokens`` bools) advertises no value."""
+
+    @app.default
+    def main(*, flag: annotation):  # pyright: ignore[reportInvalidTypeForm]
+        pass
+
+    (entry,) = _parameter_entries(app)
+    assert entry.metavar is None
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    assert "Usage: test_help_metavar --flag\n" in capture.get()
+
+
+def test_metavar_does_not_introspect_fields(app, console: Console):
+    """Help must not crash on a type whose field introspection fails (``token_count`` is not consulted)."""
+
+    class Weird:
+        def __init__(self, a: "Undefined"):  # noqa: F821  # pyright: ignore[reportUndefinedVariable]
+            self.a = a
+
+    @app.default
+    def main(*, w: Annotated[Weird | None, Parameter(accepts_keys=False)] = None):
+        pass
+
+    (entry,) = _parameter_entries(app)
+    assert entry.metavar == "WEIRD"
+
+
+def test_metavar_strips_nested_annotated(app):
+    """``Annotated`` metadata inside a container never leaks into the metavar."""
+    from cyclopts import types
+
+    @app.default
+    def main(*, ports: list[types.Port] | None = None):
+        pass
+
+    (ports,) = _parameter_entries(app)
+    assert ports.metavar == "LIST[INT]"
+
+
+def test_metavar_choice_for_literal_and_enum(app):
+    """``Literal``/``Enum`` derive ``CHOICE`` (Click-style); shown only when the ``[choices]`` list is hidden."""
+    from enum import Enum
+
+    class Color(Enum):
+        RED = 1
+
+    @app.default
+    def main(
+        *,
+        mode: Annotated[Literal["fast", "Slow"], Parameter(show_choices=False)] = "fast",
+        color: Annotated[Color, Parameter(show_choices=False)] = Color.RED,
+        either: Annotated[Literal["a"] | int, Parameter(show_choices=False)] = 1,
+        pair: tuple[Literal["a", "b"], int] = ("a", 1),
+        shown: Literal["x", "y"] = "x",
+    ):
+        pass
+
+    mode, color, either, pair, shown = _parameter_entries(app)
+    assert mode.metavar == "CHOICE"
+    assert color.metavar == "CHOICE"
+    assert either.metavar == "CHOICE|INT"
+    assert pair.metavar == "CHOICE INT"
+    assert shown.metavar is None
+    assert shown.choices == ("x", "y")
+
+
+def test_explicit_metavar_shown_alongside_choices(app, console: Console):
+    """An explicit metavar is never suppressed by a ``[choices]`` list."""
+
+    @app.default
+    def main(*, mode: Annotated[Literal["a", "b"], Parameter(metavar="MODE")]):
+        pass
+
+    (entry,) = _parameter_entries(app)
+    assert entry.metavar == "MODE"
+    assert entry.choices == ("a", "b")
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    actual = capture.get()
+    assert "Usage: test_help_metavar --mode MODE" in actual
+    assert "--mode MODE" in actual
+    assert "[choices: a, b]" in actual
+
+
+def test_metavar_none_for_dict_and_value_type_for_kwargs(app, console: Console):
+    """A dict is only populated via ``--name.KEY VALUE`` so it has no metavar; ``**kwargs`` show the value type."""
+
+    @app.default
+    def main(*, tastes: dict[str, int] | None = None, **kwargs: int):
+        pass
+
+    tastes, kwargs = _parameter_entries(app)
+    assert tastes.metavar is None
+    assert kwargs.metavar == "INT"
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    assert "--[KEYWORD] INT" in capture.get()
+
+
+def test_positional_dict_is_not_positional(app, console: Console):
+    """A dict never receives a positional index; help agrees with the parser and renders it as an option."""
+
+    @app.default
+    def main(src: str, d: dict[str, int], /):
+        pass
+
+    _, d = _parameter_entries(app)
+    assert not d.positional
+    assert d.positional_label is None
+    assert d.metavar is None
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    assert "Usage: test_help_metavar SRC\n" in capture.get()
+
+
+def test_positional_label_skips_custom_negative(app, console: Console):
+    """A custom negative flag is never used as the positional identifier."""
+
+    @app.default
+    def main(f: str, g: Annotated[bool, Parameter(name="-g", negative="--quiet")], /):
+        pass
+
+    _, g = _parameter_entries(app)
+    assert g.positional_label == "G"
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    assert "Usage: test_help_metavar F G\n" in capture.get()
+
+
+def test_metavar_not_inherited_by_structured_children(app, console: Console):
+    """A metavar on a structured parameter does not propagate to its leaf fields."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class Config:
+        host: str
+        port: int = 80
+
+    @app.default
+    def main(*, config: Annotated[Config, Parameter(metavar="CFG")]):
+        pass
+
+    host, port = _parameter_entries(app)
+    assert host.metavar == "STR"
+    assert port.metavar == "INT"
 
 
 def test_metavar_override_wins_over_type(app):
@@ -486,36 +641,39 @@ def test_empty_metavar_positional_still_labeled_by_name(app, console: Console):
     assert actual == expected
 
 
-def test_remove_duplicates_collapses_same_source_parameter(app):
-    """The same parameter surfaced via multiple resolution paths still collapses to one row."""
+def test_remove_duplicates_collapses_identical_rows(app):
+    """Rows rendering identically collapse to one, regardless of which Python parameter produced them."""
     from cyclopts.help.help import HelpEntry, HelpPanel
 
     panel = HelpPanel(
         format="parameter",
         title="Parameters",
         entries=[
-            HelpEntry(positive_names=("--verbose",), source_id="verbose"),
-            HelpEntry(positive_names=("--verbose",), source_id="verbose"),
+            HelpEntry(positive_names=("--verbose",)),
+            HelpEntry(positive_names=("--verbose",)),
+            HelpEntry(positional_label="A"),
+            HelpEntry(positional_label="B"),
         ],
     )
     panel._remove_duplicates()
-    assert len(panel.entries) == 1
+    assert len(panel.entries) == 3
 
 
-def test_remove_duplicates_keeps_distinct_sources(app):
-    """Distinct parameters that happen to render identically are not merged."""
-    from cyclopts.help.help import HelpEntry, HelpPanel
+def test_meta_app_duplicate_option_collapses(console: Console):
+    """A meta-app option and the command option it forwards to share one row even under different Python names."""
+    app = App(name="app", result_action="return_value")
 
-    panel = HelpPanel(
-        format="parameter",
-        title="Parameters",
-        entries=[
-            HelpEntry(positive_names=("--verbose",), source_id="a"),
-            HelpEntry(positive_names=("--verbose",), source_id="b"),
-        ],
-    )
-    panel._remove_duplicates()
-    assert len(panel.entries) == 2
+    @app.meta.default
+    def meta(*tokens: str, verbose: bool = False):
+        pass
+
+    @app.default
+    def cmd(*, v: Annotated[bool, Parameter(name="--verbose")] = False):
+        pass
+
+    with console.capture() as capture:
+        app.meta.help_print(console=console)
+    assert capture.get().count("--verbose --no-verbose") == 1
 
 
 def test_structured_dict_suffixes_name_not_metavar(app):
@@ -548,7 +706,7 @@ def test_structured_dict_suffixes_name_not_metavar(app):
     # while the metavar stays the plain type-derived value shape.
     child = entries["--root.{NAME}.children.{NAME}"]
     assert child.names[0].endswith(".{NAME}")
-    assert not child.metavar.endswith(".{NAME}")
+    assert child.metavar is None
     assert child.positional_label is None
 
 
@@ -571,8 +729,7 @@ def test_metavar_default_panel_rendering_unchanged(app, console: Console):
     actual = capture.get()
 
     # Assert the label-relevant rendering directly rather than a full-panel snapshot:
-    # the ``--quality`` choices/default spacing is width-sensitive and orthogonal to this
-    # (see CLAUDE.md on order-dependent full-panel snapshots).
+    # the ``--quality`` choices/default spacing is width-sensitive and orthogonal to this.
     assert actual.startswith("Usage: test_help_metavar [OPTIONS] URL [ARGS]")
     # Positional-only: label comes from the name, no option name.
     assert "│ *  URL  [required]" in actual

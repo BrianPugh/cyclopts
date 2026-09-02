@@ -1,9 +1,8 @@
 """Default Rich-based help formatter."""
 
-from functools import partial
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from attrs import define
+from attrs import define, evolve
 
 from cyclopts.help.silent import SILENT
 
@@ -70,7 +69,11 @@ class DefaultFormatter:
     """Column specifications or builder function for table columns (width, style, alignment, etc)."""
 
     show_metavar: bool = True
-    """Append the type-derived value placeholder to keyword-only parameters (e.g. ``--config PATH``)."""
+    """Show each parameter's value placeholder (the ``PATH`` in ``--config PATH``).
+
+    When False, :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` is cleared on
+    every entry before the columns render, so custom ``column_specs`` honor it too.
+    """
 
     @classmethod
     def with_newline_metadata(cls, **kwargs):
@@ -96,7 +99,6 @@ class DefaultFormatter:
         >>> from cyclopts.help import DefaultFormatter
         >>> app = App(help_formatter=DefaultFormatter.with_newline_metadata())
         """
-        show_metavar = kwargs.get("show_metavar", True)
 
         def column_builder(console, options, entries):
             import math
@@ -110,7 +112,7 @@ class DefaultFormatter:
 
             max_width = math.ceil(console.width * 0.35)
             name_column = ColumnSpec(
-                renderer=NameRenderer(max_width=max_width, show_metavar=show_metavar),
+                renderer=NameRenderer(max_width=max_width),
                 header="Option",
                 style="cyclopts.name",
                 max_width=max_width,
@@ -193,6 +195,8 @@ class DefaultFormatter:
         """Render a single help panel."""
         if not help_panel.entries:
             return SILENT
+        if not self.show_metavar:
+            help_panel = help_panel.copy(entries=[evolve(e, metavar=None) for e in help_panel.entries])
 
         from rich.console import Group as RichGroup
         from rich.console import NewLine
@@ -224,7 +228,7 @@ class DefaultFormatter:
             if help_panel.format == "command":
                 columns = get_default_command_columns
             else:
-                columns = partial(get_default_parameter_columns, show_metavar=self.show_metavar)
+                columns = get_default_parameter_columns
 
         if callable(columns):
             # It's a column builder

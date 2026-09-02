@@ -17,13 +17,14 @@ from typing import (
 
 from attrs import define, evolve, field
 
-from cyclopts.annotations import resolve_annotated
+from cyclopts.annotations import get_hint_name, is_enum, is_union, resolve_annotated, resolve_optional
 from cyclopts.argument.utils import is_short_flag
 from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
 from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
+from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE
 from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables, slice_to_str
 
 if TYPE_CHECKING:
@@ -94,10 +95,12 @@ class HelpEntry:
     """Placeholder text for this parameter's **value** (e.g., the ``PATH`` in ``--config PATH``).
 
     Describes the *shape* of the value a token becomes; it defaults to the parameter's
-    **type** in uppercase (``--config`` typed :class:`~pathlib.Path` → ``PATH``; ``str`` → ``STR``)
-    and can be overridden with :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`.
-    :obj:`None` for entries that do not consume a value, such as boolean flags,
-    counting parameters, and commands.
+    **type** in uppercase (``--config`` typed :class:`~pathlib.Path` → ``PATH``; ``str`` → ``STR``;
+    ``Literal``/``Enum`` → ``CHOICE``) and can be overridden with
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. :obj:`None` for entries that do not
+    consume a value (boolean flags, counting parameters, dict/structured parameters populated via
+    dotted keys, commands) and for entries whose ``[choices]`` list is displayed, unless an
+    explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` is set.
 
     This is *not* how a positional parameter is displayed — that is its :attr:`positional_label`,
     derived from the parameter's name. ``metavar`` never affects the identifier.
@@ -178,15 +181,6 @@ class HelpEntry:
     default: str | None = None
     """Default value for this parameter to display. None means no default to show."""
 
-    _source_id: Any = field(default=None, eq=False, repr=False, alias="source_id")
-    """Internal: stable identity of the source parameter, used only for de-duplication.
-
-    Distinguishes different parameters that happen to render identically (e.g. two
-    positional-only parameters sharing an explicit :attr:`~cyclopts.Parameter.name`),
-    while still collapsing the *same* parameter surfaced via multiple resolution paths.
-    Excluded from equality so it does not alter :class:`HelpEntry` comparisons.
-    """
-
     def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
 
@@ -222,12 +216,7 @@ class HelpPanel:
     def _remove_duplicates(self):
         seen, out = set(), []
         for item in self.entries:
-            # ``_source_id`` keys de-duplication on the underlying parameter's identity:
-            # positional-only entries have no option names, so keying on the rendered
-            # ``names``/``positional_label`` alone would wrongly merge distinct parameters
-            # that share a label.  ``names``/``shorts`` remain in the key so synthetic
-            # preview entries (which share a source) stay distinct.
-            hashable = (item._source_id, item.names, item.shorts, item.positional_label)
+            hashable = (item.names, item.shorts, item.positional_label)
             if hashable not in seen:
                 seen.add(hashable)
                 out.append(item)
@@ -280,7 +269,7 @@ def _categorize_keyword_arguments(argument_collection: "ArgumentCollection") -> 
 
         if argument.field_info.kind in (argument.field_info.VAR_KEYWORD,):
             optional.append(argument)
-        elif argument.field_info.is_keyword_only:
+        elif argument.field_info.is_keyword and argument.index is None:
             if argument.required:
                 required.append(argument)
             else:
@@ -315,7 +304,7 @@ def _categorize_positional_arguments(argument_collection: "ArgumentCollection") 
                 required.append(argument)
             else:
                 optional.append(argument)
-        elif argument.field_info.is_positional:
+        elif argument.index is not None:
             if argument.required:
                 required.append(argument)
             else:
@@ -523,18 +512,7 @@ def _expand_structured_dict_for_help(
         # to the names.
         base = _make_help_entry(argument, format)
         if outer_long_names:
-            # The ``.{NAME}`` suffix marks the next identifier layer, so it belongs on
-            # the names/positional_label (identifiers), never on the metavar (which
-            # describes the *value shape* — a ``STR`` is still a ``STR``).
-            suffixed_names = tuple(f"{n}.{{NAME}}" for n in base.positive_names)
-            suffixed_positional_label = (
-                f"{base.positional_label}.{{NAME}}" if base.positional_label else base.positional_label
-            )
-            yield evolve(
-                base,
-                positive_names=suffixed_names,
-                positional_label=suffixed_positional_label,
-            )
+            yield evolve(base, positive_names=tuple(f"{n}.{{NAME}}" for n in base.positive_names))
         else:
             yield base
         return
@@ -567,27 +545,34 @@ def _expand_structured_dict_for_help(
 def _resolve_metavar(argument: "Argument") -> str | None:
     """Resolve the value placeholder representing ``argument``'s **value** (the ``PATH`` in ``--config PATH``).
 
-    Describes the shape of the value a token becomes. An explicit
-    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty string
-    suppresses it); otherwise the default derives from the type hint (``STR``, ``PATH``).
+    An explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty
+    string suppresses it). Otherwise the default derives from the type hint (``STR``,
+    ``PATH``), except when a ``[choices]`` list is displayed, which conveys the value's
+    shape better than a raw type name.
 
-    Returns :obj:`None` for arguments that never consume a value, such as boolean
-    flags and counting parameters.  Independent of the positional display identifier;
+    Returns :obj:`None` for arguments that never consume a value on the command line:
+    boolean flags, counting parameters, and structured/dict parameters that are only
+    populated through dotted sub-keys. Independent of the positional display identifier;
     see :func:`_resolve_positional_label`.
     """
-    positional = argument.index is not None
-    if argument.parameter.count or (not positional and not argument.token_count()[0]):
-        # Parameters with no value to stand in for get no metavar, even when one is
-        # explicitly set. A count parameter never consumes a value (positional or
-        # keyword); a keyword flag consumes none either. A positional bool is *not*
-        # value-less — it is supplied positionally as a value (``myapp true``) — so it
-        # keeps its metavar. A positional's display identifier is the positional_label,
-        # never the metavar.
+    if argument.parameter.count:
+        return None
+    hint = argument.hint
+    if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+        hint = get_args(hint)[1]
+    elif argument._accepts_arbitrary_keywords:
+        return None
+    # Mirror ``Argument.match``'s flag rule rather than ``token_count`` so that
+    # ``Optional[bool]`` (and ``n_tokens`` overrides) agree with what the parser accepts.
+    resolved = resolve_optional(hint)
+    if resolved is bool or resolved in ITERATIVE_BOOL_IMPLICIT_VALUE:
         return None
     override = argument.parameter.metavar
     if override is not None:
         return override or None
-    return _type_metavar(argument.hint) or None
+    if argument.get_choices():
+        return None
+    return _type_metavar(hint) or None
 
 
 def _type_metavar(hint) -> str:
@@ -596,19 +581,31 @@ def _type_metavar(hint) -> str:
     Tuples render argparse-style, one placeholder per token the user types
     (``tuple[int, int]`` -> ``INT INT``, ``tuple[int, ...]`` -> ``INT...``), with nested
     tuples flattened. Everything else is the uppercased type name (``PATH``,
-    ``LIST[STR]``).
+    ``LIST[STR]``), with ``Literal``/``Enum`` rendered as ``CHOICE``.
     """
-    from cyclopts.annotations import get_hint_name, resolve_optional
-
-    # Strip ``None`` from the value shape: an ``Optional[Path]`` value is always a
-    # ``PATH`` (its absence is conveyed by the parameter being optional, not by a
-    # ``NONE`` you would ever type). ``resolve_optional`` drops ``NoneType`` at the
-    # type level, so member ordering (``PATH|NONE`` vs ``NONE|PATH``) is irrelevant.
-    hint = resolve_optional(hint)
+    # ``Optional[Path]`` is always supplied as a ``PATH``; absence is conveyed by the
+    # parameter being optional, not by a ``NONE`` the user would type.
+    hint = resolve_optional(resolve_annotated(hint))
     if get_origin(hint) is tuple and (args := get_args(hint)):
         if args[-1] is Ellipsis:
             return f"{_type_metavar(args[0])}..."
         return " ".join(_type_metavar(arg) for arg in args)
+    if is_union(hint):
+        return "|".join(_type_metavar(arg) for arg in get_args(hint))
+    return _type_name(hint)
+
+
+def _type_name(hint) -> str:
+    """Uppercased type name, with ``Annotated`` stripped and ``Literal``/``Enum`` shown as ``CHOICE``."""
+    hint = resolve_annotated(hint)
+    if hint is Ellipsis:
+        return "..."
+    if get_origin(hint) is Literal or is_enum(hint):
+        return "CHOICE"
+    if is_union(hint):
+        return "|".join(_type_name(arg) for arg in get_args(hint))
+    if (origin := get_origin(hint)) and (args := get_args(hint)):
+        return f"{get_hint_name(origin).upper()}[{', '.join(_type_name(arg) for arg in args)}]"
     return get_hint_name(hint).upper()
 
 
@@ -620,11 +617,10 @@ def _resolve_positional_label(argument: "Argument") -> str | None:
     :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` — use
     :attr:`Parameter.name <cyclopts.Parameter.name>` to change it.
     """
-    if argument.index is None:  # keyword-only: no positional face
+    if argument.index is None or not argument.names:
         return None
-    if not argument.names:
-        return None
-    label_source = next((o for o in argument.names if o.startswith("--")), argument.names[0])
+    negatives = set(argument.negatives)
+    label_source = next((o for o in argument.names if o.startswith("--") and o not in negatives), argument.name)
     return label_source.lstrip("-").upper() or None
 
 
@@ -646,9 +642,8 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
     positional_label = _resolve_positional_label(argument)
 
     if positional:
-        # Positional-only arguments have no real option names (user-supplied names are
-        # always normalized to a "--" prefix); their bare "name" is a synthesized display
-        # label, which ``positional_label`` now carries.
+        # A positional-only argument's bare name is a display label carried by
+        # ``positional_label``, not an option the user can type.
         options = [o for o in options if o.startswith("-")]
 
     negatives = set(argument.negatives)
@@ -713,7 +708,6 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         choices=choices,
         env_var=env_var,
         default=default,
-        source_id=argument.field_info.name,
     )
 
 

@@ -153,25 +153,24 @@ def test_bind_pydantic_basemodel_help(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: test_pydantic USER.ID USER.SIGNUP-TS USER.TASTES [ARGS]
+        Usage: test_pydantic --user.tastes [OPTIONS] USER.ID USER.SIGNUP-TS\x20
+        [ARGS]
 
         ╭─ Commands ─────────────────────────────────────────────────────────╮
         │ --help (-h)  Display this message and exit.                        │
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  USER.ID --user.id          [required]                           │
-        │    USER.NAME --user.name      [default: John Doe]                  │
-        │ *  USER.SIGNUP-TS             [required]                           │
+        │ *  USER.ID --user.id        [required]                             │
+        │    USER.NAME --user.name    [default: John Doe]                    │
+        │ *  USER.SIGNUP-TS           [required]                             │
         │      --user.signup-ts                                              │
-        │ *  --user.tastes DICT[STR,    [required]                           │
-        │      ANNOTATED[INT,                                                │
-        │      GT(GT=0)]]                                                    │
+        │ *  --user.tastes            [required]                             │
         │    --user.outfit.body STR                                          │
         │    --user.outfit.head STR                                          │
-        │    --user.outfit.has-socks -                                       │
-        │      -user.outfit.no-has-soc                                       │
-        │      ks                                                            │
+        │    --user.outfit.has-socks                                         │
+        │      --user.outfit                                                 │
+        │      .no-has-socks                                                 │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -494,9 +493,9 @@ def test_pydantic_annotated_field_discriminator(app, assert_parse_args, console)
         │ DATASET.PATH                                                       │
         │   --dataset.path                                                   │
         │ DATASET.RESOLUTION                                                 │
-        │   --dataset.resolution --                                          │
-        │   dataset.empty-resolutio                                          │
-        │   n                                                                │
+        │   --dataset.resolution                                             │
+        │   --dataset                                                        │
+        │   .empty-resolution                                                │
         │ DATASET.FPS --dataset.fps                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """

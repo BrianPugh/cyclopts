@@ -730,9 +730,10 @@ Metavars
 
 A **metavar** is the placeholder standing in for a parameter's *value*, e.g. the ``PATH`` in ``--config PATH``.
 :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` carries it for every parameter that consumes a value;
-it is :obj:`None` for boolean flags and :attr:`count <cyclopts.Parameter.count>` parameters, which consume none.
-The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``PATH``, :class:`str` → ``STR``);
-:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it. For an optional type the ``None`` is
+it is :obj:`None` for boolean flags, :attr:`count <cyclopts.Parameter.count>` parameters, and ``dict`` parameters
+(populated only through ``--name.KEY VALUE``), which consume none.
+The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``PATH``, :class:`str` → ``STR``,
+``Literal``/``Enum`` → ``CHOICE``); :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it. For an optional type the ``None`` is
 stripped, so ``Path | None`` yields ``PATH`` rather than ``PATH|NONE`` (the value you provide is always a
 :class:`~pathlib.Path`; its absence is conveyed by the parameter being optional). Tuples render one placeholder
 per token, the way the values are typed on the command line: ``tuple[int, int]`` → ``INT INT`` and
@@ -742,11 +743,14 @@ This is distinct from a positional parameter's *identifier* — the ``SRC`` in `
 :attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via
 :attr:`Parameter.name <cyclopts.Parameter.name>`). ``metavar`` never affects the identifier.
 
-The builtin panels append the metavar to **keyword-only** parameters (``--config PATH``), and show it in the
-usage line for required keyword parameters. Positional-capable rows show their identifier instead (the
-``CONFIG`` in ``CONFIG --config``, since it already stands in for the value), and rows carrying a ``[choices]``
-list omit the metavar because the choices convey the value's shape better than a raw type name. Disable the
-panel metavars entirely with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`:
+:class:`~cyclopts.help.DefaultFormatter` appends the metavar to **keyword-only** parameters (``--config PATH``),
+and the usage line shows it for required keyword parameters. Positional-capable rows show their identifier instead
+(the ``CONFIG`` in ``CONFIG --config``, since it already stands in for the value). Rows carrying a ``[choices]``
+list omit the *type-derived* metavar because the choices convey the value's shape better than ``CHOICE``; an
+explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` is still shown. Disable metavars entirely with
+:attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`, which clears
+:attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` on every entry before the columns render, so it also
+applies to custom ``column_specs``:
 
 .. code-block:: python
 
@@ -767,9 +771,9 @@ A custom column can instead render the metavar next to *every* option, positiona
 
 
    def names_renderer(entry):
-       """Render ``--option -o METAVAR``."""
-       options = " ".join(entry.all_options)
-       return f"{options} {entry.metavar}" if entry.metavar else options
+       """Render ``LABEL --option -o METAVAR``."""
+       labels = " ".join(entry.display_labels)
+       return f"{labels} {entry.metavar}" if entry.metavar else labels
 
 
    options = Group(
@@ -808,6 +812,10 @@ Output:
    $ my-script --help
    Usage: my-script [OPTIONS]
 
+   ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+   │ --help (-h)  Display this message and exit.                                  │
+   │ --version    Display application version.                                    │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
    ╭─ Options ────────────────────────────────────────────────────────────────────╮
    │ --config -c FILE           Configuration file.                               │
    │ --output-directory PATH    Where to write results.                           │
@@ -855,7 +863,7 @@ receive the console and options first, followed by the content to render:
            table.add_column("Description", style="white")
 
            for entry in panel.entries:
-               name = " ".join(entry.names + entry.shorts)
+               name = " ".join(entry.display_labels)
                # Extract plain text from description (handles InlineText, etc)
                desc = ""
                if entry.description:
