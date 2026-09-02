@@ -269,7 +269,7 @@ def test_metavar_does_not_introspect_fields(app, console: Console):
 
 
 def test_metavar_strips_nested_annotated(app):
-    """``Annotated`` metadata inside a container never leaks into the metavar."""
+    """``Annotated`` metadata inside a container never leaks into the metavar; its ``metavar`` is honored."""
     from cyclopts import types
 
     @app.default
@@ -277,7 +277,7 @@ def test_metavar_strips_nested_annotated(app):
         pass
 
     (ports,) = _parameter_entries(app)
-    assert ports.metavar == "LIST[INT]"
+    assert ports.metavar == "LIST[PORT]"
 
 
 def test_metavar_choice_for_literal_and_enum(app):
@@ -372,6 +372,140 @@ def test_positional_label_skips_custom_negative(app, console: Console):
     with console.capture() as capture:
         app.help_print(console=console)
     assert "Usage: test_help_metavar F G\n" in capture.get()
+
+
+def test_usage_keeps_choice_metavar_for_required_choice_parameters(app, console: Console):
+    """The usage line has no ``[choices]`` list, so required Literal/Enum keywords keep ``CHOICE`` there."""
+    from enum import Enum
+
+    class Color(Enum):
+        RED = 1
+
+    @app.default
+    def main(*, color: Literal["red", "blue"], mode: Color, n: int):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    actual = capture.get()
+    assert "Usage: test_help_metavar --color CHOICE --mode CHOICE --n INT" in actual
+    assert "--color  [choices: red, blue]" in actual
+
+
+def test_mixed_union_keeps_free_form_metavar_when_choices_shown(app):
+    """Only the choice half is dropped in favour of the ``[choices]`` list; ``INT`` still parses and still shows."""
+
+    @app.default
+    def main(*, mixed: Literal["auto"] | int = 1):
+        pass
+
+    (entry,) = _parameter_entries(app)
+    assert entry.choices == ("auto",)
+    assert entry.metavar == "INT"
+
+
+def test_metavar_for_dict_with_accepts_keys_false(app, console: Console):
+    """``accepts_keys=False`` makes a dict consume a token, so it gets a metavar and honors an explicit one."""
+    import json
+
+    @app.default
+    def main(
+        *,
+        d: Annotated[dict[str, int], Parameter(accepts_keys=False, converter=lambda _, t: json.loads(t[0].value))],
+        e: Annotated[dict[str, int], Parameter(accepts_keys=False, metavar="JSON")] = {},  # noqa: B006
+    ):
+        pass
+
+    d, e = _parameter_entries(app)
+    assert d.metavar == "DICT[STR, INT]"
+    assert e.metavar == "JSON"
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    assert "Usage: test_help_metavar --d DICT[STR, INT]" in capture.get()
+
+
+def test_show_metavar_false_also_clears_usage_line(console: Console):
+    """``show_metavar=False`` restores the placeholder-free usage line too, not just the rows."""
+    from cyclopts.help import DefaultFormatter
+
+    app = App(name="app", help_formatter=DefaultFormatter(show_metavar=False))
+
+    @app.default
+    def main(*, output: Annotated[Path, Parameter(metavar="DIR")]):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    actual = capture.get()
+    assert "Usage: app --output\n" in actual
+    assert "DIR" not in actual
+
+
+def test_metavar_repeats_for_n_tokens(app):
+    """``n_tokens`` renders one placeholder per consumed token, matching the tuple rule."""
+
+    @app.default
+    def main(
+        *,
+        x: Annotated[str, Parameter(n_tokens=2, converter=lambda _, tokens: " ".join(t.value for t in tokens))],
+        y: Annotated[str, Parameter(n_tokens=-1, converter=lambda _, tokens: " ".join(t.value for t in tokens))],
+        z: Annotated[tuple[str, str], Parameter(n_tokens=2)],
+    ):
+        pass
+
+    x, y, z = _parameter_entries(app)
+    assert x.metavar == "STR STR"
+    assert y.metavar == "STR..."
+    assert z.metavar == "STR STR"
+
+
+def test_metavar_honors_element_metavars_in_containers(app):
+    """Metavars attached via ``Annotated``/``@Parameter`` survive inside tuples and lists."""
+    from cyclopts import types
+
+    @app.default
+    def main(*, ports: tuple[types.Port, types.Port], emails: list[types.Email], p: types.Port):
+        pass
+
+    ports, emails, p = _parameter_entries(app)
+    assert ports.metavar == "PORT PORT"
+    assert emails.metavar == "LIST[EMAIL]"
+    assert p.metavar == "PORT"
+
+
+@pytest.mark.parametrize("output_format", ["markdown", "rst", "html", "plain"])
+def test_metavar_rendered_by_all_builtin_formatters(app, output_format, console: Console):
+    """Every builtin formatter renders the metavar next to the last value-taking name."""
+
+    @app.default
+    def main(*, config: Annotated[Path, Parameter(name=["--config", "-c"], metavar="FILE")], flag: bool = False):
+        pass
+
+    if output_format == "plain":
+        app.help_formatter = "plain"
+        with console.capture() as capture:
+            app.help_print(console=console)
+        docs = capture.get()
+    else:
+        docs = app.generate_docs(output_format=output_format)  # pyright: ignore[reportArgumentType]
+    assert "-c FILE" in docs
+    assert "BOOL" not in docs
+
+
+def test_name_renderer_wraps_long_dotted_names_at_dots():
+    """Over-long dotted names break before a ``.`` and never gain an inner space or mid-token break."""
+    from cyclopts.help.help import HelpEntry
+    from cyclopts.help.specs import NameRenderer
+
+    entry = HelpEntry(
+        positive_names=("--config.database-configuration.connection-string-for-primary-db",), metavar="STR"
+    )
+    rendered = NameRenderer(max_width=28)(entry)
+    assert rendered == "--config\n  .database-configuration\n  .connection-string-for-pri\n  mary-db STR"
+
+    short = HelpEntry(positive_names=("--models.{NAME}.inner.value",), metavar="INT")
+    assert NameRenderer(max_width=25)(short) == "--models.{NAME}.inner\n  .value INT"
 
 
 def test_metavar_not_inherited_by_structured_children(app, console: Console):

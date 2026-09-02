@@ -127,40 +127,38 @@ class NameRenderer:
             Order: positional_label (positional only), positive_names, positive_shorts,
             metavar (keyword-only), negative_names, negative_shorts
         """
-        labels = entry.display_labels
-        if not entry.positional and entry.metavar:
-            # Keyword-only value-taking parameters have no positional label to stand in
-            # for their value, so surface the metavar (``--config PATH``) right after the
-            # value-taking names; negatives such as ``--empty-custom`` take no value.
-            labels = (
-                *entry.positive_names,
-                *entry.positive_shorts,
-                entry.metavar,
-                *entry.negative_names,
-                *entry.negative_shorts,
-            )
+        text = " ".join(entry.display_labels_with_metavar)
         if self.max_width is None:
-            return " ".join(labels)
-
-        wrapped = textwrap.wrap(
-            " ".join(_split_dotted(label, self.max_width) for label in labels),
-            self.max_width,
-            subsequent_indent="  ",
-            break_on_hyphens=False,
-            tabsize=4,
-        )
-
-        return "\n".join(wrapped)
+            return text
+        return "\n".join(_wrap_labels(text, self.max_width))
 
 
-def _split_dotted(label: str, width: int) -> str:
-    """Pre-break an over-long dotted name before a ``.`` so ``textwrap`` does not split it mid-token."""
-    parts = []
-    while len(label) > width and (cut := label.rfind(".", 1, width + 1)) > 0:
-        parts.append(label[:cut])
-        label = label[cut:]
-    parts.append(label)
-    return " ".join(parts)
+def _wrap_labels(text: str, width: int) -> list[str]:
+    """Greedy word-wrap with a two-space continuation indent.
+
+    Unlike :func:`textwrap.wrap`, a label too long for one line is broken before a ``.``
+    (``--models.{NAME}`` / ``.empty-items``) rather than mid-token, and never on hyphens.
+    """
+    lines: list[str] = []
+    line = ""
+    for word in text.split():
+        candidate = f"{line} {word}" if line.strip() else line + word
+        if len(candidate) <= width:
+            line = candidate
+            continue
+        if line.strip():
+            lines.append(line)
+            line = "  "
+        while len(line) + len(word) > width:
+            available = width - len(line)
+            cut = word.rfind(".", 1, available + 1)
+            if cut <= 0:
+                cut = available
+            lines.append(line + word[:cut])
+            line, word = "  ", word[cut:]
+        line += word
+    lines.append(line)
+    return lines
 
 
 class CommandNameRenderer:

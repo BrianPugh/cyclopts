@@ -132,10 +132,7 @@ class RstFormatter:
             Console for text extraction.
         """
         for entry in entries:
-            if names := entry.display_labels:
-                # ``display_labels`` already leads with the ``positional_label``
-                # ahead of any option names, so render it directly. A positional-only
-                # row is just the label with no option forms.
+            if names := entry.display_labels_with_metavar:
                 name_str = ", ".join(names)
 
                 # Use definition list format

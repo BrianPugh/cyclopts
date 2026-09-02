@@ -1425,7 +1425,7 @@ API
          ╰────────────────────────────────────────────────────────────────╯
 
       The positional ``source`` is identified by its name (``SOURCE``); the keyword-only ``--output`` shows its metavar (``DIR``) in both the usage line and its parameter row.
-      :class:`~cyclopts.help.DefaultFormatter` appends the metavar to keyword-only parameters; positional-capable rows show their name-derived identifier instead, and rows with a ``[choices]`` list omit the type-derived metavar (an explicit one is still shown). It is also available to custom formatters as :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>`. Disable metavars with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>` set to ``False``.
+      The builtin formatters append the metavar to keyword-only parameters; positional-capable rows show their name-derived identifier instead, and rows with a ``[choices]`` list omit the type-derived ``CHOICE`` (an explicit metavar is still shown). It is also available to custom formatters as :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>`. Disable metavars (rows and usage line) with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>` set to ``False``.
 
    .. attribute:: show_env_var
       :type: Optional[bool]

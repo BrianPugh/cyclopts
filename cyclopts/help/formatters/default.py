@@ -71,8 +71,9 @@ class DefaultFormatter:
     show_metavar: bool = True
     """Show each parameter's value placeholder (the ``PATH`` in ``--config PATH``).
 
-    When False, :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` is cleared on
-    every entry before the columns render, so custom ``column_specs`` honor it too.
+    When False, the usage line omits placeholders and
+    :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` is cleared on every entry
+    before the columns render, so custom ``column_specs`` honor it too.
     """
 
     @classmethod

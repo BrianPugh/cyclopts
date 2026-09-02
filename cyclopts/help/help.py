@@ -24,7 +24,7 @@ from cyclopts.field_info import get_field_infos
 from cyclopts.group import Group
 from cyclopts.help.inline_text import InlineText
 from cyclopts.help.silent import SILENT, SilentRich
-from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE
+from cyclopts.parameter import ITERATIVE_BOOL_IMPLICIT_VALUE, get_parameters
 from cyclopts.utils import SortHelper, frozen, is_class_and_subclass, resolve_callables, slice_to_str
 
 if TYPE_CHECKING:
@@ -180,6 +180,22 @@ class HelpEntry:
 
     default: str | None = None
     """Default value for this parameter to display. None means no default to show."""
+
+    @property
+    def display_labels_with_metavar(self) -> tuple[str, ...]:
+        """:attr:`display_labels` with the :attr:`metavar` appended to the last value-taking name.
+
+        This is what the builtin formatters render, e.g. ``("--config", "-c PATH", "--no-flag")``.
+        Positional rows are unchanged (their :attr:`positional_label` already stands in for the value).
+        """
+        if self.positional or not self.metavar:
+            return self.display_labels
+        positives = [*self.positive_names, *self.positive_shorts]
+        if positives:
+            positives[-1] = f"{positives[-1]} {self.metavar}"
+        else:
+            positives = [self.metavar]
+        return (*positives, *self.negative_names, *self.negative_shorts)
 
     def copy(self, **kwargs: Any) -> Self:
         return evolve(self, **kwargs)
@@ -338,6 +354,7 @@ def format_usage(
 
     for command in command_chain:
         app = app[command]
+    show_metavar = getattr(app.app_stack.resolve("help_formatter"), "show_metavar", True)
 
     # Check for visible non-help/version commands without resolving lazy CommandSpecs.
     help_version_flags = {*app.help_flags, *app.version_flags}
@@ -364,7 +381,7 @@ def format_usage(
     for argument in required_keyword_params:
         # Keyword parameters show the value placeholder (``--foo STR``); positionals
         # below show their name-derived label instead.
-        metavar = _resolve_metavar(argument)
+        metavar = _resolve_metavar(argument, in_usage=True) if show_metavar else None
         usage.append(f"{argument.name} {metavar}" if metavar else argument.name)
 
     if optional_keyword_params:
@@ -542,13 +559,14 @@ def _expand_structured_dict_for_help(
                 yield _make_help_entry(leaf, format)
 
 
-def _resolve_metavar(argument: "Argument") -> str | None:
+def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | None:
     """Resolve the value placeholder representing ``argument``'s **value** (the ``PATH`` in ``--config PATH``).
 
     An explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty
     string suppresses it). Otherwise the default derives from the type hint (``STR``,
-    ``PATH``), except when a ``[choices]`` list is displayed, which conveys the value's
-    shape better than a raw type name.
+    ``PATH``, ``CHOICE``). In panel rows a displayed ``[choices]`` list conveys the value's
+    shape better than ``CHOICE``, so the choice part is dropped there; the usage line has
+    no such list and keeps it (``in_usage``).
 
     Returns :obj:`None` for arguments that never consume a value on the command line:
     boolean flags, counting parameters, and structured/dict parameters that are only
@@ -558,54 +576,82 @@ def _resolve_metavar(argument: "Argument") -> str | None:
     if argument.parameter.count:
         return None
     hint = argument.hint
-    if argument.field_info.kind is argument.field_info.VAR_KEYWORD:
+    is_var_keyword = argument.field_info.kind is argument.field_info.VAR_KEYWORD
+    if is_var_keyword:
         hint = get_args(hint)[1]
-    elif argument._accepts_arbitrary_keywords:
-        return None
     # Mirror ``Argument.match``'s flag rule rather than ``token_count`` so that
-    # ``Optional[bool]`` (and ``n_tokens`` overrides) agree with what the parser accepts.
+    # ``Optional[bool]`` agrees with what the parser accepts.
     resolved = resolve_optional(hint)
     if resolved is bool or resolved in ITERATIVE_BOOL_IMPLICIT_VALUE:
         return None
     override = argument.parameter.metavar
     if override is not None:
         return override or None
-    if argument.get_choices():
+    if (
+        not is_var_keyword
+        and argument._accepts_keywords
+        and (argument._accepts_arbitrary_keywords or argument.children)
+    ):
         return None
-    return _type_metavar(hint) or None
+    choice = "CHOICE" if in_usage or not argument.get_choices() else ""
+    metavar = _type_metavar(hint, choice=choice)
+    n_tokens = argument.parameter.n_tokens
+    if metavar and n_tokens and get_origin(resolved) is not tuple:
+        metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)
+    return metavar or None
 
 
-def _type_metavar(hint) -> str:
+def _explicit_metavar(hint) -> tuple[Any, str | None]:
+    """Unwrap ``hint`` and return the highest-priority ``Parameter.metavar`` attached to it, if any.
+
+    Covers ``Annotated[T, Parameter(metavar=...)]`` aliases such as :data:`cyclopts.types.Port`
+    and ``@Parameter(metavar=...)``-decorated classes such as :class:`~cyclopts.StdioPath`.
+    """
+    hint, params = get_parameters(hint, skip_converter_params=True)
+    return hint, next((p.metavar for p in reversed(params) if p.metavar is not None), None)
+
+
+def _type_metavar(hint, *, choice: str = "CHOICE") -> str:
     """Derive the default metavar from a type hint.
 
     Tuples render argparse-style, one placeholder per token the user types
     (``tuple[int, int]`` -> ``INT INT``, ``tuple[int, ...]`` -> ``INT...``), with nested
     tuples flattened. Everything else is the uppercased type name (``PATH``,
-    ``LIST[STR]``), with ``Literal``/``Enum`` rendered as ``CHOICE``.
+    ``LIST[STR]``), with ``Literal``/``Enum`` rendered as ``choice``.
     """
+    hint, explicit = _explicit_metavar(hint)
+    if explicit is not None:
+        return explicit
     # ``Optional[Path]`` is always supplied as a ``PATH``; absence is conveyed by the
     # parameter being optional, not by a ``NONE`` the user would type.
-    hint = resolve_optional(resolve_annotated(hint))
+    hint = resolve_optional(hint)
     if get_origin(hint) is tuple and (args := get_args(hint)):
         if args[-1] is Ellipsis:
-            return f"{_type_metavar(args[0])}..."
-        return " ".join(_type_metavar(arg) for arg in args)
+            element = _type_metavar(args[0], choice=choice)
+            return f"{element}..." if element else ""
+        return " ".join(m for arg in args if (m := _type_metavar(arg, choice=choice)))
     if is_union(hint):
-        return "|".join(_type_metavar(arg) for arg in get_args(hint))
-    return _type_name(hint)
+        return "|".join(m for arg in get_args(hint) if (m := _type_metavar(arg, choice=choice)))
+    return _type_name(hint, choice=choice)
 
 
-def _type_name(hint) -> str:
-    """Uppercased type name, with ``Annotated`` stripped and ``Literal``/``Enum`` shown as ``CHOICE``."""
-    hint = resolve_annotated(hint)
+def _type_name(hint, *, choice: str = "CHOICE") -> str:
+    """Uppercased type name, honoring attached metavars, with ``Literal``/``Enum`` shown as ``choice``."""
     if hint is Ellipsis:
         return "..."
+    hint, explicit = _explicit_metavar(hint)
+    if explicit is not None:
+        return explicit
     if get_origin(hint) is Literal or is_enum(hint):
-        return "CHOICE"
+        return choice
     if is_union(hint):
-        return "|".join(_type_name(arg) for arg in get_args(hint))
+        return "|".join(m for arg in get_args(hint) if (m := _type_name(arg, choice=choice)))
     if (origin := get_origin(hint)) and (args := get_args(hint)):
-        return f"{get_hint_name(origin).upper()}[{', '.join(_type_name(arg) for arg in args)}]"
+        names = [_type_name(arg, choice=choice) for arg in args]
+        if not all(names):
+            # A suppressed ``CHOICE`` element means the ``[choices]`` list describes the value.
+            return ""
+        return f"{get_hint_name(origin).upper()}[{', '.join(names)}]"
     return get_hint_name(hint).upper()
 
 

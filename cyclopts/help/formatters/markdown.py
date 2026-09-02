@@ -131,18 +131,7 @@ class MarkdownFormatter:
         # Always use list style for Typer-like output
         for entry in entries:
             if entry.display_labels:
-                is_positional = entry.positional
-                long_opts = list(entry.positive_names + entry.negative_names)
-                short_opts = list(entry.positive_shorts + entry.negative_shorts)
-
-                if is_positional and entry.positional_label:
-                    # Positional label first, then any option aliases (long before short),
-                    # matching the rich and rst renderers. ``positional_label`` already
-                    # carries the correct casing.
-                    name_str = ", ".join([entry.positional_label, *long_opts, *short_opts])
-                else:
-                    # Options: long forms first, then short forms.
-                    name_str = ", ".join(long_opts + short_opts)
+                name_str = ", ".join(entry.display_labels_with_metavar)
 
                 # Start the entry (no type display). No trailing space after the
                 # colon; each following piece (description/metadata) supplies its
@@ -190,14 +179,6 @@ class MarkdownFormatter:
 
                 # Add metadata in brackets
                 # Handle required separately for bold formatting
-                is_required = False
-                if entry.required and not is_positional:
-                    # Only show required for options, arguments show it differently
-                    is_required = True
-                elif is_positional and entry.required:
-                    # For positional args, add [required] at the end
-                    is_required = True
-
                 metadata = []
                 if entry.choices:
                     choices_str = ", ".join(entry.choices)
@@ -212,7 +193,7 @@ class MarkdownFormatter:
                     metadata.append(f"default: {default_str}")
 
                 # Write required in bold and separate brackets first
-                if is_required:
+                if entry.required:
                     self._output.write(" **[required]**")
 
                 # Write each metadata item in its own brackets with italics

@@ -743,14 +743,15 @@ This is distinct from a positional parameter's *identifier* — the ``SRC`` in `
 :attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`, derived from the parameter's **name** (change it via
 :attr:`Parameter.name <cyclopts.Parameter.name>`). ``metavar`` never affects the identifier.
 
-:class:`~cyclopts.help.DefaultFormatter` appends the metavar to **keyword-only** parameters (``--config PATH``),
-and the usage line shows it for required keyword parameters. Positional-capable rows show their identifier instead
-(the ``CONFIG`` in ``CONFIG --config``, since it already stands in for the value). Rows carrying a ``[choices]``
-list omit the *type-derived* metavar because the choices convey the value's shape better than ``CHOICE``; an
-explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` is still shown. Disable metavars entirely with
-:attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`, which clears
-:attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` on every entry before the columns render, so it also
-applies to custom ``column_specs``:
+Every builtin formatter (rich, plain, markdown, rst, html) appends the metavar to **keyword-only** parameters
+(``--config PATH``), and the usage line shows it for required keyword parameters. Positional-capable rows show
+their identifier instead (the ``CONFIG`` in ``CONFIG --config``, since it already stands in for the value). Rows
+carrying a ``[choices]`` list omit the *type-derived* ``CHOICE`` because the list conveys the value's shape better
+(the usage line, which has no such list, keeps ``CHOICE``); an explicit
+:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` is always shown. Disable metavars entirely with
+:attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>`, which drops them from the
+usage line and clears :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` on every entry before the
+columns render, so it also applies to custom ``column_specs``:
 
 .. code-block:: python
 
@@ -772,8 +773,7 @@ A custom column can instead render the metavar next to *every* option, positiona
 
    def names_renderer(entry):
        """Render ``LABEL --option -o METAVAR``."""
-       labels = " ".join(entry.display_labels)
-       return f"{labels} {entry.metavar}" if entry.metavar else labels
+       return " ".join(entry.display_labels_with_metavar)
 
 
    options = Group(
@@ -831,7 +831,9 @@ falls back to its type name (``PATH``), and ``--verbose`` has no metavar at all 
    :attr:`names <cyclopts.help.HelpEntry.names>`) contain option names only.
    Use :attr:`display_labels <cyclopts.help.HelpEntry.display_labels>` to
    reproduce the builtin layout, which prefixes the
-   :attr:`positional_label <cyclopts.help.HelpEntry.positional_label>` for positional parameters.
+   :attr:`positional_label <cyclopts.help.HelpEntry.positional_label>` for positional parameters, or
+   :attr:`display_labels_with_metavar <cyclopts.help.HelpEntry.display_labels_with_metavar>` to also
+   include the metavar exactly as the builtin formatters do.
 
 --------------------------
 Creating Custom Formatters
