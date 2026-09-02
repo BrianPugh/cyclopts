@@ -1366,8 +1366,14 @@ API
 
       ``choices`` accepts either an iterable of strings, or a type hint to derive
       them from (``Literal``, ``Enum``, unions thereof, and aliases) -- e.g.
-      ``choices=Literal["a", "b", "c"]`` is equivalent to ``choices=("a", "b", "c")``,
-      and ``choices=SomeEnum`` uses the (name-transformed) member names.
+      ``choices=Literal["a", "b", "c"]`` is equivalent to ``choices=("a", "b", "c")``.
+      ``choices=SomeEnum`` uses the :attr:`name_transform`-ed member names and, like
+      an ``Enum`` type hint, matches input case-insensitively.
+
+      Validation applies to each single-token element (so it works for ``list[str]``,
+      including JSON-list input); it is skipped for multi-token elements such as
+      ``tuple[str, int]``. The check is an exact string match, so config-file values
+      must already be strings (``mode = "true"``, not ``mode = true``).
 
       This is primarily useful when a parameter is annotated with its runtime
       type (e.g. a class) but should present a small set of user-facing keys.

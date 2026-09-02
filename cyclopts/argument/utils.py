@@ -41,6 +41,7 @@ PARAMETER_SUBKEY_BLOCKER = Parameter(
     validator=None,
     accepts_keys=None,
     env_var=None,
+    choices=None,
 )
 
 KIND_PARENT_CHILD_REASSIGNMENT = {

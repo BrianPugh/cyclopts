@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 import pytest
 
 from cyclopts import Parameter
+from cyclopts.argument import ArgumentCollection
 from cyclopts.exceptions import CoercionError
 
 
@@ -148,7 +149,6 @@ def test_choices_default_not_validated(app, assert_parse_args):
 
 def test_choices_completion_force(app):
     """Shell completion always receives the choices, even with show_choices=False."""
-    from cyclopts.argument import ArgumentCollection
 
     @app.default
     def foo(env: Annotated[str, Parameter(choices=["dev", "prod"], show_choices=False)] = "dev"):
@@ -159,24 +159,101 @@ def test_choices_completion_force(app):
     assert argument.get_choices(force=True) == ("dev", "prod")  # still offered to completion
 
 
+def _argument(func, name):
+    (argument,) = [a for a in ArgumentCollection._from_callable(func) if a.name == name]
+    return argument
+
+
 @pytest.mark.parametrize(
     "choices",
     [
-        Literal["a", "b", "c"],  # Literal
-        Literal["a", "b"] | Literal["c"],  # union of Literals
-        ("a", "b", "c"),  # plain strings
+        Literal["a", "b", "c"],
+        Literal["a", "b"] | Literal["c"],
+        ("a", "b", "c"),
     ],
 )
 def test_choices_accepts_type_hints(choices):
     """``choices`` accepts a type hint and resolves it like hint-derived choices."""
-    assert Parameter(choices=choices).choices == ("a", "b", "c")
+
+    def foo(x: Annotated[str, Parameter(choices=choices)]):
+        pass
+
+    assert _argument(foo, "--x").get_choices() == ("a", "b", "c")
 
 
-def test_choices_accepts_enum_uses_transformed_member_names():
-    """An Enum resolves to its (name-transformed) member names, matching how an
-    Enum-annotated parameter displays.
-    """
-    assert Parameter(choices=Color).choices == ("red", "green", "blue")
+def test_choices_enum_uses_name_transform():
+    """An Enum resolves to member names via the parameter's ``name_transform``."""
+
+    def foo(
+        color: Annotated[Color, Parameter(choices=Color)],
+        loud: Annotated[Color, Parameter(choices=Color, name_transform=str.upper)],
+    ):
+        pass
+
+    assert _argument(foo, "--color").get_choices() == ("red", "green", "blue")
+    assert _argument(foo, "--LOUD").get_choices() == ("RED", "GREEN", "BLUE")
+
+
+def test_choices_enum_validation_normalizes_like_converter(app, assert_parse_args):
+    """Input accepted by the Enum converter (case/underscore variants) is also accepted with ``choices``."""
+
+    @app.default
+    def foo(color: Annotated[Color, Parameter(choices=Color)]):
+        pass
+
+    assert_parse_args(foo, "--color RED", Color.RED)
+
+
+@pytest.mark.parametrize("choices", [str, list[str], [1, 2], 3])
+def test_choices_rejects_non_string_values(choices):
+    with pytest.raises(TypeError):
+        Parameter(choices=choices)
+
+
+def test_choices_json_list_expanded_before_validation(app, assert_parse_args):
+    @app.default
+    def foo(envs: Annotated[list[str], Parameter(choices=["dev", "prod"], json_list=True)]):
+        pass
+
+    assert_parse_args(foo, ["--envs", '["dev", "prod"]'], ["dev", "prod"])
+    with pytest.raises(CoercionError):
+        app(["--envs", '["dev", "nope"]'], exit_on_error=False)
+
+
+def test_choices_not_inherited_by_children(app, assert_parse_args):
+    @dataclass
+    class Cfg:
+        name: str
+        level: int
+
+    @app.default
+    def foo(cfg: Annotated[Cfg, Parameter(choices=["a", "b"])]):
+        pass
+
+    assert_parse_args(foo, "--cfg.name a --cfg.level 3", Cfg("a", 3))
+
+
+def test_choices_skipped_for_multi_token_elements(app, assert_parse_args):
+    @app.default
+    def foo(x: Annotated[tuple[str, int], Parameter(choices=["a", "b"])]):
+        pass
+
+    assert_parse_args(foo, "--x a 1", ("a", 1))
+
+
+def test_choices_converter_error_not_reported_as_bad_choice(app):
+    """A converter failure on a *valid* choice gets the normal conversion error."""
+
+    def bad(type_, tokens):
+        raise ValueError
+
+    @app.default
+    def foo(env: Annotated[str, Parameter(choices=["dev"], converter=bad)]):
+        pass
+
+    with pytest.raises(CoercionError) as e:
+        app("--env dev", exit_on_error=False)
+    assert "Choose from" not in str(e.value)
 
 
 def test_choices_literal_display_and_validation(app, console):

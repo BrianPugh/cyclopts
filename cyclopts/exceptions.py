@@ -359,13 +359,7 @@ class CoercionError(CycloptsError):
 
         choice_strs: list[str] | None = None
         plain_choices: list[str] | None = None
-        if self.argument.parameter.choices:
-            # Explicit ``Parameter.choices`` override; takes precedence over the
-            # type hint, mirroring ``Argument.get_choices``.
-            choices = self.argument.parameter.choices
-            choice_strs = [f'"{x}"' for x in choices]
-            plain_choices = list(choices)
-        elif get_origin(self.target_type) is Literal:
+        if get_origin(self.target_type) is Literal:
             args = get_args(self.target_type)
             choice_strs = [f'"{x}"' if isinstance(x, str) else repr(x) for x in args]
             plain_choices = [x for x in args if isinstance(x, str)]

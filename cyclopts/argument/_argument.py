@@ -7,8 +7,9 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from contextlib import suppress
+from enum import Enum
 from functools import partial, reduce
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
 
 from attrs import define, field
 
@@ -295,8 +296,6 @@ class Argument:
                 self._missing_keys_checker = None
 
     def _update_lookup(self, field_infos: dict[str, FieldInfo]):
-        from typing import Literal
-
         discriminator = get_annotated_discriminator(self.field_info.annotation)
 
         for key, field_info in field_infos.items():
@@ -715,18 +714,6 @@ class Argument:
                         msg=e.args[0] if e.args else None, argument=self, target_type=hint, token=token
                     ) from e
 
-        if self.parse and not self.parameter.count and self.parameter.choices:
-            # Validate raw token values against the explicit choices *before* the
-            # converter runs, so a custom converter only ever sees a valid member
-            # (and a bad value yields the standard "Choose from" error, not a
-            # converter-internal exception/traceback).
-            allowed = set(self.parameter.choices)
-            for token in self.tokens:
-                if token.keys or token.implicit_value is not UNSET:
-                    continue
-                if token.value not in allowed:
-                    raise CoercionError(token=token, argument=self, target_type=self.hint)
-
         if not self.parse:
             out = UNSET
         elif self.parameter.count:
@@ -760,6 +747,8 @@ class Argument:
                         yield token
 
             expanded_tokens = list(expand_tokens(self.tokens))
+            if self.parameter.choices:
+                self._validate_choices(expanded_tokens)
             for token in expanded_tokens:
                 resolved_hint = resolve_optional(self.hint)
                 if token.implicit_value is not UNSET and isinstance(
@@ -1183,8 +1172,43 @@ class Argument:
         """
         return self.token_count() == (0, False)
 
+    def _explicit_choices(self) -> tuple[str, ...]:
+        """Resolve ``Parameter.choices`` to strings; empty when not set."""
+        choices = self.parameter.choices
+        if not choices:
+            return ()
+        if isinstance(choices, tuple):
+            return choices
+        return tuple(get_choices_from_hint(choices, self.parameter.name_transform))  # pyright: ignore[reportArgumentType]
+
+    def _validate_choices(self, tokens: "Sequence[Token]"):
+        """Reject tokens outside ``Parameter.choices`` before conversion.
+
+        Runs before the converter so a custom converter only ever sees a valid member
+        and an invalid value gets the standard "Choose from" error.
+        """
+        tokens_per_element, _ = self.token_count()
+        if tokens_per_element != 1:
+            # Choices describe a single value; undefined for multi-token elements like tuple[str, int].
+            return
+        choices = self._explicit_choices()
+        # Enum choices are matched like get_enum_member: name_transform applied to both sides.
+        normalize = (
+            self.parameter.name_transform
+            if isinstance(self.parameter.choices, type) and issubclass(self.parameter.choices, Enum)
+            else None
+        )
+        for token in tokens:
+            if token.keys or token.implicit_value is not UNSET:
+                continue
+            value = normalize(token.value) if normalize else token.value
+            if value not in choices:
+                raise CoercionError(token=token, argument=self, target_type=Literal[choices])  # pyright: ignore
+
     def get_choices(self, force: bool = False) -> tuple[str, ...] | None:
-        """Extract completion choices from type hint.
+        """Choices for the help page and shell completion.
+
+        ``Parameter.choices`` takes precedence; otherwise derived from the type hint.
 
         Extracts choices from Literal types, Enum types, and Union types containing them.
         Respects the Parameter.show_choices setting unless force=True.
@@ -1212,10 +1236,8 @@ class Argument:
         """
         if not force and not self.parameter.show_choices:
             return None
-        if self.parameter.choices:
-            # Explicit override; decoupled from the type hint. Used verbatim for both
-            # the help page and shell completion.
-            return tuple(self.parameter.choices)
+        if explicit := self._explicit_choices():
+            return explicit
         choices = get_choices_from_hint(self.hint, self.parameter.name_transform)
         return tuple(choices) if choices else None
 

@@ -88,23 +88,25 @@ def _str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
     return cast(tuple[str, ...], to_tuple_converter(value))
 
 
-def _choices_converter(value: Any) -> tuple[str, ...]:
-    """Normalize ``Parameter.choices`` into a tuple of choice strings.
+def _choices_converter(value: Any) -> "tuple[str, ...] | type | None":
+    """Normalize ``Parameter.choices``.
 
-    Accepts an explicit iterable of strings, or a type hint from which choices
-    can be derived (``Literal``, ``Enum``, unions thereof, and aliases via
-    ``TypeAliasType``) -- resolved with the same logic as hint-derived choices.
+    An iterable of strings becomes a tuple. A type hint (``Literal``, ``Enum``,
+    unions thereof, ``TypeAliasType``) is stored as-is so :meth:`Argument.get_choices`
+    can resolve it with the parameter's ``name_transform``.
     """
     if value is None:
-        return ()
+        return None
     if not isinstance(value, str):
+        # cyclopts.argument.utils imports Parameter; import lazily to avoid the cycle.
         from cyclopts.argument.utils import get_choices_from_hint
-        from cyclopts.utils import default_name_transform
 
-        hint_choices = get_choices_from_hint(value, default_name_transform)
-        if hint_choices:
-            return tuple(hint_choices)
-    return _str_tuple_converter(value)
+        if get_choices_from_hint(value, default_name_transform):
+            return value
+    out = _str_tuple_converter(value)
+    if not all(isinstance(x, str) for x in out):
+        raise TypeError("Parameter.choices must be an iterable of strings or a Literal/Enum type hint.")
+    return out
 
 
 def _validator_tuple_converter(
@@ -311,9 +313,8 @@ class Parameter:
         kw_only=True,
     )
 
-    # Stored as a Tuple[str, ...]; an empty tuple means "derive from the type hint".
-    # Accepts an iterable of strings, or a type hint (Literal/Enum/unions/aliases).
-    choices: None | str | Iterable[str] | Any = field(
+    # Either a Tuple[str, ...] or an unresolved type hint (resolved in Argument.get_choices).
+    choices: None | str | Iterable[str] | type = field(
         default=None,
         converter=_choices_converter,
         kw_only=True,
