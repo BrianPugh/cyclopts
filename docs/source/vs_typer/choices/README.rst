@@ -79,4 +79,25 @@ Cyclopts has builtin support for :obj:`~typing.Literal`, see :ref:`Coercion Rule
    cyclopts_app(cmd)
    # Using: staging
 
+----------------
+Explicit Choices
+----------------
+Both approaches above tie the choices to the parameter's *type*.
+When you want the choices decoupled from the runtime type (e.g. keep a plain ``str``, present a set of user-facing keys for a parameter annotated with some other class, or simply customize what's shown on the help page and offered by shell completion), use :attr:`Parameter.choices <cyclopts.Parameter.choices>`.
+
+.. code-block:: python
+
+   import cyclopts
+   from cyclopts import Parameter
+   from typing import Annotated
+
+   cyclopts_app = cyclopts.App()
+
+   @cyclopts_app.default
+   def foo(env: Annotated[str, Parameter(choices=["dev", "staging", "prod"])] = "staging"):
+       print(f"Using: {env}")
+
+   cyclopts_app(["--env", "staging"])
+   # Using: staging
+
 .. _a feature request from early 2020: https://github.com/tiangolo/typer/issues/76
