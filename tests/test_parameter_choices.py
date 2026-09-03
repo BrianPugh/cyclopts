@@ -223,7 +223,7 @@ class EmptyEnum(Enum):
     pass
 
 
-@pytest.mark.parametrize("choices", [str, list[str], [1, 2], 3, EmptyEnum])
+@pytest.mark.parametrize("choices", [str, list[str], [1, 2], 3, EmptyEnum, (), []])
 def test_choices_rejects_non_string_values(choices):
     with pytest.raises(TypeError):
         Parameter(choices=choices)
@@ -248,6 +248,10 @@ class Model(BaseModel):
     mode: Annotated[str, Parameter(choices=("a", "b"))] = "a"
 
 
+class EnumModel(BaseModel):
+    color: Annotated[Color, Parameter(choices=Color)]
+
+
 @pytest.mark.parametrize("hint", [Cfg, tuple[str, int], bool])
 def test_choices_unsupported_hint_raises_at_definition(hint):
     def foo(x: Annotated[hint, Parameter(choices=["a", "b"])]):  # pyright: ignore[reportInvalidTypeForm]
@@ -266,6 +270,24 @@ def test_choices_enforced_for_pydantic_field(app, assert_parse_args):
     with pytest.raises(CoercionError) as e:
         app("--m.mode bad", exit_on_error=False)
     assert 'Choose from: "a", "b".' in str(e.value)
+
+
+def test_choices_canonical_spelling_reaches_pydantic_enum(app, assert_parse_args):
+    """The listed spelling (``RED`` -> ``red``) must survive to pydantic, not the raw input.
+
+    ``_validate_choices`` normalizes ``RED`` to the listed ``red`` before conversion; the
+    pydantic path must persist that rewrite, otherwise pydantic sees ``RED`` and rejects it.
+    """
+
+    @app.default
+    def foo(m: EnumModel):
+        pass
+
+    assert_parse_args(foo, "--m.color RED", EnumModel(color=Color.RED))
+    assert_parse_args(foo, "--m.color green", EnumModel(color=Color.GREEN))
+    with pytest.raises(CoercionError) as e:
+        app("--m.color purple", exit_on_error=False)
+    assert 'Choose from: "red", "green", "blue".' in str(e.value)
 
 
 def test_choices_enforced_for_dict_values(app, assert_parse_args):

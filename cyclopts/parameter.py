@@ -106,6 +106,8 @@ def _choices_converter(value: Any) -> tuple[str, ...] | type | None:
     out = _str_tuple_converter(value)
     if not all(isinstance(x, str) for x in out):
         raise TypeError("Parameter.choices must be an iterable of strings or a Literal/Enum type hint.")
+    if not out:
+        raise TypeError("Parameter.choices cannot be an empty iterable.")
     return out
 
 

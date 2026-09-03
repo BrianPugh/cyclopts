@@ -684,7 +684,9 @@ class Argument:
 
             for child in self.children_recursive:
                 if child.parameter.choices and child.has_tokens:
-                    child._validate_choices(child._expand_json_list_tokens(child.tokens))
+                    # Persist the canonicalized tokens so ``_json`` (and pydantic) see the
+                    # listed spelling rather than the raw input (e.g. Enum ``RED`` -> ``red``).
+                    child.tokens = child._validate_choices(child._expand_json_list_tokens(child.tokens))
             unstructured_data = self._json()
             try:
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
