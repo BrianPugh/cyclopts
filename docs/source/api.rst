@@ -1369,24 +1369,14 @@ API
       ``choices=Literal["a", "b", "c"]`` is equivalent to ``choices=("a", "b", "c")``.
       ``choices=SomeEnum`` uses the :attr:`name_transform`-ed member names.
 
-      Matching is an exact string match, so config-file values must already be
-      strings (``mode = "true"``, not ``mode = true``). When an ``Enum`` is involved
-      (in ``choices`` or in the type hint) matching follows the ``Enum`` converter
-      instead: :attr:`name_transform` is applied to both sides, and the token is
-      rewritten to the listed spelling before the :attr:`converter` sees it.
-
-      ``choices`` replaces the hint-derived choices rather than restricting them; a
-      listed value that the type hint cannot convert still fails at conversion, so
-      pair a ``Literal``/``Enum`` hint with values it accepts or supply a
-      :attr:`converter`.
-
-      Validation applies to each single-token value: scalars, the elements of
-      ``list[str]`` (a JSON-list token is expanded first when it is parsed as one,
-      e.g. with :attr:`json_list`), and the values of ``dict[str, str]`` /
-      ``**kwargs``. Flags, multi-token elements such as
-      ``tuple[str, int]``, and keyword-accepting classes (dataclasses, pydantic
-      models, ...) raise a ``ValueError`` at definition time; annotate the
-      individual fields instead.
+      Matching is case-sensitive; a config value is compared via its ``str()``, so a
+      non-string config value works when its string form is a listed choice (TOML
+      ``n = 3`` matches ``"3"``), but a boolean ``mode = true`` stringifies to ``"True"``
+      and will not match a lowercase ``"true"``. When an ``Enum`` is involved (in
+      ``choices`` or in the type hint) matching instead follows the ``Enum`` converter:
+      :attr:`name_transform` is applied to both sides (case-insensitive,
+      hyphen/underscore-tolerant) and the token is rewritten to the listed spelling
+      before the :attr:`converter` sees it.
 
       This is primarily useful when a parameter is annotated with its runtime
       type (e.g. a class) but should present a small set of user-facing keys.
@@ -1419,7 +1409,7 @@ API
           def main(
               color: Annotated[
                   Color,
-                  Parameter(accepts_keys=False, converter=to_color, choices=tuple(colors)),
+                  Parameter(accepts_keys=False, converter=to_color, choices=colors),
               ] = colors["red"],
           ):
               print(color)
