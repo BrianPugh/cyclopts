@@ -594,7 +594,13 @@ def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | N
     ):
         return None
     choice = "CHOICE" if in_usage or not argument.get_choices() else ""
-    metavar = _type_metavar(hint, choice=choice)
+    if argument._explicit_choices():
+        # An explicit ``Parameter.choices`` describes the value exactly like a
+        # ``Literal``/``Enum`` hint does: the placeholder is ``CHOICE`` (dropped in panel
+        # rows where the ``[choices]`` list is shown), never the underlying type name.
+        metavar = choice
+    else:
+        metavar = _type_metavar(hint, choice=choice)
     n_tokens = argument.parameter.n_tokens
     if metavar and n_tokens and get_origin(resolved) is not tuple:
         metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)

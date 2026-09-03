@@ -733,7 +733,9 @@ A **metavar** is the placeholder standing in for a parameter's *value*, e.g. the
 it is :obj:`None` for boolean flags, :attr:`count <cyclopts.Parameter.count>` parameters, and ``dict`` parameters
 (populated only through ``--name.KEY VALUE``), which consume none.
 The default derives from the parameter's **type** (:class:`~pathlib.Path` → ``PATH``, :class:`str` → ``STR``,
-``Literal``/``Enum`` → ``CHOICE``); :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it. For an optional type the ``None`` is
+``Literal``/``Enum`` → ``CHOICE``); an explicit :attr:`Parameter.choices <cyclopts.Parameter.choices>` also yields
+``CHOICE`` regardless of the underlying type, since the choice list describes the value.
+:attr:`Parameter.metavar <cyclopts.Parameter.metavar>` overrides it. For an optional type the ``None`` is
 stripped, so ``Path | None`` yields ``PATH`` rather than ``PATH|NONE`` (the value you provide is always a
 :class:`~pathlib.Path`; its absence is conveyed by the parameter being optional). Tuples render one placeholder
 per token, the way the values are typed on the command line: ``tuple[int, int]`` → ``INT INT`` and

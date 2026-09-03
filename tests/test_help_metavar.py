@@ -307,6 +307,50 @@ def test_metavar_choice_for_literal_and_enum(app):
     assert shown.choices == ("x", "y")
 
 
+def test_metavar_choice_for_explicit_parameter_choices(app):
+    """An explicit ``Parameter.choices`` derives ``CHOICE`` like ``Literal``/``Enum``, not the underlying type name.
+
+    The choice list describes the value, so a plain ``int``/``str`` carrying ``choices``
+    shows ``CHOICE`` in usage and is suppressed in the panel (where ``[choices]`` is listed),
+    exactly like a ``Literal`` hint. With ``show_choices=False`` the placeholder stays ``CHOICE``.
+    """
+
+    @app.default
+    def main(
+        *,
+        num: Annotated[int, Parameter(choices=["1", "2", "3"])] = 1,
+        color: Annotated[str, Parameter(choices=["red", "green"])] = "red",
+        hidden: Annotated[int, Parameter(choices=["1", "2"], show_choices=False)] = 1,
+        plain: int = 0,
+    ):
+        pass
+
+    num, color, hidden, plain = _parameter_entries(app)
+    # Panel rows: the ``[choices]`` list stands in for the placeholder.
+    assert num.metavar is None
+    assert num.choices == ("1", "2", "3")
+    assert color.metavar is None
+    assert color.choices == ("red", "green")
+    # ``show_choices=False`` hides the list, so the ``CHOICE`` placeholder returns.
+    assert hidden.metavar == "CHOICE"
+    # A plain type without choices is unaffected.
+    assert plain.metavar == "INT"
+
+
+def test_usage_keeps_choice_metavar_for_explicit_parameter_choices(app, console: Console):
+    """The usage line has no ``[choices]`` list, so a ``Parameter.choices`` keyword keeps ``CHOICE`` there."""
+
+    @app.default
+    def main(*, num: Annotated[int, Parameter(choices=["1", "2", "3"])]):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    actual = capture.get()
+    assert "Usage: test_help_metavar --num CHOICE" in actual
+    assert "[choices: 1, 2, 3]" in actual
+
+
 def test_explicit_metavar_shown_alongside_choices(app, console: Console):
     """An explicit metavar is never suppressed by a ``[choices]`` list."""
 
