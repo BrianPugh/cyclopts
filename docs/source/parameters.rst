@@ -470,6 +470,40 @@ Alternatively, you can reference the classmethod directly in function annotation
 
 **Note on classmethod signatures**: Classmethods used as converters should have the signature ``(cls, tokens)`` rather than ``(type_, tokens)``. Cyclopts automatically detects bound methods and calls them with just the ``tokens`` parameter, since ``cls`` is already bound.
 
+-------
+Choices
+-------
+By default, the set of allowed values shown on the help page (and offered by :doc:`shell completion <shell_completion>`) is derived from the parameter's type hint: :obj:`~typing.Literal`, :class:`~enum.Enum`, and unions thereof (see :ref:`Coercion Rules - Literal <Coercion Rules - Literal>`).
+
+Sometimes you want to state those choices explicitly, decoupled from the runtime type. :attr:`Parameter.choices <cyclopts.Parameter.choices>` values are used verbatim for the help page and shell completion, and any token that isn't one of them is rejected **before** the :attr:`~cyclopts.Parameter.converter` runs.
+
+.. code-block:: python
+
+   from cyclopts import App, Parameter
+   from typing import Annotated
+
+   app = App()
+
+   @app.default
+   def main(env: Annotated[str, Parameter(choices=["dev", "staging", "prod"])] = "dev"):
+       print(f"Deploying to {env}")
+
+   app()
+
+.. code-block:: console
+
+   $ my-script staging
+   Deploying to staging
+
+   $ my-script bad
+   ╭─ Error ──────────────────────────────────────────────────────────────────────╮
+   │ Invalid value "bad" for ENV. Choose from: "dev", "staging", "prod".          │
+   ╰──────────────────────────────────────────────────────────────────────────────╯
+
+This constrains a plain ``str`` to a fixed set without introducing a :obj:`~typing.Literal`.
+It's most useful when a parameter is annotated with its runtime type (e.g. a class) but should present a small set of user-facing keys: pair ``choices`` with a :attr:`~cyclopts.Parameter.converter` that maps those keys to the runtime value.
+See :attr:`Parameter.choices <cyclopts.Parameter.choices>` for information.
+
 ----------------
 Validating Input
 ----------------
