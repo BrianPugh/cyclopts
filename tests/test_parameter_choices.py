@@ -4,9 +4,10 @@ decoupled from the annotated type (see issue #886).
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 import pytest
+from pydantic import BaseModel
 
 from cyclopts import Parameter
 from cyclopts.argument import ArgumentCollection
@@ -142,8 +143,6 @@ def test_choices_default_not_validated(app, assert_parse_args):
     ):
         pass
 
-    # No token supplied -> parsing succeeds without validating the (internal-type,
-    # non-member) default; the signature default is applied by Python at call time.
     assert_parse_args(foo, "")
 
 
@@ -155,8 +154,8 @@ def test_choices_completion_force(app):
         pass
 
     (argument,) = [a for a in ArgumentCollection._from_callable(foo) if a.name == "--env"]
-    assert argument.get_choices() is None  # suppressed on the help page
-    assert argument.get_choices(force=True) == ("dev", "prod")  # still offered to completion
+    assert argument.get_choices() is None
+    assert argument.get_choices(force=True) == ("dev", "prod")
 
 
 def _argument(func, name):
@@ -194,17 +193,37 @@ def test_choices_enum_uses_name_transform():
     assert _argument(foo, "--LOUD").get_choices() == ("RED", "GREEN", "BLUE")
 
 
-def test_choices_enum_validation_normalizes_like_converter(app, assert_parse_args):
-    """Input accepted by the Enum converter (case/underscore variants) is also accepted with ``choices``."""
+@pytest.mark.parametrize("choices", [Color, Optional[Color], ("red", "green", "blue")])
+def test_choices_enum_validation_normalizes_like_converter(app, assert_parse_args, choices):
+    """Whenever an Enum is involved (in ``choices`` or the hint), matching follows ``get_enum_member``."""
 
     @app.default
-    def foo(color: Annotated[Color, Parameter(choices=Color)]):
+    def foo(color: Annotated[Color, Parameter(choices=choices)]):
         pass
 
     assert_parse_args(foo, "--color RED", Color.RED)
 
 
-@pytest.mark.parametrize("choices", [str, list[str], [1, 2], 3])
+def test_choices_enum_converter_receives_listed_spelling(app, assert_parse_args):
+    seen = []
+
+    def converter(type_, tokens):
+        seen.append(tokens[0].value)
+        return tokens[0].value
+
+    @app.default
+    def foo(color: Annotated[str, Parameter(choices=Color, converter=converter)]):
+        pass
+
+    assert_parse_args(foo, "--color RED", "red")
+    assert seen == ["red"]
+
+
+class EmptyEnum(Enum):
+    pass
+
+
+@pytest.mark.parametrize("choices", [str, list[str], [1, 2], 3, EmptyEnum])
 def test_choices_rejects_non_string_values(choices):
     with pytest.raises(TypeError):
         Parameter(choices=choices)
@@ -220,25 +239,53 @@ def test_choices_json_list_expanded_before_validation(app, assert_parse_args):
         app(["--envs", '["dev", "nope"]'], exit_on_error=False)
 
 
-def test_choices_not_inherited_by_children(app, assert_parse_args):
-    @dataclass
-    class Cfg:
-        name: str
-        level: int
+@dataclass
+class Cfg:
+    name: str
 
-    @app.default
-    def foo(cfg: Annotated[Cfg, Parameter(choices=["a", "b"])]):
+
+class Model(BaseModel):
+    mode: Annotated[str, Parameter(choices=("a", "b"))] = "a"
+
+
+@pytest.mark.parametrize("hint", [Cfg, tuple[str, int], bool])
+def test_choices_unsupported_hint_raises_at_definition(hint):
+    def foo(x: Annotated[hint, Parameter(choices=["a", "b"])]):  # pyright: ignore[reportInvalidTypeForm]
         pass
 
-    assert_parse_args(foo, "--cfg.name a --cfg.level 3", Cfg("a", 3))
+    with pytest.raises(ValueError, match="single-token"):
+        ArgumentCollection._from_callable(foo)
 
 
-def test_choices_skipped_for_multi_token_elements(app, assert_parse_args):
+def test_choices_enforced_for_pydantic_field(app, assert_parse_args):
     @app.default
-    def foo(x: Annotated[tuple[str, int], Parameter(choices=["a", "b"])]):
+    def foo(m: Model):
         pass
 
-    assert_parse_args(foo, "--x a 1", ("a", 1))
+    assert_parse_args(foo, "--m.mode b", Model(mode="b"))
+    with pytest.raises(CoercionError) as e:
+        app("--m.mode bad", exit_on_error=False)
+    assert 'Choose from: "a", "b".' in str(e.value)
+
+
+def test_choices_enforced_for_dict_values(app, assert_parse_args):
+    @app.default
+    def foo(x: Annotated[dict[str, str], Parameter(choices=["a", "b"])]):
+        pass
+
+    assert_parse_args(foo, "--x.k a", {"k": "a"})
+    with pytest.raises(CoercionError):
+        app("--x.k bad", exit_on_error=False)
+
+
+def test_choices_enforced_for_var_keyword(app, assert_parse_args):
+    @app.default
+    def foo(**kwargs: Annotated[str, Parameter(choices=["a", "b"])]):
+        pass
+
+    assert_parse_args(foo, "--foo a", foo="a")
+    with pytest.raises(CoercionError):
+        app("--foo bad", exit_on_error=False)
 
 
 def test_choices_converter_error_not_reported_as_bad_choice(app):

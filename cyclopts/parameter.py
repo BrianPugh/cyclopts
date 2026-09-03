@@ -26,6 +26,7 @@ from cyclopts._convert import _abstract_to_concrete_type_mapping
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     NoneType,
+    get_choices_from_hint,
     is_annotated,
     is_nonetype,
     is_union,
@@ -88,7 +89,7 @@ def _str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
     return cast(tuple[str, ...], to_tuple_converter(value))
 
 
-def _choices_converter(value: Any) -> "tuple[str, ...] | type | None":
+def _choices_converter(value: Any) -> tuple[str, ...] | type | None:
     """Normalize ``Parameter.choices``.
 
     An iterable of strings becomes a tuple. A type hint (``Literal``, ``Enum``,
@@ -98,11 +99,10 @@ def _choices_converter(value: Any) -> "tuple[str, ...] | type | None":
     if value is None:
         return None
     if not isinstance(value, str):
-        # cyclopts.argument.utils imports Parameter; import lazily to avoid the cycle.
-        from cyclopts.argument.utils import get_choices_from_hint
-
         if get_choices_from_hint(value, default_name_transform):
             return value
+        if isinstance(value, type):
+            raise TypeError(f"Parameter.choices type hint {value!r} yields no choices.")
     out = _str_tuple_converter(value)
     if not all(isinstance(x, str) for x in out):
         raise TypeError("Parameter.choices must be an iterable of strings or a Literal/Enum type hint.")

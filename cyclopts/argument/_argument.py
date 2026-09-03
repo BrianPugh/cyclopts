@@ -7,7 +7,6 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from contextlib import suppress
-from enum import Enum
 from functools import partial, reduce
 from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
 
@@ -22,8 +21,10 @@ from cyclopts._convert import (
 )
 from cyclopts.annotations import (
     ITERABLE_TYPES,
+    contains_enum,
     contains_hint,
     get_annotated_discriminator,
+    get_choices_from_hint,
     get_hint_name,
     is_attrs,
     is_dataclass,
@@ -60,13 +61,17 @@ from cyclopts.utils import UNSET, grouper, is_builtin, parse_version
 
 from .utils import (
     enum_flag_from_dict,
-    get_choices_from_hint,
     missing_keys_factory,
     startswith,
 )
 
 if TYPE_CHECKING:
     from cyclopts.argument._collection import ArgumentCollection
+
+_CHOICES_UNSUPPORTED = (
+    "Parameter(choices=...) only supports single-token value types (not flags, multi-token tuples, "
+    "or keyword-accepting classes); got {hint}. Annotate the individual fields instead."
+)
 
 
 @define(kw_only=True)
@@ -216,6 +221,9 @@ class Argument:
                 )
             return
 
+        if self.parameter.choices and self.token_count()[0] != 1:
+            raise ValueError(_CHOICES_UNSUPPORTED.format(hint=self.hint))
+
         if self.parameter.accepts_keys is False:
             return
 
@@ -294,6 +302,9 @@ class Argument:
                 # (yielding phantom fields like ``origin``); branch-aware gating in
                 # :meth:`_convert` supersedes it.
                 self._missing_keys_checker = None
+
+        if self.parameter.choices and self._accepts_keywords and not any(dict in {h, get_origin(h)} for h in hints):
+            raise ValueError(_CHOICES_UNSUPPORTED.format(hint=self.hint))
 
     def _update_lookup(self, field_infos: dict[str, FieldInfo]):
         discriminator = get_annotated_discriminator(self.field_info.annotation)
@@ -671,6 +682,9 @@ class Argument:
         if self.has_tokens:
             import pydantic
 
+            for child in self.children_recursive:
+                if child.parameter.choices and child.has_tokens:
+                    child._validate_choices(child._expand_json_list_tokens(child.tokens))
             unstructured_data = self._json()
             try:
                 return pydantic.TypeAdapter(self.field_info.annotation).validate_python(unstructured_data)
@@ -722,33 +736,9 @@ class Argument:
             positional: list[Token] = []
             keyword = {}
 
-            def expand_tokens(tokens):
-                for token in tokens:
-                    if self._should_attempt_json_list(token):
-                        try:
-                            parsed_json = json.loads(token.value)
-                        except json.JSONDecodeError as e:
-                            raise CoercionError(token=token, target_type=self.hint) from e
-
-                        if not isinstance(parsed_json, list):
-                            raise CoercionError(token=token, target_type=self.hint)
-
-                        if not parsed_json:
-                            yield token.evolve(value="", implicit_value=[])
-                        else:
-                            for element in parsed_json:
-                                if element is None:
-                                    yield token.evolve(value="", implicit_value=element)
-                                elif isinstance(element, dict):
-                                    yield token.evolve(value=json.dumps(element))
-                                else:
-                                    yield token.evolve(value=str(element))
-                    else:
-                        yield token
-
-            expanded_tokens = list(expand_tokens(self.tokens))
+            expanded_tokens = self._expand_json_list_tokens(self.tokens)
             if self.parameter.choices:
-                self._validate_choices(expanded_tokens)
+                expanded_tokens = self._validate_choices(expanded_tokens)
             for token in expanded_tokens:
                 resolved_hint = resolve_optional(self.hint)
                 if token.implicit_value is not UNSET and isinstance(
@@ -1181,29 +1171,57 @@ class Argument:
             return choices
         return tuple(get_choices_from_hint(choices, self.parameter.name_transform))  # pyright: ignore[reportArgumentType]
 
-    def _validate_choices(self, tokens: "Sequence[Token]"):
-        """Reject tokens outside ``Parameter.choices`` before conversion.
+    def _expand_json_list_tokens(self, tokens: Sequence[Token]) -> list[Token]:
+        """Split JSON-list tokens into one token per element."""
+        out = []
+        for token in tokens:
+            if not self._should_attempt_json_list(token):
+                out.append(token)
+                continue
+            try:
+                parsed_json = json.loads(token.value)
+            except json.JSONDecodeError as e:
+                raise CoercionError(token=token, target_type=self.hint) from e
+            if not isinstance(parsed_json, list):
+                raise CoercionError(token=token, target_type=self.hint)
+            if not parsed_json:
+                out.append(token.evolve(value="", implicit_value=[]))
+            for element in parsed_json:
+                if element is None:
+                    out.append(token.evolve(value="", implicit_value=element))
+                elif isinstance(element, dict):
+                    out.append(token.evolve(value=json.dumps(element)))
+                else:
+                    out.append(token.evolve(value=str(element)))
+        return out
 
-        Runs before the converter so a custom converter only ever sees a valid member
-        and an invalid value gets the standard "Choose from" error.
+    def _validate_choices(self, tokens: Sequence[Token]) -> list[Token]:
+        """Reject tokens outside ``Parameter.choices``; rewrite matches to the listed spelling.
+
+        Runs before the converter so it only ever sees a listed choice. When an ``Enum`` is
+        involved (in ``choices`` or the type hint) matching follows :func:`get_enum_member`:
+        ``name_transform`` is applied to both sides.
         """
-        tokens_per_element, _ = self.token_count()
-        if tokens_per_element != 1:
-            # Choices describe a single value; undefined for multi-token elements like tuple[str, int].
-            return
         choices = self._explicit_choices()
-        # Enum choices are matched like get_enum_member: name_transform applied to both sides.
+        explicit = self.parameter.choices
         normalize = (
             self.parameter.name_transform
-            if isinstance(self.parameter.choices, type) and issubclass(self.parameter.choices, Enum)
-            else None
+            if (not isinstance(explicit, tuple) and contains_enum(explicit)) or contains_enum(self.hint)
+            else str
         )
+        lookup = {normalize(choice): choice for choice in choices}
+        out = []
         for token in tokens:
-            if token.keys or token.implicit_value is not UNSET:
+            # A non-keyed token on a dict-like leaf is not a single value; let the converter report it.
+            if token.implicit_value is not UNSET or (self._accepts_keywords and not token.keys):
+                out.append(token)
                 continue
-            value = normalize(token.value) if normalize else token.value
-            if value not in choices:
-                raise CoercionError(token=token, argument=self, target_type=Literal[choices])  # pyright: ignore
+            try:
+                canonical = lookup[normalize(token.value)]
+            except KeyError:
+                raise CoercionError(token=token, argument=self, target_type=Literal[choices]) from None  # pyright: ignore
+            out.append(token if canonical == token.value else token.evolve(value=canonical))
+        return out
 
     def get_choices(self, force: bool = False) -> tuple[str, ...] | None:
         """Choices for the help page and shell completion.

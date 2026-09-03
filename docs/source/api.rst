@@ -1367,13 +1367,26 @@ API
       ``choices`` accepts either an iterable of strings, or a type hint to derive
       them from (``Literal``, ``Enum``, unions thereof, and aliases) -- e.g.
       ``choices=Literal["a", "b", "c"]`` is equivalent to ``choices=("a", "b", "c")``.
-      ``choices=SomeEnum`` uses the :attr:`name_transform`-ed member names and, like
-      an ``Enum`` type hint, matches input case-insensitively.
+      ``choices=SomeEnum`` uses the :attr:`name_transform`-ed member names.
 
-      Validation applies to each single-token element (so it works for ``list[str]``,
-      including JSON-list input); it is skipped for multi-token elements such as
-      ``tuple[str, int]``. The check is an exact string match, so config-file values
-      must already be strings (``mode = "true"``, not ``mode = true``).
+      Matching is an exact string match, so config-file values must already be
+      strings (``mode = "true"``, not ``mode = true``). When an ``Enum`` is involved
+      (in ``choices`` or in the type hint) matching follows the ``Enum`` converter
+      instead: :attr:`name_transform` is applied to both sides, and the token is
+      rewritten to the listed spelling before the :attr:`converter` sees it.
+
+      ``choices`` replaces the hint-derived choices rather than restricting them; a
+      listed value that the type hint cannot convert still fails at conversion, so
+      pair a ``Literal``/``Enum`` hint with values it accepts or supply a
+      :attr:`converter`.
+
+      Validation applies to each single-token value: scalars, the elements of
+      ``list[str]`` (a JSON-list token is expanded first when it is parsed as one,
+      e.g. with :attr:`json_list`), and the values of ``dict[str, str]`` /
+      ``**kwargs``. Flags, multi-token elements such as
+      ``tuple[str, int]``, and keyword-accepting classes (dataclasses, pydantic
+      models, ...) raise a ``ValueError`` at definition time; annotate the
+      individual fields instead.
 
       This is primarily useful when a parameter is annotated with its runtime
       type (e.g. a class) but should present a small set of user-facing keys.

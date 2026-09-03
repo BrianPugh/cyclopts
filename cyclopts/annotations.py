@@ -1,10 +1,11 @@
 import inspect
 import sys
 import typing
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from enum import Enum, Flag
+from functools import partial
 from types import UnionType
-from typing import Annotated, Any, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 import attrs
 
@@ -260,3 +261,49 @@ def get_hint_name(hint) -> str:
     if getattr(hint, "_name", None) is not None:
         return hint._name
     return str(hint)
+
+
+def contains_enum(hint) -> bool:
+    """Whether an ``Enum`` appears anywhere in ``hint`` (through ``Annotated``, unions, iterables, aliases)."""
+    hint = resolve_type_alias(hint)
+    return is_enum(hint) or any(contains_enum(arg) for arg in get_args(hint) if arg is not Ellipsis)
+
+
+def get_choices_from_hint(type_: Any, name_transform: Callable[[str], str]) -> list[str]:
+    """Extract completion choices from a type hint.
+
+    Recursively extracts choices from Literal types, Enum types, and Union types.
+
+    Parameters
+    ----------
+    type_ : Any
+        Type annotation to extract choices from.
+    name_transform : Callable[[str], str]
+        Function to transform choice names (e.g., for case conversion).
+
+    Returns
+    -------
+    list[str]
+        List of choice strings extracted from the type hint.
+    """
+    get_choices = partial(get_choices_from_hint, name_transform=name_transform)
+    choices = []
+    _origin = get_origin(type_)
+    if is_enum(type_):
+        choices.extend(name_transform(x) for x in type_.__members__)
+    elif is_union(_origin):
+        inner_choices = [get_choices(inner) for inner in get_args(type_)]
+        for x in inner_choices:
+            if x:
+                choices.extend(x)
+    elif _origin is Literal:
+        choices.extend(str(x) for x in get_args(type_))
+    elif _origin in ITERABLE_TYPES:
+        args = get_args(type_)
+        if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
+            choices.extend(get_choices(args[0]))
+    elif _origin is Annotated:
+        choices.extend(get_choices(resolve_annotated(type_)))
+    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
+        choices.extend(get_choices(type_.__value__))
+    return choices
