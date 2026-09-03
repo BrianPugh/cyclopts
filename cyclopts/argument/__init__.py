@@ -1,5 +1,6 @@
 """Argument and ArgumentCollection classes for CLI parsing."""
 
+from cyclopts.annotations import get_choices_from_hint
 from cyclopts.token import Token
 
 from ._argument import Argument
@@ -8,7 +9,7 @@ from ._collection import (
     _resolve_groups_from_callable,
     update_argument_collection,
 )
-from .utils import get_choices_from_hint, resolve_parameter_name
+from .utils import resolve_parameter_name
 
 __all__ = [
     "Argument",

@@ -1370,6 +1370,80 @@ API
 
       If a variable has a set of choices, display the choices on the help page.
 
+   .. attribute:: choices
+      :type: Union[None, str, Iterable[str], type]
+      :value: None
+
+      Explicit choices, decoupled from the type hint.
+
+      By default the displayed/completed choices are derived from the parameter's
+      type hint (``Literal``, ``Enum``, and unions thereof). Setting ``choices``
+      overrides that derivation: the values are used verbatim for the help page
+      and shell completion, and any CLI/env/config token that is not one of them
+      is rejected with the standard "Choose from" error **before** any
+      :attr:`converter` runs.
+
+      ``choices`` accepts either an iterable of strings, or a type hint to derive
+      them from (``Literal``, ``Enum``, unions thereof, and aliases) -- e.g.
+      ``choices=Literal["a", "b", "c"]`` is equivalent to ``choices=("a", "b", "c")``.
+      ``choices=SomeEnum`` uses the :attr:`name_transform`-ed member names.
+
+      Matching is case-sensitive; a config value is compared via its ``str()``, so a
+      non-string config value works when its string form is a listed choice (TOML
+      ``n = 3`` matches ``"3"``), but a boolean ``mode = true`` stringifies to ``"True"``
+      and will not match a lowercase ``"true"``. When an ``Enum`` is involved (in
+      ``choices`` or in the type hint) matching instead follows the ``Enum`` converter:
+      :attr:`name_transform` is applied to both sides (case-insensitive,
+      hyphen/underscore-tolerant) and the token is rewritten to the listed spelling
+      before the :attr:`converter` sees it.
+
+      This is primarily useful when a parameter is annotated with its runtime
+      type (e.g. a class) but should present a small set of user-facing keys.
+      Pair it with a :attr:`converter` that maps those keys to the runtime type,
+      and source ``choices`` from the same object so the two cannot drift:
+
+      .. code-block:: python
+
+          from dataclasses import dataclass
+          from typing import Annotated
+
+          from cyclopts import App, Parameter
+
+          app = App()
+
+
+          @dataclass
+          class Color:
+              rgb: str
+
+
+          colors = {"red": Color("#f00"), "green": Color("#0f0"), "blue": Color("#00f")}
+
+
+          def to_color(type_, tokens):
+              return colors[tokens[0].value]
+
+
+          @app.default
+          def main(
+              color: Annotated[
+                  Color,
+                  Parameter(accepts_keys=False, converter=to_color, choices=colors),
+              ] = colors["red"],
+          ):
+              print(color)
+
+
+          app()
+
+      .. code-block:: console
+
+          $ my-script --color green
+          Color(rgb='#0f0')
+
+      ``choices`` also works standalone (without a :attr:`converter`) to constrain
+      a plain ``str`` parameter to a fixed set without introducing a ``Literal``.
+
    .. attribute:: help
       :type: Optional[str]
       :value: None
