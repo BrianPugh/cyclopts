@@ -26,6 +26,7 @@ from cyclopts._convert import _abstract_to_concrete_type_mapping
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     NoneType,
+    get_choices_from_hint,
     is_annotated,
     is_nonetype,
     is_union,
@@ -86,6 +87,28 @@ def _not_hyphen_validator(instance, attribute, values):
 
 def _str_tuple_converter(value: str | Iterable[str] | None) -> tuple[str, ...]:
     return cast(tuple[str, ...], to_tuple_converter(value))
+
+
+def _choices_converter(value: Any) -> tuple[str, ...] | type | None:
+    """Normalize ``Parameter.choices``.
+
+    An iterable of strings becomes a tuple. A type hint (``Literal``, ``Enum``,
+    unions thereof, ``TypeAliasType``) is stored as-is so :meth:`Argument.get_choices`
+    can resolve it with the parameter's ``name_transform``.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        if get_choices_from_hint(value, default_name_transform):
+            return value
+        if isinstance(value, type):
+            raise TypeError(f"Parameter.choices type hint {value!r} yields no choices.")
+    out = _str_tuple_converter(value)
+    if not all(isinstance(x, str) for x in out):
+        raise TypeError("Parameter.choices must be an iterable of strings or a Literal/Enum type hint.")
+    if not out:
+        raise TypeError("Parameter.choices cannot be an empty iterable.")
+    return out
 
 
 def _validator_tuple_converter(
@@ -289,6 +312,13 @@ class Parameter:
     show_choices: bool = field(
         default=None,
         converter=_default_if_none_true,
+        kw_only=True,
+    )
+
+    # Either a Tuple[str, ...] or an unresolved type hint (resolved in Argument.get_choices).
+    choices: None | str | Iterable[str] | type = field(
+        default=None,
+        converter=_choices_converter,
         kw_only=True,
     )
 

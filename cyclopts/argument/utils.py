@@ -3,9 +3,8 @@
 import sys
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import suppress
-from enum import Enum, Flag
-from functools import partial
-from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar, get_args, get_origin
+from enum import Flag
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from cyclopts.argument._argument import Argument
@@ -13,12 +12,6 @@ if TYPE_CHECKING:
 F = TypeVar("F", bound=Flag)
 
 from cyclopts._convert import convert_enum_flag
-from cyclopts.annotations import (
-    ITERABLE_TYPES,
-    is_class_and_subclass,
-    is_union,
-    resolve_annotated,
-)
 from cyclopts.field_info import (
     KEYWORD_ONLY,
     POSITIONAL_ONLY,
@@ -41,6 +34,7 @@ PARAMETER_SUBKEY_BLOCKER = Parameter(
     validator=None,
     accepts_keys=None,
     env_var=None,
+    choices=None,
 )
 
 KIND_PARENT_CHILD_REASSIGNMENT = {
@@ -70,46 +64,6 @@ KIND_PARENT_CHILD_REASSIGNMENT = {
     (VAR_KEYWORD, VAR_POSITIONAL): None,
     (VAR_KEYWORD, VAR_KEYWORD): VAR_KEYWORD,
 }
-
-
-def get_choices_from_hint(type_: type, name_transform: Callable[[str], str]) -> list[str]:
-    """Extract completion choices from a type hint.
-
-    Recursively extracts choices from Literal types, Enum types, and Union types.
-
-    Parameters
-    ----------
-    type_ : type
-        Type annotation to extract choices from.
-    name_transform : Callable[[str], str]
-        Function to transform choice names (e.g., for case conversion).
-
-    Returns
-    -------
-    list[str]
-        List of choice strings extracted from the type hint.
-    """
-    get_choices = partial(get_choices_from_hint, name_transform=name_transform)
-    choices = []
-    _origin = get_origin(type_)
-    if isinstance(type_, type) and is_class_and_subclass(type_, Enum):
-        choices.extend(name_transform(x) for x in type_.__members__)
-    elif is_union(_origin):
-        inner_choices = [get_choices(inner) for inner in get_args(type_)]
-        for x in inner_choices:
-            if x:
-                choices.extend(x)
-    elif _origin is Literal:
-        choices.extend(str(x) for x in get_args(type_))
-    elif _origin in ITERABLE_TYPES:
-        args = get_args(type_)
-        if len(args) == 1 or (_origin is tuple and len(args) == 2 and args[1] is Ellipsis):
-            choices.extend(get_choices(args[0]))
-    elif _origin is Annotated:
-        choices.extend(get_choices(resolve_annotated(type_)))
-    elif TypeAliasType is not None and isinstance(type_, TypeAliasType):
-        choices.extend(get_choices(type_.__value__))
-    return choices
 
 
 def startswith(string, prefix):
