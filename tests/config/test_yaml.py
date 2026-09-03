@@ -34,6 +34,27 @@ def test_config_yaml(tmp_path):
     }
 
 
+def test_config_yaml_default_encoding_reads_non_ascii(tmp_path):
+    """Non-ASCII content round-trips through the default encoding.
+
+    Written and read with the same (default) encoding, so this is
+    platform-independent -- the default is the locale encoding on Python <3.15
+    (e.g. cp1252 on Windows) and UTF-8 on Python >=3.15 per PEP 686.
+    """
+    fn = tmp_path / "test.yaml"
+    fn.write_text("name: café\n")
+    config = Yaml(fn)
+    assert config.config == {"name": "café"}
+
+
+def test_config_yaml_explicit_encoding(tmp_path):
+    """An explicit ``encoding`` reads a file written in that (non-UTF-8) encoding."""
+    fn = tmp_path / "test.yaml"
+    fn.write_text("name: café\n", encoding="latin-1")
+    config = Yaml(fn, encoding="latin-1")
+    assert config.config == {"name": "café"}
+
+
 @pytest.mark.parametrize("contents", ["", "# only a comment\n"])
 def test_config_yaml_empty_document(tmp_path, contents):
     """An empty (or comments-only) YAML file is an empty config, not a crash."""

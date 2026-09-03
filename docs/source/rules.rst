@@ -800,6 +800,10 @@ The :obj:`~typing.Literal` type is a good option for limiting user input to a se
 Like Union_, the :obj:`~typing.Literal` options will be iterated **left-to-right** until a successful coercion is performed.
 Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typing.Literal` option.
 
+.. note::
+
+   To display and validate a set of choices *without* changing the runtime type, use :attr:`Parameter.choices <cyclopts.Parameter.choices>`.
+
 
 .. code-block:: python
 
@@ -839,6 +843,10 @@ Cyclopts attempts to coerce the input token into the **type** of each :obj:`~typ
 Enum
 ****
 While `Literal`_ is the recommended way of providing the user a set of choices, another method is using :class:`~enum.Enum`.
+
+.. note::
+
+   To display and validate a set of choices *without* changing the runtime type, use :attr:`Parameter.choices <cyclopts.Parameter.choices>`.
 
 The :attr:`Parameter.name_transform <cyclopts.Parameter.name_transform>` gets applied to all :class:`~enum.Enum` names, as well as the CLI provided token.
 By default,this means that a **case-insensitive name** lookup is performed.
