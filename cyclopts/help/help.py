@@ -17,7 +17,14 @@ from typing import (
 
 from attrs import define, evolve, field
 
-from cyclopts.annotations import get_hint_name, is_enum, is_union, resolve_annotated, resolve_optional
+from cyclopts.annotations import (
+    get_hint_name,
+    is_enum,
+    is_iterable_type,
+    is_union,
+    resolve_annotated,
+    resolve_optional,
+)
 from cyclopts.argument.utils import is_short_flag
 from cyclopts.core import _get_root_module_name, _iter_resolution_argument_collections
 from cyclopts.field_info import get_field_infos
@@ -603,6 +610,9 @@ def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | N
         metavar = _type_metavar(hint, choice=choice)
     n_tokens = argument.parameter.n_tokens
     if metavar and n_tokens and get_origin(resolved) is not tuple:
+        if not argument._explicit_choices() and is_iterable_type(resolved) and (args := get_args(resolved)):
+            # Each consumed token is one element, not one whole container.
+            metavar = _type_metavar(args[0], choice=choice)
         metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)
     return metavar or None
 

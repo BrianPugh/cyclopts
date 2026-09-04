@@ -495,13 +495,15 @@ def test_metavar_repeats_for_n_tokens(app):
         x: Annotated[str, Parameter(n_tokens=2, converter=lambda _, tokens: " ".join(t.value for t in tokens))],
         y: Annotated[str, Parameter(n_tokens=-1, converter=lambda _, tokens: " ".join(t.value for t in tokens))],
         z: Annotated[tuple[str, str], Parameter(n_tokens=2)],
+        w: Annotated[list[int], Parameter(n_tokens=3)] = [],  # noqa: B006
     ):
         pass
 
-    x, y, z = _parameter_entries(app)
+    x, y, z, w = _parameter_entries(app)
     assert x.metavar == "STR STR"
     assert y.metavar == "STR..."
     assert z.metavar == "STR STR"
+    assert w.metavar == "INT INT INT"
 
 
 def test_metavar_strips_none_from_nested_unions(app):
