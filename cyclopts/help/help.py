@@ -106,8 +106,8 @@ class HelpEntry:
     ``Literal``/``Enum`` → ``CHOICE``) and can be overridden with
     :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. :obj:`None` for entries that do not
     consume a value (boolean flags, counting parameters, dict/structured parameters populated via
-    dotted keys, commands) and for entries whose ``[choices]`` list is displayed, unless an
-    explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` is set.
+    dotted keys, commands), even with an explicit ``Parameter.metavar``, and for entries whose
+    ``[choices]`` list is displayed unless an explicit ``Parameter.metavar`` is set.
 
     This is *not* how a positional parameter is displayed — that is its :attr:`positional_label`,
     derived from the parameter's name. ``metavar`` never affects the identifier.
@@ -586,16 +586,16 @@ def _expand_structured_dict_for_help(
 def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | None:
     """Resolve the value placeholder representing ``argument``'s **value** (the ``PATH`` in ``--config PATH``).
 
-    An explicit :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty
-    string suppresses it). Otherwise the default derives from the type hint (``STR``,
-    ``PATH``, ``CHOICE``). In panel rows a displayed ``[choices]`` list conveys the value's
-    shape better than ``CHOICE``, so the choice part is dropped there; the usage line has
-    no such list and keeps it (``in_usage``).
-
-    Returns :obj:`None` for arguments that never consume a value on the command line:
-    boolean flags, counting parameters, and structured/dict parameters that are only
-    populated through dotted sub-keys. Independent of the positional display identifier;
-    see :func:`_resolve_positional_label`.
+    Returns :obj:`None` for arguments that never consume a value on the command line
+    (boolean flags, counting parameters), regardless of any explicit metavar: a placeholder
+    would misrepresent the CLI. For value-consuming arguments an explicit
+    :attr:`Parameter.metavar <cyclopts.Parameter.metavar>` wins (an empty string suppresses
+    it); structured/dict parameters populated only through dotted sub-keys otherwise get
+    :obj:`None`. The default derives from the type hint (``STR``, ``PATH``, ``CHOICE``). In
+    panel rows a displayed ``[choices]`` list conveys the value's shape better than
+    ``CHOICE``, so the choice part is dropped there; the usage line has no such list and
+    keeps it (``in_usage``). Independent of the positional display identifier; see
+    :func:`_resolve_positional_label`.
     """
     if argument.parameter.count:
         return None
