@@ -1,5 +1,19 @@
 Complex CLI application for comprehensive documentation testing.
 
+**Global Options:**
+
+``--verbose, -v``
+    Verbosity level (-v, -vv, -vvv). [Default: ``0``]
+
+``--quiet, -q, --no-quiet``
+    Suppress non-essential output. [Default: ``False``]
+
+``--log-level``
+    Logging level. [Choices: ``debug``, ``info``, ``warning``, ``error``, ``critical``, Default: ``info``]
+
+``--no-color, --no-no-color``
+    Disable colored output [Default: ``False``]
+
 .. _cyclopts-complex-cli-admin:
 
 admin
