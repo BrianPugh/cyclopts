@@ -351,6 +351,26 @@ def test_usage_keeps_choice_metavar_for_explicit_parameter_choices(app, console:
     assert "[choices: 1, 2, 3]" in actual
 
 
+def test_usage_wraps_choice_in_container_for_explicit_parameter_choices(app, console: Console):
+    """Explicit ``Parameter.choices`` on a container renders like ``list[Literal[...]]`` does."""
+
+    @app.default
+    def main(
+        *,
+        a: Annotated[list[str], Parameter(choices=("x", "y"))],
+        b: list[Literal["x", "y"]],
+    ):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    assert "Usage: test_help_metavar --a LIST[CHOICE] --b LIST[CHOICE]" in capture.get()
+
+    a, b = _parameter_entries(app)
+    assert a.metavar is None
+    assert b.metavar is None
+
+
 def test_explicit_metavar_shown_alongside_choices(app, console: Console):
     """An explicit metavar is never suppressed by a ``[choices]`` list."""
 

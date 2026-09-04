@@ -618,18 +618,16 @@ def _resolve_metavar(argument: "Argument", *, in_usage: bool = False) -> str | N
     ):
         return None
     choice = "CHOICE" if in_usage or not argument.get_choices() else ""
-    if argument._explicit_choices():
-        # An explicit ``Parameter.choices`` describes the value exactly like a
-        # ``Literal``/``Enum`` hint does: the placeholder is ``CHOICE`` (dropped in panel
-        # rows where the ``[choices]`` list is shown), never the underlying type name.
-        metavar = choice
-    else:
-        metavar = _type_metavar(hint, choice=choice)
+    # An explicit ``Parameter.choices`` describes the leaf value exactly like a
+    # ``Literal``/``Enum`` hint does, so the leaf renders as ``choice`` (``LIST[CHOICE]``),
+    # never as the underlying type name.
+    leaf = choice if argument._explicit_choices() else None
+    metavar = _type_metavar(hint, choice=choice, leaf=leaf)
     n_tokens = argument.parameter.n_tokens
     if metavar and n_tokens and get_origin(resolved) is not tuple:
-        if not argument._explicit_choices() and is_iterable_type(resolved) and (args := get_args(resolved)):
+        if is_iterable_type(resolved) and (args := get_args(resolved)):
             # Each consumed token is one element, not one whole container.
-            metavar = _type_metavar(args[0], choice=choice)
+            metavar = _type_metavar(args[0], choice=choice, leaf=leaf)
         metavar = f"{metavar}..." if n_tokens == -1 else " ".join([metavar] * n_tokens)
     return metavar or None
 
@@ -644,7 +642,7 @@ def _explicit_metavar(hint) -> tuple[Any, str | None]:
     return hint, next((p.metavar for p in reversed(params) if p.metavar is not None), None)
 
 
-def _type_metavar(hint, *, choice: str = "CHOICE") -> str:
+def _type_metavar(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> str:
     """Derive the default metavar from a type hint.
 
     Tuples render argparse-style, one placeholder per token the user types
@@ -660,16 +658,19 @@ def _type_metavar(hint, *, choice: str = "CHOICE") -> str:
     hint = resolve_optional(hint)
     if get_origin(hint) is tuple and (args := get_args(hint)):
         if args[-1] is Ellipsis:
-            element = _type_metavar(args[0], choice=choice)
+            element = _type_metavar(args[0], choice=choice, leaf=leaf)
             return f"{element}..." if element else ""
-        return " ".join(m for arg in args if (m := _type_metavar(arg, choice=choice)))
+        return " ".join(m for arg in args if (m := _type_metavar(arg, choice=choice, leaf=leaf)))
     if is_union(hint):
-        return "|".join(m for arg in get_args(hint) if (m := _type_metavar(arg, choice=choice)))
-    return _type_name(hint, choice=choice)
+        return "|".join(m for arg in get_args(hint) if (m := _type_metavar(arg, choice=choice, leaf=leaf)))
+    return _type_name(hint, choice=choice, leaf=leaf)
 
 
-def _type_name(hint, *, choice: str = "CHOICE") -> str:
-    """Uppercased type name, honoring attached metavars, with ``Literal``/``Enum`` shown as ``choice``."""
+def _type_name(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> str:
+    """Uppercased type name, honoring attached metavars, with ``Literal``/``Enum`` shown as ``choice``.
+
+    ``leaf`` replaces the name of every non-generic leaf type (explicit ``Parameter.choices``).
+    """
     if hint is Ellipsis:
         return "..."
     hint, explicit = _explicit_metavar(hint)
@@ -679,14 +680,14 @@ def _type_name(hint, *, choice: str = "CHOICE") -> str:
     if get_origin(hint) is Literal or is_enum(hint):
         return choice
     if is_union(hint):
-        return "|".join(m for arg in get_args(hint) if (m := _type_name(arg, choice=choice)))
+        return "|".join(m for arg in get_args(hint) if (m := _type_name(arg, choice=choice, leaf=leaf)))
     if (origin := get_origin(hint)) and (args := get_args(hint)):
-        names = [_type_name(arg, choice=choice) for arg in args]
+        names = [_type_name(arg, choice=choice, leaf=leaf) for arg in args]
         if not all(names):
             # A suppressed ``CHOICE`` element means the ``[choices]`` list describes the value.
             return ""
         return f"{get_hint_name(origin).upper()}[{', '.join(names)}]"
-    return get_hint_name(hint).upper()
+    return leaf if leaf is not None else get_hint_name(hint).upper()
 
 
 def _resolve_positional_label(argument: "Argument") -> str | None:
