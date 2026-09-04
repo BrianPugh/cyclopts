@@ -97,8 +97,26 @@ def test_metavar_tuple_renders_one_placeholder_per_token(app):
         "INT FLOAT FLOAT",
         "INT...",
         "INT STR",
-        "LIST[TUPLE[INT, STR]]",
+        "LIST[INT STR]",
     ]
+
+
+@pytest.mark.parametrize(
+    "hint, expected",
+    [
+        (tuple[int, int] | str, "(INT INT)|STR"),
+        (list[int] | tuple[int, int], "LIST[INT]|(INT INT)"),
+        (list[tuple[int, int] | str], "LIST[(INT INT)|STR]"),
+        (list[tuple[int, ...]], "LIST[INT...]"),
+        (dict[str, tuple[int, int]], "DICT[STR, (INT INT)]"),
+        (list[tuple[int, tuple[int, int]]], "LIST[INT INT INT]"),
+    ],
+)
+def test_type_metavar_groups_multi_token_members(hint, expected):
+    """A tuple is always its tokens; it is parenthesized only when it sits beside siblings."""
+    from cyclopts.help.help import _type_metavar
+
+    assert _type_metavar(hint) == expected
 
 
 def test_label_uses_long_name(app):

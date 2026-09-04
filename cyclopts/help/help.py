@@ -2,7 +2,7 @@ import inspect
 import sys
 from collections.abc import Iterable, Sequence
 from enum import Enum
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -640,47 +640,45 @@ def _type_metavar(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> s
 
     Tuples render argparse-style, one placeholder per token the user types
     (``tuple[int, int]`` -> ``INT INT``, ``tuple[int, ...]`` -> ``INT...``), with nested
-    tuples flattened. Everything else is the uppercased type name (``PATH``,
-    ``LIST[STR]``), with ``Literal``/``Enum`` rendered as ``choice``.
-    """
-    hint, explicit = _explicit_metavar(hint)
-    if explicit is not None:
-        return explicit
-    # ``Optional[Path]`` is always supplied as a ``PATH``; absence is conveyed by the
-    # parameter being optional, not by a ``NONE`` the user would type.
-    hint = resolve_optional(hint)
-    if get_origin(hint) is tuple and (args := get_args(hint)):
-        if args[-1] is Ellipsis:
-            element = _type_metavar(args[0], choice=choice, leaf=leaf)
-            return f"{element}..." if element else ""
-        return " ".join(m for arg in args if (m := _type_metavar(arg, choice=choice, leaf=leaf)))
-    if is_union(hint):
-        return "|".join(m for arg in get_args(hint) if (m := _type_metavar(arg, choice=choice, leaf=leaf)))
-    return _type_name(hint, choice=choice, leaf=leaf)
-
-
-def _type_name(hint, *, choice: str = "CHOICE", leaf: str | None = None) -> str:
-    """Uppercased type name, honoring attached metavars, with ``Literal``/``Enum`` shown as ``choice``.
-
-    ``leaf`` replaces the name of every non-generic leaf type (explicit ``Parameter.choices``).
+    tuples flattened. Other generics are the uppercased type name over their arguments
+    (``LIST[STR]``, ``LIST[INT INT]``); a multi-token member is parenthesized when it has
+    siblings (``(INT INT)|STR``, ``DICT[STR, (INT INT)]``) so the grouping stays unambiguous.
+    ``Literal``/``Enum`` render as ``choice``; ``leaf`` replaces every non-generic leaf name
+    (explicit ``Parameter.choices``).
     """
     if hint is Ellipsis:
         return "..."
     hint, explicit = _explicit_metavar(hint)
     if explicit is not None:
         return explicit
+    # ``Optional[Path]`` is always supplied as a ``PATH``; absence is conveyed by the
+    # parameter being optional, not by a ``NONE`` the user would type.
     hint = resolve_optional(hint)
     if get_origin(hint) is Literal or is_enum(hint):
         return choice
+    recurse = partial(_type_metavar, choice=choice, leaf=leaf)
     if is_union(hint):
-        return "|".join(m for arg in get_args(hint) if (m := _type_name(arg, choice=choice, leaf=leaf)))
-    if (origin := get_origin(hint)) and (args := get_args(hint)):
-        names = [_type_name(arg, choice=choice, leaf=leaf) for arg in args]
+        return "|".join(_group_tokens(m) for arg in get_args(hint) if (m := recurse(arg)))
+    origin, args = get_origin(hint), get_args(hint)
+    if origin is tuple and args:
+        if args[-1] is Ellipsis:
+            element = recurse(args[0])
+            return f"{element}..." if element else ""
+        return " ".join(m for arg in args if (m := recurse(arg)))
+    if origin and args:
+        names = [recurse(arg) for arg in args]
         if not all(names):
             # A suppressed ``CHOICE`` element means the ``[choices]`` list describes the value.
             return ""
+        if len(names) > 1:
+            names = [_group_tokens(n) for n in names]
         return f"{get_hint_name(origin).upper()}[{', '.join(names)}]"
     return leaf if leaf is not None else get_hint_name(hint).upper()
+
+
+def _group_tokens(metavar: str) -> str:
+    """Parenthesize a multi-token metavar so it reads as one member next to siblings."""
+    return f"({metavar})" if " " in metavar else metavar
 
 
 def _resolve_positional_label(argument: "Argument") -> str | None:
