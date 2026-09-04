@@ -30,7 +30,6 @@ def test_positional_or_keyword_label_from_name_metavar_from_type(app):
     assert entry.positive_names == ("--count",)
     assert entry.positional_label == "COUNT"  # from the name
     assert entry.metavar == "INT"  # from the type
-    assert entry.positional is True
     assert entry.all_options == ("--count",)
     assert entry.display_labels == ("COUNT", "--count")
 
@@ -46,7 +45,6 @@ def test_positional_only_label_from_name_metavar_from_type(app):
     assert entry.positive_names == ()
     assert entry.positional_label == "URL"
     assert entry.metavar == "STR"
-    assert entry.positional is True
     assert entry.all_options == ()
     assert entry.display_labels == ("URL",)
 
@@ -62,7 +60,6 @@ def test_keyword_only_has_no_label(app):
     assert entry.positive_names == ("--cookies",)
     assert entry.positional_label is None
     assert entry.metavar == "PATH"  # type-derived, Optional's None stripped
-    assert entry.positional is False
     # Builtin panels show option names only for keyword parameters.
     assert entry.display_labels == ("--cookies",)
 
@@ -414,7 +411,6 @@ def test_positional_dict_is_not_positional(app, console: Console):
         pass
 
     _, d = _parameter_entries(app)
-    assert not d.positional
     assert d.positional_label is None
     assert d.metavar is None
 

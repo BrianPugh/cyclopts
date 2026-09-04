@@ -123,16 +123,9 @@ class HelpEntry:
     :attr:`display_labels` for positional parameters.
     """
 
-    positional: bool = False
-    """Whether this parameter can be supplied positionally.
-
-    The builtin formatters prefix :attr:`positional_label` onto the option names for these
-    entries; see :attr:`display_labels`.
-    """
-
     @property
     def names(self) -> tuple[str, ...]:
-        """All long **option** names (positive + negative). For backward compatibility.
+        """All long **option** names (positive + negative).
 
         Only contains ``--`` option names. A positional-only parameter has no option
         names, so this is empty for it — its display identifier lives in
@@ -143,7 +136,7 @@ class HelpEntry:
 
     @property
     def shorts(self) -> tuple[str, ...]:
-        """All short option names (positive + negative). For backward compatibility."""
+        """All short option names (positive + negative)."""
         return self.positive_shorts + self.negative_shorts
 
     @property
@@ -160,7 +153,7 @@ class HelpEntry:
 
         This is what the builtin formatters render.
         """
-        if self.positional and self.positional_label:
+        if self.positional_label:
             return (self.positional_label,) + self.all_options
         return self.all_options
 
@@ -195,7 +188,7 @@ class HelpEntry:
         This is what the builtin formatters render, e.g. ``("--config", "-c PATH", "--no-flag")``.
         Positional rows are unchanged (their :attr:`positional_label` already stands in for the value).
         """
-        if self.positional or not self.metavar:
+        if self.positional_label or not self.metavar:
             return self.display_labels
         positives = [*self.positive_names, *self.positive_shorts]
         if positives:
@@ -782,7 +775,6 @@ def _make_help_entry(argument: "Argument", format: str) -> HelpEntry:
         negative_shorts=tuple(negative_shorts),
         metavar=metavar,
         positional_label=positional_label,
-        positional=positional,
         description=help_description,
         required=argument.required,
         type=resolve_annotated(argument.field_info.annotation),

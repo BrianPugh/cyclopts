@@ -119,7 +119,7 @@ def test_group_custom_columns(console: Console):
         Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
         positional label for positional parameters.
         """
-        parts = [entry.positional_label] if entry.positional and entry.positional_label else []
+        parts = [entry.positional_label] if entry.positional_label else []
         parts.extend(entry.names)
         parts.extend(entry.shorts)
         return " ".join(parts)
@@ -496,7 +496,7 @@ def test_table_headers_with_non_empty_headers(console: Console):
         Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
         positional label for positional parameters.
         """
-        parts = [entry.positional_label] if entry.positional and entry.positional_label else []
+        parts = [entry.positional_label] if entry.positional_label else []
         parts.extend(entry.names)
         parts.extend(entry.shorts)
         return " ".join(parts)
@@ -574,7 +574,7 @@ class SimpleCustomFormatter:
                 console.print(f"| {desc_text:<66} |")
 
         for entry in panel.entries:
-            label = entry.positional_label if entry.positional and entry.positional_label else ""
+            label = entry.positional_label if entry.positional_label else ""
             names = " ".join(entry.names) if entry.names else ""
             shorts = " ".join(entry.shorts) if entry.shorts else ""
             name_part = f"{label} {names} {shorts}".strip()
@@ -702,7 +702,7 @@ def test_custom_help_formatter_with_optional_methods(console: Console):
                 shorts = " ".join(entry.shorts) if entry.shorts else ""
                 if shorts:
                     names += " " + shorts
-                if entry.positional and entry.positional_label:
+                if entry.positional_label:
                     names = f"{entry.positional_label} {names}".strip()
 
                 # Handle entry description - convert to plain text if needed
