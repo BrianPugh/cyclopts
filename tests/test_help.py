@@ -361,8 +361,8 @@ def test_help_functools_partial_2(app, console):
         Docstring for foo.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  A --a  Docstring for a. [required]                              │
-        │    --b    Docstring for b. [default: 2]                            │
+        │ *  A --a    Docstring for a. [required]                            │
+        │    --b INT  Docstring for b. [default: 2]                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1305,7 +1305,7 @@ def test_help_print_function(app, console):
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Docstring for foo. [required]                        │
-        │ *  --bar      Docstring for bar. [required]                        │
+        │ *  --bar STR  Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1339,7 +1339,7 @@ def test_help_print_parameter_required(app, console):
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │    FOO --foo  Docstring for foo.                                   │
-        │ *  --bar      Docstring for bar. [required]                        │
+        │ *  --bar STR  Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1369,8 +1369,8 @@ def test_help_print_function_defaults(app, console):
         Cmd help string.
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --bar  Docstring for bar. [default: bar-value]                     │
-        │ --baz  Docstring for bar. [env var: BAZ] [default: baz-value]      │
+        │ --bar STR  Docstring for bar. [default: bar-value]                 │
+        │ --baz STR  Docstring for bar. [env var: BAZ] [default: baz-value]  │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1707,7 +1707,7 @@ def test_help_print_commands_and_function(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  FOO --foo  Docstring for foo. [required]                        │
-        │ *  --bar      Docstring for bar. [required]                        │
+        │ *  --bar STR  Docstring for bar. [required]                        │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1750,7 +1750,7 @@ def test_help_print_parameters_no_negative_from_default_parameter(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app foo --flag BOOL
+        Usage: app foo --flag
 
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --flag  [required]                                              │
@@ -1812,7 +1812,7 @@ def test_help_print_commands_plus_meta(console):
         │ --help  Display this message and exit.                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname  Hostname to connect to. [required]                  │
+        │ *  --hostname STR  Hostname to connect to. [required]              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1955,7 +1955,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname -n  Hostname to connect to. [required]               │
+        │ *  --hostname -n STR  Hostname to connect to. [required]           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -1997,7 +1997,7 @@ def test_help_print_commands_plus_meta_short(app, console):
         │ TOKENS                                                             │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Session Parameters ───────────────────────────────────────────────╮
-        │ *  --hostname -n  Hostname to connect to. [required]               │
+        │ *  --hostname -n STR  Hostname to connect to. [required]           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -2432,8 +2432,8 @@ def test_issue_373_help_space_with_meta_app(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  VALUE --value  [required]                                       │
-        │    --meta-value   [default: 3]                                     │
+        │ *  VALUE --value     [required]                                    │
+        │    --meta-value INT  [default: 3]                                  │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3094,7 +3094,7 @@ def test_help_pydantic_dict_of_basemodels(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3103,7 +3103,7 @@ def test_help_pydantic_dict_of_basemodels(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path  path to model data                           │
+        │ --models.{NAME}.path STR  path to model data                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3129,7 +3129,7 @@ def test_help_pydantic_req_dict_of_basemodels(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app MODELS
+        Usage: app --models
 
         App Help String Line 1.
 
@@ -3138,7 +3138,7 @@ def test_help_pydantic_req_dict_of_basemodels(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ *  --models.{NAME}.path  path to model data [required]             │
+        │ *  --models.{NAME}.path STR  path to model data [required]         │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3168,7 +3168,7 @@ def test_help_pydantic_dict_nested_basemodel(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3177,9 +3177,9 @@ def test_help_pydantic_dict_nested_basemodel(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path       path to data                            │
-        │ --models.{NAME}.inner.val  some value                              │
-        │   ue                                                               │
+        │ --models.{NAME}.path STR  path to data                             │
+        │ --models.{NAME}.inner     some value                               │
+        │   .value INT                                                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3209,7 +3209,7 @@ def test_help_pydantic_dict_nested_dict_of_basemodels(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3218,9 +3218,9 @@ def test_help_pydantic_dict_nested_dict_of_basemodels(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path       path to data                            │
-        │ --models.{NAME}.children.  model score                             │
-        │   {NAME}.score                                                     │
+        │ --models.{NAME}.path STR  path to data                             │
+        │ --models.{NAME}.children  model score                              │
+        │   .{NAME}.score FLOAT                                              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3250,7 +3250,7 @@ def test_help_pydantic_dict_optional_basemodel_field(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3259,9 +3259,9 @@ def test_help_pydantic_dict_optional_basemodel_field(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path       path to data                            │
-        │ --models.{NAME}.extra.val  inner value                             │
-        │   ue                                                               │
+        │ --models.{NAME}.path STR  path to data                             │
+        │ --models.{NAME}.extra     inner value                              │
+        │   .value INT                                                       │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3291,7 +3291,7 @@ def test_help_pydantic_dict_list_basemodel_is_leaf(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3300,10 +3300,11 @@ def test_help_pydantic_dict_list_basemodel_is_leaf(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path       path to data                            │
-        │ --models.{NAME}.items --m  list of items [default: []]             │
-        │   odels.{NAME}.empty-item                                          │
-        │   s                                                                │
+        │ --models.{NAME}.path STR  path to data                             │
+        │ --models.{NAME}.items     list of items [default: []]              │
+        │   LIST[INNER]                                                      │
+        │   --models.{NAME}                                                  │
+        │   .empty-items                                                     │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3336,7 +3337,7 @@ def test_help_pydantic_dict_circular_reference(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3345,9 +3346,9 @@ def test_help_pydantic_dict_circular_reference(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --root.{NAME}.label        node label                              │
-        │ --root.{NAME}.children.{N  child nodes [default: {}]               │
-        │   AME}                                                             │
+        │ --root.{NAME}.label STR  node label                                │
+        │ --root.{NAME}.children   child nodes [default: {}]                 │
+        │   .{NAME}                                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3375,7 +3376,7 @@ def test_help_dict_of_dataclass(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3384,8 +3385,8 @@ def test_help_dict_of_dataclass(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path   [default: /tmp]                             │
-        │ --models.{NAME}.count  [default: 3]                                │
+        │ --models.{NAME}.path STR   [default: /tmp]                         │
+        │ --models.{NAME}.count INT  [default: 3]                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3409,7 +3410,7 @@ def test_help_dict_of_attrs(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3418,7 +3419,7 @@ def test_help_dict_of_attrs(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path  [default: /tmp]                              │
+        │ --models.{NAME}.path STR  [default: /tmp]                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3442,7 +3443,7 @@ def test_help_dict_of_typeddict(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3451,8 +3452,8 @@ def test_help_dict_of_typeddict(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path                                               │
-        │ --models.{NAME}.count                                              │
+        │ --models.{NAME}.path STR                                           │
+        │ --models.{NAME}.count INT                                          │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3478,7 +3479,7 @@ def test_help_pydantic_dict_literal_choices(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3515,7 +3516,7 @@ def test_help_pydantic_dict_required_propagation(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app MODELS
+        Usage: app --models
 
         App Help String Line 1.
 
@@ -3525,7 +3526,9 @@ def test_help_pydantic_dict_required_propagation(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ *  --models.{NAME}.req-path  required [required]                   │
+        │      STR                                                           │
         │    --models.{NAME}.opt-path  defaulted [default: /tmp]             │
+        │      STR                                                           │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3551,7 +3554,7 @@ def test_help_pydantic_dict_parameter_help_precedence(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3560,7 +3563,7 @@ def test_help_pydantic_dict_parameter_help_precedence(app, console):
         │ --version    Display application version.                          │
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
-        │ --models.{NAME}.path  cyclopts help                                │
+        │ --models.{NAME}.path STR  cyclopts help                            │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )
@@ -3586,7 +3589,7 @@ def test_help_pydantic_dict_name_transform_kebab(app, console):
     actual = capture.get()
     expected = dedent(
         """\
-        Usage: app [ARGS]
+        Usage: app [OPTIONS]
 
         App Help String Line 1.
 
@@ -3596,6 +3599,7 @@ def test_help_pydantic_dict_name_transform_kebab(app, console):
         ╰────────────────────────────────────────────────────────────────────╯
         ╭─ Parameters ───────────────────────────────────────────────────────╮
         │ --models.{NAME}.my-field  a snake field                            │
+        │   STR                                                              │
         ╰────────────────────────────────────────────────────────────────────╯
         """
     )

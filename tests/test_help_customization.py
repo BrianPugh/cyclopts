@@ -9,7 +9,7 @@ from rich.console import Console
 from cyclopts import App, Group, Parameter
 from cyclopts.annotations import get_hint_name
 from cyclopts.help import ColumnSpec, DefaultFormatter, HelpEntry, PanelSpec, TableSpec
-from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer
+from cyclopts.help.specs import DescriptionColumn, DescriptionRenderer, NameColumn
 
 
 def _type_renderer(entry: Any) -> str:
@@ -114,12 +114,15 @@ def test_group_custom_columns(console: Console):
     """Test that custom columns can be specified via DefaultFormatter."""
 
     def names_renderer(entry):
-        """Render names and shorts as a single string."""
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-        if names_str and shorts_str:
-            return names_str + " " + shorts_str
-        return names_str or shorts_str
+        """Render the positional label (positionals only), names, and shorts as a single string.
+
+        Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
+        positional label for positional parameters.
+        """
+        parts = [entry.positional_label] if entry.positional_label else []
+        parts.extend(entry.names)
+        parts.extend(entry.shorts)
+        return " ".join(parts)
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, style="green bold", header="Option"),
@@ -442,7 +445,7 @@ def test_table_headers_suppressed_when_all_empty(console: Console):
 
     # Create columns with explicitly empty headers
     custom_columns = (
-        ColumnSpec(renderer=lambda entry: " ".join(entry.names) if entry.names else "", header="", style="cyan"),
+        ColumnSpec(renderer=lambda entry: " ".join(entry.display_labels), header="", style="cyan"),
         ColumnSpec(renderer=DescriptionRenderer(), header=""),
     )
 
@@ -488,12 +491,15 @@ def test_table_headers_with_non_empty_headers(console: Console):
     """Test that headers appear when column headers have text."""
 
     def names_renderer(entry):
-        """Render names and shorts as a single string."""
-        names_str = " ".join(entry.names) if entry.names else ""
-        shorts_str = " ".join(entry.shorts) if entry.shorts else ""
-        if names_str and shorts_str:
-            return names_str + " " + shorts_str
-        return names_str or shorts_str
+        """Render the positional label (positionals only), names, and shorts as a single string.
+
+        Mirrors the builtin :attr:`HelpEntry.display_labels` by prefixing the
+        positional label for positional parameters.
+        """
+        parts = [entry.positional_label] if entry.positional_label else []
+        parts.extend(entry.names)
+        parts.extend(entry.shorts)
+        return " ".join(parts)
 
     custom_columns = (
         ColumnSpec(renderer=names_renderer, header="Option", style="cyan"),
@@ -568,9 +574,10 @@ class SimpleCustomFormatter:
                 console.print(f"| {desc_text:<66} |")
 
         for entry in panel.entries:
+            label = entry.positional_label if entry.positional_label else ""
             names = " ".join(entry.names) if entry.names else ""
             shorts = " ".join(entry.shorts) if entry.shorts else ""
-            name_part = f"{names} {shorts}".strip()
+            name_part = f"{label} {names} {shorts}".strip()
 
             # Handle entry description - convert to plain text if needed
             desc = ""
@@ -695,6 +702,8 @@ def test_custom_help_formatter_with_optional_methods(console: Console):
                 shorts = " ".join(entry.shorts) if entry.shorts else ""
                 if shorts:
                     names += " " + shorts
+                if entry.positional_label:
+                    names = f"{entry.positional_label} {names}".strip()
 
                 # Handle entry description - convert to plain text if needed
                 desc = ""
@@ -768,7 +777,7 @@ def test_multiple_groups_different_formatters(console: Console):
 
             console.print(f">> {panel.title}")
             for entry in panel.entries:
-                names = " ".join(entry.names) if entry.names else ""
+                names = " ".join(entry.display_labels) if entry.display_labels else ""
 
                 # Handle entry description - convert to plain text if needed
                 desc = ""
@@ -852,7 +861,7 @@ def test_custom_formatter_protocol_validation(console: Console):
     def minimal_formatter(console, options, panel):
         console.print(f"[{panel.title}]")
         for entry in panel.entries:
-            names = " ".join(entry.names) if entry.names else ""
+            names = " ".join(entry.display_labels) if entry.display_labels else ""
             console.print(f"  {names}")
 
     custom_group = Group(
@@ -952,7 +961,7 @@ def test_custom_formatter_receives_correct_arguments(console: Console):
             assert len(panel.entries) == 1
             entry = panel.entries[0]
             assert "test" in " ".join(entry.names).lower() and "param" in " ".join(entry.names).lower()
-            console.print(f"  Entry: {' '.join(entry.names)}")
+            console.print(f"  Entry: {' '.join(entry.display_labels)}")
 
     custom_group = Group(
         "Validated Group",
@@ -1478,6 +1487,43 @@ def test_with_newline_metadata_classmethod(console: Console):
             assert found_env, "Should find env var on separate line"
             assert found_default, "Should find default on separate line"
             break
+
+
+def test_show_metavar_toggle(console: Console):
+    """``DefaultFormatter.show_metavar`` controls the keyword-only value placeholder."""
+
+    def render(fmt):
+        app = App(name="app", help_formatter=fmt)
+
+        @app.default
+        def main(*, config: str = "cfg", timeout: int = 30):
+            pass
+
+        with console.capture() as capture:
+            app.help_print(console=console)
+        return capture.get()
+
+    # Default (True): keyword-only rows show the type-derived metavar.
+    on = render(DefaultFormatter())
+    assert "--config STR" in on
+    assert "--timeout INT" in on
+
+    # Disabled: option names only, no placeholder.
+    off = render(DefaultFormatter(show_metavar=False))
+    assert "--config STR" not in off
+    assert "--timeout INT" not in off
+    assert "--config" in off
+    assert "--timeout" in off
+
+    off_newline = render(DefaultFormatter.with_newline_metadata(show_metavar=False))
+    assert "--config STR" not in off_newline
+    assert "--timeout INT" not in off_newline
+    assert "--config" in off_newline
+
+    # Custom column layouts see the cleared metavar too.
+    off_custom = render(DefaultFormatter(show_metavar=False, column_specs=(NameColumn, DescriptionColumn)))
+    assert "--config STR" not in off_custom
+    assert "--config" in off_custom
 
 
 def test_default_formatter_regular_inline(console: Console):

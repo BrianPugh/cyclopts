@@ -38,7 +38,7 @@ class _NonClosingIOWrapper:
         return getattr(self._stream, name)
 
 
-@Parameter(allow_leading_hyphen=True)
+@Parameter(allow_leading_hyphen=True, metavar="PATH")
 class StdioPath(Path):
     """A :class:`~pathlib.Path` subclass that treats ``-`` as stdin/stdout."""
 

@@ -1451,6 +1451,56 @@ API
       Help string to be displayed on the help page.
       If not specified, defaults to the docstring.
 
+   .. attribute:: metavar
+      :type: Optional[str]
+      :value: None
+
+      Placeholder text representing this parameter's **value**, e.g. the ``DIR`` in ``--output DIR``.
+      Purely cosmetic; it has no effect on parsing.
+
+      If not specified, defaults to the parameter's **type** in uppercase (:class:`~pathlib.Path` becomes ``PATH``, :class:`str` becomes ``STR``).
+      ``Literal`` and ``Enum`` types default to ``CHOICE``.
+      Boolean flags, :attr:`count` parameters, and ``dict`` parameters (populated via ``--name.KEY VALUE``) have no metavar, since they consume no value.
+      Setting an empty string suppresses it.
+
+      This is *not* how a positional parameter is displayed — that identifier comes from :attr:`name`. ``metavar`` never changes it.
+
+      .. code-block:: python
+
+         from typing import Annotated
+         from pathlib import Path
+         from cyclopts import App, Parameter
+
+         app = App()
+
+
+         @app.default
+         def main(
+             source: Path,
+             /,
+             *,
+             output: Annotated[Path, Parameter(metavar="DIR")],
+         ):
+             pass
+
+
+         app()
+
+      .. code-block:: console
+
+         $ my-script --help
+         Usage: my-script --output DIR SOURCE
+
+         ╭─ Arguments ────────────────────────────────────────────────────╮
+         │ *  SOURCE  [required]                                          │
+         ╰────────────────────────────────────────────────────────────────╯
+         ╭─ Parameters ───────────────────────────────────────────────────╮
+         │ *  --output DIR  [required]                                    │
+         ╰────────────────────────────────────────────────────────────────╯
+
+      The positional ``source`` is identified by its name (``SOURCE``); the keyword-only ``--output`` shows its metavar (``DIR``) in both the usage line and its parameter row.
+      The builtin formatters append the metavar to keyword-only parameters; positional-capable rows show their name-derived identifier instead, and rows with a ``[choices]`` list omit the type-derived ``CHOICE`` (an explicit metavar is still shown). It is also available to custom formatters as :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>`. Disable metavars (rows and usage line) with :attr:`DefaultFormatter.show_metavar <cyclopts.help.DefaultFormatter.show_metavar>` set to ``False``.
+
    .. attribute:: show_env_var
       :type: Optional[bool]
       :value: True

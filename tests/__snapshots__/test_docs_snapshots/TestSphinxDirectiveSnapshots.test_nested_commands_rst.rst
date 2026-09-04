@@ -62,10 +62,10 @@ Grant permissions to a user.
 
 **Parameters:**
 
-``--resource``
+``--resource STR``
     Specific resource to grant access to.
 
-``--expires``
+``--expires STR``
     Expiration date (ISO format).
 
 .. _cyclopts-complex-cli-admin-users-permissions-revoke:
@@ -157,5 +157,5 @@ Create a new role template.
 ``--permissions.admin, --permissions.no-admin``
     Default permissions for this role. [Default: ``False``]
 
-``--description``
+``--description STR``
     Role description. [Default: ``""``]

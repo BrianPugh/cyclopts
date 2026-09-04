@@ -313,6 +313,36 @@ An invalid :attr:`.App.result_action` name now raises :class:`ValueError` at
 
 The error message lists the valid names.
 
+Help Panels Show Metavars; Positional Labels Left ``names``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Affects:** every app's ``--help`` output, and custom :class:`~cyclopts.help.ColumnSpec` renderers.
+
+Keyword-only parameters now show a type-derived value placeholder after their option
+names (``--timeout INT``, ``--config PATH``), and the usage line no longer prints
+``BOOL`` after required flags. Restore the v4 look with
+``App(help_formatter=DefaultFormatter(show_metavar=False))``, or override individual
+placeholders with :attr:`Parameter.metavar <cyclopts.Parameter.metavar>`. Custom
+layouts built from :class:`~cyclopts.help.NameRenderer` or ``NameColumn`` pick up the
+placeholder as well; ``show_metavar=False`` also applies to them.
+
+A positional parameter's display identifier (the ``SRC`` in ``SRC --src``) is no
+longer part of :attr:`HelpEntry.names <cyclopts.help.HelpEntry.names>`, which now
+holds ``--`` option names only. It moved to the new
+:attr:`HelpEntry.positional_label <cyclopts.help.HelpEntry.positional_label>`.
+Render :attr:`HelpEntry.display_labels <cyclopts.help.HelpEntry.display_labels>`
+— the positional label followed by every option name — to reproduce the v4 row.
+
+.. code-block:: python
+
+   # A custom "names" column renderer.
+   def names_renderer(entry):
+       # v4: return " ".join(entry.names + entry.shorts)
+       return " ".join(entry.display_labels)  # v5
+
+The separate :attr:`HelpEntry.metavar <cyclopts.help.HelpEntry.metavar>` now
+carries the value placeholder (the ``PATH`` in ``--config PATH``); see
+:ref:`Help Customization`.
+
 .. _v5 Requirements:
 
 Python 3.10 Dropped; ``toml`` Extra Removed

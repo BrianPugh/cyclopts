@@ -9,7 +9,7 @@ Complex CLI application for comprehensive documentation testing.
 **Global Options**:
 
 * `--verbose, -v`: Verbosity level (-v, -vv, -vvv). *[default: 0]*
-* `--quiet, --no-quiet, -q`: Suppress non-essential output. *[default: False]*
+* `--quiet, -q, --no-quiet`: Suppress non-essential output. *[default: False]*
 * `--log-level`: Logging level. *[choices: debug, info, warning, error, critical]* *[default: info]*
 * `--no-color, --no-no-color`: Disable colored output *[default: False]*
 

@@ -291,7 +291,7 @@ def _json_converter(type_, tokens: Sequence["Token"]):
     return out
 
 
-Json = Annotated[Any, Parameter(converter=_json_converter)]
+Json = Annotated[Any, Parameter(converter=_json_converter, metavar="JSON")]
 """
 Parse a json-string from the CLI.
 
@@ -339,7 +339,7 @@ def _email_validator(type_: Any, value: Any):
 
 _email_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
 
-Email = Annotated[str, Parameter(validator=_email_validator)]
+Email = Annotated[str, Parameter(validator=_email_validator, metavar="EMAIL")]
 "An email address string with simple validation."
 
 
@@ -366,10 +366,10 @@ def _url_validator(type_: Any, value: Any):
 
 _url_validator.regex = None  # pyright: ignore[reportFunctionMemberAccess]
 
-URL = Annotated[str, Parameter(validator=_url_validator)]
+URL = Annotated[str, Parameter(validator=_url_validator, metavar="URL")]
 "A :class:`str` URL string with some simple validation."
 
-Port = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535))]
+Port = Annotated[int, Parameter(validator=validators.Number(gte=0, lte=65535), metavar="PORT")]
 "An :class:`int` limited to range ``[0, 65535]``."
 
 
