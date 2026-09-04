@@ -340,7 +340,18 @@ def format_usage(
     app: "App",
     command_chain: Iterable[str],
     execution_path: Sequence["App"] | None = None,
+    *,
+    show_metavar: bool | None = None,
 ):
+    """Build the ``Usage:`` line.
+
+    Parameters
+    ----------
+    show_metavar : bool | None
+        Force value placeholders on or off. :obj:`None` follows each parameter's
+        rendering formatter (its group's ``help_formatter``, else the app's), so the
+        usage line agrees with the panel rows.
+    """
     from rich.text import Text
 
     usage = []
@@ -361,7 +372,13 @@ def format_usage(
 
     for command in command_chain:
         app = app[command]
-    show_metavar = getattr(app.app_stack.resolve("help_formatter"), "show_metavar", True)
+    default_formatter = app.app_stack.resolve("help_formatter")
+
+    def shows_metavar(argument) -> bool:
+        if show_metavar is not None:
+            return show_metavar
+        formatter = next((g.help_formatter for g in argument.parameter.group if g.help_formatter), default_formatter)
+        return getattr(formatter, "show_metavar", True)
 
     # Check for visible non-help/version commands without resolving lazy CommandSpecs.
     help_version_flags = {*app.help_flags, *app.version_flags}
@@ -388,7 +405,7 @@ def format_usage(
     for argument in required_keyword_params:
         # Keyword parameters show the value placeholder (``--foo STR``); positionals
         # below show their name-derived label instead.
-        metavar = _resolve_metavar(argument, in_usage=True) if show_metavar else None
+        metavar = _resolve_metavar(argument, in_usage=True) if shows_metavar(argument) else None
         usage.append(f"{argument.name} {metavar}" if metavar else argument.name)
 
     if optional_keyword_params:

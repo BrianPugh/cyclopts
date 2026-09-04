@@ -491,8 +491,8 @@ def extract_usage(app: "App") -> Any | None:
     if app.usage is not None:
         return app.usage if app.usage else None
 
-    usage = format_usage(app, [])
-    return usage
+    # The docs formatters always render row metavars, so the usage line must too.
+    return format_usage(app, [], show_metavar=True)
 
 
 def format_usage_line(usage_text: str, command_chain: list[str], prefix: str = "") -> str:

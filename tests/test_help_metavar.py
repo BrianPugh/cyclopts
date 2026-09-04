@@ -486,6 +486,38 @@ def test_show_metavar_false_also_clears_usage_line(console: Console):
     assert "DIR" not in actual
 
 
+def test_show_metavar_false_on_group_formatter_clears_usage_line(console: Console):
+    """The usage line follows the formatter that renders each parameter's row, group formatters included."""
+    from cyclopts import Group
+    from cyclopts.help import DefaultFormatter
+
+    app = App(name="app")
+    quiet = Group("Quiet", help_formatter=DefaultFormatter(show_metavar=False))
+
+    @app.default
+    def main(*, output: Annotated[Path, Parameter(group=quiet)], name: str):
+        pass
+
+    with console.capture() as capture:
+        app.help_print(console=console)
+    actual = capture.get()
+    assert "Usage: app --output --name STR\n" in actual
+
+
+def test_docs_usage_keeps_metavar_when_app_formatter_hides_it():
+    """Docs formatters always render row metavars, so their usage line does too."""
+    from cyclopts.docs import generate_markdown_docs
+    from cyclopts.help import DefaultFormatter
+
+    app = App(name="app", help_formatter=DefaultFormatter(show_metavar=False))
+
+    @app.default
+    def main(*, name: str):
+        pass
+
+    assert "app --name STR" in generate_markdown_docs(app)
+
+
 def test_metavar_repeats_for_n_tokens(app):
     """``n_tokens`` renders one placeholder per consumed token, matching the tuple rule."""
 
