@@ -132,6 +132,47 @@ API
          │ --version  Display application version.                               │
          ╰───────────────────────────────────────────────────────────────────────╯
 
+   .. attribute:: deprecated
+      :type: Union[None, str, Tuple[str, str]]
+      :value: None
+
+      Mark this command as deprecated.
+      A plain string is used as the deprecation message; a ``(version, message)`` tuple additionally
+      records the version the command was deprecated in.
+      Renders a ``[⚠ Deprecated]`` tag on the command's help page and in its parent's command list,
+      taking priority over any ``.. deprecated::`` directive found in the docstring.
+      Also triggers :attr:`deprecated_handler` at runtime whenever this command is actually invoked.
+
+   .. attribute:: deprecated_handler
+      :type: Optional[Callable[[str, str, Optional[str], Optional[str]], None]]
+      :value: None
+
+      Callback invoked as ``(kind, name, version, message)`` whenever a deprecated command is
+      invoked or a deprecated parameter is explicitly supplied on the CLI (not merely declared).
+      ``kind`` is ``"command"`` or ``"parameter"``, ``name`` is its primary CLI name, and
+      ``version``/``message`` come from the :attr:`deprecated` field.
+
+      If unset, inherits from the closest ancestor App that sets one; if none do, falls back to
+      emitting a standard :class:`DeprecationWarning` via the :mod:`warnings` module. Set this to
+      route deprecation notices through your own logger instead:
+
+      .. code-block:: python
+
+         import logging
+         from cyclopts import App
+
+         logger = logging.getLogger(__name__)
+
+
+         def log_deprecation(kind, name, version, message):
+             logger.warning("%s %r is deprecated%s: %s", kind, name, f" (v{version})" if version else "", message)
+
+
+         app = App(deprecated_handler=log_deprecation)
+
+      A :class:`~cyclopts.Parameter`'s own :attr:`~cyclopts.Parameter.deprecated_handler`, if set,
+      takes priority over the App's for that specific parameter.
+
    .. attribute:: help_flags
       :type: Union[str, Iterable[str]]
       :value: ("--help", "-h")
@@ -1431,6 +1472,26 @@ API
 
       Help string to be displayed on the help page.
       If not specified, defaults to the docstring.
+
+   .. attribute:: deprecated
+      :type: Union[None, str, Tuple[str, str]]
+      :value: None
+
+      Mark this parameter as deprecated.
+      A plain string is used as the deprecation message; a ``(version, message)`` tuple additionally
+      records the version the parameter was deprecated in.
+      Renders a ``[⚠ Deprecated]`` tag alongside the parameter's help entry.
+      Also triggers :attr:`deprecated_handler` at runtime whenever this parameter is explicitly
+      supplied on the CLI (not merely declared).
+
+   .. attribute:: deprecated_handler
+      :type: Optional[Callable[[str, str, Optional[str], Optional[str]], None]]
+      :value: None
+
+      Callback invoked as ``(kind, name, version, message)`` when this parameter is deprecated
+      and explicitly supplied. Overrides the owning :class:`~cyclopts.App`'s
+      :attr:`~cyclopts.App.deprecated_handler` for this parameter only; see there for details
+      and an example.
 
    .. attribute:: show_env_var
       :type: Optional[bool]

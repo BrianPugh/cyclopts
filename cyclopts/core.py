@@ -25,6 +25,7 @@ from typing import (
 
 from attrs import Factory, define, field
 
+from cyclopts._deprecation import DeprecatedHandler, default_deprecated_handler
 from cyclopts.annotations import resolve_annotated
 from cyclopts.app_stack import AppStack
 from cyclopts.argument import ArgumentCollection
@@ -51,6 +52,7 @@ from cyclopts.utils import (
     create_error_console_from_console,
     default_name_transform,
     help_formatter_converter,
+    normalize_deprecated,
     optional_to_tuple_converter,
     sort_key_converter,
     to_list_converter,
@@ -371,6 +373,10 @@ class App:
     )
 
     show: bool = field(default=True, kw_only=True)
+
+    deprecated: str | tuple[str, str] | None = field(default=None, kw_only=True)
+
+    deprecated_handler: DeprecatedHandler | None = field(default=None, kw_only=True)
 
     _console: Optional["Console"] = field(default=None, kw_only=True, alias="console")
 
@@ -1396,6 +1402,7 @@ class App:
                 sort_key=kwargs.pop("sort_key", None),
                 group=kwargs.pop("group", None),  # type: ignore[arg-type]
                 show=kwargs.pop("show", None),  # type: ignore[arg-type]
+                deprecated=kwargs.pop("deprecated", None),  # type: ignore[arg-type]
                 app_kwargs=kwargs,
             )
 
@@ -1646,6 +1653,7 @@ class App:
                 command_chain = command_chain[:-1]
 
         command_app = execution_apps[-1]
+        command_chain_apps = execution_apps  # Used only for deprecation warnings below.
         del execution_apps  # Always use AppStack from here-on.
 
         ignored: dict[str, Any] = {}
@@ -1717,6 +1725,7 @@ class App:
                                 group=command_group,  # pyright: ignore
                             ) from e
 
+                        _emit_deprecation_warnings(command_chain_apps, argument_collection, command_app)
                     else:
                         if unused_tokens:
                             raise UnknownCommandError(unused_tokens=unused_tokens)
@@ -2796,6 +2805,33 @@ class App:
 
         signature = ", ".join(f"{k}={v!r}" for k, v in non_defaults.items())
         return f"{type(self).__name__}({signature})"
+
+
+def _emit_deprecation_warnings(
+    command_chain_apps: Sequence["App"],
+    argument_collection: ArgumentCollection,
+    command_app: "App",
+) -> None:
+    """Fire ``deprecated_handler`` for deprecated commands/parameters actually used.
+
+    Only fires for commands actually invoked and parameters actually supplied on the
+    CLI (not merely declared). Must run only once parsing/validation has fully
+    succeeded, so a failed parse never warns about deprecations that were never reached.
+    """
+    for app in command_chain_apps:
+        if app.deprecated is not None:
+            handler = app.app_stack.resolve("deprecated_handler", fallback=default_deprecated_handler)
+            version, message = normalize_deprecated(app.deprecated)
+            handler("command", app.name[0], version, message)
+
+    for argument in argument_collection:
+        if argument.parameter.deprecated is not None and argument.has_tokens:
+            handler = (
+                argument.parameter.deprecated_handler
+                or command_app.app_stack.resolve("deprecated_handler", fallback=default_deprecated_handler)
+            )
+            version, message = normalize_deprecated(argument.parameter.deprecated)
+            handler("parameter", argument.name, version, message)
 
 
 def _get_help_flag_index(tokens, help_flags, end_of_options_delimiter) -> int | None:

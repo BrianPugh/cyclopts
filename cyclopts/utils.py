@@ -299,6 +299,18 @@ def slice_to_str(value: slice, /) -> str:
     return ":".join(parts)
 
 
+def normalize_deprecated(value: str | tuple[str, str]) -> tuple[str | None, str | None]:
+    """Normalize a ``deprecated`` field value into ``(version, message)``.
+
+    A plain string is treated as the message with no version; a ``(version, message)``
+    tuple is passed through, with an empty version normalized to :obj:`None`.
+    """
+    if isinstance(value, str):
+        return None, value
+    version, message = value
+    return (version or None), message
+
+
 def is_builtin(obj: Any) -> bool:
     return getattr(obj, "__module__", "").split(".")[0] in stdlib_module_names
 

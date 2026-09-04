@@ -23,6 +23,7 @@ else:
 
 import cyclopts._env_var
 from cyclopts._convert import _abstract_to_concrete_type_mapping
+from cyclopts._deprecation import DeprecatedHandler
 from cyclopts.annotations import (
     ITERABLE_TYPES,
     NoneType,
@@ -323,6 +324,10 @@ class Parameter:
     )
 
     help: str | None = field(default=None, kw_only=True)
+
+    deprecated: str | tuple[str, str] | None = field(default=None, kw_only=True)
+
+    deprecated_handler: DeprecatedHandler | None = field(default=None, kw_only=True)
 
     show_env_var: bool = field(
         default=None,
