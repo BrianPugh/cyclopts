@@ -153,7 +153,9 @@ def _wrap_labels(text: str, width: int) -> list[str]:
             available = width - len(line)
             cut = word.rfind(".", 1, available + 1)
             if cut <= 0:
-                cut = available
+                # At least one character must move per pass, or a width that the
+                # continuation indent alone fills would never make progress.
+                cut = max(available, 1)
             lines.append(line + word[:cut])
             line, word = "  ", word[cut:]
         line += word

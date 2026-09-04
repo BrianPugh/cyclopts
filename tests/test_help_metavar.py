@@ -552,6 +552,14 @@ def test_name_renderer_wraps_long_dotted_names_at_dots():
     assert NameRenderer(max_width=25)(short) == "--models.{NAME}.inner\n  .value INT"
 
 
+def test_wrap_labels_terminates_when_indent_fills_width():
+    """A width no wider than the continuation indent still makes progress instead of looping forever."""
+    from cyclopts.help.specs import _wrap_labels
+
+    lines = _wrap_labels("--foo --barbaz", 2)
+    assert "".join(line.strip() for line in lines) == "--foo--barbaz"
+
+
 def test_metavar_not_inherited_by_structured_children(app, console: Console):
     """A metavar on a structured parameter does not propagate to its leaf fields."""
     from dataclasses import dataclass
