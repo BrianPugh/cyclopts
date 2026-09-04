@@ -504,6 +504,18 @@ def test_metavar_repeats_for_n_tokens(app):
     assert z.metavar == "STR STR"
 
 
+def test_metavar_strips_none_from_nested_unions(app):
+    """``None`` inside a container element is never something the user types, so it is not advertised."""
+
+    @app.default
+    def main(*, a: list[int | None] = [], b: list[Literal["x", "y"] | None] = []):  # noqa: B006
+        pass
+
+    a, b = _parameter_entries(app)
+    assert a.metavar == "LIST[INT]"
+    assert b.metavar is None
+
+
 def test_metavar_honors_element_metavars_in_containers(app):
     """Metavars attached via ``Annotated``/``@Parameter`` survive inside tuples and lists."""
     from cyclopts import types

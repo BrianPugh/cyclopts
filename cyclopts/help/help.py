@@ -648,6 +648,7 @@ def _type_name(hint, *, choice: str = "CHOICE") -> str:
     hint, explicit = _explicit_metavar(hint)
     if explicit is not None:
         return explicit
+    hint = resolve_optional(hint)
     if get_origin(hint) is Literal or is_enum(hint):
         return choice
     if is_union(hint):
