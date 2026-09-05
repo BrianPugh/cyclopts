@@ -2739,7 +2739,9 @@ class App:
                     break
                 except KeyboardInterrupt:
                     print()
-                    line_buffer = readline.get_line_buffer() if readline else ""
+                    # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
+                    # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
+                    line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
                     if line_buffer in ("", previous_line):
                         break
                     previous_line = line_buffer
