@@ -322,9 +322,13 @@ def generate_rst_docs(
     if not skip_preamble and should_show_usage(app):
         # Generate usage line - only if we're documenting a specific command.
         # When no_root_title is set at the root (e.g., in Sphinx contexts), the
-        # root Usage: line is intentionally suppressed; usage_name still applies
-        # to every subcommand usage block below.
-        if not (no_root_title and not command_chain):
+        # root Usage: line is normally suppressed; usage_name still applies to
+        # every subcommand usage block below. Exception: a title-less root that
+        # has its own ``default_command`` still needs its Usage: line, since the
+        # default command's invocation (e.g. ``myapp [ARGS]``) is documented
+        # nowhere else. See #923.
+        suppressed_root = no_root_title and not command_chain
+        if not suppressed_root or app.default_command is not None:
             # Extract usage from app
             usage = extract_usage(app)
             usage_text = None
@@ -394,8 +398,15 @@ def generate_rst_docs(
         if not include_hidden and group and not group.show:
             continue
 
-        # Skip if no_root_title and we're at root
-        if no_root_title and not command_chain:
+        # At a title-less root (e.g. the Sphinx ``.. cyclopts::`` directive), the
+        # command list is emitted as its own recursive sections below, so skip the
+        # root command panel here. The root *parameter* panel, however, holds the
+        # root ``default_command``'s own arguments -- which are documented nowhere
+        # else -- so it must still render. Skipping it is what made a
+        # ``@app.default`` app's parameters vanish from Sphinx output. See #923.
+        # ``skip_preamble`` documents a filtered subcommand on its own, so the root
+        # parameter panel is skipped along with the root usage/description.
+        if no_root_title and not command_chain and (panel.format == "command" or skip_preamble):
             continue
 
         # Render command panels as grouped command lists
