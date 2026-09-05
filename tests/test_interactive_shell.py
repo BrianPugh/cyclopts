@@ -392,3 +392,21 @@ def test_interactive_shell_exception_goes_to_error_console(app, mocker, console)
     actual = capture.get()
     assert "Traceback (most recent call last):" in actual
     assert "RuntimeError: boom" in actual
+
+
+def test_interactive_shell_subcommand_error_console(mocker, console):
+    """A subcommand's own error_console must not be overridden by the root's."""
+    mocker.patch("cyclopts.core.input", side_effect=["sub foo notanint", "quit"])
+
+    root = App()
+    sub = App(name="sub", error_console=console)
+    root.command(sub)
+
+    @sub.command
+    def foo(a: int):
+        pass
+
+    with console.capture() as capture:
+        root.interactive_shell()
+
+    assert "Error" in capture.get()
