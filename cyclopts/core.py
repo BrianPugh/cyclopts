@@ -57,10 +57,12 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-with suppress(ImportError):
+try:
     # By importing, makes things like the arrow-keys work.
+    import readline
+except ImportError:  # pragma: no cover
     # Not available on windows
-    import readline  # noqa: F401
+    readline = None
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -2660,8 +2662,9 @@ class App:
         """Create a blocking, interactive shell.
 
         All registered commands can be executed in the shell.
-        Ctrl-C at the prompt discards the current line; Ctrl-C during a command
-        returns to the prompt unless :attr:`App.suppress_keyboard_interrupt` is :obj:`False`.
+        Ctrl-C clears a partially typed line; on an empty line it exits the shell.
+        Ctrl-C during a command returns to the prompt unless
+        :attr:`App.suppress_keyboard_interrupt` is :obj:`False`.
 
         Parameters
         ----------
@@ -2724,6 +2727,10 @@ class App:
         if error_console is not None:
             overrides["_error_console"] = error_console
 
+        # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
+        # new text is typed, so an interrupted buffer equal to the last seen line means the
+        # line was actually empty. GNU readline reports "" directly.
+        previous_line = ""
         with self.app_stack([], overrides):
             while True:
                 try:
@@ -2732,7 +2739,12 @@ class App:
                     break
                 except KeyboardInterrupt:
                     print()
+                    line_buffer = readline.get_line_buffer() if readline else ""
+                    if line_buffer in ("", previous_line):
+                        break
+                    previous_line = line_buffer
                     continue
+                previous_line = user_input + "\n"
 
                 try:
                     tokens = normalize_tokens(user_input)

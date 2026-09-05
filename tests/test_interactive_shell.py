@@ -334,9 +334,10 @@ def test_interactive_shell_unbalanced_quote(app, mocker, console):
     )
 
 
-def test_interactive_shell_keyboard_interrupt_at_prompt(app, mocker):
-    """Ctrl-C at the prompt should abandon the line, not exit the shell."""
+def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
+    """Ctrl-C with text on the line should discard the line, not exit the shell."""
     mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="foo 5")
 
     calls = []
 
@@ -347,6 +348,57 @@ def test_interactive_shell_keyboard_interrupt_at_prompt(app, mocker):
     app.interactive_shell()
 
     assert calls == [1]
+
+
+def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
+    mock_input = mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="")
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == []
+    assert mock_input.call_count == 1
+
+
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker):
+    """Libedit reports the previous line until new text is typed; a repeat means the line was empty."""
+    mock_input = mocker.patch(
+        "cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"]
+    )
+    mocker.patch("cyclopts.core.readline.get_line_buffer", side_effect=["foo 2", "foo 2"])
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == [1]
+    assert mock_input.call_count == 3
+
+
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker):
+    mock_input = mocker.patch("cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
+    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="foo 1\n")
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == [1]
+    assert mock_input.call_count == 2
 
 
 def test_interactive_shell_keyboard_interrupt_in_command(app, mocker):
