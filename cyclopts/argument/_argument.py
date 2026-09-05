@@ -1286,25 +1286,12 @@ class Argument:
         return tuple(choices) if choices else None
 
     def get_completions(self, context: Any) -> list[tuple[str, str]] | None:
-        """Invoke this argument's dynamic :attr:`.Parameter.completer`, if any.
+        """Run this argument's :attr:`.Parameter.completer` (invoked as ``completer(context)``) at completion time.
 
-        Unlike :meth:`get_choices` (which enumerates statically-known values from
-        the type hint), this runs a user-supplied callback at completion time.
-
-        Parameters
-        ----------
-        context : CompletionContext
-            Completion-time context (the word being completed, the active
-            argument, and the sibling arguments/values typed so far). The
-            completer is always invoked as ``completer(context)``.
-
-        Returns
-        -------
-        list[tuple[str, str]] | None
-            ``None`` if no completer is configured. Otherwise a list of
-            ``(value, description)`` tuples, normalized from the completer's
-            return value (see :attr:`.Parameter.completer` for the accepted
-            return shapes).
+        Unlike :meth:`get_choices` (static values from the type hint), this runs
+        a user callback. Returns ``None`` if no completer is set, else a list of
+        ``(value, description)`` tuples (see :attr:`.Parameter.completer` for the
+        accepted return shapes).
         """
         from cyclopts.completion._engine import normalize_completions
 

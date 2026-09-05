@@ -262,12 +262,10 @@ class Parameter:
         kw_only=True,
     )
 
-    # Called at shell-completion time to produce dynamic candidate values for this
-    # parameter (e.g. names fetched from a database or remote service that cannot be
-    # baked into a static completion script). Invoked as ``completer(context)`` where
-    # ``context`` is a ``cyclopts.completion.CompletionContext`` (the word being
-    # completed is ``context.incomplete``). May return a single ``str``, or an
-    # iterable of ``str`` values and/or ``(value, description)`` tuples.
+    # Produces dynamic candidate values at shell-completion time that can't be baked
+    # into a static script (e.g. names from a database or remote service). Invoked as
+    # ``completer(context)`` (a ``CompletionContext``); may return a ``str`` or an
+    # iterable of ``str`` and/or ``(value, description)`` tuples.
     completer: "Completer | None" = field(
         default=None,
         kw_only=True,

@@ -1,15 +1,10 @@
 """Runtime engine for dynamic (Python-invoked) shell completion.
 
-Unlike the *static* generators in this package (``bash``/``zsh``/``fish``),
-which bake commands, options, and statically-enumerable choices into a shell
-script at install time, this module runs *at completion time*. The generated
-script calls back into the application through the reserved ``__complete``
-command (see :meth:`cyclopts.App.__call__`), which routes here to compute
-candidate values by invoking user-supplied :attr:`.Parameter.completer`
-callbacks.
-
-The static script remains responsible for subcommand names, option names, and
-static choice lists; this engine only contributes the values a completer emits.
+The static ``bash``/``zsh``/``fish`` generators bake command, option, and static
+choice names into a script at install time. When an argument has a
+:attr:`.Parameter.completer`, that script also calls back at TAB time through the
+reserved ``__complete`` command, which routes here to run the completer and emit
+its candidate values.
 """
 
 import os
@@ -36,12 +31,10 @@ def _exc(e: BaseException) -> str:
 
 
 def debug(message: str) -> None:
-    """Print a completion diagnostic to stderr when ``CYCLOPTS_COMPLETION_DEBUG`` is set.
+    """Print a ``[cyclopts:completion]`` diagnostic to stderr when ``CYCLOPTS_COMPLETION_DEBUG`` is set.
 
-    Runtime completion normally swallows everything (a stray byte on stdout, or a
-    traceback, corrupts the shell's candidate list). This is the escape hatch:
-    with the env var set, run ``<prog> __complete <words...>`` by hand and watch
-    how the engine resolves the active argument and what the completer returns.
+    Completion otherwise swallows all output, so this is the escape hatch for
+    running ``<prog> __complete <words...>`` by hand.
     """
     if completion_debug_enabled():
         print(f"[cyclopts:completion] {message}", file=sys.stderr)
@@ -68,11 +61,10 @@ class Completion(NamedTuple):
 
 @frozen
 class ArgumentValue:
-    """A best-effort view of what the user has already typed for one argument.
+    """A best-effort view of another argument's typed-so-far value.
 
-    Handed out by :meth:`CompletionContext.__getitem__`. Provides both the raw
-    string a user typed and a best-effort coerced value, so a completer can make
-    decisions based on *other* arguments already present on the command line.
+    Handed out by ``context[name]`` so a completer can branch on sibling
+    arguments already on the command line.
     """
 
     argument: "Argument"
@@ -84,11 +76,7 @@ class ArgumentValue:
 
     @property
     def raw(self) -> str | None:
-        """The raw string the user typed, or :obj:`None` if not provided.
-
-        For multi-token arguments this is the first token; use :attr:`raw_tokens`
-        for the full list.
-        """
+        """The raw string the user typed, or :obj:`None` if not provided (first token only; see :attr:`raw_tokens`)."""
         tokens = self.argument.tokens
         return tokens[0].value if tokens else None
 
@@ -101,14 +89,10 @@ class ArgumentValue:
     def value(self) -> Any:
         """Best-effort coerced value, or :obj:`~.UNSET` if unavailable.
 
-        Runs the argument's normal type conversion over the tokens supplied so
-        far (CLI, env var, or config source), which means it may invoke a
-        user-supplied :attr:`.Parameter.converter` on partial input. Intended for
-        the common cases (``str``/``int``/``Path``/``Literal``/``Enum``/simple
-        unions); if conversion fails (partial input, or a complex type) this
-        returns :obj:`~.UNSET` rather than raising. The value is *not* validated.
-        With no tokens at all, falls back to the parameter's default (matching
-        what a real invocation would bind), or :obj:`~.UNSET` if it has none.
+        Runs the argument's normal conversion over the tokens typed so far (may
+        invoke a user :attr:`.Parameter.converter` on partial input); returns
+        :obj:`~.UNSET` instead of raising on failure, and does not validate.
+        Falls back to the parameter's default when no tokens were given.
         """
         if not self.argument.has_tokens:
             default = self.argument.field_info.default
@@ -164,15 +148,10 @@ class CompletionContext:
 def normalize_completions(result: "CompletionResult | None") -> list[tuple[str, str]]:
     """Normalize a completer's return value to ``(value, description)`` pairs.
 
-    A bare :class:`str` is a single candidate (never iterated per-character). A
-    :class:`tuple` is likewise a single record - ``(value,)`` or
-    ``(value, description)`` - so ``("us-west", "Oregon")`` is one described
-    candidate, not two. Any other iterable (list, set, generator, ...) is a
-    collection whose items are each a ``str`` or a ``(value, description)`` tuple.
-
-    An empty :class:`tuple` (whether returned bare or yielded as an item) means
-    "no candidate here" and is dropped, so a completer can return ``()`` to mean
-    no completions just as it can return ``None`` or ``[]``.
+    A bare :class:`str` or :class:`tuple` is one candidate — ``("us-west",
+    "Oregon")`` is a single described record, not two values. Any other iterable
+    is a collection of such items. An empty tuple (bare or as an item) means "no
+    candidate" and is dropped, like ``None`` or ``[]``.
     """
     if result is None:
         return []
@@ -202,18 +181,11 @@ _ACTIVE_SENTINEL = "\x00cyclopts-active\x00"
 
 
 def _merge_wordbreaks(words: list[str]) -> list[str]:
-    """Reassemble bash's ``COMP_WORDBREAKS`` splits of a single token.
+    """Rejoin bash ``COMP_WORDBREAKS`` splits (``--user=al`` arrives as ``['--user', '=', 'al']``) into single tokens.
 
-    Interactive bash tokenizes on the characters in ``COMP_WORDBREAKS`` (which by
-    default include ``=`` and ``:``), so ``--user=al`` arrives as
-    ``['--user', '=', 'al']`` and ``http://ex`` as ``['http', ':', '//ex']``. The
-    generated script forwards the words verbatim; rejoin the split points so the
-    engine sees the same single token that zsh and fish send.
-
-    ``=`` is only rejoined for an option-form ``--opt=value`` (a bare ``=`` value
-    is left alone); ``:`` is always rejoined, since bash only emits a lone break
-    character as its own word when it split a contiguous string — a
-    space-separated one would attach to a neighbor.
+    Matches what zsh and fish send. ``=`` is rejoined only for option forms
+    (``--opt=value``); ``:`` always, since a lone break word only comes from
+    splitting a contiguous string.
     """
     merged: list[str] = []
     i = 0
@@ -242,16 +214,13 @@ def _resolve_active_argument(
     tokens: list[str],
     end_of_options_delimiter: str,
 ) -> "Argument | None":
-    """Run the real parser over ``tokens`` and return the argument that owns the cursor.
+    """Run the real parser over ``tokens`` and return the argument owning the cursor.
 
-    ``tokens`` are the already-typed tokens plus a trailing sentinel standing in
-    for the word being completed. Reusing :func:`.bind._parse_kw_and_flags` /
-    :func:`.bind._parse_pos` (stopping short of ``_convert``/validation) means
-    option value consumption (``token_count``, ``=`` forms, ``--`` end-of-options,
-    negative numbers, hidden/variadic positionals) all behave exactly like a real
-    invocation, and the prior tokens land on the sibling arguments so a completer
-    can inspect them. Whichever argument the sentinel attaches to is the active
-    one; the sentinel is stripped afterwards so completers never see it.
+    ``tokens`` end with a sentinel standing in for the word being completed.
+    Reusing the real :mod:`.bind` parser (minus ``_convert``/validation) makes
+    option-value consumption, ``=`` forms, ``--``, and variadics behave exactly
+    like a real invocation, and leaves prior tokens on the sibling arguments.
+    Whichever argument the sentinel lands on is active; it is stripped afterward.
     """
     active: Argument | None = None
     try:
@@ -297,10 +266,9 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     Returns
     -------
     list[Completion]
-        Candidates contributed by :attr:`.Parameter.completer` callbacks for the
-        active slot. Empty when the active slot has no dynamic completer (static
-        choices, subcommand names, and option names are handled by the generated
-        script, not here).
+        Candidates from the active slot's :attr:`.Parameter.completer`. Empty
+        when it has no completer (the generated script handles static choices,
+        command names, and option names).
     """
     if not words:
         words = [""]

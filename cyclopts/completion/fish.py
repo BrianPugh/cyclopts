@@ -23,14 +23,11 @@ if TYPE_CHECKING:
 
 
 def _completer_substitution(prog_name: str) -> str:
-    """Fish command substitution that asks the app for dynamic completions.
+    """Fish command substitution that fetches ``__complete`` candidates.
 
-    Passes the words typed after the program name to the reserved ``__complete``
-    command as the word list to complete. ``commandline -pco`` already includes
-    the empty cursor slot when the line ends in a space, so it is the incomplete
-    word; the mid-token current word is appended by ``commandline -ct`` (dropped
-    when empty, exactly when ``-pco`` already carries the empty slot). Fish parses
-    the ``value<TAB>description`` lines the command prints.
+    ``commandline -pco`` already carries the empty cursor slot on a trailing
+    space; ``-ct`` appends the mid-token current word (dropped when empty). Fish
+    parses the printed ``value<TAB>description`` lines.
     """
     return f"{prog_name} __complete (commandline -pco)[2..] (commandline -ct)"
 

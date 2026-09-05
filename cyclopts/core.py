@@ -2698,17 +2698,10 @@ class App:
         return tree
 
     def _run_complete(self, words: Iterable[str]) -> None:
-        """Handle the reserved ``__complete`` command.
+        """Handle the reserved ``__complete`` command: print the engine's candidates as ``value<TAB>description`` lines.
 
-        Computes dynamic completion candidates for the partial command line in
-        ``words`` (see :func:`cyclopts.completion._engine.compute_completions`)
-        and prints them one per line as ``value<TAB>description``. The generated
-        shell script parses this output.
-
-        Errors are swallowed: a broken completer must never surface a traceback
-        into the user's interactive shell. Set ``CYCLOPTS_COMPLETION_DEBUG`` and
-        run ``<prog> __complete <words...>`` by hand to see the traceback and the
-        engine's resolution diagnostics on stderr.
+        Errors are swallowed (a broken completer must never surface a traceback
+        into the shell); ``CYCLOPTS_COMPLETION_DEBUG`` reveals them on stderr.
         """
         from cyclopts.completion._engine import completion_debug_enabled, compute_completions
 

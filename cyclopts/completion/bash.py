@@ -82,17 +82,12 @@ def _escape_bash_choice(choice: str) -> str:
 
 
 def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
-    """Emit bash that asks the app for dynamic completions at TAB time.
+    """Emit bash that fetches ``__complete`` candidates at TAB time.
 
-    Calls the reserved ``__complete`` command with the words typed after the
-    program name (``COMP_WORDS`` includes the current, possibly-empty, word), so
-    the engine can resolve the active argument and run its
-    :attr:`.Parameter.completer`. Candidates are read line-by-line into an array
-    and prefix-matched against ``$cur`` -- never fed to ``compgen -W``, which
-    word-splits values containing whitespace and shell-expands each word
-    (``$(...)``/backticks in completer output would execute on TAB).
-    Descriptions (after a tab) are dropped -- bash ``COMPREPLY`` shows values
-    only. Errors are swallowed so a broken completer can't disrupt the shell.
+    Candidates are read line-by-line and prefix-matched against ``$cur`` — never
+    fed to ``compgen -W``, which word-splits and shell-expands each value
+    (``$(...)``/backticks in completer output would execute on TAB). Descriptions
+    are dropped (``COMPREPLY`` shows values only); errors are swallowed.
     """
     return [
         f"{indent}local -a _c=()",

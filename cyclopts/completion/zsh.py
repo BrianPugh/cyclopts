@@ -255,15 +255,11 @@ def _completer_action_fn(prog_name: str) -> str:
 
 
 def _generate_dynamic_helper(prog_name: str) -> list[str]:
-    """Emit the shared zsh helper that fetches dynamic completions at TAB time.
+    """Emit the shared zsh helper that fetches ``__complete`` candidates at TAB time.
 
-    Referenced as the ``action`` of any ``_arguments`` spec whose argument has a
-    :attr:`.Parameter.completer`. Calls the reserved ``__complete`` command with
-    the words typed after the program name and feeds the
-    ``value<TAB>description`` lines to ``compadd`` (with a parallel display array
-    so descriptions show). ``_describe`` is avoided because a ``format ''`` style
-    can suppress it. Errors are swallowed so a broken completer can't disrupt the
-    shell.
+    Referenced as the ``action`` of any completer-backed ``_arguments`` spec.
+    Feeds the ``value<TAB>description`` lines to ``compadd`` with a parallel
+    display array — not ``_describe``, which a ``format ''`` style can suppress.
     """
     fn = _completer_action_fn(prog_name)
     return [
