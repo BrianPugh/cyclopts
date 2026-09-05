@@ -17,6 +17,10 @@ from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _pars
 from cyclopts.exceptions import CycloptsError, MissingArgumentError
 from cyclopts.utils import UNSET, frozen, is_option_like
 
+if TYPE_CHECKING:
+    from cyclopts import App
+    from cyclopts.argument import Argument, ArgumentCollection
+
 
 def completion_debug_enabled() -> bool:
     """Whether the ``CYCLOPTS_COMPLETION_DEBUG`` diagnostic is switched on."""
@@ -39,10 +43,6 @@ def debug(message: str) -> None:
     if completion_debug_enabled():
         print(f"[cyclopts:completion] {message}", file=sys.stderr)
 
-
-if TYPE_CHECKING:
-    from cyclopts import App
-    from cyclopts.argument import Argument, ArgumentCollection
 
 #: What a :attr:`.Parameter.completer` may return: a single value, or an iterable
 #: of values and/or ``(value, description)`` tuples.
