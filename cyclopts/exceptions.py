@@ -47,6 +47,7 @@ __all__ = [
     "RequiresEqualsError",
     "UnknownOptionError",
     "UnusedCliTokensError",
+    "TokenizationError",
     "ValidationError",
     "CombinedShortOptionError",
     "STYLE_OFFENDING_VALUE",
@@ -507,6 +508,11 @@ class UnknownCommandError(CycloptsError):
                     yield ", ", ""
                 yield name, STYLE_VALID_CHOICE
             yield ".", ""
+
+
+@define(kw_only=True)
+class TokenizationError(CycloptsError):
+    """A string of CLI tokens could not be split (e.g. unbalanced quotes)."""
 
 
 @define(kw_only=True)
