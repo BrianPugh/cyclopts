@@ -205,23 +205,35 @@ def _normalize_item(item: "str | tuple") -> "tuple[str, str] | None":
 _ACTIVE_SENTINEL = "\x00cyclopts-active\x00"
 
 
-def _merge_eq_wordbreaks(words: list[str]) -> list[str]:
-    """Reassemble bash's ``COMP_WORDBREAKS`` splits of ``--opt=value``.
+def _merge_wordbreaks(words: list[str]) -> list[str]:
+    """Reassemble bash's ``COMP_WORDBREAKS`` splits of a single token.
 
-    Interactive bash tokenizes ``--user=al`` into ``['--user', '=', 'al']`` and
-    the generated script forwards the words verbatim; rejoin them so the engine
-    sees the same single eq-form token that zsh and fish send.
+    Interactive bash tokenizes on the characters in ``COMP_WORDBREAKS`` (which by
+    default include ``=`` and ``:``), so ``--user=al`` arrives as
+    ``['--user', '=', 'al']`` and ``http://ex`` as ``['http', ':', '//ex']``. The
+    generated script forwards the words verbatim; rejoin the split points so the
+    engine sees the same single token that zsh and fish send.
+
+    ``=`` is only rejoined for an option-form ``--opt=value`` (a bare ``=`` value
+    is left alone); ``:`` is always rejoined, since bash only emits a lone break
+    character as its own word when it split a contiguous string — a
+    space-separated one would attach to a neighbor.
     """
     merged: list[str] = []
     i = 0
-    while i < len(words):
+    n = len(words)
+    while i < n:
         word = words[i]
-        if word == "=" and merged and merged[-1].startswith("-") and "=" not in merged[-1]:
-            if i + 1 < len(words):
-                merged[-1] += "=" + words[i + 1]
+        eq_join = word == "=" and merged and merged[-1].startswith("-") and "=" not in merged[-1]
+        colon_join = word == ":" and merged
+        if eq_join or colon_join:
+            # Glue the break char onto the previous word and absorb the following
+            # word too (the char sat between the two halves of one token).
+            merged[-1] += word
+            if i + 1 < n:
+                merged[-1] += words[i + 1]
                 i += 2
             else:
-                merged[-1] += "="
                 i += 1
             continue
         merged.append(word)
@@ -296,7 +308,7 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     """
     if not words:
         words = [""]
-    words = _merge_eq_wordbreaks(words)
+    words = _merge_wordbreaks(words)
     prior, incomplete = words[:-1], words[-1]
     debug(f"words={words!r} prior={prior!r} incomplete={incomplete!r}")
 

@@ -272,6 +272,32 @@ def test_eq_form_bash_wordbreak_split(app):
     assert _values(compute_completions(app, ["deploy", "--user", "="])) == ["alice", "bob", "carol"]
 
 
+def test_colon_wordbreak_split_rejoined():
+    """Bash splits ``http://ex`` on ``:``; the engine rejoins it into ``incomplete``."""
+    app = App(name="myapp", result_action="return_value")
+    seen = []
+
+    @app.command
+    def fetch(url: Annotated[str, Parameter(completer=lambda ctx: seen.append(ctx.incomplete) or [])]):
+        pass
+
+    compute_completions(app, ["fetch", "http", ":", "//ex"])
+    assert seen == ["http://ex"]
+
+
+def test_eq_and_colon_wordbreak_split_rejoined():
+    """A value ``--host=localhost:80`` split by bash on both ``=`` and ``:`` rejoins."""
+    app = App(name="myapp", result_action="return_value")
+    seen = []
+
+    @app.command
+    def deploy(*, host: Annotated[str, Parameter(completer=lambda ctx: seen.append(ctx.incomplete) or [])] = ""):
+        pass
+
+    compute_completions(app, ["deploy", "--host", "=", "localhost", ":", "80"])
+    assert seen == ["localhost:80"]
+
+
 def test_keyword_supplied_positional_or_keyword_closes_slot(app):
     """``--service x`` fills the positional slot; the free word has no argument."""
     result = compute_completions(app, ["deploy", "--service", "x", ""])
