@@ -1,3 +1,5 @@
+import pytest
+
 from cyclopts import App
 
 
@@ -309,3 +311,154 @@ def test_interactive_shell_no_sys_exit_on_command(app, mocker, console):
     assert cmd1_called == 1
     assert cmd2_called == 1
     assert cmd3_called == 1
+
+
+def test_interactive_shell_unbalanced_quote(app, mocker, console):
+    """A tokenization error should be reported and the shell should keep running."""
+    mocker.patch("cyclopts.core.input", side_effect=['foo "1', "foo 2", "quit"])
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    with console.capture() as capture:
+        app.interactive_shell(error_console=console)
+
+    assert calls == [2]
+    assert capture.get() == (
+        "╭─ Error ────────────────────────────────────────────────────────────╮\n"
+        "│ No closing quotation                                               │\n"
+        "╰────────────────────────────────────────────────────────────────────╯\n"
+    )
+
+
+def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
+    """Ctrl-C with text on the line should discard the line, not exit the shell."""
+    mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="foo 5")
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == [1]
+
+
+def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
+    mock_input = mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
+    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="")
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == []
+    assert mock_input.call_count == 1
+
+
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interrupt(app, mocker):
+    """Libedit reports the previous line until new text is typed; a repeat means the line was empty."""
+    mock_input = mocker.patch(
+        "cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"]
+    )
+    mocker.patch("cyclopts.core.readline.get_line_buffer", side_effect=["foo 2", "foo 2"])
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == [1]
+    assert mock_input.call_count == 3
+
+
+def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker):
+    mock_input = mocker.patch("cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
+    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="foo 1\n")
+
+    calls = []
+
+    @app.command
+    def foo(a: int):
+        calls.append(a)
+
+    app.interactive_shell()
+
+    assert calls == [1]
+    assert mock_input.call_count == 2
+
+
+def test_interactive_shell_keyboard_interrupt_in_command(app, mocker):
+    """Ctrl-C during a command should return to the prompt when suppress_keyboard_interrupt is set."""
+    mocker.patch("cyclopts.core.input", side_effect=["foo", "bar", "quit"])
+
+    calls = []
+
+    @app.command
+    def foo():
+        raise KeyboardInterrupt
+
+    @app.command
+    def bar():
+        calls.append("bar")
+
+    app.interactive_shell()
+    assert calls == ["bar"]
+
+
+def test_interactive_shell_keyboard_interrupt_in_command_not_suppressed(mocker):
+    mocker.patch("cyclopts.core.input", side_effect=["foo", "quit"])
+    app = App(suppress_keyboard_interrupt=False)
+
+    @app.command
+    def foo():
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        app.interactive_shell()
+
+
+def test_interactive_shell_exception_goes_to_error_console(app, mocker, console):
+    mocker.patch("cyclopts.core.input", side_effect=["foo", "quit"])
+
+    @app.command
+    def foo():
+        raise RuntimeError("boom")
+
+    with console.capture() as capture:
+        app.interactive_shell(error_console=console)
+
+    actual = capture.get()
+    assert "Traceback (most recent call last):" in actual
+    assert "RuntimeError: boom" in actual
+
+
+def test_interactive_shell_subcommand_error_console(mocker, console):
+    """A subcommand's own error_console must not be overridden by the root's."""
+    mocker.patch("cyclopts.core.input", side_effect=["sub foo notanint", "quit"])
+
+    root = App()
+    sub = App(name="sub", error_console=console)
+    root.command(sub)
+
+    @sub.command
+    def foo(a: int):
+        pass
+
+    with console.capture() as capture:
+        root.interactive_shell()
+
+    assert "Error" in capture.get()

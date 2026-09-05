@@ -57,15 +57,12 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-if sys.version_info < (3, 11):  # pragma: no cover
-    pass
-else:  # pragma: no cover
-    pass
-
-with suppress(ImportError):
+try:
     # By importing, makes things like the arrow-keys work.
+    import readline
+except ImportError:  # pragma: no cover
     # Not available on windows
-    import readline  # noqa: F401
+    readline = None
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -2659,11 +2656,15 @@ class App:
         console: "Console | None" = None,
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
+        error_console: "Console | None" = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
 
         All registered commands can be executed in the shell.
+        Ctrl-C clears a partially typed line; on an empty line it exits the shell.
+        Ctrl-C during a command returns to the prompt unless
+        :attr:`App.suppress_keyboard_interrupt` is :obj:`False`.
 
         Parameters
         ----------
@@ -2694,6 +2695,8 @@ class App:
             Defaults to ``"print_non_int_return_int_as_exit_code"`` which prints non-int results
             and returns int/bool as exit codes without calling sys.exit.
             If :obj:`None`, inherits from :attr:`App.result_action`.
+        error_console: Console | None
+            Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -2721,31 +2724,52 @@ class App:
             overrides["result_action"] = result_action
         if console is not None:
             overrides["_console"] = console
+        if error_console is not None:
+            overrides["_error_console"] = error_console
 
-        while True:
-            try:
-                user_input = input(prompt)
-            except EOFError:  # pragma: no cover
-                break
+        # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
+        # new text is typed, so an interrupted buffer equal to the last seen line means the
+        # line was actually empty. GNU readline reports "" directly.
+        previous_line = ""
+        with self.app_stack([], overrides):
+            while True:
+                try:
+                    user_input = input(prompt)
+                except EOFError:  # pragma: no cover
+                    break
+                except KeyboardInterrupt:
+                    print()
+                    line_buffer = readline.get_line_buffer() if readline else ""
+                    if line_buffer in ("", previous_line):
+                        break
+                    previous_line = line_buffer
+                    continue
+                previous_line = user_input + "\n"
 
-            tokens = normalize_tokens(user_input)
-            if not tokens:
-                continue
-            if tokens[0] in quit:
-                break
+                try:
+                    tokens = normalize_tokens(user_input)
+                except ValueError as e:
+                    self.error_console.print(CycloptsPanel(CycloptsError(msg=str(e))))
+                    continue
+                if not tokens:
+                    continue
+                if tokens[0] in quit:
+                    break
 
-            try:
-                with self.app_stack(tokens, overrides):
-                    command, bound, ignored = self.parse_args(
-                        tokens, console=console, exit_on_error=exit_on_error, **kwargs
-                    )
-                    result = dispatcher(command, bound, ignored)
-                    self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-            except CycloptsError:
-                # Upstream ``parse_args`` already printed the error
-                pass
-            except Exception:
-                print(traceback.format_exc())
+                try:
+                    with self.app_stack(tokens):
+                        command, bound, ignored = self.parse_args(tokens, exit_on_error=exit_on_error, **kwargs)
+                        result = dispatcher(command, bound, ignored)
+                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
+                except CycloptsError:
+                    # Upstream ``parse_args`` already printed the error
+                    pass
+                except KeyboardInterrupt:
+                    if not self.suppress_keyboard_interrupt:
+                        raise
+                    print()
+                except Exception:
+                    self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
