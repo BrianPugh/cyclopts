@@ -544,6 +544,57 @@ def test_generate_rst_docs_no_root_title_renders_default_command_params():
     assert "=====\nmyapp\n=====" not in docs
 
 
+def test_generate_rst_docs_no_root_title_meta_default_renders_params():
+    """A root with only a ``meta.default`` (no ``default_command``) still documents its global options.
+
+    The meta app's parameters live in the root parameter panel and are documented
+    nowhere else, so they render even though there is no root Usage: line.
+    """
+    from cyclopts.docs.rst import generate_rst_docs
+
+    app = App(name="myapp", help="Meta root")
+
+    @app.meta.default
+    def meta_main(*tokens: str, verbose: bool = False):
+        """Meta."""
+
+    @app.command
+    def build(source: str):
+        """Build the project."""
+
+    docs = generate_rst_docs(app, no_root_title=True)
+
+    assert "``--verbose, --no-verbose``" in docs
+    assert "myapp [ARGS]" not in docs
+    assert "myapp COMMAND" not in docs
+    assert "myapp build" in docs
+
+
+def test_generate_rst_docs_no_root_title_skip_preamble_hides_root_params():
+    """``skip_preamble`` with a command filter must not leak the root default's parameters.
+
+    This is the "one subcommand per page" pattern: only the filtered command's
+    content should appear.
+    """
+    from cyclopts.docs.rst import generate_rst_docs
+
+    app = App(name="myapp", help="My app")
+
+    @app.default
+    def init(path: str = "."):
+        """Initialize."""
+
+    @app.command
+    def build(source: str):
+        """Build the project."""
+
+    docs = generate_rst_docs(app, no_root_title=True, commands_filter=["build"], skip_preamble=True)
+
+    assert "``PATH, --path``" not in docs
+    assert "My app" not in docs
+    assert "``SOURCE, --source``" in docs
+
+
 def test_generate_rst_docs_no_root_title_command_group_unchanged():
     """A pure command-group root (no default_command) stays title/usage-less.
 

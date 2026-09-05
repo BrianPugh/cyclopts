@@ -404,7 +404,9 @@ def generate_rst_docs(
         # root ``default_command``'s own arguments -- which are documented nowhere
         # else -- so it must still render. Skipping it is what made a
         # ``@app.default`` app's parameters vanish from Sphinx output. See #923.
-        if no_root_title and not command_chain and panel.format == "command":
+        # ``skip_preamble`` documents a filtered subcommand on its own, so the root
+        # parameter panel is skipped along with the root usage/description.
+        if no_root_title and not command_chain and (panel.format == "command" or skip_preamble):
             continue
 
         # Render command panels as grouped command lists
