@@ -19,6 +19,7 @@ from cyclopts.exceptions import (
     CycloptsError,
     MissingArgumentError,
     RequiresEqualsError,
+    TokenizationError,
     UnknownOptionError,
     ValidationError,
 )
@@ -58,7 +59,10 @@ def normalize_tokens(tokens: None | str | Iterable[str]) -> list[str]:
     if tokens is None:
         tokens = sys.argv[1:]  # Remove the executable
     elif isinstance(tokens, str):
-        tokens = shlex.split(tokens)
+        try:
+            tokens = shlex.split(tokens)
+        except ValueError as e:
+            raise TokenizationError(msg=f"{e}: {tokens!r}") from e
     else:
         tokens = list(tokens)
     return tokens

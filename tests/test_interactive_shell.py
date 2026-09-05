@@ -329,7 +329,7 @@ def test_interactive_shell_unbalanced_quote(app, mocker, console):
     assert calls == [2]
     assert capture.get() == (
         "╭─ Error ────────────────────────────────────────────────────────────╮\n"
-        "│ No closing quotation                                               │\n"
+        "│ No closing quotation: 'foo \"1'                                     │\n"
         "╰────────────────────────────────────────────────────────────────────╯\n"
     )
 
