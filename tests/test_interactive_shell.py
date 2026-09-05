@@ -337,7 +337,7 @@ def test_interactive_shell_unbalanced_quote(app, mocker, console):
 def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
     """Ctrl-C with text on the line should discard the line, not exit the shell."""
     mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="foo 5")
+    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = "foo 5"
 
     calls = []
 
@@ -352,7 +352,7 @@ def test_interactive_shell_keyboard_interrupt_clears_typed_line(app, mocker):
 
 def test_interactive_shell_keyboard_interrupt_empty_line_exits(app, mocker):
     mock_input = mocker.patch("cyclopts.core.input", side_effect=[KeyboardInterrupt(), "foo 1", "quit"])
-    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="")
+    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = ""
 
     calls = []
 
@@ -371,7 +371,7 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interru
     mock_input = mocker.patch(
         "cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), KeyboardInterrupt(), "quit"]
     )
-    mocker.patch("cyclopts.core.readline.get_line_buffer", side_effect=["foo 2", "foo 2"])
+    mocker.patch("cyclopts.core.readline").get_line_buffer.side_effect = ["foo 2", "foo 2"]
 
     calls = []
 
@@ -387,7 +387,7 @@ def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_interru
 
 def test_interactive_shell_keyboard_interrupt_stale_libedit_buffer_after_line(app, mocker):
     mock_input = mocker.patch("cyclopts.core.input", side_effect=["foo 1", KeyboardInterrupt(), "quit"])
-    mocker.patch("cyclopts.core.readline.get_line_buffer", return_value="foo 1\n")
+    mocker.patch("cyclopts.core.readline").get_line_buffer.return_value = "foo 1\n"
 
     calls = []
 

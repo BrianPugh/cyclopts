@@ -2756,20 +2756,23 @@ class App:
                 if tokens[0] in quit:
                     break
 
-                try:
-                    with self.app_stack(tokens):
+                # Keep the exception handlers inside the token ``app_stack`` context so that
+                # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
+                # subcommand rather than the root app.
+                with self.app_stack(tokens):
+                    try:
                         command, bound, ignored = self.parse_args(tokens, exit_on_error=exit_on_error, **kwargs)
                         result = dispatcher(command, bound, ignored)
                         self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-                except CycloptsError:
-                    # Upstream ``parse_args`` already printed the error
-                    pass
-                except KeyboardInterrupt:
-                    if not self.suppress_keyboard_interrupt:
-                        raise
-                    print()
-                except Exception:
-                    self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
+                    except CycloptsError:
+                        # Upstream ``parse_args`` already printed the error
+                        pass
+                    except KeyboardInterrupt:
+                        if not self.suppress_keyboard_interrupt:
+                            raise
+                        print()
+                    except Exception:
+                        self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
