@@ -1302,9 +1302,9 @@ class Argument:
         -------
         list[tuple[str, str]] | None
             ``None`` if no completer is configured. Otherwise a list of
-            ``(value, description)`` tuples (see
-            :func:`~cyclopts.completion._engine.normalize_completions` for the
-            accepted return shapes).
+            ``(value, description)`` tuples, normalized from the completer's
+            return value (see :attr:`.Parameter.completer` for the accepted
+            return shapes).
         """
         from cyclopts.completion._engine import normalize_completions
 
