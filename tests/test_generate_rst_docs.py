@@ -618,3 +618,44 @@ def test_generate_rst_docs_no_root_title_command_group_unchanged():
     # The subcommand is still documented recursively.
     assert "build" in docs
     assert "myapp build" in docs
+
+
+def test_generate_rst_docs_no_root_title_shared_group_command_not_leaked():
+    """Regression for #924.
+
+    ``_assemble_help_panels`` merges command entries into a same-named parameter
+    panel and upgrades its format to ``"parameter"``. At a title-less root the
+    #923 fix renders root parameter panels, so those merged command entries would
+    leak in: rendered as bogus parameters, duplicated by the recursive sections
+    below, and bypassing ``exclude_commands``/``commands_filter``. The root
+    default's real parameters must still render.
+    """
+    from typing import Annotated
+
+    from cyclopts import Group, Parameter
+    from cyclopts.docs.rst import generate_rst_docs
+
+    shared = Group("Shared")
+    app = App(name="myapp")
+
+    @app.default
+    def main(alpha: Annotated[str, Parameter(group=shared)] = "x"):
+        """Root default."""
+
+    @app.command(group=shared)
+    def sub(beta: int = 3):
+        """A subcommand."""
+
+    docs = generate_rst_docs(app, no_root_title=True)
+
+    # The root default's own parameter still renders (the #923 fix).
+    assert "``ALPHA, --alpha``" in docs
+    # The command is documented once, as its own recursive section...
+    assert docs.count("``sub``") == 0  # not rendered as a definition-list entry
+    assert "\nsub\n" in docs  # rendered as a recursive section header
+    assert "myapp sub" in docs
+
+    # ...and ``exclude_commands`` must be honored: no leak through the merged panel.
+    excluded = generate_rst_docs(app, no_root_title=True, exclude_commands=["sub"])
+    assert "``ALPHA, --alpha``" in excluded
+    assert "sub" not in excluded

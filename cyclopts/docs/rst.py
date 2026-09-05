@@ -441,6 +441,19 @@ def generate_rst_docs(
 
         # Render parameter panels as-is
         elif panel.format == "parameter":
+            # A "parameter" panel is not guaranteed to hold only parameter
+            # entries: ``_assemble_help_panels`` merges command entries into a
+            # same-named parameter panel (upgrading its format to "parameter").
+            # At the title-less root those command entries would be rendered as
+            # bogus parameters, duplicated by the recursive sections below, and
+            # would bypass ``commands_filter``/``exclude_commands``. The commands
+            # are documented by the recursive sections, so drop them here. See #924.
+            if no_root_title and not command_chain:
+                param_entries = [e for e in panel.entries if not any(name in command_map for name in e.names)]
+                if not param_entries:
+                    continue  # Nothing left once commands are stripped
+                panel = panel.copy(entries=param_entries)
+
             # Render content first to check if there's anything
             formatter.reset()
             panel_copy = panel.copy(title="")
