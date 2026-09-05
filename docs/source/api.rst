@@ -1150,8 +1150,11 @@ API
               cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
           ): ...
 
-      Dynamic completion re-invokes your application on each ``<TAB>``, so it is slower
-      than static completion; keep the callback (and your module imports) fast.
+      Completing a completer-backed value launches your Python program in a fresh process
+      to run the completer, paying interpreter startup plus every module-load import before
+      the callback runs (other completions stay in-shell). Keep the callback and your
+      top-level imports fast, importing heavy dependencies lazily, and see
+      :ref:`Lazy Loading` for commands with heavy dependencies.
 
    .. attribute:: group
       :type: Union[None, str, Group, Iterable[Union[str, Group]]]

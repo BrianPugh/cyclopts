@@ -141,7 +141,15 @@ To install without modifying shell RC files, use:
 Custom Completers
 =================
 
-Static completion can only offer values that are known when the completion script is generated: :obj:`~typing.Literal` and :class:`~enum.Enum` choices, and :class:`~pathlib.Path` values. But many valid values are only known at runtime: usernames fetched from a database, resources listed from a remote API, or IDs derived from a live system. For these cases, attach a **completer callback** to a parameter. The callback is invoked when the user presses ``<TAB>``, enabling **runtime value completion** for bash, zsh, and fish.
+Static completion can only offer values that are known when the completion script is generated.
+Sometimes, valid values are only known at runtime; for these cases, attach a **completer callback** to a parameter.
+The callback is invoked when the user presses ``<TAB>``, enabling **runtime value completion** for bash, zsh, and fish.
+
+.. warning::
+
+   Completing the value of a completer-backed parameter launches your Python program in a fresh process to run the completer. Each such ``<TAB>`` pays interpreter startup plus every import your program performs at module load, *before* the completer callback runs. (Completing command names, option names, and static choices stays entirely in-shell and pays none of this.) Heavy, non-lazy top-level imports (``numpy``, ``pandas``, ``torch``, ...) make those completions noticeably sluggish.
+
+   To keep completion responsive, avoid heavy module-level imports, import expensive dependencies lazily inside the functions that use them, and use :ref:`Lazy Loading` for commands with heavy dependencies.
 
 .. note::
 
@@ -222,10 +230,6 @@ The following example completes ``--cluster`` based on the already-typed ``--reg
 
 
    app()
-
-.. warning::
-
-   Runtime completion re-invokes your application on every ``<TAB>`` press, so it is inherently slower than static completion. Keep completer callbacks and module-level imports fast, and consider :ref:`Lazy Loading` for commands with heavy dependencies.
 
 See :attr:`.Parameter.completer` and :class:`~cyclopts.completion.CompletionContext` for full API details.
 
