@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 from cyclopts.bind import _parse_configs, _parse_env, _parse_kw_and_flags, _parse_pos
 from cyclopts.exceptions import CycloptsError, MissingArgumentError
-from cyclopts.field_info import VAR_KEYWORD
 from cyclopts.utils import UNSET, frozen, is_option_like
 
 
@@ -139,15 +138,12 @@ class CompletionContext:
         return self.argument.parameter
 
     def _match(self, name: str) -> "Argument":
-        try:
-            argument, _, _ = self.arguments.match(name)
-            # ``ArgumentCollection.match`` resolves any unrecognized term to a
-            # ``**kwargs`` catch-all; a bare name like ``"region"`` must keep
-            # falling through to the explicit field/option-name scan below.
-            if argument.field_info.kind is not VAR_KEYWORD:
-                return argument
-        except ValueError:
-            pass
+        # ``_match_explicit`` matches ``name`` against declared options while
+        # skipping the ``**kwargs`` catch-all, so a bare name like ``"region"``
+        # keeps falling through to the explicit field/option-name scan below.
+        argument = self.arguments._match_explicit(name)
+        if argument is not None:
+            return argument
         for argument in self.arguments:
             if argument.field_info.name == name or name in argument.names or f"--{name}" in argument.names:
                 return argument
