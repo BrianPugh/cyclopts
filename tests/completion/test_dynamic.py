@@ -445,6 +445,21 @@ def test_normalize_none_is_empty():
     assert normalize_completions(None) == []
 
 
+def test_normalize_empty_tuple_is_no_candidate():
+    """A bare ``()`` means no completions, not a malformed record."""
+    assert normalize_completions(()) == []
+
+
+def test_normalize_empty_tuple_item_is_dropped():
+    """An empty-tuple item inside a collection is skipped, not an error."""
+    assert normalize_completions([("a",), (), "b"]) == [("a", ""), ("b", "")]  # pyright: ignore[reportArgumentType]
+
+
+def test_normalize_non_str_items_are_coerced():
+    """Non-str/non-tuple items (e.g. ints) coerce to str rather than raising."""
+    assert normalize_completions([1, 2, 3]) == [("1", ""), ("2", ""), ("3", "")]  # pyright: ignore[reportArgumentType]
+
+
 def test_get_completions_none_without_completer():
     app = App(name="myapp")
 

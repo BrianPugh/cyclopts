@@ -173,19 +173,29 @@ def normalize_completions(result: "CompletionResult | None") -> list[tuple[str, 
     ``(value, description)`` - so ``("us-west", "Oregon")`` is one described
     candidate, not two. Any other iterable (list, set, generator, ...) is a
     collection whose items are each a ``str`` or a ``(value, description)`` tuple.
+
+    An empty :class:`tuple` (whether returned bare or yielded as an item) means
+    "no candidate here" and is dropped, so a completer can return ``()`` to mean
+    no completions just as it can return ``None`` or ``[]``.
     """
     if result is None:
         return []
-    if isinstance(result, (str, tuple)):
-        return [_normalize_item(result)]
-    return [_normalize_item(item) for item in result]
+    items: Iterable[str | tuple] = [result] if isinstance(result, (str, tuple)) else result
+    normalized = [_normalize_item(item) for item in items]
+    return [pair for pair in normalized if pair is not None]
 
 
-def _normalize_item(item: "str | tuple") -> tuple[str, str]:
+def _normalize_item(item: "str | tuple") -> "tuple[str, str] | None":
     if isinstance(item, str):
         return (item, "")
-    value, *rest = item
-    return (str(value), str(rest[0]) if rest else "")
+    if isinstance(item, tuple):
+        if not item:
+            return None
+        value, *rest = item
+        return (str(value), str(rest[0]) if rest else "")
+    # Not a str or (value, description) tuple (e.g. a completer yielding ints):
+    # coerce to its string form rather than raising mid-completion.
+    return (str(item), "")
 
 
 #: Stands in for the word being completed while the real parser distributes
