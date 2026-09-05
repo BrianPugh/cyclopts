@@ -117,7 +117,12 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
         # forward the whole path to ``__complete`` regardless of nesting depth.
         # ``local`` is dynamically scoped, so the nested helper sees it when
         # ``_arguments`` calls it within this frame.
+        # Snapshot ``$CURRENT`` alongside it: the cursor's index in the full line.
+        # ``_arguments`` rebases both ``$words`` and ``$CURRENT`` inside subcommand
+        # frames, so the helper must slice the snapshot by the *snapshot's* cursor
+        # index (captured here in the top-level frame), not the rebased one.
         lines.append('  local -a _cyc_words=("${words[@]}")')
+        lines.append("  local _cyc_current=$CURRENT")
         lines.extend(f"  {line}" if line else "" for line in _generate_dynamic_helper(prog_name))
 
     lines.extend(
@@ -271,7 +276,11 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
         # executable (env, git, test, ...), that binary would be exec'd instead.
         '  _cyc_cmd="${_cyc_words[1]}"',
         f'  (( $+commands[$_cyc_cmd] )) || _cyc_cmd="{prog_name}"',
-        '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,-1]}" 2>/dev/null)}")',
+        # Slice ``[2, _cyc_current]`` — the words after the program name up to and
+        # including the word under the cursor. Dropping anything past the cursor
+        # (a mid-line TAB) means the engine treats the cursor's word as the
+        # incomplete one, matching bash's ``${COMP_WORDS[@]:1:COMP_CWORD}`` slice.
+        '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,_cyc_current]}" 2>/dev/null)}")',
         '  for _cyc_line in "${_cyc_lines[@]}"; do',
         '    [[ -z "$_cyc_line" ]] && continue',
         "    _cyc_val=\"${_cyc_line%%$'\\t'*}\"",
