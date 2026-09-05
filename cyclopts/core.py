@@ -57,11 +57,6 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-if sys.version_info < (3, 11):  # pragma: no cover
-    pass
-else:  # pragma: no cover
-    pass
-
 with suppress(ImportError):
     # By importing, makes things like the arrow-keys work.
     # Not available on windows
@@ -2657,6 +2652,7 @@ class App:
         quit: None | str | Iterable[str] = None,
         dispatcher: Dispatcher | None = None,
         console: "Console | None" = None,
+        error_console: "Console | None" = None,
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
         **kwargs,
@@ -2687,6 +2683,8 @@ class App:
             async commands itself (e.g. via :func:`asyncio.run`).
         console: Console | None
             Rich Console to use for output. If :obj:`None`, uses :attr:`App.console`.
+        error_console: Console | None
+            Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
         exit_on_error: bool
             Whether to call ``sys.exit`` on parsing errors. Defaults to :obj:`False`.
         result_action: ResultAction | None
@@ -2722,13 +2720,23 @@ class App:
         if console is not None:
             overrides["_console"] = console
 
+        if error_console is None:
+            error_console = self.error_console
+
         while True:
             try:
                 user_input = input(prompt)
             except EOFError:  # pragma: no cover
                 break
+            except KeyboardInterrupt:
+                print()
+                continue
 
-            tokens = normalize_tokens(user_input)
+            try:
+                tokens = normalize_tokens(user_input)
+            except ValueError as e:
+                error_console.print(CycloptsPanel(CycloptsError(msg=str(e))))
+                continue
             if not tokens:
                 continue
             if tokens[0] in quit:
@@ -2737,15 +2745,23 @@ class App:
             try:
                 with self.app_stack(tokens, overrides):
                     command, bound, ignored = self.parse_args(
-                        tokens, console=console, exit_on_error=exit_on_error, **kwargs
+                        tokens,
+                        console=console,
+                        error_console=error_console,
+                        exit_on_error=exit_on_error,
+                        **kwargs,
                     )
                     result = dispatcher(command, bound, ignored)
                     self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
             except CycloptsError:
                 # Upstream ``parse_args`` already printed the error
                 pass
+            except KeyboardInterrupt:
+                if not self.suppress_keyboard_interrupt:
+                    raise
+                print()
             except Exception:
-                print(traceback.format_exc())
+                error_console.print(traceback.format_exc(), markup=False, highlight=False)
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.
