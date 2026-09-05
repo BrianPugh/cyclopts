@@ -86,6 +86,11 @@ V = TypeVar("V")
 
 DEFAULT_FORMAT = "markdown"
 
+#: Reserved first token the generated shell-completion script uses to request
+#: dynamic completions (see :meth:`App._run_complete`). Shared by the sync and
+#: async entrypoints so their interception guards can't drift apart.
+_COMPLETE_COMMAND = "__complete"
+
 
 def _result_action_converter(
     value: "ResultAction | ResultActionSingle | None",
@@ -1726,6 +1731,17 @@ class App:
 
         tokens = normalize_tokens(tokens)
 
+        # Reserved command: the generated shell-completion script calls back into
+        # the application as ``<prog> __complete <words...>`` to obtain dynamic
+        # completions from ``Parameter.completer`` callbacks. Intercepted here —
+        # like the help/version pseudo-commands — so every entry point
+        # (``__call__``, ``run_async``, ``parse_args``, ``parse_known_args``)
+        # handles it and it never collides with user commands.
+        if tokens and tokens[0] == _COMPLETE_COMMAND:
+            command = self._run_complete
+            bound = inspect.signature(command).bind(tokens[1:])
+            return command, bound, [], {}, ArgumentCollection()
+
         meta_parent = self
 
         # We need both versions of the apps list:
@@ -2680,6 +2696,29 @@ class App:
         tree = Tree(node_label(self.name[0], self))
         build(tree, self, 1)
         return tree
+
+    def _run_complete(self, words: Iterable[str]) -> None:
+        """Handle the reserved ``__complete`` command: print the engine's candidates as ``value<TAB>description`` lines.
+
+        Errors are swallowed (a broken completer must never surface a traceback
+        into the shell); ``CYCLOPTS_COMPLETION_DEBUG`` reveals them on stderr.
+        """
+        from cyclopts.completion._engine import completion_debug_enabled, compute_completions
+
+        try:
+            completions = compute_completions(self, list(words))
+        except Exception:
+            if completion_debug_enabled():
+                import traceback
+
+                traceback.print_exc()
+            return None
+        for completion in completions:
+            if completion.help:
+                print(f"{completion.value}\t{completion.help}")
+            else:
+                print(completion.value)
+        return None
 
     def generate_completion(
         self,

@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from typing import (  # noqa: UP035
+    TYPE_CHECKING,
     Any,
     List,
     Self,
@@ -39,6 +40,9 @@ from cyclopts.utils import (
     record_init,
     to_tuple_converter,
 )
+
+if TYPE_CHECKING:
+    from cyclopts.completion._engine import Completer
 
 ITERATIVE_BOOL_IMPLICIT_VALUE = frozenset(
     {
@@ -255,6 +259,15 @@ class Parameter:
     validator: None | Callable[..., Any] | str | Iterable[Callable[..., Any] | str] = field(
         default=(),
         converter=_validator_tuple_converter,
+        kw_only=True,
+    )
+
+    # Produces dynamic candidate values at shell-completion time that can't be baked
+    # into a static script (e.g. names from a database or remote service). Invoked as
+    # ``completer(context)`` (a ``CompletionContext``); may return a ``str`` or an
+    # iterable of ``str`` and/or ``(value, description)`` tuples.
+    completer: "Completer | None" = field(
+        default=None,
         kw_only=True,
     )
 

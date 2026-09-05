@@ -22,6 +22,16 @@ if TYPE_CHECKING:
     from cyclopts.command_spec import CommandSpec
 
 
+def _completer_substitution(prog_name: str) -> str:
+    """Fish command substitution that fetches ``__complete`` candidates.
+
+    ``commandline -pco`` already carries the empty cursor slot on a trailing
+    space; ``-ct`` appends the mid-token current word (dropped when empty). Fish
+    parses the printed ``value<TAB>description`` lines.
+    """
+    return f"{prog_name} __complete (commandline -pco)[2..] (commandline -ct)"
+
+
 def generate_completion_script(app: "App", prog_name: str) -> str:
     """Generate fish completion script.
 
@@ -71,11 +81,12 @@ def generate_completion_script(app: "App", prog_name: str) -> str:
 
 
 def _any_nested_positional_choices(completion_data: dict[tuple[str, ...], CompletionData]) -> bool:
-    """Whether any nested command path has a positional argument with choices.
+    """Whether any nested command path has a positional argument with choices or a completer.
 
     The positional-index helper is only needed when there is at least one
-    nested positional that emits a choice list — without choices, fish's
-    default file fallback already produces sensible completions.
+    nested positional that emits a per-slot rule (a choice list or a dynamic
+    completer) — without either, fish's default file fallback already produces
+    sensible completions.
     """
     for path, data in completion_data.items():
         if not path:
@@ -83,7 +94,7 @@ def _any_nested_positional_choices(completion_data: dict[tuple[str, ...], Comple
         for argument in data.arguments:
             if argument.index is None or not argument.show:
                 continue
-            if argument.get_choices(force=True):
+            if argument.parameter.completer is not None or argument.get_choices(force=True):
                 return True
     return False
 
@@ -441,25 +452,45 @@ def _generate_positional_completions(
             lines.append(f"# Positionals for: {' '.join(command_path)}")
             header_emitted = True
 
+    # Fish evaluates ``-a`` command substitutions even while the user is typing
+    # an option name (current token starts with ``-``); guard completer entries
+    # so a full ``<prog> __complete`` subprocess isn't spawned on option-name TABs
+    # the engine would refuse anyway.
+    not_option_cond = '; and not string match -q -- "-*" (commandline -ct)'
+
     for slot_idx, argument in enumerate(head):
+        pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) = {slot_idx}"
+        if argument.parameter.completer is not None:
+            _ensure_header()
+            lines.append(
+                f"complete -c {prog_name} -n '{pos_cond}{not_option_cond}' "
+                f"-f -a '({_completer_substitution(prog_name)})'"
+            )
+            continue
         choices = argument.get_choices(force=True)
         if not choices:
             continue
         escaped_choices = [_escape_fish_string(clean_choice_text(c)) for c in choices]
         choices_str = " ".join(escaped_choices)
-        pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) = {slot_idx}"
         _ensure_header()
         lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '{choices_str}'")
 
     if rest_owner is not None:
-        choices = rest_owner.get_choices(force=True)
-        if choices:
-            rest_slot = rest_idx if rest_idx is not None else 0
-            escaped_choices = [_escape_fish_string(clean_choice_text(c)) for c in choices]
-            choices_str = " ".join(escaped_choices)
-            pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) -ge {rest_slot}"
+        rest_slot = rest_idx if rest_idx is not None else 0
+        pos_cond = f"{base_predicate}; and test ({helper_fn} {path_len}) -ge {rest_slot}"
+        if rest_owner.parameter.completer is not None:
             _ensure_header()
-            lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '{choices_str}'")
+            lines.append(
+                f"complete -c {prog_name} -n '{pos_cond}{not_option_cond}' "
+                f"-f -a '({_completer_substitution(prog_name)})'"
+            )
+        else:
+            choices = rest_owner.get_choices(force=True)
+            if choices:
+                escaped_choices = [_escape_fish_string(clean_choice_text(c)) for c in choices]
+                choices_str = " ".join(escaped_choices)
+                _ensure_header()
+                lines.append(f"complete -c {prog_name} -n '{pos_cond}' -f -a '{choices_str}'")
 
     return lines
 
@@ -626,6 +657,9 @@ def _generate_keyword_arg_completions(
 
             if is_flag:
                 line_parts.append(f"-d '{escaped_desc}'")
+            elif argument.parameter.completer is not None:
+                # Dynamic value completion: fish invokes the app at TAB time.
+                line_parts.append(f"-x -a '({_completer_substitution(prog_name)})' -d '{escaped_desc}'")
             elif choices:
                 escaped_choices = [_escape_fish_string(clean_choice_text(c)) for c in choices]
                 choices_str = " ".join(escaped_choices)

@@ -21,9 +21,11 @@ Each shell exposes two capabilities:
     two prompt sentinels. Skipped if ``pexpect`` is unavailable.
 """
 
+import importlib.util
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -408,3 +410,81 @@ def zsh_tester(zsh_available):
         return ZshCompletionTester(script, prog_name)
 
     return _make_tester
+
+
+# --- Dynamic completion (Parameter.completer end-to-end) ---------------------
+#
+# Static completion is self-contained (the generated script needs nothing but a
+# shell), but ``Parameter.completer`` completion calls *back into the installed
+# program* as ``<prog> __complete <words...>`` on every TAB. To exercise that
+# path in a real shell we must actually put a runnable ``<prog>`` on ``$PATH``.
+#
+# The tester below does exactly that:
+#   1. writes the app source (which must define ``app`` and end with a
+#      ``if __name__ == "__main__": app()`` guard) to a temp module,
+#   2. imports it once to generate the completion script,
+#   3. drops a tiny executable shim named ``<prog>`` on a temp ``$PATH`` entry
+#      that dispatches to that module via the *current* interpreter (fast --
+#      ``uv run`` startup would blow the shells' completion timeouts), and
+#   4. hands back the ordinary per-shell tester, which now finds the shim.
+#
+# ``monkeypatch.setenv`` on ``PATH`` reaches all three shells with no tester
+# changes: bash/fish inherit the parent env, and the zsh driver reads
+# ``os.environ["PATH"]`` when building its restricted pexpect env.
+
+_TESTER_BY_SHELL = {
+    "bash": BashCompletionTester,
+    "fish": FishCompletionTester,
+    "zsh": ZshCompletionTester,
+}
+
+_AVAILABLE_CHECK_BY_SHELL = {
+    "bash": _check_bash_available,
+    "fish": _check_fish_available,
+    "zsh": _check_zsh_available,
+}
+
+
+@pytest.fixture
+def dynamic_completion_tester(tmp_path, monkeypatch):
+    """Build a real-shell tester for an app that uses ``Parameter.completer``.
+
+    Usage::
+
+        def test_it(dynamic_completion_tester):
+            tester = dynamic_completion_tester(APP_SOURCE, prog_name="deployer", shell="fish")
+            assert tester.get_completions("deployer deploy --user ") == ["alice", "bob", "carol"]
+
+    ``app_source`` is the full text of a module that defines ``app`` and ends
+    with ``if __name__ == "__main__": app()``. Skips when the requested shell
+    (or, for zsh, ``pexpect``) is unavailable.
+    """
+
+    def _make(app_source: str, *, prog_name: str = "deployer", shell: str = "bash"):
+        if shell not in _TESTER_BY_SHELL:
+            raise ValueError(f"unknown shell {shell!r}")
+        if not _AVAILABLE_CHECK_BY_SHELL[shell]():
+            pytest.skip(f"{shell} not available")
+
+        # 1. Write and import the app module (guarded ``app()`` won't run on import).
+        module_path = tmp_path / f"{prog_name}_app.py"
+        module_path.write_text(app_source)
+        spec = importlib.util.spec_from_file_location(f"_dyn_{prog_name}_app", module_path)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # 2. Generate the completion script from the imported app.
+        script = module.app.generate_completion(prog_name=prog_name, shell=shell)
+
+        # 3. Fast executable shim on a temp PATH entry.
+        bindir = tmp_path / "bin"
+        bindir.mkdir(exist_ok=True)
+        shim = bindir / prog_name
+        shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{module_path}" "$@"\n')
+        shim.chmod(0o755)
+        monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
+
+        return _TESTER_BY_SHELL[shell](script, prog_name)
+
+    return _make

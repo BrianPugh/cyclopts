@@ -1285,6 +1285,21 @@ class Argument:
         choices = get_choices_from_hint(self.hint, self.parameter.name_transform)
         return tuple(choices) if choices else None
 
+    def get_completions(self, context: Any) -> list[tuple[str, str]] | None:
+        """Run this argument's :attr:`.Parameter.completer` (invoked as ``completer(context)``) at completion time.
+
+        Unlike :meth:`get_choices` (static values from the type hint), this runs
+        a user callback. Returns ``None`` if no completer is set, else a list of
+        ``(value, description)`` tuples (see :attr:`.Parameter.completer` for the
+        accepted return shapes).
+        """
+        from cyclopts.completion._engine import normalize_completions
+
+        completer = self.parameter.completer
+        if completer is None:
+            return None
+        return normalize_completions(completer(context))
+
     def _json(self) -> dict:
         """Convert argument to be json-like for pydantic.
 

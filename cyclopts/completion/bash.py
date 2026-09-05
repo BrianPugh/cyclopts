@@ -81,6 +81,37 @@ def _escape_bash_choice(choice: str) -> str:
     return choice
 
 
+def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
+    """Emit bash that fetches ``__complete`` candidates at TAB time.
+
+    Candidates are read line-by-line and prefix-matched against ``$cur`` — never
+    fed to ``compgen -W``, which word-splits and shell-expands each value
+    (``$(...)``/backticks in completer output would execute on TAB). Descriptions
+    are dropped (``COMPREPLY`` shows values only); errors are swallowed.
+    """
+    return [
+        f"{indent}local -a _c=()",
+        f"{indent}local _line",
+        # ``COMP_WORDS[0]`` is how the user typed the command, which isn't always
+        # directly executable (a shell function/alias, or completion registered
+        # under a different name). Fall back to the installed program name when it
+        # isn't on ``PATH`` -- mirrors the zsh helper's ``$+commands`` guard.
+        f'{indent}local _cmd="${{COMP_WORDS[0]}}"',
+        f'{indent}command -v "$_cmd" >/dev/null 2>&1 || _cmd="{prog_name}"',
+        f"{indent}while IFS= read -r _line; do",
+        f"{indent}  _line=\"${{_line%%$'\\t'*}}\"",
+        f'{indent}  [[ -n "$_line" ]] && _c+=("$_line")',
+        # Words after the cursor (mid-line TAB) must not be forwarded — the final
+        # word the engine sees is the one being completed. The slice sends
+        # indices 1..COMP_CWORD inclusive.
+        f'{indent}done < <("$_cmd" __complete "${{COMP_WORDS[@]:1:COMP_CWORD}}" 2>/dev/null)',
+        f"{indent}COMPREPLY=()",
+        f'{indent}for _x in "${{_c[@]}}"; do',
+        f'{indent}  [[ "$_x" == "${{cur}}"* ]] && COMPREPLY+=("$_x")',
+        f"{indent}done",
+    ]
+
+
 def _emit_choice_completion(choices: list[str], indent: str) -> list[str]:
     """Emit bash that prefix-matches ``$cur`` against an array of choices.
 
@@ -319,7 +350,9 @@ def _generate_completion_logic(
         lines.append(f"    {depth})")
 
         if depth == 0:
-            lines.extend(_generate_completions_for_path(completion_data, (), "      ", help_flags, version_flags))
+            lines.extend(
+                _generate_completions_for_path(completion_data, (), "      ", help_flags, version_flags, prog_name)
+            )
         else:
             lines.append('      case "${cmd_path[@]}" in')
             for path in sorted(relevant_paths):
@@ -328,7 +361,9 @@ def _generate_completion_logic(
                 path_str = " ".join(escaped_path)
                 lines.append(f'        "{path_str}")')
                 lines.extend(
-                    _generate_completions_for_path(completion_data, path, "          ", help_flags, version_flags)
+                    _generate_completions_for_path(
+                        completion_data, path, "          ", help_flags, version_flags, prog_name
+                    )
                 )
                 lines.append("          ;;")
             lines.append("        *)")
@@ -350,6 +385,7 @@ def _generate_completions_for_path(
     indent: str,
     help_flags: tuple[str, ...],
     version_flags: tuple[str, ...],
+    prog_name: str,
 ) -> list[str]:
     """Generate completions for a specific command path.
 
@@ -365,6 +401,8 @@ def _generate_completions_for_path(
         Help flag names.
     version_flags : tuple[str, ...]
         Version flag names.
+    prog_name : str
+        Program name (fallback command for dynamic completer callbacks).
 
     Returns
     -------
@@ -431,13 +469,13 @@ def _generate_completions_for_path(
 
     if needs_value_completion:
         value_completion_lines = _generate_value_completion_for_prev(
-            data.arguments, commands, positional_args, f"{indent}  "
+            data.arguments, commands, positional_args, f"{indent}  ", prog_name
         )
         lines.extend(value_completion_lines)
     elif commands:
         lines.extend(_emit_choice_completion(commands, f"{indent}  "))
     elif positional_args:
-        lines.extend(_generate_positional_completion(positional_args, f"{indent}  "))
+        lines.extend(_generate_positional_completion(positional_args, f"{indent}  ", prog_name))
     else:
         lines.append(f"{indent}  COMPREPLY=()")
 
@@ -446,7 +484,7 @@ def _generate_completions_for_path(
     return lines
 
 
-def _generate_positional_completion(positional_args, indent: str) -> list[str]:
+def _generate_positional_completion(positional_args, indent: str, prog_name: str) -> list[str]:
     """Generate position-aware positional argument completion.
 
     Parameters
@@ -455,6 +493,8 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
         List of positional arguments sorted by index.
     indent : str
         Indentation string.
+    prog_name : str
+        Program name (fallback command for dynamic completer callbacks).
 
     Returns
     -------
@@ -464,6 +504,8 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
     lines = []
 
     def _emit_one(argument, body_indent: str) -> list[str]:
+        if argument.parameter.completer is not None:
+            return _emit_completer_completion(body_indent, prog_name)
         choices = argument.get_choices(force=True)
         if choices:
             cleaned = [clean_choice_text(c) for c in choices]
@@ -498,8 +540,10 @@ def _generate_positional_completion(positional_args, indent: str) -> list[str]:
         # Rest-owner at index 0 — no case statement needed; the iterable
         # answers every position.
         lines.extend(_emit_one(rest_owner, indent))
-    elif len(head) == 1 and rest_owner is None:
-        # Single non-iterable positional — simple case.
+    elif len(head) == 1 and rest_owner is None and head[0].parameter.completer is None:
+        # Single non-iterable positional — simple case. Completer-backed args
+        # take the case statement below so an already-filled slot doesn't spawn
+        # a useless ``__complete`` subprocess on every TAB.
         lines.extend(_emit_one(head[0], indent))
     else:
         lines.append(f"{indent}case ${{positional_count}} in")
@@ -539,7 +583,9 @@ def _check_if_prev_needs_value(arguments) -> bool:
     return False
 
 
-def _generate_value_completion_for_prev(arguments, commands: list[str], positional_args, indent: str) -> list[str]:
+def _generate_value_completion_for_prev(
+    arguments, commands: list[str], positional_args, indent: str, prog_name: str
+) -> list[str]:
     """Generate value completion based on previous word.
 
     Parameters
@@ -552,6 +598,8 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
         List of positional arguments sorted by index.
     indent : str
         Indentation string.
+    prog_name : str
+        Program name (fallback command for dynamic completer callbacks).
 
     Returns
     -------
@@ -579,13 +627,16 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
             continue
 
         has_cases = True
+        has_completer = argument.parameter.completer is not None
         choices = argument.get_choices(force=True)
         action = get_completion_action(argument.hint)
 
         for name in names:
             lines.append(f"{indent}  {name})")
 
-            if choices:
+            if has_completer:
+                lines.extend(_emit_completer_completion(f"{indent}    ", prog_name))
+            elif choices:
                 cleaned = [clean_choice_text(c) for c in choices]
                 lines.extend(_emit_choice_completion(cleaned, f"{indent}    "))
             else:
@@ -602,7 +653,7 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
         if commands:
             lines.extend(_emit_choice_completion(commands, f"{indent}    "))
         elif positional_args:
-            lines.extend(_generate_positional_completion(positional_args, f"{indent}    "))
+            lines.extend(_generate_positional_completion(positional_args, f"{indent}    ", prog_name))
         else:
             lines.append(f"{indent}    COMPREPLY=()")
         lines.append(f"{indent}    ;;")
@@ -612,7 +663,7 @@ def _generate_value_completion_for_prev(arguments, commands: list[str], position
         if commands:
             lines.extend(_emit_choice_completion(commands, indent))
         elif positional_args:
-            lines.extend(_generate_positional_completion(positional_args, indent))
+            lines.extend(_generate_positional_completion(positional_args, indent, prog_name))
         else:
             lines.append(f"{indent}COMPREPLY=()")
 
