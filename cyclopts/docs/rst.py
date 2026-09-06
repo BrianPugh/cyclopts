@@ -325,7 +325,6 @@ def generate_rst_docs(
         # root Usage: line is intentionally suppressed; usage_name still applies
         # to every subcommand usage block below.
         if not (no_root_title and not command_chain):
-            # Extract usage from app
             usage = extract_usage(app)
             usage_text = None
             if usage:
@@ -385,7 +384,6 @@ def generate_rst_docs(
     # Build a mapping of command names to App objects for filtering
     command_map = _build_command_map(app, include_hidden=True)
 
-    # Create formatter for help panels
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
     # Render panels as-is without categorization

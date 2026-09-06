@@ -1144,7 +1144,6 @@ class App:
             else:
                 app = app_or_spec
 
-            # Found a command - add it to the chain
             add_parent_metas(app)
             apps.append(app)
             command_mapping = _combined_meta_command_mapping(app, recurse_parent_meta=include_parent_meta)

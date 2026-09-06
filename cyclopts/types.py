@@ -206,7 +206,6 @@ NonExistentYamlPath = Annotated[Path, Parameter(validator=validators.Path(ext="y
 ##########
 # Number #
 ##########
-# foo
 PositiveFloat = Annotated[float, Parameter(validator=validators.Number(gt=0))]
 "A float that **must** be ``>0``."
 NonNegativeFloat = Annotated[float, Parameter(validator=validators.Number(gte=0))]

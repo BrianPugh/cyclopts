@@ -218,7 +218,6 @@ class DefaultFormatter:
             # It's a column builder
             columns = columns(console, options, help_panel.entries)
 
-        # Build table with columns and entries
         table = table_spec.build(columns, help_panel.entries)
 
         # Build the panel

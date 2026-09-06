@@ -70,19 +70,16 @@ class MarkdownFormatter:
         if not panel.entries:
             return
 
-        # Write panel title as heading
         if panel.title:
             title_text = extract_text(panel.title, console)
             heading = "#" * self.heading_level
             self._output.write(f"{heading} {title_text}\n\n")
 
-        # Write panel description if present
         if panel.description:
             desc_text = extract_text(panel.description, console)
             if desc_text:
                 self._output.write(f"{desc_text}\n\n")
 
-        # Format entries based on panel type
         if panel.format == "command":
             self._format_command_panel(panel.entries, console)
         elif panel.format == "parameter":
@@ -175,7 +172,7 @@ class MarkdownFormatter:
                     in_numbered_list = False
 
                     for line in lines[1:]:
-                        if not line.strip():  # Blank line
+                        if not line.strip():
                             self._output.write("\n")
                         else:
                             stripped = line.lstrip()
