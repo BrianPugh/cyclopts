@@ -816,3 +816,36 @@ def test_e2e_dependent_completion(dynamic_completion_tester, shell):
     assert sorted(west) == ["wa-1", "wa-2"]
     east = [_lead(c) for c in tester.get_completions("deployer deploy --region us-east --cluster ")]
     assert east == ["va-1"]
+
+
+# A completer that emits a normal candidate plus a line beginning with the
+# reserved \x1f control marker. Nothing in cyclopts emits such a line today; this
+# stands in for a future control/directive channel, which generated scripts must
+# already skip so it can be added without corrupting an installed script.
+E2E_DIRECTIVE_GUARD_SOURCE = """
+from typing import Annotated
+
+from cyclopts import App, Parameter
+
+app = App(name="deployer")
+
+
+def complete_with_reserved(ctx):
+    return ["real", "\\x1freserved"]
+
+
+@app.command
+def deploy(*, thing: Annotated[str, Parameter(completer=complete_with_reserved)] = ""):
+    pass
+
+
+if __name__ == "__main__":
+    app()
+"""
+
+
+def test_e2e_reserved_directive_line_is_skipped(dynamic_completion_tester, shell):
+    r"""Forward-compat: output lines starting with \x1f are reserved and dropped by the script."""
+    tester = dynamic_completion_tester(E2E_DIRECTIVE_GUARD_SOURCE, prog_name="deployer", shell=shell)
+    result = [_lead(c) for c in tester.get_completions("deployer deploy --thing ")]
+    assert result == ["real"]

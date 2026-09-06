@@ -23,13 +23,17 @@ if TYPE_CHECKING:
 
 
 def _completer_substitution(prog_name: str) -> str:
-    """Fish command substitution that fetches ``__complete`` candidates.
+    r"""Fish command substitution that fetches ``__complete`` candidates.
 
     ``commandline -pco`` already carries the empty cursor slot on a trailing
     space; ``-ct`` appends the mid-token current word (dropped when empty). Fish
     parses the printed ``value<TAB>description`` lines.
+
+    Lines starting with ``\x1f`` are reserved for future control directives and
+    filtered out here, so a later cyclopts can add that channel without polluting
+    an already-installed script's candidate list.
     """
-    return f"{prog_name} __complete (commandline -pco)[2..] (commandline -ct)"
+    return f"{prog_name} __complete (commandline -pco)[2..] (commandline -ct) | string match --invert --regex '^\\x1f'"
 
 
 def generate_completion_script(app: "App", prog_name: str) -> str:

@@ -2717,10 +2717,17 @@ class App:
         return tree
 
     def _run_complete(self, words: Iterable[str]) -> None:
-        """Handle the reserved ``__complete`` command: print the engine's candidates as ``value<TAB>description`` lines.
+        r"""Handle the reserved ``__complete`` command: print the engine's candidates as ``value<TAB>description`` lines.
 
         Errors are swallowed (a broken completer must never surface a traceback
         into the shell); ``CYCLOPTS_COMPLETION_DEBUG`` reveals them on stderr.
+
+        Wire-protocol note: an output line whose first character is ``\x1f`` (ASCII
+        Unit Separator) is reserved for future control directives (e.g. a
+        Cobra-style "no trailing space" hint). Nothing emits one yet, but the
+        generated ``bash``/``zsh``/``fish`` scripts already skip such lines, so a
+        later cyclopts can add the channel without corrupting the candidate list of
+        an already-installed script. ``\x1f`` can never occur in a real value.
         """
         from cyclopts.completion._engine import completion_debug_enabled, compute_completions
 

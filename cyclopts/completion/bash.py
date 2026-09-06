@@ -99,6 +99,8 @@ def _emit_completer_completion(indent: str, prog_name: str) -> list[str]:
         f'{indent}local _cmd="${{COMP_WORDS[0]}}"',
         f'{indent}command -v "$_cmd" >/dev/null 2>&1 || _cmd="{prog_name}"',
         f"{indent}while IFS= read -r _line; do",
+        # Lines starting with \x1f are reserved for future control directives; skip them.
+        f"{indent}  [[ \"$_line\" == $'\\x1f'* ]] && continue",
         f"{indent}  _line=\"${{_line%%$'\\t'*}}\"",
         f'{indent}  [[ -n "$_line" ]] && _c+=("$_line")',
         # Words after the cursor (mid-line TAB) must not be forwarded — the final

@@ -279,6 +279,8 @@ def _generate_dynamic_helper(prog_name: str) -> list[str]:
         '  _cyc_lines=("${(@f)$($_cyc_cmd __complete "${(@)_cyc_words[2,_cyc_current]}" 2>/dev/null)}")',
         '  for _cyc_line in "${_cyc_lines[@]}"; do',
         '    [[ -z "$_cyc_line" ]] && continue',
+        # Lines starting with \x1f are reserved for future control directives; skip them.
+        "    [[ \"$_cyc_line\" == $'\\x1f'* ]] && continue",
         "    _cyc_val=\"${_cyc_line%%$'\\t'*}\"",
         '    _cyc_vals+=("$_cyc_val")',
         "    if [[ \"$_cyc_line\" == *$'\\t'* ]]; then",
