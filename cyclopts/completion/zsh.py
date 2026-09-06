@@ -911,21 +911,17 @@ def _generate_keyword_specs(argument: "Argument", help_format: str, prog_name: s
     # ``--file a --file b`` is the natural usage). Bool flags stay
     # non-repeating per zsh convention.
     #
-    # The ``=`` suffix on the option name is the *only* knob zsh exposes for
-    # eq-form support, and it's load-bearing in two ways at once:
-    #
-    #   1. With ``=``, ``--opt=value`` value-completion works.
-    #   2. With ``=``, TAB-completing the option *name* inserts ``--opt=``
-    #      (no trailing space). Without ``=``, TAB inserts ``--opt`` plus a
-    #      space — which most users prefer.
-    #
-    # Since most CLIs in the wild lean on the space form and users find a
-    # forced ``=`` insertion surprising, the default (``requires_equals=False``)
-    # emits the plain spec — accepting the cost that ``--opt=value<TAB>``
-    # value-completion silently does nothing in zsh. When the parser is
-    # configured to *require* the eq form (``requires_equals=True``), we
-    # emit the ``=`` spec so completion mirrors what the parser will
-    # accept. Bash is unaffected: its eq-form completion is driven by
+    # The ``=`` suffix on the option-name spec controls how ``_arguments``
+    # completes the option *name*: with ``=`` it inserts ``--opt=`` (no
+    # trailing space); without it, ``--opt`` plus a space, which most users
+    # prefer. So by default (``requires_equals=False``) we emit the plain
+    # spec for the natural space-form name TAB. ``--opt=value<TAB>`` value
+    # completion still works: it is driven by the eq-form pre-pass
+    # (``_generate_eq_form_prepass`` above), not by this spec. When the parser
+    # *requires* the eq form (``requires_equals=True``) we emit the ``=`` spec
+    # so name TAB mirrors what the parser accepts (and the pre-pass skips those
+    # options, since ``_arguments`` then handles their eq-form value completion
+    # natively). Bash is unaffected: its eq-form completion is driven by
     # ``_value_prev`` hopping over the ``=`` token, not by the spec.
     requires_eq = bool(argument.parameter.requires_equals)
     # An option "takes a value" iff it isn't a bool flag — independent of whether

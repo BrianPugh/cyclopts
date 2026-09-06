@@ -206,6 +206,10 @@ Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive look
 
    In fish, a completer on a *positional* parameter of the **root** command (``@app.default`` with no subcommand) is not wired up; fish falls back to its default file completion there. Positional completers on subcommands, and option-value completers everywhere, work in all three shells.
 
+.. note::
+
+   A value that looks like an option (begins with ``-``, such as a negative number, or any value for a parameter with :attr:`.Parameter.allow_leading_hyphen`) is not completer-dispatched: the shells treat a ``-``-prefixed word as an option name and offer option-name completion instead.
+
 Descriptions
 ------------
 
@@ -274,6 +278,10 @@ For a parameter that takes several values (``tuple[str, str]``, ``list[str]``, `
 
    @app.command
    def bind(endpoint: Annotated[tuple[str, str], Parameter(completer=complete_endpoint)]): ...
+
+.. note::
+
+   Per-value dispatch works for positional multi-value parameters in all three shells, and for the first value of a multi-value *option*. The generated scripts do not yet invoke the completer for the *second and later* values of a multi-value option (e.g. ``--point 1 <TAB>`` on a ``tuple[int, int]``): the engine resolves that slot correctly, but bash/zsh/fish route it as a fresh positional/option position instead. If later elements need completion, prefer a positional multi-value parameter.
 
 Shared Completers
 -----------------
