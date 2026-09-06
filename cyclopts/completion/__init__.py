@@ -3,7 +3,6 @@
 from cyclopts.completion._engine import (
     ArgumentValue,
     Completer,
-    Completion,
     CompletionContext,
     CompletionResult,
 )
@@ -17,7 +16,6 @@ __all__ = [
     "add_to_rc_file",
     "ArgumentValue",
     "Completer",
-    "Completion",
     "CompletionContext",
     "CompletionResult",
 ]

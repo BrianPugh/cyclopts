@@ -1112,12 +1112,16 @@ API
 
       The callback is always invoked as ``completer(context)``, where ``context`` is a
       :class:`~cyclopts.completion.CompletionContext`. It may return a single ``str``,
-      or an iterable of ``str`` values and/or ``(value, description)`` tuples.
+      or an iterable of ``str`` values and/or ``(value, description)`` tuples. Return the
+      full candidate set; the shell prefix-matches candidates against the word being
+      completed, so there is no need to filter by prefix in the callback (and substring
+      or fuzzy matching is not possible). Use ``ctx.incomplete`` to narrow expensive
+      lookups rather than to filter the result.
 
       .. code-block:: python
 
           def complete_user(ctx) -> list[str]:
-              return [u for u in fetch_users() if u.startswith(ctx.incomplete)]
+              return fetch_users()
 
 
           @app.command
@@ -2272,8 +2276,15 @@ See the :attr:`.Parameter.completer` documentation for usage.
 .. autoclass:: cyclopts.completion.ArgumentValue
    :members:
 
-.. autoclass:: cyclopts.completion.Completion
-   :members:
+.. py:data:: cyclopts.completion.Completer
+
+   Type alias for a :attr:`.Parameter.completer` callback: a callable taking a
+   single :class:`CompletionContext` and returning a :data:`CompletionResult`.
+
+.. py:data:: cyclopts.completion.CompletionResult
+
+   Type alias for what a completer may return: a single :class:`str`, or an
+   iterable of :class:`str` values and/or ``(value, description)`` tuples.
 
 .. _API Validators:
 

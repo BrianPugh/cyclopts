@@ -360,6 +360,10 @@ def compute_completions(app: "App", words: list[str]) -> list[Completion]:
     debug(f"completer returned {len(completions or [])} candidate(s): {completions!r}")
     if not completions:
         return []
-    # The completer already received ``context.incomplete`` and owns its own
-    # filtering (mirroring Click/Cobra); we do not re-filter here.
+    # Emitted as-is: the engine never filters. The generated shell script
+    # prefix-matches these candidates against the word being completed (bash's
+    # ``[[ $x == $cur* ]]``, zsh ``compadd``, fish ``complete -a``), so a
+    # completer need not prefix-filter itself -- and cannot override that prefix
+    # match, which is why substring/fuzzy completion isn't possible. ``incomplete``
+    # is for narrowing expensive lookups, not for filtering the result.
     return [Completion(value, help) for value, help in completions]

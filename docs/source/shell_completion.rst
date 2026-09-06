@@ -158,45 +158,69 @@ The callback is invoked when the user presses ``<TAB>``, enabling **runtime valu
 Basic Usage
 -----------
 
-A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument. Use ``ctx.incomplete`` to get the partial word the user has typed, and return either a single string, or an iterable of strings and/or ``(value, description)`` tuples:
+.. important::
+
+   Only reach for a completer when the candidate values are genuinely unknown until runtime -- git branches, running containers, rows from a database, files on disk. If the values are fixed at definition time, use a :class:`~typing.Literal`, an :class:`~enum.Enum`, or :attr:`.Parameter.choices` instead: those complete entirely in the shell, whereas a completer launches your Python program on every ``<TAB>`` (see the warning above).
+
+A completer is a callable that accepts a single :class:`~cyclopts.completion.CompletionContext` argument and returns the candidate values: a single string, or an iterable of strings and/or ``(value, description)`` tuples. This example completes a git branch name -- values that can't be baked into a static script, since they change as branches come and go:
 
 .. code-block:: python
 
+   import subprocess
    from typing import Annotated
 
    from cyclopts import App, Parameter
 
-   app = App(name="deployer")
-
-   USERS = ["alice", "bob", "carol"]
+   app = App(name="gitish")
 
 
-   def complete_user(ctx):
-       return [u for u in USERS if u.startswith(ctx.incomplete)]
+   def complete_branch(ctx):
+       result = subprocess.run(
+           ["git", "branch", "--format=%(refname:short)"],
+           capture_output=True,
+           text=True,
+       )
+       return result.stdout.split()
 
 
    @app.command
-   def grant(user: Annotated[str, Parameter(completer=complete_user)]): ...
+   def checkout(branch: Annotated[str, Parameter(completer=complete_branch)]): ...
 
 
    app()
 
-When the user types ``deployer grant al<TAB>``, Cyclopts calls ``complete_user`` with ``ctx.incomplete == "al"`` and offers ``alice``. Returning a plain string is also allowed, which is convenient when the completer resolves to exactly one value.
+When the user types ``gitish checkout ma<TAB>``, Cyclopts offers ``main``. Notice ``complete_branch`` returns *all* branches rather than filtering them: your shell prefix-matches the returned candidates against the word being completed, so there is no need to filter by prefix yourself. Returning a plain string is also allowed, which is convenient when the completer resolves to exactly one value.
+
+Use ``ctx.incomplete`` (the partial word typed so far) to *narrow expensive lookups*, not to filter the result. For example, pass the prefix into a database query so you fetch only matching rows instead of every possible value:
+
+.. code-block:: python
+
+   def complete_user(ctx):
+       return db.usernames_starting_with(ctx.incomplete)
+
+.. note::
+
+   Because the shell prefix-matches candidates, completers can only offer prefix completions; substring and fuzzy matching are not possible, since the shell drops any candidate that does not start with the word being completed.
 
 Descriptions
 ------------
 
-To display descriptions alongside completions, return ``(value, description)`` tuples. zsh and fish render these in the completion menu; bash shows the values only.
+To display descriptions alongside completions, return ``(value, description)`` tuples. zsh and fish render these in the completion menu; bash shows the values only. Here each branch is annotated with the subject of its latest commit:
 
 .. code-block:: python
 
-   def complete_environment(ctx):
-       return [("dev", "Development"), ("prod", "Production")]
+   def complete_branch(ctx):
+       result = subprocess.run(
+           ["git", "for-each-ref", "--format=%(refname:short)%09%(subject)", "refs/heads"],
+           capture_output=True,
+           text=True,
+       )
+       return [tuple(line.split("\t", 1)) for line in result.stdout.splitlines()]
 
 Dependent Completions
 ---------------------
 
-Often the valid values for a parameter depend on another parameter already supplied on the command line. Access those values through the :class:`~cyclopts.completion.CompletionContext` by indexing with the option name (``ctx["--region"]``), its bare name (``ctx["region"]``), or the Python field name. The returned object exposes:
+Often the valid values for a parameter depend on another parameter already supplied on the command line. Access those values through the :class:`~cyclopts.completion.CompletionContext` by indexing with the option name (``ctx["--directory"]``), its bare name (``ctx["directory"]``), or the Python field name. The returned object exposes:
 
 - ``.value`` -- the best-effort coerced Python value. Sourced like a real invocation: CLI tokens, then the parameter's ``env_var``, then config sources, then its default (:obj:`~cyclopts.UNSET` if none of those apply or coercion fails).
 - ``.raw`` -- the raw typed string, or :obj:`None` if not provided
@@ -204,29 +228,65 @@ Often the valid values for a parameter depend on another parameter already suppl
 
 Use ``ctx.get(name, default)`` to return a default instead of raising for an unknown name.
 
-The following example completes ``--cluster`` based on the already-typed ``--region``:
+The following example completes ``--entry`` with the files that actually exist in the already-typed ``--directory`` -- a value pair that can only be known at runtime:
 
 .. code-block:: python
 
+   import os
    from typing import Annotated
 
    from cyclopts import App, Parameter
 
-   app = App(name="deployer")
-
-   CLUSTERS = {"us-east": ["web-prod", "web-staging"], "us-west": ["data-prod", "data-dev"]}
+   app = App(name="viewer")
 
 
-   def complete_cluster(ctx):
-       return CLUSTERS.get(ctx["--region"].value, [])
+   def complete_entry(ctx):
+       directory = ctx["--directory"].value
+       if not directory or not os.path.isdir(directory):
+           return []
+       return os.listdir(directory)
 
 
    @app.command
-   def deploy(
+   def show(
        *,
-       region: str = "us-east",
-       cluster: Annotated[str, Parameter(completer=complete_cluster)] = "",
+       directory: str = ".",
+       entry: Annotated[str, Parameter(completer=complete_entry)] = "",
    ): ...
+
+
+   app()
+
+Shared Completers
+-----------------
+
+To apply one completer across many parameters, set it on an :class:`~cyclopts.App`'s ``default_parameter`` instead of on each parameter individually. It then acts as the default completer for every parameter of that app (and its subcommands) that doesn't specify its own:
+
+.. code-block:: python
+
+   import subprocess
+
+   from cyclopts import App, Parameter
+
+
+   def complete_branch(ctx):
+       result = subprocess.run(
+           ["git", "branch", "--format=%(refname:short)"],
+           capture_output=True,
+           text=True,
+       )
+       return result.stdout.split()
+
+
+   app = App(name="gitish", default_parameter=Parameter(completer=complete_branch))
+
+
+   @app.command
+   def checkout(branch: str): ...  # both commands complete branch names
+
+
+   @app.command
+   def delete(branch: str): ...
 
 
    app()
