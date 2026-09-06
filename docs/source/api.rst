@@ -2910,6 +2910,10 @@ Exceptions
    :show-inheritance:
    :members:
 
+.. autoexception:: cyclopts.TokenizationError
+   :show-inheritance:
+   :members:
+
 .. autoexception:: cyclopts.MissingArgumentError
    :show-inheritance:
    :members:

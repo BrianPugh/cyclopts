@@ -322,10 +322,13 @@ def generate_rst_docs(
     if not skip_preamble and should_show_usage(app):
         # Generate usage line - only if we're documenting a specific command.
         # When no_root_title is set at the root (e.g., in Sphinx contexts), the
-        # root Usage: line is intentionally suppressed; usage_name still applies
-        # to every subcommand usage block below.
-        if not (no_root_title and not command_chain):
-            # Extract usage from app
+        # root Usage: line is normally suppressed; usage_name still applies to
+        # every subcommand usage block below. Exception: a title-less root that
+        # has its own ``default_command`` still needs its Usage: line, since the
+        # default command's invocation (e.g. ``myapp [ARGS]``) is documented
+        # nowhere else. See #923.
+        suppressed_root = no_root_title and not command_chain
+        if not suppressed_root or app.default_command is not None:
             usage = extract_usage(app)
             usage_text = None
             if usage:
@@ -385,7 +388,6 @@ def generate_rst_docs(
     # Build a mapping of command names to App objects for filtering
     command_map = _build_command_map(app, include_hidden=True)
 
-    # Create formatter for help panels
     formatter = RstFormatter(heading_level=heading_level + 1, include_hidden=include_hidden)
 
     # Render panels as-is without categorization
@@ -394,8 +396,15 @@ def generate_rst_docs(
         if not include_hidden and group and not group.show:
             continue
 
-        # Skip if no_root_title and we're at root
-        if no_root_title and not command_chain:
+        # At a title-less root (e.g. the Sphinx ``.. cyclopts::`` directive), the
+        # command list is emitted as its own recursive sections below, so skip the
+        # root command panel here. The root *parameter* panel, however, holds the
+        # root ``default_command``'s own arguments -- which are documented nowhere
+        # else -- so it must still render. Skipping it is what made a
+        # ``@app.default`` app's parameters vanish from Sphinx output. See #923.
+        # ``skip_preamble`` documents a filtered subcommand on its own, so the root
+        # parameter panel is skipped along with the root usage/description.
+        if no_root_title and not command_chain and (panel.format == "command" or skip_preamble):
             continue
 
         # Render command panels as grouped command lists
@@ -430,6 +439,19 @@ def generate_rst_docs(
 
         # Render parameter panels as-is
         elif panel.format == "parameter":
+            # A "parameter" panel is not guaranteed to hold only parameter
+            # entries: ``_assemble_help_panels`` merges command entries into a
+            # same-named parameter panel (upgrading its format to "parameter").
+            # At the title-less root those command entries would be rendered as
+            # bogus parameters, duplicated by the recursive sections below, and
+            # would bypass ``commands_filter``/``exclude_commands``. The commands
+            # are documented by the recursive sections, so drop them here. See #924.
+            if no_root_title and not command_chain:
+                param_entries = [e for e in panel.entries if not any(name in command_map for name in e.names)]
+                if not param_entries:
+                    continue  # Nothing left once commands are stripped
+                panel = panel.copy(entries=param_entries)
+
             # Render content first to check if there's anything
             formatter.reset()
             panel_copy = panel.copy(title="")

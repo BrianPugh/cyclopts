@@ -82,14 +82,12 @@ class CommandSpec:
         if self._resolved is not None:
             return self._resolved
 
-        # Parse import path
         module_path, _, attr_name = self.import_path.rpartition(":")
         if not module_path or not attr_name:
             raise ValueError(
                 f"Invalid import path: {self.import_path!r}. Expected format: 'module.path:attribute_name'"
             )
 
-        # Import the module and get the attribute
         try:
             module = importlib.import_module(module_path)
         except ImportError as e:

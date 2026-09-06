@@ -16,6 +16,7 @@ from typing import (
     Annotated,
     Any,
     Literal,
+    NoReturn,
     Optional,
     TypeVar,
     Union,
@@ -65,10 +66,12 @@ from cyclopts.utils import (
     to_tuple_converter,
 )
 
-with suppress(ImportError):
+try:
     # By importing, makes things like the arrow-keys work.
+    import readline
+except ImportError:  # pragma: no cover
     # Not available on windows
-    import readline  # noqa: F401
+    readline = None
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -2040,8 +2043,6 @@ class App:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
 
-        tokens = normalize_tokens(tokens)
-
         # Store overrides for nested calls
         overrides = {
             k: v
@@ -2060,33 +2061,49 @@ class App:
 
         # overrides isn't being propagated to subcommands because they aren't provided to the context manager here.
         with self.app_stack([], overrides=overrides):
+            tokens = self._normalize_tokens(tokens)
             try:
                 command, bound, _, ignored, _ = self._parse_known_args(
                     tokens,
                     raise_on_unused_tokens=True,
                 )
             except CycloptsError as e:
-                print_error = self.app_stack.resolve("print_error")
-                exit_on_error = self.app_stack.resolve("exit_on_error")
-                help_on_error = self.app_stack.resolve("help_on_error")
-                verbose = self.app_stack.resolve("verbose")
-
-                e.verbose = verbose if verbose is not None else False
-                e.root_input_tokens = tokens
-                assert e.console is not None
-                if help_on_error if help_on_error is not None else False:
-                    self.help_print(tokens, console=e.console)
-                if print_error if print_error is not None else True:
-                    resolved_error_formatter = self.app_stack.resolve("error_formatter")
-                    if resolved_error_formatter is not None:
-                        e.console.print(resolved_error_formatter(e))
-                    else:
-                        e.console.print(CycloptsPanel(e))
-                if exit_on_error if exit_on_error is not None else True:
-                    sys.exit(2)
-                raise
+                self._handle_parse_error(e, tokens)
 
         return command, bound, ignored
+
+    def _normalize_tokens(self, tokens: None | str | Iterable[str]) -> list[str]:
+        """Tokenize ``tokens``, reporting a failure like any other parse error.
+
+        Must be called inside an :attr:`app_stack` context so error settings resolve.
+        """
+        try:
+            return normalize_tokens(tokens)
+        except CycloptsError as e:
+            self._handle_parse_error(e, [])
+
+    def _handle_parse_error(self, e: CycloptsError, tokens: list[str]) -> NoReturn:
+        """Print ``e`` according to the resolved error settings, then exit or re-raise it."""
+        print_error = self.app_stack.resolve("print_error")
+        exit_on_error = self.app_stack.resolve("exit_on_error")
+        help_on_error = self.app_stack.resolve("help_on_error")
+        verbose = self.app_stack.resolve("verbose")
+
+        e.verbose = verbose if verbose is not None else False
+        e.root_input_tokens = tokens
+        if e.console is None:
+            e.console = self.error_console
+        if help_on_error if help_on_error is not None else False:
+            self.help_print(tokens, console=e.console)
+        if print_error if print_error is not None else True:
+            resolved_error_formatter = self.app_stack.resolve("error_formatter")
+            if resolved_error_formatter is not None:
+                e.console.print(resolved_error_formatter(e))
+            else:
+                e.console.print(CycloptsPanel(e))
+        if exit_on_error if exit_on_error is not None else True:
+            sys.exit(2)
+        raise
 
     def _is_nested_call(self) -> bool:
         """Check if this is a nested call (meta app pattern or same-app recursion)."""
@@ -2157,8 +2174,6 @@ class App:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
 
-        tokens = normalize_tokens(tokens)
-
         overrides = {
             k: v
             for k, v in {
@@ -2177,6 +2192,9 @@ class App:
 
         if self._is_nested_call():
             overrides.setdefault("result_action", "return_value")
+
+        with self.app_stack([], overrides):
+            tokens = self._normalize_tokens(tokens)
 
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
@@ -2286,8 +2304,6 @@ class App:
         if tokens is None:
             _log_framework_warning(_detect_test_framework())
 
-        tokens = normalize_tokens(tokens)
-
         overrides = {
             k: v
             for k, v in {
@@ -2306,6 +2322,9 @@ class App:
 
         if self._is_nested_call():
             overrides.setdefault("result_action", "return_value")
+
+        with self.app_stack([], overrides):
+            tokens = self._normalize_tokens(tokens)
 
         with self.app_stack(tokens, overrides):
             command, bound, _ = self.parse_args(
@@ -2887,11 +2906,15 @@ class App:
         console: "Console | None" = None,
         exit_on_error: bool = False,
         result_action: ResultAction | None = None,
+        error_console: "Console | None" = None,
         **kwargs,
     ) -> None:
         """Create a blocking, interactive shell.
 
         All registered commands can be executed in the shell.
+        Ctrl-C clears a partially typed line; on an empty line it exits the shell.
+        Ctrl-C during a command returns to the prompt unless
+        :attr:`App.suppress_keyboard_interrupt` is :obj:`False`.
 
         Parameters
         ----------
@@ -2922,6 +2945,8 @@ class App:
             Defaults to ``"print_non_int_return_int_as_exit_code"`` which prints non-int results
             and returns int/bool as exit codes without calling sys.exit.
             If :obj:`None`, inherits from :attr:`App.result_action`.
+        error_console: Console | None
+            Rich Console to use for error messages and tracebacks. If :obj:`None`, uses :attr:`App.error_console`.
         `**kwargs`
             Get passed along to :meth:`parse_args`.
         """
@@ -2949,31 +2974,59 @@ class App:
             overrides["result_action"] = result_action
         if console is not None:
             overrides["_console"] = console
+        if error_console is not None:
+            overrides["_error_console"] = error_console
+        overrides["exit_on_error"] = exit_on_error
 
-        while True:
-            try:
-                user_input = input(prompt)
-            except EOFError:  # pragma: no cover
-                break
+        # libedit (macOS) keeps reporting the previous line from ``get_line_buffer`` until
+        # new text is typed, so an interrupted buffer equal to the last seen line means the
+        # line was actually empty. GNU readline reports "" directly.
+        previous_line = ""
+        with self.app_stack([], overrides):
+            while True:
+                try:
+                    user_input = input(prompt)
+                except EOFError:  # pragma: no cover
+                    break
+                except KeyboardInterrupt:
+                    print()
+                    # typeshed guards ``get_line_buffer`` behind ``sys.platform != "win32"``;
+                    # ``readline`` is ``None`` on Windows anyway, so this branch never runs there.
+                    line_buffer = readline.get_line_buffer() if readline else ""  # pyright: ignore[reportAttributeAccessIssue]
+                    if line_buffer in ("", previous_line):
+                        break
+                    previous_line = line_buffer
+                    continue
+                previous_line = user_input + "\n"
 
-            tokens = normalize_tokens(user_input)
-            if not tokens:
-                continue
-            if tokens[0] in quit:
-                break
+                try:
+                    tokens = self._normalize_tokens(user_input)
+                except CycloptsError:
+                    # ``_normalize_tokens`` already reported the error (respecting
+                    # ``exit_on_error``); keep the shell running.
+                    continue
+                if not tokens:
+                    continue
+                if tokens[0] in quit:
+                    break
 
-            try:
-                with self.app_stack(tokens, overrides):
-                    command, bound, ignored = self.parse_args(
-                        tokens, console=console, exit_on_error=exit_on_error, **kwargs
-                    )
-                    result = dispatcher(command, bound, ignored)
-                    self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
-            except CycloptsError:
-                # Upstream ``parse_args`` already printed the error
-                pass
-            except Exception:
-                print(traceback.format_exc())
+                # Keep the exception handlers inside the token ``app_stack`` context so that
+                # context-sensitive settings (e.g. ``error_console``) resolve from the invoked
+                # subcommand rather than the root app.
+                with self.app_stack(tokens):
+                    try:
+                        command, bound, ignored = self.parse_args(tokens, **kwargs)
+                        result = dispatcher(command, bound, ignored)
+                        self._handle_result_action(result, fallback="print_non_int_return_int_as_exit_code")
+                    except CycloptsError:
+                        # Upstream ``parse_args`` already printed the error
+                        pass
+                    except KeyboardInterrupt:
+                        if not self.suppress_keyboard_interrupt:
+                            raise
+                        print()
+                    except Exception:
+                        self.error_console.print(traceback.format_exc(), markup=False, highlight=False, soft_wrap=True)
 
     def _handle_result_action(self, result: Any, fallback: ResultAction = "print_non_int_sys_exit") -> Any:
         """Handle command result based on result_action.

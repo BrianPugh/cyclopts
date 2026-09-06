@@ -107,7 +107,6 @@ class PlainFormatter:
         if panel.title:
             self._print_plain(console, f"{panel.title}:")
 
-        # Print each entry in the panel
         for entry in panel.entries:
             desc = _to_plain_text(entry.description, console)
 
@@ -264,7 +263,6 @@ class PlainFormatter:
                     # Additional names on separate lines
                     self._print_plain(console, textwrap.indent(name, self.indent))
         elif shorts:
-            # Only short names
             shorts_str = " ".join(shorts)
             if desc:
                 text = f"{shorts_str}: {desc}"

@@ -14,7 +14,93 @@ on:
       - main
   pull_request:
 
+# Cancel a PR's in-progress run when a new commit is pushed to it. Pushes to
+# main are never cancelled, so every landed commit is fully tested.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Lint + type-check, split out of the test matrix so they run in parallel with
+  # it rather than serialized as a step inside every test cell (which added
+  # ~1-2 min to each cell, most visibly on Windows).
+  #
+  # This keeps the same pyright coverage as the old per-cell run: pyright infers
+  # pythonPlatform from the runner OS and pythonVersion from the synced venv, so
+  # sweeping OS x python-version here type-checks every platform/version combo.
+  # All configuration stays in .pre-commit-config.yaml / pyproject.toml -- no
+  # flags or version pins are duplicated into this workflow. The two ubuntu
+  # runners collapse to a single "Linux" platform for pyright, so only
+  # ubuntu-latest is needed here.
+  lint:
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for hatch-vcs to get version from git tags
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up python ${{ matrix.python-version }}
+        id: setup-python
+        run: |
+          uv python install ${{ matrix.python-version }}
+          # Exact patch version (e.g. 3.11.13) for the pre-commit cache key. pre-commit's
+          # hook environments embed the interpreter path, so the cache must be keyed on the
+          # resolved interpreter, not just the "3.11" matrix value; otherwise a restored
+          # environment fails pre-commit's health check and every hook is reinstalled.
+          echo "version=$("$(uv python find ${{ matrix.python-version }})" -c 'import platform; print(platform.python_version())')" >> "$GITHUB_OUTPUT"
+
+      - name: Install library
+        run: uv sync --all-extras
+
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit/
+          key: pre-commit-${{ runner.os }}-py${{ steps.setup-python.outputs.version }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Pre-commit run
+        run: uv run pre-commit run --show-diff-on-failure --color=always --all-files
+
+  # Docs build is platform- and version-independent, so it runs once.
+  docs:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for hatch-vcs to get version from git tags
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up python
+        run: uv python install 3.12
+
+      - name: Install library
+        run: uv sync --all-extras
+
+      - name: Build HTML docs
+        run: uv run sphinx-build -b html -W docs/source/ docs/build/html
+
   test:
     timeout-minutes: 45
     defaults:
@@ -43,10 +129,22 @@ jobs:
 
       - name: Install zsh and fish (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y zsh fish
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: zsh fish
+          version: 1.0 # bump to invalidate the apt cache
+
+      - name: Cache Homebrew downloads (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-fish-${{ runner.os }}
 
       - name: Install fish (macOS)
         if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1" # skip the slow `brew update` self-refresh
         run: brew install fish
 
       - name: Check out repository
@@ -60,20 +158,10 @@ jobs:
           enable-cache: true
 
       - name: Set up python ${{ matrix.python-version }}
-        id: setup-python
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install library
         run: uv sync --all-extras
-
-      - name: Cache pre-commit
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit/
-          key: pre-commit-${{ runner.os }}-${{ env.pythonLocation }}-${{ hashFiles('.pre-commit-config.yaml') }}
-
-      - name: Pre-commit run
-        run: uv run pre-commit run --show-diff-on-failure --color=always --all-files
 
       - name: Check tests folder existence
         id: check_test_files
@@ -95,9 +183,3 @@ jobs:
           flags: unittests
           env_vars: OS,PYTHON
           name: Python ${{ matrix.python-version }} on ${{ runner.os }}
-
-      #----------------------------------------------
-      #            make sure docs build
-      #----------------------------------------------
-      - name: Build HTML docs
-        run: uv run sphinx-build -b html -W docs/source/ docs/build/html
